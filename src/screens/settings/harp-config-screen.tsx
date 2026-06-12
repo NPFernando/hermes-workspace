@@ -1,5 +1,5 @@
 import type * as React from 'react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowDown01Icon,
@@ -422,10 +422,92 @@ function BlocklistSection({
   )
 }
 
+// ── Cap widget ─────────────────────────────────────────────────────────────
+
+type CapPeriod = 'day' | 'week' | 'month'
+const CAP_MULTIPLIER: Record<CapPeriod, number> = { day: 1, week: 7, month: 30 }
+const CAP_LABELS: Record<CapPeriod, string> = { day: 'Day', week: 'Week', month: 'Month' }
+
+function CapWidget({
+  dailyValue,
+  period,
+  onPeriodChange,
+  onSave,
+}: {
+  dailyValue: number
+  period: CapPeriod
+  onPeriodChange: (p: CapPeriod) => void
+  onSave: (daily: number) => void
+}) {
+  const multiplier = CAP_MULTIPLIER[period]
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // When the period changes, update the displayed value without triggering a save.
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.value = (dailyValue * multiplier).toFixed(2)
+    }
+  }, [period, dailyValue, multiplier])
+
+  function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const v = parseFloat(e.target.value)
+    if (!isNaN(v) && v >= 0) {
+      onSave(v / multiplier)
+    }
+  }
+
+  const dailyHint = period !== 'day'
+    ? `= $${(dailyValue).toFixed(2)}/day`
+    : null
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-primary-600 dark:text-neutral-400">
+        Paid benchmark cap (USD)
+      </label>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-primary-400 dark:text-neutral-500">$</span>
+        <input
+          ref={inputRef}
+          type="number"
+          step={0.01}
+          min={0}
+          defaultValue={(dailyValue * multiplier).toFixed(2)}
+          onBlur={handleBlur}
+          className="h-8 w-20 rounded-lg border border-primary-200 bg-surface px-2 text-xs outline-none focus:border-accent-400 dark:border-neutral-700"
+        />
+        <span className="text-xs text-primary-400 dark:text-neutral-500">per</span>
+        <div className="flex overflow-hidden rounded-lg border border-primary-200 dark:border-neutral-700">
+          {(['day', 'week', 'month'] as CapPeriod[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onPeriodChange(p)}
+              className={cn(
+                'h-8 px-2.5 text-xs transition-colors',
+                p === period
+                  ? 'bg-accent-500 font-medium text-white'
+                  : 'bg-surface text-primary-500 hover:bg-primary-100 dark:text-neutral-400 dark:hover:bg-neutral-800',
+              )}
+            >
+              {CAP_LABELS[p]}
+            </button>
+          ))}
+        </div>
+      </div>
+      {dailyHint && (
+        <p className="text-[10px] text-primary-400 dark:text-neutral-500">{dailyHint}</p>
+      )}
+    </div>
+  )
+}
+
 // ── Main screen ────────────────────────────────────────────────────────────
 
 export function HarpConfigScreen() {
   const queryClient = useQueryClient()
+  const [capPeriod, setCapPeriod] = useState<'day' | 'week' | 'month'>('day')
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['harp-config'],
     queryFn: fetchHarpConfig,
@@ -567,22 +649,12 @@ export function HarpConfigScreen() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-primary-600 dark:text-neutral-400">
-              Paid daily cap (USD)
-            </label>
-            <input
-              type="number"
-              step={0.01}
-              min={0}
-              defaultValue={g.paid_benchmark_daily_cap_usd}
-              onBlur={(e) => {
-                const v = parseFloat(e.target.value)
-                if (!isNaN(v)) patch({ action: 'set-global', field: 'paid_benchmark_daily_cap_usd', value: v })
-              }}
-              className="h-8 w-20 rounded-lg border border-primary-200 bg-surface px-2 text-xs outline-none focus:border-accent-400 dark:border-neutral-700"
-            />
-          </div>
+          <CapWidget
+            dailyValue={g.paid_benchmark_daily_cap_usd}
+            period={capPeriod}
+            onPeriodChange={setCapPeriod}
+            onSave={(daily) => patch({ action: 'set-global', field: 'paid_benchmark_daily_cap_usd', value: daily })}
+          />
         </div>
       </SectionCard>
 
