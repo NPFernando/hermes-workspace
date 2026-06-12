@@ -203,10 +203,16 @@ async function requestHandler(req, res) {
   try {
     const response = await server.fetch(request)
 
-    res.writeHead(
-      response.status,
-      Object.fromEntries(response.headers.entries()),
-    )
+    const responseHeaders = Object.fromEntries(response.headers.entries())
+    // Prevent browsers from caching the HTML shell. The shell embeds hashed
+    // asset references that change on every build — a stale cached copy causes
+    // "Failed to fetch dynamically imported module" errors after a redeploy.
+    const ct = responseHeaders['content-type'] || ''
+    if (ct.startsWith('text/html')) {
+      responseHeaders['cache-control'] = 'no-store, no-cache, must-revalidate'
+    }
+
+    res.writeHead(response.status, responseHeaders)
 
     if (response.body) {
       const reader = response.body.getReader()
