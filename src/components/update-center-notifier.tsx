@@ -80,9 +80,9 @@ type NaveenUpdateStatus = {
   ourAhead: number
   upstreamBehind: number
   mergeBase: string | null
-  upstreamNewCommits: string[]
-  customFilesUpstreamTouched: string[]
-  potentialConflicts: ConflictFile[]
+  upstreamNewCommits: Array<string>
+  customFilesUpstreamTouched: Array<string>
+  potentialConflicts: Array<ConflictFile>
   canAutoRebase: boolean
   checkedAt: number
   error?: string
@@ -95,14 +95,14 @@ type AiFileRecommendation = {
   reason: string
 }
 type NaveenAiAnalysis = {
-  recommendations: AiFileRecommendation[]
+  recommendations: Array<AiFileRecommendation>
   summary: string
   checkedAt: number
 }
 type NaveenApplyResult = {
   ok: boolean
   output: string
-  conflictFiles: string[]
+  conflictFiles: Array<string>
   pushedToFork: boolean
   restartRequired: boolean
   error?: string
@@ -314,11 +314,11 @@ export function UpdateCenterNotifier() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
         })
-        const data = (await res.json()) as { ok: boolean; analysis?: NaveenAiAnalysis }
-        if (data.ok && data.analysis) {
-          setNaveenAiAnalysis(data.analysis)
+        const analysisData = (await res.json()) as { ok: boolean; analysis?: NaveenAiAnalysis }
+        if (analysisData.ok && analysisData.analysis) {
+          setNaveenAiAnalysis(analysisData.analysis)
           const aiDefaults: Record<string, ResolutionStrategy> = {}
-          for (const rec of data.analysis.recommendations) {
+          for (const rec of analysisData.analysis.recommendations) {
             if (rec.action !== 'needs_manual_merge') aiDefaults[rec.file] = rec.action
           }
           setPerFileStrategy((prev) => ({ ...aiDefaults, ...prev }))
@@ -406,7 +406,7 @@ export function UpdateCenterNotifier() {
           {showNaveenCard && (
             <NaveenUpdateCard
               key="naveen-update"
-              status={naveenStatus!}
+              status={naveenStatus}
               phase={naveenPhase}
               error={naveenError}
               onOpen={openNaveenModal}
