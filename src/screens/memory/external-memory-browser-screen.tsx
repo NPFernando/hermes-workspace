@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 type ExternalMemoryProvider = {
   id: string
   label: string
+  kind?: string
   capabilities: Array<string>
   dbPath: string
   configPath: string
@@ -65,7 +66,7 @@ async function mutateCandidate(options: {
   id: string
   text?: string
   reason?: string
-}): Promise<void> {
+}): Promise<{ hindsight_operation_id?: string }> {
   const response =
     options.action === 'delete'
       ? await fetch(
@@ -81,6 +82,7 @@ async function mutateCandidate(options: {
     const payload = await response.json().catch(() => null)
     throw new Error(payload?.error || `Action failed (${response.status})`)
   }
+  return response.json().catch(() => ({})) as Promise<{ hindsight_operation_id?: string }>
 }
 
 async function readJson<T>(url: string): Promise<T> {
@@ -128,9 +130,11 @@ export function formatStateFilterLabel(
 
 export function candidateActionLabels(
   candidate: Pick<ExternalMemoryCandidate, 'state'>,
+  providerKind?: string,
 ): Array<string> {
   const labels = ['Edit']
-  if (candidate.state !== 'approved') labels.push('Approve')
+  if (candidate.state !== 'approved')
+    labels.push(providerKind === 'hindsight' ? 'Approve & Retain' : 'Approve')
   if (candidate.state !== 'rejected') labels.push('Reject')
   labels.push('Delete')
   return labels
@@ -154,6 +158,7 @@ export function ExternalMemoryBrowserScreen() {
   const [state, setState] = useState<MemoryState>('candidate')
   const [searchInput, setSearchInput] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [lastRetainOpId, setLastRetainOpId] = useState<string | null>(null)
   const deferredSearch = useDeferredValue(searchInput)
   const searchTerm = deferredSearch.trim()
 
@@ -237,13 +242,17 @@ export function ExternalMemoryBrowserScreen() {
     ) {
       return
     }
-    await mutateCandidate({
+    setLastRetainOpId(null)
+    const result = await mutateCandidate({
       action,
       provider: selected.provider,
       id: selected.id,
       text,
       reason,
     })
+    if (action === 'approve' && result.hindsight_operation_id) {
+      setLastRetainOpId(result.hindsight_operation_id)
+    }
     if (action === 'delete') setSelectedId(null)
     await refreshCandidates()
   }
@@ -412,9 +421,16 @@ export function ExternalMemoryBrowserScreen() {
           <article className="mx-auto max-w-4xl space-y-4 rounded-2xl border border-primary-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-primary-100 pb-4 dark:border-neutral-800">
               <div>
-                <p className="font-mono text-xs text-primary-500 dark:text-neutral-400">
-                  {selected.id}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="font-mono text-xs text-primary-500 dark:text-neutral-400">
+                    {selected.id}
+                  </p>
+                  {activeProvider?.kind === 'hindsight' ? (
+                    <span className="rounded-full border border-violet-400/40 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:text-violet-300">
+                      Hindsight
+                    </span>
+                  ) : null}
+                </div>
                 <h1 className="mt-1 text-xl font-semibold text-primary-950 dark:text-neutral-50">
                   {activeProvider?.label || selected.provider}
                 </h1>
@@ -428,18 +444,22 @@ export function ExternalMemoryBrowserScreen() {
                 >
                   {selected.state}
                 </span>
-                {candidateActionLabels(selected).map((label) => (
+                {candidateActionLabels(selected, activeProvider?.kind).map((label) => (
                   <button
                     key={label}
                     type="button"
                     onClick={() =>
-                      runAction(label.toLowerCase() as CandidateAction)
+                      runAction(
+                        (label.startsWith('Approve') ? 'approve' : label.toLowerCase()) as CandidateAction,
+                      )
                     }
                     className={cn(
                       'rounded-lg border px-3 py-1 text-xs transition',
                       label === 'Delete'
                         ? 'border-rose-500/40 text-rose-600 hover:bg-rose-500/10 dark:text-rose-300'
-                        : 'border-primary-200 text-primary-700 hover:bg-primary-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-900',
+                        : label.startsWith('Approve')
+                          ? 'border-violet-400/40 text-violet-700 hover:bg-violet-500/10 dark:border-violet-700 dark:text-violet-300 dark:hover:bg-violet-500/10'
+                          : 'border-primary-200 text-primary-700 hover:bg-primary-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-900',
                     )}
                   >
                     {label}
@@ -447,6 +467,14 @@ export function ExternalMemoryBrowserScreen() {
                 ))}
               </div>
             </div>
+            {lastRetainOpId ? (
+              <div className="flex items-start gap-2 rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-xs text-violet-800 dark:text-violet-200">
+                <span className="font-medium">Committed to Hindsight.</span>
+                <span className="font-mono text-violet-600 dark:text-violet-400">
+                  op:{lastRetainOpId.slice(0, 16)}…
+                </span>
+              </div>
+            ) : null}
 
             <div className="rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm leading-7 whitespace-pre-wrap text-primary-950 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100">
               {selected.text}
@@ -477,6 +505,16 @@ export function ExternalMemoryBrowserScreen() {
                   {metadataPreview(selected.metadata)}
                 </dd>
               </div>
+              {selected.metadata.hindsight_operation_id ? (
+                <div className="md:col-span-2">
+                  <dt className="text-xs uppercase tracking-wide text-violet-500 dark:text-violet-400">
+                    Hindsight operation
+                  </dt>
+                  <dd className="mt-1 font-mono text-xs text-violet-700 dark:text-violet-300">
+                    {String(selected.metadata.hindsight_operation_id)}
+                  </dd>
+                </div>
+              ) : null}
               <div className="md:col-span-2">
                 <dt className="text-xs uppercase tracking-wide text-primary-400 dark:text-neutral-500">
                   SHA-256

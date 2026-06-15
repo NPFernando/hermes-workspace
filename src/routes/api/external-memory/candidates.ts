@@ -7,7 +7,10 @@ import {
   approveExternalMemoryCandidate,
   rejectExternalMemoryCandidate,
   deleteExternalMemoryCandidate,
+  getExternalMemoryProviderById,
+  updateExternalMemoryCandidateMeta,
 } from '../../../server/external-memory-browser'
+import { retainHindsight } from '../../../server/hindsight-client'
 
 export const Route = createFileRoute('/api/external-memory/candidates')({
   server: {
@@ -62,12 +65,29 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
             )
           }
           if (body.action === 'approve') {
-            return json(
-              approveExternalMemoryCandidate({
-                provider: body.provider,
-                id: body.id || '',
-              }),
-            )
+            const result = approveExternalMemoryCandidate({
+              provider: body.provider,
+              id: body.id || '',
+            })
+            // For Hindsight provider: commit to daemon as part of the approve flow
+            try {
+              const prov = getExternalMemoryProviderById(body.provider)
+              if (prov.kind === 'hindsight') {
+                const { operation_id } = await retainHindsight(result.candidate.text)
+                updateExternalMemoryCandidateMeta({
+                  provider: body.provider,
+                  id: body.id || '',
+                  meta: {
+                    hindsight_operation_id: operation_id,
+                    hindsight_committed_at: Date.now(),
+                  },
+                })
+                return json({ ...result, hindsight_operation_id: operation_id })
+              }
+            } catch {
+              // non-Hindsight provider or daemon unavailable — return standard result
+            }
+            return json(result)
           }
           if (body.action === 'reject') {
             return json(

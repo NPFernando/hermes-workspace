@@ -2,10 +2,26 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const HINDSIGHT_BASE = 'http://localhost:8888'
+const METADATA_PATH = path.join(os.homedir(), '.hindsight', 'profiles', 'metadata.json')
+const HERMES_PROFILE = 'hermes'
 const BANK = 'hermes'
 const CONFIG_PATH = path.join(os.homedir(), '.hermes', 'hindsight', 'config.json')
 const DLQ_PATH = path.join(os.homedir(), '.hindsight', 'retain_dlq.jsonl')
+
+function getHindsightPort(): number {
+  try {
+    const metadata = JSON.parse(fs.readFileSync(METADATA_PATH, 'utf-8')) as {
+      profiles?: Record<string, { port?: number }>
+    }
+    return metadata?.profiles?.[HERMES_PROFILE]?.port ?? 9177
+  } catch {
+    return 9177
+  }
+}
+
+export function getHindsightBaseUrl(): string {
+  return `http://localhost:${getHindsightPort()}`
+}
 
 export type HindsightMemory = {
   id: string
@@ -52,7 +68,7 @@ export type HindsightOperation = {
 }
 
 async function hFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${HINDSIGHT_BASE}${endpoint}`, {
+  const res = await fetch(`${getHindsightBaseUrl()}${endpoint}`, {
     ...options,
     signal: AbortSignal.timeout(8000),
   })
