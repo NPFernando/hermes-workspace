@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { CHAT_OPEN_MESSAGE_SEARCH_EVENT } from '@/screens/chat/chat-events'
 import { useChatStore } from '@/stores/chat-store'
+import { useChatActivityStore } from '@/stores/chat-activity-store'
 
 /** Duration (ms) the thinking indicator stays visible after waitingForResponse
  *  clears, giving the first response message time to render before the
@@ -112,6 +113,26 @@ function getToolVerb(name: string): string {
   return 'Working'
 }
 
+type LiveEvent = { text: string; emoji: string; timestamp: number; isError: boolean }
+
+function LiveEventLog({ events }: { events: Array<LiveEvent> }) {
+  const visible = events.filter((e) => !e.isError).slice(-3)
+  if (visible.length === 0) return null
+  return (
+    <ul className="mt-2 flex flex-col gap-1" aria-label="Live activity">
+      {visible.map((event, i) => (
+        <li
+          key={`${event.timestamp}-${i}`}
+          className="lifecycle-entry flex items-center gap-1.5 text-[10px] text-primary-500 dark:text-primary-400"
+        >
+          <span className="text-[11px] leading-none shrink-0">{event.emoji}</span>
+          <span className="truncate">{event.text}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function ToolCallCard({ name, phase }: { name: string; phase: string }) {
   const isDone =
     phase === 'done' || phase === 'complete' || phase === 'completed'
@@ -178,10 +199,11 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
 type ThinkingBubbleProps = {
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
   liveToolActivity?: Array<{ name: string; timestamp: number }>
+  lifecycleEvents?: Array<LiveEvent>
   researchCard?: UseResearchCardResult
   isCompacting?: boolean
   /** When true, always show "Thinking…" regardless of activity. Used for the
-   * first 10s before the delayed activity feed appears. */
+   * first few seconds before the delayed activity feed appears. */
   forceSimple?: boolean
 }
 
@@ -193,6 +215,7 @@ type ThinkingBubbleProps = {
 function ThinkingBubble({
   activeToolCalls = [],
   liveToolActivity = [],
+  lifecycleEvents = [],
   researchCard,
   isCompacting = false,
   forceSimple = false,
@@ -200,6 +223,7 @@ function ThinkingBubble({
   // Fallback activity from heartbeat — shows last known agent activity
   // when no tool calls are in flight (e.g. during pure reasoning)
   const heartbeatActivity = useChatStore((s) => s.heartbeatActivity)
+  const agentActivity = useChatActivityStore((s) => s.activity)
 
   // Build a meaningful status label from live activity
   const activeToolNames = activeToolCalls
@@ -211,11 +235,26 @@ function ThinkingBubble({
     uniqueNames.length > 0
       ? `Using: ${uniqueNames.slice(0, 3).join(', ')}${uniqueNames.length > 3 ? ` +${uniqueNames.length - 3} more` : ''}`
       : null
+
+  // Last lifecycle event as an informative fallback (e.g. "Delegating to agent…")
+  const lastLifecycleText =
+    lifecycleEvents.length > 0
+      ? lifecycleEvents.filter((e) => !e.isError).at(-1)?.text ?? null
+      : null
+
+  // Activity-store label for states not covered by tool calls or events
+  const activityStoreLabel =
+    agentActivity === 'orchestrating'
+      ? 'Orchestrating agents…'
+      : agentActivity === 'reading'
+        ? 'Reading…'
+        : null
+
   const statusLabel = isCompacting
     ? 'Compacting context...'
     : forceSimple
       ? 'Thinking…'
-      : activityLabel || heartbeatActivity || 'Thinking…'
+      : activityLabel || lastLifecycleText || heartbeatActivity || activityStoreLabel || 'Thinking…'
 
   // Elapsed time counter — counts from bubble mount, not from last label change
   const [elapsed, setElapsed] = useState(0)
@@ -356,6 +395,9 @@ function ThinkingBubble({
             ) : null}
           </div>
 
+          {!forceSimple && lifecycleEvents.length > 0 ? (
+            <LiveEventLog events={lifecycleEvents} />
+          ) : null}
           {isStale ? (
             <span className="text-[11px] text-amber-500 dark:text-amber-400 animate-pulse">
               {isVeryStale
@@ -609,6 +651,7 @@ type ChatMessageListProps = {
    *  can confirm the server received it). Keeps the thinking indicator visible
    *  during the very first render after the user submits. */
   sending?: boolean
+  onRegenerate?: () => void
 }
 
 function ChatMessageListComponent({
@@ -638,6 +681,7 @@ function ChatMessageListComponent({
   hideSystemMessages = false,
   isCompacting = false,
   sending = false,
+  onRegenerate,
 }: ChatMessageListProps) {
   const anchorRef = useRef<HTMLDivElement | null>(null)
   const lastUserRef = useRef<HTMLDivElement | null>(null)
@@ -1209,9 +1253,10 @@ function ChatMessageListComponent({
   }, [thinkingAreaVisible])
 
   const showActivityFeed =
-    thinkingElapsed >= THINKING_ACTIVITY_DELAY_S ||
+    thinkingElapsed >= 3 ||
     activeToolCalls.length > 0 ||
-    liveToolActivity.length > 0
+    liveToolActivity.length > 0 ||
+    lifecycleEvents.length > 0
 
   const shouldBottomPin =
     visibleEntries.length > 0 ||
@@ -1400,6 +1445,7 @@ function ChatMessageListComponent({
             simulateStreaming={simulateStreaming}
             streamingKey={signature}
             expandAllToolSections={expandAllToolSections}
+            onRegenerate={forceActionsVisible ? onRegenerate : undefined}
           />
         </div>
       )
@@ -1432,6 +1478,7 @@ function ChatMessageListComponent({
         simulateStreaming={simulateStreaming}
         streamingKey={signature}
         expandAllToolSections={expandAllToolSections}
+        onRegenerate={forceActionsVisible ? onRegenerate : undefined}
       />
     )
   }
@@ -1878,6 +1925,7 @@ function ChatMessageListComponent({
                         streamingKey={signature}
                         expandAllToolSections={expandAllToolSections}
                         isLastAssistant={forceActionsVisible}
+                        onRegenerate={forceActionsVisible ? onRegenerate : undefined}
                       />
                     )
                   })}
@@ -1927,6 +1975,7 @@ function ChatMessageListComponent({
                 <ThinkingBubble
                   activeToolCalls={activeToolCalls}
                   liveToolActivity={liveToolActivity}
+                  lifecycleEvents={lifecycleEvents}
                   researchCard={researchCard}
                   isCompacting={isCompacting}
                   forceSimple={!showActivityFeed}
@@ -2135,7 +2184,8 @@ function areChatMessageListEqual(
     prev.liveToolActivity === next.liveToolActivity &&
     prev.researchCard === next.researchCard &&
     prev.hideSystemMessages === next.hideSystemMessages &&
-    prev.sending === next.sending
+    prev.sending === next.sending &&
+    prev.onRegenerate === next.onRegenerate
   )
 }
 

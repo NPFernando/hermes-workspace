@@ -201,6 +201,26 @@ export const Route = createFileRoute('/api/sessions')({
             )
           }
 
+          // Try to update via gateway/dashboard first so the title persists
+          // in the backend. Only fall back to local if the session is not
+          // known to the gateway (i.e. a portable-mode-only session).
+          let gatewaySession: Awaited<ReturnType<typeof updateSession>> | undefined
+          try {
+            gatewaySession = await updateSession(sessionKey, { title: label })
+          } catch {
+            // Session not found in gateway — will fall back to local-only update
+          }
+          if (gatewaySession) {
+            // Keep local store in sync if a mirror exists there
+            const localSession = getLocalSession(sessionKey)
+            if (localSession && label) updateLocalSessionTitle(sessionKey, label)
+            return json({
+              ok: true,
+              sessionKey,
+              entry: toSessionSummary(gatewaySession),
+            })
+          }
+
           const localSession = getLocalSession(sessionKey)
           if (localSession) {
             if (label) updateLocalSessionTitle(sessionKey, label)
@@ -225,31 +245,7 @@ export const Route = createFileRoute('/api/sessions')({
             })
           }
 
-          if (capabilities.dashboard.available && !capabilities.enhancedChat) {
-            return json({
-              ok: true,
-              sessionKey,
-              entry: {
-                key: sessionKey,
-                id: sessionKey,
-                title: label || sessionKey,
-                label: label || sessionKey,
-                derivedTitle: label || sessionKey,
-                updatedAt: Date.now(),
-              },
-              updated: false,
-            })
-          }
-
-          const session = await updateSession(sessionKey, {
-            title: label,
-          })
-
-          return json({
-            ok: true,
-            sessionKey,
-            entry: toSessionSummary(session),
-          })
+          return json({ ok: false, error: 'Session not found' }, { status: 404 })
         } catch (err) {
           return json(
             {

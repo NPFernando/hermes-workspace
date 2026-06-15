@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Copy01Icon, RefreshIcon, Tick02Icon } from '@hugeicons/core-free-icons'
+import {
+  Copy01Icon,
+  RefreshIcon,
+  Tick02Icon,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
+} from '@hugeicons/core-free-icons'
 import { MessageTimestamp } from './message-timestamp'
 import {
   TooltipContent,
@@ -18,7 +24,9 @@ type MessageActionsBarProps = {
   forceVisible?: boolean
   isQueued?: boolean
   isFailed?: boolean
+  isAssistant?: boolean
   onRetry?: () => void
+  onRegenerate?: () => void
 }
 
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -53,9 +61,12 @@ export function MessageActionsBar({
   forceVisible = false,
   isQueued = false,
   isFailed = false,
+  isAssistant = false,
   onRetry,
+  onRegenerate,
 }: MessageActionsBarProps) {
   const [copied, setCopied] = useState(false)
+  const [thumbs, setThumbs] = useState<'up' | 'down' | null>(null)
 
   const handleCopy = async () => {
     try {
@@ -72,7 +83,7 @@ export function MessageActionsBar({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 text-xs text-primary-600 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 duration-100 ease-out',
+        'flex items-center gap-1.5 text-xs text-primary-600 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 duration-100 ease-out',
         forceVisible || isQueued || isFailed ? 'opacity-100' : 'opacity-0',
         positionClass,
       )}
@@ -92,6 +103,61 @@ export function MessageActionsBar({
           </TooltipRoot>
         </TooltipProvider>
       )}
+
+      {isAssistant && onRegenerate && (
+        <TooltipProvider>
+          <TooltipRoot>
+            <TooltipTrigger
+              type="button"
+              onClick={onRegenerate}
+              className="inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 text-primary-500 hover:text-primary-900 hover:bg-primary-100 dark:hover:bg-primary-800 transition-colors"
+            >
+              <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.6} />
+            </TooltipTrigger>
+            <TooltipContent side="top">Regenerate response</TooltipContent>
+          </TooltipRoot>
+        </TooltipProvider>
+      )}
+
+      {isAssistant && (
+        <>
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                type="button"
+                onClick={() => setThumbs(thumbs === 'up' ? null : 'up')}
+                className={cn(
+                  'inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 transition-colors',
+                  thumbs === 'up'
+                    ? 'text-green-600 bg-green-50 dark:bg-green-900/30'
+                    : 'text-primary-500 hover:text-primary-900 hover:bg-primary-100 dark:hover:bg-primary-800',
+                )}
+              >
+                <HugeiconsIcon icon={ThumbsUpIcon} size={14} strokeWidth={1.6} />
+              </TooltipTrigger>
+              <TooltipContent side="top">Good response</TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                type="button"
+                onClick={() => setThumbs(thumbs === 'down' ? null : 'down')}
+                className={cn(
+                  'inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 transition-colors',
+                  thumbs === 'down'
+                    ? 'text-red-600 bg-red-50 dark:bg-red-900/30'
+                    : 'text-primary-500 hover:text-primary-900 hover:bg-primary-100 dark:hover:bg-primary-800',
+                )}
+              >
+                <HugeiconsIcon icon={ThumbsDownIcon} size={14} strokeWidth={1.6} />
+              </TooltipTrigger>
+              <TooltipContent side="top">Poor response</TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+        </>
+      )}
+
       <TooltipProvider>
         <TooltipRoot>
           <TooltipTrigger

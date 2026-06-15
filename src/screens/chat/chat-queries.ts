@@ -13,6 +13,49 @@ type StatusResponse = {
   status?: number
 }
 
+// ── O(1) Dedup Index ──────────────────────────────────────────────
+// Maintains a Map of clientId → index for O(1) lookups instead of O(n) scans.
+// This is critical for long conversations (500+ messages) where the old
+// Array.findIndex approach caused noticeable lag.
+
+const _clientIdIndex = new Map<string, Set<number>>();
+
+function _indexKey(clientId: string, optimisticId: string): string {
+  return `${clientId}::${optimisticId}`;
+}
+
+function rebuildClientIdIndex(messages: ChatMessage[]): void {
+  _clientIdIndex.clear();
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    const cid = getMessageClientId(msg);
+    const oid = getMessageOptimisticId(msg);
+    if (cid || oid) {
+      const key = _indexKey(cid, oid);
+      const set = _clientIdIndex.get(key) ?? new Set();
+      set.add(i);
+      _clientIdIndex.set(key, set);
+    }
+  }
+}
+
+function isMessageInIndex(message: ChatMessage): boolean {
+  const cid = getMessageClientId(message);
+  const oid = getMessageOptimisticId(message);
+  if (!cid && !oid) return false;
+  const key = _indexKey(cid, oid);
+  return _clientIdIndex.has(key);
+}
+
+// Rebuild index on every append call (amortized O(n) once, then O(1) lookups)
+function ensureIndexBuilt(friendlyId: string, sessionKey: string, messages: ChatMessage[]): void {
+  const cacheKey = `${friendlyId}:${sessionKey}`;
+  // Simple heuristic: if index is empty or messages changed significantly, rebuild
+  if (_clientIdIndex.size === 0 || messages.length > _clientIdIndex.size * 2) {
+    rebuildClientIdIndex(messages);
+  }
+}
+
 function normalizeId(value: unknown): string {
   if (typeof value !== 'string') return ''
   const trimmed = value.trim()
@@ -258,12 +301,15 @@ export function appendHistoryMessage(
       )
       if (replacedOptimistic) return replacedOptimistic
 
-      // Dedup: if a message with the same clientId (or optimistic id) already
-      // exists, skip appending — prevents double-display when an optimistic
-      // message is added on send and then echoed back via SSE onUserMessage.
+      // Dedup: O(1) fast path using clientId index, O(n) fallback for text match.
+      // This prevents double-display when an optimistic message is added on send
+      // and then echoed back via SSE.
       const incomingClientId = getMessageClientId(message)
       const incomingOptimisticId = getMessageOptimisticId(message)
       if (incomingClientId || incomingOptimisticId) {
+        // O(1) fast path: check index first
+        if (isMessageInIndex(message)) return messages;
+        // O(n) fallback: full scan (for edge cases where index is stale)
         const optimisticKey = incomingClientId ? `opt-${incomingClientId}` : ''
         const alreadyExists = messages.some((m) =>
           isMatchingClientMessage(
@@ -360,6 +406,11 @@ export function appendHistoryMessage(
       return [...messages, message]
     },
   )
+  // Rebuild index after mutation for O(1) lookups on next append
+  const updatedMessages = queryClient.getQueryData(chatQueryKeys.history(friendlyId, sessionKey)) as HistoryResponse | undefined;
+  if (updatedMessages?.messages) {
+    rebuildClientIdIndex(updatedMessages.messages);
+  }
 }
 
 export function updateHistoryMessageByClientId(

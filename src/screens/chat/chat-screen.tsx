@@ -98,6 +98,12 @@ import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
+import { ArtifactPanel } from './components/artifact-panel'
+import {
+  ArtifactPanelContext,
+  type ArtifactPanelState,
+} from './contexts/artifact-panel-context'
+import type { InlineArtifact } from './components/message-item'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
@@ -503,6 +509,7 @@ export function ChatScreen({
     Array<ApprovalRequest>
   >([])
   const [isCompacting, setIsCompacting] = useState(false)
+  const [artifactPanelState, setArtifactPanelState] = useState<ArtifactPanelState | null>(null)
   const [researchResetKey, setResearchResetKey] = useState(0)
   // Per-session thinking level — stored in sessionStorage keyed by session
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(() => {
@@ -2548,6 +2555,20 @@ export function ChatScreen({
     setWaitingForResponse(false)
   }, [cancelStreaming, queryClient])
 
+  const handleRegenerate = useCallback(() => {
+    send('/retry', [], false, commandHelpers)
+  }, [commandHelpers, send])
+
+  const handleExport = useCallback(() => {
+    const exported = exportConversationTranscript({
+      sessionLabel: activeFriendlyId || 'conversation',
+      messages: finalDisplayMessages,
+    })
+    if (exported) {
+      toast('Conversation exported', { type: 'success' })
+    }
+  }, [activeFriendlyId, finalDisplayMessages])
+
   const runPaletteSlashCommand = useCallback(
     (command: string) => {
       const trimmedCommand = command.trim()
@@ -2716,7 +2737,13 @@ export function ChatScreen({
       window.removeEventListener('claude:chat-agent-details', handler)
   }, [])
 
+  const artifactPanelContextValue = {
+    open: (artifacts: Array<InlineArtifact>, index: number) =>
+      setArtifactPanelState({ artifacts, activeIndex: index }),
+  }
+
   return (
+    <ArtifactPanelContext.Provider value={artifactPanelContextValue}>
     <div
       className={cn(
         'relative min-w-0 flex flex-col overflow-hidden',
@@ -2785,6 +2812,7 @@ export function ChatScreen({
               onToggleFocusMode={handleToggleFocusMode}
               onUndo={undefined}
               onClear={undefined}
+              onExport={handleExport}
             />
           )}
 
@@ -2895,6 +2923,7 @@ export function ChatScreen({
               researchCard={researchCard}
               isCompacting={isCompacting}
               sending={sending}
+              onRegenerate={handleRegenerate}
             />
           )}
           {showComposer ? (
@@ -2921,7 +2950,22 @@ export function ChatScreen({
             />
           ) : null}
         </main>
-        {!compact && !isFocusMode && <AgentViewPanel />}
+        {!compact && !isFocusMode && (
+          artifactPanelState ? (
+            <div className="h-full w-[480px] shrink-0">
+              <ArtifactPanel
+                artifacts={artifactPanelState.artifacts}
+                activeIndex={artifactPanelState.activeIndex}
+                onTabChange={(index) =>
+                  setArtifactPanelState((s) => s ? { ...s, activeIndex: index } : null)
+                }
+                onClose={() => setArtifactPanelState(null)}
+              />
+            </div>
+          ) : (
+            <AgentViewPanel />
+          )
+        )}
       </div>
       {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
 
@@ -2968,5 +3012,6 @@ export function ChatScreen({
 
       <ErrorToastContainer />
     </div>
+    </ArtifactPanelContext.Provider>
   )
 }

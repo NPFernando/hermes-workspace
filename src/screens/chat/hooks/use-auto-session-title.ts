@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { chatQueryKeys } from '../chat-queries'
@@ -46,6 +46,22 @@ function hasAssistantResponse(messages: Array<ChatMessage>): boolean {
   })
 }
 
+async function generateAiTitle(messages: Array<ChatMessage>): Promise<string> {
+  const context = messages.slice(0, 2).map((m) => ({
+    role: m.role,
+    content: textFromMessage(m).trim(),
+  }))
+  const res = await fetch('/api/sessions/generate-title', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ messages: context }),
+  })
+  if (!res.ok) throw new Error(`generate-title: ${res.status}`)
+  const data = (await res.json()) as { ok: boolean; title?: string; error?: string }
+  if (!data.ok || !data.title) throw new Error(data.error ?? 'empty title')
+  return data.title
+}
+
 type UseAutoSessionTitleInput = {
   friendlyId: string
   sessionKey: string | undefined
@@ -70,52 +86,22 @@ export function useAutoSessionTitle({
 }: UseAutoSessionTitleInput) {
   const queryClient = useQueryClient()
   const titleInfo = useSessionTitleInfo(friendlyId)
-  const lastAttemptRef = useRef<Record<string, string>>({})
+  const lastAttemptRef = useRef<Record<string, boolean>>({})
 
-  const proposedTitle = useMemo(() => {
-    const firstUserText = getFirstUserMessage(messages)
-    if (!firstUserText) return ''
-    return truncateTitle(firstUserText)
-  }, [messages])
-
-  const shouldGenerate = useMemo(() => {
-    if (!enabled) return false
-    if (!friendlyId || friendlyId === 'new') return false
-    if (!sessionKey || sessionKey === 'new') return false
-    if (!proposedTitle) return false
-    if (!hasAssistantResponse(messages)) return false
-    if (activeSession?.label && !isGenericTitle(activeSession.label))
-      return false
-    if (activeSession?.title && !isGenericTitle(activeSession.title))
-      return false
-    if (
-      activeSession?.derivedTitle &&
-      !isGenericTitle(activeSession.derivedTitle)
-    ) {
-      return false
-    }
-    if (titleInfo.source === 'manual' && titleInfo.title) return false
-    if (
-      titleInfo.status === 'ready' &&
-      titleInfo.title &&
-      !isGenericTitle(titleInfo.title)
-    ) {
-      return false
-    }
-    return titleInfo.status !== 'generating'
-  }, [
-    activeSession?.derivedTitle,
-    activeSession?.label,
-    activeSession?.title,
-    enabled,
-    friendlyId,
-    messages,
-    proposedTitle,
-    sessionKey,
-    titleInfo.source,
-    titleInfo.status,
-    titleInfo.title,
-  ])
+  const shouldGenerate =
+    enabled &&
+    !!friendlyId &&
+    friendlyId !== 'new' &&
+    !!sessionKey &&
+    sessionKey !== 'new' &&
+    !!getFirstUserMessage(messages) &&
+    hasAssistantResponse(messages) &&
+    (!activeSession?.label || isGenericTitle(activeSession.label)) &&
+    (!activeSession?.title || isGenericTitle(activeSession.title)) &&
+    (!activeSession?.derivedTitle || isGenericTitle(activeSession.derivedTitle)) &&
+    !(titleInfo.source === 'manual' && titleInfo.title) &&
+    !(titleInfo.status === 'ready' && titleInfo.title && !isGenericTitle(titleInfo.title)) &&
+    titleInfo.status !== 'generating'
 
   const applyTitle = (
     friendlyIdToUpdate: string,
@@ -188,14 +174,25 @@ export function useAutoSessionTitle({
   useEffect(() => {
     if (!shouldGenerate) return
     if (isPending) return
-    const signature = `${sessionKey}:${proposedTitle}`
-    if (lastAttemptRef.current[friendlyId] === signature) return
-    lastAttemptRef.current[friendlyId] = signature
+    const key = `${sessionKey}:${friendlyId}`
+    if (lastAttemptRef.current[key]) return
+    lastAttemptRef.current[key] = true
+
     updateSessionTitleState(friendlyId, { status: 'generating', error: null })
-    mutate({
-      friendlyId,
-      sessionKey: sessionKey ?? friendlyId,
-      title: proposedTitle,
-    })
-  }, [friendlyId, isPending, mutate, proposedTitle, sessionKey, shouldGenerate])
+
+    generateAiTitle(messages)
+      .then((aiTitle) => {
+        mutate({ friendlyId, sessionKey: sessionKey ?? friendlyId, title: aiTitle })
+      })
+      .catch(() => {
+        // Fallback: use truncated first user message
+        const fallback = truncateTitle(getFirstUserMessage(messages))
+        if (fallback) {
+          mutate({ friendlyId, sessionKey: sessionKey ?? friendlyId, title: fallback })
+        } else {
+          updateSessionTitleState(friendlyId, { status: 'idle', error: null })
+          lastAttemptRef.current[key] = false
+        }
+      })
+  }, [friendlyId, isPending, messages, mutate, sessionKey, shouldGenerate])
 }

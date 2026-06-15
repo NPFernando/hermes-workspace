@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown01Icon, Idea01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -37,6 +37,7 @@ import {
 } from '@/hooks/use-chat-settings'
 import { cn } from '@/lib/utils'
 import { CHAT_SUBMIT_SELECTION_EVENT } from '@/screens/chat/chat-events'
+import { useArtifactPanel } from '@/screens/chat/contexts/artifact-panel-context'
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
@@ -150,6 +151,7 @@ type MessageItemProps = {
   streamingKey?: string | null
   expandAllToolSections?: boolean
   isLastAssistant?: boolean
+  onRegenerate?: () => void
 }
 
 function dispatchSelectionCardReply(text: string) {
@@ -1236,6 +1238,41 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
   )
 }
 
+function AgentWorkSummary({ toolSections }: { toolSections: Array<InlineToolSection> }) {
+  if (toolSections.length === 0) return null
+  const toolNames = [...new Set(toolSections.map((s) => s.type.replace(/_/g, ' ')))]
+  const errorCount = toolSections.filter((s) => s.state === 'output-error').length
+
+  return (
+    <details className="group/agentwork w-full max-w-[var(--chat-content-max-width)]">
+      <summary className="flex cursor-pointer select-none list-none items-center gap-2 rounded-lg border border-primary-200/60 bg-primary-50/50 px-3 py-1.5 text-[11px] text-primary-500 transition-colors hover:bg-primary-100/60 dark:border-primary-800/60 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-800/30 [&::-webkit-details-marker]:hidden">
+        <span className="shrink-0 opacity-70">⚙</span>
+        <span className="flex-1 font-medium">
+          Agent Work
+          <span className="ml-1.5 font-normal opacity-60">
+            · {toolSections.length} tool{toolSections.length !== 1 ? 's' : ''}
+            {errorCount > 0 ? ` · ${errorCount} error${errorCount !== 1 ? 's' : ''}` : ''}
+          </span>
+        </span>
+        <span className="shrink-0 text-[10px] opacity-50 transition-transform group-open/agentwork:rotate-180">▾</span>
+      </summary>
+      <div className="mt-1 rounded-lg border border-primary-200/40 bg-primary-50/30 px-3 py-2 dark:border-primary-800/40 dark:bg-primary-900/10">
+        <div className="text-[10px] font-medium uppercase tracking-wide text-primary-400 mb-1">Tools used</div>
+        <div className="flex flex-wrap gap-1">
+          {toolNames.map((name) => (
+            <span
+              key={name}
+              className="rounded-full border border-primary-200 bg-primary-100/80 px-2 py-0.5 text-[10px] text-primary-600 dark:border-primary-800 dark:bg-primary-900/50 dark:text-primary-400"
+            >
+              {name}
+            </span>
+          ))}
+        </div>
+      </div>
+    </details>
+  )
+}
+
 function LifecycleEventCard({
   text,
   emoji,
@@ -1463,7 +1500,7 @@ function MarkdownMessageCard({ content }: { content: string }) {
   )
 }
 
-type InlineArtifact = {
+export type InlineArtifact = {
   type: string
   title: string
   content: string
@@ -1526,7 +1563,7 @@ function artifactLanguage(type: string): string {
   return type
 }
 
-function ArtifactPreviewBody({ artifact }: { artifact: InlineArtifact }) {
+function ArtifactPreviewBody({ artifact, onExpand }: { artifact: InlineArtifact; onExpand?: () => void }) {
   if (artifact.type === 'html' || artifact.type === 'svg') {
     return (
       <iframe
@@ -1558,13 +1595,31 @@ function ArtifactPreviewBody({ artifact }: { artifact: InlineArtifact }) {
       content={artifact.content}
       language={artifactLanguage(artifact.type)}
       className="my-0 max-h-[60vh] overflow-auto"
+      onExpand={onExpand}
     />
   )
 }
 
-function InlineArtifactCard({ artifact }: { artifact: InlineArtifact }) {
+function InlineArtifactCard({
+  artifact,
+  allArtifacts,
+  artifactIndex,
+}: {
+  artifact: InlineArtifact
+  allArtifacts: Array<InlineArtifact>
+  artifactIndex: number
+}) {
   const [open, setOpen] = useState(false)
   const summary = summarizeArtifactContent(artifact)
+  const artifactPanel = useArtifactPanel()
+
+  function handleOpen() {
+    if (artifactPanel) {
+      artifactPanel.open(allArtifacts, artifactIndex)
+    } else {
+      setOpen(true)
+    }
+  }
 
   return (
     <>
@@ -1594,7 +1649,7 @@ function InlineArtifactCard({ artifact }: { artifact: InlineArtifact }) {
               <p className="mt-2 text-xs opacity-80">{summary}</p>
             ) : null}
           </div>
-          <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+          <Button type="button" variant="outline" onClick={handleOpen}>
             Open
           </Button>
         </div>
@@ -2082,6 +2137,7 @@ function MessageItemComponent({
   streamingKey: _streamingKey,
   expandAllToolSections = false,
   isLastAssistant = false,
+  onRegenerate,
 }: MessageItemProps) {
   const role = message.role || 'assistant'
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
@@ -2166,6 +2222,18 @@ function MessageItemComponent({
   const effectiveIsStreaming =
     remoteStreamingActive || (_simulateStreaming && !revealComplete)
   const assistantDisplayText = effectiveIsStreaming ? revealedText : displayText
+  const artifactPanelForExpand = useArtifactPanel()
+  const handleCodeExpand = useCallback(
+    (code: string, language: string) => {
+      if (!artifactPanelForExpand) return
+      artifactPanelForExpand.open(
+        [{ type: language || 'text', title: language ? `${language} snippet` : 'Code', content: code }],
+        0,
+      )
+    },
+    [artifactPanelForExpand],
+  )
+
   const assistantCorruptionWarning = useMemo(
     () => detectAssistantCorruptionWarning(role, assistantDisplayText),
     [role, assistantDisplayText],
@@ -2626,9 +2694,7 @@ function MessageItemComponent({
                 formatArg={keyArgLabel}
               />
             ) : (
-              <span className="inline-block text-[11px] text-primary-400 dark:text-primary-500 py-0.5 opacity-60">
-                {finalToolSections.length} tool{finalToolSections.length !== 1 ? 's' : ''} used
-              </span>
+              <AgentWorkSummary toolSections={finalToolSections} />
             )}
           </div>
         </div>
@@ -2834,6 +2900,7 @@ function MessageItemComponent({
                         'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
                         effectiveIsStreaming && 'chat-streaming-content',
                       )}
+                      onCodeExpand={artifactPanelForExpand ? handleCodeExpand : undefined}
                     >
                       {parsedInlineArtifacts.cleanedText}
                     </MessageContent>
@@ -2844,6 +2911,8 @@ function MessageItemComponent({
                         <InlineArtifactCard
                           key={`${artifact.title}-${artifact.type}-${index}`}
                           artifact={artifact}
+                          allArtifacts={parsedInlineArtifacts.artifacts}
+                          artifactIndex={index}
                         />
                       ))}
                     </div>
@@ -2897,12 +2966,14 @@ function MessageItemComponent({
           forceVisible={forceActionsVisible}
           isQueued={isUser && isQueued && !isFailed}
           isFailed={isUser && (isFailed || isStuckSending)}
+          isAssistant={!isUser}
           onRetry={
             // Only show Retry for actual failures — never for queued (delivered, just waiting)
             canRetryMessage && (isFailed || isStuckSending) && onRetryMessage
               ? () => onRetryMessage(message)
               : undefined
           }
+          onRegenerate={!isUser ? onRegenerate : undefined}
         />
       )}
     </div>

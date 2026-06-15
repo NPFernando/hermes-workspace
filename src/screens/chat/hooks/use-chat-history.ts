@@ -398,12 +398,19 @@ export function useChatHistory({
       return queryClient.getQueryData(historyKey)
     },
     refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false, // Redundant with SSE; reduces unnecessary network calls
     refetchInterval: historyRefetchInterval,
-    staleTime: 0, // Always refetch on mount — prevents stale data after tab navigation
+    staleTime: 10_000, // 10s stale time reduces unnecessary refetches during rapid navigation
     gcTime: 1000 * 60 * 10,
     structuralSharing: true,
     notifyOnChangeProps: ['data', 'error', 'isError'],
+    retry: (failureCount: number, error: unknown) => {
+      // Don't retry auth errors or 404s
+      if (error instanceof Error && error.message.includes('401')) return false;
+      if (error instanceof Error && error.message.includes('404')) return false;
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30_000),
   })
 
   const [persistedPending, setPersistedPending] =
