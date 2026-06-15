@@ -251,18 +251,38 @@ export function ExternalMemoryBrowserScreen() {
   if (!providersQuery.isLoading && providers.length === 0) {
     return (
       <div className="flex h-full items-center justify-center px-4">
-        <div className="max-w-xl rounded-2xl border border-primary-200 bg-primary-50 p-6 text-center dark:border-neutral-800 dark:bg-neutral-950">
+        <div className="max-w-xl rounded-2xl border border-primary-200 bg-primary-50 p-6 dark:border-neutral-800 dark:bg-neutral-950">
           <HugeiconsIcon
             icon={BrainIcon}
-            className="mx-auto mb-3 size-8 text-primary-500"
+            className="mx-auto mb-4 size-8 text-primary-400 dark:text-neutral-500"
           />
-          <h2 className="text-lg font-semibold text-primary-900 dark:text-neutral-100">
+          <h2 className="text-center text-lg font-semibold text-primary-900 dark:text-neutral-100">
             No external memory providers
           </h2>
-          <p className="mt-2 text-sm text-primary-600 dark:text-neutral-400">
-            Register providers in $HERMES_HOME/external_memory_providers.json to
-            inspect external memory review queues here.
+          <p className="mt-2 text-center text-sm text-primary-600 dark:text-neutral-400">
+            This tab shows a human review queue for memories the agent has flagged
+            before committing them to long-term storage.
           </p>
+          <div className="mt-4 space-y-2 rounded-xl border border-primary-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+            <p className="text-xs font-medium text-primary-700 dark:text-neutral-300">
+              To enable: create{' '}
+              <code className="rounded bg-primary-100 px-1 font-mono dark:bg-neutral-800">
+                ~/.hermes/external_memory_providers.json
+              </code>
+            </p>
+            <pre className="overflow-x-auto rounded-lg bg-primary-50 p-3 text-xs text-primary-800 dark:bg-neutral-950 dark:text-neutral-300">{`{
+  "providers": [{
+    "id": "hindsight",
+    "label": "Hindsight (Long-term Memory)",
+    "db_path": "external_memory/hindsight_candidates.sqlite",
+    "config_path": "hindsight/config.json"
+  }]
+}`}</pre>
+            <p className="text-xs text-primary-500 dark:text-neutral-500">
+              Memories written by Astra during sessions will appear here as candidates
+              for you to approve, reject, or edit before they enter long-term recall.
+            </p>
+          </div>
         </div>
       </div>
     )
@@ -338,9 +358,16 @@ export function ExternalMemoryBrowserScreen() {
             </p>
           ) : null}
           {!isLoading && candidates.length === 0 ? (
-            <p className="p-3 text-sm text-primary-500 dark:text-neutral-400">
-              No memory rows found.
-            </p>
+            <div className="px-3 py-6 text-center">
+              <p className="text-sm text-primary-500 dark:text-neutral-400">
+                No {state === 'all' ? '' : state + ' '}candidates yet.
+              </p>
+              {state === 'candidate' ? (
+                <p className="mt-1 text-xs text-primary-400 dark:text-neutral-500">
+                  Memory candidates appear here as Astra saves notes during sessions.
+                </p>
+              ) : null}
+            </div>
           ) : null}
           <div className="space-y-2">
             {candidates.map((candidate) => (
