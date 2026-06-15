@@ -27,7 +27,9 @@ const STORE_FILE = join(
   process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? join(homedir(), '.hermes'),
   'workspace-sessions.json',
 )
-const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days (legacy default)
+const TOKEN_TTL_LONG = 365 * 24 * 60 * 60 * 1000 // 1 year (remember me)
+const TOKEN_TTL_SHORT = 24 * 60 * 60 * 1000 // 24 hours (session-only)
 
 function loadStore(): SessionStore {
   try {
@@ -108,10 +110,17 @@ export function generateSessionToken(): string {
 }
 
 /**
- * Store a session token as valid (30-day TTL).
+ * Store a session token.
+ * rememberMe=true → 1-year TTL; rememberMe=false → 24-hour TTL; undefined → 30-day legacy default.
  */
-export function storeSessionToken(token: string): void {
-  _tokens.set(token, Date.now() + TOKEN_TTL_MS)
+export function storeSessionToken(token: string, rememberMe?: boolean): void {
+  const ttl =
+    rememberMe === true
+      ? TOKEN_TTL_LONG
+      : rememberMe === false
+        ? TOKEN_TTL_SHORT
+        : TOKEN_TTL_MS
+  _tokens.set(token, Date.now() + ttl)
   _persist()
 }
 
@@ -293,16 +302,20 @@ function shouldSetSecureCookie(): boolean {
 /**
  * Create a Set-Cookie header for the session token.
  *
- * Attributes:
- *   - HttpOnly    — blocks JS access, mitigates XSS session theft
- *   - Secure      — HTTPS only (production default, overridable)
- *   - SameSite=Strict — CSRF protection
- *   - Path=/      — available across the whole app
- *   - Max-Age     — 30 days
+ * rememberMe=true  → Max-Age 1 year (persistent)
+ * rememberMe=false → no Max-Age (session cookie, cleared on browser close)
+ * rememberMe=undefined → 30-day legacy default
  */
-export function createSessionCookie(token: string): string {
+export function createSessionCookie(token: string, rememberMe?: boolean): string {
   const attrs = ['HttpOnly']
   if (shouldSetSecureCookie()) attrs.push('Secure')
-  attrs.push('SameSite=Strict', 'Path=/', `Max-Age=${30 * 24 * 60 * 60}`)
+  attrs.push('SameSite=Strict', 'Path=/')
+  if (rememberMe === true) {
+    attrs.push(`Max-Age=${365 * 24 * 60 * 60}`)
+  } else if (rememberMe !== false) {
+    // legacy default: 30 days
+    attrs.push(`Max-Age=${30 * 24 * 60 * 60}`)
+  }
+  // rememberMe=false → session cookie, no Max-Age
   return `claude-auth=${token}; ${attrs.join('; ')}`
 }

@@ -17,6 +17,7 @@ import {
 
 const AuthSchema = z.object({
   password: z.string().max(1000),
+  rememberMe: z.boolean().optional(),
 })
 
 export const Route = createFileRoute('/api/auth')({
@@ -51,7 +52,7 @@ export const Route = createFileRoute('/api/auth')({
             )
           }
 
-          const { password } = parsed.data
+          const { password, rememberMe } = parsed.data
 
           // Verify password
           const valid = verifyPassword(password)
@@ -67,7 +68,7 @@ export const Route = createFileRoute('/api/auth')({
 
           // Generate session token
           const token = generateSessionToken()
-          storeSessionToken(token)
+          storeSessionToken(token, rememberMe ?? true)
 
           // Return success with Set-Cookie header
           return json(
@@ -75,7 +76,7 @@ export const Route = createFileRoute('/api/auth')({
             {
               status: 200,
               headers: {
-                'Set-Cookie': createSessionCookie(token),
+                'Set-Cookie': createSessionCookie(token, rememberMe ?? true),
               },
             },
           )
