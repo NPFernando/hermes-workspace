@@ -5,7 +5,6 @@ import {
   AiBrain03Icon,
   Settings01Icon,
   PlusSignIcon,
-  UserAdd01Icon,
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -57,6 +56,7 @@ export function OperationsScreen() {
     sessionsQuery,
     cronJobsQuery,
     sisterMap,
+    sistersQuery,
     settings,
     saveSettings,
     defaultModel,
@@ -85,6 +85,13 @@ export function OperationsScreen() {
   }, [agents, sisterMap])
 
   const sortedAgents = useMemo(() => [...sisterAgents, ...otherAgents], [sisterAgents, otherAgents])
+  const rosterEntries = useMemo(
+    () =>
+      [...(sistersQuery.data ?? [])].sort(
+        (left, right) => (left.priority ?? 99) - (right.priority ?? 99),
+      ),
+    [sistersQuery.data],
+  )
 
   const isLoading =
     configQuery.isPending || sessionsQuery.isPending || cronJobsQuery.isPending
@@ -141,15 +148,6 @@ export function OperationsScreen() {
               </button>
             </div>
             <Button
-              variant="secondary"
-              className="border border-violet-400/40 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20"
-              onClick={() => setNewAgentOpen(true)}
-              title="Invite a new sister to join the agent space"
-            >
-              <HugeiconsIcon icon={UserAdd01Icon} size={16} strokeWidth={1.8} />
-              Invite Sister
-            </Button>
-            <Button
               className="bg-[var(--theme-accent)] text-primary-950 hover:bg-[var(--theme-accent-strong)]"
               onClick={() => setNewAgentOpen(true)}
             >
@@ -186,6 +184,7 @@ export function OperationsScreen() {
             >
               <OrchestratorCard
                 totalAgents={sortedAgents.length}
+                sisterCount={sisterAgents.length}
               />
             </motion.div>
 
@@ -223,7 +222,7 @@ export function OperationsScreen() {
               </div>
             ) : null}
 
-            {otherAgents.length > 0 || sisterAgents.length === 0 ? (
+            {otherAgents.length > 0 ? (
               <div className="space-y-3">
                 {sisterAgents.length > 0 ? (
                   <div className="flex items-center gap-2 px-1">
@@ -282,6 +281,31 @@ export function OperationsScreen() {
                 <span className="mt-3 text-sm text-[var(--theme-muted)]">Add Agent</span>
               </motion.button>
             )}
+
+            {rosterEntries.length > 0 ? (
+              <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 shadow-[0_24px_80px_var(--theme-shadow)]">
+                <div className="mb-4">
+                  <h2 className="text-base font-semibold text-[var(--theme-text)]">Team Personality Roster</h2>
+                  <p className="mt-0.5 text-xs text-[var(--theme-muted-2)]">Live personas from the sisters registry — no hard-coded roster</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                  {rosterEntries.map((sister) => (
+                    <div
+                      key={sister.id}
+                      className="flex flex-col gap-1.5 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-[var(--theme-accent-soft-strong)] bg-[var(--theme-accent-soft)] text-xs font-bold text-[var(--theme-accent)]">
+                          {sister.emoji || sister.name.charAt(0)}
+                        </span>
+                        <span className="truncate text-sm font-semibold text-[var(--theme-text)]">{sister.name}</span>
+                      </div>
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--theme-muted)]">{sister.role}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 shadow-[0_24px_80px_var(--theme-shadow)]">
               <div className="flex items-center justify-between gap-3">

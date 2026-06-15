@@ -26,6 +26,10 @@ import {
 
 type AuthResult = Response | true
 
+function unauthorizedResponse(): Response {
+  return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+}
+
 const ACTION_MESSAGES: Record<string, string> = {
   'set-default-model': 'Default model updated.',
   'set-api-key': 'API key saved.',
@@ -72,8 +76,8 @@ const LegacyPatchSchema = z.object({
 })
 
 async function authorize(request: Request): Promise<AuthResult> {
-  const result = isAuthenticated(request) as AuthResult
-  if (result !== true) return result
+  const result = isAuthenticated(request)
+  if (result !== true) return unauthorizedResponse()
   await ensureGatewayProbed()
   return true
 }

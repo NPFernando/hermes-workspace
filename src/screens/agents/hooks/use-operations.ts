@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { CronJob } from '@/components/cron-manager/cron-types'
+import { toast } from '@/components/ui/toast'
+import { fetchCronJobs } from '@/lib/cron-api'
+import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
+import { formatModelName, formatRelativeTime } from '@/screens/dashboard/lib/formatters'
 
 export type SisterInfo = {
   id: string
@@ -28,11 +33,6 @@ async function fetchSisters(): Promise<SisterInfo[]> {
     return []
   }
 }
-import type { CronJob } from '@/components/cron-manager/cron-types'
-import { toast } from '@/components/ui/toast'
-import { fetchCronJobs } from '@/lib/cron-api'
-import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
-import { formatModelName, formatRelativeTime } from '@/screens/dashboard/lib/formatters'
 
 // Claude-Workspace adapter: Operations is backed by Hermes profiles
 // (each profile = one persistent agent). Profiles live at ~/.hermes/profiles/<name>/
@@ -443,11 +443,17 @@ function getAgentJobs(agentId: string, jobs: CronJob[]): CronJob[] {
 }
 
 function getAgentSessions(agentId: string, sessions: GatewaySession[]): GatewaySession[] {
+  const expectedSessionKey = getOperationsSessionKey(agentId)
   return [...sessions]
     .filter((session) => {
       const label = readString(session.label)
       const key = readString(session.key)
-      return label.includes(agentId) || key.includes(agentId)
+      return (
+        key === expectedSessionKey ||
+        label === expectedSessionKey ||
+        label === agentId ||
+        key.endsWith(`ops-${agentId}`)
+      )
     })
     .sort((left, right) => {
       const leftTs = readTimestamp(left.updatedAt) ?? 0

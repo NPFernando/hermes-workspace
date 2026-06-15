@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRight01Icon,
   Clock01Icon,
-  PauseIcon,
   PlayIcon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
@@ -57,7 +56,7 @@ function PersonalityBadge({ sister }: { sister: SisterInfo }) {
         )}
         title={sister.description || sister.role}
       >
-        {sister.emoji} {sister.role}
+        {sister.emoji} {sister.name}
         {tier ? <span className="opacity-60">· {tier}</span> : null}
       </span>
       {hasGrowth ? (
@@ -232,10 +231,9 @@ export function OperationsAgentCard({
   const status = getStatusStyles(agent.status)
   const displayName = stripEmojiPrefix(agent.name)
   const [showCronPanel, setShowCronPanel] = useState(false)
-  const [isPaused, setIsPaused] = useState(false)
   const { messages, sendMessage, isSending, error } = useAgentChat(agent.sessionKey)
   const cronJobCount = agent.jobs.length
-  const isActive = agent.status === 'active' && !isPaused
+  const isActive = agent.status === 'active'
 
   const toggleMutation = useMutation({
     mutationFn: async (payload: { jobId: string; enabled: boolean }) =>
@@ -267,13 +265,8 @@ export function OperationsAgentCard({
     },
   })
 
-  async function handlePlayPause() {
-    if (isActive) {
-      setIsPaused(true)
-      return
-    }
-
-    setIsPaused(false)
+  async function handleRunNow() {
+    if (isActive) return
     await sendMessage('Run your primary task now')
   }
 
@@ -310,7 +303,7 @@ export function OperationsAgentCard({
             <span
               className={cn(
                 'h-2 w-2 shrink-0 rounded-full',
-                agent.status === 'active' && !isPaused && 'animate-pulse',
+                agent.status === 'active' && 'animate-pulse',
                 status.dot,
               )}
               aria-label={status.label}
@@ -326,16 +319,16 @@ export function OperationsAgentCard({
             aria-label={
               agent.needsSetup
                 ? `Configure ${displayName} before running`
-                : isActive ? `Pause ${displayName}` : `Run ${displayName} now`
+                : isActive ? `${displayName} is already running` : `Run ${displayName} now`
             }
             onClick={() => {
               if (agent.needsSetup) {
                 onOpenSettings(agent.id)
                 return
               }
-              void handlePlayPause()
+              void handleRunNow()
             }}
-            disabled={(isSending && !isActive)}
+            disabled={isSending || isActive}
             title={
               agent.needsSetup
                 ? 'No model configured — open settings to set one up'
@@ -349,7 +342,7 @@ export function OperationsAgentCard({
             )}
           >
             <HugeiconsIcon
-              icon={isActive ? PauseIcon : PlayIcon}
+              icon={PlayIcon}
               size={16}
               strokeWidth={1.8}
             />

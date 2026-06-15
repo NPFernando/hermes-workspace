@@ -7,8 +7,12 @@ vi.mock('@tanstack/react-router', () => ({
   createFileRoute: (_path: string) => (opts: any) => opts,
 }))
 
+const authState = vi.hoisted(() => ({
+  authenticated: true,
+}))
+
 vi.mock('../../server/auth-middleware', () => ({
-  isAuthenticated: () => true,
+  isAuthenticated: () => authState.authenticated,
 }))
 
 vi.mock('../../server/gateway-capabilities', () => ({
@@ -35,6 +39,7 @@ beforeEach(() => {
   tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-config-route-'))
   setEnv('HERMES_HOME', tmpHome)
   setEnv('CLAUDE_HOME', undefined)
+  authState.authenticated = true
   vi.resetModules()
 })
 
@@ -165,5 +170,18 @@ describe('legacy /api/claude-config alias', () => {
 
     expect(openrouter.maskedKeys).toEqual(openrouter.maskedCredentials)
     expect(openrouter.maskedKeys.OPENROUTER_API_KEY).toBeTruthy()
+  })
+
+  it('GET returns a JSON 401 instead of surfacing a false auth result as a 500', async () => {
+    authState.authenticated = false
+
+    const handlers = await loadHandlers('./claude-config')
+    const res = await handlers.GET({
+      request: new Request('http://localhost/api/claude-config'),
+    })
+    const body = await res.json()
+
+    expect(res.status).toBe(401)
+    expect(body).toMatchObject({ ok: false, error: 'Unauthorized' })
   })
 })

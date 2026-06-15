@@ -11,12 +11,14 @@ const ChatScreen = lazy(() =>
 )
 
 const ORCHESTRATOR_NAME_KEY = 'operations:orchestrator:name'
-const DEFAULT_ORCHESTRATOR_NAME = 'Main Agent'
+const DEFAULT_ORCHESTRATOR_NAME = 'Astra'
 
 export function OrchestratorCard({
   totalAgents,
+  sisterCount,
 }: {
   totalAgents: number
+  sisterCount: number
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [orchestratorName, setOrchestratorName] = useState(() => {
@@ -89,7 +91,7 @@ export function OrchestratorCard({
           </div>
 
           <p className="text-sm text-[var(--theme-muted)]">
-            Orchestrator · {totalAgents} agents reporting
+            {orchestratorName} · {sisterCount} sister{sisterCount === 1 ? '' : 's'} · {totalAgents} total agent{totalAgents === 1 ? '' : 's'}
           </p>
 
         </div>

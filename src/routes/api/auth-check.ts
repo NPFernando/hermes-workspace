@@ -23,7 +23,7 @@ export const Route = createFileRoute('/api/auth-check')({
             return json(
               {
                 authenticated: false,
-                authRequired: false,
+                authRequired: true,
                 error: 'claude_agent_unreachable',
               },
               { status: 503 },
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/api/auth-check')({
           return json(
             {
               authenticated: false,
-              authRequired: false,
+              authRequired: true,
               error:
                 error instanceof DOMException && error.name === 'AbortError'
                   ? 'claude_agent_timeout'

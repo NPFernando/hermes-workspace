@@ -63,10 +63,14 @@ function ModelSelector({
   value,
   onChange,
   models,
+  isLoading,
+  error,
 }: {
   value: string
   onChange: (nextValue: string) => void
   models: AvailableModel[]
+  isLoading: boolean
+  error: string | null
 }) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -92,7 +96,13 @@ function ModelSelector({
         className="inline-flex min-h-[3rem] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-left text-sm text-[var(--theme-text)] shadow-[0_8px_24px_color-mix(in_srgb,var(--theme-shadow)_18%,transparent)]"
       >
         <span className="truncate">
-          {selected ? `${selected.provider} / ${selected.name}` : 'Default (auto)'}
+          {isLoading
+            ? 'Loading models…'
+            : selected
+              ? `${selected.provider} / ${selected.name}`
+              : value
+                ? value
+                : 'Select a model'}
         </span>
         <HugeiconsIcon
           icon={ArrowDown01Icon}
@@ -126,6 +136,21 @@ function ModelSelector({
           </div>
         </div>
       ) : null}
+      {error ? (
+        <p className="mt-2 text-xs text-amber-300">
+          Model catalog unavailable. Paste a model id manually below.
+        </p>
+      ) : models.length === 0 && !isLoading ? (
+        <p className="mt-2 text-xs text-[var(--theme-muted)]">
+          No catalog models returned. Paste a model id manually below.
+        </p>
+      ) : null}
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="openrouter/nvidia/nemotron-3-super-120b-a12b:free"
+        className="mt-2 w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
+      />
     </div>
   )
 }
@@ -258,7 +283,7 @@ export function OperationsNewAgentModal({
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Sage"
+              placeholder="Ada"
               className="w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
             />
           </label>
@@ -276,7 +301,13 @@ export function OperationsNewAgentModal({
 
         <label className="mt-4 block space-y-2">
           <span className="text-sm font-medium text-[var(--theme-text)]">Model</span>
-          <ModelSelector value={model} onChange={setModel} models={models} />
+          <ModelSelector
+            value={model}
+            onChange={setModel}
+            models={models}
+            isLoading={modelsQuery.isPending}
+            error={modelsQuery.error instanceof Error ? modelsQuery.error.message : null}
+          />
         </label>
 
         <label className="mt-4 block space-y-2">
@@ -296,7 +327,7 @@ export function OperationsNewAgentModal({
           <textarea
             value={systemPrompt}
             onChange={(event) => setSystemPrompt(event.target.value)}
-            placeholder="You are Sage, an expert..."
+            placeholder="You are Ada, a code specialist and senior engineer…"
             className="min-h-[180px] w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
           />
         </label>
@@ -320,7 +351,7 @@ export function OperationsNewAgentModal({
                 description,
               }).then(() => onClose())
             }
-            disabled={isSaving || !name.trim()}
+            disabled={isSaving || !name.trim() || !model.trim()}
           >
             {isSaving ? 'Creating…' : 'Create Agent'}
           </Button>
