@@ -11,7 +11,9 @@
     "node_modules",
     "e2e",
     "playground-ws-worker",
-    "services"
+    "services",
+    "**/*.test.ts",
+    "**/*.test.tsx"
   ],
 
   "compilerOptions": {

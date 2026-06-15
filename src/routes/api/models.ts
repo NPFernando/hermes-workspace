@@ -21,8 +21,8 @@ const MODELS_PATH = path.join(CLAUDE_HOME, 'models.json')
 const CONFIG_PATH = path.join(CLAUDE_HOME, 'config.yaml')
 
 type ModelEntry = {
+  id: string
   provider?: string
-  id?: string
   name?: string
   [key: string]: unknown
 }

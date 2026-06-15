@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
+import { detectNovusOpportunity } from '@/lib/novus-opportunity-detector'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 
 const SUBSCRIPTION_PATTERNS: Array<RegExp> = [
-  /(^|[\s\-:/])codex(\b|[-/])/i,
+  /(^|[\s:/\-])codex(\b|[-/])/i,
   /anthropic[-_]?oauth/i,
   /^claude-(opus|sonnet|haiku)/i,
   /minimax/i,
@@ -36,22 +37,15 @@ function formatCostUsd(usd: number): string {
 }
 
 /**
- * Per-model cost ledger.
- *
- * The retired Cost KPI tile failed because it averaged paid + free
- * providers and produced a meaningless single number. This card
- * recovers the underlying signal *without* lying:
- *
- *   - Splits each row into 'paid' (real $$) vs 'included'
- *     (subscription / local / oauth) categories.
- *   - Sorts paid rows by cost descending so the operator sees what
- *     is actually burning money first.
- *   - Falls back to tokens for the included rows so they still get
- *     a comparable magnitude to eyeball.
- *
- * Default-hidden so we don't reintroduce the noise on the main
- * layout; lives in the edit-mode menu for users who want to track
- * spend explicitly.
+ * Enhanced Per-model cost ledger with Novus optimization suggestions.
+ * 
+ * This enhanced version:
+ * - Splits each row into 'paid' (real $$) vs 'included' (subscription / local / oauth) categories
+ * - Sorts paid rows by cost descending so the operator sees what is actually burning money first
+ * - Falls back to tokens for the included rows so they still get a comparable magnitude to eyeball
+ * - Adds Novus optimization suggestions for qualifying paid model usage
+ * - Default-hidden so we don't reintroduce the noise on the main layout
+ *   lives in the edit-mode menu for users who want to track spend explicitly
  */
 export function CostLedgerCard({
   analytics,
@@ -60,11 +54,27 @@ export function CostLedgerCard({
 }) {
   const rows = useMemo(() => {
     if (!analytics || analytics.source !== 'analytics') return []
+    
     return analytics.topModels
-      .map((m) => ({
-        ...m,
-        included: isSubscription(m.id),
-      }))
+      .map((m) => {
+        const included = isSubscription(m.id)
+        
+        // For non-included (paid) models, check for Novus optimization opportunities
+        let novusSuggestion = null
+        if (!included) {
+          // Infer task type and risk from model usage patterns
+          // This is a simplified inference - in practice, you might want to 
+          // correlate with actual task data from analytics
+          const taskContext = inferTaskContextFromModelUsage(m, analytics)
+          novusSuggestion = detectNovusOpportunity(taskContext)
+        }
+        
+        return {
+          ...m,
+          included,
+          novusSuggestion
+        }
+      })
       .sort((a, b) => {
         // Paid first (sorted by descending cost), then included by
         // descending tokens.
@@ -154,8 +164,17 @@ export function CostLedgerCard({
                   </span>
                 </span>
               ) : (
-                <span title={`${row.sessions} sessions \u00b7 ${row.tokens.toLocaleString()} tokens`}>
+                <span title={`${row.sessions} sessions · ${row.tokens.toLocaleString()} tokens`}>
                   {formatCostUsd(row.cost)}
+                  {row.novusSuggestion ? (
+                    <span
+                      className="ml-1.5 cursor-help"
+                      title={`Switch to ${row.novusSuggestion.suggestedModel} to save ~${row.novusSuggestion.potentialSavingsPercent}%`}
+                      style={{ color: 'var(--theme-accent)' }}
+                    >
+                      💡 {row.novusSuggestion.potentialSavingsPercent}%↓
+                    </span>
+                  ) : null}
                 </span>
               )}
             </span>
@@ -164,4 +183,40 @@ export function CostLedgerCard({
       </ul>
     </div>
   )
+}
+
+/**
+ * Infer task context from model usage patterns for Novus opportunity detection
+ * This is a simplified implementation - in a production system, you would
+ * have more detailed task analytics available
+ */
+function inferTaskContextFromModelUsage(
+  model: any,
+  analytics: NonNullable<DashboardOverview['analytics']>
+): { type: string; risk: string; description?: string } {
+  // Default values
+  let type = 'text_summary' // Default to a type that Novus can handle
+  let risk = 'standard'
+  let description
+  
+  // Simple heuristic: more expensive models likely used for more complex tasks
+  const costPerToken = model.cost > 0 && model.tokens > 0 ? model.cost / model.tokens : 0
+  
+  if (costPerToken > 0.00001) { // Expensive model (> $10/M tokens)
+    type = 'code_generation'
+    risk = 'standard'
+  } else if (costPerToken > 0.000005) { // Moderately expensive ($5-10/M tokens)
+    type = 'text_summary'
+    risk = 'low'
+  } else { // Inexpensive model (< $5/M tokens)
+    type = 'documentation'
+    risk = 'low'
+  }
+  
+  // Add description if available from analytics
+  if (analytics.topModels.length > 0) {
+    description = `${model.id} used in ${analytics.topModels.length} model comparisons`
+  }
+  
+  return { type, risk, description }
 }

@@ -63,7 +63,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     select: (state) => state.location.pathname,
   })
   const search = useRouterState({
-    select: (state) => state.location.search,
+    select: (state) => state.location.search as Record<string, unknown>,
   })
   const isElectron = useMemo(
     () =>
@@ -94,8 +94,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   // Map pathname to tab index (mirrors TABS order in mobile-tab-bar)
   const getTabIndex = useCallback((path: string): number => {
     if (path === '/dashboard') return 0
-    if (path.startsWith('/chat') || path === '/new' || path === '/') return 1
-    if (path.startsWith('/files')) return 2
+    if (path.startsWith('/research')) return 1
+    if (path.startsWith('/chat') || path === '/new' || path === '/') return 2
+    if (path.startsWith('/files')) return 3
     if (path.startsWith('/terminal')) return 3
     if (path.startsWith('/jobs')) return 4
     if (path === '/swarm' || path.startsWith('/swarm2')) return 5
@@ -168,11 +169,13 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   // Derive active session from URL
   const mobilePageTitle = (() => {
+    if (pathname.startsWith('/research')) return 'Research'
     if (pathname.startsWith('/terminal')) return 'Terminal'
     if (pathname.startsWith('/files')) return 'Files'
     if (pathname.startsWith('/jobs')) return 'Jobs'
     if (pathname.startsWith('/conductor')) return 'Conductor'
     if (pathname.startsWith('/operations')) return 'Operations'
+    if (pathname.startsWith('/agents')) return 'Agent Team'
     if (pathname.startsWith('/swarm2') || pathname === '/swarm') return 'Swarm'
     if (pathname.startsWith('/echo-studio')) return 'Echo Studio'
     if (pathname.startsWith('/memory')) return 'Memory'
