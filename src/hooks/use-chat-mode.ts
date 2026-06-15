@@ -23,8 +23,8 @@ export function useChatMode(): ChatMode {
     },
     staleTime: 15_000,
     refetchInterval: (query) => {
-      const d = (query.state.data as GatewayStatus | null | undefined)
-      return d?.capabilities?.health ? 60_000 : 5_000
+      const d = query.state.data
+      return d ? (d.capabilities.health ? 60_000 : 5_000) : 5_000
     },
     retry: 3,
     retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30_000),
