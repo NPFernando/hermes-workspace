@@ -4,5 +4,47 @@
     "description": "Introduce a mechanism that automatically scores and decays memory entries over time based on the Ebbinghaus forgetting curve, with reinforcement upon retrieval. This would improve memory relevance and reduce stale information, enhancing agent's ability to recall important facts.",
     "category": "memory",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Add Astra-review filter to Tasks board",
+    "description": "Add a quick filter button to the Tasks Kanban board to show only tasks awaiting Astra AI review, improving visibility of review queue and reducing manual scanning.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Auto-summarize terminal errors with Nova",
+    "description": "When the terminal tool returns an error, automatically trigger Nova sister to capture a screenshot (if applicable) and provide a AI-generated summary of the error, attaching it to the current task or memory for faster debugging.",
+    "category": "ai",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "OpenRouter usage budget alerts",
+    "description": "Implement a budget alert system that monitors OpenRouter free tier usage via HARP data, sends warnings when approaching limits, and suggests routing shifts to local models to avoid unexpected costs.",
+    "category": "analytics",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Telegram /hermes status command",
+    "description": "Add a Telegram bot command `/hermes status` that returns current VM resource usage (disk, memory, CPU) and Hermes agent status (active sisters, pending tasks, gateway health) for quick operator oversight.",
+    "category": "integration",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Sister daily standup automation",
+    "description": "At a configurable time each day, have each AI sister (Astra, Novus, Nova, etc.) post a brief standup message in the Operations screen summarizing yesterday's work, today's plan, and any blockers, making the team feel more alive.",
+    "category": "ai",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "One-click environment reset in Settings",
+    "description": "Add a 'Reset Environment' button in the Settings screen that clears temporary caches, restarts the OpenRouter gateway and dashboard services, and resets transient states without requiring a full VM reboot, improving developer productivity.",
+    "category": "devex",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Auto-archive old chat messages",
+    "description": "Implement a background job that automatically compresses and archives chat messages older than 30 days to free up database space, while keeping them searchable and restorable, to manage storage growth on the VM.",
+    "category": "storage",
+    "estimated_effort": "medium"
   }
 ]

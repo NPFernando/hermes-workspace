@@ -49,6 +49,16 @@ When `upstream-sync.py` reports that upstream touched one of our files:
 | `src/routes/api/sisters-growth.ts` | NEW — GET /api/sisters/growth?id=: returns growth log and level for a sister | Personal customization | Keep always |
 | `src/server/sisters-registry.ts` | EXTEND — Sister type now includes growthLevel/growthLabel/growthEmoji/growthEntryCount/lastNote from growth log | Personal customization | Keep; merge carefully if upstream changes Sister type |
 | `src/screens/agents/components/operations-agent-card.tsx` | EXTEND PersonalityBadge — second mini pill shows growth level emoji+label (🌱 Seed → 💫 Transcendent) | Personal customization | Keep; upstream doesn't have growth tracking |
+| `services/odysseus/` | NEW — Odysseus companion service (cloned from NPFernando/odysseus); provides Deep Research, Model Compare, Cookbook, Email, Calendar, Gallery, TTS/STT, Documents, Notes APIs on :7100 | Personal customization | Keep always; not upstream |
+| `services/odysseus/.env` | NEW — Odysseus runtime config: AUTH_ENABLED=false, LLM_HOST→:8642, port 7100 | Personal customization | Keep always |
+| `scripts/start-odysseus.sh` | NEW — production launcher for Odysseus (activates venv, starts uvicorn on :7100) | Personal customization | Keep always |
+| `src/routes/api/odysseus.$.ts` | NEW — catch-all proxy /api/odysseus/** → http://127.0.0.1:7100/api/**; Hermes auth enforced at perimeter | Personal customization | Keep always |
+| `src/routes/research.tsx` | NEW — /research route (Deep Research UI) | Personal customization | Keep always |
+| `src/screens/research/research-screen.tsx` | NEW — Deep Research screen: query form, SSE progress stream, result renderer, past research library | Personal customization | Keep always |
+| `src/screens/chat/components/chat-sidebar.tsx` | Added Telescope02Icon import + Research nav item in mainItems | Personal customization | Keep; merge if upstream changes sidebar structure |
+| `src/components/mobile-tab-bar.tsx` | Added Research tab (Telescope02Icon, /research) to MOBILE_NAV_TABS | Personal customization | Keep; merge if upstream changes tab bar |
+| `vite.config.ts` | Added startOdysseus() auto-start: spawns services/odysseus venv uvicorn, health check, SIGTERM on dev stop | Personal customization | Keep; merge carefully if upstream changes vite plugin structure |
+| `package.json` | start:all now includes `bash scripts/start-odysseus.sh` via concurrently | Personal customization | Keep; merge if upstream changes start:all |
 
 ---
 

@@ -11,19 +11,14 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { AchievementsCard } from './components/achievements-card'
 import { ActiveModelKpi } from './components/active-model-kpi'
-import { AnalyticsChartCard } from './components/analytics-chart-card'
+
+const ActivityChartInner = lazy(() => import('./components/activity-chart-inner'))
+const AnalyticsChartCard = lazy(() =>
+  import('./components/analytics-chart-card').then((m) => ({ default: m.AnalyticsChartCard }))
+)
 import { AttentionMarquee } from './components/attention-marquee'
 import { CacheEfficiencyCard } from './components/cache-efficiency-card'
 import { CostLedgerCard } from './components/cost-ledger-card'
@@ -31,6 +26,7 @@ import { EditModePanel } from './components/edit-mode-panel'
 import { HeroMetrics } from './components/hero-metrics'
 import { LogsTailCard } from './components/logs-tail-card'
 import { OperatorTipCard } from './components/operator-tip-card'
+import { ProactiveSuggestionsCard } from './components/proactive-suggestions-card'
 import { OpsStrip } from './components/ops-strip'
 import { ProviderMixCard } from './components/provider-mix-card'
 import { SessionsIntelligenceCard } from './components/sessions-intelligence-card'
@@ -292,86 +288,9 @@ function ActivityChart({
       accentColor={palette.accent}
       className="h-full"
     >
-      <div className="h-[200px] w-full -ml-2">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={chartData}
-            margin={{ top: 8, right: 32, left: -16, bottom: 0 }}
-          >
-            <defs>
-              <linearGradient id="g-sessions" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={palette.accent} stopOpacity={0.3} />
-                <stop offset="100%" stopColor={palette.accent} stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="g-messages" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={palette.success} stopOpacity={0.2} />
-                <stop offset="100%" stopColor={palette.success} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke={palette.border} opacity={0.45} />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 10, fill: palette.muted }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              yAxisId="left"
-              tick={{ fontSize: 10, fill: palette.success }}
-              axisLine={false}
-              tickLine={false}
-              allowDecimals={false}
-              width={28}
-            />
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              tick={{ fontSize: 10, fill: palette.accent }}
-              axisLine={false}
-              tickLine={false}
-              allowDecimals={false}
-              width={28}
-            />
-            <Tooltip
-              contentStyle={{
-                background: palette.card,
-                border: `1px solid ${palette.border}`,
-                borderRadius: '8px',
-                fontSize: '11px',
-              }}
-              labelStyle={{ color: palette.muted, fontSize: '10px' }}
-            />
-            <Area
-              yAxisId="left"
-              type="monotone"
-              dataKey="messages"
-              stroke={palette.success}
-              fill="url(#g-messages)"
-              strokeWidth={1.5}
-              dot={false}
-            />
-            <Area
-              yAxisId="right"
-              type="monotone"
-              dataKey="sessions"
-              stroke={palette.accent}
-              fill="url(#g-sessions)"
-              strokeWidth={2}
-              dot={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="mt-2 flex items-center gap-5 text-[10px] text-muted">
-        <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full" style={{ background: palette.accent }} />
-          Sessions
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full" style={{ background: palette.success }} />
-          Messages
-        </span>
-      </div>
+      <Suspense fallback={<div className="h-[200px] w-full animate-pulse rounded-lg bg-primary-100/40" />}>
+        <ActivityChartInner chartData={chartData} palette={palette} />
+      </Suspense>
     </GlassCard>
   )
 }
@@ -1064,13 +983,15 @@ export function DashboardScreen() {
         {layout.isVisible('analytics_chart') ? (
           <div className="lg:col-span-8">
             <WidgetShell id="analytics_chart" layout={layout}>
-              <AnalyticsChartCard
-                analytics={overview?.analytics ?? null}
-                insights={overview?.insights ?? []}
-                period={period}
-                onPeriodChange={setPeriod}
-                loading={overviewQuery.isFetching}
-              />
+              <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-primary-100/40" />}>
+                <AnalyticsChartCard
+                  analytics={overview?.analytics ?? null}
+                  insights={overview?.insights ?? []}
+                  period={period}
+                  onPeriodChange={setPeriod}
+                  loading={overviewQuery.isFetching}
+                />
+              </Suspense>
             </WidgetShell>
           </div>
         ) : null}
@@ -1183,6 +1104,11 @@ export function DashboardScreen() {
               onOpen={() => navigate({ to: '/skills' })}
             />
           </WidgetShell>
+          {layout.isVisible('proactive_suggestions') ? (
+            <WidgetShell id="proactive_suggestions" layout={layout}>
+              <ProactiveSuggestionsCard overview={overview} />
+            </WidgetShell>
+          ) : null}
           {/* `flex-1` here pushes the rhythm card to consume any
               remaining vertical space so the rail's bottom aligns
               with Sessions Intelligence. The card itself uses

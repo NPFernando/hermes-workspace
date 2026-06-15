@@ -87,6 +87,7 @@ export type OpenAIChatOptions = {
   model?: string
   stream?: boolean
   temperature?: number
+  max_tokens?: number
   signal?: AbortSignal
   sessionId?: string
   /** Override the base URL (e.g. for local providers). Bypasses gateway. */
@@ -101,6 +102,7 @@ type OpenAIChatRequest = {
   }>
   stream: boolean
   temperature?: number
+  max_tokens?: number
 }
 
 type OpenAIChatCompletionResponse = {
@@ -124,6 +126,7 @@ export async function buildRequestBody(
     messages,
     stream: options.stream === true,
     temperature: options.temperature,
+    max_tokens: options.max_tokens,
   }
 }
 

@@ -27,6 +27,48 @@ type PersonalityPreset = { key: string; label: string; description: string; prom
 type WorkerRec = { workerId: string; name: string; role: string; recommendedPreset: string; presetLabel: string; isMain: boolean }
 type SwarmPersonalityData = { presets: PersonalityPreset[]; recommendations: WorkerRec[] }
 
+type SisterEntry = {
+  id: string
+  name: string
+  emoji: string
+  role: string
+  type: 'ai_sister' | 'business_agent' | 'delegation_profile'
+  description?: string
+  modelPreference?: string
+  growthLabel?: string
+  growthEmoji?: string
+  growthEntryCount?: number
+}
+
+const SISTER_BADGE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  astra:    { bg: 'bg-violet-500/15',  text: 'text-violet-400',  border: 'border-violet-400/30' },
+  novus:    { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-400/30' },
+  nova:     { bg: 'bg-sky-500/15',     text: 'text-sky-400',     border: 'border-sky-400/30' },
+  business: { bg: 'bg-amber-500/15',   text: 'text-amber-400',   border: 'border-amber-400/30' },
+  default:  { bg: 'bg-primary-500/10', text: 'text-primary-400', border: 'border-primary-300/20' },
+}
+
+function sisterBadgeStyle(s: SisterEntry) {
+  if (SISTER_BADGE_STYLES[s.id]) return SISTER_BADGE_STYLES[s.id]
+  if (s.type === 'business_agent') return SISTER_BADGE_STYLES.business
+  return SISTER_BADGE_STYLES.default
+}
+
+function SisterBadge({ sister }: { sister: SisterEntry }) {
+  const style = sisterBadgeStyle(sister)
+  return (
+    <span className={cn(
+      'mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+      style.bg, style.text, style.border,
+    )} title={sister.description || sister.role}>
+      {sister.emoji} {sister.name}
+      {(sister.growthEntryCount ?? 0) > 0 && sister.growthEmoji ? (
+        <span className="opacity-60">{sister.growthEmoji}</span>
+      ) : null}
+    </span>
+  )
+}
+
 type ProfileSummary = {
   name: string
   path: string
@@ -142,6 +184,26 @@ export function ProfilesScreen() {
         '/api/profiles/list',
       ),
   })
+
+  const sistersQuery = useQuery({
+    queryKey: ['sisters'],
+    queryFn: async () => {
+      const res = await fetch('/api/sisters')
+      if (!res.ok) return []
+      const payload = (await res.json()) as { ok?: boolean; sisters?: SisterEntry[] }
+      return Array.isArray(payload.sisters) ? payload.sisters : []
+    },
+    staleTime: 60_000,
+  })
+
+  const sisterMap = useMemo(() => {
+    const map: Record<string, SisterEntry> = {}
+    for (const s of sistersQuery.data ?? []) {
+      map[s.id] = s
+      if (s.id === 'astra') map['default'] = s
+    }
+    return map
+  }, [sistersQuery.data])
 
   const detailQuery = useQuery({
     queryKey: ['profiles', 'read', detailsName],
@@ -451,6 +513,9 @@ export function ProfilesScreen() {
                 <span className="mt-1 inline-block rounded-full bg-primary-100 px-2.5 py-0.5 text-[11px] font-medium text-primary-600 dark:bg-neutral-800 dark:text-neutral-400">
                   {profile.provider || 'no provider'}
                 </span>
+                {sisterMap[profile.name] ? (
+                  <SisterBadge sister={sisterMap[profile.name]!} />
+                ) : null}
                 <p className="mt-3 line-clamp-2 min-h-[2.5rem] px-6 text-center text-xs text-primary-500 dark:text-neutral-400">
                   {profile.description?.trim() || 'No description yet'}
                 </p>

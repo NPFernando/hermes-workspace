@@ -22,7 +22,6 @@ import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { UpdateCenterNotifier } from '@/components/update-center-notifier'
 import { applyInterfacePreferences, initializeSettingsAppearance, useSettings } from '@/hooks/use-settings'
 import { useApplyChatWidth } from '@/hooks/use-chat-settings'
-import { useSettingsSync } from '@/hooks/use-settings-sync'
 import {
   ClaudeOnboarding,
   ONBOARDING_COMPLETE_EVENT,
@@ -259,11 +258,6 @@ export async function registerAppServiceWorker({
     })
 }
 
-function SettingsSyncMount() {
-  useSettingsSync()
-  return null
-}
-
 function RootLayout() {
   const { settings } = useSettings()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
@@ -302,6 +296,24 @@ function RootLayout() {
 
     syncOnboardingCompletion()
 
+    void fetch('/api/connection-status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then(
+        (
+          status: {
+            ok?: boolean
+            chatReady?: boolean
+            modelConfigured?: boolean
+          } | null,
+        ) => {
+          if (status?.ok || (status?.chatReady && status?.modelConfigured)) {
+            localStorage.setItem(ONBOARDING_KEY, 'true')
+            syncOnboardingCompletion()
+          }
+        },
+      )
+      .catch(() => undefined)
+
     const handleStorage = (event: StorageEvent) => {
       if (event.key && event.key !== ONBOARDING_KEY) return
       syncOnboardingCompletion()
@@ -337,35 +349,11 @@ function RootLayout() {
     let cancelled = false
     fetchClaudeAuthStatus()
       .then((status) => {
-        if (cancelled) return
-        setAuthStatus(status)
-        if (status.authenticated || !status.authRequired) {
-          void fetch('/api/connection-status')
-            .then((res) => (res.ok ? res.json() : null))
-            .then(
-              (
-                connectionStatus: {
-                  ok?: boolean
-                  chatReady?: boolean
-                  modelConfigured?: boolean
-                } | null,
-              ) => {
-                if (
-                  !cancelled &&
-                  (connectionStatus?.ok ||
-                    (connectionStatus?.chatReady && connectionStatus?.modelConfigured))
-                ) {
-                  localStorage.setItem(ONBOARDING_KEY, 'true')
-                  setOnboardingComplete(true)
-                }
-              },
-            )
-            .catch(() => undefined)
-        }
+        if (!cancelled) setAuthStatus(status)
       })
       .catch(() => {
         if (!cancelled) {
-          setAuthStatus((prev) => prev ?? { authenticated: false, authRequired: true })
+          setAuthStatus({ authenticated: true, authRequired: false })
         }
       })
     return () => {
@@ -382,7 +370,6 @@ function RootLayout() {
       {mounted && rootSurfaceState.showOnboarding ? <ClaudeOnboarding /> : null}
       {rootSurfaceState.showWorkspaceShell ? (
         <>
-          <SettingsSyncMount />
           <GlobalShortcutListener />
           <TerminalShortcutListener />
           <WorkspaceShell>

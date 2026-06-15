@@ -20,6 +20,7 @@ export type WidgetId =
   | 'sessions_intelligence'
   | 'logs_tail'
   | 'operator_tip'
+  | 'proactive_suggestions'
   | 'skills_usage'
   | 'achievements'
   | 'mix_rhythm'
@@ -105,6 +106,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     hideable: true,
   },
   {
+    id: 'proactive_suggestions',
+    label: 'Optimization hints',
+    description:
+      'Cost & routing suggestions derived from live analytics — paid model alternatives, cache rate, HARP guidance.',
+    column: 'rail',
+    hideable: true,
+  },
+  {
     id: 'skills_usage',
     label: 'Skills usage',
     description: 'Top-5 used skills as a bar chart.',
@@ -157,7 +166,7 @@ const DEFAULT_HIDDEN: ReadonlyArray<WidgetId> = [
  * so existing localStorage entries with `attention` get migrated
  * cleanly instead of silently re-hiding stale ids.
  */
-const STORAGE_VERSION = 4
+const STORAGE_VERSION = 5
 
 function readLayout(): StoredLayout {
   if (typeof window === 'undefined') {
