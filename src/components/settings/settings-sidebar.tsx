@@ -5,6 +5,7 @@ export type SettingsNavId =
   | 'connection'
   | 'claude'
   | 'agent'
+  | 'routing'
   | 'voice'
   | 'display'
   | 'appearance'

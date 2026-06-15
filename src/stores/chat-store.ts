@@ -913,11 +913,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
             newPlainText.length === 0 &&
             sessionMessages.length > 0
           ) {
-            const prevEmptyIdx = sessionMessages.findLastIndex(
-              (m) =>
-                m.role === 'assistant' &&
-                extractMessageText(m).length === 0,
-            )
+            let prevEmptyIdx = -1
+            for (let idx = sessionMessages.length - 1; idx >= 0; idx -= 1) {
+              const message = sessionMessages[idx]
+              if (
+                message.role === 'assistant' &&
+                extractMessageText(message).length === 0
+              ) {
+                prevEmptyIdx = idx
+                break
+              }
+            }
             if (prevEmptyIdx >= 0) {
               sessionMessages[prevEmptyIdx] = incomingMessage
               messages.set(

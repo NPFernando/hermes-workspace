@@ -673,7 +673,7 @@ export function ScatteredScenery({
       for (let i = 0; i < 26; i++) {
         const ang = r() * Math.PI * 2
         const rad = 18 + r() * 6
-        out.push({ type: r() < 0.5 ? 'pine' : 'broadleaf', pos: [Math.cos(ang) * rad, 0, Math.sin(ang) * rad], scale: 0.8 + r() * 0.6, color: r() < 0.5 ? '#1f8b4f' : '#2bbf6f', glow: '#86efac' })
+        out.push({ type: r() < 0.5 ? 'pine' : 'broadleaf', pos: [Math.cos(ang) * rad, 0, Math.sin(ang) * rad], scale: 0.8 + r() * 0.6, color: r() < 0.5 ? '#1f8b4f' : '#2bbf6f', glow: '#86efac' } as any)
       }
       // Flowers and grass tufts in the green band, off the paths
       for (let i = 0; i < 28; i++) {
@@ -727,7 +727,7 @@ export function ScatteredScenery({
     }
 
     if (worldId === 'grove') {
-      for (let i = 0; i < 38; i++) out.push({ type: 'pine', pos: maybeOnEdge(), scale: 0.7 + r() * 0.7, color: '#1f8b4f', glow: '#86efac' })
+      for (let i = 0; i < 38; i++) out.push({ type: 'pine', pos: maybeOnEdge(), scale: 0.7 + r() * 0.7, color: '#1f8b4f', glow: '#86efac' } as any)
       for (let i = 0; i < 16; i++) out.push({ type: 'broadleaf', pos: maybeOnEdge(), scale: 0.8 + r() * 0.5, color: '#2bbf6f' })
       for (let i = 0; i < 18; i++) {
         const ang = r() * Math.PI * 2

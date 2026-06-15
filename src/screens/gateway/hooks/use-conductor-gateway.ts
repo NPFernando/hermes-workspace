@@ -171,8 +171,8 @@ export type MissionHistoryEntry = {
 const HISTORY_STORAGE_KEY = 'conductor:history'
 const MAX_HISTORY_ENTRIES = 50
 
-const AGENT_NAMES = ['Nova', 'Pixel', 'Blaze', 'Echo', 'Sage', 'Drift', 'Flux', 'Volt']
-const AGENT_EMOJIS = ['🤖', '⚡', '🔥', '🌊', '🌿', '💫', '🔮', '⭐']
+const AGENT_NAMES  = ['Astra', 'Nova', 'Ada',  'Maya', 'Vega', 'Atlas', 'Lyra', 'Forge']
+const AGENT_EMOJIS = ['✨',    '🔎',  '💻',   '🔨',   '📈',  '🗺️',   '💡',   '🏗️']
 
 function getAgentPersona(index: number) {
   return {
@@ -1055,8 +1055,9 @@ export function useConductorGateway() {
       const checkpoint = assignment.checkpoint
       const isComplete = state === 'checkpointed' || state === 'done' || state === 'cancelled'
       const isBlocked = state === 'blocked' || state === 'needs_input'
-      const personaNames = ['Nova', 'Pixel', 'Blaze', 'Echo', 'Sage', 'Drift', 'Flux', 'Volt']
-      const persona = personaNames[index % personaNames.length]
+      const personaNames  = ['Astra', 'Nova', 'Ada',  'Maya', 'Vega', 'Atlas', 'Lyra', 'Forge']
+      const personaEmojis = ['✨',    '🔎',  '💻',   '🔨',   '📈',  '🗺️',   '💡',   '🏗️']
+      const persona = `${personaEmojis[index % personaEmojis.length]} ${personaNames[index % personaNames.length]}`
       return {
         key: workerId,
         label: workerId,
@@ -1663,7 +1664,7 @@ export function useConductorGateway() {
                 setOrchestratorSessionKey(match.key)
                 setMissionWorkerKeys((current) => {
                   const next = new Set(current)
-                  next.delete(orchestratorKey)
+                  if (orchestratorKey) next.delete(orchestratorKey)
                   next.add(match.key as string)
                   return next
                 })

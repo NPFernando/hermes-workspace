@@ -216,7 +216,7 @@ export function SwarmScreen() {
       <header className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-400/20 bg-black/45 px-4 py-2.5 backdrop-blur">
         <div className="inline-flex items-center gap-2">
           <div className="flex size-7 items-center justify-center rounded-lg border border-emerald-400/40 bg-emerald-500/10 text-emerald-300">
-            <HugeiconsIcon icon={CpuIcon} size={14} />
+            <HugeiconsIcon icon={ComputerTerminal01Icon} size={14} />
           </div>
           <div className="text-sm font-bold tracking-tight text-white">Swarm OS</div>
         </div>
@@ -455,7 +455,7 @@ function ViewModeToggle({ mode, setMode }: { mode: SwarmViewMode; setMode: (mode
   )
 }
 
-function Chip({ icon, label, value, tone = 'neutral' }: { icon: typeof CpuIcon; label: string; value: string; tone?: 'neutral' | 'good' | 'warn' }) {
+function Chip({ icon, label, value, tone = 'neutral' }: { icon: typeof ComputerTerminal01Icon; label: string; value: string; tone?: 'neutral' | 'good' | 'warn' }) {
   return (
     <div
       className={cn(
