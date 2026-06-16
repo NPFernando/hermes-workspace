@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-
-const ODYSSEUS_BASE = 'http://127.0.0.1:7100'
+import { ODYSSEUS_BASE, getOdysseusCookie, invalidateOdysseusCookie } from '../../server/odysseus-session'
 
 export const Route = createFileRoute('/api/odysseus/$')({
   server: {
@@ -38,12 +37,18 @@ async function handler({ request }: { request: Request }): Promise<Response> {
     upstreamHeaders.set('X-Accel-Buffering', 'no')
   }
 
+  // Inject server-side Odysseus session cookie
+  const sessionCookie = await getOdysseusCookie()
+  if (sessionCookie) {
+    upstreamHeaders.set('cookie', sessionCookie)
+  }
+
   let body: BodyInit | null = null
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     body = await request.arrayBuffer()
   }
 
-  try {
+  const doRequest = async () => {
     const upstream = await fetch(target, {
       method: request.method,
       headers: upstreamHeaders,
@@ -51,11 +56,28 @@ async function handler({ request }: { request: Request }): Promise<Response> {
       // @ts-expect-error -- Node 18+ fetch supports this
       duplex: 'half',
     })
+    return upstream
+  }
+
+  try {
+    let upstream = await doRequest()
+
+    // On 401/403 invalidate cached cookie and retry once with a fresh session
+    if ((upstream.status === 401 || upstream.status === 403) && sessionCookie) {
+      await invalidateOdysseusCookie()
+      const freshCookie = await getOdysseusCookie()
+      if (freshCookie) {
+        upstreamHeaders.set('cookie', freshCookie)
+        upstream = await doRequest()
+      }
+    }
 
     const responseHeaders = new Headers(upstream.headers)
     // Remove hop-by-hop headers that must not be forwarded
     responseHeaders.delete('transfer-encoding')
     responseHeaders.delete('connection')
+    // Don't forward Odysseus's own set-cookie to browser (we manage the session server-side)
+    responseHeaders.delete('set-cookie')
 
     return new Response(upstream.body, {
       status: upstream.status,
