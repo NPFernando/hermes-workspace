@@ -127,10 +127,10 @@ async function tryServeStatic(req, res) {
       if (!fileStat.isFile()) throw new Error('not a file')
     } catch {
       res.writeHead(404, {
-        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Type': 'application/json',
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       })
-      res.end('Asset not found')
+      res.end(JSON.stringify({ error: { code: 'NOT_FOUND', message: 'Asset not found' } }))
       return true
     }
   }
@@ -234,8 +234,8 @@ async function requestHandler(req, res) {
     }
   } catch (err) {
     console.error('Request error:', err)
-    res.writeHead(500)
-    res.end('Internal Server Error')
+    res.writeHead(500, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'Internal Server Error' } }))
   }
 }
 
