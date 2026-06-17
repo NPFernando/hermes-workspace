@@ -158,7 +158,7 @@ export function useResearchCard(opts?: {
     return () => {
       es.close()
     }
-  }, [sessionKey, dismissed, startTime, _version]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionKey, dismissed, startTime, _version])
 
   // Tick for totalDurationMs while active
   useEffect(() => {

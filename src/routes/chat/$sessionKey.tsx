@@ -71,7 +71,7 @@ function ChatRoute() {
   const isNewChat = activeFriendlyId === 'new'
   const forcedSessionKey =
     forcedSession?.friendlyId === activeFriendlyId
-      ? forcedSession?.sessionKey
+      ? forcedSession.sessionKey
       : undefined
 
   // Clear history cache when navigating to new chat

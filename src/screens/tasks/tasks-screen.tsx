@@ -5,8 +5,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, RefreshIcon, Search01Icon } from '@hugeicons/core-free-icons'
-import { PlayIcon } from '@hugeicons/core-free-icons'
+import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, PlayIcon, RefreshIcon, Search01Icon  } from '@hugeicons/core-free-icons'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
 import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority, UpdateTaskInput } from '@/lib/tasks-api'
@@ -32,7 +31,7 @@ import {
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { isTypingTarget } from '@/screens/playground/components/keyboard-shortcuts-overlay'
-import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
 
 const QUERY_KEY = ['claude', 'tasks'] as const
 const ASSIGNEES_KEY = ['claude', 'tasks', 'assignees'] as const
@@ -82,7 +81,7 @@ export function TasksScreen() {
     priority?: TaskPriority; assignee?: string; tags?: string
   } | null>(null)
   // Snapshot of column/priority taken when Deploy Agents fires; cleared when agents finish
-  const [deploySnapshot, setDeploySnapshot] = useState<Record<string, { column: TaskColumn; priority: TaskPriority }> | null>(null)
+  const [deploySnapshot, setDeploySnapshot] = useState<Partial<Record<string, { column: TaskColumn; priority: TaskPriority }>> | null>(null)
 
   // — Search + filter state
   const [searchQuery, setSearchQuery] = useState('')
@@ -90,6 +89,7 @@ export function TasksScreen() {
   const [filterOverdue, setFilterOverdue] = useState(false)
   const [filterBlocked, setFilterBlocked] = useState(false)
   const [filterActiveAgent, setFilterActiveAgent] = useState(false)
+  const [filterInReview, setFilterInReview] = useState(false)
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | null>(null)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
 
@@ -139,6 +139,7 @@ export function TasksScreen() {
       if (filterOverdue && !isOverdue(t)) continue
       if (filterBlocked && t.column !== 'blocked') continue
       if (filterActiveAgent && !t.agent_state) continue
+      if (filterInReview && t.column !== 'review') continue
       if (priorityFilter && t.priority !== priorityFilter) continue
       if (tagFilter && !t.tags.includes(tagFilter)) continue
 
@@ -148,9 +149,9 @@ export function TasksScreen() {
     for (const col of COLUMN_ORDER) {
       columns[col].sort((a, b) => a.position - b.position)
     }
-    const hasAnyFilter = Boolean(assigneeFilter || q || filterOverdue || filterBlocked || filterActiveAgent || priorityFilter || tagFilter)
+    const hasAnyFilter = Boolean(assigneeFilter || q || filterOverdue || filterBlocked || filterActiveAgent || filterInReview || priorityFilter || tagFilter)
     return { columns, matchCount, totalTasks: tasks.length, hasAnyFilter }
-  }, [tasks, assigneeFilter, searchQuery, filterOverdue, filterBlocked, filterActiveAgent, priorityFilter, tagFilter])
+  }, [tasks, assigneeFilter, searchQuery, filterOverdue, filterBlocked, filterActiveAgent, filterInReview, priorityFilter, tagFilter])
 
   const columnMap = tasksByColumn.columns
 
@@ -278,7 +279,7 @@ export function TasksScreen() {
       if (before.priority !== task.priority) reprioritised++
     }
     if (total > 0) {
-      const parts: string[] = [`Reviewed ${total} task${total !== 1 ? 's' : ''}`]
+      const parts: Array<string> = [`Reviewed ${total} task${total !== 1 ? 's' : ''}`]
       if (movedToReady > 0) parts.push(`${movedToReady} → Ready`)
       if (movedToBlocked > 0) parts.push(`${movedToBlocked} Blocked`)
       if (reprioritised > 0) parts.push(`${reprioritised} reprioritised`)
@@ -335,8 +336,8 @@ export function TasksScreen() {
   const colMaxWidth = Math.floor(1200 / visibleColumns.length)
 
   return (
-    <div className="min-h-full overflow-y-auto bg-surface text-ink">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
+    <div className="h-full overflow-hidden flex flex-col bg-surface text-ink">
+      <div className="shrink-0 mx-auto w-full max-w-[1200px] flex flex-col gap-3 px-4 pt-5 pb-2 sm:px-6 lg:px-8">
       {/* Header */}
       <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
         <div className="flex items-center justify-between">
@@ -446,7 +447,7 @@ export function TasksScreen() {
               setIdeasLoading(true)
               try {
                 const res = await fetch('/api/tasks-generate-ideas', { method: 'POST' })
-                const data = await res.json() as { ok: boolean; injected: number; ideas: string[]; error?: string }
+                const data = await res.json() as { ok: boolean; injected: number; ideas: Array<string>; error?: string }
                 if (data.injected > 0) {
                   await tasksQuery.refetch()
                   toast(`Added ${data.injected} idea${data.injected > 1 ? 's' : ''} to backlog`)
@@ -629,7 +630,8 @@ export function TasksScreen() {
           ['Overdue', filterOverdue, () => setFilterOverdue(v => !v)],
           ['Blocked', filterBlocked, () => setFilterBlocked(v => !v)],
           ['Active Agent', filterActiveAgent, () => setFilterActiveAgent(v => !v)],
-        ] as [string, boolean, () => void][]).map(([label, active, toggle]) => (
+          ['In Review', filterInReview, () => setFilterInReview(v => !v)],
+        ] as Array<[string, boolean, () => void]>).map(([label, active, toggle]) => (
           <button
             key={label}
             type="button"
@@ -646,7 +648,7 @@ export function TasksScreen() {
         ))}
 
         {/* Priority filter chips */}
-        {(['high', 'medium', 'low'] as TaskPriority[]).map(p => (
+        {(['high', 'medium', 'low'] as Array<TaskPriority>).map(p => (
           <button
             key={p}
             type="button"
@@ -699,10 +701,11 @@ export function TasksScreen() {
           </span>
         )}
       </div>
+      </div>
 
       {/* Board */}
       <div
-        className="mx-auto flex w-full max-w-[1200px] flex-1 gap-3 overflow-x-auto overflow-y-hidden p-4 min-h-0"
+        className="flex-1 min-h-0 mx-auto w-full max-w-[1200px] flex gap-3 overflow-x-auto overflow-y-hidden px-4 pb-[calc(var(--tabbar-h,80px)+1rem)] pt-3 sm:px-6 lg:px-8"
         style={{ boxShadow: 'inset 0 8px 24px rgba(0,0,0,0.2)' }}
       >
         {visibleColumns.map((col) => {
@@ -714,7 +717,7 @@ export function TasksScreen() {
             <div
               key={col}
               className={cn(
-                'flex flex-col rounded-xl border min-w-[180px] w-full shrink-0 flex-1',
+                'flex flex-col rounded-xl border min-w-[180px] w-full shrink-0 flex-1 min-h-0',
                 'bg-[var(--theme-card)] border-[var(--theme-border)]',
                 'transition-colors shadow-[0_2px_12px_rgba(0,0,0,0.25)]',
                 isDragOver && 'border-[var(--theme-accent)] bg-[var(--theme-hover)]',
@@ -748,7 +751,7 @@ export function TasksScreen() {
               </div>
 
               {/* Cards */}
-              <div className="flex flex-col gap-2 p-2 flex-1 overflow-y-auto">
+              <div className="flex flex-col gap-2 p-2 flex-1 min-h-0 overflow-y-auto scrollbar-thin">
                 {tasksQuery.isError ? (
                   <motion.div
                     key="error"
@@ -919,7 +922,6 @@ export function TasksScreen() {
           }
         } : undefined}
       />
-    </div>
     </div>
   )
 }

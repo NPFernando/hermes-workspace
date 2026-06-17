@@ -2,18 +2,19 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
-  requireJsonContentType,
+  getClientIp,
   rateLimit,
   rateLimitResponse,
-  getClientIp,
+  requireJsonContentType,
 } from '../../server/rate-limit'
 import {
+  
   bootstrapAllSisters,
   ensureSisterProfile,
-  listSisters,
   invalidateSistersCache,
-  type Sister,
+  listSisters
 } from '../../server/sisters-registry'
+import type {Sister} from '../../server/sisters-registry';
 
 export const Route = createFileRoute('/api/sisters-bootstrap')({
   server: {

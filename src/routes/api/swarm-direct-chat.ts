@@ -1,12 +1,13 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { json } from '@tanstack/react-start'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { readWorkerMessages, type SwarmChatMessage } from '../../server/swarm-chat-reader'
+import {  readWorkerMessages } from '../../server/swarm-chat-reader'
 import { rosterByWorkerId } from '../../server/swarm-roster'
+import type {SwarmChatMessage} from '../../server/swarm-chat-reader';
 
 type DirectChatRequest = {
   workerId?: unknown
@@ -111,7 +112,7 @@ function execFileAsync(
   return new Promise((resolve) => {
     const child = execFile(cmd, args, { timeout, maxBuffer: MAX_OUTPUT_CHARS }, (error, stdout, stderr) => {
       if (error) {
-        resolve({ ok: false, error: stderr?.toString().trim() || error.message })
+        resolve({ ok: false, error: stderr.toString().trim() || error.message })
         return
       }
       resolve({
@@ -120,7 +121,10 @@ function execFileAsync(
         stderr: (stderr || '').toString(),
       })
     })
-    if (input !== undefined) child.stdin?.end(input)
+    if (input !== undefined) {
+      const stdin = child.stdin
+      if (stdin) stdin.end(input)
+    }
   })
 }
 

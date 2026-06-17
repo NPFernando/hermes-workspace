@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ActivityEntry, ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority } from '@/lib/tasks-api'
 import {
   DialogContent,
+  DialogDescription,
   DialogRoot,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { ActivityEntry, ClaudeTask, CreateTaskInput, TaskColumn, TaskPriority, TaskAssignee } from '@/lib/tasks-api'
 import { COLUMN_LABELS, COLUMN_ORDER } from '@/lib/tasks-api'
 
 function relativeTime(isoStr: string): string {
@@ -110,7 +110,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
 
   const labelClass = 'block text-xs font-medium text-[var(--theme-muted)] mb-1'
 
-  const history: ActivityEntry[] = task?.agent_history ?? []
+  const history: Array<ActivityEntry> = task?.agent_history ?? []
 
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: 'smooth' })

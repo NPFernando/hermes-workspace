@@ -7,7 +7,7 @@ import YAML from 'yaml'
 // Probes standard locations in priority order.
 // Override all of these with the HARP_CONFIG_PATH environment variable.
 
-function candidatePaths(): string[] {
+function candidatePaths(): Array<string> {
   const home = os.homedir()
   const hermesHome =
     process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(home, '.hermes')
@@ -38,7 +38,7 @@ export function resolveHarpConfigPath(): string {
   return process.env.HARP_CONFIG_PATH ?? path.join(hermesHome, 'harp-config.yaml')
 }
 
-export function getHarpCandidatePaths(): string[] {
+export function getHarpCandidatePaths(): Array<string> {
   return candidatePaths()
 }
 
@@ -60,7 +60,7 @@ export type HarpTier = {
   label: string
   provider: string
   trigger: unknown
-  models: HarpTierModel[]
+  models: Array<HarpTierModel>
   base_url?: string
   key_env?: string
   setup_instructions?: string
@@ -96,13 +96,13 @@ export type HarpConfig = {
   routing: {
     strategy: string
     free_first: boolean
-    tier1_free: { provider: string; trigger: unknown; models: HarpTierModel[] }
-    tier2_paid: { provider: string; trigger: unknown; models: HarpTierModel[] }
-    tier3_codex?: { provider: string; trigger: unknown; models: HarpTierModel[]; auth_check?: string; setup_instructions?: string }
-    tier4_gemini?: { provider: string; trigger: unknown; models: HarpTierModel[]; base_url?: string; key_env?: string; setup_instructions?: string }
+    tier1_free: { provider: string; trigger: unknown; models: Array<HarpTierModel> }
+    tier2_paid: { provider: string; trigger: unknown; models: Array<HarpTierModel> }
+    tier3_codex?: { provider: string; trigger: unknown; models: Array<HarpTierModel>; auth_check?: string; setup_instructions?: string }
+    tier4_gemini?: { provider: string; trigger: unknown; models: Array<HarpTierModel>; base_url?: string; key_env?: string; setup_instructions?: string }
     tier5_local?: { provider: string; trigger: unknown; model?: string; base_url?: string }
   }
-  routing_blocklist: HarpBlocklistEntry[]
+  routing_blocklist: Array<HarpBlocklistEntry>
   auto_improve: HarpAutoImprove
   [key: string]: unknown
 }
@@ -139,7 +139,7 @@ export type HarpPatchSetGlobal = {
 export type HarpPatchReorderTierModels = {
   action: 'reorder-tier-models'
   tier: 'tier1_free' | 'tier2_paid'
-  models: HarpTierModel[]
+  models: Array<HarpTierModel>
 }
 
 export type HarpPatchAddTierModel = {
@@ -196,34 +196,23 @@ export function applyHarpPatch(patch: HarpPatch): HarpPatchResult {
       }
 
       case 'reorder-tier-models': {
-        const tier = config.routing[patch.tier]
-        if (tier) {
-          tier.models = patch.models
-        }
+        config.routing[patch.tier].models = patch.models
         break
       }
 
       case 'add-tier-model': {
-        const tier = config.routing[patch.tier]
-        if (tier) {
-          tier.models = tier.models ?? []
-          tier.models.push(patch.model)
-        }
+        config.routing[patch.tier].models.push(patch.model)
         break
       }
 
       case 'remove-tier-model': {
-        const tier = config.routing[patch.tier]
-        if (tier) {
-          tier.models = (tier.models ?? []).filter(
-            (m) => m.model !== patch.modelId,
-          )
-        }
+        config.routing[patch.tier].models = config.routing[patch.tier].models.filter(
+          (m) => m.model !== patch.modelId,
+        )
         break
       }
 
       case 'add-blocklist': {
-        config.routing_blocklist = config.routing_blocklist ?? []
         const exists = config.routing_blocklist.some(
           (e) => e.model === patch.entry.model,
         )
@@ -234,7 +223,7 @@ export function applyHarpPatch(patch: HarpPatch): HarpPatchResult {
       }
 
       case 'remove-blocklist': {
-        config.routing_blocklist = (config.routing_blocklist ?? []).filter(
+        config.routing_blocklist = config.routing_blocklist.filter(
           (e) => e.model !== patch.modelId,
         )
         break
@@ -315,10 +304,10 @@ export function createStarterHarpConfig(): HarpPatchResult {
 export type HarpConfigView = {
   available: boolean
   configPath: string
-  candidatePaths: string[]
+  candidatePaths: Array<string>
   global: HarpGlobalSettings
-  tiers: HarpTier[]
-  blocklist: HarpBlocklistEntry[]
+  tiers: Array<HarpTier>
+  blocklist: Array<HarpBlocklistEntry>
   autoImprove: HarpAutoImprove
 }
 
@@ -362,19 +351,19 @@ export function getHarpConfigView(): HarpConfigView {
   }
 
   const tierKeys = ['tier1_free', 'tier2_paid', 'tier3_codex', 'tier4_gemini', 'tier5_local'] as const
-  const tiers: HarpTier[] = tierKeys
+  const tiers: Array<HarpTier> = tierKeys
     .filter((k) => k in config.routing)
     .map((k) => {
       const raw = config.routing[k] as Record<string, unknown>
       return {
         key: k,
-        label: TIER_META[k]?.label ?? k,
-        provider: String(raw?.provider ?? ''),
-        trigger: raw?.trigger ?? [],
-        models: (raw?.models as HarpTierModel[] | undefined) ?? (raw?.model ? [{ model: String(raw.model), role: 'primary' }] : []),
-        base_url: raw?.base_url as string | undefined,
-        key_env: raw?.key_env as string | undefined,
-        setup_instructions: raw?.setup_instructions as string | undefined,
+        label: TIER_META[k].label,
+        provider: String(raw.provider ?? ''),
+        trigger: (raw.trigger ?? []) as Array<unknown>,
+        models: (raw.models as Array<HarpTierModel> | undefined) ?? (raw.model ? [{ model: String(raw.model), role: 'primary' }] : []),
+        base_url: raw.base_url as string | undefined,
+        key_env: raw.key_env as string | undefined,
+        setup_instructions: raw.setup_instructions as string | undefined,
       }
     })
 
@@ -384,7 +373,7 @@ export function getHarpConfigView(): HarpConfigView {
     candidatePaths: getHarpCandidatePaths(),
     global: config.harp_vm,
     tiers,
-    blocklist: config.routing_blocklist ?? [],
+    blocklist: config.routing_blocklist,
     autoImprove: config.auto_improve,
   }
 }

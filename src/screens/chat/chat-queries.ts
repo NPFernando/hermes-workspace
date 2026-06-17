@@ -24,7 +24,7 @@ function _indexKey(clientId: string, optimisticId: string): string {
   return `${clientId}::${optimisticId}`;
 }
 
-function rebuildClientIdIndex(messages: ChatMessage[]): void {
+function rebuildClientIdIndex(messages: Array<ChatMessage>): void {
   _clientIdIndex.clear();
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
@@ -48,7 +48,7 @@ function isMessageInIndex(message: ChatMessage): boolean {
 }
 
 // Rebuild index on every append call (amortized O(n) once, then O(1) lookups)
-function ensureIndexBuilt(friendlyId: string, sessionKey: string, messages: ChatMessage[]): void {
+function ensureIndexBuilt(friendlyId: string, sessionKey: string, messages: Array<ChatMessage>): void {
   const cacheKey = `${friendlyId}:${sessionKey}`;
   // Simple heuristic: if index is empty or messages changed significantly, rebuild
   if (_clientIdIndex.size === 0 || messages.length > _clientIdIndex.size * 2) {
@@ -407,7 +407,7 @@ export function appendHistoryMessage(
     },
   )
   // Rebuild index after mutation for O(1) lookups on next append
-  const updatedMessages = queryClient.getQueryData(chatQueryKeys.history(friendlyId, sessionKey)) as HistoryResponse | undefined;
+  const updatedMessages = queryClient.getQueryData<HistoryResponse>(chatQueryKeys.history(friendlyId, sessionKey));
   if (updatedMessages?.messages) {
     rebuildClientIdIndex(updatedMessages.messages);
   }
@@ -521,12 +521,12 @@ export function moveHistoryMessages(
 ) {
   const fromKey = chatQueryKeys.history(fromFriendlyId, fromSessionKey)
   const toKey = chatQueryKeys.history(toFriendlyId, toSessionKey)
-  const fromData = queryClient.getQueryData(fromKey) as Record<string, unknown> | undefined
+  const fromData = queryClient.getQueryData<HistoryResponse>(fromKey);
   if (!fromData) return
   const messages = Array.isArray(fromData.messages) ? fromData.messages : []
   queryClient.setQueryData(toKey, {
     sessionKey: toSessionKey,
-    sessionId: (fromData as any).sessionId,
+    sessionId: (fromData as HistoryResponse & { sessionId?: string }).sessionId,
     messages,
   })
   queryClient.removeQueries({ queryKey: fromKey, exact: true })

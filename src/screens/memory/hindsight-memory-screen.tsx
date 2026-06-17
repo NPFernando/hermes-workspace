@@ -1,14 +1,14 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  BrainIcon,
-  Search01Icon,
-  Clock01Icon,
-  CheckmarkCircle01Icon,
-  AlertCircleIcon,
-  Loading03Icon,
   Add01Icon,
-  Delete01Icon,
+  AlertCircleIcon,
+  BrainIcon,
   Cancel01Icon,
+  CheckmarkCircle01Icon,
+  Clock01Icon,
+  Delete01Icon,
+  Loading03Icon,
+  Search01Icon,
 } from '@hugeicons/core-free-icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useState } from 'react'
@@ -28,7 +28,7 @@ type HindsightMemory = {
   entities: string
   chunk_id: string | null
   proof_count: number
-  tags: string[]
+  tags: Array<string>
   consolidated_at: string | null
   consolidation_failed_at: string | null
 }
@@ -37,10 +37,10 @@ type HindsightRecallResult = {
   id: string
   text: string
   type: string
-  entities: string[]
+  entities: Array<string>
   context: string | null
   mentioned_at: string
-  tags: string[]
+  tags: Array<string>
 }
 
 type HindsightOperation = {
@@ -67,18 +67,18 @@ type StatusData = {
 }
 
 type MemoriesData = {
-  items: HindsightMemory[]
+  items: Array<HindsightMemory>
   total: number
   limit: number
   offset: number
 }
 
 type RecallData = {
-  results: HindsightRecallResult[]
+  results: Array<HindsightRecallResult>
 }
 
 type OperationsData = {
-  operations: HindsightOperation[]
+  operations: Array<HindsightOperation>
   total: number
 }
 

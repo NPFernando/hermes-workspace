@@ -11,6 +11,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 beforeEach(() => {
   vi.resetModules()
+  delete process.env.COOKIE_SECURE
+  delete process.env.NODE_ENV
+  delete process.env.TRUST_PROXY
+  delete process.env.HERMES_PASSWORD
+  delete process.env.CLAUDE_PASSWORD
 })
 
 afterEach(() => {

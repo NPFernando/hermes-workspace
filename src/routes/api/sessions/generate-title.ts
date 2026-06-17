@@ -37,7 +37,7 @@ export const Route = createFileRoute('/api/sessions/generate-title')({
         // Take first user + first assistant message for context
         const context = messages.slice(0, 2).map((m) => ({
           role: m.role,
-          content: truncate(String(m.content ?? ''), MAX_MSG_CHARS),
+          content: truncate(String(m.content), MAX_MSG_CHARS),
         }))
 
         try {
@@ -52,7 +52,7 @@ export const Route = createFileRoute('/api/sessions/generate-title')({
           if (!title) throw new Error('empty title from model')
           return json({ ok: true, title })
         } catch (err) {
-          const message = err instanceof Error ? err.message : String(err ?? 'Unknown error')
+          const message = err instanceof Error ? err.message : String(err)
           return json({ ok: false, error: message }, { status: 500 })
         }
       },

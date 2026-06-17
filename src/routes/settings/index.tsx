@@ -14,7 +14,6 @@ import {
   UserIcon,
   VolumeHighIcon,
 } from '@hugeicons/core-free-icons'
-import { HarpConfigScreen } from '@/screens/settings/harp-config-screen'
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import type * as React from 'react'
@@ -23,6 +22,7 @@ import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import type { ThemeId } from '@/lib/theme'
 import type { SettingsNavId } from '@/components/settings/settings-sidebar'
 import type {LocaleId} from '@/lib/i18n';
+import { HarpConfigScreen } from '@/screens/settings/harp-config-screen'
 import { GROQ_STT_MODELS, STT_PROVIDER_OPTIONS } from '@/lib/stt-config'
 import {
   SETTINGS_NAV_ITEMS,

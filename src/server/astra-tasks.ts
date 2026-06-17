@@ -3,9 +3,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { listTasks, getTask, updateTask, createTask } from './tasks-store'
-import type { TaskRecord, TaskColumn, TaskPriority, ActivityEntry } from './tasks-store'
+import { createTask, getTask, listTasks, updateTask } from './tasks-store'
 import { openaiChat } from './openai-compat-api'
+import type { ActivityEntry, TaskColumn, TaskPriority, TaskRecord } from './tasks-store'
 
 // Resolve hermes binary path — the systemd service PATH doesn't include ~/.local/bin
 function resolveHermesBin(): string {
@@ -15,7 +15,7 @@ function resolveHermesBin(): string {
     path.join(os.homedir(), '.hermes', 'bin', 'hermes'),
     '/usr/local/bin/hermes',
     'hermes',
-  ].filter(Boolean) as string[]
+  ].filter(Boolean) as Array<string>
   for (const p of candidates) {
     try { if (fs.existsSync(p)) return p } catch { /* skip */ }
   }
@@ -29,7 +29,7 @@ const HERMES_BIN = resolveHermesBin()
 // markTasksAsReviewing
 // ---------------------------------------------------------------------------
 
-export function markTasksAsReviewing(taskIds: string[]): void {
+export function markTasksAsReviewing(taskIds: Array<string>): void {
   const now = new Date().toISOString()
   for (const id of taskIds) {
     updateTask(id, {
@@ -104,9 +104,12 @@ function readTasks() {
   }
 }
 
-// Helper: write tasks.json
+// Helper: write tasks.json (atomic via rename)
 function writeTasks(data) {
-  fs.writeFileSync(TASKS_FILE, JSON.stringify(data, null, 2) + '\\n', 'utf-8');
+  const content = JSON.stringify(data, null, 2) + '\\n';
+  const tmp = TASKS_FILE + '.tmp';
+  fs.writeFileSync(tmp, content, 'utf-8');
+  fs.renameSync(tmp, TASKS_FILE);
 }
 
 // Helper: clear agent state on a set of task ids
@@ -248,7 +251,10 @@ function readTasks() {
 }
 
 function writeTasks(data) {
-  fs.writeFileSync(TASKS_FILE, JSON.stringify(data, null, 2) + '\\n', 'utf-8');
+  const content = JSON.stringify(data, null, 2) + '\\n';
+  const tmp = TASKS_FILE + '.tmp';
+  fs.writeFileSync(tmp, content, 'utf-8');
+  fs.renameSync(tmp, TASKS_FILE);
 }
 
 function getTaskDirect(taskId) {
@@ -409,7 +415,7 @@ function resolveSisterAndCwd(task: Pick<TaskRecord, 'assignee' | 'tags' | 'colum
     profileDir = 'novus'; displayName = 'Novus'; emoji = '⚙️'
   }
 
-  const tags = task.tags ?? []
+  const tags = task.tags
   const hermesTags = ['ui', 'dashboard', 'hermes', 'self-improvement']
 
   let workCwd = process.cwd()
@@ -461,7 +467,7 @@ export function executeTaskBackground(taskId: string): void {
   let recentCommits = ''
   try {
     const r = spawnSync('git', ['log', '--oneline', '-5'], { encoding: 'utf-8', cwd: workCwd, timeout: 5000 })
-    if (r.stdout?.trim()) recentCommits = r.stdout.trim()
+    if (r.stdout.trim()) recentCommits = r.stdout.trim()
   } catch { /* ok */ }
 
   // Build conversation context from history (agent replies + user replies)
@@ -481,7 +487,7 @@ export function executeTaskBackground(taskId: string): void {
 
   const taskLines = [
     `Task: ${task.title}`,
-    `Status: ${task.column} | Priority: ${task.priority}${task.tags?.length ? ' | Tags: ' + task.tags.join(', ') : ''}`,
+    `Status: ${task.column} | Priority: ${task.priority}${task.tags.length ? ' | Tags: ' + task.tags.join(', ') : ''}`,
     task.description ? `Description: ${task.description}` : '',
     recentCommits ? `Recent commits: ${recentCommits.split('\n').slice(0, 3).join(' | ')}` : '',
   ].filter(Boolean).join('\n')
@@ -534,15 +540,30 @@ export function executeTaskBackground(taskId: string): void {
 
   void (async () => {
     let output = ''
-    try {
-      output = await openaiChat(
+
+    const doChat = (signal: AbortSignal) =>
+      openaiChat(
         [
           { role: 'system', content: systemMsg },
           { role: 'user', content: userMsg },
         ],
-        { max_tokens: 900, temperature: 0.4 },
+        { max_tokens: 900, temperature: 0.4, signal },
       )
-    } catch { /* openaiChat failed */ }
+
+    try {
+      output = await doChat(AbortSignal.timeout(45_000))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const cause = err instanceof Error && 'cause' in err
+        ? String((err as { cause?: unknown }).cause)
+        : ''
+      console.error(`[executeTaskBackground] openaiChat failed: ${msg}${cause ? ` (cause: ${cause})` : ''} — retrying`)
+      try {
+        output = await doChat(AbortSignal.timeout(30_000))
+      } catch (err2) {
+        console.error('[executeTaskBackground] retry failed:', err2 instanceof Error ? err2.message : String(err2))
+      }
+    }
 
     let status = 'partial'
     let summary = ''
@@ -550,16 +571,19 @@ export function executeTaskBackground(taskId: string): void {
     let next = ''
     let question = ''
 
-    // Parse WORK_SUMMARY block
-    const block = (output.match(/<WORK_SUMMARY>([\s\S]*?)<\/WORK_SUMMARY>/) || [])[1] ?? ''
+    // Parse WORK_SUMMARY block — accepts both wrapped (<WORK_SUMMARY>…</WORK_SUMMARY>)
+    // and unwrapped (bare STATUS:/SUMMARY: lines) since some models drop the XML tags.
+    const block = output.match(/<WORK_SUMMARY>([\s\S]*?)<\/WORK_SUMMARY>/)?.[1] ?? ''
     const freeText = output.replace(/<WORK_SUMMARY>[\s\S]*?<\/WORK_SUMMARY>/g, '').trim()
 
-    if (block) {
-      const smMatch = block.match(/STATUS:\s*(\w+)/i)
-      const suMatch = block.match(/SUMMARY:\s*(.+)/i)
-      const chMatch = block.match(/CHANGES:\s*(.+)/i)
-      const nxMatch = block.match(/NEXT:\s*(.+)/i)
-      const qMatch = block.match(/QUESTION:\s*(.+)/i)
+    // Parse from the XML block if present; otherwise fall back to the raw output
+    const parseSource = block || (output.match(/^STATUS:/im) ? output : '')
+    if (parseSource) {
+      const smMatch = parseSource.match(/STATUS:\s*(\w+)/i)
+      const suMatch = parseSource.match(/SUMMARY:\s*(.+)/i)
+      const chMatch = parseSource.match(/CHANGES:\s*(.+)/i)
+      const nxMatch = parseSource.match(/NEXT:\s*(.+)/i)
+      const qMatch = parseSource.match(/QUESTION:\s*(.+)/i)
       if (smMatch) status = smMatch[1].toLowerCase()
       if (suMatch) summary = suMatch[1].trim().replace(/^\[|\]$/g, '')
       if (chMatch) changes = chMatch[1].trim().replace(/^\[|\]$/g, '')
@@ -567,13 +591,17 @@ export function executeTaskBackground(taskId: string): void {
       if (qMatch) question = qMatch[1].trim().replace(/^\[|\]$/g, '')
     }
 
-    // In continuation mode, the free text is Astra's conversational reply — use it as the note
-    const conversationalReply = hasConversation && freeText && !freeText.startsWith('You are') && freeText.length > 10
-      ? freeText
+    // In continuation mode, the free text is Astra's conversational reply — use it as the note.
+    // Also accept free-form output in initial mode when the model ignores the structured format.
+    const rawOutputIsUsable = output.trim().length > 10 && !output.trim().startsWith('You are')
+    const conversationalReply = (hasConversation || (!block && !parseSource)) && rawOutputIsUsable
+      ? freeText || output.trim()
       : ''
 
-    // Use conversational reply as primary note; fall back to SUMMARY from block
-    const primaryNote = conversationalReply || summary
+    // Use conversational reply as primary note; fall back to SUMMARY from block;
+    // last resort: first 400 chars of whatever the model returned
+    const primaryNote = conversationalReply || summary ||
+      (rawOutputIsUsable ? output.trim().slice(0, 400).replace(/\n{3,}/g, '\n\n') : '')
 
     if (!primaryNote) {
       // Parsing completely failed
@@ -600,7 +628,7 @@ export function executeTaskBackground(taskId: string): void {
     const existing = current?.agent_history ?? []
     const freshColumn = current?.column ?? task.column
 
-    const newColumn: import('./tasks-store').TaskColumn =
+    const newColumn: TaskColumn =
       status === 'done' ? 'review' :
       status === 'blocked' ? 'blocked' :
       status === 'needs_input' ? 'blocked' :
@@ -670,7 +698,7 @@ export type GeneratedTaskFields = {
   column: TaskColumn
   priority: TaskPriority
   assignee: string | null
-  tags: string[]
+  tags: Array<string>
 }
 
 export async function generateTaskFromText(text: string): Promise<GeneratedTaskFields | null> {
@@ -716,8 +744,8 @@ export async function generateTaskFromText(text: string): Promise<GeneratedTaskF
   const title = typeof p.title === 'string' ? p.title.trim() : ''
   if (!title) return null
 
-  const VALID_COLUMNS: TaskColumn[] = ['backlog', 'todo', 'in_progress', 'review', 'blocked', 'done']
-  const VALID_PRIORITIES: TaskPriority[] = ['high', 'medium', 'low']
+  const VALID_COLUMNS: Array<TaskColumn> = ['backlog', 'todo', 'in_progress', 'review', 'blocked', 'done']
+  const VALID_PRIORITIES: Array<TaskPriority> = ['high', 'medium', 'low']
 
   return {
     title,
@@ -733,7 +761,7 @@ export async function generateTaskFromText(text: string): Promise<GeneratedTaskF
 // breakdownTaskWithAI — split a complex task into concrete subtasks
 // ---------------------------------------------------------------------------
 
-export async function breakdownTaskWithAI(taskId: string): Promise<{ count: number; titles: string[] } | null> {
+export async function breakdownTaskWithAI(taskId: string): Promise<{ count: number; titles: Array<string> } | null> {
   const task = getTask(taskId)
   if (!task) return null
 
@@ -781,16 +809,16 @@ export async function breakdownTaskWithAI(taskId: string): Promise<{ count: numb
 
   if (!Array.isArray(parsed) || parsed.length === 0) return null
 
-  const VALID_PRIORITIES: TaskPriority[] = ['high', 'medium', 'low']
-  const subtasks = (parsed as Record<string, unknown>[]).filter(s => typeof s.title === 'string' && s.title)
+  const VALID_PRIORITIES: Array<TaskPriority> = ['high', 'medium', 'low']
+  const subtasks = (parsed as Array<Record<string, unknown>>).filter(s => typeof s.title === 'string' && s.title)
 
   if (subtasks.length === 0) return null
 
-  const titles: string[] = []
+  const titles: Array<string> = []
 
   for (const sub of subtasks) {
     const subTags = Array.isArray(sub.tags)
-      ? (sub.tags as string[]).filter(t => typeof t === 'string').slice(0, 4)
+      ? (sub.tags as Array<string>).filter(t => typeof t === 'string').slice(0, 4)
       : ['subtask', ...task.tags.slice(0, 2)]
 
     if (!subTags.includes('subtask')) subTags.unshift('subtask')
@@ -845,12 +873,12 @@ const IDEAS_FILE =
   process.env.HERMES_WORKSPACE_IDEAS_FILE ??
   path.join(process.cwd(), 'IDEAS.json')
 
-export function injectIdeasAsBacklog(): { injected: number; ideas: string[] } {
-  let ideas: IdeaEntry[] = []
+export function injectIdeasAsBacklog(): { injected: number; ideas: Array<string> } {
+  let ideas: Array<IdeaEntry> = []
   try {
     const raw = fs.readFileSync(IDEAS_FILE, 'utf-8').trim()
     const parsed = JSON.parse(raw) as unknown
-    ideas = Array.isArray(parsed) ? (parsed as IdeaEntry[]) : []
+    ideas = Array.isArray(parsed) ? (parsed as Array<IdeaEntry>) : []
   } catch {
     return { injected: 0, ideas: [] }
   }
@@ -861,7 +889,7 @@ export function injectIdeasAsBacklog(): { injected: number; ideas: string[] } {
   const allTasks = listTasks({ includeDone: true })
   const existingTitles = new Set(allTasks.map((t) => t.title.toLowerCase()))
 
-  const injectedTitles: string[] = []
+  const injectedTitles: Array<string> = []
 
   for (const idea of ideas) {
     if (!idea.title) continue
@@ -894,7 +922,7 @@ export function injectIdeasAsBacklog(): { injected: number; ideas: string[] } {
 // generateIdeasWithAI
 // ---------------------------------------------------------------------------
 
-export function generateIdeasWithAI(): { injected: number; ideas: string[]; error?: string } {
+export function generateIdeasWithAI(): { injected: number; ideas: Array<string>; error?: string } {
   const hermesHome =
     process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
 
@@ -902,11 +930,11 @@ export function generateIdeasWithAI(): { injected: number; ideas: string[]; erro
   const allTasks = listTasks({ includeDone: true })
   const existingTaskTitles = allTasks.map((t) => t.title).slice(0, 50)
 
-  let existingIdeas: IdeaEntry[] = []
+  let existingIdeas: Array<IdeaEntry> = []
   try {
     const raw = fs.readFileSync(IDEAS_FILE, 'utf-8').trim()
     const parsed = JSON.parse(raw) as unknown
-    existingIdeas = Array.isArray(parsed) ? (parsed as IdeaEntry[]) : []
+    existingIdeas = Array.isArray(parsed) ? (parsed as Array<IdeaEntry>) : []
   } catch { /* ok if file doesn't exist */ }
 
   const allSkipTitles = [
@@ -922,7 +950,7 @@ export function generateIdeasWithAI(): { injected: number; ideas: string[]; erro
       cwd: process.cwd(),
       timeout: 5000,
     })
-    if (r.stdout?.trim()) recentCommits = r.stdout.trim()
+    if (r.stdout.trim()) recentCommits = r.stdout.trim()
   } catch { /* ok */ }
 
   // App screen list from routes — gives AI a clear map of what exists
@@ -933,7 +961,7 @@ export function generateIdeasWithAI(): { injected: number; ideas: string[]; erro
       ['src/routes', '-name', 'index.tsx', '-not', '-path', '*/api/*'],
       { encoding: 'utf-8', cwd: process.cwd(), timeout: 5000 },
     )
-    if (r.stdout?.trim()) {
+    if (r.stdout.trim()) {
       screenList = r.stdout
         .trim()
         .split('\n')
@@ -950,7 +978,7 @@ export function generateIdeasWithAI(): { injected: number; ideas: string[]; erro
       cwd: process.cwd(),
       timeout: 5000,
     })
-    if (r.stdout?.trim()) {
+    if (r.stdout.trim()) {
       screenDirs = r.stdout
         .trim()
         .split('\n')
@@ -966,7 +994,7 @@ export function generateIdeasWithAI(): { injected: number; ideas: string[]; erro
       encoding: 'utf-8',
       timeout: 5000,
     })
-    if (r.stdout?.trim()) {
+    if (r.stdout.trim()) {
       vmProjects = r.stdout
         .trim()
         .split('\n')
@@ -982,7 +1010,7 @@ export function generateIdeasWithAI(): { injected: number; ideas: string[]; erro
       path.join(hermesHome, 'config', 'sisters.yaml'),
       'utf-8',
     )
-    const names = [...sistersYaml.matchAll(/^  name:\s+"?([^"\n]+)"?/gm)].map((m) => m[1])
+    const names = [...sistersYaml.matchAll(/^ {2}name:\s+"?([^"\n]+)"?/gm)].map((m) => m[1])
     if (names.length > 0) sisterNames = names.join(', ')
   } catch { /* ok */ }
 
@@ -1044,12 +1072,12 @@ Return ONLY a valid JSON array, no explanation before or after:
     maxBuffer: 4 * 1024 * 1024,
   })
 
-  if (result.status !== 0 || !result.stdout?.trim()) {
+  if (result.status !== 0 || !result.stdout.trim()) {
     return { injected: 0, ideas: [], error: 'AI call failed or returned empty' }
   }
 
   // ── 4. Parse JSON from response ──────────────────────────────────────────
-  let generated: IdeaEntry[] = []
+  let generated: Array<IdeaEntry> = []
   try {
     const text = result.stdout.trim()
     let parsed: unknown
@@ -1061,8 +1089,8 @@ Return ONLY a valid JSON array, no explanation before or after:
       if (match) parsed = JSON.parse(match[0])
     }
     if (Array.isArray(parsed)) {
-      generated = (parsed as IdeaEntry[]).filter(
-        (e) => e && typeof e.title === 'string' && e.title.trim(),
+      generated = (parsed as Array<IdeaEntry>).filter(
+        (e) => typeof e.title === 'string' && Boolean(e.title.trim()),
       )
     }
   } catch {

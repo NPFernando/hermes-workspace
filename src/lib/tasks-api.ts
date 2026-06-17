@@ -116,7 +116,7 @@ export type ClaudeTask = {
   agent_action_at?: string | null
   source?: TaskSource
   agent_comment?: string | null
-  agent_history?: ActivityEntry[]
+  agent_history?: Array<ActivityEntry>
   waiting_for_user?: boolean
 }
 
@@ -229,7 +229,7 @@ export async function launchSession(taskId: string): Promise<{ sessionId: string
   return res.json()
 }
 
-export async function breakdownTask(taskId: string): Promise<{ ok: boolean; count: number; titles: string[] }> {
+export async function breakdownTask(taskId: string): Promise<{ ok: boolean; count: number; titles: Array<string> }> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}?action=breakdown`, {
     method: 'POST',

@@ -35,7 +35,7 @@ export type HindsightMemory = {
   entities: string
   chunk_id: string | null
   proof_count: number
-  tags: string[]
+  tags: Array<string>
   consolidated_at: string | null
   consolidation_failed_at: string | null
 }
@@ -44,7 +44,7 @@ export type HindsightRecallResult = {
   id: string
   text: string
   type: string
-  entities: string[]
+  entities: Array<string>
   context: string | null
   occurred_start: string | null
   occurred_end: string | null
@@ -52,7 +52,7 @@ export type HindsightRecallResult = {
   document_id: string | null
   metadata: Record<string, unknown>
   chunk_id: string | null
-  tags: string[]
+  tags: Array<string>
 }
 
 export type HindsightOperation = {
@@ -105,7 +105,7 @@ export async function listHindsightMemories(opts: {
   q?: string
   limit?: number
   offset?: number
-}): Promise<{ items: HindsightMemory[]; total: number; limit: number; offset: number }> {
+}): Promise<{ items: Array<HindsightMemory>; total: number; limit: number; offset: number }> {
   const params = new URLSearchParams()
   if (opts.q) params.set('q', opts.q)
   params.set('limit', String(opts.limit ?? 50))
@@ -116,7 +116,7 @@ export async function listHindsightMemories(opts: {
 export async function recallHindsight(
   query: string,
   budget = 'mid',
-): Promise<{ results: HindsightRecallResult[] }> {
+): Promise<{ results: Array<HindsightRecallResult> }> {
   return hFetch(`/v1/default/banks/${BANK}/memories/recall`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -126,7 +126,7 @@ export async function recallHindsight(
 
 export async function listHindsightOperations(
   limit = 20,
-): Promise<{ operations: HindsightOperation[]; total: number }> {
+): Promise<{ operations: Array<HindsightOperation>; total: number }> {
   return hFetch(`/v1/default/banks/${BANK}/operations?limit=${limit}`)
 }
 

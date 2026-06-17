@@ -10,7 +10,6 @@ import {
 } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-
 import {
   deriveFriendlyIdFromKey,
   isMissingAuth,
@@ -67,6 +66,11 @@ import {
   CHAT_RUN_COMMAND_EVENT,
   CHAT_SUBMIT_SELECTION_EVENT,
 } from './chat-events'
+import { ArtifactPanel } from './components/artifact-panel'
+import {
+  ArtifactPanelContext
+  
+} from './contexts/artifact-panel-context'
 import type {
   ChatRunCommandDetail,
   ChatSubmitSelectionDetail,
@@ -81,6 +85,9 @@ import type {
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import type {AgentActivity} from '@/stores/chat-activity-store';
+import type {ArtifactPanelState} from './contexts/artifact-panel-context';
+import type { InlineArtifact } from './components/message-item'
+import KeyboardShortcuts from '@/components/KeyboardShortcuts'
 import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { playChatComplete } from '@/lib/sounds'
 import {
@@ -98,12 +105,6 @@ import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
-import { ArtifactPanel } from './components/artifact-panel'
-import {
-  ArtifactPanelContext,
-  type ArtifactPanelState,
-} from './contexts/artifact-panel-context'
-import type { InlineArtifact } from './components/message-item'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
@@ -113,7 +114,7 @@ import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
 // ContextMeter removed — ContextBar (PR #32) replaces it
 import { persistRecoveryMessage, useChatStore } from '@/stores/chat-store'
 import { useSessionModelStore } from '@/stores/session-model-store'
-import { useResearchCard, setActiveResearch } from '@/hooks/use-research-card'
+import { setActiveResearch, useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
@@ -2770,6 +2771,7 @@ export function ChatScreen({
       )}
       style={{ background: 'var(--theme-bg)' }}
     >
+    <KeyboardShortcuts />
       <div
         className={cn(
           'flex-1 min-h-0 overflow-hidden',

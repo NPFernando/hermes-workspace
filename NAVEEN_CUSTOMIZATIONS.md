@@ -55,8 +55,11 @@ When `upstream-sync.py` reports that upstream touched one of our files:
 | `src/routes/api/odysseus.$.ts` | NEW — catch-all proxy /api/odysseus/** → http://127.0.0.1:7100/api/**; Hermes auth enforced at perimeter | Personal customization | Keep always |
 | `src/routes/research.tsx` | NEW — /research route (Deep Research UI) | Personal customization | Keep always |
 | `src/screens/research/research-screen.tsx` | NEW — Deep Research screen: query form, SSE progress stream, result renderer, past research library | Personal customization | Keep always |
-| `src/screens/chat/components/chat-sidebar.tsx` | Added Telescope02Icon import + Research nav item in mainItems | Personal customization | Keep; merge if upstream changes sidebar structure |
-| `src/components/mobile-tab-bar.tsx` | Added Research tab (Telescope02Icon, /research) to MOBILE_NAV_TABS | Personal customization | Keep; merge if upstream changes tab bar |
+| `src/screens/chat/components/chat-sidebar.tsx` | Added Telescope02Icon + Research nav item; replaced "Agent Team" + "Operations" items with single "Command Center" → /command | Personal customization | Keep; merge if upstream changes sidebar structure |
+| `src/components/mobile-tab-bar.tsx` | Added Research tab (Telescope02Icon, /research); renamed 'operations' tab to 'command' → /command | Personal customization | Keep; merge if upstream changes tab bar |
+| `src/routes/command.tsx` | NEW — /command route (Command Center page, SSR disabled) | Personal customization | Keep always |
+| `src/screens/command/command-center-screen.tsx` | NEW — Command Center: unified agent roster (AI sisters + delegation profiles), swarm personality roster, Agent Bus panel, recent activity; replaces separate Agents + Operations nav entries | Personal customization | Keep always |
+| `~/.hermes/config/sisters.yaml` | Added emoji field to all 12 AI sisters (🌟⚙️🔬🌙🔨⚖️💬💼📡🎨📊💻) | Personal customization | Keep; CLI config, not a workspace file |
 | `vite.config.ts` | Added startOdysseus() auto-start: spawns services/odysseus venv uvicorn, health check, SIGTERM on dev stop | Personal customization | Keep; merge carefully if upstream changes vite plugin structure |
 | `package.json` | start:all now includes `bash scripts/start-odysseus.sh` via concurrently | Personal customization | Keep; merge if upstream changes start:all |
 

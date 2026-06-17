@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { UserGroupIcon, Rocket01Icon, UserMultipleIcon } from '@hugeicons/core-free-icons'
+import { Rocket01Icon, UserGroupIcon, UserMultipleIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@/components/ui/button'
 
@@ -44,7 +44,7 @@ const TYPE_BADGE: Record<SisterType, { label: string; classes: string }> = {
 }
 
 function SisterCard({ sister }: { sister: Sister }) {
-  const badge = TYPE_BADGE[sister.type] ?? TYPE_BADGE.delegation_profile
+  const badge = TYPE_BADGE[sister.type]
 
   return (
     <div
@@ -143,7 +143,7 @@ export function AgentsScreen() {
     queryFn: async () => {
       const res = await fetch('/api/sisters')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = (await res.json()) as { ok: boolean; sisters?: Sister[] }
+      const data = (await res.json()) as { ok: boolean; sisters?: Array<Sister> }
       return data.sisters ?? []
     },
     staleTime: 30_000,
@@ -155,7 +155,7 @@ export function AgentsScreen() {
     queryFn: async () => {
       const res = await fetch('/api/personality-swarm')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = (await res.json()) as { ok: boolean; presets?: PersonalityPreset[] }
+      const data = (await res.json()) as { ok: boolean; presets?: Array<PersonalityPreset> }
       return data.presets ?? []
     },
     staleTime: 60_000,

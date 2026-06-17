@@ -12,11 +12,11 @@ export const Route = createFileRoute('/api/hindsight/retain')({
         }
         try {
           const body = (await request.json()) as { content?: string; context?: string }
-          const content = String(body?.content ?? '').trim()
+          const content = String(body.content ?? '').trim()
           if (!content) {
             return json({ error: 'content is required' }, { status: 400 })
           }
-          return json(await retainHindsight(content, body?.context?.trim()))
+          return json(await retainHindsight(content, body.context?.trim()))
         } catch (err) {
           return json(
             { error: err instanceof Error ? err.message : 'Retain failed' },

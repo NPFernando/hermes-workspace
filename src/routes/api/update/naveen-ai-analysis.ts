@@ -8,11 +8,12 @@ import {
   requireJsonContentType,
 } from '../../../server/rate-limit'
 import {
+  
   generateNaveenAiAnalysis,
   readCachedAiAnalysis,
-  readNaveenUpdateStatus,
-  type ConflictFile,
+  readNaveenUpdateStatus
 } from '../../../server/naveen-update'
+import type {ConflictFile} from '../../../server/naveen-update';
 
 export const Route = createFileRoute('/api/update/naveen-ai-analysis')({
   server: {
@@ -38,7 +39,7 @@ export const Route = createFileRoute('/api/update/naveen-ai-analysis')({
         }
         try {
           const body = (await request.json().catch(() => ({}))) as {
-            conflicts?: ConflictFile[]
+            conflicts?: Array<ConflictFile>
           }
           // Use provided conflicts or fetch from current status
           let conflicts = body.conflicts

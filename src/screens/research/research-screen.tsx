@@ -85,7 +85,7 @@ export function ResearchScreen() {
   const [maxTime, setMaxTime] = useState(300)
   const [phase, setPhase] = useState<ResearchPhase>('idle')
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [steps, setSteps] = useState<ProgressStep[]>([])
+  const [steps, setSteps] = useState<Array<ProgressStep>>([])
   const [result, setResult] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'new' | 'library'>('new')
@@ -105,11 +105,11 @@ export function ResearchScreen() {
     }
   }, [])
 
-  const appendStep = useCallback((phase: string, message: string) => {
+  const appendStep = useCallback((stepPhase: string, message: string) => {
     stepCounterRef.current += 1
     setSteps((prev) => [
       ...prev,
-      { id: stepCounterRef.current, phase, message, timestamp: Date.now() },
+      { id: stepCounterRef.current, phase: stepPhase, message, timestamp: Date.now() },
     ])
   }, [])
 
@@ -166,7 +166,7 @@ export function ResearchScreen() {
               void fetchResult(sid)
             }
           } else {
-            setPhase((event.phase as ResearchPhase) ?? 'running')
+            setPhase((event.phase as ResearchPhase | undefined) ?? 'running')
           }
         } catch {
           // ignore parse errors
@@ -225,12 +225,12 @@ export function ResearchScreen() {
   })
 
   // ── Library data ───────────────────────────────────────────────────────────
-  const { data: library } = useQuery<LibraryEntry[]>({
+  const { data: library } = useQuery<Array<LibraryEntry>>({
     queryKey: ['odysseus-research-library'],
     queryFn: async () => {
       const res = await fetch('/api/odysseus/research/library')
       if (!res.ok) return []
-      const data = (await res.json()) as { research?: LibraryEntry[] }
+      const data = (await res.json()) as { research?: Array<LibraryEntry> }
       return data.research ?? []
     },
     enabled: activeTab === 'library',
@@ -493,7 +493,7 @@ function LibraryView({
   entries,
   onSelect,
 }: {
-  entries: LibraryEntry[]
+  entries: Array<LibraryEntry>
   onSelect: (e: LibraryEntry) => void
 }) {
   if (entries.length === 0) {

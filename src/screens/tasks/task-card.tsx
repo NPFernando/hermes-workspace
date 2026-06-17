@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react'
-import { cn } from '@/lib/utils'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Delete01Icon, MoreVerticalIcon, PlayIcon, Rocket01Icon, SplitIcon } from '@hugeicons/core-free-icons'
 import type { ClaudeTask, TaskAgentState, TaskColumn, TaskPriority } from '@/lib/tasks-api'
+import { cn } from '@/lib/utils'
 import { COLUMN_LABELS, COLUMN_ORDER, PRIORITY_COLORS, isOverdue } from '@/lib/tasks-api'
-import { MenuRoot, MenuTrigger, MenuContent, MenuItem } from '@/components/ui/menu'
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from '@/components/ui/menu'
 
 function relativeTime(isoStr: string): string {
   const diff = Date.now() - new Date(isoStr).getTime()
@@ -91,13 +91,11 @@ function SourceBadge({ source }: { source: ClaudeTask['source'] }) {
       </span>
     )
   }
-  if (source === 'astra') {
-    return (
-      <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
-        ✦ astra
-      </span>
-    )
-  }
+  return (
+    <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
+      ✦ astra
+    </span>
+  )
   return null
 }
 
@@ -227,7 +225,7 @@ export function TaskCard({
             >
               Priority
             </div>
-            {(['high', 'medium', 'low'] as TaskPriority[]).map(p => (
+            {(['high', 'medium', 'low'] as Array<TaskPriority>).map(p => (
               <MenuItem
                 key={p}
                 onClick={(e) => { e.stopPropagation(); onChangePriority(p) }}
@@ -486,7 +484,7 @@ export function TaskCard({
               )}
               <span className={overdue ? 'text-red-400 font-semibold' : 'text-[var(--theme-muted)]'}>
                 {(() => {
-                  const [y, m, d] = task.due_date!.split('-').map(Number)
+                  const [y, m, d] = task.due_date.split('-').map(Number)
                   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 })()}
               </span>

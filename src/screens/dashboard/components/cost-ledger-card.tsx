@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import { detectNovusOpportunity } from '@/lib/novus-opportunity-detector'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { detectNovusOpportunity } from '@/lib/novus-opportunity-detector'
 
 const SUBSCRIPTION_PATTERNS: Array<RegExp> = [
   /(^|[\s:/\-])codex(\b|[-/])/i,

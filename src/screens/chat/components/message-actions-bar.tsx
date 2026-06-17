@@ -3,9 +3,9 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Copy01Icon,
   RefreshIcon,
-  Tick02Icon,
   ThumbsDownIcon,
   ThumbsUpIcon,
+  Tick02Icon,
 } from '@hugeicons/core-free-icons'
 import { MessageTimestamp } from './message-timestamp'
 import {

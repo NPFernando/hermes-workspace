@@ -12,8 +12,9 @@ import { getRootSurfaceState } from './-root-layout-state'
 import type {AuthStatus} from '@/lib/claude-auth';
 import { SearchModal } from '@/components/search/search-modal'
 import { UsageMeter } from '@/components/usage-meter'
-import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
-import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
+import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener';
+import { GlobalShortcutListener } from '@/components/global-shortcut-listener';
+import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrigger'
 import { Toaster } from '@/components/ui/toast'
@@ -353,7 +354,7 @@ function RootLayout() {
                 if (
                   !cancelled &&
                   (connectionStatus?.ok ||
-                    (connectionStatus?.chatReady && connectionStatus?.modelConfigured))
+                    (connectionStatus?.chatReady && connectionStatus.modelConfigured))
                 ) {
                   localStorage.setItem(ONBOARDING_KEY, 'true')
                   setOnboardingComplete(true)
@@ -385,6 +386,7 @@ function RootLayout() {
           <SettingsSyncMount />
           <GlobalShortcutListener />
           <TerminalShortcutListener />
+          <KeyboardShortcuts />
           <WorkspaceShell>
             <ErrorBoundary
               className="h-full min-h-0 flex-1"

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Refresh01Icon, Idea01Icon, Alert01Icon, CheckmarkCircle01Icon } from '@hugeicons/core-free-icons'
+import { Alert01Icon, CheckmarkCircle01Icon, Idea01Icon, Refresh01Icon } from '@hugeicons/core-free-icons'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 
 type Suggestion = {
@@ -26,8 +26,8 @@ function isPaidAndReplaceable(modelId: string): boolean {
   return id.includes('claude') || id.includes('gpt') || id.includes('deepseek') || id.includes('openai')
 }
 
-function buildSuggestions(overview: DashboardOverview | null, cycleIdx: number): Suggestion[] {
-  const suggestions: Suggestion[] = []
+function buildSuggestions(overview: DashboardOverview | null, cycleIdx: number): Array<Suggestion> {
+  const suggestions: Array<Suggestion> = []
 
   if (!overview) {
     suggestions.push({
@@ -113,7 +113,7 @@ function buildSuggestions(overview: DashboardOverview | null, cycleIdx: number):
 
   // ── 5. Generic optimization if nothing else ────────────────────────────
   if (suggestions.length === 0) {
-    const defaults: Suggestion[] = [
+    const defaults: Array<Suggestion> = [
       {
         id: 'harp-tip',
         icon: 'idea',

@@ -94,7 +94,7 @@ export function tierLabel(modelPreference?: string): string {
 }
 
 // Color for badge UI rendering
-export const SISTER_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+export const SISTER_COLORS: Partial<Record<string, { bg: string; text: string; border: string }>> = {
   astra:      { bg: 'bg-violet-500/15',  text: 'text-violet-400',  border: 'border-violet-400/30' },
   novus:      { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-400/30' },
   nova:       { bg: 'bg-sky-500/15',     text: 'text-sky-400',     border: 'border-sky-400/30' },
@@ -130,12 +130,12 @@ export const WORKER_ROLE_TO_SISTER: Record<string, string> = {
 const ASTRA_IS_DEFAULT = true
 
 function getProfilePath(hermesRoot: string, id: string): string {
-  if (id === 'astra' && ASTRA_IS_DEFAULT) return hermesRoot
+  if (id === 'astra') return hermesRoot
   return path.join(hermesRoot, 'profiles', id)
 }
 
 function checkProfileLive(profilePath: string, id?: string): { hasProfile: boolean; isLive: boolean } {
-  if (id === 'astra' && ASTRA_IS_DEFAULT) {
+  if (id === 'astra') {
     // Astra's "profile" is always live — it IS the root hermes config
     return { hasProfile: true, isLive: true }
   }
@@ -147,13 +147,25 @@ function checkProfileLive(profilePath: string, id?: string): { hasProfile: boole
 
 // ── Source readers ──────────────────────────────────────────────────────────
 
-function readAiSisters(hermesRoot: string): Sister[] {
+function readAiSisters(hermesRoot: string): Array<Sister> {
   const sistersYaml = safeParseYaml(path.join(hermesRoot, 'config', 'sisters.yaml'))
-  const sistersMap = obj(sistersYaml.sisters)
-  const result: Sister[] = []
+  const raw = sistersYaml.sisters
 
-  for (const [id, raw] of Object.entries(sistersMap)) {
-    const entry = obj(raw)
+  // sisters.yaml may use list format [{id, name, ...}] or dict format {id: {...}}
+  let entries: Array<[string, Record<string, unknown>]>
+  if (Array.isArray(raw)) {
+    entries = raw
+      .filter((item): item is Record<string, unknown> => item && typeof item === 'object' && !Array.isArray(item))
+      .filter((item) => typeof item.id === 'string' && item.id)
+      .map((item) => [item.id as string, item])
+  } else {
+    entries = Object.entries(obj(raw)).map(([k, v]) => [k, obj(v)])
+  }
+
+  const result: Array<Sister> = []
+
+  for (const [id, entry_] of entries) {
+    const entry = obj(entry_)
     if (entry.enabled === false) continue
     const profilePath = getProfilePath(hermesRoot, id)
     const { hasProfile, isLive } = checkProfileLive(profilePath, id)
@@ -180,10 +192,10 @@ function readAiSisters(hermesRoot: string): Sister[] {
   return result
 }
 
-function readBusinessAgents(hermesRoot: string): Sister[] {
+function readBusinessAgents(hermesRoot: string): Array<Sister> {
   const sistersYaml = safeParseYaml(path.join(hermesRoot, 'config', 'sisters.yaml'))
   const businessMap = obj(sistersYaml.business_agents)
-  const result: Sister[] = []
+  const result: Array<Sister> = []
 
   for (const [id, raw] of Object.entries(businessMap)) {
     const entry = obj(raw)
@@ -208,9 +220,9 @@ function readBusinessAgents(hermesRoot: string): Sister[] {
   return result
 }
 
-function readDelegationProfiles(hermesRoot: string): Sister[] {
+function readDelegationProfiles(hermesRoot: string): Array<Sister> {
   const profilesYaml = safeParseYaml(path.join(hermesRoot, 'sister_profiles.yaml'))
-  const result: Sister[] = []
+  const result: Array<Sister> = []
 
   for (const [id, raw] of Object.entries(profilesYaml)) {
     const entry = obj(raw)
@@ -238,11 +250,11 @@ function readDelegationProfiles(hermesRoot: string): Sister[] {
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
-let _cached: Sister[] | null = null
+let _cached: Array<Sister> | null = null
 let _cachedAt = 0
 const CACHE_TTL = 30_000
 
-export function listSisters(skipCache = false): Sister[] {
+export function listSisters(skipCache = false): Array<Sister> {
   const now = Date.now()
   if (!skipCache && _cached && now - _cachedAt < CACHE_TTL) return _cached
 
@@ -253,7 +265,7 @@ export function listSisters(skipCache = false): Sister[] {
 
   // De-duplicate: AI sisters take priority over delegation profiles with same id
   const seen = new Set<string>()
-  const deduped: Sister[] = []
+  const deduped: Array<Sister> = []
   for (const s of [...ai, ...delegation, ...business]) {
     if (!seen.has(s.id)) {
       seen.add(s.id)
@@ -319,7 +331,7 @@ function buildProfileConfig(sister: Sister): string {
 export function ensureSisterProfile(sister: Sister): void {
   // Astra IS the default profile (root ~/.hermes/). Never create a subdir for it —
   // that would produce a duplicate entry in the profiles list.
-  if (sister.id === 'astra' && ASTRA_IS_DEFAULT) return
+  if (sister.id === 'astra') return
 
   const { profilePath } = sister
   if (!fs.existsSync(profilePath)) {

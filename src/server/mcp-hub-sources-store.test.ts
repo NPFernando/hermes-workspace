@@ -25,6 +25,7 @@ import {
 
 let homeDir: string
 let originalHermesHome: string | undefined
+let originalStateDir: string | undefined
 
 function writeSourcesFile(payload: unknown): void {
   const path = join(homeDir, 'mcp-hub-sources.json')
@@ -48,13 +49,17 @@ const VALID_USER_SOURCE = {
 beforeEach(() => {
   homeDir = mkdtempSync(join(tmpdir(), 'hermes-hub-sources-'))
   originalHermesHome = process.env.HERMES_HOME
+  originalStateDir = process.env.HERMES_WORKSPACE_STATE_DIR
   process.env.HERMES_HOME = homeDir
+  process.env.HERMES_WORKSPACE_STATE_DIR = homeDir
   __resetHubSourcesCacheForTests()
 })
 
 afterEach(() => {
   if (originalHermesHome === undefined) delete process.env.HERMES_HOME
   else process.env.HERMES_HOME = originalHermesHome
+  if (originalStateDir === undefined) delete process.env.HERMES_WORKSPACE_STATE_DIR
+  else process.env.HERMES_WORKSPACE_STATE_DIR = originalStateDir
   rmSync(homeDir, { recursive: true, force: true })
   __resetHubSourcesCacheForTests()
 })

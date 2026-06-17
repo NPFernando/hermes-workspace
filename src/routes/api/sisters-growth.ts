@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { listSisters } from '../../server/sisters-registry'
-import { getGrowthLog, getGrowthLevel } from '../../server/sisters-growth'
+import { getGrowthLevel, getGrowthLog } from '../../server/sisters-growth'
 
 export const Route = createFileRoute('/api/sisters-growth')({
   server: {

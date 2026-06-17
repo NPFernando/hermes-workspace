@@ -11,11 +11,11 @@ type SisterEntry = {
   handoffTo?: string
 }
 
-async function fetchSistersForBus(): Promise<SisterEntry[]> {
+async function fetchSistersForBus(): Promise<Array<SisterEntry>> {
   try {
     const res = await fetch('/api/sisters')
     if (!res.ok) return []
-    const payload = (await res.json()) as { ok?: boolean; sisters?: SisterEntry[] }
+    const payload = (await res.json()) as { ok?: boolean; sisters?: Array<SisterEntry> }
     return Array.isArray(payload.sisters) ? payload.sisters : []
   } catch {
     return []

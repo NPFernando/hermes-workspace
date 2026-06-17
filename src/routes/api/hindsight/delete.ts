@@ -12,7 +12,7 @@ export const Route = createFileRoute('/api/hindsight/delete')({
         }
         try {
           const body = (await request.json()) as { id?: string }
-          const id = String(body?.id ?? '').trim()
+          const id = String(body.id ?? '').trim()
           if (!id) {
             return json({ error: 'id is required' }, { status: 400 })
           }

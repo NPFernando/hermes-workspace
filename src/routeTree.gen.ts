@@ -31,6 +31,7 @@ import { Route as EchoStudioRouteImport } from './routes/echo-studio'
 import { Route as EarlyAccessRouteImport } from './routes/early-access'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConductorRouteImport } from './routes/conductor'
+import { Route as CommandRouteImport } from './routes/command'
 import { Route as AgoraRouteImport } from './routes/agora'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as SplatRouteImport } from './routes/$'
@@ -42,6 +43,7 @@ import { Route as ReserveConfirmRouteImport } from './routes/reserve/confirm'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiVtCapitalRouteImport } from './routes/api/vt-capital'
+import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
 import { Route as ApiUserSettingsRouteImport } from './routes/api/user-settings'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
@@ -54,6 +56,7 @@ import { Route as ApiTasksFromTextRouteImport } from './routes/api/tasks-from-te
 import { Route as ApiTasksDeployAgentsRouteImport } from './routes/api/tasks-deploy-agents'
 import { Route as ApiTasksAstraReviewRouteImport } from './routes/api/tasks-astra-review'
 import { Route as ApiTasksAskAstraRouteImport } from './routes/api/tasks-ask-astra'
+import { Route as ApiTasksRouteImport } from './routes/api/tasks'
 import { Route as ApiSystemMetricsRouteImport } from './routes/api/system-metrics'
 import { Route as ApiSwarmTmuxStopRouteImport } from './routes/api/swarm-tmux-stop'
 import { Route as ApiSwarmTmuxStartRouteImport } from './routes/api/swarm-tmux-start'
@@ -97,6 +100,7 @@ import { Route as ApiPersonalitySwarmRouteImport } from './routes/api/personalit
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiOdysseusBootstrapRouteImport } from './routes/api/odysseus-bootstrap'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
+import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiMemoryRouteImport } from './routes/api/memory'
 import { Route as ApiMediaRouteImport } from './routes/api/media'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
@@ -111,14 +115,18 @@ import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-statu
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
+import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
 import { Route as ApiConnectionStatusRouteImport } from './routes/api/connection-status'
 import { Route as ApiConnectionSettingsRouteImport } from './routes/api/connection-settings'
 import { Route as ApiConfigPatchRouteImport } from './routes/api/config-patch'
+import { Route as ApiConfigGetRouteImport } from './routes/api/config-get'
 import { Route as ApiConductorStopRouteImport } from './routes/api/conductor-stop'
 import { Route as ApiConductorSpawnRouteImport } from './routes/api/conductor-spawn'
 import { Route as ApiCommandsRouteImport } from './routes/api/commands'
+import { Route as ApiCliAgentsRouteImport } from './routes/api/cli-agents'
 import { Route as ApiClaudeUpdateRouteImport } from './routes/api/claude-update'
 import { Route as ApiClaudeTasksAssigneesRouteImport } from './routes/api/claude-tasks-assignees'
 import { Route as ApiClaudeTasksRouteImport } from './routes/api/claude-tasks'
@@ -128,7 +136,12 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as ApiAgentPauseRouteImport } from './routes/api/agent-pause'
+import { Route as ApiAgentDispatchRouteImport } from './routes/api/agent-dispatch'
 import { Route as ApiAgentBusRouteImport } from './routes/api/agent-bus'
+import { Route as ApiWorkspaceStatsRouteImport } from './routes/api/workspace/stats'
+import { Route as ApiWorkspaceSkillsRouteImport } from './routes/api/workspace/skills'
+import { Route as ApiWorkspaceMemoryFilesRouteImport } from './routes/api/workspace/memory-files'
 import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
 import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
 import { Route as ApiUpdateNaveenStatusRouteImport } from './routes/api/update/naveen-status'
@@ -183,6 +196,8 @@ import { Route as ApiHindsightMemoriesRouteImport } from './routes/api/hindsight
 import { Route as ApiHindsightDeleteRouteImport } from './routes/api/hindsight/delete'
 import { Route as ApiHermesworldReservationsRouteImport } from './routes/api/hermesworld/reservations'
 import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-tasks.$taskId'
+import { Route as ApiGatewaySessionsRouteImport } from './routes/api/gateway/sessions'
+import { Route as ApiGatewayAgentsRouteImport } from './routes/api/gateway/agents'
 import { Route as ApiExternalMemorySearchRouteImport } from './routes/api/external-memory/search'
 import { Route as ApiExternalMemoryProvidersRouteImport } from './routes/api/external-memory/providers'
 import { Route as ApiExternalMemoryCandidatesRouteImport } from './routes/api/external-memory/candidates'
@@ -198,6 +213,7 @@ import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sou
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
 import { Route as ApiHermesworldReservationsConfirmRouteImport } from './routes/api/hermesworld/reservations/confirm'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth.google.callback'
+import { Route as ApiWorkspaceSkillsSkillIdContentRouteImport } from './routes/api/workspace/skills.$skillId.content'
 import { Route as ApiRunsSessionKeyRunIdAbandonRouteImport } from './routes/api/runs/$sessionKey.$runId.abandon'
 
 const WorldRoute = WorldRouteImport.update({
@@ -310,6 +326,11 @@ const ConductorRoute = ConductorRouteImport.update({
   path: '/conductor',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CommandRoute = CommandRouteImport.update({
+  id: '/command',
+  path: '/command',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgoraRoute = AgoraRouteImport.update({
   id: '/agora',
   path: '/agora',
@@ -363,6 +384,11 @@ const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
 const ApiVtCapitalRoute = ApiVtCapitalRouteImport.update({
   id: '/api/vt-capital',
   path: '/api/vt-capital',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiValidateProviderRoute = ApiValidateProviderRouteImport.update({
+  id: '/api/validate-provider',
+  path: '/api/validate-provider',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUserSettingsRoute = ApiUserSettingsRouteImport.update({
@@ -423,6 +449,11 @@ const ApiTasksAstraReviewRoute = ApiTasksAstraReviewRouteImport.update({
 const ApiTasksAskAstraRoute = ApiTasksAskAstraRouteImport.update({
   id: '/api/tasks-ask-astra',
   path: '/api/tasks-ask-astra',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksRoute = ApiTasksRouteImport.update({
+  id: '/api/tasks',
+  path: '/api/tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSystemMetricsRoute = ApiSystemMetricsRouteImport.update({
@@ -641,6 +672,11 @@ const ApiModelsRoute = ApiModelsRouteImport.update({
   path: '/api/models',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiModelSwitchRoute = ApiModelSwitchRouteImport.update({
+  id: '/api/model-switch',
+  path: '/api/model-switch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMemoryRoute = ApiMemoryRouteImport.update({
   id: '/api/memory',
   path: '/api/memory',
@@ -711,6 +747,16 @@ const ApiEventsRoute = ApiEventsRouteImport.update({
   path: '/api/events',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiEnvResetRoute = ApiEnvResetRouteImport.update({
+  id: '/api/env-reset',
+  path: '/api/env-reset',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDebugAnalyzeRoute = ApiDebugAnalyzeRouteImport.update({
+  id: '/api/debug-analyze',
+  path: '/api/debug-analyze',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCrewStatusRoute = ApiCrewStatusRouteImport.update({
   id: '/api/crew-status',
   path: '/api/crew-status',
@@ -736,6 +782,11 @@ const ApiConfigPatchRoute = ApiConfigPatchRouteImport.update({
   path: '/api/config-patch',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiConfigGetRoute = ApiConfigGetRouteImport.update({
+  id: '/api/config-get',
+  path: '/api/config-get',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiConductorStopRoute = ApiConductorStopRouteImport.update({
   id: '/api/conductor-stop',
   path: '/api/conductor-stop',
@@ -749,6 +800,11 @@ const ApiConductorSpawnRoute = ApiConductorSpawnRouteImport.update({
 const ApiCommandsRoute = ApiCommandsRouteImport.update({
   id: '/api/commands',
   path: '/api/commands',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCliAgentsRoute = ApiCliAgentsRouteImport.update({
+  id: '/api/cli-agents',
+  path: '/api/cli-agents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiClaudeUpdateRoute = ApiClaudeUpdateRouteImport.update({
@@ -796,10 +852,35 @@ const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   path: '/api/artifacts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAgentPauseRoute = ApiAgentPauseRouteImport.update({
+  id: '/api/agent-pause',
+  path: '/api/agent-pause',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentDispatchRoute = ApiAgentDispatchRouteImport.update({
+  id: '/api/agent-dispatch',
+  path: '/api/agent-dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAgentBusRoute = ApiAgentBusRouteImport.update({
   id: '/api/agent-bus',
   path: '/api/agent-bus',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkspaceStatsRoute = ApiWorkspaceStatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
+  getParentRoute: () => ApiWorkspaceRoute,
+} as any)
+const ApiWorkspaceSkillsRoute = ApiWorkspaceSkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
+  getParentRoute: () => ApiWorkspaceRoute,
+} as any)
+const ApiWorkspaceMemoryFilesRoute = ApiWorkspaceMemoryFilesRouteImport.update({
+  id: '/memory-files',
+  path: '/memory-files',
+  getParentRoute: () => ApiWorkspaceRoute,
 } as any)
 const ApiUpdateWorkspaceRoute = ApiUpdateWorkspaceRouteImport.update({
   id: '/api/update/workspace',
@@ -1074,6 +1155,16 @@ const ApiHermesTasksTaskIdRoute = ApiHermesTasksTaskIdRouteImport.update({
   path: '/$taskId',
   getParentRoute: () => ApiHermesTasksRoute,
 } as any)
+const ApiGatewaySessionsRoute = ApiGatewaySessionsRouteImport.update({
+  id: '/api/gateway/sessions',
+  path: '/api/gateway/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGatewayAgentsRoute = ApiGatewayAgentsRouteImport.update({
+  id: '/api/gateway/agents',
+  path: '/api/gateway/agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiExternalMemorySearchRoute = ApiExternalMemorySearchRouteImport.update({
   id: '/api/external-memory/search',
   path: '/api/external-memory/search',
@@ -1154,6 +1245,12 @@ const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => ApiAuthGoogleRoute,
 } as any)
+const ApiWorkspaceSkillsSkillIdContentRoute =
+  ApiWorkspaceSkillsSkillIdContentRouteImport.update({
+    id: '/$skillId/content',
+    path: '/$skillId/content',
+    getParentRoute: () => ApiWorkspaceSkillsRoute,
+  } as any)
 const ApiRunsSessionKeyRunIdAbandonRoute =
   ApiRunsSessionKeyRunIdAbandonRouteImport.update({
     id: '/api/runs/$sessionKey/$runId/abandon',
@@ -1166,6 +1263,7 @@ export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/agents': typeof AgentsRoute
   '/agora': typeof AgoraRoute
+  '/command': typeof CommandRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/early-access': typeof EarlyAccessRoute
@@ -1189,6 +1287,8 @@ export interface FileRoutesByFullPath {
   '/vt-capital': typeof VtCapitalRoute
   '/world': typeof WorldRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
+  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
+  '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -1198,14 +1298,18 @@ export interface FileRoutesByFullPath {
   '/api/claude-tasks': typeof ApiClaudeTasksRouteWithChildren
   '/api/claude-tasks-assignees': typeof ApiClaudeTasksAssigneesRoute
   '/api/claude-update': typeof ApiClaudeUpdateRoute
+  '/api/cli-agents': typeof ApiCliAgentsRoute
   '/api/commands': typeof ApiCommandsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
+  '/api/config-get': typeof ApiConfigGetRoute
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/connection-settings': typeof ApiConnectionSettingsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
+  '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
@@ -1220,6 +1324,7 @@ export interface FileRoutesByFullPath {
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
+  '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
   '/api/paths': typeof ApiPathsRoute
@@ -1263,6 +1368,7 @@ export interface FileRoutesByFullPath {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
+  '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
@@ -1275,8 +1381,9 @@ export interface FileRoutesByFullPath {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
+  '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
-  '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/reserve/confirm': typeof ReserveConfirmRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -1291,6 +1398,8 @@ export interface FileRoutesByFullPath {
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
+  '/api/gateway/agents': typeof ApiGatewayAgentsRoute
+  '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
   '/api/hindsight/delete': typeof ApiHindsightDeleteRoute
@@ -1345,6 +1454,9 @@ export interface FileRoutesByFullPath {
   '/api/update/naveen-status': typeof ApiUpdateNaveenStatusRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
+  '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
+  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
@@ -1352,12 +1464,14 @@ export interface FileRoutesByFullPath {
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
+  '/api/workspace/skills/$skillId/content': typeof ApiWorkspaceSkillsSkillIdContentRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/agents': typeof AgentsRoute
   '/agora': typeof AgoraRoute
+  '/command': typeof CommandRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/early-access': typeof EarlyAccessRoute
@@ -1380,6 +1494,8 @@ export interface FileRoutesByTo {
   '/vt-capital': typeof VtCapitalRoute
   '/world': typeof WorldRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
+  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
+  '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -1389,14 +1505,18 @@ export interface FileRoutesByTo {
   '/api/claude-tasks': typeof ApiClaudeTasksRouteWithChildren
   '/api/claude-tasks-assignees': typeof ApiClaudeTasksAssigneesRoute
   '/api/claude-update': typeof ApiClaudeUpdateRoute
+  '/api/cli-agents': typeof ApiCliAgentsRoute
   '/api/commands': typeof ApiCommandsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
+  '/api/config-get': typeof ApiConfigGetRoute
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/connection-settings': typeof ApiConnectionSettingsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
+  '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
@@ -1411,6 +1531,7 @@ export interface FileRoutesByTo {
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
+  '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
   '/api/paths': typeof ApiPathsRoute
@@ -1454,6 +1575,7 @@ export interface FileRoutesByTo {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
+  '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
@@ -1466,8 +1588,9 @@ export interface FileRoutesByTo {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
+  '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
-  '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/reserve/confirm': typeof ReserveConfirmRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -1482,6 +1605,8 @@ export interface FileRoutesByTo {
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
+  '/api/gateway/agents': typeof ApiGatewayAgentsRoute
+  '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
   '/api/hindsight/delete': typeof ApiHindsightDeleteRoute
@@ -1536,6 +1661,9 @@ export interface FileRoutesByTo {
   '/api/update/naveen-status': typeof ApiUpdateNaveenStatusRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
+  '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
+  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
@@ -1543,6 +1671,7 @@ export interface FileRoutesByTo {
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
+  '/api/workspace/skills/$skillId/content': typeof ApiWorkspaceSkillsSkillIdContentRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1550,6 +1679,7 @@ export interface FileRoutesById {
   '/$': typeof SplatRoute
   '/agents': typeof AgentsRoute
   '/agora': typeof AgoraRoute
+  '/command': typeof CommandRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
   '/early-access': typeof EarlyAccessRoute
@@ -1573,6 +1703,8 @@ export interface FileRoutesById {
   '/vt-capital': typeof VtCapitalRoute
   '/world': typeof WorldRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
+  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
+  '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -1582,14 +1714,18 @@ export interface FileRoutesById {
   '/api/claude-tasks': typeof ApiClaudeTasksRouteWithChildren
   '/api/claude-tasks-assignees': typeof ApiClaudeTasksAssigneesRoute
   '/api/claude-update': typeof ApiClaudeUpdateRoute
+  '/api/cli-agents': typeof ApiCliAgentsRoute
   '/api/commands': typeof ApiCommandsRoute
   '/api/conductor-spawn': typeof ApiConductorSpawnRoute
   '/api/conductor-stop': typeof ApiConductorStopRoute
+  '/api/config-get': typeof ApiConfigGetRoute
   '/api/config-patch': typeof ApiConfigPatchRoute
   '/api/connection-settings': typeof ApiConnectionSettingsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
+  '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
@@ -1604,6 +1740,7 @@ export interface FileRoutesById {
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/media': typeof ApiMediaRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
+  '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
   '/api/paths': typeof ApiPathsRoute
@@ -1647,6 +1784,7 @@ export interface FileRoutesById {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
+  '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
@@ -1659,8 +1797,9 @@ export interface FileRoutesById {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
+  '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
-  '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/reserve/confirm': typeof ReserveConfirmRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -1675,6 +1814,8 @@ export interface FileRoutesById {
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
+  '/api/gateway/agents': typeof ApiGatewayAgentsRoute
+  '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
   '/api/hermesworld/reservations': typeof ApiHermesworldReservationsRouteWithChildren
   '/api/hindsight/delete': typeof ApiHindsightDeleteRoute
@@ -1729,6 +1870,9 @@ export interface FileRoutesById {
   '/api/update/naveen-status': typeof ApiUpdateNaveenStatusRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/workspace/memory-files': typeof ApiWorkspaceMemoryFilesRoute
+  '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
+  '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/hermesworld/reservations/confirm': typeof ApiHermesworldReservationsConfirmRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
@@ -1736,6 +1880,7 @@ export interface FileRoutesById {
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
+  '/api/workspace/skills/$skillId/content': typeof ApiWorkspaceSkillsSkillIdContentRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1744,6 +1889,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/agents'
     | '/agora'
+    | '/command'
     | '/conductor'
     | '/dashboard'
     | '/early-access'
@@ -1767,6 +1913,8 @@ export interface FileRouteTypes {
     | '/vt-capital'
     | '/world'
     | '/api/agent-bus'
+    | '/api/agent-dispatch'
+    | '/api/agent-pause'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1776,14 +1924,18 @@ export interface FileRouteTypes {
     | '/api/claude-tasks'
     | '/api/claude-tasks-assignees'
     | '/api/claude-update'
+    | '/api/cli-agents'
     | '/api/commands'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
+    | '/api/config-get'
     | '/api/config-patch'
     | '/api/connection-settings'
     | '/api/connection-status'
     | '/api/context-usage'
     | '/api/crew-status'
+    | '/api/debug-analyze'
+    | '/api/env-reset'
     | '/api/events'
     | '/api/files'
     | '/api/gateway-reprobe'
@@ -1798,6 +1950,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/api/media'
     | '/api/memory'
+    | '/api/model-switch'
     | '/api/models'
     | '/api/odysseus-bootstrap'
     | '/api/paths'
@@ -1841,6 +1994,7 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
     | '/api/system-metrics'
+    | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
     | '/api/tasks-deploy-agents'
@@ -1853,6 +2007,7 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/transcribe'
     | '/api/user-settings'
+    | '/api/validate-provider'
     | '/api/vt-capital'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -1869,6 +2024,8 @@ export interface FileRouteTypes {
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
+    | '/api/gateway/agents'
+    | '/api/gateway/sessions'
     | '/api/hermes-tasks/$taskId'
     | '/api/hermesworld/reservations'
     | '/api/hindsight/delete'
@@ -1923,6 +2080,9 @@ export interface FileRouteTypes {
     | '/api/update/naveen-status'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/workspace/memory-files'
+    | '/api/workspace/skills'
+    | '/api/workspace/stats'
     | '/api/auth/google/callback'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
@@ -1930,12 +2090,14 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/runs/$sessionKey/$runId/abandon'
+    | '/api/workspace/skills/$skillId/content'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/$'
     | '/agents'
     | '/agora'
+    | '/command'
     | '/conductor'
     | '/dashboard'
     | '/early-access'
@@ -1958,6 +2120,8 @@ export interface FileRouteTypes {
     | '/vt-capital'
     | '/world'
     | '/api/agent-bus'
+    | '/api/agent-dispatch'
+    | '/api/agent-pause'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1967,14 +2131,18 @@ export interface FileRouteTypes {
     | '/api/claude-tasks'
     | '/api/claude-tasks-assignees'
     | '/api/claude-update'
+    | '/api/cli-agents'
     | '/api/commands'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
+    | '/api/config-get'
     | '/api/config-patch'
     | '/api/connection-settings'
     | '/api/connection-status'
     | '/api/context-usage'
     | '/api/crew-status'
+    | '/api/debug-analyze'
+    | '/api/env-reset'
     | '/api/events'
     | '/api/files'
     | '/api/gateway-reprobe'
@@ -1989,6 +2157,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/api/media'
     | '/api/memory'
+    | '/api/model-switch'
     | '/api/models'
     | '/api/odysseus-bootstrap'
     | '/api/paths'
@@ -2032,6 +2201,7 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
     | '/api/system-metrics'
+    | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
     | '/api/tasks-deploy-agents'
@@ -2044,6 +2214,7 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/transcribe'
     | '/api/user-settings'
+    | '/api/validate-provider'
     | '/api/vt-capital'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -2060,6 +2231,8 @@ export interface FileRouteTypes {
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
+    | '/api/gateway/agents'
+    | '/api/gateway/sessions'
     | '/api/hermes-tasks/$taskId'
     | '/api/hermesworld/reservations'
     | '/api/hindsight/delete'
@@ -2114,6 +2287,9 @@ export interface FileRouteTypes {
     | '/api/update/naveen-status'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/workspace/memory-files'
+    | '/api/workspace/skills'
+    | '/api/workspace/stats'
     | '/api/auth/google/callback'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
@@ -2121,12 +2297,14 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/runs/$sessionKey/$runId/abandon'
+    | '/api/workspace/skills/$skillId/content'
   id:
     | '__root__'
     | '/'
     | '/$'
     | '/agents'
     | '/agora'
+    | '/command'
     | '/conductor'
     | '/dashboard'
     | '/early-access'
@@ -2150,6 +2328,8 @@ export interface FileRouteTypes {
     | '/vt-capital'
     | '/world'
     | '/api/agent-bus'
+    | '/api/agent-dispatch'
+    | '/api/agent-pause'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -2159,14 +2339,18 @@ export interface FileRouteTypes {
     | '/api/claude-tasks'
     | '/api/claude-tasks-assignees'
     | '/api/claude-update'
+    | '/api/cli-agents'
     | '/api/commands'
     | '/api/conductor-spawn'
     | '/api/conductor-stop'
+    | '/api/config-get'
     | '/api/config-patch'
     | '/api/connection-settings'
     | '/api/connection-status'
     | '/api/context-usage'
     | '/api/crew-status'
+    | '/api/debug-analyze'
+    | '/api/env-reset'
     | '/api/events'
     | '/api/files'
     | '/api/gateway-reprobe'
@@ -2181,6 +2365,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/api/media'
     | '/api/memory'
+    | '/api/model-switch'
     | '/api/models'
     | '/api/odysseus-bootstrap'
     | '/api/paths'
@@ -2224,6 +2409,7 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
     | '/api/system-metrics'
+    | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
     | '/api/tasks-deploy-agents'
@@ -2236,6 +2422,7 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/transcribe'
     | '/api/user-settings'
+    | '/api/validate-provider'
     | '/api/vt-capital'
     | '/api/workspace'
     | '/chat/$sessionKey'
@@ -2252,6 +2439,8 @@ export interface FileRouteTypes {
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
+    | '/api/gateway/agents'
+    | '/api/gateway/sessions'
     | '/api/hermes-tasks/$taskId'
     | '/api/hermesworld/reservations'
     | '/api/hindsight/delete'
@@ -2306,6 +2495,9 @@ export interface FileRouteTypes {
     | '/api/update/naveen-status'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/workspace/memory-files'
+    | '/api/workspace/skills'
+    | '/api/workspace/stats'
     | '/api/auth/google/callback'
     | '/api/hermesworld/reservations/confirm'
     | '/api/mcp/$name/logs'
@@ -2313,6 +2505,7 @@ export interface FileRouteTypes {
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/runs/$sessionKey/$runId/abandon'
+    | '/api/workspace/skills/$skillId/content'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2320,6 +2513,7 @@ export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   AgentsRoute: typeof AgentsRoute
   AgoraRoute: typeof AgoraRoute
+  CommandRoute: typeof CommandRoute
   ConductorRoute: typeof ConductorRoute
   DashboardRoute: typeof DashboardRoute
   EarlyAccessRoute: typeof EarlyAccessRoute
@@ -2343,6 +2537,8 @@ export interface RootRouteChildren {
   VtCapitalRoute: typeof VtCapitalRoute
   WorldRoute: typeof WorldRoute
   ApiAgentBusRoute: typeof ApiAgentBusRoute
+  ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
+  ApiAgentPauseRoute: typeof ApiAgentPauseRoute
   ApiArtifactsRoute: typeof ApiArtifactsRouteWithChildren
   ApiAuthRoute: typeof ApiAuthRouteWithChildren
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
@@ -2352,14 +2548,18 @@ export interface RootRouteChildren {
   ApiClaudeTasksRoute: typeof ApiClaudeTasksRouteWithChildren
   ApiClaudeTasksAssigneesRoute: typeof ApiClaudeTasksAssigneesRoute
   ApiClaudeUpdateRoute: typeof ApiClaudeUpdateRoute
+  ApiCliAgentsRoute: typeof ApiCliAgentsRoute
   ApiCommandsRoute: typeof ApiCommandsRoute
   ApiConductorSpawnRoute: typeof ApiConductorSpawnRoute
   ApiConductorStopRoute: typeof ApiConductorStopRoute
+  ApiConfigGetRoute: typeof ApiConfigGetRoute
   ApiConfigPatchRoute: typeof ApiConfigPatchRoute
   ApiConnectionSettingsRoute: typeof ApiConnectionSettingsRoute
   ApiConnectionStatusRoute: typeof ApiConnectionStatusRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
+  ApiDebugAnalyzeRoute: typeof ApiDebugAnalyzeRoute
+  ApiEnvResetRoute: typeof ApiEnvResetRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
@@ -2374,6 +2574,7 @@ export interface RootRouteChildren {
   ApiMcpRoute: typeof ApiMcpRouteWithChildren
   ApiMediaRoute: typeof ApiMediaRoute
   ApiMemoryRoute: typeof ApiMemoryRouteWithChildren
+  ApiModelSwitchRoute: typeof ApiModelSwitchRoute
   ApiModelsRoute: typeof ApiModelsRoute
   ApiOdysseusBootstrapRoute: typeof ApiOdysseusBootstrapRoute
   ApiPathsRoute: typeof ApiPathsRoute
@@ -2417,6 +2618,7 @@ export interface RootRouteChildren {
   ApiSwarmTmuxStartRoute: typeof ApiSwarmTmuxStartRoute
   ApiSwarmTmuxStopRoute: typeof ApiSwarmTmuxStopRoute
   ApiSystemMetricsRoute: typeof ApiSystemMetricsRoute
+  ApiTasksRoute: typeof ApiTasksRoute
   ApiTasksAskAstraRoute: typeof ApiTasksAskAstraRoute
   ApiTasksAstraReviewRoute: typeof ApiTasksAstraReviewRoute
   ApiTasksDeployAgentsRoute: typeof ApiTasksDeployAgentsRoute
@@ -2429,8 +2631,9 @@ export interface RootRouteChildren {
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiUserSettingsRoute: typeof ApiUserSettingsRoute
+  ApiValidateProviderRoute: typeof ApiValidateProviderRoute
   ApiVtCapitalRoute: typeof ApiVtCapitalRoute
-  ApiWorkspaceRoute: typeof ApiWorkspaceRoute
+  ApiWorkspaceRoute: typeof ApiWorkspaceRouteWithChildren
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiClaudeProxySplatRoute: typeof ApiClaudeProxySplatRoute
@@ -2438,6 +2641,8 @@ export interface RootRouteChildren {
   ApiExternalMemoryCandidatesRoute: typeof ApiExternalMemoryCandidatesRoute
   ApiExternalMemoryProvidersRoute: typeof ApiExternalMemoryProvidersRoute
   ApiExternalMemorySearchRoute: typeof ApiExternalMemorySearchRoute
+  ApiGatewayAgentsRoute: typeof ApiGatewayAgentsRoute
+  ApiGatewaySessionsRoute: typeof ApiGatewaySessionsRoute
   ApiHermesworldReservationsRoute: typeof ApiHermesworldReservationsRouteWithChildren
   ApiHindsightDeleteRoute: typeof ApiHindsightDeleteRoute
   ApiHindsightMemoriesRoute: typeof ApiHindsightMemoriesRoute
@@ -2630,6 +2835,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConductorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/command': {
+      id: '/command'
+      path: '/command'
+      fullPath: '/command'
+      preLoaderRoute: typeof CommandRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agora': {
       id: '/agora'
       path: '/agora'
@@ -2705,6 +2917,13 @@ declare module '@tanstack/react-router' {
       path: '/api/vt-capital'
       fullPath: '/api/vt-capital'
       preLoaderRoute: typeof ApiVtCapitalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/validate-provider': {
+      id: '/api/validate-provider'
+      path: '/api/validate-provider'
+      fullPath: '/api/validate-provider'
+      preLoaderRoute: typeof ApiValidateProviderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/user-settings': {
@@ -2789,6 +3008,13 @@ declare module '@tanstack/react-router' {
       path: '/api/tasks-ask-astra'
       fullPath: '/api/tasks-ask-astra'
       preLoaderRoute: typeof ApiTasksAskAstraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks': {
+      id: '/api/tasks'
+      path: '/api/tasks'
+      fullPath: '/api/tasks'
+      preLoaderRoute: typeof ApiTasksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/system-metrics': {
@@ -3092,6 +3318,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiModelsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/model-switch': {
+      id: '/api/model-switch'
+      path: '/api/model-switch'
+      fullPath: '/api/model-switch'
+      preLoaderRoute: typeof ApiModelSwitchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/memory': {
       id: '/api/memory'
       path: '/api/memory'
@@ -3190,6 +3423,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/env-reset': {
+      id: '/api/env-reset'
+      path: '/api/env-reset'
+      fullPath: '/api/env-reset'
+      preLoaderRoute: typeof ApiEnvResetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/debug-analyze': {
+      id: '/api/debug-analyze'
+      path: '/api/debug-analyze'
+      fullPath: '/api/debug-analyze'
+      preLoaderRoute: typeof ApiDebugAnalyzeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/crew-status': {
       id: '/api/crew-status'
       path: '/api/crew-status'
@@ -3225,6 +3472,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiConfigPatchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/config-get': {
+      id: '/api/config-get'
+      path: '/api/config-get'
+      fullPath: '/api/config-get'
+      preLoaderRoute: typeof ApiConfigGetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/conductor-stop': {
       id: '/api/conductor-stop'
       path: '/api/conductor-stop'
@@ -3244,6 +3498,13 @@ declare module '@tanstack/react-router' {
       path: '/api/commands'
       fullPath: '/api/commands'
       preLoaderRoute: typeof ApiCommandsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cli-agents': {
+      id: '/api/cli-agents'
+      path: '/api/cli-agents'
+      fullPath: '/api/cli-agents'
+      preLoaderRoute: typeof ApiCliAgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/claude-update': {
@@ -3309,12 +3570,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArtifactsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/agent-pause': {
+      id: '/api/agent-pause'
+      path: '/api/agent-pause'
+      fullPath: '/api/agent-pause'
+      preLoaderRoute: typeof ApiAgentPauseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-dispatch': {
+      id: '/api/agent-dispatch'
+      path: '/api/agent-dispatch'
+      fullPath: '/api/agent-dispatch'
+      preLoaderRoute: typeof ApiAgentDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/agent-bus': {
       id: '/api/agent-bus'
       path: '/api/agent-bus'
       fullPath: '/api/agent-bus'
       preLoaderRoute: typeof ApiAgentBusRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace/stats': {
+      id: '/api/workspace/stats'
+      path: '/stats'
+      fullPath: '/api/workspace/stats'
+      preLoaderRoute: typeof ApiWorkspaceStatsRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
+    }
+    '/api/workspace/skills': {
+      id: '/api/workspace/skills'
+      path: '/skills'
+      fullPath: '/api/workspace/skills'
+      preLoaderRoute: typeof ApiWorkspaceSkillsRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
+    }
+    '/api/workspace/memory-files': {
+      id: '/api/workspace/memory-files'
+      path: '/memory-files'
+      fullPath: '/api/workspace/memory-files'
+      preLoaderRoute: typeof ApiWorkspaceMemoryFilesRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
     }
     '/api/update/workspace': {
       id: '/api/update/workspace'
@@ -3694,6 +3990,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHermesTasksTaskIdRouteImport
       parentRoute: typeof ApiHermesTasksRoute
     }
+    '/api/gateway/sessions': {
+      id: '/api/gateway/sessions'
+      path: '/api/gateway/sessions'
+      fullPath: '/api/gateway/sessions'
+      preLoaderRoute: typeof ApiGatewaySessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gateway/agents': {
+      id: '/api/gateway/agents'
+      path: '/api/gateway/agents'
+      fullPath: '/api/gateway/agents'
+      preLoaderRoute: typeof ApiGatewayAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/external-memory/search': {
       id: '/api/external-memory/search'
       path: '/api/external-memory/search'
@@ -3798,6 +4108,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/google/callback'
       preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
       parentRoute: typeof ApiAuthGoogleRoute
+    }
+    '/api/workspace/skills/$skillId/content': {
+      id: '/api/workspace/skills/$skillId/content'
+      path: '/$skillId/content'
+      fullPath: '/api/workspace/skills/$skillId/content'
+      preLoaderRoute: typeof ApiWorkspaceSkillsSkillIdContentRouteImport
+      parentRoute: typeof ApiWorkspaceSkillsRoute
     }
     '/api/runs/$sessionKey/$runId/abandon': {
       id: '/api/runs/$sessionKey/$runId/abandon'
@@ -4031,6 +4348,33 @@ const ApiSwarmRuntimeRouteWithChildren = ApiSwarmRuntimeRoute._addFileChildren(
   ApiSwarmRuntimeRouteChildren,
 )
 
+interface ApiWorkspaceSkillsRouteChildren {
+  ApiWorkspaceSkillsSkillIdContentRoute: typeof ApiWorkspaceSkillsSkillIdContentRoute
+}
+
+const ApiWorkspaceSkillsRouteChildren: ApiWorkspaceSkillsRouteChildren = {
+  ApiWorkspaceSkillsSkillIdContentRoute: ApiWorkspaceSkillsSkillIdContentRoute,
+}
+
+const ApiWorkspaceSkillsRouteWithChildren =
+  ApiWorkspaceSkillsRoute._addFileChildren(ApiWorkspaceSkillsRouteChildren)
+
+interface ApiWorkspaceRouteChildren {
+  ApiWorkspaceMemoryFilesRoute: typeof ApiWorkspaceMemoryFilesRoute
+  ApiWorkspaceSkillsRoute: typeof ApiWorkspaceSkillsRouteWithChildren
+  ApiWorkspaceStatsRoute: typeof ApiWorkspaceStatsRoute
+}
+
+const ApiWorkspaceRouteChildren: ApiWorkspaceRouteChildren = {
+  ApiWorkspaceMemoryFilesRoute: ApiWorkspaceMemoryFilesRoute,
+  ApiWorkspaceSkillsRoute: ApiWorkspaceSkillsRouteWithChildren,
+  ApiWorkspaceStatsRoute: ApiWorkspaceStatsRoute,
+}
+
+const ApiWorkspaceRouteWithChildren = ApiWorkspaceRoute._addFileChildren(
+  ApiWorkspaceRouteChildren,
+)
+
 interface ApiHermesworldReservationsRouteChildren {
   ApiHermesworldReservationsConfirmRoute: typeof ApiHermesworldReservationsConfirmRoute
 }
@@ -4051,6 +4395,7 @@ const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   AgentsRoute: AgentsRoute,
   AgoraRoute: AgoraRoute,
+  CommandRoute: CommandRoute,
   ConductorRoute: ConductorRoute,
   DashboardRoute: DashboardRoute,
   EarlyAccessRoute: EarlyAccessRoute,
@@ -4074,6 +4419,8 @@ const rootRouteChildren: RootRouteChildren = {
   VtCapitalRoute: VtCapitalRoute,
   WorldRoute: WorldRoute,
   ApiAgentBusRoute: ApiAgentBusRoute,
+  ApiAgentDispatchRoute: ApiAgentDispatchRoute,
+  ApiAgentPauseRoute: ApiAgentPauseRoute,
   ApiArtifactsRoute: ApiArtifactsRouteWithChildren,
   ApiAuthRoute: ApiAuthRouteWithChildren,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
@@ -4083,14 +4430,18 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClaudeTasksRoute: ApiClaudeTasksRouteWithChildren,
   ApiClaudeTasksAssigneesRoute: ApiClaudeTasksAssigneesRoute,
   ApiClaudeUpdateRoute: ApiClaudeUpdateRoute,
+  ApiCliAgentsRoute: ApiCliAgentsRoute,
   ApiCommandsRoute: ApiCommandsRoute,
   ApiConductorSpawnRoute: ApiConductorSpawnRoute,
   ApiConductorStopRoute: ApiConductorStopRoute,
+  ApiConfigGetRoute: ApiConfigGetRoute,
   ApiConfigPatchRoute: ApiConfigPatchRoute,
   ApiConnectionSettingsRoute: ApiConnectionSettingsRoute,
   ApiConnectionStatusRoute: ApiConnectionStatusRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiCrewStatusRoute: ApiCrewStatusRoute,
+  ApiDebugAnalyzeRoute: ApiDebugAnalyzeRoute,
+  ApiEnvResetRoute: ApiEnvResetRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
@@ -4105,6 +4456,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMcpRoute: ApiMcpRouteWithChildren,
   ApiMediaRoute: ApiMediaRoute,
   ApiMemoryRoute: ApiMemoryRouteWithChildren,
+  ApiModelSwitchRoute: ApiModelSwitchRoute,
   ApiModelsRoute: ApiModelsRoute,
   ApiOdysseusBootstrapRoute: ApiOdysseusBootstrapRoute,
   ApiPathsRoute: ApiPathsRoute,
@@ -4148,6 +4500,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmTmuxStartRoute: ApiSwarmTmuxStartRoute,
   ApiSwarmTmuxStopRoute: ApiSwarmTmuxStopRoute,
   ApiSystemMetricsRoute: ApiSystemMetricsRoute,
+  ApiTasksRoute: ApiTasksRoute,
   ApiTasksAskAstraRoute: ApiTasksAskAstraRoute,
   ApiTasksAstraReviewRoute: ApiTasksAstraReviewRoute,
   ApiTasksDeployAgentsRoute: ApiTasksDeployAgentsRoute,
@@ -4160,8 +4513,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiUserSettingsRoute: ApiUserSettingsRoute,
+  ApiValidateProviderRoute: ApiValidateProviderRoute,
   ApiVtCapitalRoute: ApiVtCapitalRoute,
-  ApiWorkspaceRoute: ApiWorkspaceRoute,
+  ApiWorkspaceRoute: ApiWorkspaceRouteWithChildren,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiClaudeProxySplatRoute: ApiClaudeProxySplatRoute,
@@ -4169,6 +4523,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiExternalMemoryCandidatesRoute: ApiExternalMemoryCandidatesRoute,
   ApiExternalMemoryProvidersRoute: ApiExternalMemoryProvidersRoute,
   ApiExternalMemorySearchRoute: ApiExternalMemorySearchRoute,
+  ApiGatewayAgentsRoute: ApiGatewayAgentsRoute,
+  ApiGatewaySessionsRoute: ApiGatewaySessionsRoute,
   ApiHermesworldReservationsRoute: ApiHermesworldReservationsRouteWithChildren,
   ApiHindsightDeleteRoute: ApiHindsightDeleteRoute,
   ApiHindsightMemoriesRoute: ApiHindsightMemoriesRoute,

@@ -1586,3 +1586,9 @@ code {
    Tailwind oklch values and .system dark mode overrides.
    ═══════════════════════════════════════════════════════════════════ */
 @import './scifi-theme.css';
+
+/* Example: ensure focus outlines are visible */
+*:focus-visible {
+  outline: 2px solid #0066cc;
+  outline-offset: 2px;
+}

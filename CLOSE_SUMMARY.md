@@ -1,0 +1,1 @@
+Implementation phase failed: TypeScript compilation errors after attempting to add keyboard shortcuts component. The file src/screens/chat/chat-screen.tsx has been corrupted by previous patch attempts, resulting in invalid syntax. Manual intervention is required to fix the file.

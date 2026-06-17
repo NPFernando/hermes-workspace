@@ -7,7 +7,8 @@ import {
   rateLimitResponse,
   requireJsonContentType,
 } from '../../../server/rate-limit'
-import { applyNaveenSmartUpdate, type NaveenApplyOptions } from '../../../server/naveen-update'
+import {  applyNaveenSmartUpdate } from '../../../server/naveen-update'
+import type {NaveenApplyOptions} from '../../../server/naveen-update';
 
 export const Route = createFileRoute('/api/update/naveen-apply')({
   server: {

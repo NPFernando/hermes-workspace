@@ -13,11 +13,11 @@ export const Route = createFileRoute('/api/hindsight/recall')({
 
         try {
           const body = (await request.json()) as { query?: string; budget?: string }
-          const query = String(body?.query ?? '').trim()
+          const query = String(body.query ?? '').trim()
           if (!query) {
             return json({ error: 'query is required' }, { status: 400 })
           }
-          const budget = String(body?.budget ?? 'mid')
+          const budget = String(body.budget ?? 'mid')
           return json(await recallHindsight(query, budget))
         } catch (err) {
           return json(

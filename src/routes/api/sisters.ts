@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { listSisters, bootstrapOnceLazy } from '../../server/sisters-registry'
+import { bootstrapOnceLazy, listSisters } from '../../server/sisters-registry'
 
 export const Route = createFileRoute('/api/sisters')({
   server: {

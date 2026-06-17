@@ -1,14 +1,11 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import {  useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { seedAgentPresets } from './agent-presets'
 import {
   AiBrain03Icon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
-import { cn } from '@/lib/utils'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Button } from '@/components/ui/button'
-import { formatRelativeTime } from '@/screens/dashboard/lib/formatters'
+import { seedAgentPresets } from './agent-presets'
 import { OrchestratorCard } from './components/orchestrator-card'
 import { OperationsAgentCard } from './components/operations-agent-card'
 import { OperationsAgentDetail } from './components/operations-agent-detail'
@@ -16,6 +13,10 @@ import { OperationsSettingsModal } from './components/operations-settings-modal'
 import { FullOutputsView } from './components/full-outputs-view'
 import { AgentBusPanel } from './components/agent-bus-panel'
 import { useOperations } from './hooks/use-operations'
+import type {CSSProperties} from 'react';
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { formatRelativeTime } from '@/screens/dashboard/lib/formatters'
 
 type AgentBusHealth = {
   ok?: boolean

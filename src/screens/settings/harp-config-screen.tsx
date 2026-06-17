@@ -1,5 +1,4 @@
-import type * as React from 'react'
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowDown01Icon,
@@ -15,6 +14,7 @@ import {
   ToggleOnIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import type * as React from 'react'
 import type {
   HarpBlocklistEntry,
   HarpConfigView,
@@ -292,7 +292,7 @@ function TierSection({
   onRemove,
 }: {
   tier: HarpTier
-  onReorder: (models: HarpTierModel[]) => void
+  onReorder: (models: Array<HarpTierModel>) => void
   onAdd: (model: HarpTierModel) => void
   onRemove: (modelId: string) => void
 }) {
@@ -350,7 +350,7 @@ function BlocklistSection({
   onAdd,
   onRemove,
 }: {
-  entries: HarpBlocklistEntry[]
+  entries: Array<HarpBlocklistEntry>
   onAdd: (entry: HarpBlocklistEntry) => void
   onRemove: (modelId: string) => void
 }) {
@@ -478,7 +478,7 @@ function CapWidget({
         />
         <span className="text-xs text-primary-400 dark:text-neutral-500">per</span>
         <div className="flex overflow-hidden rounded-lg border border-primary-200 dark:border-neutral-700">
-          {(['day', 'week', 'month'] as CapPeriod[]).map((p) => (
+          {(['day', 'week', 'month'] as Array<CapPeriod>).map((p) => (
             <button
               key={p}
               type="button"

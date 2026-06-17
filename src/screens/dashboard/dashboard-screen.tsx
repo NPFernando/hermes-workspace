@@ -11,14 +11,9 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { AchievementsCard } from './components/achievements-card'
 import { ActiveModelKpi } from './components/active-model-kpi'
-
-const ActivityChartInner = lazy(() => import('./components/activity-chart-inner'))
-const AnalyticsChartCard = lazy(() =>
-  import('./components/analytics-chart-card').then((m) => ({ default: m.AnalyticsChartCard }))
-)
 import { AttentionMarquee } from './components/attention-marquee'
 import { CacheEfficiencyCard } from './components/cache-efficiency-card'
 import { CostLedgerCard } from './components/cost-ledger-card'
@@ -47,6 +42,11 @@ import { cn } from '@/lib/utils'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
+
+const ActivityChartInner = lazy(() => import('./components/activity-chart-inner'))
+const AnalyticsChartCard = lazy(() =>
+  import('./components/analytics-chart-card').then((m) => ({ default: m.AnalyticsChartCard }))
+)
 
 // `IconSvgObject` isn't exported from @hugeicons/react; reuse the
 // inferred type from a real icon import for prop typing.

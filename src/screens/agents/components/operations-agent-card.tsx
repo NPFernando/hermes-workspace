@@ -8,6 +8,9 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { AnimatePresence, motion } from 'motion/react'
+import {  useAgentChat } from '../hooks/use-agent-chat'
+import type {OperationsChatMessage} from '../hooks/use-agent-chat';
+import type { OperationsAgent, SisterInfo } from '../hooks/use-operations'
 import { Button } from '@/components/ui/button'
 import { AgentProgress } from '@/components/agent-view/agent-progress'
 import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
@@ -15,10 +18,8 @@ import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
 import { runCronJob, toggleCronJob } from '@/lib/cron-api'
 import { cn } from '@/lib/utils'
-import { useAgentChat, type OperationsChatMessage } from '../hooks/use-agent-chat'
-import type { OperationsAgent, SisterInfo } from '../hooks/use-operations'
 
-const SISTER_BADGE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+const SISTER_BADGE_STYLES: Partial<Record<string, { bg: string; text: string; border: string }>> = {
   astra:    { bg: 'bg-violet-500/15',  text: 'text-violet-300',  border: 'border-violet-400/30' },
   novus:    { bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-400/30' },
   nova:     { bg: 'bg-sky-500/15',     text: 'text-sky-300',     border: 'border-sky-400/30' },
@@ -26,10 +27,12 @@ const SISTER_BADGE_STYLES: Record<string, { bg: string; text: string; border: st
   default:  { bg: 'bg-primary-500/10', text: 'text-primary-400', border: 'border-primary-300/20' },
 }
 
-function badgeStyle(sister: SisterInfo) {
-  if (SISTER_BADGE_STYLES[sister.id]) return SISTER_BADGE_STYLES[sister.id]
-  if (sister.type === 'business_agent') return SISTER_BADGE_STYLES.business
-  return SISTER_BADGE_STYLES.default
+const FALLBACK_STYLE = { bg: 'bg-primary-500/10', text: 'text-primary-400', border: 'border-primary-300/20' }
+
+function badgeStyle(sister: SisterInfo): { bg: string; text: string; border: string } {
+  return SISTER_BADGE_STYLES[sister.id]
+    ?? (sister.type === 'business_agent' ? SISTER_BADGE_STYLES.business : undefined)
+    ?? FALLBACK_STYLE
 }
 
 function PersonalityBadge({ sister }: { sister: SisterInfo }) {
@@ -124,7 +127,7 @@ export function OperationsInlineChat({
   error,
 }: {
   agentName: string
-  messages: OperationsChatMessage[]
+  messages: Array<OperationsChatMessage>
   sendMessage: (message: string) => Promise<unknown>
   isSending: boolean
   error: string | null

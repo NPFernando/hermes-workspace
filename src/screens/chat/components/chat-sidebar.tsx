@@ -586,7 +586,7 @@ function ChatSidebarComponent({
   const isMemoryActive = pathname === '/memory'
   const isTasksActive = pathname === '/tasks'
   const isConductorActive = pathname === '/conductor'
-  const isOperationsActive = pathname === '/operations'
+  const isCommandActive = pathname.startsWith('/command')
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
   const isResearchActive = pathname.startsWith('/research')
   const echoStudioEnabled = useSettingsStore(
@@ -845,17 +845,10 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/operations',
+      to: '/command',
       icon: UserMultipleIcon,
-      label: 'Operations',
-      active: isOperationsActive,
-    },
-    {
-      kind: 'link',
-      to: '/agents',
-      icon: UserMultipleIcon,
-      label: 'Agent Team',
-      active: pathname.startsWith('/agents'),
+      label: 'Command Center',
+      active: isCommandActive,
     },
     {
       kind: 'link',

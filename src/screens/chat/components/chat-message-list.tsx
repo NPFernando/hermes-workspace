@@ -597,14 +597,44 @@ export function buildDisplayEntries(
     entries.push(entry)
   })
 
-  if (pendingAssistantToolMessages.length > 0) {
-    const previousEntry = entries[entries.length - 1]
-    if (previousEntry?.message.role === 'assistant') {
-      previousEntry.attachedToolMessages.push(...pendingAssistantToolMessages)
+  return entries
+}
+
+export function getTrailingToolOnlyTurnSummary(
+  messages: Array<ChatMessage>,
+): { count: number; toolNames: Array<string>; hasFinalAssistantText: boolean } | null {
+  let trailingStart = messages.length
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.role === 'tool' || msg.role === 'toolResult') {
+      trailingStart = i
+    } else if (isAssistantToolCallOnlyMessage(msg)) {
+      trailingStart = i
+    } else {
+      break
     }
   }
 
-  return entries
+  if (trailingStart >= messages.length) return null
+
+  const lastVisible = messages[trailingStart - 1]
+  if (!lastVisible || lastVisible.role !== 'assistant' || isAssistantToolCallOnlyMessage(lastVisible)) {
+    return null
+  }
+
+  const trailing = messages.slice(trailingStart)
+  const toolNames = Array.from(
+    new Set(
+      trailing.flatMap((msg) => {
+        if (isAssistantToolCallOnlyMessage(msg)) {
+          return getToolCallsFromMessage(msg).map((tc) => tc.name).filter((n): n is string => n != null)
+        }
+        return []
+      }),
+    ),
+  )
+
+  return { count: trailing.length, toolNames, hasFinalAssistantText: true }
 }
 
 function escapeAttributeSelector(value: string): string {

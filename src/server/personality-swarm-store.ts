@@ -145,7 +145,7 @@ How you work: Every report ends with "recommended next actions." Use tables for 
 export type PersonalityPresetKey = keyof typeof PERSONALITY_PRESETS
 
 // Recommended preset per worker role keyword
-const ROLE_PRESET_MAP: Array<{ keywords: string[]; preset: PersonalityPresetKey }> = [
+const ROLE_PRESET_MAP: Array<{ keywords: Array<string>; preset: PersonalityPresetKey }> = [
   { keywords: ['orchestrat', 'plan', 'gate', 'route', 'main', 'default'], preset: 'astra' },
   { keywords: ['build', 'implement', 'code', 'engineer', 'local'], preset: 'novus' },
   { keywords: ['review', 'merge', 'audit', 'security', 'critic'], preset: 'ada' },
@@ -211,7 +211,7 @@ export type SwarmPersonalityAssignment = {
 export type ApplyPersonalitySwarmOptions = {
   name: string
   primaryPersonality: string
-  workers: SwarmPersonalityAssignment[]
+  workers: Array<SwarmPersonalityAssignment>
 }
 
 export type ApplyPersonalitySwarmResult = {
@@ -253,8 +253,7 @@ export function applyPersonalityToSwarm(opts: ApplyPersonalitySwarmOptions): App
 
     const personalityText =
       assignment.custom?.trim() ||
-      PERSONALITY_PRESETS[assignment.presetKey]?.prompt ||
-      PERSONALITY_PRESETS.astra.prompt
+      PERSONALITY_PRESETS[assignment.presetKey].prompt
 
     try {
       let workerConfig = readProfileConfig(configPath)
@@ -290,7 +289,7 @@ export type WorkerPersonalityRecommendation = {
   isMain: boolean
 }
 
-export function getSwarmPersonalityRecommendations(): WorkerPersonalityRecommendation[] {
+export function getSwarmPersonalityRecommendations(): Array<WorkerPersonalityRecommendation> {
   const roster = readSwarmRoster()
   return roster.workers.map((worker) => {
     const isMain = worker.id === 'orchestrator' || worker.modes.includes('plan')
@@ -300,7 +299,7 @@ export function getSwarmPersonalityRecommendations(): WorkerPersonalityRecommend
       name: worker.name || worker.id,
       role: worker.role,
       recommendedPreset: recommended,
-      presetLabel: PERSONALITY_PRESETS[recommended]?.label ?? recommended,
+      presetLabel: PERSONALITY_PRESETS[recommended].label,
       isMain,
     }
   })

@@ -4,7 +4,7 @@
  * Client-side heuristics to suggest cheaper/better models
  * Opt-in only (requires settings toggle)
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSettings } from './use-settings'
 
 type ModelTier = 'budget' | 'balanced' | 'premium'
@@ -157,24 +157,21 @@ function isSessionDismissed(sessionKey: string): boolean {
   return dismissals.some((d) => d.sessionKey === sessionKey)
 }
 
-export function useModelSuggestions(_opts: {
+export function useModelSuggestions({
+  currentModel,
+  sessionKey,
+  messages,
+  availableModels,
+}: {
   currentModel: string
   sessionKey: string
   messages: Array<Message>
   availableModels: Array<string>
 }) {
-  // DISABLED: was causing infinite re-render loop (Maximum update depth exceeded)
-  // TODO: fix the dependency array / memoization and re-enable
-  return {
-    suggestion: null as Suggestion | null,
-    dismiss: () => {},
-    dismissForSession: () => {},
-  }
+  return _useModelSuggestionsImpl({ currentModel, sessionKey, messages, availableModels })
 }
 
-// -ignore -- disabled, will re-enable after fixing deps
-
-function _useModelSuggestionsDisabled({
+function _useModelSuggestionsImpl({
   currentModel,
   sessionKey,
   messages,
@@ -188,7 +185,21 @@ function _useModelSuggestionsDisabled({
   const { settings } = useSettings()
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null)
 
+  // Stable fingerprint: avoid re-triggering the effect when setSuggestion
+  // causes the parent to re-render with a new (but equal) messages array.
+  const msgCount = messages.length
+  const lastMsgContent = messages[messages.length - 1]?.content ?? ''
+  const availableModelsKey = useMemo(
+    () => availableModels.join(','),
+    [availableModels],
+  )
+  // Guard: only run the suggestion logic once per unique (messages, model) combo
+  const computedForRef = useRef('')
+
   useEffect(() => {
+    const fingerprint = `${currentModel}|${sessionKey}|${msgCount}|${typeof lastMsgContent === 'string' ? lastMsgContent.slice(0, 60) : ''}|${availableModelsKey}`
+    if (computedForRef.current === fingerprint) return
+    computedForRef.current = fingerprint
     // Feature disabled
     if (!settings.smartSuggestionsEnabled) {
       setSuggestion(null)
@@ -293,9 +304,10 @@ function _useModelSuggestionsDisabled({
       }
     }
   }, [
-    availableModels,
+    availableModelsKey,
     currentModel,
-    messages,
+    msgCount,
+    lastMsgContent,
     sessionKey,
     settings.smartSuggestionsEnabled,
     settings.onlySuggestCheaper,

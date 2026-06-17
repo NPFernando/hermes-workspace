@@ -25,6 +25,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.HERMES_HOME
+  delete process.env.HERMES_WORKSPACE_STATE_DIR
   delete process.env.MCP_TOOLS_CACHE_TTL_MS
   rmSync(tmpDir, { recursive: true, force: true })
   vi.resetModules()
@@ -161,6 +162,7 @@ describe('HERMES_HOME override for path resolution', () => {
   it('uses HERMES_HOME to resolve cache file path', async () => {
     const customHome = mkdtempSync(join(tmpdir(), 'custom-hermes-'))
     process.env.HERMES_HOME = customHome
+    process.env.HERMES_WORKSPACE_STATE_DIR = customHome
     vi.resetModules()
 
     const mod = await loadCache()

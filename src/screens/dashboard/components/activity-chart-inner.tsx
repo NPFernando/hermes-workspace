@@ -14,7 +14,7 @@ export default function ActivityChartInner({
   chartData,
   palette,
 }: {
-  chartData: ChartEntry[]
+  chartData: Array<ChartEntry>
   palette: Record<string, string>
 }) {
   return (

@@ -12,10 +12,10 @@ import {
   Folder01Icon,
   Key01Icon,
   SparklesIcon,
+  ToggleOffIcon,
+  ToggleOnIcon,
   UserGroupIcon,
   UserStar01Icon,
-  ToggleOnIcon,
-  ToggleOffIcon,
 } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { DialogContent, DialogRoot, DialogTitle } from '@/components/ui/dialog'
@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
 
 type PersonalityPreset = { key: string; label: string; description: string; prompt: string }
 type WorkerRec = { workerId: string; name: string; role: string; recommendedPreset: string; presetLabel: string; isMain: boolean }
-type SwarmPersonalityData = { presets: PersonalityPreset[]; recommendations: WorkerRec[] }
+type SwarmPersonalityData = { presets: Array<PersonalityPreset>; recommendations: Array<WorkerRec> }
 
 type SisterEntry = {
   id: string
@@ -190,7 +190,7 @@ export function ProfilesScreen() {
     queryFn: async () => {
       const res = await fetch('/api/sisters')
       if (!res.ok) return []
-      const payload = (await res.json()) as { ok?: boolean; sisters?: SisterEntry[] }
+      const payload = (await res.json()) as { ok?: boolean; sisters?: Array<SisterEntry> }
       return Array.isArray(payload.sisters) ? payload.sisters : []
     },
     staleTime: 60_000,
@@ -514,7 +514,7 @@ export function ProfilesScreen() {
                   {profile.provider || 'no provider'}
                 </span>
                 {sisterMap[profile.name] ? (
-                  <SisterBadge sister={sisterMap[profile.name]!} />
+                  <SisterBadge sister={sisterMap[profile.name]} />
                 ) : null}
                 <p className="mt-3 line-clamp-2 min-h-[2.5rem] px-6 text-center text-xs text-primary-500 dark:text-neutral-400">
                   {profile.description?.trim() || 'No description yet'}

@@ -1,30 +1,78 @@
-# Auto-Improvement Plan: Improve API error handling with structured error responses
+# Implementation Plan: Add keyboard shortcuts for common actions
 
 ## Summary of the change
-Modify the server-entry.js to return consistent JSON error objects with error code, message, and details instead of plain text or HTML errors. This improves client-side error handling and provides a uniform API response format.
+Add keyboard shortcuts for common actions in the workspace UI, such as Ctrl+S for save and Ctrl+F for search, improving user efficiency and accessibility.
 
 ## Files to modify
-- `server-entry.js` (located in the workspace root)
+- `src/components/KeyboardShortcuts.js` (new file)
+- `src/App.js` (modify to import and use the new component)
+- `src/index.css` (add styles for focus outlines if needed)
 
 ## Steps
-1. Backup the original server-entry.js (optional but recommended).
-2. Open server-entry.js and locate the error handling middleware or try/catch blocks.
-3. Replace any plain text or HTML error responses with a JSON object of the form:
-   {
-     "error": {
-       "code": "<ERROR_CODE>",
-       "message": "<Human-readable message>",
-       "details": "<Optional additional details>"
-     }
+1. Create a new file `src/components/KeyboardShortcuts.js` with the following content:
+   ```javascript
+   import { useEffect } from 'react';
+   import { useDispatch } from 'react-redux';
+   import { saveWorkspace, focusSearch } from '../actions/workspaceActions'; // Adjust action names as needed
+
+   const KeyboardShortcuts = () => {
+     const dispatch = useDispatch();
+
+     useEffect(() => {
+       const handleKeyDown = (e) => {
+         // Ignore if focus is on an input, textarea, or select
+         if (e.target.tagName.match(/input|textarea|select/i)) return;
+
+         if (e.ctrlKey && e.key === 's') {
+           e.preventDefault();
+           dispatch(saveWorkspace());
+         }
+         if (e.ctrlKey && e.key === 'f') {
+           e.preventDefault();
+           dispatch(focusSearch());
+         }
+       };
+
+       document.addEventListener('keydown', handleKeyDown);
+       return () => {
+         document.removeEventListener('keydown', handleKeyDown);
+       };
+     }, [dispatch]);
+
+     return null;
+   };
+
+   export default KeyboardShortcuts;
+   ```
+
+2. In `src/App.js`, import the `KeyboardShortcuts` component and render it inside the main App component, preferably at the top level so it captures events globally:
+   ```javascript
+   import KeyboardShortcuts from './components/KeyboardShortcuts';
+
+   function App() {
+     return (
+       <>
+         <KeyboardShortcuts />
+         {/* rest of the app */}
+       </>
+     );
    }
-   Ensure the response Content-Type is set to application/json.
-4. For existing routes that throw errors, ensure they throw an object with code and message, or create a helper function to format errors.
-5. Test the changes by starting the server and making requests that trigger errors (e.g., invalid endpoints, missing parameters).
-6. Verify that the response is valid JSON and contains the expected error structure.
+   ```
+
+3. In `src/index.css`, add any necessary styles to ensure visible focus outlines for accessibility:
+   ```css
+   /* Example: ensure focus outlines are visible */
+   *:focus-visible {
+     outline: 2px solid #0066cc;
+     outline-offset: 2px;
+   }
+   ```
 
 ## How to verify the change works
-- Start the server: `cd /home/ubuntu/hermes-workspace && node server-entry.js` (or use pm2/dev script).
-- Use curl to request a non-existent endpoint: `curl -v http://localhost:3000/invalid`
-- Check that the response is JSON and contains an error object.
-- Alternatively, run the existing test suite if it includes error case tests: `pnpm test` (if configured).
-- Ensure no regressions in normal responses (they should still be JSON or as expected).
+- Manual testing:
+  1. Press Ctrl+S and observe if a save action is triggered (check for a toast notification or console log if save action is implemented).
+  2. Press Ctrl+F and observe if the search input gains focus.
+  3. Verify that pressing these shortcuts does not trigger when typing in an input field.
+  4. Ensure no JavaScript errors appear in the console.
+- Run the existing test suite: `pnpm test` to ensure no regressions.
+- Run linting: `pnpm lint` to ensure code quality.

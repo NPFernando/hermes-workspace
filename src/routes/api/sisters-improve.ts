@@ -2,19 +2,20 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
-  requireJsonContentType,
+  getClientIp,
   rateLimit,
   rateLimitResponse,
-  getClientIp,
+  requireJsonContentType,
 } from '../../server/rate-limit'
-import { listSisters, invalidateSistersCache } from '../../server/sisters-registry'
+import { invalidateSistersCache, listSisters } from '../../server/sisters-registry'
 import {
+  
   appendGrowthEntry,
-  updateSisterDescription,
-  registerSisterCron,
   isValidCronExpr,
-  type SisterCronRequest,
+  registerSisterCron,
+  updateSisterDescription
 } from '../../server/sisters-growth'
+import type {SisterCronRequest} from '../../server/sisters-growth';
 
 type ImproveBody = {
   id?: unknown
@@ -65,7 +66,7 @@ export const Route = createFileRoute('/api/sisters-improve')({
           return json({ ok: false, error: `Sister '${id}' not found` }, { status: 404 })
         }
 
-        const results: string[] = []
+        const results: Array<string> = []
 
         // Add personality note
         if (typeof body.note === 'string' && body.note.trim()) {
@@ -112,12 +113,12 @@ export const Route = createFileRoute('/api/sisters-improve')({
 
           const skills =
             Array.isArray(c.skills) && c.skills.every((s) => typeof s === 'string')
-              ? (c.skills as string[])
+              ? (c.skills)
               : []
           const deliver = typeof c.deliver === 'string' ? c.deliver : 'local'
           const toolsets =
             Array.isArray(c.toolsets) && c.toolsets.every((s) => typeof s === 'string')
-              ? (c.toolsets as string[])
+              ? (c.toolsets)
               : undefined
           const profile = typeof c.profile === 'string' ? c.profile : id
 

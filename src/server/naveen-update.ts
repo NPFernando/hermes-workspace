@@ -7,7 +7,7 @@ import path from 'node:path'
 
 // Files Naveen has customized on top of upstream. Any upstream commit that
 // touches these files needs review before applying.
-export const NAVEEN_CUSTOM_FILES: readonly string[] = [
+export const NAVEEN_CUSTOM_FILES: ReadonlyArray<string> = [
   'server-entry.js',
   'src/components/settings/settings-sidebar.tsx',
   'src/components/update-center-notifier.tsx',
@@ -49,9 +49,9 @@ export type NaveenUpdateStatus = {
   ourAhead: number
   upstreamBehind: number
   mergeBase: string | null
-  upstreamNewCommits: string[]
-  customFilesUpstreamTouched: string[]
-  potentialConflicts: ConflictFile[]
+  upstreamNewCommits: Array<string>
+  customFilesUpstreamTouched: Array<string>
+  potentialConflicts: Array<ConflictFile>
   canAutoRebase: boolean
   checkedAt: number
   error?: string
@@ -67,7 +67,7 @@ export type NaveenApplyOptions = {
 export type NaveenApplyResult = {
   ok: boolean
   output: string
-  conflictFiles: string[]
+  conflictFiles: Array<string>
   pushedToFork: boolean
   restartRequired: boolean
   error?: string
@@ -81,14 +81,14 @@ export type AiFileRecommendation = {
 }
 
 export type NaveenAiAnalysis = {
-  recommendations: AiFileRecommendation[]
+  recommendations: Array<AiFileRecommendation>
   summary: string
   checkedAt: number
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function git(args: string[], cwd = CWD, timeout = 10_000): string | null {
+function git(args: Array<string>, cwd = CWD, timeout = 10_000): string | null {
   try {
     return (
       execFileSync('git', args, {
@@ -103,7 +103,7 @@ function git(args: string[], cwd = CWD, timeout = 10_000): string | null {
   }
 }
 
-function gitOrThrow(args: string[], cwd = CWD, timeout = 60_000): string {
+function gitOrThrow(args: Array<string>, cwd = CWD, timeout = 60_000): string {
   return execFileSync('git', args, {
     cwd,
     encoding: 'utf8',
@@ -118,7 +118,7 @@ function resolveHermesBin(): string {
     path.join(os.homedir(), '.local', 'bin', 'hermes'),
     path.join(os.homedir(), '.hermes', 'bin', 'hermes'),
     '/usr/local/bin/hermes',
-  ].filter(Boolean) as string[]
+  ].filter(Boolean) as Array<string>
   for (const p of candidates) {
     try {
       if (existsSync(p)) return p
@@ -135,8 +135,8 @@ function ensureRuntime(): void {
   mkdirSync(RUNTIME_DIR, { recursive: true })
 }
 
-function parseConflictFilesFromOutput(text: string): string[] {
-  const files: string[] = []
+function parseConflictFilesFromOutput(text: string): Array<string> {
+  const files: Array<string> = []
   for (const line of text.split('\n')) {
     const m = line.match(/CONFLICT.*?:\s+Merge conflict in (.+)$/)
     if (m) files.push(m[1].trim())
@@ -144,7 +144,7 @@ function parseConflictFilesFromOutput(text: string): string[] {
   return [...new Set(files)]
 }
 
-function getUnresolvedConflicts(cwd = CWD): string[] {
+function getUnresolvedConflicts(cwd = CWD): Array<string> {
   const raw = git(['diff', '--name-only', '--diff-filter=U'], cwd)
   return raw?.split('\n').filter(Boolean) ?? []
 }
@@ -258,7 +258,7 @@ export function readNaveenUpdateStatus(skipCache = false): NaveenUpdateStatus {
   )
 
   // Files both sides changed = potential rebase conflicts
-  const potentialConflicts: ConflictFile[] = []
+  const potentialConflicts: Array<ConflictFile> = []
   for (const file of customFilesUpstreamTouched) {
     if (!ourChangedFiles.has(file)) continue
     const upstreamDiffStat =
@@ -295,7 +295,7 @@ export function readNaveenUpdateStatus(skipCache = false): NaveenUpdateStatus {
 // ── applyNaveenSmartUpdate ────────────────────────────────────────────────────
 
 export function applyNaveenSmartUpdate(options: NaveenApplyOptions = {}): NaveenApplyResult {
-  const output: string[] = []
+  const output: Array<string> = []
   const rebaseEnv: NodeJS.ProcessEnv = {
     ...process.env,
     GIT_EDITOR: 'true',
@@ -423,7 +423,7 @@ export function applyNaveenSmartUpdate(options: NaveenApplyOptions = {}): Naveen
   return _buildAndFinish(output, rebaseEnv)
 }
 
-function _buildAndFinish(output: string[], env: NodeJS.ProcessEnv): NaveenApplyResult {
+function _buildAndFinish(output: Array<string>, env: NodeJS.ProcessEnv): NaveenApplyResult {
   const changedFiles =
     git(['diff', '--name-only', 'HEAD@{1}', 'HEAD'])?.split('\n').filter(Boolean) ?? []
 
@@ -503,7 +503,7 @@ function _buildAndFinish(output: string[], env: NodeJS.ProcessEnv): NaveenApplyR
 // ── generateNaveenAiAnalysis ──────────────────────────────────────────────────
 
 export function generateNaveenAiAnalysis(
-  conflicts: ConflictFile[],
+  conflicts: Array<ConflictFile>,
 ): NaveenAiAnalysis {
   if (conflicts.length === 0) {
     return { recommendations: [], summary: 'No conflicts to analyze.', checkedAt: Date.now() }
@@ -550,7 +550,7 @@ ${conflictDetails}`
     maxBuffer: 4 * 1024 * 1024,
   })
 
-  if (!result.stdout?.trim()) {
+  if (!result.stdout.trim()) {
     return {
       recommendations: conflicts.map((c) => ({
         file: c.file,
@@ -589,7 +589,7 @@ ${conflictDetails}`
   return analysis
 }
 
-type AiAnalysisPayload = { recommendations: AiFileRecommendation[]; summary: string }
+type AiAnalysisPayload = { recommendations: Array<AiFileRecommendation>; summary: string }
 
 export function readCachedAiAnalysis(): NaveenAiAnalysis | null {
   try {

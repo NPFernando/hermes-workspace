@@ -25,7 +25,7 @@ type HermesCronJob = {
   id: string
   name: string
   prompt: string
-  skills: string[]
+  skills: Array<string>
   skill: string | null
   model: string | null
   provider: string | null
@@ -48,7 +48,7 @@ type HermesCronJob = {
   last_delivery_error: string | null
   deliver: string
   origin: { platform: string; chat_id: string; chat_name: string | null; thread_id: null } | null
-  enabled_toolsets: string[] | null
+  enabled_toolsets: Array<string> | null
   workdir: string | null
   profile: string | null
 }
@@ -57,9 +57,9 @@ export type SisterCronRequest = {
   name: string
   schedule: string
   prompt: string
-  skills?: string[]
+  skills?: Array<string>
   deliver?: string
-  toolsets?: string[]
+  toolsets?: Array<string>
   profile?: string
 }
 
@@ -95,7 +95,7 @@ export function appendGrowthEntry(
   return full
 }
 
-export function getGrowthLog(sisterId: string, limit = 50): GrowthEntry[] {
+export function getGrowthLog(sisterId: string, limit = 50): Array<GrowthEntry> {
   const logPath = growthLogPath(sisterId)
   if (!fs.existsSync(logPath)) return []
   try {
@@ -161,11 +161,11 @@ export function registerSisterCron(
   const root = getHermesRoot()
   const cronPath = path.join(root, 'cron', 'jobs.json')
 
-  let jobs: HermesCronJob[] = []
+  let jobs: Array<HermesCronJob> = []
   if (fs.existsSync(cronPath)) {
     try {
       const raw = fs.readFileSync(cronPath, 'utf-8')
-      const parsed = JSON.parse(raw) as { jobs?: HermesCronJob[] }
+      const parsed = JSON.parse(raw) as { jobs?: Array<HermesCronJob> }
       if (Array.isArray(parsed.jobs)) jobs = parsed.jobs
     } catch {
       // start fresh

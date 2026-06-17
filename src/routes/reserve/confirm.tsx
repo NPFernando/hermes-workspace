@@ -3,14 +3,17 @@ import { useEffect, useState } from 'react'
 import { usePageTitle } from '@/hooks/use-page-title'
 
 export const Route = createFileRoute('/reserve/confirm')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    token: typeof search.token === 'string' ? search.token : '',
+  }),
   ssr: false,
   component: ReserveConfirmRoute,
 })
 
 function ReserveConfirmRoute() {
   usePageTitle('Confirm HermesWorld reservation')
-  const search = Route.useSearch() as { token?: string }
-  const token = search.token || ''
+  const search = Route.useSearch()
+  const token = search.token
   const [state, setState] = useState<{
     status: 'loading' | 'success' | 'error'
     message: string

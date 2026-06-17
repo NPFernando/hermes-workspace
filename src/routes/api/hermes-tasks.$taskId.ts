@@ -1,11 +1,11 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { randomUUID } from 'node:crypto'
+import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { deleteTask, getTask, moveTask, updateTask } from '../../server/tasks-store'
-import { executeTaskBackground, breakdownTaskWithAI } from '../../server/astra-tasks'
-import { ensureLocalSession, appendLocalMessage, getLocalMessages } from '../../server/local-session-store'
+import { breakdownTaskWithAI, executeTaskBackground } from '../../server/astra-tasks'
+import { appendLocalMessage, ensureLocalSession, getLocalMessages } from '../../server/local-session-store'
 import { getSessionMessages } from '../../server/claude-dashboard-api'
-import type { TaskColumn, TaskPriority, TaskAgentState, ActivityEntry } from '../../server/tasks-store'
+import type { ActivityEntry, TaskAgentState, TaskColumn, TaskPriority } from '../../server/tasks-store'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -61,8 +61,8 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
             position: typeof body.position === 'number' ? body.position : undefined,
             session_id: body.session_id === null || typeof body.session_id === 'string' ? body.session_id : undefined,
             agent_state: (body.agent_state === null || body.agent_state === 'reviewing' || body.agent_state === 'delegating' || body.agent_state === 'working' || body.agent_state === 'waiting_for_input') ? body.agent_state as TaskAgentState | null : undefined,
-            agent_name: body.agent_name === null || typeof body.agent_name === 'string' ? body.agent_name as string | null : undefined,
-            agent_action_at: body.agent_action_at === null || typeof body.agent_action_at === 'string' ? body.agent_action_at as string | null : undefined,
+            agent_name: body.agent_name === null || typeof body.agent_name === 'string' ? body.agent_name : undefined,
+            agent_action_at: body.agent_action_at === null || typeof body.agent_action_at === 'string' ? body.agent_action_at : undefined,
           })
 
           if (!task) return jsonResponse({ error: 'Task not found' }, 404)
@@ -105,7 +105,7 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
             // Try dashboard API first — this has the full conversation history
             try {
               const dashResult = await getSessionMessages(task.session_id)
-              if (dashResult?.messages?.length) {
+              if (dashResult.messages.length) {
                 tail = dashResult.messages
                   .filter((m) => m.role === 'user' || m.role === 'assistant')
                   .filter((m) => typeof m.content === 'string' && m.content.trim().length > 0)

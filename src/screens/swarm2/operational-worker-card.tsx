@@ -10,13 +10,14 @@ import {
   ComputerTerminal01Icon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
-import { AgentProgress } from '@/components/agent-view/agent-progress'
-import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { useQuery } from '@tanstack/react-query'
-import { Swarm2Artifacts, type Swarm2Artifact, type Swarm2Preview } from './swarm2-artifacts'
+import {  Swarm2Artifacts  } from './swarm2-artifacts'
 import { Swarm2LiveChat } from './swarm2-live-chat'
 import { Swarm2TaskQueue } from './swarm2-task-queue'
+import type {Swarm2Artifact, Swarm2Preview} from './swarm2-artifacts';
 import type { CrewMember } from '@/hooks/use-crew-status'
+import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
+import { AgentProgress } from '@/components/agent-view/agent-progress'
 import { getOnlineStatus } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
 
@@ -38,7 +39,7 @@ const ROLE_TO_SISTER_ID: Record<string, string> = {
   research: 'nova', ops: 'bia', hackathon: 'novus', worker: 'astra',
 }
 
-const SISTER_BADGE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+const SISTER_BADGE_COLORS: Partial<Record<string, { bg: string; text: string; border: string }>> = {
   astra:    { bg: 'bg-violet-500/12',  text: 'text-violet-300',  border: 'border-violet-400/25' },
   novus:    { bg: 'bg-emerald-500/12', text: 'text-emerald-300', border: 'border-emerald-400/25' },
   nova:     { bg: 'bg-sky-500/12',     text: 'text-sky-300',     border: 'border-sky-400/25' },
@@ -60,27 +61,29 @@ const SISTER_BADGE_COLORS: Record<string, { bg: string; text: string; border: st
   default:  { bg: 'bg-primary-500/10', text: 'text-primary-300', border: 'border-primary-300/20' },
 }
 
-function badgeColors(id: string, type: string) {
-  if (SISTER_BADGE_COLORS[id]) return SISTER_BADGE_COLORS[id]
-  if (type === 'business_agent') return SISTER_BADGE_COLORS.business
-  return SISTER_BADGE_COLORS.default
+const FALLBACK_COLORS = { bg: 'bg-primary-500/10', text: 'text-primary-300', border: 'border-primary-300/20' }
+
+function badgeColors(id: string, type: string): { bg: string; text: string; border: string } {
+  return SISTER_BADGE_COLORS[id]
+    ?? (type === 'business_agent' ? SISTER_BADGE_COLORS.business : undefined)
+    ?? FALLBACK_COLORS
 }
 
 function useSistersByRole() {
-  const { data: sisters } = useQuery<SisterData[]>({
+  const { data: sisters } = useQuery<Array<SisterData>>({
     queryKey: ['sisters'],
     queryFn: async () => {
       const res = await fetch('/api/sisters')
       if (!res.ok) return []
-      const p = (await res.json()) as { ok?: boolean; sisters?: SisterData[] }
+      const p = (await res.json()) as { ok?: boolean; sisters?: Array<SisterData> }
       return Array.isArray(p.sisters) ? p.sisters : []
     },
     staleTime: 60_000,
   })
   return useMemo(() => {
-    const byId: Record<string, SisterData> = {}
+    const byId: Partial<Record<string, SisterData>> = {}
     for (const s of sisters ?? []) byId[s.id] = s
-    const map: Record<string, SisterData> = {}
+    const map: Partial<Record<string, SisterData>> = {}
     for (const [role, sisterId] of Object.entries(ROLE_TO_SISTER_ID)) {
       if (byId[sisterId]) map[role] = byId[sisterId]
     }
@@ -584,9 +587,9 @@ export function OperationalWorkerCard({
               <HugeiconsIcon icon={ArrowLeft01Icon} size={11} />
             </button>
             <div className="min-w-0 flex-1 text-center">
-              <div className="truncate">{activeFocusPanel?.label ?? 'Panel'}</div>
+              <div className="truncate">{activeFocusPanel.label}</div>
               <div className="truncate text-[10px] font-medium normal-case tracking-normal text-[var(--theme-muted)]/80">
-                {activeFocusPanel?.meta ?? outputFreshness}
+                {activeFocusPanel.meta}
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -614,7 +617,7 @@ export function OperationalWorkerCard({
           </div>
 
           <p className="mb-2 mx-auto max-w-2xl text-center text-[11px] leading-relaxed text-[var(--theme-muted)]">
-            {activeFocusPanel?.helper ?? 'Worker details'}
+            {activeFocusPanel.helper}
           </p>
 
           {focusPanel === 'tasks' ? (
