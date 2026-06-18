@@ -1,15 +1,15 @@
 {
-  "name": "Hermes Workspace",
+  "name": "Fernando Family Hermes Workspace",
   "short_name": "Hermes",
-  "description": "Installable control surface for Hermes Agent chat, tools, files, memory, jobs, and agent workflows.",
+  "description": "Installable AI workspace for Hermes Agent chat, tools, files, memory, jobs, and agent workflows.",
   "id": "/?app=hermes-workspace",
-  "start_url": "/?source=pwa",
+  "start_url": "/chat/new?source=pwa",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "browser"],
   "orientation": "any",
-  "background_color": "#0A0E1A",
-  "theme_color": "#031A1A",
+  "background_color": "#282c34",
+  "theme_color": "#282c34",
   "categories": ["productivity", "utilities", "developer"],
   "icons": [
     {
@@ -23,6 +23,29 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Chat",
+      "short_name": "Chat",
+      "description": "Start a new Hermes Agent session",
+      "url": "/chat/new?source=pwa-shortcut",
+      "icons": [{ "src": "/claude-icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Operations",
+      "short_name": "Ops",
+      "description": "Open agent operations dashboard",
+      "url": "/operations?source=pwa-shortcut",
+      "icons": [{ "src": "/claude-icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Tasks",
+      "short_name": "Tasks",
+      "description": "Open Hermes tasks",
+      "url": "/tasks?source=pwa-shortcut",
+      "icons": [{ "src": "/claude-icon-192.png", "sizes": "192x192" }]
     }
   ]
 }
