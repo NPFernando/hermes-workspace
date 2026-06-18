@@ -1,4 +1,5 @@
 import { ChangeEvent, useState } from 'react';
+// TODO: Implement search functionality
 
 export function SearchBar() {
   const [query, setQuery] = useState('');
