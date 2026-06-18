@@ -70,5 +70,23 @@
     "description": "Generate a shareable link for a conversation that allows others to view the chat history (with optional expiration).",
     "category": "ui",
     "estimated_effort": "high"
+  },
+  {
+    "title": "Add ability to save and load chat sessions as files",
+    "description": "Allow users to save their current chat session to a file and load it later to continue the conversation.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add integration with external calendar services",
+    "description": "Enable users to connect their Google Calendar or Outlook to view and manage meetings within the Hermes workspace.",
+    "category": "api",
+    "estimated_effort": "high"
+  },
+  {
+    "title": "Add voice input for chat messages",
+    "description": "Allow users to speak their messages instead of typing, using the browser's Speech Recognition API.",
+    "category": "ui",
+    "estimated_effort": "medium"
   }
 ]
