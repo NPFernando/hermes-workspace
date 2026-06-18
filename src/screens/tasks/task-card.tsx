@@ -96,7 +96,6 @@ function SourceBadge({ source }: { source: ClaudeTask['source'] }) {
       ✦ astra
     </span>
   )
-  return null
 }
 
 export function TaskCard({
@@ -188,8 +187,7 @@ export function TaskCard({
             <HugeiconsIcon
               icon={PlayIcon}
               size={13}
-              className={isLaunching ? 'animate-pulse' : ''}
-              style={{ color: 'var(--theme-accent)' }}
+              className={cn(isLaunching ? 'animate-pulse' : '', 'text-[var(--theme-accent)]')}
             />
           </button>
         )}
@@ -205,8 +203,7 @@ export function TaskCard({
             <HugeiconsIcon
               icon={Rocket01Icon}
               size={13}
-              className={isExecuting ? 'animate-pulse' : ''}
-              style={{ color: '#f59e0b' }}
+              className={cn(isExecuting ? 'animate-pulse' : '', 'text-amber-500')}
             />
           </button>
         )}
@@ -220,8 +217,7 @@ export function TaskCard({
           </MenuTrigger>
           <MenuContent side="bottom" align="end">
             <div
-              className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest"
-              style={{ color: 'var(--theme-muted)' }}
+              className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-[var(--theme-muted)]"
             >
               Priority
             </div>
@@ -237,11 +233,10 @@ export function TaskCard({
               </MenuItem>
             ))}
 
-            <hr style={{ borderColor: 'var(--theme-border)', margin: '4px 0' }} />
+            <hr className="border-[var(--theme-border)] my-1" />
 
             <div
-              className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest"
-              style={{ color: 'var(--theme-muted)' }}
+              className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-[var(--theme-muted)]"
             >
               Move to
             </div>
@@ -255,7 +250,7 @@ export function TaskCard({
               </MenuItem>
             ))}
 
-            <hr style={{ borderColor: 'var(--theme-border)', margin: '4px 0' }} />
+            <hr className="border-[var(--theme-border)] my-1" />
 
             {onBreakdown && (
               <MenuItem
@@ -263,12 +258,12 @@ export function TaskCard({
                 className="text-xs flex items-center gap-2"
                 style={{ opacity: isBreakingDown ? 0.5 : 1, cursor: isBreakingDown ? 'wait' : 'pointer' }}
               >
-                <HugeiconsIcon icon={SplitIcon} size={12} style={{ color: '#8b5cf6' }} />
+                <HugeiconsIcon icon={SplitIcon} size={12} className="text-violet-500" />
                 {isBreakingDown ? 'Breaking down…' : 'Break Down'}
               </MenuItem>
             )}
 
-            <hr style={{ borderColor: 'var(--theme-border)', margin: '4px 0' }} />
+            <hr className="border-[var(--theme-border)] my-1" />
 
             <MenuItem
               onClick={(e) => { e.stopPropagation(); onDelete() }}
@@ -310,8 +305,7 @@ export function TaskCard({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onResetAgent() }}
                 title="Agent appears stuck — click to reset"
-                className="text-[9px] px-1.5 py-0.5 rounded-md border transition-colors"
-                style={{ borderColor: '#ef444466', color: '#ef4444', background: '#ef444411' }}
+                className="text-[9px] px-1.5 py-0.5 rounded-md border transition-colors border-red-500/40 text-red-500 bg-red-500/7"
               >
                 ✕ reset
               </button>
@@ -322,8 +316,8 @@ export function TaskCard({
 
         {/* Agent comment — latest reasoning shown at a glance (when panel is closed) */}
         {task.agent_comment && !isAgentActive && !activityOpen && (
-          <p className="text-[10px] leading-relaxed line-clamp-2" style={{ color: 'var(--theme-muted)' }}>
-            <span style={{ color: '#a855f7' }}>✦</span> {task.agent_comment}
+          <p className="text-[10px] leading-relaxed line-clamp-2 text-[var(--theme-muted)]">
+            <span className="text-purple-500">✦</span> {task.agent_comment}
           </p>
         )}
 
@@ -332,8 +326,7 @@ export function TaskCard({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setActivityOpen(v => !v) }}
-            className="text-[9px] text-left hover:underline"
-            style={{ color: 'var(--theme-muted)' }}
+            className="text-[9px] text-left hover:underline text-[var(--theme-muted)]"
           >
             {activityOpen ? '▲ hide' : `💬 ${task.agent_history!.length} note${task.agent_history!.length !== 1 ? 's' : ''} — click to reply`}
           </button>
@@ -342,15 +335,14 @@ export function TaskCard({
         {/* Collapsible agent activity panel — shown when agent active OR when history panel toggled */}
         {(isAgentActive || hasHistory) && activityOpen && (
           <div
-            className="rounded-md p-2 space-y-1.5"
-            style={{ background: 'var(--theme-hover)', border: '1px solid var(--theme-border)' }}
+            className="rounded-md p-2 space-y-1.5 bg-[var(--theme-hover)] border border-[var(--theme-border)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Live status indicator (only when active) */}
             {isAgentActive && (() => {
               const cfg = AGENT_STATE_CONFIG[task.agent_state!]
               return (
-                <div className="flex items-center gap-1.5 text-[10px] pb-1" style={{ color: cfg.color, borderBottom: '1px solid var(--theme-border)' }}>
+                <div className="flex items-center gap-1.5 text-[10px] pb-1 border-b border-[var(--theme-border)]" style={{ color: cfg.color }}>
                   <span
                     className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.pulse ? 'animate-ping' : ''}`}
                     style={{ background: cfg.color }}
@@ -365,10 +357,10 @@ export function TaskCard({
               <div key={entry.id} className="flex gap-1.5 text-[10px]">
                 <span className="shrink-0 leading-none mt-0.5">{entry.byEmoji}</span>
                 <div className="min-w-0">
-                  <span className="font-medium capitalize" style={{ color: entry.action === 'question' ? '#f59e0b' : 'var(--theme-text)' }}>{entry.by}</span>
-                  <span style={{ color: 'var(--theme-muted)' }}> · {entry.action === 'question' ? 'asked' : entry.action} · {relativeTime(entry.at)}</span>
+                  <span className={cn('font-medium capitalize', entry.action === 'question' ? 'text-amber-500' : 'text-[var(--theme-text)]')}>{entry.by}</span>
+                  <span className="text-[var(--theme-muted)]"> · {entry.action === 'question' ? 'asked' : entry.action} · {relativeTime(entry.at)}</span>
                   {entry.note && (
-                    <p className="mt-0.5 leading-relaxed line-clamp-3" style={{ color: entry.action === 'question' ? '#f59e0b' : 'var(--theme-muted)' }}>
+                    <p className={cn('mt-0.5 leading-relaxed line-clamp-3', entry.action === 'question' ? 'text-amber-500' : 'text-[var(--theme-muted)]')}>
                       {entry.note}
                     </p>
                   )}
@@ -378,16 +370,10 @@ export function TaskCard({
 
             {/* Inline reply input */}
             {onComment && (
-              <div className="flex gap-1.5 pt-1 border-t" style={{ borderColor: 'var(--theme-border)' }}>
+              <div className="flex gap-1.5 pt-1 border-t border-[var(--theme-border)]">
                 <input
                   ref={replyInputRef}
-                  className="flex-1 rounded px-2 py-1 text-[10px] min-w-0"
-                  style={{
-                    background: 'var(--theme-input, var(--theme-bg))',
-                    border: '1px solid var(--theme-border)',
-                    color: 'var(--theme-text)',
-                    outline: 'none',
-                  }}
+                  className="flex-1 rounded px-2 py-1 text-[10px] min-w-0 bg-[var(--theme-input)] border border-[var(--theme-border)] text-[var(--theme-text)] outline-none"
                   placeholder={task.agent_state === 'waiting_for_input' ? 'Reply to Astra…' : 'Continue…'}
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
@@ -417,10 +403,8 @@ export function TaskCard({
                       setReplySending(false)
                     }
                   }}
-                  className="rounded px-2 py-1 text-[10px] shrink-0 transition-opacity"
+                  className={cn('rounded px-2 py-1 text-[10px] shrink-0 transition-opacity text-white', replySending ? 'bg-purple-500/20' : 'bg-purple-500')}
                   style={{
-                    background: replySending ? '#a855f733' : '#a855f7',
-                    color: 'white',
                     opacity: (!replyText.trim() || replySending) ? 0.5 : 1,
                     cursor: (!replyText.trim() || replySending) ? 'default' : 'pointer',
                   }}
@@ -438,8 +422,7 @@ export function TaskCard({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onAssigneeClick(task.assignee!) }}
-                className="text-[10px] px-1.5 py-0.5 rounded-md transition-colors hover:outline hover:outline-1 hover:outline-[var(--theme-accent)]"
-                style={{ background: 'var(--theme-hover)', color: 'var(--theme-muted)' }}
+                className="text-[10px] px-1.5 py-0.5 rounded-md transition-colors hover:outline hover:outline-1 hover:outline-[var(--theme-accent)] bg-[var(--theme-hover)] text-[var(--theme-muted)]"
                 title="Filter by this assignee"
               >
                 {assigneeLabel}
@@ -454,14 +437,12 @@ export function TaskCard({
                 key={tag}
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onTagClick(tag) }}
-                className="text-[10px] px-1.5 py-0.5 rounded-md transition-colors"
-                style={{
-                  background: activeTagFilter === tag
-                    ? 'color-mix(in srgb, var(--theme-accent) 20%, var(--theme-hover))'
-                    : 'var(--theme-hover)',
-                  color: activeTagFilter === tag ? 'var(--theme-accent)' : 'var(--theme-muted)',
-                  outline: activeTagFilter === tag ? '1px solid var(--theme-accent)' : 'none',
-                }}
+                className={cn(
+                  'text-[10px] px-1.5 py-0.5 rounded-md transition-colors',
+                  activeTagFilter === tag
+                    ? 'bg-[var(--theme-accent)]/20 text-[var(--theme-accent)] outline outline-1 outline-[var(--theme-accent)]'
+                    : 'bg-[var(--theme-hover)] text-[var(--theme-muted)]',
+                )}
               >
                 #{tag}
               </button>

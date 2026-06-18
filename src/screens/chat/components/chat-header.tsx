@@ -277,7 +277,7 @@ function ChatHeaderComponent({
           <button
             type="button"
             onClick={onOpenSessions}
-            className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-primary-100/70 hover:bg-primary-200/80 dark:bg-neutral-700/80 dark:hover:bg-neutral-600/80 transition-colors"
+            className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-primary-100/70 hover:bg-primary-200/80 transition-colors"
             aria-label="Switch session"
           >
             <span className="truncate text-[13px] font-medium text-primary-600 dark:text-primary-300">
@@ -388,11 +388,7 @@ function ChatHeaderComponent({
               {sessionPopoverOpen && (
                 <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-80 overflow-hidden rounded-xl border border-[var(--theme-border)] shadow-2xl">
                   <div
-                    className="border-b px-3 py-2"
-                    style={{
-                      background: 'var(--theme-card)',
-                      borderColor: 'var(--theme-border)',
-                    }}
+                    className="border-b border-[var(--theme-border)] px-3 py-2 bg-[var(--theme-card)]"
                   >
                     <div className="flex items-center gap-2">
                       <svg
@@ -413,17 +409,14 @@ function ChatHeaderComponent({
                         placeholder="Search sessions..."
                         value={sessionSearch}
                         onChange={(e) => setSessionSearch(e.target.value)}
-                        className="flex-1 bg-transparent text-sm outline-none"
-                        style={{ color: 'var(--theme-text)' }}
+                        className="flex-1 bg-transparent text-sm outline-none text-[var(--theme-text)]"
                       />
                     </div>
                   </div>
                   <div
-                    className="max-h-60 overflow-y-auto p-1"
+                    className="max-h-60 overflow-y-auto p-1 bg-[var(--theme-card)]"
                     style={{
-                      background: 'var(--theme-card)',
                       boxShadow: '0 18px 48px rgba(0,0,0,0.38)',
-                      opacity: 1,
                     }}
                   >
                     {sessions
@@ -465,8 +458,7 @@ function ChatHeaderComponent({
                             )}
                           >
                             <span
-                              className="flex-1 min-w-0 truncate"
-                              style={{ color: 'var(--theme-text)' }}
+                              className="flex-1 min-w-0 truncate text-[var(--theme-text)]"
                             >
                               {label}
                             </span>
@@ -477,7 +469,7 @@ function ChatHeaderComponent({
                         )
                       })}
                     {sessions.length === 0 && (
-                      <p className="px-3 py-4 text-sm text-neutral-400">
+                      <p className="px-3 py-4 text-sm text-[var(--theme-muted)]">
                         No sessions
                       </p>
                     )}
@@ -489,7 +481,7 @@ function ChatHeaderComponent({
         </div>
         {renamingTitle ? (
           <span
-            className="mr-1 inline-flex size-3 animate-spin rounded-full border border-primary-300 border-t-primary-700"
+            className="spinner-accent spinner-sm mr-1"
             aria-label="Saving session name"
           />
         ) : null}

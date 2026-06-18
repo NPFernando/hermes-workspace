@@ -110,15 +110,13 @@ export function TokenMixHourCard({
     >
       <div className="flex items-center justify-between gap-2">
         <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-text)' }}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
         >
           Mix &amp; rhythm
           {analytics ? ` · ${analytics.windowDays}d` : ''}
         </h3>
         <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
         >
           {totalTokens > 0 ? `out/in ${ratio.toFixed(1)}%` : ''}
           {totalTokens > 0 && totalSessions > 0 ? ' · ' : ''}
@@ -156,8 +154,7 @@ export function TokenMixHourCard({
               return (
                 <li
                   key={s.label}
-                  className="flex items-center justify-between gap-2"
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="flex items-center justify-between gap-2 text-[var(--theme-muted)]"
                   title={s.hint}
                 >
                   <span className="flex items-center gap-1.5 truncate">
@@ -171,13 +168,11 @@ export function TokenMixHourCard({
                     </span>
                   </span>
                   <span
-                    className="shrink-0 font-mono tabular-nums"
-                    style={{ color: 'var(--theme-text)' }}
+                    className="shrink-0 font-mono tabular-nums text-[var(--theme-text)]"
                   >
                     {formatTokens(s.value)}
                     <span
-                      className="ml-1"
-                      style={{ color: 'var(--theme-muted)' }}
+                      className="ml-1 text-[var(--theme-muted)]"
                     >
                       · {widthPct.toFixed(0)}%
                     </span>
@@ -217,8 +212,7 @@ export function TokenMixHourCard({
             })}
           </div>
           <div
-            className="flex justify-between font-mono text-[8px] uppercase tracking-[0.1em]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="flex justify-between font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
           >
             <span>12a</span>
             <span>6a</span>

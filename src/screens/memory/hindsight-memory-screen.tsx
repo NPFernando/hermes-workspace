@@ -110,12 +110,17 @@ function modelShort(model: string): string {
   return name.replace(':free', '').slice(0, 28)
 }
 
+function getSisterName(tags: Array<string>): string | null {
+  const t = tags.find((x) => x.startsWith('sister:'))
+  return t ? t.replace('sister:', '') : null
+}
+
 function factTypeBadge(type: string): string {
   if (type === 'observation')
     return 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300'
   if (type === 'world')
     return 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300'
-  return 'border-primary-200 bg-primary-50 text-primary-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300'
+  return 'border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)]'
 }
 
 function opStatusBadge(status: string): string {
@@ -133,35 +138,35 @@ function StatusBar({ data, isLoading }: { data: StatusData | undefined; isLoadin
     data?.daemon.status === 'healthy' && data?.daemon.database === 'connected'
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-primary-200 bg-white px-4 py-2 text-xs dark:border-neutral-800 dark:bg-neutral-950">
+    <div className="flex flex-wrap items-center gap-3 border-b border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-2 text-xs">
       {/* Daemon health */}
       <div className="flex items-center gap-1.5">
         <span
           className={cn(
             'size-2 rounded-full',
             isLoading
-              ? 'bg-primary-300 dark:bg-neutral-600'
+              ? 'bg-[var(--theme-muted)]'
               : healthy
                 ? 'bg-emerald-500'
                 : 'bg-rose-500',
           )}
         />
-        <span className="text-primary-600 dark:text-neutral-400">
+        <span className="text-[var(--theme-muted)]">
           {isLoading ? 'Checking…' : healthy ? 'Daemon healthy' : 'Daemon offline'}
         </span>
       </div>
 
       {data?.model ? (
-        <div className="flex items-center gap-1 text-primary-500 dark:text-neutral-500">
-          <span className="text-primary-300 dark:text-neutral-700">|</span>
+        <div className="flex items-center gap-1 text-[var(--theme-muted)]">
+          <span className="opacity-40">|</span>
           <HugeiconsIcon icon={BrainIcon} className="size-3" />
           <span className="font-mono">{modelShort(data.model)}</span>
         </div>
       ) : null}
 
       {data?.stats?.total_nodes !== undefined ? (
-        <div className="text-primary-500 dark:text-neutral-500">
-          <span className="text-primary-300 dark:text-neutral-700">|</span>{' '}
+        <div className="text-[var(--theme-muted)]">
+          <span className="opacity-40">|</span>{' '}
           {data.stats.total_nodes} memories
         </div>
       ) : null}
@@ -174,7 +179,7 @@ function StatusBar({ data, isLoading }: { data: StatusData | undefined; isLoadin
       ) : null}
 
       {(data?.stats?.pending_operations ?? 0) > 0 ? (
-        <div className="flex items-center gap-1 text-primary-500 dark:text-neutral-500">
+        <div className="flex items-center gap-1 text-[var(--theme-muted)]">
           <HugeiconsIcon icon={Loading03Icon} className="size-3 animate-spin" />
           {data!.stats!.pending_operations} op(s) running
         </div>
@@ -194,24 +199,39 @@ export function HindsightMemoryScreen() {
   const [addOpen, setAddOpen] = useState(false)
   const [addContent, setAddContent] = useState('')
   const [addContext, setAddContext] = useState('')
+  const [bank, setBank] = useState<'hermes' | 'agents' | 'all'>('hermes')
   const deferredSearch = useDeferredValue(searchInput)
   const searchTerm = deferredSearch.trim()
 
-  // Status — poll every 30s
+  const primaryBank = bank === 'all' ? 'hermes' : bank
+
+  // Status — poll every 30s; scoped to active bank for node counts
   const statusQuery = useQuery({
-    queryKey: ['hindsight', 'status'],
-    queryFn: () => readJson<StatusData>('/api/hindsight/status'),
+    queryKey: ['hindsight', 'status', primaryBank],
+    queryFn: () => readJson<StatusData>(`/api/hindsight/status?bank=${primaryBank}`),
     refetchInterval: 30_000,
   })
 
   // Memory browse list (when not in recall mode)
   const memoriesQuery = useQuery({
-    queryKey: ['hindsight', 'memories', searchTerm],
-    queryFn: () =>
-      readJson<MemoriesData>(
-        `/api/hindsight/memories${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`,
-      ),
+    queryKey: ['hindsight', 'memories', primaryBank, searchTerm],
+    queryFn: () => {
+      const p = new URLSearchParams({ bank: primaryBank })
+      if (searchTerm) p.set('q', searchTerm)
+      return readJson<MemoriesData>(`/api/hindsight/memories?${p.toString()}`)
+    },
     enabled: panel === 'memories' && !recallMode,
+  })
+
+  // Agents bank memories — only fetched when bank === 'all'
+  const agentsMemoriesQuery = useQuery({
+    queryKey: ['hindsight', 'memories', 'agents', searchTerm],
+    queryFn: () => {
+      const p = new URLSearchParams({ bank: 'agents' })
+      if (searchTerm) p.set('q', searchTerm)
+      return readJson<MemoriesData>(`/api/hindsight/memories?${p.toString()}`)
+    },
+    enabled: panel === 'memories' && !recallMode && bank === 'all',
   })
 
   // Operations list
@@ -228,7 +248,7 @@ export function HindsightMemoryScreen() {
       fetch('/api/hindsight/recall', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, bank: primaryBank }),
       }).then((r) => r.json() as Promise<RecallData>),
     onSuccess: () => setRecallMode(true),
   })
@@ -239,7 +259,7 @@ export function HindsightMemoryScreen() {
       fetch('/api/hindsight/retain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, context: context || undefined }),
+        body: JSON.stringify({ content, context: context || undefined, bank: primaryBank }),
       }).then((r) => r.json()),
     onSuccess: () => {
       setAddOpen(false)
@@ -256,7 +276,7 @@ export function HindsightMemoryScreen() {
       fetch('/api/hindsight/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, bank: primaryBank }),
       }).then((r) => r.json()),
     onSuccess: () => {
       setSelectedId(null)
@@ -280,23 +300,32 @@ export function HindsightMemoryScreen() {
     recallMutation.reset()
   }
 
-  const memories = memoriesQuery.data?.items ?? []
+  const hermesItems = memoriesQuery.data?.items ?? []
+  const agentItems = agentsMemoriesQuery.data?.items ?? []
+  const memories =
+    bank === 'all'
+      ? [...hermesItems, ...agentItems].sort(
+          (a, b) => new Date(b.mentioned_at).getTime() - new Date(a.mentioned_at).getTime(),
+        )
+      : hermesItems
   const recallResults = recallMutation.data?.results ?? []
   const operations = operationsQuery.data?.operations ?? []
 
-  const listItems: Array<{ id: string; text: string; badge: string; sub: string }> =
+  const listItems: Array<{ id: string; text: string; badge: string; sub: string; sisterTag: string | null }> =
     recallMode
       ? recallResults.map((r) => ({
           id: r.id,
           text: r.text,
           badge: r.type,
           sub: fmtDate(r.mentioned_at),
+          sisterTag: getSisterName(r.tags),
         }))
       : memories.map((m) => ({
           id: m.id,
           text: m.text,
           badge: m.fact_type,
           sub: fmtDate(m.mentioned_at),
+          sisterTag: getSisterName(m.tags),
         }))
 
   const selectedMemory =
@@ -314,7 +343,7 @@ export function HindsightMemoryScreen() {
     statusQuery.data?.daemon.status !== 'healthy'
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div data-route-page className="flex h-full min-h-0 flex-col">
       <StatusBar data={statusQuery.data} isLoading={statusQuery.isLoading} />
 
       {daemonOffline ? (
@@ -329,9 +358,33 @@ export function HindsightMemoryScreen() {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[360px_minmax(0,1fr)]">
         {/* Left panel */}
-        <aside className="flex min-h-0 flex-col border-b border-primary-200 bg-white dark:border-neutral-800 dark:bg-neutral-950 lg:border-r lg:border-b-0">
+        <aside className="flex min-h-0 flex-col border-b border-[var(--theme-border)] bg-[var(--theme-panel)] lg:border-r lg:border-b-0">
+          {/* Bank toggle */}
+          <div className="flex items-center gap-1 border-b border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2">
+            {(['hermes', 'agents', 'all'] as const).map((b) => (
+              <button
+                key={b}
+                type="button"
+                onClick={() => { setBank(b); clearRecall() }}
+                className={cn(
+                  'rounded-md px-3 py-1 text-xs font-medium transition-all',
+                  bank === b
+                    ? 'bg-[var(--theme-accent)] text-white'
+                    : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]',
+                )}
+              >
+                {b === 'hermes' ? 'Naveen' : b === 'agents' ? 'Agents' : 'All'}
+              </button>
+            ))}
+            {statusQuery.data?.stats?.total_nodes !== undefined ? (
+              <span className="ml-auto font-mono text-[10px] text-[var(--theme-muted)]">
+                {statusQuery.data.stats.total_nodes} nodes
+              </span>
+            ) : null}
+          </div>
+
           {/* Panel tabs + search */}
-          <div className="space-y-3 border-b border-primary-200 p-4 dark:border-neutral-800">
+          <div className="space-y-3 border-b border-[var(--theme-border)] p-4">
             <div className="flex items-center gap-1 text-xs">
               {(['memories', 'operations'] as const).map((p) => (
                 <button
@@ -344,8 +397,8 @@ export function HindsightMemoryScreen() {
                   className={cn(
                     'flex-1 rounded-lg border px-3 py-1.5 capitalize transition',
                     panel === p
-                      ? 'border-primary-500 bg-primary-100 text-primary-900 dark:border-blue-500 dark:bg-blue-500/15 dark:text-blue-100'
-                      : 'border-primary-200 text-primary-600 hover:bg-primary-50 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-900',
+                      ? 'border-[var(--theme-accent)] bg-[var(--theme-hover)] text-[var(--theme-text)]'
+                      : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
                   )}
                 >
                   {p}
@@ -356,7 +409,7 @@ export function HindsightMemoryScreen() {
                   type="button"
                   title="Add memory"
                   onClick={() => setAddOpen(true)}
-                  className="rounded-lg border border-primary-200 p-1.5 text-primary-600 transition hover:bg-primary-50 dark:border-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-900"
+                  className="rounded-lg border border-[var(--theme-border)] p-1.5 text-[var(--theme-muted)] transition hover:bg-[var(--theme-hover)]"
                 >
                   <HugeiconsIcon icon={Add01Icon} className="size-3.5" />
                 </button>
@@ -365,15 +418,15 @@ export function HindsightMemoryScreen() {
 
             {/* Add memory form */}
             {addOpen ? (
-              <div className="space-y-2 rounded-xl border border-primary-200 bg-primary-50 p-3 dark:border-neutral-700 dark:bg-neutral-900">
+              <div className="space-y-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-primary-700 dark:text-neutral-300">
+                  <span className="text-xs font-medium text-[var(--theme-muted)]">
                     Add memory
                   </span>
                   <button
                     type="button"
                     onClick={() => { setAddOpen(false); setAddContent(''); setAddContext('') }}
-                    className="text-primary-400 hover:text-primary-700 dark:text-neutral-500"
+                    className="text-[var(--theme-muted)] hover:text-[var(--theme-text)]"
                   >
                     <HugeiconsIcon icon={Cancel01Icon} className="size-3.5" />
                   </button>
@@ -383,19 +436,19 @@ export function HindsightMemoryScreen() {
                   value={addContent}
                   onChange={(e) => setAddContent(e.target.value)}
                   placeholder="Memory content…"
-                  className="w-full resize-none rounded-lg border border-primary-200 bg-white px-3 py-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full resize-none rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm text-[var(--theme-text)] outline-none"
                 />
                 <input
                   value={addContext}
                   onChange={(e) => setAddContext(e.target.value)}
                   placeholder="Context (optional)"
-                  className="w-full rounded-lg border border-primary-200 bg-white px-3 py-1.5 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                  className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-sm text-[var(--theme-text)] outline-none"
                 />
                 <button
                   type="button"
                   disabled={!addContent.trim() || addMutation.isPending}
                   onClick={() => addMutation.mutate({ content: addContent, context: addContext })}
-                  className="w-full rounded-lg border border-primary-500 bg-primary-100 py-1.5 text-xs font-medium text-primary-900 transition hover:bg-primary-200 disabled:opacity-50 dark:border-blue-500 dark:bg-blue-500/15 dark:text-blue-100"
+                  className="w-full rounded-lg border border-[var(--theme-accent)] bg-[var(--theme-accent)]/20 py-1.5 text-xs font-medium text-[var(--theme-text)] transition hover:bg-[var(--theme-accent)]/30 disabled:opacity-50"
                 >
                   {addMutation.isPending ? 'Saving…' : 'Save to Hindsight'}
                 </button>
@@ -409,27 +462,27 @@ export function HindsightMemoryScreen() {
               <div className="relative">
                 <HugeiconsIcon
                   icon={Search01Icon}
-                  className="pointer-events-none absolute top-2.5 left-3 size-4 text-primary-400"
+                  className="pointer-events-none absolute top-2.5 left-3 size-4 text-[var(--theme-muted)]"
                 />
                 <input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={handleSearchKeyDown}
                   placeholder="Search or Enter to recall…"
-                  className="w-full rounded-xl border border-primary-200 bg-white py-2 pr-3 pl-9 text-sm text-primary-900 outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100"
+                  className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] py-2 pr-3 pl-9 text-sm text-[var(--theme-text)] outline-none focus:border-[var(--theme-accent)]"
                 />
               </div>
             ) : null}
 
             {recallMode ? (
               <div className="flex items-center justify-between text-xs">
-                <span className="text-primary-500 dark:text-neutral-400">
+                <span className="text-[var(--theme-muted)]">
                   Recall: {recallResults.length} result(s)
                 </span>
                 <button
                   type="button"
                   onClick={clearRecall}
-                  className="text-primary-500 underline hover:text-primary-700 dark:text-neutral-400"
+                  className="text-[var(--theme-muted)] underline hover:text-[var(--theme-text)]"
                 >
                   Clear
                 </button>
@@ -442,7 +495,7 @@ export function HindsightMemoryScreen() {
             {panel === 'memories' ? (
               <>
                 {memoriesQuery.isLoading || recallMutation.isPending ? (
-                  <p className="p-3 text-sm text-primary-500 dark:text-neutral-400">Loading…</p>
+                  <p className="p-3 text-sm text-[var(--theme-muted)]">Loading…</p>
                 ) : null}
                 {memoriesQuery.error ? (
                   <p className="p-3 text-sm text-rose-600">
@@ -452,7 +505,7 @@ export function HindsightMemoryScreen() {
                   </p>
                 ) : null}
                 {!memoriesQuery.isLoading && !recallMutation.isPending && listItems.length === 0 ? (
-                  <p className="p-3 text-sm text-primary-500 dark:text-neutral-400">
+                  <p className="p-3 text-sm text-[var(--theme-muted)]">
                     No memories found.
                   </p>
                 ) : null}
@@ -465,24 +518,31 @@ export function HindsightMemoryScreen() {
                       className={cn(
                         'w-full rounded-xl border p-3 text-left transition',
                         selectedId === item.id
-                          ? 'border-primary-500 bg-primary-50 dark:border-blue-500 dark:bg-blue-500/10'
-                          : 'border-primary-200 bg-white hover:bg-primary-50 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900',
+                          ? 'border-[var(--theme-accent)] bg-[var(--theme-hover)]'
+                          : 'border-[var(--theme-border)] bg-[var(--theme-card)] hover:bg-[var(--theme-hover)]',
                       )}
                     >
                       <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <span
-                          className={cn(
-                            'rounded-full border px-2 py-0.5 text-[10px] capitalize',
-                            factTypeBadge(item.badge),
-                          )}
-                        >
-                          {item.badge}
-                        </span>
-                        <span className="text-[10px] text-primary-400 dark:text-neutral-500">
+                        <div className="flex items-center gap-1">
+                          <span
+                            className={cn(
+                              'rounded-full border px-2 py-0.5 text-[10px] capitalize',
+                              factTypeBadge(item.badge),
+                            )}
+                          >
+                            {item.badge}
+                          </span>
+                          {item.sisterTag ? (
+                            <span className="rounded-full border border-[var(--theme-accent)]/40 bg-[var(--theme-accent)]/10 px-2 py-0.5 text-[10px] capitalize text-[var(--theme-accent)]">
+                              {item.sisterTag}
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className="text-[10px] text-[var(--theme-muted)]">
                           {item.sub}
                         </span>
                       </div>
-                      <p className="line-clamp-2 text-sm text-primary-900 dark:text-neutral-100">
+                      <p className="line-clamp-2 text-sm text-[var(--theme-text)]">
                         {item.text}
                       </p>
                     </button>
@@ -492,7 +552,7 @@ export function HindsightMemoryScreen() {
             ) : (
               <>
                 {operationsQuery.isLoading ? (
-                  <p className="p-3 text-sm text-primary-500 dark:text-neutral-400">Loading…</p>
+                  <p className="p-3 text-sm text-[var(--theme-muted)]">Loading…</p>
                 ) : null}
                 {operationsQuery.error ? (
                   <p className="p-3 text-sm text-rose-600">
@@ -505,10 +565,10 @@ export function HindsightMemoryScreen() {
                   {operations.map((op) => (
                     <div
                       key={op.id}
-                      className="rounded-xl border border-primary-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-950"
+                      className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3"
                     >
                       <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="font-mono text-xs text-primary-600 dark:text-neutral-400 capitalize">
+                        <span className="font-mono text-xs text-[var(--theme-muted)] capitalize">
                           {op.task_type.replace(/_/g, ' ')}
                         </span>
                         <span
@@ -520,7 +580,7 @@ export function HindsightMemoryScreen() {
                           {op.status}
                         </span>
                       </div>
-                      <p className="text-xs text-primary-500 dark:text-neutral-500">
+                      <p className="text-xs text-[var(--theme-muted)]">
                         {fmtDate(op.created_at)}
                         {op.items_count > 0 ? ` · ${op.items_count} item(s)` : ''}
                         {op.retry_count > 0 ? ` · retried ${op.retry_count}×` : ''}
@@ -533,7 +593,7 @@ export function HindsightMemoryScreen() {
                     </div>
                   ))}
                   {!operationsQuery.isLoading && operations.length === 0 ? (
-                    <p className="p-3 text-sm text-primary-500 dark:text-neutral-400">
+                    <p className="p-3 text-sm text-[var(--theme-muted)]">
                       No operations yet.
                     </p>
                   ) : null}
@@ -544,7 +604,7 @@ export function HindsightMemoryScreen() {
         </aside>
 
         {/* Detail panel */}
-        <main className="min-h-0 overflow-y-auto bg-primary-50 p-4 dark:bg-neutral-950/80">
+        <main className="min-h-0 overflow-y-auto bg-[var(--theme-panel)] p-4">
           {selectedMemory ? (
             <MemoryDetail
               memory={selectedMemory}
@@ -578,10 +638,10 @@ function MemoryDetail({
   isDeleting: boolean
 }) {
   return (
-    <article className="mx-auto max-w-4xl space-y-4 rounded-2xl border border-primary-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-primary-100 pb-4 dark:border-neutral-800">
+    <article className="mx-auto max-w-4xl space-y-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--theme-border)] pb-4">
         <div>
-          <p className="font-mono text-xs text-primary-400 dark:text-neutral-500">{memory.id}</p>
+          <p className="font-mono text-xs text-[var(--theme-muted)]">{memory.id}</p>
           <div className="mt-1 flex items-center gap-2">
             <span
               className={cn(
@@ -600,7 +660,7 @@ function MemoryDetail({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-xs text-primary-400 dark:text-neutral-500">
+          <div className="flex items-center gap-1 text-xs text-[var(--theme-muted)]">
             <HugeiconsIcon icon={Clock01Icon} className="size-3" />
             {fmtDate(memory.mentioned_at)}
           </div>
@@ -616,35 +676,35 @@ function MemoryDetail({
         </div>
       </div>
 
-      <div className="rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm leading-7 whitespace-pre-wrap text-primary-950 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100">
+      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 text-sm leading-7 whitespace-pre-wrap text-[var(--theme-text)]">
         {memory.text}
       </div>
 
       <dl className="grid gap-3 text-sm md:grid-cols-2">
         {memory.entities ? (
           <div>
-            <dt className="text-xs uppercase tracking-wide text-primary-400 dark:text-neutral-500">
+            <dt className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
               Entities
             </dt>
-            <dd className="mt-1 text-primary-900 dark:text-neutral-100">{memory.entities}</dd>
+            <dd className="mt-1 text-[var(--theme-text)]">{memory.entities}</dd>
           </div>
         ) : null}
         <div>
-          <dt className="text-xs uppercase tracking-wide text-primary-400 dark:text-neutral-500">
+          <dt className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
             Proof count
           </dt>
-          <dd className="mt-1 text-primary-900 dark:text-neutral-100">{memory.proof_count}</dd>
+          <dd className="mt-1 text-[var(--theme-text)]">{memory.proof_count}</dd>
         </div>
         {memory.tags.length > 0 ? (
           <div className="md:col-span-2">
-            <dt className="text-xs uppercase tracking-wide text-primary-400 dark:text-neutral-500">
+            <dt className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
               Tags
             </dt>
             <dd className="mt-1 flex flex-wrap gap-1">
               {memory.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-primary-200 px-2 py-0.5 text-xs text-primary-700 dark:border-neutral-700 dark:text-neutral-300"
+                  className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 text-xs text-[var(--theme-muted)]"
                 >
                   {tag}
                 </span>
@@ -654,10 +714,10 @@ function MemoryDetail({
         ) : null}
         {memory.context ? (
           <div className="md:col-span-2">
-            <dt className="text-xs uppercase tracking-wide text-primary-400 dark:text-neutral-500">
+            <dt className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
               Context
             </dt>
-            <dd className="mt-1 text-xs text-primary-700 dark:text-neutral-300 whitespace-pre-wrap">
+            <dd className="mt-1 text-xs text-[var(--theme-muted)] whitespace-pre-wrap">
               {memory.context}
             </dd>
           </div>
@@ -669,8 +729,8 @@ function MemoryDetail({
 
 function RecallDetail({ result }: { result: HindsightRecallResult }) {
   return (
-    <article className="mx-auto max-w-4xl space-y-4 rounded-2xl border border-primary-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
-      <div className="flex items-center gap-2 border-b border-primary-100 pb-4 dark:border-neutral-800">
+    <article className="mx-auto max-w-4xl space-y-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5">
+      <div className="flex items-center gap-2 border-b border-[var(--theme-border)] pb-4">
         <span
           className={cn(
             'rounded-full border px-2 py-0.5 text-xs capitalize',
@@ -679,25 +739,25 @@ function RecallDetail({ result }: { result: HindsightRecallResult }) {
         >
           {result.type}
         </span>
-        <span className="text-xs text-primary-400 dark:text-neutral-500">
+        <span className="text-xs text-[var(--theme-muted)]">
           {fmtDate(result.mentioned_at)}
         </span>
       </div>
 
-      <div className="rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm leading-7 whitespace-pre-wrap text-primary-950 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100">
+      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 text-sm leading-7 whitespace-pre-wrap text-[var(--theme-text)]">
         {result.text}
       </div>
 
       {result.entities.length > 0 ? (
         <div>
-          <p className="mb-1 text-xs uppercase tracking-wide text-primary-400 dark:text-neutral-500">
+          <p className="mb-1 text-xs uppercase tracking-wide text-[var(--theme-muted)]">
             Entities
           </p>
           <div className="flex flex-wrap gap-1">
             {result.entities.map((e) => (
               <span
                 key={e}
-                className="rounded-full border border-primary-200 px-2 py-0.5 text-xs text-primary-700 dark:border-neutral-700 dark:text-neutral-300"
+                className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 text-xs text-[var(--theme-muted)]"
               >
                 {e}
               </span>
@@ -715,10 +775,10 @@ function EmptyDetail() {
       <div className="text-center">
         <HugeiconsIcon
           icon={BrainIcon}
-          className="mx-auto mb-3 size-8 text-primary-300 dark:text-neutral-600"
+          className="mx-auto mb-3 size-8 text-[var(--theme-muted)]"
         />
-        <p className="text-sm text-primary-500 dark:text-neutral-400">
-          Select a memory to inspect, or press <kbd className="rounded border border-primary-200 px-1 font-mono text-xs dark:border-neutral-700">Enter</kbd> in the search box to recall.
+        <p className="text-sm text-[var(--theme-muted)]">
+          Select a memory to inspect, or press <kbd className="rounded border border-[var(--theme-border)] px-1 font-mono text-xs">Enter</kbd> in the search box to recall.
         </p>
       </div>
     </div>

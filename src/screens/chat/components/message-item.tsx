@@ -1147,7 +1147,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
         {isDone && <span className="shrink-0 text-xs text-green-500">✅</span>}
         {isError && <span className="shrink-0 text-xs text-red-500">❌</span>}
         {isRunning && (
-          <span className="shrink-0 size-1.5 rounded-full animate-pulse bg-indigo-500" />
+          <span className="shrink-0 size-1.5 rounded-full animate-pulse bg-[var(--theme-accent)]" />
         )}
       </button>
       {isRunning && !expanded && (
@@ -1161,8 +1161,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
       {/* Expanded content — args while running, result when done */}
       {expanded && (
         <div
-          className="border-t"
-          style={{ borderColor: 'var(--theme-border)' }}
+          className="border-t border-[var(--theme-border)]"
         >
           {/* Show args (input) */}
           {toolCall.args != null &&
@@ -1181,8 +1180,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
           {/* Show result when done */}
           {isDone && result && (
             <div
-              className="px-2.5 py-1.5 border-t"
-              style={{ borderColor: 'var(--theme-border)' }}
+              className="px-2.5 py-1.5 border-t border-[var(--theme-border)]"
             >
               <div className="text-[9px] uppercase tracking-widest opacity-40 mb-0.5">
                 Output
@@ -1218,8 +1216,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
           {/* Running indicator when expanded */}
           {isRunning && (
             <div
-              className="px-2.5 py-1.5 text-[10px] text-primary-400 border-t"
-              style={{ borderColor: 'var(--theme-border)' }}
+              className="px-2.5 py-1.5 text-[10px] text-primary-400 border-t border-[var(--theme-border)]"
             >
               <span>
                 {verb}
@@ -1582,8 +1579,7 @@ function ArtifactPreviewBody({ artifact, onExpand }: { artifact: InlineArtifact;
   if (artifact.type === 'markdown' || artifact.type === 'md') {
     return (
       <div
-        className="max-h-[60vh] overflow-auto rounded-lg border p-4"
-        style={{ borderColor: 'var(--theme-border)' }}
+        className="max-h-[60vh] overflow-auto rounded-lg border p-4 border-[var(--theme-border)]"
       >
         <Markdown className="text-sm">{artifact.content}</Markdown>
       </div>
@@ -1656,7 +1652,7 @@ function InlineArtifactCard({
       </div>
       <DialogRoot open={open} onOpenChange={setOpen}>
         <DialogContent className="w-[min(1100px,96vw)] max-h-[92vh]">
-          <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--theme-border)' }}>
+          <div className="flex items-center justify-between gap-3 border-b px-4 py-3 border-[var(--theme-border)]">
             <div className="min-w-0">
               <DialogTitle className="truncate text-base">{artifact.title}</DialogTitle>
               <div className="text-xs uppercase tracking-wide opacity-70">{artifact.type}</div>
@@ -1882,8 +1878,7 @@ function InlineToolSectionItem({
                   </div>
                   {artifactPath ? (
                     <div
-                      className="mt-1 truncate font-mono text-[11px]"
-                      style={{ color: 'var(--theme-muted)' }}
+                      className="mt-1 truncate font-mono text-[11px] text-[var(--theme-muted)]"
                       title={artifactPath}
                     >
                       {artifactPath}
@@ -1927,8 +1922,7 @@ function InlineToolSectionItem({
               </div>
               {toolSection.type === 'exec' && headerArg ? (
                 <pre
-                  className="overflow-x-auto whitespace-pre-wrap break-words rounded px-2 py-1 text-[10px] font-mono text-amber-500"
-                  style={{ background: 'var(--code-bg, var(--theme-card))' }}
+                  className="overflow-x-auto whitespace-pre-wrap break-words rounded px-2 py-1 text-[10px] font-mono text-amber-500 bg-[var(--code-bg,var(--theme-card))]"
                 >
                   $ {headerArg}
                 </pre>
@@ -1953,8 +1947,7 @@ function InlineToolSectionItem({
                   Error
                 </div>
                 <pre
-                  className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono text-red-400"
-                  style={{ background: 'var(--code-bg, var(--theme-card))' }}
+                  className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono text-red-400 bg-[var(--code-bg,var(--theme-card))]"
                 >
                   {displayedOutputText}
                 </pre>
@@ -2058,7 +2051,7 @@ function ToolCallGroup({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+              <span className="font-mono micro-label">
                 Tool calls
               </span>
               <span className="rounded-md border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-[var(--theme-muted)]">
@@ -2645,7 +2638,7 @@ function MessageItemComponent({
             : undefined
         }
         className={cn(
-          'text-xs text-neutral-500 italic text-center py-1',
+          'text-xs text-[var(--theme-muted)] italic text-center py-1',
           wrapperClassName,
         )}
       >
@@ -2758,8 +2751,8 @@ function MessageItemComponent({
               'break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
               '',
               !isUser
-                ? 'border rounded-2xl rounded-tl-sm'
-                : 'text-white rounded-2xl rounded-tr-sm',
+                ? 'border rounded-2xl rounded-bl-[2px]'
+                : 'text-white rounded-2xl rounded-br-[2px]',
               isQueued && isUser && !isFailed && 'opacity-70',
               isFailed && isUser && 'bg-red-50/50 border border-red-300',
               bubbleClassName,

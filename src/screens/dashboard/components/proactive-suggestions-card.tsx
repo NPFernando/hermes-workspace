@@ -161,11 +161,11 @@ export function ProactiveSuggestionsCard({
 
   const iconNode =
     active.icon === 'warn' ? (
-      <HugeiconsIcon icon={Alert01Icon} size={13} strokeWidth={1.8} style={{ color: 'var(--theme-warning)' }} />
+      <HugeiconsIcon icon={Alert01Icon} size={13} strokeWidth={1.8} className="text-amber-400" />
     ) : active.icon === 'ok' ? (
-      <HugeiconsIcon icon={CheckmarkCircle01Icon} size={13} strokeWidth={1.8} style={{ color: 'var(--theme-success)' }} />
+      <HugeiconsIcon icon={CheckmarkCircle01Icon} size={13} strokeWidth={1.8} className="text-[var(--theme-success,#50fa7b)]" />
     ) : (
-      <HugeiconsIcon icon={Idea01Icon} size={13} strokeWidth={1.8} style={{ color: 'var(--theme-accent)' }} />
+      <HugeiconsIcon icon={Idea01Icon} size={13} strokeWidth={1.8} className="text-[var(--theme-accent)]" />
     )
 
   const impactColor =
@@ -196,8 +196,7 @@ export function ProactiveSuggestionsCard({
 
       <div className="flex items-center justify-between">
         <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-text)' }}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
         >
           Optimization hint
         </h3>
@@ -212,8 +211,7 @@ export function ProactiveSuggestionsCard({
             type="button"
             aria-label="Next suggestion"
             onClick={() => setCycleIdx((i) => i + 1)}
-            className="inline-flex h-5 w-5 items-center justify-center rounded-md transition-colors hover:bg-[var(--theme-bg)]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="inline-flex h-5 w-5 items-center justify-center rounded-md transition-colors hover:bg-[var(--theme-bg)] text-[var(--theme-muted)]"
           >
             <HugeiconsIcon icon={Refresh01Icon} size={11} strokeWidth={1.8} />
           </button>
@@ -224,22 +222,19 @@ export function ProactiveSuggestionsCard({
         <span className="mt-0.5 shrink-0">{iconNode}</span>
         <div className="min-w-0 flex-1">
           <p
-            className="text-[11px] font-medium leading-tight"
-            style={{ color: 'var(--theme-text)' }}
+            className="text-[11px] font-medium leading-tight text-[var(--theme-text)]"
           >
             {active.title}
           </p>
           <p
-            className="mt-0.5 text-[10px] leading-relaxed"
-            style={{ color: 'var(--theme-muted)' }}
+            className="mt-0.5 text-[10px] leading-relaxed text-[var(--theme-muted)]"
           >
             {active.body}
           </p>
           {active.href ? (
             <a
               href={active.href}
-              className="mt-1 inline-block text-[9px] font-semibold uppercase tracking-[0.12em] transition-opacity hover:opacity-80"
-              style={{ color: 'var(--theme-accent)' }}
+              className="mt-1 inline-block text-[9px] font-semibold uppercase tracking-[0.12em] transition-opacity hover:opacity-80 text-[var(--theme-accent)]"
             >
               Open →
             </a>
@@ -249,8 +244,7 @@ export function ProactiveSuggestionsCard({
 
       {suggestions.length > 1 ? (
         <p
-          className="text-right text-[9px]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="text-right text-[9px] text-[var(--theme-muted)]"
         >
           {(cycleIdx % suggestions.length) + 1} / {suggestions.length}
         </p>

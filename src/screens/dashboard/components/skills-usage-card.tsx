@@ -51,14 +51,12 @@ export function SkillsUsageCard({
       />
       <div className="flex items-center justify-between">
         <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-text)' }}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
         >
           Skills usage
         </h3>
         <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em] transition-colors group-hover:text-[var(--theme-accent)]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[9px] uppercase tracking-[0.15em] transition-colors group-hover:text-[var(--theme-accent)] text-[var(--theme-muted)]"
         >
           {hasUsage
             ? `${usage.distinctSkills} of ${installedCount} used`
@@ -75,15 +73,13 @@ export function SkillsUsageCard({
               <li key={s.skill}>
                 <div className="flex items-baseline justify-between gap-2 text-[11px]">
                   <span
-                    className="truncate font-mono"
-                    style={{ color: 'var(--theme-text)' }}
+                    className="truncate font-mono text-[var(--theme-text)]"
                     title={s.skill}
                   >
                     {formatSkillName(s.skill)}
                   </span>
                   <span
-                    className="font-mono text-[10px] tabular-nums"
-                    style={{ color: 'var(--theme-muted)' }}
+                    className="font-mono text-[10px] tabular-nums text-[var(--theme-muted)]"
                   >
                     {s.totalCount}
                     <span className="ml-1">·</span>
@@ -112,8 +108,7 @@ export function SkillsUsageCard({
         </ul>
       ) : (
         <div
-          className="font-mono text-[11px] uppercase tracking-[0.15em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[11px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
         >
           {installedCount === 0
             ? 'no skills installed'

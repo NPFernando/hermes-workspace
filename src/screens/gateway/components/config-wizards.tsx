@@ -54,14 +54,14 @@ export const PROVIDER_META: Record<string, {
   anthropic:          { label: 'Anthropic',       emoji: '🟠', color: 'text-orange-600 dark:text-orange-400',   bg: 'bg-orange-50 dark:bg-orange-900/20',   border: 'border-orange-300',   description: 'Claude models' },
   openai:             { label: 'OpenAI',           emoji: '🟢', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-300',  description: 'GPT & o-series' },
   'openai-codex':     { label: 'OpenAI Codex',     emoji: '🟢', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-300',  description: 'Codex models' },
-  'github-copilot':   { label: 'GitHub Copilot',   emoji: '⚫', color: 'text-neutral-700 dark:text-neutral-300', bg: 'bg-neutral-100 dark:bg-neutral-800',   border: 'border-neutral-400',  description: 'Copilot via GitHub' },
+  'github-copilot':   { label: 'GitHub Copilot',   emoji: '⚫', color: 'text-[var(--theme-muted)]', bg: 'bg-[var(--theme-card2)]',   border: 'border-[var(--theme-border)]',  description: 'Copilot via GitHub' },
   google:             { label: 'Google',           emoji: '🔵', color: 'text-blue-600 dark:text-blue-400',       bg: 'bg-blue-50 dark:bg-blue-900/20',       border: 'border-blue-300',     description: 'Gemini models' },
   'google-antigravity': { label: 'Google AG',      emoji: '🔵', color: 'text-blue-600 dark:text-blue-400',       bg: 'bg-blue-50 dark:bg-blue-900/20',       border: 'border-blue-300',     description: 'Gemini experimental' },
   deepseek:           { label: 'DeepSeek',         emoji: '🐋', color: 'text-sky-600 dark:text-sky-400',         bg: 'bg-sky-50 dark:bg-sky-900/20',         border: 'border-sky-300',      description: 'DeepSeek R-series' },
   minimax:            { label: 'MiniMax',          emoji: '🟣', color: 'text-violet-600 dark:text-violet-400',   bg: 'bg-violet-50 dark:bg-violet-900/20',   border: 'border-violet-300',   description: 'M-series models' },
   openrouter:         { label: 'OpenRouter',       emoji: '🌐', color: 'text-indigo-600 dark:text-indigo-400',   bg: 'bg-indigo-50 dark:bg-indigo-900/20',   border: 'border-indigo-300',   description: 'Multi-provider routing' },
   mistral:            { label: 'Mistral',          emoji: '🔴', color: 'text-rose-600 dark:text-rose-400',       bg: 'bg-rose-50 dark:bg-rose-900/20',       border: 'border-rose-300',     description: 'Mistral models' },
-  xai:                { label: 'xAI',              emoji: '⚡', color: 'text-neutral-800 dark:text-neutral-100', bg: 'bg-neutral-100 dark:bg-neutral-800',   border: 'border-neutral-400',  description: 'Grok models' },
+  xai:                { label: 'xAI',              emoji: '⚡', color: 'text-[var(--theme-text)]', bg: 'bg-[var(--theme-card2)]',   border: 'border-[var(--theme-border)]',  description: 'Grok models' },
   groq:               { label: 'Groq',             emoji: '⚡', color: 'text-amber-600 dark:text-amber-400',     bg: 'bg-amber-50 dark:bg-amber-900/20',     border: 'border-amber-300',    description: 'Ultra-fast inference' },
   ollama:             { label: 'Ollama',           emoji: '🦙', color: 'text-teal-600 dark:text-teal-400',       bg: 'bg-teal-50 dark:bg-teal-900/20',       border: 'border-teal-300',     description: 'Local models' },
   together:           { label: 'Together AI',      emoji: '🤝', color: 'text-pink-600 dark:text-pink-400',       bg: 'bg-pink-50 dark:bg-pink-900/20',       border: 'border-pink-300',     description: 'Together inference' },
@@ -75,9 +75,9 @@ export function getProviderMeta(provider: string) {
   return PROVIDER_META[key] ?? {
     label: provider,
     emoji: '🔑',
-    color: 'text-neutral-600 dark:text-neutral-400',
-    bg: 'bg-neutral-100 dark:bg-neutral-800',
-    border: 'border-neutral-300',
+    color: 'text-[var(--theme-muted)]',
+    bg: 'bg-[var(--theme-card2)]',
+    border: 'border-[var(--theme-border)]',
     description: 'Custom provider',
   }
 }
@@ -107,7 +107,7 @@ export function ProviderLogo({ provider, size = 28 }: { provider: string; size?:
         height={size}
         viewBox="0 0 24 24"
         fill="currentColor"
-        className="text-neutral-800 dark:text-white"
+        className="text-[var(--theme-text)] dark:text-white"
         aria-label={meta.label}
       >
         <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 11.44.525a5.985 5.985 0 0 0-5.708 4.17 6.046 6.046 0 0 0-4.039 2.916 6.046 6.046 0 0 0 .745 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.516 2.9A5.985 5.985 0 0 0 12.56 23.48a5.985 5.985 0 0 0 5.708-4.17 6.046 6.046 0 0 0 4.039-2.916 6.046 6.046 0 0 0-.025-7.573zM12.56 21.9a4.52 4.52 0 0 1-2.897-1.056l.143-.081 4.806-2.776a.795.795 0 0 0 .397-.689v-6.787l2.032 1.173a.071.071 0 0 1 .038.052v5.614a4.524 4.524 0 0 1-4.52 4.57zm-9.715-4.154a4.52 4.52 0 0 1-.54-3.03l.142.085 4.807 2.776a.793.793 0 0 0 .794 0l5.864-3.388v2.344a.072.072 0 0 1-.03.056L8.68 19.733a4.52 4.52 0 0 1-5.835-1.987zm-1.265-10.51a4.52 4.52 0 0 1 2.36-1.986V9.07a.77.77 0 0 0 .396.68l5.864 3.387-2.033 1.174a.072.072 0 0 1-.066 0L3.44 11.507a4.518 4.518 0 0 1-.86-4.271zm16.697 3.855-5.864-3.387 2.032-1.173a.072.072 0 0 1 .066 0l4.823 2.786a4.52 4.52 0 0 1-.706 8.156v-5.27a.795.795 0 0 0-.351-.612zm2.022-3.017-.143-.085-4.806-2.776a.795.795 0 0 0-.795 0L9.57 8.517V6.173a.072.072 0 0 1 .03-.057l4.83-2.786a4.52 4.52 0 0 1 6.585 4.685zm-12.64 4.135-2.032-1.174a.072.072 0 0 1-.038-.053V9.285a4.52 4.52 0 0 1 7.415-3.473l-.143.082L9.17 8.67a.795.795 0 0 0-.398.69zm1.103-2.378 2.607-1.506 2.607 1.506v3.012l-2.607 1.506-2.607-1.506V11.83z" />
@@ -296,7 +296,7 @@ export function WizardModal({
       {/* Panel — clicks inside stay inside */}
       <div
         className={cn(
-          'relative w-full rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-2xl',
+          'relative w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-2xl',
           'max-h-[90vh] overflow-y-auto',
           width,
         )}
@@ -311,11 +311,11 @@ export function WizardModal({
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">{children}</span>
+  return <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--theme-muted)]">{children}</span>
 }
 
-const INPUT_CLS = 'h-9 w-full rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 text-sm text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-1 transition-colors'
-const SELECT_CLS = 'h-9 w-full rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 text-sm text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-1'
+const INPUT_CLS = 'h-9 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-3 text-sm text-[var(--theme-text)] outline-none ring-accent-400 focus:ring-1 transition-colors'
+const SELECT_CLS = 'h-9 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-3 text-sm text-[var(--theme-text)] outline-none ring-accent-400 focus:ring-1'
 
 // ─── AgentWizardModal ─────────────────────────────────────────────────────────
 
@@ -363,15 +363,15 @@ export function AgentWizardModal({
   return (
     <WizardModal open onClose={onClose} width="max-w-2xl">
       {/* Header */}
-      <div className={cn('flex items-center gap-4 border-b border-neutral-100 dark:border-neutral-800 px-6 py-5 border-l-4', accentBorderClass)}>
+      <div className={cn('flex items-center gap-4 border-b border-[var(--theme-border)] px-6 py-5 border-l-4', accentBorderClass)}>
         {/* Avatar slot (rendered by parent to avoid circular import) */}
         {avatarNode}
         <div className="min-w-0 flex-1">
-          <p className="text-lg font-bold text-neutral-900 dark:text-white">{member.name || `Agent ${memberIndex + 1}`}</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">{headerSubtitle}</p>
+          <p className="text-lg font-bold text-[var(--theme-text)] dark:text-white">{member.name || `Agent ${memberIndex + 1}`}</p>
+          <p className="text-xs text-[var(--theme-muted)]">{headerSubtitle}</p>
         </div>
         <button type="button" onClick={onClose}
-          className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
+          className="flex size-7 items-center justify-center rounded-full bg-[var(--theme-card2)] text-[var(--theme-muted)] hover:text-[var(--theme-text)] dark:hover:text-white transition-colors">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
         </button>
       </div>
@@ -384,7 +384,7 @@ export function AgentWizardModal({
           <input
             value={member.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
-            className="h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 text-base font-semibold text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-1 transition-colors"
+            className="h-10 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-3 text-base font-semibold text-[var(--theme-text)] outline-none ring-accent-400 focus:ring-1 transition-colors"
             placeholder={`Agent ${memberIndex + 1}`}
           />
         </div>
@@ -413,17 +413,17 @@ export function AgentWizardModal({
         {/* Row 3: Memory Path + Skill Allowlist */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <FieldLabel>Memory Path <span className="text-[9px] text-neutral-400 font-normal">(optional)</span></FieldLabel>
+            <FieldLabel>Memory Path <span className="text-[9px] text-[var(--theme-muted)] font-normal">(optional)</span></FieldLabel>
             <input
               value={member.memoryPath ?? ''}
               onChange={(e) => onUpdate({ memoryPath: e.target.value || undefined } as Partial<typeof member>)}
               className={INPUT_CLS}
               placeholder="e.g. ~/workspace/agent-memory"
             />
-            <p className="mt-0.5 text-[9px] text-neutral-400">Custom memory/workspace directory for this agent</p>
+            <p className="mt-0.5 text-[9px] text-[var(--theme-muted)]">Custom memory/workspace directory for this agent</p>
           </div>
           <div>
-            <FieldLabel>Skill Allowlist <span className="text-[9px] text-neutral-400 font-normal">(optional)</span></FieldLabel>
+            <FieldLabel>Skill Allowlist <span className="text-[9px] text-[var(--theme-muted)] font-normal">(optional)</span></FieldLabel>
             <input
               value={(member.skillAllowlist ?? []).join(', ')}
               onChange={(e) => {
@@ -433,7 +433,7 @@ export function AgentWizardModal({
               className={INPUT_CLS}
               placeholder="web_search, exec, read, write"
             />
-            <p className="mt-0.5 text-[9px] text-neutral-400">Comma-separated skill names. Empty = all skills allowed.</p>
+            <p className="mt-0.5 text-[9px] text-[var(--theme-muted)]">Comma-separated skill names. Empty = all skills allowed.</p>
           </div>
         </div>
 
@@ -444,12 +444,12 @@ export function AgentWizardModal({
             <div className="flex gap-1.5">
               <span className={cn('rounded-md border px-1.5 py-0.5 text-[9px] font-semibold',
                 isCustomPrompt ? 'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
-                  : 'border-neutral-200 dark:border-neutral-700 text-neutral-400')}>
+                  : 'border-[var(--theme-border)] text-[var(--theme-muted)]')}>
                 {isCustomPrompt ? '✏️ Custom' : 'Template'}
               </span>
               {member.backstory.trim() ? (
                 <button type="button" onClick={() => onUpdate({ backstory: '' })}
-                  className="rounded-md border border-neutral-200 dark:border-neutral-700 px-1.5 py-0.5 text-[9px] text-neutral-400 hover:text-red-500 transition-colors">
+                  className="rounded-md border border-[var(--theme-border)] px-1.5 py-0.5 text-[9px] text-[var(--theme-muted)] hover:text-red-500 transition-colors">
                   ✕ Clear
                 </button>
               ) : null}
@@ -471,7 +471,7 @@ export function AgentWizardModal({
                         onClick={() => { onUpdate({ backstory: active ? '' : tpl.prompt }) }}
                         className={cn('rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors gap-1',
                           active ? 'border-accent-300 bg-accent-50 text-accent-700 dark:border-accent-700 dark:bg-accent-900/20 dark:text-accent-400'
-                            : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-500 hover:border-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700')}
+                            : 'border-[var(--theme-border)] bg-[var(--theme-input)] text-[var(--theme-muted)] hover:border-[var(--theme-border)] hover:bg-[var(--theme-card)]')}
                         title={tpl.prompt.slice(0, 120)}
                       >
                         {tpl.icon} {tpl.label}
@@ -487,7 +487,7 @@ export function AgentWizardModal({
             ref={systemPromptRef}
             value={member.backstory}
             onChange={(e) => { onUpdate({ backstory: e.target.value }) }}
-            className="mt-2 w-full resize-none rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800 px-3 py-2.5 text-xs text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-1 font-mono leading-relaxed overflow-auto"
+            className="mt-2 w-full resize-none rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-3 py-2.5 text-xs text-[var(--theme-text)] outline-none ring-accent-400 focus:ring-1 font-mono leading-relaxed overflow-auto"
             style={{ minHeight: 100, maxHeight: 400 }}
             placeholder="Persona, instructions, and context for this agent..."
           />
@@ -495,14 +495,14 @@ export function AgentWizardModal({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between gap-3 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+      <div className="flex items-center justify-between gap-3 border-t border-[var(--theme-border)] px-6 py-4">
         <button
           type="button"
           onClick={onDelete}
           className={cn(
             'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors',
             addMode
-              ? 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-800'
+              ? 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-card)] dark:hover:bg-neutral-800'
               : 'border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20',
           )}
         >
@@ -540,7 +540,7 @@ function TeamIconPicker({
   onClose: () => void
 }) {
   return (
-    <div className="absolute left-0 top-full mt-1 z-[60] rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-xl p-2 w-52">
+    <div className="absolute left-0 top-full mt-1 z-[60] rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-xl p-2 w-52">
       <div className="grid grid-cols-8 gap-0.5">
         {TEAM_ICONS.map((icon) => (
           <button
@@ -630,16 +630,16 @@ export function TeamWizardModal({
   return (
     <WizardModal open onClose={onClose} width="max-w-lg">
       {/* Header */}
-      <div className={cn('flex items-center gap-4 border-b border-neutral-100 dark:border-neutral-800 px-6 py-5 border-l-4', accentBorder)}>
+      <div className={cn('flex items-center gap-4 border-b border-[var(--theme-border)] px-6 py-5 border-l-4', accentBorder)}>
         {/* Team icon with pencil */}
         <div className="relative shrink-0">
-          <div className="flex size-14 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-3xl shadow-sm">
+          <div className="flex size-14 items-center justify-center rounded-full bg-[var(--theme-card2)] text-3xl shadow-sm">
             {icon}
           </div>
           <button
             type="button"
             onClick={() => setShowIconPicker((v) => !v)}
-            className="absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-700 text-white shadow-md hover:bg-neutral-600 transition-colors"
+            className="absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full border-2 border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-text)] shadow-md hover:bg-[var(--theme-card)] transition-colors"
             title="Change icon"
           >
             <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -654,8 +654,8 @@ export function TeamWizardModal({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-lg font-bold text-neutral-900 dark:text-white">{name || 'Untitled Team'}</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">{localMembers.length} agent{localMembers.length !== 1 ? 's' : ''}</p>
+          <p className="text-lg font-bold text-[var(--theme-text)] dark:text-white">{name || 'Untitled Team'}</p>
+          <p className="text-xs text-[var(--theme-muted)]">{localMembers.length} agent{localMembers.length !== 1 ? 's' : ''}</p>
         </div>
 
         {/* Star — active team toggle */}
@@ -663,13 +663,13 @@ export function TeamWizardModal({
           type="button"
           onClick={() => { if (!isActive) { onLoad(); onClose() } }}
           title={isActive ? 'Active team' : 'Set as active team'}
-          className={cn('text-2xl leading-none transition-colors mr-1', isActive ? 'text-accent-400 cursor-default' : 'text-neutral-300 hover:text-accent-400 cursor-pointer')}
+          className={cn('text-2xl leading-none transition-colors mr-1', isActive ? 'text-accent-400 cursor-default' : 'text-[var(--theme-muted)] hover:text-accent-400 cursor-pointer')}
         >
           {isActive ? '⭐' : '☆'}
         </button>
 
         <button type="button" onClick={onClose}
-          className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
+          className="flex size-7 items-center justify-center rounded-full bg-[var(--theme-card2)] text-[var(--theme-muted)] hover:text-[var(--theme-text)] dark:hover:text-white transition-colors">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
         </button>
       </div>
@@ -697,22 +697,22 @@ export function TeamWizardModal({
           <FieldLabel>TEAM ({localMembers.length} agent{localMembers.length !== 1 ? 's' : ''})</FieldLabel>
           <div className="space-y-1.5">
             {localMembers.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-neutral-200 dark:border-neutral-700 py-3 text-center text-xs text-neutral-400">No agents yet — add some below</p>
+              <p className="rounded-lg border border-dashed border-[var(--theme-border)] py-3 text-center text-xs text-[var(--theme-muted)]">No agents yet — add some below</p>
             ) : localMembers.map((member) => (
-              <div key={member.id} className="flex items-center gap-2.5 rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2.5">
+              <div key={member.id} className="flex items-center gap-2.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2.5">
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/30 text-[11px] font-bold text-accent-600 dark:text-accent-400">
                   {member.name[0]?.toUpperCase() ?? '?'}
                 </div>
-                <p className="min-w-0 flex-1 text-xs font-semibold text-neutral-900 dark:text-white truncate">{member.name}</p>
+                <p className="min-w-0 flex-1 text-xs font-semibold text-[var(--theme-text)] dark:text-white truncate">{member.name}</p>
                 <button type="button" onClick={() => removeAgent(member.id)}
-                  className="flex size-6 items-center justify-center rounded-full text-neutral-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors" title="Remove from team">
+                  className="flex size-6 items-center justify-center rounded-full text-[var(--theme-muted)] hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors" title="Remove from team">
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
                 </button>
               </div>
             ))}
           </div>
           {notInTeam.length > 0 && localMembers.length > 0 ? (
-            <p className="mt-1 text-center text-[9px] text-neutral-400">↓ scroll to add more agents</p>
+            <p className="mt-1 text-center text-[9px] text-[var(--theme-muted)]">↓ scroll to add more agents</p>
           ) : null}
         </div>
 
@@ -720,9 +720,9 @@ export function TeamWizardModal({
         {notInTeam.length > 0 ? (
           <div>
             <div className="flex items-center gap-2 my-1">
-              <div className="flex-1 h-px bg-neutral-100 dark:bg-neutral-800" />
-              <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400">Add Agents</span>
-              <div className="flex-1 h-px bg-neutral-100 dark:bg-neutral-800" />
+              <div className="flex-1 h-px bg-[var(--theme-border)]" />
+              <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Add Agents</span>
+              <div className="flex-1 h-px bg-[var(--theme-border)]" />
             </div>
             <div className="space-y-1.5">
               {notInTeam.map((agent) => (
@@ -731,8 +731,8 @@ export function TeamWizardModal({
                     {agent.name[0]?.toUpperCase() ?? '?'}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs text-neutral-700 dark:text-neutral-200 font-medium">{agent.name}</p>
-                    {agent.role ? <p className="text-[10px] text-neutral-400 truncate">{agent.role}</p> : null}
+                    <p className="text-xs text-[var(--theme-text)] font-medium">{agent.name}</p>
+                    {agent.role ? <p className="text-[10px] text-[var(--theme-muted)] truncate">{agent.role}</p> : null}
                   </div>
                   <button type="button" onClick={() => addAgent(agent.id)}
                     className="flex size-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-colors" title="Add to team">
@@ -745,7 +745,7 @@ export function TeamWizardModal({
         ) : null}
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+      <div className="flex items-center justify-between gap-3 border-t border-[var(--theme-border)] px-6 py-4">
         <button
           type="button"
           onClick={onDelete}
@@ -859,22 +859,22 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
   return (
     <WizardModal open onClose={onClose} width="max-w-lg">
       {/* Header */}
-      <div className="flex items-center gap-4 border-b border-neutral-100 dark:border-neutral-800 px-6 py-5 border-l-4 border-l-accent-400">
+      <div className="flex items-center gap-4 border-b border-[var(--theme-border)] px-6 py-5 border-l-4 border-l-accent-400">
         <div className="flex size-12 items-center justify-center rounded-full bg-accent-50 dark:bg-accent-900/20 text-2xl shadow-sm">
           {teamIcon}
         </div>
         <div className="flex-1">
-          <p className="text-base font-bold text-neutral-900 dark:text-white">New Team</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">{stepLabel}</p>
+          <p className="text-base font-bold text-[var(--theme-text)] dark:text-white">New Team</p>
+          <p className="text-xs text-[var(--theme-muted)]">{stepLabel}</p>
         </div>
         {/* Step dots */}
         <div className="flex items-center gap-1.5 mr-2">
-          <span className={cn('size-2 rounded-full transition-colors', step === 1 ? 'bg-accent-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
-          <span className={cn('size-2 rounded-full transition-colors', step === 2 ? 'bg-accent-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
-          <span className={cn('size-2 rounded-full transition-colors', step === 3 ? 'bg-accent-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+          <span className={cn('size-2 rounded-full transition-colors', step === 1 ? 'bg-accent-500' : 'bg-[var(--theme-border)]')} />
+          <span className={cn('size-2 rounded-full transition-colors', step === 2 ? 'bg-accent-500' : 'bg-[var(--theme-border)]')} />
+          <span className={cn('size-2 rounded-full transition-colors', step === 3 ? 'bg-accent-500' : 'bg-[var(--theme-border)]')} />
         </div>
         <button type="button" onClick={onClose}
-          className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
+          className="flex size-7 items-center justify-center rounded-full bg-[var(--theme-card2)] text-[var(--theme-muted)] hover:text-[var(--theme-text)] dark:hover:text-white transition-colors">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
         </button>
       </div>
@@ -883,18 +883,18 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
       {step === 1 ? (
         <>
           <div className="px-6 py-8">
-            <p className="mb-5 text-xl font-bold text-neutral-900 dark:text-white">Name your team</p>
+            <p className="mb-5 text-xl font-bold text-[var(--theme-text)] dark:text-white">Name your team</p>
             <input
               ref={nameInputRef}
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && teamName.trim() && !e.nativeEvent.isComposing) setStep(2) }}
               placeholder="e.g. Research Squad, Dev Team..."
-              className="h-11 w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 text-sm text-neutral-900 dark:text-white outline-none ring-accent-400 focus:ring-2 transition-colors"
+              className="h-11 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-4 text-sm text-[var(--theme-text)] outline-none ring-accent-400 focus:ring-2 transition-colors"
             />
-            <p className="mt-2 text-xs text-neutral-400 dark:text-neutral-500">You can change this later</p>
+            <p className="mt-2 text-xs text-[var(--theme-muted)]">You can change this later</p>
           </div>
-          <div className="flex justify-end border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+          <div className="flex justify-end border-t border-[var(--theme-border)] px-6 py-4">
             <button
               type="button"
               onClick={() => setStep(2)}
@@ -911,7 +911,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
       {step === 2 ? (
         <>
           <div className="px-6 py-6">
-            <p className="mb-4 text-xl font-bold text-neutral-900 dark:text-white">Choose a picture</p>
+            <p className="mb-4 text-xl font-bold text-[var(--theme-text)] dark:text-white">Choose a picture</p>
             <div className="grid grid-cols-6 gap-2">
               {INLINE_TEAM_ICONS.map((ic) => (
                 <button
@@ -922,7 +922,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
                     'flex size-11 items-center justify-center rounded-xl text-2xl transition-all hover:scale-110',
                     teamIcon === ic
                       ? 'bg-accent-100 dark:bg-accent-900/40 ring-2 ring-accent-400'
-                      : 'hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                      : 'hover:bg-[var(--theme-card2)] dark:hover:bg-neutral-800',
                   )}
                 >
                   {ic}
@@ -930,11 +930,11 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
               ))}
             </div>
           </div>
-          <div className="flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+          <div className="flex items-center justify-between border-t border-[var(--theme-border)] px-6 py-4">
             <button
               type="button"
               onClick={() => setStep(1)}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+              className="rounded-lg border border-[var(--theme-border)] px-4 py-2 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-card)] dark:hover:bg-neutral-800 transition-colors"
             >
               ← Back
             </button>
@@ -955,7 +955,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
           <div className="px-6 py-5 max-h-[65vh] overflow-y-auto space-y-4">
             {/* Templates section */}
             <div>
-              <p className="mb-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">Start from a template</p>
+              <p className="mb-2 text-xs font-semibold text-[var(--theme-muted)] uppercase tracking-wide">Start from a template</p>
               <div className="grid grid-cols-2 gap-2">
                 {quickStartTemplates.map((tpl) => (
                   <button
@@ -969,12 +969,12 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
                     className={cn('flex items-center gap-2 rounded-xl border-2 px-3 py-3 text-left transition-all',
                       selectedTemplate === tpl.id
                         ? 'border-accent-400 bg-accent-50 dark:bg-accent-900/15 shadow-sm'
-                        : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600')}
+                        : 'border-[var(--theme-border)] hover:border-[var(--theme-border)] dark:hover:border-neutral-600')}
                   >
                     <span className="shrink-0 text-xl">{tpl.icon}</span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-100 truncate">{tpl.label}</p>
-                      <p className="text-[9px] text-neutral-400 truncate mt-0.5">{tpl.description}</p>
+                      <p className="text-[11px] font-semibold text-[var(--theme-text)] truncate">{tpl.label}</p>
+                      <p className="text-[9px] text-[var(--theme-muted)] truncate mt-0.5">{tpl.description}</p>
                     </div>
                     <span className={cn('ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold',
                       tpl.tier === 'budget' ? 'bg-green-100 text-green-700' : tpl.tier === 'balanced' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700')}>
@@ -987,22 +987,22 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
 
             {/* Divider */}
             <div className="flex items-center gap-3">
-              <div className="flex-1 border-t border-neutral-200 dark:border-neutral-700" />
-              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 whitespace-nowrap">— or configure from scratch —</span>
-              <div className="flex-1 border-t border-neutral-200 dark:border-neutral-700" />
+              <div className="flex-1 border-t border-[var(--theme-border)]" />
+              <span className="text-[10px] text-[var(--theme-muted)] whitespace-nowrap">— or configure from scratch —</span>
+              <div className="flex-1 border-t border-[var(--theme-border)]" />
             </div>
 
             {/* Agent checklist */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <FieldLabel>Agents to Include</FieldLabel>
-                <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+                <span className="text-[10px] font-medium text-[var(--theme-muted)]">
                   {selectedAgents.size} of {currentTeam.length} selected
                 </span>
               </div>
               <div className="space-y-1.5">
                 {currentTeam.length === 0 ? (
-                  <p className="text-center text-xs text-neutral-400 py-3">No agents configured yet</p>
+                  <p className="text-center text-xs text-[var(--theme-muted)] py-3">No agents configured yet</p>
                 ) : currentTeam.map((m) => {
                   const checked = selectedAgents.has(m.id)
                   const modelParts = m.modelId.split('/')
@@ -1016,20 +1016,20 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
                         'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all',
                         checked
                           ? 'border-accent-300 bg-accent-50/50 dark:border-accent-700/50 dark:bg-accent-900/10'
-                          : 'border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/30 opacity-60 hover:opacity-80',
+                          : 'border-[var(--theme-border)] bg-[var(--theme-card)] opacity-60 hover:opacity-80',
                       )}
                     >
                       <span className={cn(
                         'flex size-4 shrink-0 items-center justify-center rounded border-2 transition-all',
-                        checked ? 'border-accent-500 bg-accent-500' : 'border-neutral-300 dark:border-neutral-600',
+                        checked ? 'border-accent-500 bg-accent-500' : 'border-[var(--theme-border)]',
                       )}>
                         {checked ? <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l2 2 3-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> : null}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-neutral-800 dark:text-neutral-100 truncate leading-tight">{m.name}</p>
-                        <p className="text-[10px] text-neutral-400 truncate leading-tight mt-0.5">{m.modelId}</p>
+                        <p className="text-xs font-semibold text-[var(--theme-text)] truncate leading-tight">{m.name}</p>
+                        <p className="text-[10px] text-[var(--theme-muted)] truncate leading-tight mt-0.5">{m.modelId}</p>
                       </div>
-                      <span className="shrink-0 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] font-medium text-neutral-500 dark:text-neutral-400">
+                      <span className="shrink-0 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--theme-muted)]">
                         {modelShort}
                       </span>
                     </button>
@@ -1042,11 +1042,11 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+          <div className="flex items-center justify-between gap-3 border-t border-[var(--theme-border)] px-6 py-4">
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+              className="rounded-lg border border-[var(--theme-border)] px-4 py-2 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-card)] dark:hover:bg-neutral-800 transition-colors"
             >
               ← Back
             </button>
@@ -1084,13 +1084,13 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
   return (
     <WizardModal open onClose={onClose} width="max-w-md">
       {/* Header — branded with provider logo + accent border */}
-      <div className={cn('flex items-center gap-4 border-b border-neutral-100 dark:border-neutral-800 px-6 py-5 border-l-4', meta.border)}>
+      <div className={cn('flex items-center gap-4 border-b border-[var(--theme-border)] px-6 py-5 border-l-4', meta.border)}>
         <div className={cn('flex size-14 shrink-0 items-center justify-center rounded-full shadow-sm', meta.bg)}>
           <ProviderLogo provider={provider} size={32} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-base font-bold text-neutral-900 dark:text-white">{meta.label}</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">{meta.description}</p>
+          <p className="text-base font-bold text-[var(--theme-text)] dark:text-white">{meta.label}</p>
+          <p className="text-xs text-[var(--theme-muted)]">{meta.description}</p>
           {currentModels.length > 0 ? (
             <div className="mt-1 flex items-center gap-1.5">
               <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
@@ -1101,7 +1101,7 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
           ) : null}
         </div>
         <button type="button" onClick={onClose}
-          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
+          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--theme-card2)] text-[var(--theme-muted)] hover:text-[var(--theme-text)] dark:hover:text-white transition-colors">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
         </button>
       </div>
@@ -1111,11 +1111,11 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
         {currentModels.length > 0 ? (
           <div>
             <FieldLabel>Available Models</FieldLabel>
-            <div className="rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 p-2 max-h-36 overflow-y-auto">
+            <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-2 max-h-36 overflow-y-auto">
               {currentModels.map((m) => (
                 <div key={m.value} className="flex items-center gap-2 px-1 py-1">
                   <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
-                  <span className="text-[11px] text-neutral-600 dark:text-neutral-400 truncate">{m.label}</span>
+                  <span className="text-[11px] text-[var(--theme-muted)] truncate">{m.label}</span>
                 </div>
               ))}
             </div>
@@ -1133,7 +1133,7 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
               <FieldLabel>
                 Default Model{' '}
                 {availableModels.length === 0 ? (
-                  <span className="font-normal normal-case text-neutral-300 dark:text-neutral-600">— common models</span>
+                  <span className="font-normal normal-case text-[var(--theme-muted)]">— common models</span>
                 ) : null}
               </FieldLabel>
               <select value={defaultModel} onChange={(e) => setDefaultModel(e.target.value)} className={SELECT_CLS}>
@@ -1148,7 +1148,7 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
         <div>
           <FieldLabel>
             Update API Key{' '}
-            <span className="font-normal normal-case text-neutral-300 dark:text-neutral-600">— leave blank to keep current</span>
+            <span className="font-normal normal-case text-[var(--theme-muted)]">— leave blank to keep current</span>
           </FieldLabel>
           <input
             type="password"
@@ -1160,7 +1160,7 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+      <div className="flex items-center justify-between gap-2 border-t border-[var(--theme-border)] px-6 py-4">
         <div>
           {onDelete ? (
             <button
@@ -1174,7 +1174,7 @@ export function ProviderEditModal({ provider, currentModels, availableModels, on
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={onClose}
-            className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
+            className="rounded-lg border border-[var(--theme-border)] px-4 py-2 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-card)] dark:hover:bg-neutral-800 transition-colors">
             Cancel
           </button>
           <button

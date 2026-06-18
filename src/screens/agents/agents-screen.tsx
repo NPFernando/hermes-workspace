@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { Rocket01Icon, UserGroupIcon, UserMultipleIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 type SisterType = 'ai_sister' | 'business_agent' | 'delegation_profile'
 
@@ -43,20 +44,21 @@ const TYPE_BADGE: Record<SisterType, { label: string; classes: string }> = {
   },
 }
 
-function SisterCard({ sister }: { sister: Sister }) {
+function SisterCard({ sister, className }: { sister: Sister; className?: string }) {
   const badge = TYPE_BADGE[sister.type]
 
   return (
     <div
-      className={[
-        'flex flex-col gap-3 rounded-2xl border p-4 shadow-sm transition-colors',
+      className={cn(
+        'card-glow flex flex-col gap-3 rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
         sister.isLive
-          ? 'border-primary-200 bg-[var(--theme-card)]'
-          : 'border-primary-100 bg-primary-50/60 opacity-70',
-      ].join(' ')}
+          ? 'border-[var(--theme-border)] bg-[var(--theme-card)]'
+          : 'border-[var(--theme-border)] bg-[var(--theme-card)] opacity-60',
+        className,
+      )}
     >
       <div className="flex items-start gap-3">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary-200 bg-white text-2xl shadow-sm">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary-200 bg-[var(--theme-card2)] text-2xl shadow-sm">
           {sister.emoji}
         </div>
         <div className="min-w-0 flex-1">
@@ -86,7 +88,7 @@ function SisterCard({ sister }: { sister: Sister }) {
         ) : null}
 
         {sister.hasProfile ? (
-          <span className="inline-flex items-center rounded-full border border-primary-200 bg-white px-2 py-0.5 text-[10px] font-medium text-primary-500">
+          <span className="inline-flex items-center rounded-full border border-primary-200 bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] font-medium text-primary-500">
             profile ✓
           </span>
         ) : null}
@@ -103,13 +105,13 @@ function SisterCard({ sister }: { sister: Sister }) {
   )
 }
 
-function PresetCard({ preset }: { preset: PersonalityPreset }) {
+function PresetCard({ preset, className }: { preset: PersonalityPreset; className?: string }) {
   const roleLabel = preset.label.startsWith(`${preset.name} — `)
     ? preset.label.slice(preset.name.length + 4)
     : preset.label
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-4 shadow-sm">
+    <div className={cn('flex flex-col gap-2 rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--theme-accent)]/30', className)}>
       <div className="flex items-center gap-2">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-accent-500/30 bg-accent-500/10 text-sm font-bold text-accent-600">
           {preset.name.charAt(0)}
@@ -128,7 +130,7 @@ function LoadingGrid() {
   return (
     <div className="flex h-24 items-center justify-center rounded-2xl border border-primary-200 bg-primary-50">
       <div className="flex items-center gap-2 text-primary-500">
-        <div className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600" />
+        <div className="spinner-accent" />
         <span className="text-sm">Loading...</span>
       </div>
     </div>
@@ -170,7 +172,7 @@ export function AgentsScreen() {
   const profiles = sisters.filter((s) => s.type === 'delegation_profile')
 
   return (
-    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+    <main data-route-page className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
       <section className="mx-auto w-full max-w-[1480px] space-y-6">
 
         {/* Header */}
@@ -210,10 +212,10 @@ export function AgentsScreen() {
         {/* AI Sisters */}
         <section className="space-y-3">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-[11px] font-bold uppercase tracking-widest text-primary-500">
+            <h2 className="micro-label">
               AI Sisters
             </h2>
-            <span className="text-[11px] font-medium text-primary-400">{aiSisters.length}</span>
+            <span className="text-[10px] font-medium text-primary-400">{aiSisters.length}</span>
           </div>
 
           {sistersQuery.isLoading ? (
@@ -235,7 +237,7 @@ export function AgentsScreen() {
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {aiSisters.map((sister) => (
-                <SisterCard key={sister.id} sister={sister} />
+                <SisterCard key={sister.id} sister={sister} className="domino-item" />
               ))}
             </div>
           )}
@@ -245,16 +247,16 @@ export function AgentsScreen() {
         {businessAgents.length > 0 ? (
           <section className="space-y-3">
             <div className="flex items-center justify-between px-1">
-              <h2 className="text-[11px] font-bold uppercase tracking-widest text-primary-500">
+              <h2 className="micro-label">
                 Business Agents
               </h2>
-              <span className="text-[11px] font-medium text-primary-400">
+              <span className="text-[10px] font-medium text-primary-400">
                 {businessAgents.length}
               </span>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {businessAgents.map((sister) => (
-                <SisterCard key={sister.id} sister={sister} />
+                <SisterCard key={sister.id} sister={sister} className="domino-item" />
               ))}
             </div>
           </section>
@@ -264,14 +266,14 @@ export function AgentsScreen() {
         {profiles.length > 0 ? (
           <section className="space-y-3">
             <div className="flex items-center justify-between px-1">
-              <h2 className="text-[11px] font-bold uppercase tracking-widest text-primary-500">
+              <h2 className="micro-label">
                 Delegation Profiles
               </h2>
-              <span className="text-[11px] font-medium text-primary-400">{profiles.length}</span>
+              <span className="text-[10px] font-medium text-primary-400">{profiles.length}</span>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {profiles.map((sister) => (
-                <SisterCard key={sister.id} sister={sister} />
+                <SisterCard key={sister.id} sister={sister} className="domino-item" />
               ))}
             </div>
           </section>
@@ -280,10 +282,10 @@ export function AgentsScreen() {
         {/* Swarm Personality Roster */}
         <section className="space-y-3">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-[11px] font-bold uppercase tracking-widest text-primary-500">
+            <h2 className="micro-label">
               Swarm Personality Roster
             </h2>
-            <span className="text-[11px] font-medium text-primary-400">{presets.length}</span>
+            <span className="text-[10px] font-medium text-primary-400">{presets.length}</span>
           </div>
           <p className="px-1 text-xs text-primary-500">
             Named roles assigned to swarm workers during multi-agent missions. Dispatch via
@@ -301,7 +303,7 @@ export function AgentsScreen() {
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {presets.map((preset) => (
-                <PresetCard key={preset.key} preset={preset} />
+                <PresetCard key={preset.key} preset={preset} className="domino-item" />
               ))}
             </div>
           )}

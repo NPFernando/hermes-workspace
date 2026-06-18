@@ -398,7 +398,7 @@ export function OperationsAgentCard({
           <button
             type="button"
             onClick={() => onOpenSettings(agent.id)}
-            className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-300/40 bg-amber-300/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200 transition-colors hover:bg-amber-300/20"
+            className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-400 transition-colors hover:bg-[var(--theme-warning-soft-strong)]"
             title="This agent has no model configured. Click to set one up."
           >
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-300" />

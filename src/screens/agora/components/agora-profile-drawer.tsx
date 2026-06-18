@@ -4,6 +4,7 @@
  */
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
+import { cn } from '@/lib/utils'
 import type { AgoraAvatarId, AgoraProfile, AgoraStatus, AgoraUser } from '../lib/agora-types'
 
 const ALL_AVATARS: Array<{ id: AgoraAvatarId; label: string; tier: 'greek' | 'emoji' }> = [
@@ -77,11 +78,7 @@ export function AgoraProfileDrawer({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="fixed right-0 top-0 z-[71] h-full w-full max-w-md overflow-y-auto p-5"
-            style={{
-              background: 'var(--theme-bg)',
-              borderLeft: '1px solid var(--theme-border)',
-            }}
+            className="fixed right-0 top-0 z-[71] h-full w-full max-w-md overflow-y-auto p-5 bg-[var(--theme-bg)] border-l border-[var(--theme-border)]"
           >
             <div className="flex items-start justify-between mb-4">
               <h2 className="text-base font-semibold">{isSelf ? 'Your Profile' : user.profile.displayName}</h2>
@@ -101,8 +98,7 @@ export function AgoraProfileDrawer({
                 alt={user.profile.displayName}
                 width={72}
                 height={72}
-                className="rounded-full"
-                style={{ border: '2px solid var(--theme-border)' }}
+                className="rounded-full border-2 border-[var(--theme-border)]"
                 onError={(e) => {
                   ;(e.currentTarget as HTMLImageElement).src = '/avatars/hermes.png'
                 }}
@@ -113,12 +109,7 @@ export function AgoraProfileDrawer({
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     onBlur={() => onSaveProfile({ displayName: editName.slice(0, 32) || 'Builder' })}
-                    className="w-full rounded-md px-2 py-1 text-sm font-semibold outline-none"
-                    style={{
-                      background: 'var(--theme-card)',
-                      border: '1px solid var(--theme-border)',
-                      color: 'var(--theme-text)',
-                    }}
+                    className="w-full rounded-md px-2 py-1 text-sm font-semibold outline-none bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)]"
                   />
                 ) : (
                   <div className="text-sm font-semibold">{user.profile.displayName}</div>
@@ -143,15 +134,12 @@ export function AgoraProfileDrawer({
                         setEditStatus(s)
                         onSaveProfile({ status: s })
                       }}
-                      className="rounded-md px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.05em]"
-                      style={{
-                        background:
-                          editStatus === s
-                            ? 'var(--theme-accent)'
-                            : 'var(--theme-card)',
-                        color: editStatus === s ? 'var(--theme-bg)' : 'var(--theme-text)',
-                        border: '1px solid var(--theme-border)',
-                      }}
+                      className={cn(
+                        'rounded-md px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.05em] border border-[var(--theme-border)]',
+                        editStatus === s
+                          ? 'bg-[var(--theme-accent)] text-[var(--theme-bg)]'
+                          : 'bg-[var(--theme-card)] text-[var(--theme-text)]',
+                      )}
                     >
                       {s}
                     </button>
@@ -173,12 +161,7 @@ export function AgoraProfileDrawer({
                   placeholder="Say something about yourself…"
                   rows={3}
                   maxLength={240}
-                  className="w-full rounded-md px-2 py-1.5 text-[12px] outline-none resize-none"
-                  style={{
-                    background: 'var(--theme-card)',
-                    border: '1px solid var(--theme-border)',
-                    color: 'var(--theme-text)',
-                  }}
+                  className="w-full rounded-md px-2 py-1.5 text-[12px] outline-none resize-none bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)]"
                 />
               ) : (
                 <div className="text-[12px] opacity-80 whitespace-pre-wrap">{user.profile.bio || 'No bio.'}</div>

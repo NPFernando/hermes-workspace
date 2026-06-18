@@ -66,9 +66,9 @@ function StatusDot({ status }: { status: CrewOnlineStatus }) {
       <span
         className={cn(
           'inline-block size-2 rounded-full',
-          status === 'online'  && 'bg-green-500',
+          status === 'online'  && 'bg-emerald-400 ring-pulse',
           status === 'offline' && 'bg-red-500',
-          status === 'unknown' && 'bg-gray-500',
+          status === 'unknown' && 'bg-[var(--theme-muted)]',
         )}
       />
       <span
@@ -76,7 +76,7 @@ function StatusDot({ status }: { status: CrewOnlineStatus }) {
           'text-[10px] font-semibold uppercase tracking-widest',
           status === 'online'  && 'text-green-400',
           status === 'offline' && 'text-red-400',
-          status === 'unknown' && 'text-gray-500',
+          status === 'unknown' && 'text-[var(--theme-muted)]',
         )}
       >
         {status}
@@ -89,7 +89,7 @@ function StatusDot({ status }: { status: CrewOnlineStatus }) {
 
 function SkeletonCard() {
   return (
-    <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] overflow-hidden animate-pulse">
+    <div className="skeleton-shimmer rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] overflow-hidden">
       <div className="border-l-[3px] border-l-[#B87333] p-4 h-full">
         <div className="flex justify-between mb-3">
           <div className="h-2.5 bg-[var(--theme-hover)] rounded w-16" />
@@ -152,7 +152,7 @@ function AgentCard({ member }: { member: CrewMember }) {
         </div>
         {/* Agent name + model */}
         <div>
-          <h3 className="text-xl font-bold tracking-tight" style={{ color: '#f59e0b' }}>
+          <h3 className="text-xl font-bold tracking-tight text-amber-500">
             {member.displayName || member.id}
           </h3>
           <p className="text-xs text-[var(--theme-muted)] mt-0.5">
@@ -164,7 +164,7 @@ function AgentCard({ member }: { member: CrewMember }) {
                 icon={telegramPlatform.state === 'connected' ? Wifi01Icon : WifiOffIcon}
                 size={10}
                 className={cn(
-                  telegramPlatform.state === 'connected' ? 'text-green-400' : 'text-gray-500',
+                  telegramPlatform.state === 'connected' ? 'text-green-400' : 'text-[var(--theme-muted)]',
                 )}
               />
               <span className="text-[10px] text-[var(--theme-muted)]">
@@ -197,7 +197,7 @@ function AgentCard({ member }: { member: CrewMember }) {
               key={label}
               className="rounded border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-2 text-center"
             >
-              <div className="text-sm font-bold" style={{ color: '#f59e0b' }}>{value}</div>
+              <div className="text-sm font-bold text-amber-500">{value}</div>
               <div className="text-[9px] text-[var(--theme-muted)] uppercase tracking-widest mt-0.5">{label}</div>
             </div>
           ))}
@@ -293,7 +293,7 @@ export function CrewScreen() {
   }, [refetch])
 
   return (
-    <div className="flex h-full flex-col gap-6 overflow-auto p-4 md:p-6">
+    <div data-route-page className="flex h-full flex-col gap-6 overflow-auto p-4 md:p-6">
       {/* ── Header ── */}
       <div className="space-y-4">
         <div className="h-px" style={{ background: 'linear-gradient(to right, #B87333, transparent)' }} />
@@ -301,8 +301,7 @@ export function CrewScreen() {
           <div className="max-w-3xl space-y-2">
             <div>
               <h1
-                className="text-2xl font-bold tracking-[0.18em] uppercase"
-                style={{ color: '#f59e0b' }}
+                className="text-2xl font-bold tracking-[0.18em] uppercase text-amber-500"
               >
                 Crew Status
               </h1>

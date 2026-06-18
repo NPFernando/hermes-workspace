@@ -4,7 +4,7 @@ import path from 'node:path'
 
 const METADATA_PATH = path.join(os.homedir(), '.hindsight', 'profiles', 'metadata.json')
 const HERMES_PROFILE = 'hermes'
-const BANK = 'hermes'
+const DEFAULT_BANK = 'hermes'
 const CONFIG_PATH = path.join(os.homedir(), '.hermes', 'hindsight', 'config.json')
 const DLQ_PATH = path.join(os.homedir(), '.hindsight', 'retain_dlq.jsonl')
 
@@ -97,27 +97,30 @@ export async function getHindsightHealth(): Promise<{ status: string; database: 
   return hFetch('/health')
 }
 
-export async function getHindsightStats(): Promise<Record<string, unknown>> {
-  return hFetch(`/v1/default/banks/${BANK}/stats`)
+export async function getHindsightStats(bank = DEFAULT_BANK): Promise<Record<string, unknown>> {
+  return hFetch(`/v1/default/banks/${bank}/stats`)
 }
 
 export async function listHindsightMemories(opts: {
   q?: string
   limit?: number
   offset?: number
+  bank?: string
 }): Promise<{ items: Array<HindsightMemory>; total: number; limit: number; offset: number }> {
+  const bank = opts.bank ?? DEFAULT_BANK
   const params = new URLSearchParams()
   if (opts.q) params.set('q', opts.q)
   params.set('limit', String(opts.limit ?? 50))
   params.set('offset', String(opts.offset ?? 0))
-  return hFetch(`/v1/default/banks/${BANK}/memories/list?${params.toString()}`)
+  return hFetch(`/v1/default/banks/${bank}/memories/list?${params.toString()}`)
 }
 
 export async function recallHindsight(
   query: string,
   budget = 'mid',
+  bank = DEFAULT_BANK,
 ): Promise<{ results: Array<HindsightRecallResult> }> {
-  return hFetch(`/v1/default/banks/${BANK}/memories/recall`, {
+  return hFetch(`/v1/default/banks/${bank}/memories/recall`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, budget }),
@@ -126,15 +129,17 @@ export async function recallHindsight(
 
 export async function listHindsightOperations(
   limit = 20,
+  bank = DEFAULT_BANK,
 ): Promise<{ operations: Array<HindsightOperation>; total: number }> {
-  return hFetch(`/v1/default/banks/${BANK}/operations?limit=${limit}`)
+  return hFetch(`/v1/default/banks/${bank}/operations?limit=${limit}`)
 }
 
 export async function retainHindsight(
   content: string,
   context?: string,
-): Promise<{ operation_id: string }> {
-  return hFetch(`/v1/default/banks/${BANK}/files/retain`, {
+  bank = DEFAULT_BANK,
+): Promise<{ success: boolean; operation_id?: string }> {
+  return hFetch(`/v1/default/banks/${bank}/memories`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -144,8 +149,11 @@ export async function retainHindsight(
   })
 }
 
-export async function deleteHindsightMemory(memoryId: string): Promise<void> {
-  await hFetch(`/v1/default/banks/${BANK}/memories/${encodeURIComponent(memoryId)}/observations`, {
+export async function deleteHindsightMemory(
+  memoryId: string,
+  bank = DEFAULT_BANK,
+): Promise<void> {
+  await hFetch(`/v1/default/banks/${bank}/memories/${encodeURIComponent(memoryId)}/observations`, {
     method: 'DELETE',
   })
 }

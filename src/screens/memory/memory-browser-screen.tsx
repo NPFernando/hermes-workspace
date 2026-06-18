@@ -254,24 +254,15 @@ export function MemoryBrowserScreen() {
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col"
-      style={{ backgroundColor: 'var(--theme-bg)', color: 'var(--theme-text)' }}
+      data-route-page
+      className="flex h-full min-h-0 flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]"
     >
       <div
-        className="px-3 py-3 md:px-4"
-        style={{
-          borderBottom: '1px solid var(--theme-border)',
-          backgroundColor: 'var(--theme-bg)',
-        }}
+        className="px-3 py-3 md:px-4 border-b border-[var(--theme-border)] bg-[var(--theme-bg)]"
       >
         <div className="flex items-center gap-3">
           <div
-            className="inline-flex size-9 items-center justify-center rounded-xl"
-            style={{
-              border: '1px solid var(--theme-border)',
-              backgroundColor: 'var(--theme-card)',
-              color: 'var(--theme-text)',
-            }}
+            className="inline-flex size-9 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]"
           >
             <HugeiconsIcon icon={BrainIcon} size={18} strokeWidth={1.6} />
           </div>
@@ -281,19 +272,13 @@ export function MemoryBrowserScreen() {
                 icon={Search01Icon}
                 size={16}
                 strokeWidth={1.7}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
-                style={{ color: 'var(--theme-muted)' }}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--theme-muted)]"
               />
               <input
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
                 placeholder="Search memory files"
-                className="w-full rounded-xl py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:border-accent-500"
-                style={{
-                  border: '1px solid var(--theme-border)',
-                  backgroundColor: 'var(--theme-card)',
-                  color: 'var(--theme-text)',
-                }}
+                className="w-full rounded-xl py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:border-accent-500 border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]"
               />
             </div>
           </div>
@@ -301,16 +286,16 @@ export function MemoryBrowserScreen() {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 md:grid-cols-3 md:p-4">
-        <aside className="flex min-h-0 flex-col rounded-2xl border border-primary-200 bg-primary-50 dark:border-neutral-800 dark:bg-neutral-950 md:col-span-1">
+        <aside className="flex min-h-0 flex-col rounded-2xl border border-primary-200 bg-primary-50 md:col-span-1">
           <button
             type="button"
             className="flex items-center justify-between px-3 py-2 text-left md:cursor-default"
             onClick={() => setMobileFilesOpen((value) => !value)}
           >
-            <span className="text-xs font-semibold uppercase tracking-wide text-primary-500 dark:text-neutral-400">
+            <span className="text-xs font-semibold uppercase tracking-wide text-primary-500">
               Memory Files ({fileItems.length})
             </span>
-            <span className="md:hidden text-primary-500 dark:text-neutral-400">
+            <span className="md:hidden text-primary-500">
               <HugeiconsIcon
                 icon={mobileFilesOpen ? ArrowUp01Icon : ArrowDown01Icon}
                 size={16}
@@ -321,16 +306,16 @@ export function MemoryBrowserScreen() {
 
           {searchEnabled ? (
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-              <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-primary-400 dark:text-neutral-500">
+              <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-primary-400">
                 Search Results
               </div>
               <div className="space-y-1">
                 {searchQuery.isLoading ? (
-                  <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-400 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-500">
+                  <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-400">
                     Searching...
                   </div>
                 ) : searchResults.length === 0 ? (
-                  <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-400 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-500">
+                  <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-400">
                     No matches
                   </div>
                 ) : (
@@ -343,12 +328,12 @@ export function MemoryBrowserScreen() {
                           setMobileFilesOpen(false)
                         }
                       }}
-                      className="w-full rounded-lg border border-primary-200 bg-primary-50/80 px-2.5 py-2 text-left hover:border-primary-300 hover:bg-primary-100 dark:border-neutral-800 dark:bg-neutral-900/60 dark:hover:border-neutral-700 dark:hover:bg-neutral-900"
+                      className="w-full rounded-lg border border-primary-200 bg-primary-50/80 px-2.5 py-2 text-left hover:border-primary-300 hover:bg-primary-100 dark:hover:border-neutral-700 dark:hover:bg-neutral-900"
                     >
-                      <div className="truncate text-[11px] text-primary-500 dark:text-neutral-400">
+                      <div className="truncate text-[11px] text-primary-500">
                         {result.path}:{result.line}
                       </div>
-                      <div className="mt-0.5 line-clamp-2 text-xs text-primary-700 dark:text-neutral-200">
+                      <div className="mt-0.5 line-clamp-2 text-xs text-primary-700">
                         {highlightMatch(result.text, searchTerm).map(
                           (part, partIndex) => (
                             <span
@@ -387,11 +372,11 @@ export function MemoryBrowserScreen() {
                   />
                 ) : null}
 
-                <div className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-primary-400 dark:text-neutral-500">
+                <div className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-primary-400">
                   memory/ or memories/
                 </div>
                 {memoryFiles.length === 0 ? (
-                  <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-400 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-500">
+                  <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-400">
                     No files in memory/ or memories/
                   </div>
                 ) : (
@@ -411,14 +396,14 @@ export function MemoryBrowserScreen() {
           )}
         </aside>
 
-        <section className="flex min-h-0 flex-col rounded-2xl border border-primary-200 bg-primary-50 dark:border-neutral-800 dark:bg-neutral-950 md:col-span-2">
-          <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 dark:border-neutral-800">
+        <section className="flex min-h-0 flex-col rounded-2xl border border-primary-200 bg-primary-50 md:col-span-2">
+          <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2">
             <div className="min-w-0">
-              <div className="truncate font-mono text-sm text-primary-900 dark:text-neutral-100">
+              <div className="truncate font-mono text-sm text-primary-900">
                 {selectedPath || 'Select a file'}
               </div>
               {selectedPath ? (
-                <div className="text-xs text-primary-400 dark:text-neutral-500">
+                <div className="text-xs text-primary-400">
                   {selectedFileMeta?.size != null
                     ? `${formatBytes(selectedFileMeta.size)} · ${formatModified(selectedFileMeta.modified)}`
                     : 'Loading metadata...'}
@@ -427,7 +412,7 @@ export function MemoryBrowserScreen() {
             </div>
             <div className="ml-3 flex items-center gap-2">
               {!isEditing && selectedPath ? (
-                <div className="flex items-center rounded-md border border-primary-200 dark:border-neutral-700">
+                <div className="flex items-center rounded-md border border-primary-200">
                   <button
                     type="button"
                     onClick={() => setViewMode('rendered')}
@@ -436,7 +421,7 @@ export function MemoryBrowserScreen() {
                       'inline-flex items-center gap-1 rounded-l-md px-2.5 py-1.5 text-xs font-semibold transition-colors',
                       viewMode === 'rendered'
                         ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
-                        : 'text-primary-500 hover:bg-primary-100 dark:text-neutral-400 dark:hover:bg-neutral-800',
+                        : 'text-primary-500 hover:bg-primary-100 dark:hover:bg-neutral-800',
                     )}
                   >
                     <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={1.7} />
@@ -447,10 +432,10 @@ export function MemoryBrowserScreen() {
                     onClick={() => setViewMode('raw')}
                     title="Raw view"
                     className={cn(
-                      'inline-flex items-center gap-1 rounded-r-md border-l border-primary-200 px-2.5 py-1.5 text-xs font-semibold transition-colors dark:border-neutral-700',
+                      'inline-flex items-center gap-1 rounded-r-md border-l border-primary-200 px-2.5 py-1.5 text-xs font-semibold transition-colors',
                       viewMode === 'raw'
                         ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
-                        : 'text-primary-500 hover:bg-primary-100 dark:text-neutral-400 dark:hover:bg-neutral-800',
+                        : 'text-primary-500 hover:bg-primary-100 dark:hover:bg-neutral-800',
                     )}
                   >
                     <HugeiconsIcon icon={CodeCircleIcon} size={13} strokeWidth={1.7} />
@@ -462,7 +447,7 @@ export function MemoryBrowserScreen() {
                 type="button"
                 title="Refresh files"
                 onClick={() => queryClient.invalidateQueries({ queryKey: ['memory'] })}
-                className="inline-flex items-center justify-center rounded-md border border-primary-200 p-1.5 text-primary-500 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                className="inline-flex items-center justify-center rounded-md border border-primary-200 p-1.5 text-primary-500 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
               >
                 <HugeiconsIcon icon={CircleArrowReload01Icon} size={14} strokeWidth={1.7} />
               </button>
@@ -482,7 +467,7 @@ export function MemoryBrowserScreen() {
                         type="button"
                         disabled={isSaving}
                         onClick={handleCancelEditing}
-                        className="rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                        className="rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
                       >
                         Cancel
                       </button>
@@ -497,7 +482,7 @@ export function MemoryBrowserScreen() {
                     <button
                       type="button"
                       onClick={handleStartEditing}
-                      className="relative inline-flex items-center gap-1.5 rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                      className="relative inline-flex items-center gap-1.5 rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
                     >
                       <HugeiconsIcon
                         icon={PencilEdit02Icon}
@@ -533,11 +518,7 @@ export function MemoryBrowserScreen() {
               <StateBox label={contentQuery.error.message} error />
             ) : isEditing ? (
               <div
-                className="h-full rounded-xl p-2"
-                style={{
-                  border: '1px solid var(--theme-border)',
-                  backgroundColor: 'var(--theme-card)',
-                }}
+                className="h-full rounded-xl p-2 border border-[var(--theme-border)] bg-[var(--theme-card)]"
               >
                 <textarea
                   value={draftContent}
@@ -546,23 +527,13 @@ export function MemoryBrowserScreen() {
                     setDraftContent(nextValue)
                     setHasUnsavedChanges(nextValue !== content)
                   }}
-                  className="h-full w-full resize-none rounded-lg px-3 py-2 font-mono text-[13px] outline-none ring-0"
-                  style={{
-                    border: '1px solid var(--theme-border)',
-                    backgroundColor: 'var(--theme-bg)',
-                    color: 'var(--theme-text)',
-                  }}
+                  className="h-full w-full resize-none rounded-lg px-3 py-2 font-mono text-[13px] outline-none ring-0 border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-text)]"
                   spellCheck={false}
                 />
               </div>
             ) : viewMode === 'rendered' ? (
               <div
-                className="min-h-full rounded-xl p-4 md:p-5"
-                style={{
-                  border: '1px solid var(--theme-border)',
-                  backgroundColor: 'var(--theme-card)',
-                  color: 'var(--theme-text)',
-                }}
+                className="min-h-full rounded-xl p-4 md:p-5 border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]"
               >
                 <Markdown className="prose prose-sm dark:prose-invert max-w-none prose-hr:my-4">
                   {renderMemoryContent(content)}
@@ -570,11 +541,7 @@ export function MemoryBrowserScreen() {
               </div>
             ) : (
               <div
-                className="rounded-xl"
-                style={{
-                  border: '1px solid var(--theme-border)',
-                  backgroundColor: 'var(--theme-card)',
-                }}
+                className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)]"
               >
                 <div className="font-mono text-xs">
                   {lines.map((line, index) => {
@@ -587,19 +554,19 @@ export function MemoryBrowserScreen() {
                           lineRefs.current[lineNumber] = node
                         }}
                         className={cn(
-                          'grid grid-cols-[56px_1fr] gap-0 border-b border-primary-200/80 last:border-b-0 dark:border-neutral-900/80',
+                          'grid grid-cols-[56px_1fr] gap-0 border-b border-primary-200/80 last:border-b-0',
                           highlighted && 'bg-yellow-300/10',
                         )}
                       >
                         <div
                           className={cn(
-                            'select-none border-r border-primary-200 px-2 py-0.5 text-right text-primary-400 dark:border-neutral-800 dark:text-neutral-600',
+                            'select-none border-r border-primary-200 px-2 py-0.5 text-right text-primary-400',
                             highlighted && 'text-yellow-200',
                           )}
                         >
                           {lineNumber}
                         </div>
-                        <pre className="overflow-x-auto whitespace-pre-wrap break-words px-3 py-0.5 text-primary-800 dark:text-neutral-200">
+                        <pre className="overflow-x-auto whitespace-pre-wrap break-words px-3 py-0.5 text-primary-800">
                           {line || ' '}
                         </pre>
                       </div>
@@ -632,13 +599,13 @@ function FileRow({
         'w-full rounded-lg border px-2.5 py-2 text-left transition-colors',
         selected
           ? 'border-accent-500/70 bg-accent-500/10'
-          : 'border-primary-200 bg-primary-50/80 hover:border-primary-300 hover:bg-primary-100 dark:border-neutral-800 dark:bg-neutral-900/60 dark:hover:border-neutral-700 dark:hover:bg-neutral-900',
+          : 'border-primary-200 bg-primary-50/80 hover:border-primary-300 hover:bg-primary-100 dark:hover:border-neutral-700 dark:hover:bg-neutral-900',
       )}
     >
-      <div className="truncate font-mono text-xs text-primary-900 dark:text-neutral-100">
+      <div className="truncate font-mono text-xs text-primary-900">
         {file.path}
       </div>
-      <div className="mt-0.5 text-[11px] text-primary-400 dark:text-neutral-500">
+      <div className="mt-0.5 text-[11px] text-primary-400">
         {formatBytes(file.size)} · {formatModified(file.modified)}
       </div>
     </button>
@@ -652,7 +619,7 @@ function StateBox({ label, error }: { label: string; error?: boolean }) {
         'flex min-h-32 items-center justify-center rounded-xl border px-4 text-sm',
         error
           ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300'
-          : 'border-primary-200 bg-primary-50 text-primary-500 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400',
+          : 'border-primary-200 bg-primary-50 text-primary-500',
       )}
     >
       {label}

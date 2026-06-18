@@ -10,7 +10,7 @@ export function BackendUnavailableState({ feature, description }: Props) {
   return (
     <div className="flex h-full min-h-[320px] items-center justify-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-primary-200 bg-primary-50/70 p-8 text-center shadow-sm backdrop-blur-sm">
-        <div className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-primary-200 bg-white text-primary-600 shadow-sm">
+        <div className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-accent)] shadow-sm">
           <HugeiconsIcon icon={Alert02Icon} size={24} strokeWidth={1.7} />
         </div>
         <div className="mt-4 space-y-2">

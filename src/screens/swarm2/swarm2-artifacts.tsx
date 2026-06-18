@@ -136,7 +136,7 @@ export function Swarm2Artifacts({
       )}
     >
       {showHeader ? (
-        <div className="mb-1.5 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+        <div className="mb-1.5 flex items-center justify-between gap-2 micro-label">
           <span className="inline-flex items-center gap-1">
             <HugeiconsIcon icon={Files01Icon} size={11} />
             {showingChangedFiles ? 'Changed files' : 'Output'}

@@ -11,12 +11,13 @@ export const Route = createFileRoute('/api/hindsight/delete')({
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
         try {
-          const body = (await request.json()) as { id?: string }
+          const body = (await request.json()) as { id?: string; bank?: string }
           const id = String(body.id ?? '').trim()
           if (!id) {
             return json({ error: 'id is required' }, { status: 400 })
           }
-          await deleteHindsightMemory(id)
+          const bank = body.bank ? String(body.bank) : undefined
+          await deleteHindsightMemory(id, bank)
           return json({ ok: true })
         } catch (err) {
           return json(

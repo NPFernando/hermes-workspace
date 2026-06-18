@@ -89,11 +89,8 @@ export function MobilePromptTrigger() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -50, scale: 0.95 }}
             transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
-            className="fixed left-1/2 z-[9999] w-[90vw] max-w-md -translate-x-1/2 overflow-hidden rounded-2xl shadow-2xl top-[calc(var(--titlebar-h,0px)+1rem)]"
+            className="fixed left-1/2 z-[9999] w-[90vw] max-w-md -translate-x-1/2 overflow-hidden rounded-2xl shadow-2xl top-[calc(var(--titlebar-h,0px)+1rem)] bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)]"
             style={{
-              background: 'var(--theme-card)',
-              border: '1px solid var(--theme-border)',
-              color: 'var(--theme-text)',
               boxShadow: 'var(--theme-shadow-3)',
             }}
           >
@@ -171,14 +168,12 @@ export function MobilePromptTrigger() {
 
                 <div className="min-w-0 flex-1 text-center">
                   <p
-                    className="text-sm font-semibold"
-                    style={{ color: 'var(--theme-text)' }}
+                    className="text-sm font-semibold text-[var(--theme-text)]"
                   >
                     Set up mobile access
                   </p>
                   <p
-                    className="text-xs"
-                    style={{ color: 'var(--theme-muted)' }}
+                    className="text-xs text-[var(--theme-muted)]"
                   >
                     Connect your phone to this Hermes Workspace instance in a
                     few steps.
@@ -189,16 +184,14 @@ export function MobilePromptTrigger() {
                   <button
                     type="button"
                     onClick={openSetup}
-                    className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
-                    style={{ background: 'var(--theme-accent)' }}
+                    className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white bg-[var(--theme-accent)]"
                   >
                     Set up
                   </button>
                   <button
                     type="button"
                     onClick={dismissPrompt}
-                    className="rounded-lg p-1.5 transition-colors hover:opacity-80"
-                    style={{ color: 'var(--theme-muted)' }}
+                    className="rounded-lg p-1.5 transition-colors hover:opacity-80 text-[var(--theme-muted)]"
                     aria-label="Dismiss mobile setup prompt"
                   >
                     <HugeiconsIcon
@@ -211,18 +204,13 @@ export function MobilePromptTrigger() {
               </div>
 
               <label
-                className="mt-3 flex items-center gap-2 text-xs"
-                style={{ color: 'var(--theme-muted)' }}
+                className="mt-3 flex items-center gap-2 text-xs text-[var(--theme-muted)]"
               >
                 <input
                   type="checkbox"
                   checked={dontShowAgain}
                   onChange={(event) => setDontShowAgain(event.target.checked)}
-                  className="size-3.5 rounded"
-                  style={{
-                    border: '1px solid var(--theme-border)',
-                    background: 'var(--theme-card2)',
-                  }}
+                  className="size-3.5 rounded border border-[var(--theme-border)] bg-[var(--theme-card2)]"
                 />
                 <span>Don&apos;t show this again</span>
               </label>

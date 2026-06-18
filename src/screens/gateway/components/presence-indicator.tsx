@@ -131,7 +131,7 @@ export function PresenceIndicator({ currentTab }: { currentTab: string }) {
           </div>
         ))}
         {peers.length > 5 && (
-          <div className="flex size-6 items-center justify-center rounded-full border-2 border-white dark:border-slate-900 bg-neutral-300 dark:bg-neutral-700 text-[9px] font-bold text-neutral-600 dark:text-neutral-300">
+          <div className="flex size-6 items-center justify-center rounded-full border-2 border-white dark:border-slate-900 bg-neutral-300 text-[9px] font-bold text-neutral-600">
             +{peers.length - 5}
           </div>
         )}
@@ -139,7 +139,7 @@ export function PresenceIndicator({ currentTab }: { currentTab: string }) {
 
       {/* Label */}
       <span className={cn(
-        'text-[10px] text-neutral-500 dark:text-neutral-400',
+        'text-[10px] text-[var(--theme-muted)]',
         peers.length > 0 && 'hidden sm:inline',
       )}>
         {peers.length === 1

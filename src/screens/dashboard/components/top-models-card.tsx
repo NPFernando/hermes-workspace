@@ -49,18 +49,16 @@ export function TopModelsCard({
             icon={ChartBarLineIcon}
             size={14}
             strokeWidth={1.5}
-            style={{ color: 'var(--theme-accent-secondary)' }}
+            className="text-[var(--theme-accent-secondary,var(--theme-accent))]"
           />
           <h3
-            className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-            style={{ color: 'var(--theme-text)' }}
+            className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
           >
             Top models · {analytics.windowDays}d
           </h3>
         </div>
         <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
         >
           {analytics.topModels.length} ranked
         </span>
@@ -81,21 +79,18 @@ export function TopModelsCard({
             <li key={m.id}>
               <div className="flex items-center justify-between gap-2 text-[11px]">
                 <span
-                  className="flex min-w-0 items-center gap-1.5 truncate font-mono"
-                  style={{ color: 'var(--theme-text)' }}
+                  className="flex min-w-0 items-center gap-1.5 truncate font-mono text-[var(--theme-text)]"
                   title={m.id}
                 >
                   <span
-                    className="inline-block w-3 text-right tabular-nums"
-                    style={{ color: 'var(--theme-muted)' }}
+                    className="inline-block w-3 text-right tabular-nums text-[var(--theme-muted)]"
                   >
                     {i + 1}
                   </span>
                   {formatModelName(m.id)}
                 </span>
                 <span
-                  className="font-mono text-[10px] tabular-nums"
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="font-mono text-[10px] tabular-nums text-[var(--theme-muted)]"
                 >
                   {formatTokens(m.tokens)}
                 </span>
@@ -116,8 +111,7 @@ export function TopModelsCard({
                 />
               </div>
               <div
-                className="mt-0.5 flex items-center justify-between gap-2 font-mono text-[9px] uppercase tracking-[0.1em]"
-                style={{ color: 'var(--theme-muted)' }}
+                className="mt-0.5 flex items-center justify-between gap-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
               >
                 <span>
                   {sharePct}% of calls · {m.sessions.toLocaleString()} sessions

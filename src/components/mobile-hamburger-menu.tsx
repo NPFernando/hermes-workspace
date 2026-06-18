@@ -4,7 +4,6 @@ import {
   BrainIcon,
   Building01Icon,
   Cancel01Icon,
-  Castle02Icon,
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
@@ -42,13 +41,6 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     icon: DashboardSquare01Icon,
     to: '/dashboard',
     match: (p: string) => p.startsWith('/dashboard'),
-  },
-  {
-    id: 'playground',
-    label: 'HermesWorld',
-    icon: Castle02Icon,
-    to: '/playground',
-    match: (p: string) => p.startsWith('/playground'),
   },
   {
     id: 'terminal',
@@ -218,20 +210,15 @@ export function MobileHamburgerMenu() {
       <div
         className={cn(
           'fixed top-0 left-0 bottom-0 z-[96] w-72 md:hidden',
-          'shadow-2xl',
+          'shadow-2xl bg-[var(--theme-panel)]',
           'flex flex-col pt-[max(env(safe-area-inset-top,20px),20px)] pb-[max(env(safe-area-inset-bottom,20px),20px)]',
           'transition-transform duration-300 ease-in-out',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
-        style={{
-          background: 'var(--color-surface, #fff)',
-          borderColor: 'var(--color-border, #e5e7eb)',
-        }}
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between px-4 pb-4"
-          style={{ borderBottom: '1px solid var(--color-border, #e5e7eb)' }}
+          className="flex items-center justify-between px-4 pb-4 border-b border-[var(--theme-border)]"
         >
           <div className="flex items-center gap-2.5">
             <img
@@ -241,14 +228,12 @@ export function MobileHamburgerMenu() {
             />
             <div className="flex flex-col leading-tight">
               <span
-                className="font-bold text-[15px] tracking-tight"
-                style={{ color: 'var(--color-ink, #111)' }}
+                className="font-bold text-[15px] tracking-tight text-[var(--theme-text)]"
               >
                 Hermes Agent
               </span>
               <span
-                className="text-[11px]"
-                style={{ color: 'var(--color-muted, #888)' }}
+                className="text-[11px] text-[var(--theme-muted)]"
               >
                 Workspace
               </span>
@@ -258,8 +243,7 @@ export function MobileHamburgerMenu() {
             type="button"
             aria-label="Close menu"
             onClick={() => setOpen(false)}
-            className="flex items-center justify-center size-8 rounded-full active:scale-90 transition-all"
-            style={{ color: 'var(--color-muted, #888)' }}
+            className="flex items-center justify-center size-8 rounded-full active:scale-90 transition-all text-[var(--theme-muted)]"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={1.8} />
           </button>
@@ -305,8 +289,7 @@ export function MobileHamburgerMenu() {
 
         {/* Bottom — user profile + settings + theme toggle */}
         <div
-          className="px-3 pb-2 pt-3"
-          style={{ borderTop: '1px solid var(--color-border, #e5e7eb)' }}
+          className="px-3 pb-2 pt-3 border-t border-[var(--theme-border)]"
         >
           <div className="flex items-center gap-3 px-2">
             {/* User avatar + name + status dot */}
@@ -335,8 +318,7 @@ export function MobileHamburgerMenu() {
               </svg>
             </div>
             <span
-              className="text-[15px] font-semibold truncate"
-              style={{ color: 'var(--color-ink, #111)' }}
+              className="text-[15px] font-semibold truncate text-[var(--theme-text)]"
             >
               {profileDisplayName}
             </span>
@@ -348,9 +330,8 @@ export function MobileHamburgerMenu() {
             <button
               type="button"
               onClick={() => handleNav('/settings')}
-              className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors"
+              className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors text-[var(--theme-muted)]"
               aria-label="Settings"
-              style={{ color: 'var(--color-ink-muted, #888)' }}
             >
               <HugeiconsIcon
                 icon={Settings01Icon}
@@ -368,9 +349,8 @@ export function MobileHamburgerMenu() {
                 const next = getThemeVariant(current, dark ? 'light' : 'dark')
                 setTheme(next)
               }}
-              className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors"
+              className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors text-[var(--theme-muted)]"
               aria-label="Toggle theme"
-              style={{ color: 'var(--color-ink-muted, #888)' }}
             >
               <svg
                 width="18"

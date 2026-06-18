@@ -111,11 +111,11 @@ export function AttentionMarquee({
                 <span aria-hidden className="text-[12px]">
                   {SOURCE_GLYPH[item.source] ?? '•'}
                 </span>
-                <span style={{ color: 'var(--theme-text)' }}>
+                <span className="text-[var(--theme-text)]">
                   {item.label}
                 </span>
                 {item.detail ? (
-                  <span style={{ color: 'var(--theme-muted)' }}>
+                  <span className="text-[var(--theme-muted)]">
                     · {item.detail}
                   </span>
                 ) : null}

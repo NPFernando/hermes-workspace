@@ -33,18 +33,13 @@ function MenuContent({
       <Menu.Positioner side={side} align={align}>
         <Menu.Popup
           className={cn(
-            'min-w-[110px] rounded-lg p-1 text-sm shadow-lg',
+            'min-w-[110px] rounded-lg p-1 text-sm shadow-lg bg-[var(--theme-card)] text-[var(--theme-text)] border border-[var(--theme-border)] z-[9999]',
             className,
           )}
           style={{
-            background: 'var(--theme-card)',
-            color: 'var(--theme-text)',
-            border: '1px solid var(--theme-border)',
             boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            opacity: 1,
-            zIndex: 9999,
           }}
         >
           {children}
@@ -60,12 +55,9 @@ function MenuItem({ className, ...props }: MenuItemProps) {
   return (
     <Menu.Item
       className={cn(
-        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm select-none font-[450]',
+        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm select-none font-[450] text-[var(--theme-text)]',
         className,
       )}
-      style={{
-        color: 'var(--theme-text)',
-      }}
       onMouseEnter={(e) => {
         ;(e.currentTarget as HTMLElement).style.background =
           'var(--theme-card2)'

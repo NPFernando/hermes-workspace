@@ -75,15 +75,10 @@ function CommandDialogPopup({
       <CommandDialogViewport>
         <CommandDialogPrimitive.Popup
           className={cn(
-            '-translate-y-[calc(1.25rem*var(--nested-dialogs))] relative row-start-2 flex max-h-105 min-h-0 w-full min-w-0 max-w-xl scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl opacity-[calc(1-0.1*var(--nested-dialogs))] shadow-lg outline-1 outline-primary-950/10 outline transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 **:data-[slot=scroll-area-viewport]:data-has-overflow-y:pe-1',
+            '-translate-y-[calc(1.25rem*var(--nested-dialogs))] relative row-start-2 flex max-h-105 min-h-0 w-full min-w-0 max-w-xl scale-[calc(1-0.1*var(--nested-dialogs))] flex-col rounded-2xl opacity-[calc(1-0.1*var(--nested-dialogs))] shadow-lg outline-1 outline-primary-950/10 outline transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform data-nested:data-ending-style:translate-y-8 data-nested:data-starting-style:translate-y-8 data-nested-dialog-open:origin-top data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 **:data-[slot=scroll-area-viewport]:data-has-overflow-y:pe-1 bg-[var(--theme-card)] text-[var(--theme-text)] border border-[var(--theme-border)]',
             className,
           )}
           data-slot="command-dialog-popup"
-          style={{
-            background: 'var(--theme-card)',
-            color: 'var(--theme-text)',
-            border: '1px solid var(--theme-border)',
-          }}
           {...props}
         >
           {children}
@@ -162,11 +157,7 @@ function CommandEmpty({
 function CommandPanel({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
-      className="-mx-px not-has-[+[data-slot=command-footer]]:-mb-px relative min-h-0 rounded-t-xl not-has-[+[data-slot=command-footer]]:rounded-b-2xl border border-b-0 bg-clip-padding shadow-xs/5 [clip-path:inset(0_1px)] not-has-[+[data-slot=command-footer]]:[clip-path:inset(0_1px_1px_1px_round_0_0_calc(var(--radius-2xl)-1px)_calc(var(--radius-2xl)-1px))] before:pointer-events-none before:absolute before:inset-0 before:rounded-t-[calc(var(--radius-xl)-1px)] **:data-[slot=scroll-area-scrollbar]:mt-2"
-      style={{
-        background: 'var(--theme-card)',
-        borderColor: 'var(--theme-border)',
-      }}
+      className="-mx-px not-has-[+[data-slot=command-footer]]:-mb-px relative min-h-0 rounded-t-xl not-has-[+[data-slot=command-footer]]:rounded-b-2xl border border-b-0 border-[var(--theme-border)] bg-[var(--theme-card)] bg-clip-padding shadow-xs/5 [clip-path:inset(0_1px)] not-has-[+[data-slot=command-footer]]:[clip-path:inset(0_1px_1px_1px_round_0_0_calc(var(--radius-2xl)-1px)_calc(var(--radius-2xl)-1px))] before:pointer-events-none before:absolute before:inset-0 before:rounded-t-[calc(var(--radius-xl)-1px)] **:data-[slot=scroll-area-scrollbar]:mt-2"
       {...props}
     />
   )
@@ -234,11 +225,10 @@ function CommandShortcut({ className, ...props }: React.ComponentProps<'kbd'>) {
   return (
     <kbd
       className={cn(
-        'ms-auto font-medium font-sans text-xs tracking-widest',
+        'ms-auto font-medium font-sans text-xs tracking-widest text-[var(--theme-muted)]',
         className,
       )}
       data-slot="command-shortcut"
-      style={{ color: 'var(--theme-muted)' }}
       {...props}
     />
   )
@@ -248,14 +238,10 @@ function CommandFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] border-t px-5 py-3 text-xs',
+        'flex items-center justify-between gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] border-t border-[var(--theme-border)] px-5 py-3 text-xs text-[var(--theme-muted)]',
         className,
       )}
       data-slot="command-footer"
-      style={{
-        borderColor: 'var(--theme-border)',
-        color: 'var(--theme-muted)',
-      }}
       {...props}
     />
   )

@@ -1,20 +1,74 @@
 [
   {
+    "title": "Add search bar for conversations and memories",
+    "description": "Implement a global search bar that allows users to search across all agent conversations and stored memories.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add settings page for agent configuration",
+    "description": "Create a settings page in the workspace UI where users can adjust agent parameters like temperature, max tokens, and system prompts.",
+    "category": "ui",
+    "estimated_effort": "high"
+  },
+  {
+    "title": "Add pin/favorite feature for conversations",
+    "description": "Allow users to pin or favorite important conversations for quick access from the workspace sidebar.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
     "title": "Add dark mode toggle to workspace UI",
     "description": "Implement a dark/light mode switch in the workspace header, storing preference in localStorage.",
     "category": "ui",
     "estimated_effort": "medium"
   },
   {
-    "title": "Improve error handling in agent tool calls",
-    "description": "Add retry logic with exponential backoff for transient tool failures, and display user-friendly error messages.",
-    "category": "backend",
-    "estimated_effort": "high"
+    "title": "Add keyboard shortcuts for common actions",
+    "description": "Implement keyboard shortcuts (e.g., Ctrl+S for save, Ctrl+F for search) in the workspace interface.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add export chat history feature",
+    "description": "Allow users to export their chat history as a JSON or text file for backup or sharing.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add dark mode toggle to workspace UI",
+    "description": "Implement a dark/light mode switch in the workspace header, storing preference in localStorage.",
+    "category": "ui",
+    "estimated_effort": "medium"
   },
   {
     "title": "Add keyboard shortcuts for common actions",
     "description": "Implement keyboard shortcuts (e.g., Ctrl+S for save, Ctrl+F for search) in the workspace interface.",
     "category": "ui",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Add export chat history feature",
+    "description": "Allow users to export their chat history as a JSON or text file for backup or sharing.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add save/load agent configuration profiles",
+    "description": "Allow users to save their agent settings (temperature, max tokens, system prompts) as profiles and load them later.",
+    "category": "config",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add error boundaries to UI components",
+    "description": "Implement React error boundaries to gracefully handle UI errors and display fallback UI instead of crashing.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add conversation sharing via shareable links",
+    "description": "Generate a shareable link for a conversation that allows others to view the chat history (with optional expiration).",
+    "category": "ui",
+    "estimated_effort": "high"
   }
 ]

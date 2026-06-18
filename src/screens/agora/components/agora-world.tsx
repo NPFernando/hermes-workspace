@@ -50,13 +50,10 @@ export function AgoraWorld({
     <div
       ref={containerRef}
       onClick={handleClick}
-      className="relative h-full w-full overflow-hidden rounded-2xl"
+      className="relative h-full w-full overflow-hidden rounded-2xl cursor-pointer select-none border border-[var(--theme-border)]"
       style={{
         background:
           'radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--theme-accent) 14%, var(--theme-bg)) 0%, var(--theme-bg) 70%), repeating-linear-gradient(45deg, transparent 0 28px, color-mix(in srgb, var(--theme-border) 25%, transparent) 28px 29px)',
-        border: '1px solid var(--theme-border)',
-        cursor: 'pointer',
-        userSelect: 'none',
       }}
     >
       {/* Decorative center medallion */}
@@ -134,13 +131,7 @@ export function AgoraWorld({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.95 }}
                     transition={{ duration: 0.18 }}
-                    className="absolute left-1/2 -top-3 max-w-[180px] -translate-x-1/2 -translate-y-full rounded-xl px-2.5 py-1.5 text-[11px] leading-snug shadow-lg"
-                    style={{
-                      background: 'var(--theme-card)',
-                      color: 'var(--theme-text)',
-                      border: '1px solid var(--theme-border)',
-                      whiteSpace: 'pre-wrap',
-                    }}
+                    className="absolute left-1/2 -top-3 max-w-[180px] -translate-x-1/2 -translate-y-full rounded-xl px-2.5 py-1.5 text-[11px] leading-snug shadow-lg bg-[var(--theme-card)] text-[var(--theme-text)] border border-[var(--theme-border)] whitespace-pre-wrap"
                   >
                     {bubble.body}
                   </motion.div>
@@ -162,10 +153,9 @@ export function AgoraWorld({
       })}
 
       {/* Movement hint */}
-      <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.2em] opacity-60"
+      <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.2em] opacity-60 border border-[var(--theme-border)]"
         style={{
           background: 'color-mix(in srgb, var(--theme-bg) 80%, transparent)',
-          border: '1px solid var(--theme-border)',
         }}
       >
         WASD or arrow keys · click to walk

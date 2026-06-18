@@ -237,7 +237,7 @@ function JobCard({
             <HugeiconsIcon
               icon={Delete01Icon}
               size={14}
-              style={{ color: 'var(--theme-danger)' }}
+              className="text-[var(--theme-danger,#ef4444)]"
             />
           </button>
         </div>
@@ -418,7 +418,7 @@ export function JobsScreen() {
   )
 
   return (
-    <div className="min-h-full overflow-y-auto bg-surface text-ink">
+    <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
         <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
           <div className="flex items-center justify-between">
@@ -453,8 +453,7 @@ export function JobsScreen() {
               </button>
               <button
                 onClick={() => setShowCreate(true)}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
-                style={{ background: 'var(--theme-accent)' }}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 bg-[var(--theme-accent)]"
               >
                 <HugeiconsIcon icon={Add01Icon} size={14} />
                 New Job
@@ -480,8 +479,7 @@ export function JobsScreen() {
           </div>
           {profilesQuery.isError ? (
             <p
-              className="mt-2 text-xs"
-              style={{ color: 'var(--theme-warning)' }}
+              className="mt-2 text-xs text-amber-400"
             >
               Profile list failed to load. New jobs will default to the default
               profile until profiles refresh.
@@ -496,8 +494,7 @@ export function JobsScreen() {
             </div>
           ) : jobsQuery.isError ? (
             <div
-              className="flex items-center justify-center py-12 text-sm"
-              style={{ color: 'var(--theme-danger)' }}
+              className="flex items-center justify-center py-12 text-sm text-[var(--theme-danger,#ef4444)]"
             >
               Failed to load jobs:{' '}
               {jobsQuery.error instanceof Error

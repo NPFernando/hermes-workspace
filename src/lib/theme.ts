@@ -11,6 +11,7 @@ export type ThemeId =
   | 'claude-slate-light'
   | 'scifi'
   | 'scifi-light'
+  | 'odysseus'
 
 export const THEMES: Array<{
   id: ThemeId
@@ -90,21 +91,28 @@ export const THEMES: Array<{
     description: 'Cold steel and teal — cyberpunk interface in daylight',
     icon: '🌌',
   },
+  {
+    id: 'odysseus',
+    label: 'Odysseus',
+    description: 'Minimal monospace-forward dark — blue-gray background, coral-red accent, cyan text',
+    icon: '◎',
+  },
 ]
 
 const STORAGE_KEY = 'claude-theme'
 const DEFAULT_THEME: ThemeId = 'claude-nous'
 const THEME_SET = new Set<ThemeId>(THEMES.map((theme) => theme.id))
-const LIGHT_THEME_MAP: Record<
+const LIGHT_THEME_MAP: Partial<Record<
   Exclude<ThemeId, `${string}-light`>,
   Extract<ThemeId, `${string}-light`>
-> = {
+>> = {
   'claude-nous': 'claude-nous-light',
   matrix: 'matrix-light',
   'claude-official': 'claude-official-light',
   'claude-classic': 'claude-classic-light',
   'claude-slate': 'claude-slate-light',
   'scifi': 'scifi-light',
+  // odysseus: no light variant — stays as-is when light mode is requested
 }
 const DARK_THEME_MAP: Record<
   Extract<ThemeId, `${string}-light`>,
@@ -143,7 +151,7 @@ export function getThemeVariant(
 ): ThemeId {
   if (mode === 'light') {
     return isDarkTheme(theme)
-      ? LIGHT_THEME_MAP[theme as keyof typeof LIGHT_THEME_MAP]
+      ? (LIGHT_THEME_MAP[theme as keyof typeof LIGHT_THEME_MAP] ?? theme)
       : theme
   }
 

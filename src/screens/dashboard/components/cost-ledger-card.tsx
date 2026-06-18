@@ -110,14 +110,12 @@ export function CostLedgerCard({
 
       <div className="flex items-center justify-between">
         <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-text)' }}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
         >
           Cost ledger
         </h3>
         <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
           title="Total billed across non-subscription rows."
         >
           {formatCostUsd(paidTotal)} paid
@@ -128,8 +126,7 @@ export function CostLedgerCard({
         {rows.slice(0, 6).map((row) => (
           <li
             key={row.id}
-            className="flex items-center justify-between gap-2 text-[10px]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="flex items-center justify-between gap-2 text-[10px] text-[var(--theme-muted)]"
           >
             <span className="flex min-w-0 items-center gap-1.5 truncate">
               <span
@@ -142,23 +139,20 @@ export function CostLedgerCard({
                 }}
               />
               <span
-                className="truncate font-mono uppercase tracking-[0.08em]"
-                style={{ color: 'var(--theme-text)' }}
+                className="truncate font-mono uppercase tracking-[0.08em] text-[var(--theme-text)]"
                 title={row.id}
               >
                 {row.id}
               </span>
             </span>
             <span
-              className="shrink-0 font-mono tabular-nums"
-              style={{ color: 'var(--theme-text)' }}
+              className="shrink-0 font-mono tabular-nums text-[var(--theme-text)]"
             >
               {row.included ? (
                 <span title={`${row.sessions} sessions`}>
                   {formatTokens(row.tokens)}
                   <span
-                    className="ml-1"
-                    style={{ color: 'var(--theme-muted)' }}
+                    className="ml-1 text-[var(--theme-muted)]"
                   >
                     incl
                   </span>
@@ -168,9 +162,8 @@ export function CostLedgerCard({
                   {formatCostUsd(row.cost)}
                   {row.novusSuggestion ? (
                     <span
-                      className="ml-1.5 cursor-help"
+                      className="ml-1.5 cursor-help text-[var(--theme-accent)]"
                       title={`Switch to ${row.novusSuggestion.suggestedModel} to save ~${row.novusSuggestion.potentialSavingsPercent}%`}
-                      style={{ color: 'var(--theme-accent)' }}
                     >
                       💡 {row.novusSuggestion.potentialSavingsPercent}%↓
                     </span>

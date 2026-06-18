@@ -72,8 +72,7 @@ export function ActiveModelKpi({
 
       <div className="flex items-center justify-between">
         <span
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]"
         >
           Active Model
         </span>
@@ -93,8 +92,7 @@ export function ActiveModelKpi({
 
       <div className="flex items-end justify-between gap-2">
         <span
-          className="font-mono text-2xl font-bold leading-none tracking-tight"
-          style={{ color: 'var(--theme-text)' }}
+          className="font-mono text-2xl font-bold leading-none tracking-tight text-[var(--theme-text)]"
           title={modelInfo?.model}
         >
           {display}
@@ -115,8 +113,7 @@ export function ActiveModelKpi({
 
       <div className="flex items-center justify-between gap-2 text-[10px]">
         <span
-          className="truncate font-mono uppercase tracking-[0.12em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="truncate font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]"
         >
           {provider}
           {sessionsForModel !== null
@@ -125,8 +122,7 @@ export function ActiveModelKpi({
         </span>
         {modelInfo?.effectiveContextLength ? (
           <span
-            className="font-mono uppercase tracking-[0.12em]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]"
           >
             ctx {formatCount(modelInfo.effectiveContextLength)}
           </span>

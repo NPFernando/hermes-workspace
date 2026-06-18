@@ -1,5 +1,5 @@
 {
-  "tests_passed": false,
-  "lint_errors": 349,
-  "passed": false
+  "tests_passed": true,
+  "lint_errors": 4,
+  "passed": true
 }

@@ -53,7 +53,7 @@ export function McpScreen() {
       : `${servers.length.toLocaleString()} servers`
 
   return (
-    <div className="min-h-full overflow-y-auto bg-surface text-ink">
+    <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
         <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -348,7 +348,7 @@ function MarketplaceGrid({
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="animate-pulse rounded-2xl border border-primary-200 bg-primary-50/70 p-4 min-h-[160px]"
+            className="skeleton-shimmer rounded-2xl border border-[var(--theme-border)] p-4 min-h-[160px]"
           >
             <div className="mb-3 h-4 w-2/5 rounded-md bg-primary-100" />
             <div className="mb-2 h-3 w-3/4 rounded-md bg-primary-100" />

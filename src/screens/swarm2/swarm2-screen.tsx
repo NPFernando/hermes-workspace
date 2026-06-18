@@ -1475,7 +1475,7 @@ export function Swarm2Screen() {
 
 
   return (
-    <div ref={topRef} className="min-h-full bg-surface text-primary-900" style={SWARM2_OPERATION_THEME}>
+    <div ref={topRef} data-route-page className="min-h-full bg-surface text-primary-900" style={SWARM2_OPERATION_THEME}>
       <div
         className={cn(
           'mx-auto flex min-h-full max-w-[1680px] flex-col gap-3 px-3 pt-3 sm:px-4 lg:px-5',

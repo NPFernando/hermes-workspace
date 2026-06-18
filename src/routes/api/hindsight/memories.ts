@@ -16,11 +16,13 @@ export const Route = createFileRoute('/api/hindsight/memories')({
           const q = url.searchParams.get('q') || undefined
           const limit = Number.parseInt(url.searchParams.get('limit') ?? '50', 10)
           const offset = Number.parseInt(url.searchParams.get('offset') ?? '0', 10)
+          const bank = url.searchParams.get('bank') ?? undefined
           return json(
             await listHindsightMemories({
               q,
               limit: Number.isFinite(limit) ? limit : 50,
               offset: Number.isFinite(offset) ? offset : 0,
+              bank,
             }),
           )
         } catch (err) {

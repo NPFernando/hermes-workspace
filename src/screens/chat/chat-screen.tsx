@@ -2222,13 +2222,6 @@ export function ChatScreen({
   )
 
   useEffect(() => {
-    if (false) {
-      // Server connection checks removed — Hermes Agent uses direct API
-      hasSeenDisconnectRef.current = true
-      retriedQueuedMessageKeysRef.current.clear()
-      return
-    }
-
     if (connectionState === 'connected' && hasSeenDisconnectRef.current) {
       hasSeenDisconnectRef.current = false
       flushRetryableMessages()
@@ -2766,10 +2759,9 @@ export function ChatScreen({
     <ArtifactPanelContext.Provider value={artifactPanelContextValue}>
     <div
       className={cn(
-        'relative min-w-0 flex flex-col overflow-hidden',
+        'relative min-w-0 flex flex-col overflow-hidden bg-[var(--theme-bg)]',
         compact ? 'h-full flex-1 min-h-0' : 'h-full',
       )}
-      style={{ background: 'var(--theme-bg)' }}
     >
     <KeyboardShortcuts />
       <div
@@ -2877,7 +2869,7 @@ export function ChatScreen({
                         onClick={() => {
                           void resolvePendingApproval(approval, 'denied')
                         }}
-                        className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 dark:border-red-800/50 dark:bg-red-900/10 dark:text-red-400"
+                        className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-[var(--theme-danger-soft-strong)]"
                       >
                         Deny
                       </button>

@@ -643,18 +643,18 @@ export function SkillsScreen() {
   }
 
   return (
-    <div className="min-h-full overflow-y-auto bg-surface text-ink">
+    <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
-        <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
+        <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 backdrop-blur-xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1.5">
-              <p className="text-xs font-medium uppercase text-primary-500 tabular-nums">
+              <p className="text-xs font-medium uppercase text-[var(--theme-muted)] tabular-nums">
                 Hermes Workspace Marketplace
               </p>
               <h1 className="text-2xl font-medium text-ink text-balance sm:text-3xl">
                 Skills Browser
               </h1>
-              <p className="text-sm text-primary-500 text-pretty sm:text-base">
+              <p className="text-sm text-[var(--theme-muted)] text-pretty sm:text-base">
                 Discover, install, and manage skills across your local workspace
                 and Skills Hub.
               </p>
@@ -662,11 +662,11 @@ export function SkillsScreen() {
           </div>
         </header>
 
-        <section className="rounded-2xl border border-primary-200 bg-primary-50/80 p-3 backdrop-blur-xl sm:p-4">
+        <section className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3 backdrop-blur-xl sm:p-4">
           <Tabs value={tab} onValueChange={handleTabChange}>
             <div className="flex flex-wrap items-center gap-2">
               {profiles.length > 1 ? (
-                <label className="flex h-9 items-center gap-2 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-xs text-primary-500">
+                <label className="flex h-9 items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-xs text-[var(--theme-muted)]">
                   <span className="font-medium uppercase tracking-wider text-[10px]">
                     Profile
                   </span>
@@ -676,7 +676,7 @@ export function SkillsScreen() {
                       setSelectedProfile(event.target.value)
                       setPage(1)
                     }}
-                    className="h-7 rounded-md border border-primary-200 bg-primary-50/70 px-2 text-xs text-ink outline-none"
+                    className="h-7 rounded-md border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2 text-xs text-ink outline-none"
                     aria-label="Profile"
                   >
                     {profiles.map((profile) => (
@@ -698,7 +698,7 @@ export function SkillsScreen() {
                     ? 'Search Skills Hub, GitHub, and local fallback'
                     : 'Search by name, tags, or description'
                 }
-                className="h-9 w-full min-w-0 flex-1 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary sm:min-w-[220px]"
+                className="h-9 w-full min-w-0 flex-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-sm text-ink outline-none transition-colors focus:border-primary sm:min-w-[220px]"
               />
 
               {tab === 'installed' ? (
@@ -707,7 +707,7 @@ export function SkillsScreen() {
                   onChange={(event) =>
                     handleCategoryChange(event.target.value)
                   }
-                  className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
+                  className="h-9 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-sm text-ink outline-none"
                 >
                   {categories.map((item) => (
                     <option key={item} value={item}>
@@ -721,7 +721,7 @@ export function SkillsScreen() {
                 <select
                   value={origin}
                   onChange={(event) => handleOriginChange(event.target.value)}
-                  className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
+                  className="h-9 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-sm text-ink outline-none"
                 >
                   <option value="All">All Origins</option>
                   <option value="builtin">Built-in</option>
@@ -738,7 +738,7 @@ export function SkillsScreen() {
                       event.target.value === 'category' ? 'category' : 'name',
                     )
                   }
-                  className="h-9 rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none"
+                  className="h-9 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-sm text-ink outline-none"
                 >
                   <option value="name">Name A-Z</option>
                   <option value="category">Category</option>
@@ -746,7 +746,7 @@ export function SkillsScreen() {
               ) : null}
 
               <TabsList
-                className="ml-auto rounded-xl border border-primary-200 bg-primary-100/60 p-1"
+                className="ml-auto rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)] p-1"
                 variant="default"
               >
                 <TabsTab value="installed" className="min-w-[110px]">
@@ -764,7 +764,7 @@ export function SkillsScreen() {
             </div>
 
             {actionError ? (
-              <p className="rounded-lg border border-primary-200 bg-primary-100/60 px-3 py-2 text-sm text-ink">
+              <p className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 py-2 text-sm text-ink">
                 {actionError}
               </p>
             ) : null}
@@ -789,7 +789,7 @@ export function SkillsScreen() {
             <TabsPanel value="marketplace" className="space-y-3 pt-2">
               <div className="flex items-center justify-between gap-2">
                 {hubQuery.data?.source ? (
-                  <div className="text-xs text-primary-500">
+                  <div className="text-xs text-[var(--theme-muted)]">
                     Source: {hubQuery.data.source}
                   </div>
                 ) : (
@@ -845,7 +845,7 @@ export function SkillsScreen() {
             </TabsPanel>
 
             <TabsPanel value="workspace" className="pt-2">
-              <Suspense fallback={<div className="py-8 text-center text-sm text-primary-500">Loading…</div>}>
+              <Suspense fallback={<div className="py-8 text-center text-sm text-[var(--theme-muted)]">Loading…</div>}>
                 <WorkspaceSkillsScreen />
               </Suspense>
             </TabsPanel>
@@ -853,7 +853,7 @@ export function SkillsScreen() {
         </section>
 
         {tab !== 'marketplace' && tab !== 'workspace' ? (
-          <footer className="flex items-center justify-between rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-2.5 text-sm text-primary-500 tabular-nums">
+          <footer className="flex items-center justify-between rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2.5 text-sm text-[var(--theme-muted)] tabular-nums">
             <span>
               {(skillsQuery.data?.total || 0).toLocaleString()} total skills
             </span>
@@ -892,10 +892,10 @@ export function SkillsScreen() {
           }
         }}
       >
-        <DialogContent className="w-[min(960px,95vw)] border-primary-200 bg-primary-50/95 backdrop-blur-sm">
+        <DialogContent className="w-[min(960px,95vw)] border-[var(--theme-border)] bg-[var(--theme-panel)] backdrop-blur-sm">
           {selectedSkill ? (
             <div className="flex max-h-[85vh] flex-col">
-              <div className="border-b border-primary-200 px-5 py-4">
+              <div className="border-b border-[var(--theme-border)] px-5 py-4">
                 <DialogTitle className="text-balance">
                   {selectedSkill.icon} {selectedSkill.name}
                 </DialogTitle>
@@ -904,7 +904,7 @@ export function SkillsScreen() {
                   {selectedSkill.fileCount.toLocaleString()} files
                 </DialogDescription>
                 {selectedSkill.security && (
-                  <div className="mt-3 rounded-xl border border-primary-200 bg-primary-50/80 overflow-hidden">
+                  <div className="mt-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] overflow-hidden">
                     <SecurityBadge
                       security={selectedSkill.security}
                       compact={false}
@@ -917,7 +917,7 @@ export function SkillsScreen() {
                 <ScrollAreaViewport className="px-5 py-4">
                   <div className="space-y-3">
                     {selectedSkill.homepage ? (
-                      <p className="text-sm text-primary-500 text-pretty">
+                      <p className="text-sm text-[var(--theme-muted)] text-pretty">
                         Homepage:{' '}
                         <a
                           href={selectedSkill.homepage}
@@ -935,19 +935,19 @@ export function SkillsScreen() {
                         selectedSkill.triggers.slice(0, 8).map((trigger) => (
                           <span
                             key={trigger}
-                            className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500"
+                            className="rounded-md border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-0.5 text-xs text-[var(--theme-muted)]"
                           >
                             {trigger}
                           </span>
                         ))
                       ) : (
-                        <span className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500">
+                        <span className="rounded-md border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-0.5 text-xs text-[var(--theme-muted)]">
                           No triggers listed
                         </span>
                       )}
                     </div>
 
-                    <article className="rounded-xl border border-primary-200 bg-primary-100/30 p-4 backdrop-blur-sm">
+                    <article className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)] p-4 backdrop-blur-sm">
                       <Markdown>
                         {selectedSkill.content ||
                           `# ${selectedSkill.name}\n\n${selectedSkill.description}`}
@@ -960,14 +960,14 @@ export function SkillsScreen() {
                 </ScrollAreaScrollbar>
               </ScrollAreaRoot>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-primary-200 px-5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--theme-border)] px-5 py-3">
                 <div className="flex flex-wrap items-center gap-2">
                   {selectedSkill.origin ? (
                     <span
                       className={cn(
                         'rounded-md border px-2 py-0.5 text-xs tabular-nums',
                         selectedSkill.origin === 'builtin' &&
-                          'border-primary-200 bg-primary-100/60 text-primary-500',
+                          'border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
                         selectedSkill.origin === 'agent-created' &&
                           'border-amber-300/70 bg-amber-100/60 text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-200',
                         selectedSkill.origin === 'marketplace' &&
@@ -981,7 +981,7 @@ export function SkillsScreen() {
                           : 'Marketplace'}
                     </span>
                   ) : null}
-                  <p className="text-sm text-primary-500 text-pretty">
+                  <p className="text-sm text-[var(--theme-muted)] text-pretty">
                     Source:{' '}
                     <code className="inline-code">
                       {selectedSkill.sourcePath}
@@ -1105,7 +1105,7 @@ function SecurityBadge({
         </button>
         {expanded && (
           <div
-            className="absolute left-0 bottom-[calc(100%+6px)] z-50 w-72 overflow-hidden rounded-xl border border-primary-200 p-0 shadow-xl"
+            className="absolute left-0 bottom-[calc(100%+6px)] z-50 w-72 overflow-hidden rounded-xl border border-[var(--theme-border)] p-0 shadow-xl"
             style={{ backgroundColor: 'var(--color-primary-50)' }}
           >
             <SecurityScanCard security={security} />
@@ -1134,12 +1134,12 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
   return (
     <div className="text-xs">
       <div className="px-3 pt-3 pb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-400 mb-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] mb-2">
           Security Scan
         </p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="text-primary-500 font-medium w-16 shrink-0">
+            <span className="text-[var(--theme-muted)] font-medium w-16 shrink-0">
               Hermes Workspace
             </span>
             <span
@@ -1150,19 +1150,19 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
             >
               {config.label}
             </span>
-            <span className="text-[10px] text-primary-400 uppercase tracking-wide font-medium">
+            <span className="text-[10px] text-[var(--theme-muted)] uppercase tracking-wide font-medium">
               {config.confidence}
             </span>
           </div>
         </div>
       </div>
       <div className="px-3 pb-2">
-        <p className="text-primary-500 text-pretty leading-relaxed">
+        <p className="text-[var(--theme-muted)] text-pretty leading-relaxed">
           {summaryText}
         </p>
       </div>
       {security.flags.length > 0 && (
-        <div className="border-t border-primary-100">
+        <div className="border-t border-[var(--theme-border)]">
           <button
             type="button"
             onClick={(e) => {
@@ -1179,9 +1179,9 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
               {security.flags.map((flag) => (
                 <div
                   key={flag}
-                  className="flex items-start gap-2 text-primary-600"
+                  className="flex items-start gap-2 text-[var(--theme-muted)]"
                 >
-                  <span className="mt-0.5 text-[9px] text-primary-400">●</span>
+                  <span className="mt-0.5 text-[9px] text-[var(--theme-muted)]">●</span>
                   <span>{flag}</span>
                 </div>
               ))}
@@ -1189,8 +1189,8 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
           )}
         </div>
       )}
-      <div className="border-t border-primary-100 px-3 py-2">
-        <p className="text-[10px] text-primary-400 italic">
+      <div className="border-t border-[var(--theme-border)] px-3 py-2">
+        <p className="text-[10px] text-[var(--theme-muted)] italic">
           Like a lobster shell, security has layers — review code before you run
           it.
         </p>
@@ -1216,11 +1216,11 @@ function SkillsGrid({
 
   if (skills.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-8 text-center">
-        <p className="text-sm font-medium text-primary-700">
+      <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-hover)]/40 px-4 py-8 text-center">
+        <p className="text-sm font-medium text-[var(--theme-muted)]">
           {emptyState?.title || 'No skills found'}
         </p>
-        <p className="mt-1 text-xs text-primary-500 text-pretty max-w-sm mx-auto">
+        <p className="mt-1 text-xs text-[var(--theme-muted)] text-pretty max-w-sm mx-auto">
           {emptyState?.description ||
             'Try adjusting your filters or search term'}
         </p>
@@ -1240,7 +1240,7 @@ function SkillsGrid({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18 }}
-              className="relative z-0 flex min-h-[220px] flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm hover:z-20 focus-within:z-20"
+              className="relative z-0 flex min-h-[220px] flex-col rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm backdrop-blur-sm hover:z-20 focus-within:z-20"
             >
               <div className="mb-2 flex items-start justify-between gap-2">
                 <div className="min-w-0 space-y-1">
@@ -1251,7 +1251,7 @@ function SkillsGrid({
                     </h3>
                   </div>
                   {skill.author ? (
-                    <p className="line-clamp-1 text-xs text-primary-500">
+                    <p className="line-clamp-1 text-xs text-[var(--theme-muted)]">
                       by {skill.author}
                     </p>
                   ) : null}
@@ -1262,7 +1262,7 @@ function SkillsGrid({
                       className={cn(
                         'rounded-md border px-2 py-0.5 text-xs tabular-nums',
                         skill.origin === 'builtin' &&
-                          'border-primary-200 bg-primary-100/60 text-primary-500',
+                          'border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
                         skill.origin === 'agent-created' &&
                           'border-amber-300/70 bg-amber-100/60 text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-200',
                         skill.origin === 'marketplace' &&
@@ -1281,7 +1281,7 @@ function SkillsGrid({
                       'rounded-md border px-2 py-0.5 text-xs tabular-nums',
                       skill.installed
                         ? 'border-primary/40 bg-primary/15 text-primary'
-                        : 'border-primary-200 bg-primary-100/60 text-primary-500',
+                        : 'border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
                     )}
                   >
                     {skill.installed ? 'Installed' : 'Available'}
@@ -1289,19 +1289,19 @@ function SkillsGrid({
                 </div>
               </div>
 
-              <p className="line-clamp-3 min-h-[58px] text-sm text-primary-500 text-pretty">
+              <p className="line-clamp-3 min-h-[58px] text-sm text-[var(--theme-muted)] text-pretty">
                 {skill.description}
               </p>
 
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <SecurityBadge security={skill.security} />
-                <span className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500">
+                <span className="rounded-md border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-0.5 text-xs text-[var(--theme-muted)]">
                   {skill.category}
                 </span>
                 {skill.triggers.slice(0, 2).map((trigger) => (
                   <span
                     key={`${skill.id}-${trigger}`}
-                    className="rounded-md border border-primary-200 bg-primary-100/50 px-2 py-0.5 text-xs text-primary-500"
+                    className="rounded-md border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-0.5 text-xs text-[var(--theme-muted)]"
                   >
                     {trigger}
                   </span>
@@ -1319,7 +1319,7 @@ function SkillsGrid({
 
                 {tab === 'installed' ? (
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 text-xs text-primary-500">
+                    <div className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
                       <Switch
                         checked={skill.enabled}
                         disabled={isActing}
@@ -1389,7 +1389,7 @@ function FeaturedGrid({
 
   if (skills.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-10 text-center text-sm text-primary-500 text-pretty">
+      <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-hover)]/40 px-4 py-10 text-center text-sm text-[var(--theme-muted)] text-pretty">
         Featured picks are currently unavailable.
       </div>
     )
@@ -1402,17 +1402,17 @@ function FeaturedGrid({
         return (
           <article
             key={skill.id}
-            className="flex min-h-0 flex-col rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-sm"
+            className="flex min-h-0 flex-col rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm backdrop-blur-sm"
           >
             <div className="mb-3 flex items-start justify-between gap-2">
               <div className="space-y-1">
-                <p className="text-xs font-medium uppercase text-primary-500 tabular-nums">
+                <p className="text-xs font-medium uppercase text-[var(--theme-muted)] tabular-nums">
                   {skill.featuredGroup || 'Staff Pick'}
                 </p>
                 <h3 className="text-lg font-medium text-ink text-balance">
                   {skill.icon} {skill.name}
                 </h3>
-                <p className="text-sm text-primary-500">by {skill.author}</p>
+                <p className="text-sm text-[var(--theme-muted)]">by {skill.author}</p>
               </div>
 
               <span
@@ -1420,14 +1420,14 @@ function FeaturedGrid({
                   'rounded-md border px-2 py-0.5 text-xs tabular-nums',
                   skill.installed
                     ? 'border-primary/40 bg-primary/15 text-primary'
-                    : 'border-primary-200 bg-primary-100/60 text-primary-500',
+                    : 'border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
                 )}
               >
                 {skill.installed ? 'Installed' : 'Staff Pick'}
               </span>
             </div>
 
-            <p className="line-clamp-3 mb-3 text-sm text-primary-500 text-pretty">
+            <p className="line-clamp-3 mb-3 text-sm text-[var(--theme-muted)] text-pretty">
               {skill.description}
             </p>
 
@@ -1485,15 +1485,15 @@ function SkillsSkeleton({
         <div
           key={index}
           className={cn(
-            'animate-pulse rounded-2xl border border-primary-200 bg-primary-50/70 p-4',
+            'skeleton-shimmer rounded-2xl border border-[var(--theme-border)] p-4',
             large ? 'min-h-[120px]' : 'min-h-[100px]',
           )}
         >
-          <div className="mb-3 h-5 w-2/5 rounded-md bg-primary-100" />
-          <div className="mb-2 h-4 w-3/4 rounded-md bg-primary-100" />
-          <div className="h-4 w-1/2 rounded-md bg-primary-100" />
-          <div className="mt-4 h-20 rounded-xl bg-primary-100/80" />
-          <div className="mt-4 h-8 w-1/3 rounded-md bg-primary-100" />
+          <div className="mb-3 h-5 w-2/5 rounded-md bg-[var(--theme-hover)]" />
+          <div className="mb-2 h-4 w-3/4 rounded-md bg-[var(--theme-hover)]" />
+          <div className="h-4 w-1/2 rounded-md bg-[var(--theme-hover)]" />
+          <div className="mt-4 h-20 rounded-xl bg-[var(--theme-hover)]/80" />
+          <div className="mt-4 h-8 w-1/3 rounded-md bg-[var(--theme-hover)]" />
         </div>
       ))}
     </div>

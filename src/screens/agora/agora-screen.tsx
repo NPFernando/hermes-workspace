@@ -40,19 +40,17 @@ export function AgoraScreen() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col" style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }}>
+    <div data-route-page className="flex h-full min-h-0 flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]">
       {/* Top bar */}
       <header
-        className="flex items-center justify-between gap-3 px-4 py-3 border-b"
-        style={{ borderColor: 'var(--theme-border)' }}
+        className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--theme-border)]"
       >
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-base font-semibold truncate">🏛️ Agora</span>
           <span
-            className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em]"
+            className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--theme-accent)]"
             style={{
               background: 'color-mix(in srgb, var(--theme-accent) 25%, transparent)',
-              color: 'var(--theme-accent)',
             }}
           >
             beta
@@ -68,11 +66,7 @@ export function AgoraScreen() {
           <button
             type="button"
             onClick={openSelfProfile}
-            className="flex items-center gap-2 rounded-full px-2 py-1 text-[11px] hover:opacity-80"
-            style={{
-              background: 'var(--theme-card)',
-              border: '1px solid var(--theme-border)',
-            }}
+            className="flex items-center gap-2 rounded-full px-2 py-1 text-[11px] hover:opacity-80 bg-[var(--theme-card)] border border-[var(--theme-border)]"
             title="Your profile"
           >
             <img

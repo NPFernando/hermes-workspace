@@ -53,14 +53,12 @@ export function HourOfDayCard({
     >
       <div className="flex items-center justify-between gap-2">
         <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-text)' }}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
         >
           Hour of day
         </h3>
         <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
         >
           peak {formatHour(peakHour)} · {total} sessions
         </span>
@@ -91,8 +89,7 @@ export function HourOfDayCard({
       </div>
 
       <div
-        className="flex justify-between font-mono text-[8px] uppercase tracking-[0.1em]"
-        style={{ color: 'var(--theme-muted)' }}
+        className="flex justify-between font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
       >
         <span>12a</span>
         <span>6a</span>

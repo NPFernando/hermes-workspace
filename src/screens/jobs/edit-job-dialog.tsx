@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import { cn } from '@/lib/utils'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
 import type { ClaudeJob, JobProfileOption } from '@/lib/jobs-api'
@@ -176,22 +177,15 @@ export function EditJobDialog({
             exit={{ opacity: 0, scale: 0.98, y: 10 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
             onSubmit={handleFormSubmit}
-            className="relative z-10 flex max-h-[85vh] w-[min(720px,96vw)] flex-col overflow-hidden rounded-2xl border shadow-2xl"
-            style={{
-              background: 'var(--theme-card)',
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-text)',
-            }}
+            className="relative z-10 flex max-h-[85vh] w-[min(720px,96vw)] flex-col overflow-hidden rounded-2xl border shadow-2xl bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]"
           >
             <div
-              className="flex items-start justify-between gap-4 border-b px-5 py-4"
-              style={{ borderColor: 'var(--theme-border)' }}
+              className="flex items-start justify-between gap-4 border-b px-5 py-4 border-[var(--theme-border)]"
             >
               <div>
                 <h2 className="text-lg font-semibold">Edit Job</h2>
                 <p
-                  className="mt-1 text-sm"
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="mt-1 text-sm text-[var(--theme-muted)]"
                 >
                   Update the schedule, prompt, and routing for this Hermes task.
                 </p>
@@ -199,8 +193,7 @@ export function EditJobDialog({
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="rounded-lg p-2 transition-colors"
-                style={{ color: 'var(--theme-muted)' }}
+                className="rounded-lg p-2 transition-colors text-[var(--theme-muted)]"
                 aria-label="Close edit job dialog"
               >
                 <HugeiconsIcon icon={Cancel01Icon} size={18} />
@@ -219,12 +212,7 @@ export function EditJobDialog({
                     }))
                   }
                   required
-                  className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
-                  style={{
-                    background: 'var(--theme-input)',
-                    borderColor: 'var(--theme-border)',
-                    color: 'var(--theme-text)',
-                  }}
+                  className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1 bg-[var(--theme-input)] border-[var(--theme-border)] text-[var(--theme-text)]"
                 >
                   {profiles.map((profile) => (
                     <option key={profile.name} value={profile.name}>
@@ -235,16 +223,14 @@ export function EditJobDialog({
                 </select>
                 {job.profile && form.profile !== job.profile ? (
                   <p
-                    className="text-xs"
-                    style={{ color: 'var(--theme-muted)' }}
+                    className="text-xs text-[var(--theme-muted)]"
                   >
                     Saving will recreate this cron job in {form.profile} and
                     remove it from {job.profile}.
                   </p>
                 ) : (
                   <p
-                    className="text-xs"
-                    style={{ color: 'var(--theme-muted)' }}
+                    className="text-xs text-[var(--theme-muted)]"
                   >
                     Cron jobs are stored under the selected Hermes profile.
                   </p>
@@ -263,13 +249,7 @@ export function EditJobDialog({
                   }
                   placeholder="Daily research summary"
                   required
-                  className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
-                  style={{
-                    background: 'var(--theme-input)',
-                    borderColor: 'var(--theme-border)',
-                    color: 'var(--theme-text)',
-                    boxShadow: '0 0 0 0 transparent',
-                  }}
+                  className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1 bg-[var(--theme-input)] border-[var(--theme-border)] text-[var(--theme-text)]"
                 />
               </section>
 
@@ -277,8 +257,7 @@ export function EditJobDialog({
                 <div>
                   <h3 className="text-sm font-medium">Schedule</h3>
                   <p
-                    className="mt-1 text-xs"
-                    style={{ color: 'var(--theme-muted)' }}
+                    className="mt-1 text-xs text-[var(--theme-muted)]"
                   >
                     Choose a preset or enter a custom schedule string below.
                   </p>
@@ -296,16 +275,12 @@ export function EditJobDialog({
                             schedule: preset.value,
                           }))
                         }
-                        className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
-                        style={{
-                          background: isActive
-                            ? 'var(--theme-accent)'
-                            : 'var(--theme-card)',
-                          borderColor: isActive
-                            ? 'var(--theme-accent)'
-                            : 'var(--theme-border)',
-                          color: isActive ? '#fff' : 'var(--theme-text)',
-                        }}
+                        className={cn(
+                          'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                          isActive
+                            ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-white'
+                            : 'bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]',
+                        )}
                       >
                         {preset.label}
                       </button>
@@ -324,12 +299,7 @@ export function EditJobDialog({
                     }
                     placeholder="every 30m or 0 9 * * *"
                     required
-                    className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
-                    style={{
-                      background: 'var(--theme-input)',
-                      borderColor: 'var(--theme-border)',
-                      color: 'var(--theme-text)',
-                    }}
+                    className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1 bg-[var(--theme-input)] border-[var(--theme-border)] text-[var(--theme-text)]"
                   />
                 </div>
               </section>
@@ -347,12 +317,7 @@ export function EditJobDialog({
                   placeholder="What should Hermes Agent do?"
                   required
                   rows={5}
-                  className="w-full resize-none rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
-                  style={{
-                    background: 'var(--theme-input)',
-                    borderColor: 'var(--theme-border)',
-                    color: 'var(--theme-text)',
-                  }}
+                  className="w-full resize-none rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1 bg-[var(--theme-input)] border-[var(--theme-border)] text-[var(--theme-text)]"
                 />
               </section>
 
@@ -360,8 +325,7 @@ export function EditJobDialog({
                 <div>
                   <h3 className="text-sm font-medium">Options</h3>
                   <p
-                    className="mt-1 text-xs"
-                    style={{ color: 'var(--theme-muted)' }}
+                    className="mt-1 text-xs text-[var(--theme-muted)]"
                   >
                     Optional routing and repeat controls.
                   </p>
@@ -378,12 +342,7 @@ export function EditJobDialog({
                       }))
                     }
                     placeholder="research, writing, synthesis"
-                    className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
-                    style={{
-                      background: 'var(--theme-input)',
-                      borderColor: 'var(--theme-border)',
-                      color: 'var(--theme-text)',
-                    }}
+                    className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1 bg-[var(--theme-input)] border-[var(--theme-border)] text-[var(--theme-text)]"
                   />
                 </div>
 
@@ -437,21 +396,12 @@ export function EditJobDialog({
                           repeatMode: 'unlimited',
                         }))
                       }
-                      className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
-                      style={{
-                        background:
-                          form.repeatMode === 'unlimited'
-                            ? 'var(--theme-accent)'
-                            : 'var(--theme-card)',
-                        borderColor:
-                          form.repeatMode === 'unlimited'
-                            ? 'var(--theme-accent)'
-                            : 'var(--theme-border)',
-                        color:
-                          form.repeatMode === 'unlimited'
-                            ? '#fff'
-                            : 'var(--theme-text)',
-                      }}
+                      className={cn(
+                      'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                      form.repeatMode === 'unlimited'
+                        ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-white'
+                        : 'bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]',
+                    )}
                     >
                       Unlimited
                     </button>
@@ -463,21 +413,12 @@ export function EditJobDialog({
                           repeatMode: 'limited',
                         }))
                       }
-                      className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
-                      style={{
-                        background:
-                          form.repeatMode === 'limited'
-                            ? 'var(--theme-accent)'
-                            : 'var(--theme-card)',
-                        borderColor:
-                          form.repeatMode === 'limited'
-                            ? 'var(--theme-accent)'
-                            : 'var(--theme-border)',
-                        color:
-                          form.repeatMode === 'limited'
-                            ? '#fff'
-                            : 'var(--theme-text)',
-                      }}
+                      className={cn(
+                      'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                      form.repeatMode === 'limited'
+                        ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-white'
+                        : 'bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]',
+                    )}
                     >
                       Set count
                     </button>
@@ -494,12 +435,7 @@ export function EditJobDialog({
                           repeatCount: event.target.value,
                         }))
                       }
-                      className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
-                      style={{
-                        background: 'var(--theme-input)',
-                        borderColor: 'var(--theme-border)',
-                        color: 'var(--theme-text)',
-                      }}
+                      className="w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-1 bg-[var(--theme-input)] border-[var(--theme-border)] text-[var(--theme-text)]"
                     />
                   ) : null}
                 </div>
@@ -507,17 +443,12 @@ export function EditJobDialog({
             </div>
 
             <div
-              className="flex items-center justify-end gap-2 border-t px-5 py-4"
-              style={{ borderColor: 'var(--theme-border)' }}
+              className="flex items-center justify-end gap-2 border-t px-5 py-4 border-[var(--theme-border)]"
             >
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="rounded-xl px-4 py-2 text-sm transition-colors"
-                style={{
-                  background: 'var(--theme-card)',
-                  color: 'var(--theme-muted)',
-                }}
+                className="rounded-xl px-4 py-2 text-sm transition-colors bg-[var(--theme-card)] text-[var(--theme-muted)]"
               >
                 Cancel
               </button>
@@ -529,8 +460,7 @@ export function EditJobDialog({
                   !form.schedule.trim() ||
                   !form.prompt.trim()
                 }
-                className="rounded-xl px-4 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-50"
-                style={{ background: 'var(--theme-accent)' }}
+                className="rounded-xl px-4 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-50 bg-[var(--theme-accent)]"
               >
                 {isSubmitting ? 'Saving...' : 'Save changes'}
               </button>

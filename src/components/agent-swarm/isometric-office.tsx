@@ -102,7 +102,7 @@ function MeetingTable() {
           )
         })}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[8px] text-slate-500/60">Meeting</span>
+          <span className="text-[8px] text-[var(--theme-muted)]/60">Meeting</span>
         </div>
       </div>
     </div>
@@ -120,7 +120,7 @@ function WaterCooler() {
     >
       <div className="h-5 w-3 rounded-t-sm bg-sky-300/60" />
       <div className="h-8 w-4 rounded-b-sm bg-slate-400/40" />
-      <span className="mt-0.5 text-[7px] text-slate-500">💧</span>
+      <span className="mt-0.5 text-[7px] text-[var(--theme-muted)]">💧</span>
     </div>
   )
 }
@@ -136,7 +136,7 @@ function CoffeeMachine() {
     >
       <div className="h-6 w-5 rounded-t-sm bg-amber-800/60 shadow-sm" />
       <div className="h-2 w-6 rounded-b-sm bg-amber-700/40" />
-      <span className="mt-0.5 text-[7px] text-slate-500">☕</span>
+      <span className="mt-0.5 text-[7px] text-[var(--theme-muted)]">☕</span>
     </div>
   )
 }
@@ -156,7 +156,7 @@ function LunchArea() {
         <div className="size-2 rounded-full bg-green-400/30" />
         <div className="size-2 rounded-full bg-yellow-400/30" />
       </div>
-      <span className="mt-0.5 text-[7px] text-slate-500">🍕 Lunch</span>
+      <span className="mt-0.5 text-[7px] text-[var(--theme-muted)]">🍕 Lunch</span>
     </div>
   )
 }
@@ -304,7 +304,7 @@ function AnimatedAgent({
             session.swarmStatus === 'idle' && 'bg-slate-400',
           )}
         />
-        <span className="text-[8px] text-slate-500 drop-shadow-sm">
+        <span className="text-[8px] text-[var(--theme-muted)] drop-shadow-sm">
           {persona.role}
         </span>
       </div>
@@ -324,8 +324,8 @@ function EmptyOffice() {
         >
           🏢
         </motion.span>
-        <p className="mt-2 text-sm text-slate-400">Virtual office is empty</p>
-        <p className="text-xs text-slate-500">
+        <p className="mt-2 text-sm text-[var(--theme-muted)]">Virtual office is empty</p>
+        <p className="text-xs text-[var(--theme-muted)]">
           Spawn agents to see them work here
         </p>
       </div>
@@ -484,14 +484,14 @@ export function IsometricOffice({ sessions, className }: IsometricOfficeProps) {
       </div>
 
       <div className="absolute bottom-3 right-3 rounded bg-slate-900/80 px-2 py-1 backdrop-blur">
-        <span className="text-[9px] text-slate-500">
+        <span className="text-[9px] text-[var(--theme-muted)]">
           {behaviors.size} agents · {sessions.length} sessions
         </span>
       </div>
 
       {/* Whiteboard with live stats */}
       <div className="absolute left-[8%] top-[10%] rounded border border-slate-600/30 bg-slate-800/70 px-2 py-1">
-        <div className="text-[8px] text-slate-400 font-mono">
+        <div className="text-[8px] text-[var(--theme-muted)] font-mono">
           <div>📋 Tasks: {sessions.length}</div>
           <div>
             🏃 Active:{' '}

@@ -56,7 +56,7 @@ const SISTER_BADGE_COLORS: Partial<Record<string, { bg: string; text: string; bo
   vitoria:  { bg: 'bg-pink-500/12',    text: 'text-pink-300',    border: 'border-pink-400/25' },
   larissa:  { bg: 'bg-green-500/12',   text: 'text-green-300',   border: 'border-green-400/25' },
   clara:    { bg: 'bg-amber-500/12',   text: 'text-amber-300',   border: 'border-amber-400/25' },
-  helena:   { bg: 'bg-gray-500/12',    text: 'text-gray-300',    border: 'border-gray-400/25' },
+  helena:   { bg: 'bg-[var(--theme-card2)]',    text: 'text-[var(--theme-muted)]',    border: 'border-[var(--theme-border)]' },
   business: { bg: 'bg-amber-500/12',   text: 'text-amber-300',   border: 'border-amber-400/25' },
   default:  { bg: 'bg-primary-500/10', text: 'text-primary-300', border: 'border-primary-300/20' },
 }
@@ -576,7 +576,7 @@ export function OperationalWorkerCard({
         )}
         onClick={(event) => event.stopPropagation()}
       >
-          <div className="mb-2 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+          <div className="mb-2 flex items-center justify-between gap-2 micro-label">
             <button
               type="button"
               aria-label="Previous panel"

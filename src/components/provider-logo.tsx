@@ -59,7 +59,7 @@ export function ProviderLogo({
     return (
       <div
         className={cn(
-          'flex items-center justify-center rounded-lg bg-neutral-600 text-white text-xs font-bold',
+          'flex items-center justify-center rounded-lg bg-[var(--theme-card2)] text-[var(--theme-text)] text-xs font-bold',
           className,
         )}
         style={{ width: size, height: size }}

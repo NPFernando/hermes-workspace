@@ -33,7 +33,7 @@ export const Route = createFileRoute('/swarm2')({
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <div className="mb-3 inline-block h-8 w-8 animate-spin rounded-full border-4 border-accent-500 border-r-transparent" />
+          <div className="spinner-accent spinner-xl mb-3" />
           <p className="text-sm text-primary-500">Loading Swarm...</p>
         </div>
       </div>

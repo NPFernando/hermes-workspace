@@ -47,14 +47,14 @@ function HealthTile({
     <div
       className={cn(
         'rounded-2xl border px-4 py-3',
-        tone === 'good' && 'border-emerald-200 bg-emerald-50 text-emerald-900',
-        tone === 'warn' && 'border-amber-200 bg-amber-50 text-amber-950',
-        tone === 'bad' && 'border-red-200 bg-red-50 text-red-900',
+        tone === 'good' && 'border-emerald-400/40 bg-[var(--theme-card)] text-emerald-500',
+        tone === 'warn' && 'border-amber-400/40 bg-[var(--theme-card)] text-amber-500',
+        tone === 'bad' && 'border-red-400/40 bg-[var(--theme-card)] text-red-500',
         tone === 'loading' && 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)]',
       )}
     >
       <div className="text-sm font-semibold">{label}</div>
-      <div className="mt-2 text-2xl font-bold leading-none">{value}</div>
+      <div className="mt-2 text-2xl font-bold leading-none terminal-glow-soft">{value}</div>
       <div className="mt-1 text-xs opacity-70">{detail}</div>
     </div>
   )
@@ -268,6 +268,7 @@ export function OperationsScreen() {
 
   return (
     <main
+      data-route-page
       className="min-h-full bg-surface px-3 pb-24 pt-5 text-primary-900 md:px-5 md:pt-8"
       style={THEME_STYLE}
     >
@@ -381,8 +382,8 @@ export function OperationsScreen() {
             {sisterAgents.length > 0 ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 px-1">
-                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-violet-400">AI Sisters</span>
-                  <span className="h-px flex-1 bg-violet-400/20" />
+                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--theme-accent)]">AI Sisters</span>
+                  <span className="h-px flex-1 bg-[var(--theme-accent)]/20" />
                   <span className="text-[10px] text-[var(--theme-muted)]">{sisterAgents.length} active</span>
                 </div>
                 <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -415,7 +416,7 @@ export function OperationsScreen() {
                   {rosterEntries.map((sister) => (
                     <div
                       key={sister.id}
-                      className="flex flex-col gap-1.5 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3"
+                      className="domino-item flex flex-col gap-1.5 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--theme-accent)]/30"
                     >
                       <div className="flex items-center gap-2">
                         <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-[var(--theme-accent-soft-strong)] bg-[var(--theme-accent-soft)] text-xs font-bold text-[var(--theme-accent)]">
@@ -423,7 +424,7 @@ export function OperationsScreen() {
                         </span>
                         <span className="truncate text-sm font-semibold text-[var(--theme-text)]">{sister.name}</span>
                       </div>
-                      <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--theme-muted)]">{sister.role}</p>
+                      <p className="micro-label">{sister.role}</p>
                     </div>
                   ))}
                 </div>
@@ -448,7 +449,7 @@ export function OperationsScreen() {
                     return (
                       <div
                         key={activity.id}
-                        className="flex flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 md:flex-row md:items-center md:justify-between"
+                        className="domino-item flex flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 transition-all hover:-translate-y-px hover:shadow-sm md:flex-row md:items-center md:justify-between"
                       >
                         <p className="text-sm text-[var(--theme-text)]">
                           <span className="mr-2">{agent?.meta.emoji ?? '🤖'}</span>

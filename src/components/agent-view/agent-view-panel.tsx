@@ -1194,7 +1194,7 @@ export function AgentViewPanel() {
                                       'size-1.5 shrink-0 rounded-full',
                                       agent.status === 'running'
                                         ? 'bg-emerald-500'
-                                        : 'bg-gray-400',
+                                        : 'bg-[var(--theme-muted)]',
                                     )}
                                   />
                                   <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary-800">

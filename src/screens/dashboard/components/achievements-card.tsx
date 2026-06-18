@@ -37,8 +37,7 @@ function AchievementRow({
 }) {
   return (
     <div
-      className="flex items-center gap-2 rounded border px-2 py-1.5"
-      style={{ borderColor: 'var(--theme-border)' }}
+      className="flex items-center gap-2 rounded border px-2 py-1.5 border-[var(--theme-border)]"
     >
       <span
         aria-hidden
@@ -53,15 +52,13 @@ function AchievementRow({
       </span>
       <div className="min-w-0 flex-1">
         <div
-          className="truncate text-[11px] font-semibold"
-          style={{ color: 'var(--theme-text)' }}
+          className="truncate text-[11px] font-semibold text-[var(--theme-text)]"
         >
           {unlock.name}
         </div>
         {!compact ? (
           <div
-            className="truncate text-[10px]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="truncate text-[10px] text-[var(--theme-muted)]"
           >
             {unlock.description || unlock.category}
           </div>
@@ -77,8 +74,7 @@ function AchievementRow({
           </span>
         ) : null}
         <span
-          className="block text-[9px] font-mono"
-          style={{ color: 'var(--theme-muted)' }}
+          className="block text-[9px] font-mono text-[var(--theme-muted)]"
         >
           {relativeTime(unlock.unlockedAt)}
         </span>
@@ -148,11 +144,10 @@ export function AchievementsCard({
               icon={Award01Icon}
               size={14}
               strokeWidth={1.5}
-              style={{ color: 'var(--theme-muted)' }}
+              className="text-[var(--theme-muted)]"
             />
             <h3
-              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: 'var(--theme-text)' }}
+              className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
             >
               Achievements
             </h3>
@@ -160,8 +155,7 @@ export function AchievementsCard({
           <button
             type="button"
             onClick={openModal}
-            className="font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:text-[var(--theme-accent)]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:text-[var(--theme-accent)] text-[var(--theme-muted)]"
           >
             {achievements.totalUnlocked} unlocked · view all →
           </button>
@@ -169,8 +163,7 @@ export function AchievementsCard({
         <div className="flex flex-col gap-1.5">
           {achievements.recentUnlocks.length === 0 ? (
             <div
-              className="py-3 text-center text-[11px]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="py-3 text-center text-[11px] text-[var(--theme-muted)]"
             >
               No unlocks yet — keep working.
             </div>
@@ -193,17 +186,14 @@ export function AchievementsCard({
           onClick={() => setShowAll(false)}
         >
           <div
-            className="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-lg border bg-[var(--theme-card)]"
-            style={{ borderColor: 'var(--theme-border)' }}
+            className="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-lg border bg-[var(--theme-card)] border-[var(--theme-border)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div
-              className="flex items-center justify-between border-b px-4 py-3"
-              style={{ borderColor: 'var(--theme-border)' }}
+              className="flex items-center justify-between border-b px-4 py-3 border-[var(--theme-border)]"
             >
               <h2
-                className="text-sm font-semibold uppercase tracking-[0.15em]"
-                style={{ color: 'var(--theme-text)' }}
+                className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--theme-text)]"
               >
                 Achievement Ribbon
               </h2>
@@ -217,22 +207,20 @@ export function AchievementsCard({
                   icon={CancelIcon}
                   size={16}
                   strokeWidth={1.5}
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="text-[var(--theme-muted)]"
                 />
               </button>
             </div>
             <div className="max-h-[64vh] overflow-y-auto p-4">
               {loadingAll ? (
                 <div
-                  className="py-8 text-center text-[11px]"
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="py-8 text-center text-[11px] text-[var(--theme-muted)]"
                 >
                   Loading…
                 </div>
               ) : allError ? (
                 <div
-                  className="py-8 text-center text-[11px]"
-                  style={{ color: 'var(--theme-danger)' }}
+                  className="py-8 text-center text-[11px] text-[var(--theme-danger,#ef4444)]"
                 >
                   {allError}
                 </div>

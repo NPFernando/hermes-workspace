@@ -47,14 +47,12 @@ export function MobileTerminalInput() {
 
   return (
     <div
-      className="flex items-center gap-1 px-2 py-1.5 shrink-0"
-      style={{ background: '#1a1a1a', borderTop: '1px solid #333' }}
+      className="flex items-center gap-1 px-2 py-1.5 shrink-0 bg-[var(--theme-bg)] border-t border-[var(--theme-border)]"
     >
       <button
         type="button"
         onClick={() => void paste()}
-        className="flex items-center justify-center size-8 rounded-lg shrink-0 active:opacity-60"
-        style={{ background: '#2a2a2a', color: '#aaa' }}
+        className="flex items-center justify-center size-8 rounded-lg shrink-0 active:opacity-60 bg-[var(--theme-card)] text-[var(--theme-muted)]"
         aria-label="Paste"
       >
         <HugeiconsIcon icon={Copy01Icon} size={16} strokeWidth={1.6} />
@@ -89,8 +87,7 @@ export function MobileTerminalInput() {
       <button
         type="button"
         onClick={ctrlC}
-        className="flex items-center justify-center px-2 h-8 rounded-lg shrink-0 text-xs active:opacity-60"
-        style={{ background: '#3a1a1a', color: '#f87171' }}
+        className="flex items-center justify-center px-2 h-8 rounded-lg shrink-0 text-xs active:opacity-60 bg-red-950 text-red-400"
         aria-label="Ctrl+C"
       >
         ^C
@@ -98,8 +95,7 @@ export function MobileTerminalInput() {
       <button
         type="button"
         onClick={send}
-        className="flex items-center justify-center size-8 rounded-lg shrink-0 active:opacity-60"
-        style={{ background: '#ea580c', color: '#fff' }}
+        className="flex items-center justify-center size-8 rounded-lg shrink-0 active:opacity-60 bg-orange-600 text-white"
         aria-label="Send"
       >
         <HugeiconsIcon icon={ArrowUp02Icon} size={16} strokeWidth={1.8} />

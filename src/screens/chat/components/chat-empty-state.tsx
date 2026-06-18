@@ -72,33 +72,22 @@ export function ChatEmptyState({
           <img
             src="/claude-avatar.webp"
             alt="Hermes Agent"
-            className="relative size-20 rounded-md"
-            style={{
-              border: '1px solid var(--theme-border)',
-              padding: '4px',
-              background: 'var(--theme-card)',
-            }}
+            className="relative size-20 rounded-md border border-[var(--theme-border)] p-1 bg-[var(--theme-card)]"
           />
         </div>
 
         {/* Editorial micro-label */}
-        <p
-          className="micro-label mb-2"
-          style={{ color: 'var(--theme-muted)' }}
-        >
+        <p className="micro-label mb-2">
           Hermes Workspace
         </p>
 
         {/* Editorial display title */}
-        <h2
-          className="editorial-display text-3xl"
-          style={{ color: 'var(--theme-text)' }}
-        >
+        <h2 className="editorial-display text-3xl text-[var(--theme-text)]">
           Begin a session
         </h2>
 
         {activeProfile && (
-          <span className="mt-2 text-xs" style={{ color: 'var(--theme-accent)' }}>
+          <span className="mt-2 text-xs text-[var(--theme-accent)]">
             {activeProfile.name}
             {activeProfile.model ? ` · ${activeProfile.model}` : ''}
           </span>
@@ -106,7 +95,7 @@ export function ChatEmptyState({
 
         {!compact && (
           <>
-            <p className="mt-3 text-sm" style={{ color: 'var(--theme-muted)' }}>
+            <p className="mt-3 text-sm text-[var(--theme-muted)]">
               Agent chat · live tools · memory · full observability
             </p>
           </>
@@ -119,26 +108,13 @@ export function ChatEmptyState({
               key={suggestion.label}
               type="button"
               onClick={() => onSuggestionClick?.(suggestion.prompt)}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-3.5 py-2 text-xs font-medium transition-all"
-              style={{
-                background: 'var(--theme-card)',
-                border: '1px solid var(--theme-border)',
-                color: 'var(--theme-text)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--theme-card2)'
-                e.currentTarget.style.borderColor = 'var(--theme-accent-border)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'var(--theme-card)'
-                e.currentTarget.style.borderColor = 'var(--theme-border)'
-              }}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-3.5 py-2 text-xs font-medium transition-all bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)] hover:border-[var(--theme-accent-border)]"
             >
               <HugeiconsIcon
                 icon={suggestion.icon as any}
                 size={14}
                 strokeWidth={1.5}
-                style={{ color: 'var(--theme-accent)' }}
+                className="text-[var(--theme-accent)]"
               />
               {suggestion.label}
             </button>

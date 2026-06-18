@@ -57,7 +57,7 @@ function LoadingState({ text }: { text: string }) {
           borderTopColor: 'transparent',
         }}
       />
-      <span className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+      <span className="text-xs text-[var(--theme-muted)]">
         {text}
       </span>
     </div>
@@ -74,22 +74,17 @@ function ArtifactsTab() {
 
   return (
     <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
-      <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+      <p className="text-xs text-[var(--theme-muted)]">
         {artifacts.length} artifacts emitted by the agent
       </p>
       {artifacts.map((artifact, index) => (
         <div
           key={`${artifact.time}-${index}`}
-          className="rounded-lg px-3 py-2 text-xs leading-relaxed"
-          style={{
-            backgroundColor: 'var(--theme-card)',
-            border: '1px solid var(--theme-border)',
-            color: 'var(--theme-text)',
-          }}
+          className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)]"
         >
           <div className="flex items-center justify-between gap-2">
             <span className="font-medium">{artifact.text}</span>
-            <span style={{ color: 'var(--theme-accent)' }}>{artifact.time}</span>
+            <span className="text-[var(--theme-accent)]">{artifact.time}</span>
           </div>
         </div>
       ))}
@@ -100,7 +95,7 @@ function ArtifactsTab() {
 function ErrorState({ text }: { text: string }) {
   return (
     <div className="p-4">
-      <span className="text-xs" style={{ color: 'var(--theme-danger)' }}>
+      <span className="text-xs text-[var(--theme-danger,#ef4444)]">
         {text}
       </span>
     </div>
@@ -110,7 +105,7 @@ function ErrorState({ text }: { text: string }) {
 function EmptyState({ text }: { text: string }) {
   return (
     <div className="p-4">
-      <span className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+      <span className="text-xs text-[var(--theme-muted)]">
         {text}
       </span>
     </div>
@@ -139,18 +134,16 @@ function ActivityTab() {
       {events.map((event: ActivityEvent, i: number) => (
         <div
           key={i}
-          className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs"
-          style={{ background: 'var(--theme-card2)' }}
+          className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs bg-[var(--theme-card2)]"
         >
           <span
-            style={{ color: 'var(--theme-accent)', fontFamily: 'monospace' }}
+            className="text-[var(--theme-accent)] font-mono"
           >
             {event.time}
           </span>
-          <span style={{ color: 'var(--theme-muted)' }}>{event.type}</span>
+          <span className="text-[var(--theme-muted)]">{event.type}</span>
           <span
-            className="ml-auto truncate"
-            style={{ color: 'var(--theme-text)' }}
+            className="ml-auto truncate text-[var(--theme-text)]"
           >
             {event.text}
           </span>
@@ -188,17 +181,13 @@ function FilesTab() {
 
   return (
     <div className="space-y-1 p-3">
-      <p className="mb-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
+      <p className="mb-2 text-xs text-[var(--theme-muted)]">
         Files touched in session ({files.length})
       </p>
       {files.map((file: string, i: number) => (
         <div
           key={i}
-          className="rounded px-2 py-1 text-xs font-mono truncate"
-          style={{
-            color: 'var(--theme-text)',
-            background: 'var(--theme-card2)',
-          }}
+          className="rounded px-2 py-1 text-xs font-mono truncate text-[var(--theme-text)] bg-[var(--theme-card2)]"
         >
           {file}
         </div>
@@ -254,21 +243,16 @@ function MemoryTab() {
 
   return (
     <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
-      <p className="mb-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
+      <p className="mb-1 text-xs text-[var(--theme-muted)]">
         {files.length} memory files available
       </p>
       {files.map((file, index) => (
         <div
           key={`${file.path}-${index}`}
-          className="rounded-lg px-3 py-2 text-xs leading-relaxed"
-          style={{
-            backgroundColor: 'var(--theme-card)',
-            border: '1px solid var(--theme-border)',
-            color: 'var(--theme-text)',
-          }}
+          className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)]"
         >
           <div className="font-medium">{file.name}</div>
-          <div style={{ color: 'var(--theme-muted)' }}>{file.path}</div>
+          <div className="text-[var(--theme-muted)]">{file.path}</div>
         </div>
       ))}
     </div>
@@ -331,14 +315,13 @@ function SkillsTab() {
 
   return (
     <div className="space-y-3 p-3 overflow-auto max-h-[calc(100vh-140px)]">
-      <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+      <p className="text-xs text-[var(--theme-muted)]">
         {skills.length} skills loaded
       </p>
       {Object.entries(grouped).map(([category, items = []]) => (
         <div key={category}>
           <p
-            className="text-[10px] uppercase tracking-wider mb-1 font-semibold"
-            style={{ color: 'var(--theme-accent)' }}
+            className="text-[10px] uppercase tracking-wider mb-1 font-semibold text-[var(--theme-accent)]"
           >
             {category}
           </p>
@@ -359,13 +342,12 @@ function SkillsTab() {
               }}
             >
               <div className="flex items-center gap-2">
-                <span style={{ color: 'var(--theme-accent)' }}>⚡</span>
+                <span className="text-[var(--theme-accent)]">⚡</span>
                 <span>{skill.name}</span>
               </div>
               {expanded === skill.name && skill.description && (
                 <p
-                  className="mt-1 pl-5 text-[11px]"
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="mt-1 pl-5 text-[11px] text-[var(--theme-muted)]"
                 >
                   {skill.description}
                 </p>
@@ -435,22 +417,17 @@ function McpTab() {
 
   return (
     <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
-      <p className="mb-1 text-xs" style={{ color: 'var(--theme-muted)' }}>
+      <p className="mb-1 text-xs text-[var(--theme-muted)]">
         {servers.length} MCP server{servers.length === 1 ? '' : 's'}
       </p>
       {servers.map((server) => (
         <div
           key={server.id}
-          className="rounded-lg px-3 py-2 text-xs leading-relaxed"
-          style={{
-            backgroundColor: 'var(--theme-card)',
-            border: '1px solid var(--theme-border)',
-            color: 'var(--theme-text)',
-          }}
+          className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)]"
         >
           <div className="flex items-center justify-between gap-2">
             <span className="font-medium">{server.name}</span>
-            <span style={{ color: 'var(--theme-accent)' }}>
+            <span className="text-[var(--theme-accent)]">
               {server.enabled ? 'on' : 'off'}
               {typeof server.discoveredToolsCount === 'number'
                 ? ` · ${server.discoveredToolsCount} tools`
@@ -458,7 +435,7 @@ function McpTab() {
             </span>
           </div>
           {server.status ? (
-            <div style={{ color: 'var(--theme-muted)' }}>{server.status}</div>
+            <div className="text-[var(--theme-muted)]">{server.status}</div>
           ) : null}
         </div>
       ))}
@@ -479,7 +456,7 @@ function LogsTab() {
   if (events.length === 0) {
     return (
       <div className="p-3">
-        <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+        <p className="text-xs text-[var(--theme-muted)]">
           Raw event stream — waiting for activity…
         </p>
       </div>
@@ -488,7 +465,7 @@ function LogsTab() {
 
   return (
     <div className="p-3">
-      <p className="mb-2 text-xs" style={{ color: 'var(--theme-muted)' }}>
+      <p className="mb-2 text-xs text-[var(--theme-muted)]">
         Raw events ({events.length})
       </p>
       <pre
@@ -546,20 +523,17 @@ export function InspectorPanel({ embedded = false }: { embedded?: boolean } = {}
         <>
           {/* Header */}
           <div
-            className="flex items-center justify-between px-4 py-3 shrink-0"
-            style={{ borderBottom: '1px solid var(--theme-border)' }}
+            className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-[var(--theme-border)]"
           >
             <span
-              className="text-sm font-semibold"
-              style={{ color: 'var(--theme-text)' }}
+              className="text-sm font-semibold text-[var(--theme-text)]"
             >
               Inspector
             </span>
             <button
               type="button"
               onClick={() => useInspectorStore.getState().setOpen(false)}
-              className="rounded p-1 text-xs hover:opacity-70 transition-opacity"
-              style={{ color: 'var(--theme-muted)' }}
+              className="rounded p-1 text-xs hover:opacity-70 transition-opacity text-[var(--theme-muted)]"
               aria-label="Close inspector"
             >
               ✕
@@ -568,8 +542,7 @@ export function InspectorPanel({ embedded = false }: { embedded?: boolean } = {}
 
           {/* Tab bar */}
           <div
-            className="flex shrink-0 overflow-x-auto"
-            style={{ borderBottom: '1px solid var(--theme-border)' }}
+            className="flex shrink-0 overflow-x-auto border-b border-[var(--theme-border)]"
           >
             {TABS.map((tab) =>
               (() => {

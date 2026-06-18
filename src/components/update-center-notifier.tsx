@@ -463,8 +463,7 @@ function UpdateCard({
     >
       {updating ? (
         <div
-          className="h-0.5 animate-pulse"
-          style={{ background: 'var(--theme-accent)' }}
+          className="h-0.5 animate-pulse bg-[var(--theme-accent)]"
         />
       ) : null}
       <div className="flex items-center gap-3 px-5 py-3.5">
@@ -492,19 +491,12 @@ function UpdateCard({
             }
             size={18}
             strokeWidth={2}
-            className={updating ? 'animate-spin' : undefined}
-            style={{
-              color:
-                blocked || phase === 'error'
-                  ? '#f59e0b'
-                  : 'var(--theme-accent)',
-            }}
+            className={cn(updating ? 'animate-spin' : '', blocked || phase === 'error' ? 'text-amber-500' : 'text-[var(--theme-accent)]')}
           />
         </div>
         <div className="min-w-0 flex-1">
           <p
-            className="text-sm font-semibold"
-            style={{ color: 'var(--theme-text)' }}
+            className="text-sm font-semibold text-[var(--theme-text)]"
           >
             {blocked
               ? `${product.label} update blocked`
@@ -513,15 +505,13 @@ function UpdateCard({
           {/* Don't truncate when blocked — the full reason is what the
               user needs to act on. See #293. */}
           <p
-            className={cn('text-xs', blocked ? '' : 'truncate')}
-            style={{ color: 'var(--theme-muted)' }}
+            className={cn('text-xs text-[var(--theme-muted)]', blocked ? '' : 'truncate')}
           >
             {subtitle}
           </p>
           {blocked && product.repoPath ? (
             <p
-              className="mt-0.5 truncate font-mono text-[11px]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="mt-0.5 truncate font-mono text-[11px] text-[var(--theme-muted)]"
               title={product.repoPath}
             >
               {product.repoPath}
@@ -532,8 +522,7 @@ function UpdateCard({
               {product.blockingFiles.slice(0, 8).map((file) => (
                 <li
                   key={file}
-                  className="truncate font-mono text-[11px]"
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="truncate font-mono text-[11px] text-[var(--theme-muted)]"
                   title={file}
                 >
                   {file}
@@ -541,8 +530,7 @@ function UpdateCard({
               ))}
               {product.blockingFiles.length > 8 ? (
                 <li
-                  className="text-[11px] italic"
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="text-[11px] italic text-[var(--theme-muted)]"
                 >
                   …and {product.blockingFiles.length - 8} more
                 </li>
@@ -556,27 +544,19 @@ function UpdateCard({
               type="button"
               onClick={onUpdate}
               disabled={updating}
-              className="rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-              style={{ background: 'var(--theme-accent)' }}
+              className="rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60 bg-[var(--theme-accent)]"
             >
               {updating ? 'Updating' : 'Update'}
             </button>
           ) : (
-            <span
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold"
-              style={{
-                background: 'var(--theme-card2)',
-                color: 'var(--theme-muted)',
-              }}
-            >
+            <span className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-[var(--theme-card2)] text-[var(--theme-muted)]">
               Review required
             </span>
           )}
           <button
             type="button"
             onClick={onDismiss}
-            className="rounded-lg p-1.5 transition-opacity hover:opacity-80"
-            style={{ color: 'var(--theme-muted)' }}
+            className="rounded-lg p-1.5 transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
             aria-label={`Dismiss ${product.label} update`}
           >
             <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
@@ -628,20 +608,19 @@ function ReleaseNotes({
                 icon={Tick01Icon}
                 size={20}
                 strokeWidth={2}
-                style={{ color: 'var(--theme-accent)' }}
+                className="text-[var(--theme-accent)]"
               />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold">Hermes updated</p>
-              <p className="text-sm" style={{ color: 'var(--theme-muted)' }}>
+              <p className="text-sm text-[var(--theme-muted)]">
                 What changed in this update.
               </p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-1.5 transition-opacity hover:opacity-80"
-              style={{ color: 'var(--theme-muted)' }}
+              className="rounded-lg p-1.5 transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={2} />
             </button>
@@ -651,13 +630,7 @@ function ReleaseNotes({
               <section key={`${section.product}:${section.to}`}>
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <h3 className="text-sm font-semibold">{section.label}</h3>
-                  <span
-                    className="shrink-0 rounded-full px-2 py-0.5 text-[11px]"
-                    style={{
-                      background: 'var(--theme-card2)',
-                      color: 'var(--theme-muted)',
-                    }}
-                  >
+                  <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] bg-[var(--theme-card2)] text-[var(--theme-muted)]">
                     {shortSha(section.from)} → {shortSha(section.to)}
                   </span>
                 </div>
@@ -668,8 +641,7 @@ function ReleaseNotes({
                   ).map((commit, index) => (
                     <li
                       key={`${section.product}-${index}-${commit}`}
-                      className="rounded-xl px-3 py-2 text-sm"
-                      style={{ background: 'var(--theme-card2)' }}
+                      className="rounded-xl px-3 py-2 text-sm bg-[var(--theme-card2)]"
                     >
                       {commit}
                     </li>
@@ -679,14 +651,12 @@ function ReleaseNotes({
             ))}
           </div>
           <div
-            className="flex justify-end border-t px-5 py-3"
-            style={{ borderColor: 'var(--theme-border)' }}
+            className="flex justify-end border-t px-5 py-3 border-[var(--theme-border)]"
           >
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-white"
-              style={{ background: 'var(--theme-accent)' }}
+              className="rounded-lg px-4 py-2 text-sm font-semibold text-white bg-[var(--theme-accent)]"
             >
               Continue
             </button>
@@ -738,8 +708,7 @@ function NaveenUpdateCard({
     >
       {applying && (
         <div
-          className="h-0.5 animate-pulse"
-          style={{ background: 'linear-gradient(90deg, #a855f7, #3b82f6, #a855f7)' }}
+          className="h-0.5 animate-pulse bg-gradient-to-r from-purple-500 via-blue-500 to-purple-500"
         />
       )}
       <div className="flex items-center gap-3 px-5 py-3.5">
@@ -755,15 +724,14 @@ function NaveenUpdateCard({
             icon={applying ? Loading03Icon : hasConflicts ? AlertDiamondIcon : CodeSimpleIcon}
             size={18}
             strokeWidth={2}
-            className={applying ? 'animate-spin' : undefined}
-            style={{ color: hasConflicts ? '#f59e0b' : '#a855f7' }}
+            className={cn(applying ? 'animate-spin' : '', hasConflicts ? 'text-amber-500' : 'text-purple-500')}
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold" style={{ color: 'var(--theme-text)' }}>
+          <p className="text-sm font-semibold text-[var(--theme-text)]">
             {applying ? 'Applying smart update…' : 'Upstream update available'}
           </p>
-          <p className="truncate text-xs" style={{ color: 'var(--theme-muted)' }}>
+          <p className="truncate text-xs text-[var(--theme-muted)]">
             {subtitle}
           </p>
         </div>
@@ -772,16 +740,14 @@ function NaveenUpdateCard({
             type="button"
             onClick={onOpen}
             disabled={applying}
-            className="rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-            style={{ background: hasConflicts ? '#f59e0b' : '#a855f7' }}
+            className={cn('rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60', hasConflicts ? 'bg-amber-500' : 'bg-purple-500')}
           >
             {applying ? 'Updating' : hasConflicts ? 'Review' : 'Update'}
           </button>
           <button
             type="button"
             onClick={onDismiss}
-            className="rounded-lg p-1.5 transition-opacity hover:opacity-80"
-            style={{ color: 'var(--theme-muted)' }}
+            className="rounded-lg p-1.5 transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
             aria-label="Dismiss upstream update"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
@@ -839,19 +805,18 @@ function NaveenUpdateModal({
         {/* Header */}
         <div className="flex items-start gap-3 px-5 py-4">
           <div
-            className="flex size-10 shrink-0 items-center justify-center rounded-xl"
-            style={{ background: 'color-mix(in srgb, #a855f7 14%, transparent)' }}
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/14"
           >
             <HugeiconsIcon
               icon={hasConflicts ? AlertDiamondIcon : CodeSimpleIcon}
               size={20}
               strokeWidth={2}
-              style={{ color: '#a855f7' }}
+              className="text-purple-500"
             />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-base font-semibold">Smart upstream update</p>
-            <p className="text-sm" style={{ color: 'var(--theme-muted)' }}>
+            <p className="text-sm text-[var(--theme-muted)]">
               {status.upstreamBehind} new upstream commit{status.upstreamBehind > 1 ? 's' : ''} ·{' '}
               {hasConflicts
                 ? `${status.potentialConflicts.length} custom file${status.potentialConflicts.length > 1 ? 's' : ''} need your decision`
@@ -861,8 +826,7 @@ function NaveenUpdateModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 transition-opacity hover:opacity-80"
-            style={{ color: 'var(--theme-muted)' }}
+            className="rounded-lg p-1.5 transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={2} />
           </button>
@@ -872,15 +836,14 @@ function NaveenUpdateModal({
         <div className="max-h-[60vh] space-y-4 overflow-auto px-5 pb-2">
           {/* Upstream commits */}
           <section>
-            <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--theme-text)' }}>
+            <h3 className="mb-2 text-sm font-semibold text-[var(--theme-text)]">
               New upstream commits
             </h3>
             <ul className="space-y-1">
               {status.upstreamNewCommits.map((commit, i) => (
                 <li
                   key={i}
-                  className="rounded-xl px-3 py-1.5 font-mono text-xs"
-                  style={{ background: 'var(--theme-card2)', color: 'var(--theme-muted)' }}
+                  className="rounded-xl px-3 py-1.5 font-mono text-xs bg-[var(--theme-card2)] text-[var(--theme-muted)]"
                 >
                   {commit}
                 </li>
@@ -891,7 +854,7 @@ function NaveenUpdateModal({
           {/* Custom files upstream touched but we didn't change */}
           {status.customFilesUpstreamTouched.length > status.potentialConflicts.length ? (
             <section>
-              <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--theme-text)' }}>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--theme-text)]">
                 Custom files upstream updated (no conflict)
               </h3>
               <ul className="space-y-1">
@@ -900,8 +863,7 @@ function NaveenUpdateModal({
                   .map((file) => (
                     <li
                       key={file}
-                      className="rounded-xl px-3 py-1.5 font-mono text-xs"
-                      style={{ background: 'var(--theme-card2)', color: 'var(--theme-muted)' }}
+                      className="rounded-xl px-3 py-1.5 font-mono text-xs bg-[var(--theme-card2)] text-[var(--theme-muted)]"
                     >
                       {file}
                     </li>
@@ -913,23 +875,22 @@ function NaveenUpdateModal({
           {/* AI summary */}
           {hasConflicts && (
             <section
-              className="rounded-xl px-4 py-3"
-              style={{ background: 'color-mix(in srgb, #a855f7 8%, var(--theme-card2))' }}
+              className="rounded-xl px-4 py-3 bg-purple-500/8"
             >
-              <p className="mb-1 text-xs font-semibold" style={{ color: '#a855f7' }}>
+              <p className="mb-1 text-xs font-semibold text-purple-500">
                 AI Analysis
               </p>
               {aiLoading ? (
-                <div className="flex items-center gap-2" style={{ color: 'var(--theme-muted)' }}>
+                <div className="flex items-center gap-2 text-[var(--theme-muted)]">
                   <HugeiconsIcon icon={Loading03Icon} size={14} strokeWidth={2} className="animate-spin" />
                   <span className="text-xs">Asking Astra to analyze conflicts…</span>
                 </div>
               ) : aiAnalysis?.summary ? (
-                <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+                <p className="text-xs text-[var(--theme-muted)]">
                   {aiAnalysis.summary}
                 </p>
               ) : (
-                <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+                <p className="text-xs text-[var(--theme-muted)]">
                   Analysis will appear here once loaded.
                 </p>
               )}
@@ -943,36 +904,28 @@ function NaveenUpdateModal({
             return (
               <section
                 key={conflict.file}
-                className="rounded-xl border p-4 space-y-3"
-                style={{ borderColor: 'var(--theme-border)', background: 'var(--theme-card2)' }}
+                className="rounded-xl border border-[var(--theme-border)] p-4 space-y-3 bg-[var(--theme-card2)]"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-mono text-xs font-semibold" style={{ color: 'var(--theme-text)' }}>
+                  <p className="font-mono text-xs font-semibold text-[var(--theme-text)]">
                     {conflict.file}
                   </p>
                   {aiRec && (
                     <span
-                      className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
-                      style={{
-                        background:
-                          aiRec.action === 'keep_ours'
-                            ? 'rgb(34 197 94 / 0.15)'
-                            : aiRec.action === 'take_theirs'
-                              ? 'rgb(59 130 246 / 0.15)'
-                              : 'rgb(245 158 11 / 0.15)',
-                        color:
-                          aiRec.action === 'keep_ours'
-                            ? '#22c55e'
-                            : aiRec.action === 'take_theirs'
-                              ? '#3b82f6'
-                              : '#f59e0b',
-                      }}
+                      className={cn(
+                        'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                        aiRec.action === 'keep_ours'
+                          ? 'bg-green-500/15 text-green-500'
+                          : aiRec.action === 'take_theirs'
+                            ? 'bg-blue-500/15 text-blue-500'
+                            : 'bg-amber-500/15 text-amber-500',
+                      )}
                     >
                       AI: {aiRec.action.replace(/_/g, ' ')} ({aiRec.confidence}%)
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-[11px]" style={{ color: 'var(--theme-muted)' }}>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--theme-muted)]">
                   <div>
                     <span className="font-semibold">Upstream: </span>
                     {conflict.upstreamDiffStat}
@@ -983,7 +936,7 @@ function NaveenUpdateModal({
                   </div>
                 </div>
                 {aiRec?.reason && (
-                  <p className="text-[11px] italic" style={{ color: 'var(--theme-muted)' }}>
+                  <p className="text-[11px] italic text-[var(--theme-muted)]">
                     {aiRec.reason}
                   </p>
                 )}
@@ -993,16 +946,11 @@ function NaveenUpdateModal({
                     type="button"
                     onClick={() => onStrategyChange(conflict.file, 'keep_ours')}
                     className={cn(
-                      'flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+                      'flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all border border-[var(--theme-border)]',
                       currentStrategy === 'keep_ours'
-                        ? 'text-white'
-                        : 'opacity-50 hover:opacity-80',
+                        ? 'text-white bg-green-500'
+                        : 'opacity-50 hover:opacity-80 bg-[var(--theme-card)]',
                     )}
-                    style={{
-                      background:
-                        currentStrategy === 'keep_ours' ? '#22c55e' : 'var(--theme-card)',
-                      border: '1px solid var(--theme-border)',
-                    }}
                   >
                     Keep mine
                   </button>
@@ -1010,16 +958,11 @@ function NaveenUpdateModal({
                     type="button"
                     onClick={() => onStrategyChange(conflict.file, 'take_theirs')}
                     className={cn(
-                      'flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+                      'flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all border border-[var(--theme-border)]',
                       currentStrategy === 'take_theirs'
-                        ? 'text-white'
-                        : 'opacity-50 hover:opacity-80',
+                        ? 'text-white bg-blue-500'
+                        : 'opacity-50 hover:opacity-80 bg-[var(--theme-card)]',
                     )}
-                    style={{
-                      background:
-                        currentStrategy === 'take_theirs' ? '#3b82f6' : 'var(--theme-card)',
-                      border: '1px solid var(--theme-border)',
-                    }}
                   >
                     Take upstream
                   </button>
@@ -1031,17 +974,16 @@ function NaveenUpdateModal({
 
         {/* Error */}
         {phase === 'error' && error && (
-          <div className="mx-5 mb-2 rounded-xl px-4 py-2 text-xs" style={{ background: 'rgb(239 68 68 / 0.12)', color: '#ef4444' }}>
+          <div className="mx-5 mb-2 rounded-xl px-4 py-2 text-xs bg-red-500/12 text-red-500">
             {error}
           </div>
         )}
 
         {/* Footer */}
         <div
-          className="flex items-center justify-between border-t px-5 py-3"
-          style={{ borderColor: 'var(--theme-border)' }}
+          className="flex items-center justify-between border-t px-5 py-3 border-[var(--theme-border)]"
         >
-          <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
+          <p className="text-xs text-[var(--theme-muted)]">
             {hasConflicts
               ? 'Rebase with chosen strategies · build · push to fork'
               : 'Auto-rebase · build · push to fork'}
@@ -1050,8 +992,7 @@ function NaveenUpdateModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm font-semibold"
-              style={{ background: 'var(--theme-card2)', color: 'var(--theme-text)' }}
+              className="rounded-lg px-4 py-2 text-sm font-semibold bg-[var(--theme-card2)] text-[var(--theme-text)]"
             >
               Cancel
             </button>
@@ -1059,8 +1000,7 @@ function NaveenUpdateModal({
               type="button"
               onClick={onApply}
               disabled={applying}
-              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-              style={{ background: '#a855f7' }}
+              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60 bg-purple-500"
             >
               {applying && (
                 <HugeiconsIcon icon={Loading03Icon} size={14} strokeWidth={2} className="animate-spin" />

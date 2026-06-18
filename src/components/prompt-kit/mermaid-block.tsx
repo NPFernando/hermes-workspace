@@ -72,8 +72,7 @@ export function MermaidBlock({ code }: { code: string }) {
   return (
     <div className="my-2 rounded-lg border border-primary-200 overflow-hidden">
       <div
-        className="flex items-center justify-between px-3 py-1.5"
-        style={{ background: 'var(--theme-card2, #f8f8f8)' }}
+        className="flex items-center justify-between px-3 py-1.5 bg-[var(--theme-card2)]"
       >
         <span className="rounded border border-primary-200 bg-primary-100/80 px-2 py-0.5 text-xs font-medium text-primary-700">
           Diagram

@@ -189,7 +189,7 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenuComponent(
                   }}
                   className={cn(
                     'flex items-center gap-2 px-3 py-2 text-sm transition-colors',
-                    index === activeIndex && 'bg-neutral-100 dark:bg-neutral-800',
+                    index === activeIndex && 'bg-[var(--theme-card2)]',
                   )}
                 >
                   <span className="font-mono text-[var(--color-accent,#6366f1)]">

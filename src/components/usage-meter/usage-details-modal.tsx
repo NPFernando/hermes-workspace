@@ -221,7 +221,7 @@ function statusBadge(status: ProviderUsage['status']) {
       )
     case 'missing_credentials':
       return (
-        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600">
+        <span className="rounded-full bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-muted)]">
           Not Configured
         </span>
       )

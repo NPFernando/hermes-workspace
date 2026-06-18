@@ -161,7 +161,7 @@ export function Swarm2ActivityFeed({
                   : 'border-[var(--theme-border)] bg-[var(--theme-bg)] hover:bg-[var(--theme-card2)]',
               )}
             >
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-0.5 micro-label">
                 {row.workerName}
               </span>
               <span className="min-w-0 flex-1 truncate text-xs text-[var(--theme-text)]">
