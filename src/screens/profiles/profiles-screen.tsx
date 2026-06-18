@@ -45,7 +45,7 @@ const SISTER_BADGE_STYLES: Record<string, { bg: string; text: string; border: st
   novus:    { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-400/30' },
   nova:     { bg: 'bg-sky-500/15',     text: 'text-sky-400',     border: 'border-sky-400/30' },
   business: { bg: 'bg-amber-500/15',   text: 'text-amber-400',   border: 'border-amber-400/30' },
-  default:  { bg: 'bg-primary-500/10', text: 'text-primary-400', border: 'border-primary-300/20' },
+  default:  { bg: 'bg-[var(--theme-panel)]0/10', text: 'text-[var(--theme-muted)]', border: 'border-[var(--theme-border)]/20' },
 }
 
 function sisterBadgeStyle(s: SisterEntry) {
@@ -119,8 +119,8 @@ function formatDate(value?: string): string {
 
 function StatChip({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-lg border border-primary-200 bg-primary-100/60 px-2.5 py-1 text-xs text-primary-700">
-      <span className="font-semibold text-primary-900">{value}</span> {label}
+    <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
+      <span className="font-semibold text-[var(--theme-text)]">{value}</span> {label}
     </div>
   )
 }
@@ -138,13 +138,13 @@ function ProfileStat({
     <div className="flex flex-col items-center py-2.5 px-1">
       <div
         className={cn(
-          'text-sm font-bold text-primary-900 dark:text-neutral-100',
+          'text-sm font-bold text-[var(--theme-text)]',
           truncate && 'max-w-[72px] truncate text-xs',
         )}
       >
         {value}
       </div>
-      <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-primary-400 dark:text-neutral-500">
+      <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--theme-muted)]">
         {label}
       </div>
     </div>
@@ -433,14 +433,14 @@ export function ProfilesScreen() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 md:px-6">
-      <div className="flex flex-col gap-3 rounded-2xl border border-primary-200 bg-primary-50/80 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+    <div data-route-page className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 md:px-6">
+      <div className="flex flex-col gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <HugeiconsIcon icon={UserGroupIcon} size={22} strokeWidth={1.7} />
-            <h1 className="text-lg font-semibold text-primary-900">Profiles</h1>
+            <h1 className="text-lg font-semibold text-[var(--theme-text)]">Profiles</h1>
           </div>
-          <p className="mt-1 text-sm text-primary-600">
+          <p className="mt-1 text-sm text-[var(--theme-muted)]">
             Browse and manage Hermes profiles stored under{' '}
             <span className="font-mono">~/.hermes/profiles</span>.
           </p>
@@ -457,7 +457,7 @@ export function ProfilesScreen() {
           return (
             <article
               key={profile.name}
-              className="group relative overflow-hidden rounded-2xl border border-primary-200 bg-primary-50/80 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
+              className="group relative overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-sm"
             >
               {/* Active glow accent */}
               {profile.active && (
@@ -472,7 +472,7 @@ export function ProfilesScreen() {
                       'rounded-full p-1',
                       profile.active
                         ? 'bg-gradient-to-br from-emerald-400 via-accent-500 to-emerald-500 shadow-lg shadow-emerald-500/20'
-                        : 'bg-gradient-to-br from-primary-200 to-primary-300 dark:from-neutral-700 dark:to-neutral-600',
+                        : 'bg-gradient-to-br from-primary-200 to-primary-300',
                     )}
                   >
                     <img
@@ -481,8 +481,8 @@ export function ProfilesScreen() {
                       className={cn(
                         'size-20 rounded-full border-2 object-cover',
                         profile.active
-                          ? 'border-white dark:border-neutral-950'
-                          : 'border-primary-50 dark:border-neutral-950',
+                          ? 'border-white'
+                          : 'border-primary-50',
                       )}
                       style={{
                         filter: profile.active
@@ -492,7 +492,7 @@ export function ProfilesScreen() {
                     />
                   </div>
                   {profile.active && (
-                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full border-2 border-white bg-emerald-500 px-2 py-0.5 dark:border-neutral-950">
+                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full border-2 border-white bg-emerald-500 px-2 py-0.5">
                       <HugeiconsIcon
                         icon={CheckmarkCircle02Icon}
                         size={10}
@@ -507,22 +507,22 @@ export function ProfilesScreen() {
                 </div>
 
                 {/* Name + provider */}
-                <h2 className="mt-3 text-center text-lg font-bold text-primary-900 dark:text-neutral-100">
+                <h2 className="mt-3 text-center text-lg font-bold text-[var(--theme-text)]">
                   {profile.name}
                 </h2>
-                <span className="mt-1 inline-block rounded-full bg-primary-100 px-2.5 py-0.5 text-[11px] font-medium text-primary-600 dark:bg-neutral-800 dark:text-neutral-400">
+                <span className="mt-1 inline-block rounded-full bg-[var(--theme-hover)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--theme-muted)]">
                   {profile.provider || 'no provider'}
                 </span>
                 {sisterMap[profile.name] ? (
                   <SisterBadge sister={sisterMap[profile.name]} />
                 ) : null}
-                <p className="mt-3 line-clamp-2 min-h-[2.5rem] px-6 text-center text-xs text-primary-500 dark:text-neutral-400">
+                <p className="mt-3 line-clamp-2 min-h-[2.5rem] px-6 text-center text-xs text-[var(--theme-muted)]">
                   {profile.description?.trim() || 'No description yet'}
                 </p>
               </div>
 
               {/* Stats ring */}
-              <div className="mx-4 mt-4 grid grid-cols-4 divide-x divide-primary-200 rounded-xl border border-primary-200 bg-primary-100/50 dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900/50">
+              <div className="mx-4 mt-4 grid grid-cols-4 divide-x divide-primary-200 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]">
                 <ProfileStat label="Skills" value={profile.skillCount} />
                 <ProfileStat label="Sessions" value={profile.sessionCount} />
                 <ProfileStat
@@ -537,22 +537,22 @@ export function ProfilesScreen() {
               </div>
 
               {/* Updated timestamp */}
-              <div className="mx-4 mt-3 flex items-center justify-center gap-1.5 text-xs text-primary-400 dark:text-neutral-500">
+              <div className="mx-4 mt-3 flex items-center justify-center gap-1.5 text-xs text-[var(--theme-muted)]">
                 <HugeiconsIcon icon={Clock01Icon} size={12} strokeWidth={1.7} />
                 {formatDate(profile.updatedAt)}
               </div>
 
               {/* Actions */}
-              <div className="mt-4 flex border-t border-primary-200 dark:border-neutral-800">
+              <div className="mt-4 flex border-t border-[var(--theme-border)]">
                 <button
                   type="button"
                   onClick={() => void handleActivate(profile.name)}
                   disabled={profile.active || busy}
                   className={cn(
-                    'flex flex-1 items-center justify-center gap-1.5 border-r border-primary-200 py-2.5 text-xs font-semibold transition-colors dark:border-neutral-800',
+                    'flex flex-1 items-center justify-center gap-1.5 border-r border-[var(--theme-border)] py-2.5 text-xs font-semibold transition-colors',
                     profile.active
-                      ? 'cursor-default text-primary-300 dark:text-neutral-600'
-                      : 'text-primary-700 hover:bg-primary-100 dark:text-neutral-300 dark:hover:bg-neutral-900',
+                      ? 'cursor-default text-[var(--theme-muted)]'
+                      : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
                   )}
                 >
                   <HugeiconsIcon
@@ -565,7 +565,7 @@ export function ProfilesScreen() {
                 <button
                   type="button"
                   onClick={() => setDetailsName(profile.name)}
-                  className="flex flex-1 items-center justify-center gap-1.5 border-r border-primary-200 py-2.5 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-900"
+                  className="flex flex-1 items-center justify-center gap-1.5 border-r border-[var(--theme-border)] py-2.5 text-xs font-semibold text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]"
                 >
                   <HugeiconsIcon
                     icon={Folder01Icon}
@@ -580,7 +580,7 @@ export function ProfilesScreen() {
                     setRenameTarget(profile)
                     setRenameValue(profile.name)
                   }}
-                  className="flex flex-1 items-center justify-center gap-1.5 border-r border-primary-200 py-2.5 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-900"
+                  className="flex flex-1 items-center justify-center gap-1.5 border-r border-[var(--theme-border)] py-2.5 text-xs font-semibold text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]"
                 >
                   <HugeiconsIcon
                     icon={Edit02Icon}
@@ -596,7 +596,7 @@ export function ProfilesScreen() {
                   className={cn(
                     'flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs font-semibold transition-colors',
                     profile.active
-                      ? 'cursor-default text-primary-300 dark:text-neutral-600'
+                      ? 'cursor-default text-[var(--theme-muted)]'
                       : 'text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20',
                   )}
                 >
@@ -614,7 +614,7 @@ export function ProfilesScreen() {
       </div>
 
       {sorted.length === 0 && !profilesQuery.isLoading ? (
-        <div className="rounded-2xl border border-dashed border-primary-200 bg-primary-50/70 p-8 text-center text-sm text-primary-600">
+        <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-panel)] p-8 text-center text-sm text-[var(--theme-muted)]">
           No named profiles found yet. The active profile is{' '}
           <span className="font-semibold">{activeProfile}</span>.
         </div>
@@ -629,16 +629,16 @@ export function ProfilesScreen() {
       >
         <DialogContent className="w-[min(560px,94vw)] max-w-none p-0">
           {/* ── Header ─────────────────────────────────── */}
-          <div className="border-b border-primary-200 px-6 pb-4 pt-5 dark:border-neutral-800">
+          <div className="border-b border-[var(--theme-border)] px-6 pb-4 pt-5">
             <div className="flex items-center gap-3">
-              <div className="inline-flex size-10 items-center justify-center rounded-xl border border-primary-200 bg-primary-100/70 dark:border-neutral-700 dark:bg-neutral-900">
+              <div className="inline-flex size-10 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]">
                 <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.7} />
               </div>
               <div>
                 <DialogTitle className="text-base font-semibold">
                   Create profile
                 </DialogTitle>
-                <p className="mt-0.5 text-xs text-primary-500 dark:text-neutral-400">
+                <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
                   {wizardStep === 1
                     ? 'Name & template'
                     : wizardStep === 2
@@ -661,7 +661,7 @@ export function ProfilesScreen() {
                         ? 'bg-emerald-500 text-white'
                         : wizardStep === step
                           ? 'bg-accent-500 text-white'
-                          : 'border border-primary-200 bg-primary-100 text-primary-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-500',
+                          : 'border border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
                     )}
                   >
                     {wizardStep > step ? (
@@ -680,7 +680,7 @@ export function ProfilesScreen() {
                         'h-0.5 flex-1 rounded-full transition-colors',
                         wizardStep > step
                           ? 'bg-emerald-400'
-                          : 'bg-primary-200 dark:bg-neutral-700',
+                          : 'bg-[var(--theme-hover)]',
                       )}
                     />
                   )}
@@ -694,7 +694,7 @@ export function ProfilesScreen() {
             {wizardStep === 1 && (
               <div className="space-y-5">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-neutral-400">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                     Profile name
                   </label>
                   <Input
@@ -712,14 +712,14 @@ export function ProfilesScreen() {
                   ) : newProfileName.trim() && nameValid ? (
                     <p className="text-xs text-emerald-600">✓ Valid name</p>
                   ) : (
-                    <p className="text-xs text-primary-400 dark:text-neutral-500">
+                    <p className="text-xs text-[var(--theme-muted)]">
                       Choose a short, memorable identifier
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-neutral-400">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                     <span className="flex items-center gap-1.5">
                       <HugeiconsIcon
                         icon={Copy01Icon}
@@ -732,7 +732,7 @@ export function ProfilesScreen() {
                   <select
                     value={cloneFrom}
                     onChange={(e) => setCloneFrom(e.target.value)}
-                    className="h-11 w-full rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+                    className="h-11 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
                   >
                     <option value="">Start fresh — empty config</option>
                     {profiles.map((p) => (
@@ -742,16 +742,16 @@ export function ProfilesScreen() {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-primary-400 dark:text-neutral-500">
+                  <p className="text-xs text-[var(--theme-muted)]">
                     Copies config, skills path, and env from the selected
                     profile
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
-                  <p className="text-xs text-primary-500 dark:text-neutral-400">
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
+                  <p className="text-xs text-[var(--theme-muted)]">
                     Profiles are stored under{' '}
-                    <code className="rounded bg-primary-100 px-1 py-0.5 font-mono text-[11px] dark:bg-neutral-800">
+                    <code className="rounded bg-[var(--theme-hover)] px-1 py-0.5 font-mono text-[11px]">
                       ~/.hermes/profiles/&lt;name&gt;/
                     </code>{' '}
                     with their own config, skills, sessions, and env.
@@ -763,11 +763,11 @@ export function ProfilesScreen() {
             {wizardStep === 2 && (
               <div className="space-y-5">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-neutral-400">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                     Default model
                   </label>
                   {loadingModels ? (
-                    <div className="flex h-11 items-center rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-400 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-500">
+                    <div className="flex h-11 items-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-sm text-[var(--theme-muted)]">
                       Loading configured models…
                     </div>
                   ) : allModels.length === 0 ? (
@@ -784,7 +784,7 @@ export function ProfilesScreen() {
                         const matched = allModels.find((m) => m.id === modelId)
                         setWizardProvider(matched?.provider || '')
                       }}
-                      className="h-11 w-full rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+                      className="h-11 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
                     >
                       <option value="">Skip — configure later</option>
                       {allModels.map((m) => (
@@ -804,8 +804,8 @@ export function ProfilesScreen() {
                 </div>
 
                 {!wizardModel && !loadingModels && allModels.length > 0 && (
-                  <div className="rounded-xl border border-primary-200 bg-primary-50/60 p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
-                    <p className="text-xs text-primary-500 dark:text-neutral-400">
+                  <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
+                    <p className="text-xs text-[var(--theme-muted)]">
                       Select a model or skip to configure later from profile
                       details or config.yaml.
                     </p>
@@ -819,14 +819,14 @@ export function ProfilesScreen() {
               <div className="space-y-4">
                 {/* Preset selector */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-neutral-400">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                     <span className="flex items-center gap-1.5">
                       <HugeiconsIcon icon={UserStar01Icon} size={13} strokeWidth={1.8} />
                       Personality preset
                     </span>
                   </label>
                   {loadingSwarm ? (
-                    <p className="text-xs text-primary-400">Loading presets…</p>
+                    <p className="text-xs text-[var(--theme-muted)]">Loading presets…</p>
                   ) : (
                     <select
                       value={wizardSelectedPreset}
@@ -836,7 +836,7 @@ export function ProfilesScreen() {
                         const preset = swarmData?.presets.find((p) => p.key === key)
                         if (preset) setWizardPersonality(preset.prompt)
                       }}
-                      className="h-11 w-full rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+                      className="h-11 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
                     >
                       <option value="">— Choose a preset or write custom —</option>
                       {(swarmData?.presets ?? []).map((p) => (
@@ -845,7 +845,7 @@ export function ProfilesScreen() {
                     </select>
                   )}
                   {wizardSelectedPreset && swarmData && (
-                    <p className="text-[11px] text-primary-400 dark:text-neutral-500">
+                    <p className="text-[11px] text-[var(--theme-muted)]">
                       {swarmData.presets.find((p) => p.key === wizardSelectedPreset)?.description}
                     </p>
                   )}
@@ -853,9 +853,9 @@ export function ProfilesScreen() {
 
                 {/* Custom prompt */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-neutral-400">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                     System prompt
-                    <span className="ml-1 font-normal text-primary-400">(optional — skip to inherit default)</span>
+                    <span className="ml-1 font-normal text-[var(--theme-muted)]">(optional — skip to inherit default)</span>
                   </label>
                   <textarea
                     value={wizardPersonality}
@@ -865,7 +865,7 @@ export function ProfilesScreen() {
                     }}
                     placeholder="You are [name], a [role] assistant. Your goal is…"
                     rows={5}
-                    className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+                    className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2.5 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
                   />
                 </div>
 
@@ -879,7 +879,7 @@ export function ProfilesScreen() {
                         'flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition-colors',
                         wizardEnableSwarm
                           ? 'border-accent-300 bg-accent-50/60 text-accent-700 dark:border-accent-700/40 dark:bg-accent-950/20 dark:text-accent-300'
-                          : 'border-primary-200 bg-primary-50/60 text-primary-600 hover:border-primary-300 dark:border-neutral-800 dark:bg-neutral-900/40 dark:text-neutral-400',
+                          : 'border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)] hover:border-[var(--theme-border)]',
                       )}
                     >
                       <HugeiconsIcon
@@ -896,8 +896,8 @@ export function ProfilesScreen() {
                     </button>
 
                     {wizardEnableSwarm && (
-                      <div className="space-y-2 rounded-xl border border-primary-200 bg-primary-50/60 p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
+                      <div className="space-y-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                           Worker personalities
                         </p>
                         <div className="space-y-1.5 max-h-52 overflow-y-auto">
@@ -908,7 +908,7 @@ export function ProfilesScreen() {
                                   'inline-block rounded-md px-2 py-0.5 text-[10px] font-medium',
                                   rec.isMain
                                     ? 'bg-accent-100 text-accent-700 dark:bg-accent-950/40 dark:text-accent-300'
-                                    : 'bg-primary-100 text-primary-600 dark:bg-neutral-800 dark:text-neutral-400',
+                                    : 'bg-[var(--theme-hover)] text-[var(--theme-muted)]',
                                 )}>
                                   {rec.name || rec.workerId}
                                 </span>
@@ -921,7 +921,7 @@ export function ProfilesScreen() {
                                 onChange={(e) =>
                                   setWorkerPresets((prev) => ({ ...prev, [rec.workerId]: e.target.value }))
                                 }
-                                className="h-7 flex-1 rounded-lg border border-primary-200 bg-surface px-2 text-[11px] outline-none focus:border-accent-400 dark:border-neutral-700"
+                                className="h-7 flex-1 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-[11px] outline-none focus:border-accent-400"
                               >
                                 {(swarmData.presets ?? []).map((p) => (
                                   <option key={p.key} value={p.key}>{p.label}</option>
@@ -930,7 +930,7 @@ export function ProfilesScreen() {
                             </div>
                           ))}
                         </div>
-                        <p className="text-[10px] text-primary-400 dark:text-neutral-500">
+                        <p className="text-[10px] text-[var(--theme-muted)]">
                           Astra (orchestrator) uses the primary personality above. Other workers get their selected preset.
                         </p>
                       </div>
@@ -943,8 +943,8 @@ export function ProfilesScreen() {
             {/* ── Step 4: Review & create ────────────────────────────── */}
             {wizardStep === 4 && (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-primary-200 bg-primary-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
-                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
+                <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                     Profile summary
                   </h3>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -1003,7 +1003,7 @@ export function ProfilesScreen() {
           </div>
 
           {/* ── Footer ─────────────────────────────────── */}
-          <div className="flex items-center justify-between border-t border-primary-200 px-6 py-4 dark:border-neutral-800">
+          <div className="flex items-center justify-between border-t border-[var(--theme-border)] px-6 py-4">
             <div>
               {wizardStep > 1 && (
                 <Button
@@ -1070,18 +1070,18 @@ export function ProfilesScreen() {
         }}
       >
         <DialogContent className="w-[min(440px,94vw)] max-w-none p-0">
-          <div className="border-b border-primary-200 px-6 pb-4 pt-5 dark:border-neutral-800">
+          <div className="border-b border-[var(--theme-border)] px-6 pb-4 pt-5">
             <div className="flex items-center gap-3">
-              <div className="inline-flex size-10 items-center justify-center rounded-xl border border-primary-200 bg-primary-100/70 dark:border-neutral-700 dark:bg-neutral-900">
+              <div className="inline-flex size-10 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]">
                 <HugeiconsIcon icon={Edit02Icon} size={20} strokeWidth={1.7} />
               </div>
               <div>
                 <DialogTitle className="text-base font-semibold">
                   Rename profile
                 </DialogTitle>
-                <p className="mt-0.5 text-xs text-primary-500 dark:text-neutral-400">
+                <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
                   Renaming{' '}
-                  <span className="font-semibold text-primary-700 dark:text-neutral-200">
+                  <span className="font-semibold text-[var(--theme-muted)]">
                     {renameTarget?.name}
                   </span>
                 </p>
@@ -1090,7 +1090,7 @@ export function ProfilesScreen() {
           </div>
           <div className="px-6 py-5 space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-neutral-400">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                 New name
               </label>
               <Input
@@ -1108,7 +1108,7 @@ export function ProfilesScreen() {
                 )}
             </div>
           </div>
-          <div className="flex justify-end gap-2 border-t border-primary-200 px-6 py-3 dark:border-neutral-800">
+          <div className="flex justify-end gap-2 border-t border-[var(--theme-border)] px-6 py-3">
             <Button
               variant="outline"
               size="sm"
@@ -1140,19 +1140,19 @@ export function ProfilesScreen() {
       >
         <DialogContent className="w-[min(640px,94vw)] max-w-none p-0 max-h-[85vh] flex flex-col">
           {/* Header */}
-          <div className="shrink-0 border-b border-primary-200 px-6 pb-4 pt-5 dark:border-neutral-800">
+          <div className="shrink-0 border-b border-[var(--theme-border)] px-6 pb-4 pt-5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <img
                   src="/claude-avatar.webp"
                   alt={detailsName || ''}
-                  className="size-12 rounded-full border-2 border-primary-200 object-cover dark:border-neutral-700"
+                  className="size-12 rounded-full border-2 border-[var(--theme-border)] object-cover"
                 />
                 <div className="min-w-0">
                   <DialogTitle className="text-base font-semibold">
                     {detailsName}
                   </DialogTitle>
-                  <p className="mt-0.5 text-xs text-primary-500 dark:text-neutral-400">
+                  <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
                     Profile details &amp; configuration
                   </p>
                 </div>
@@ -1208,9 +1208,9 @@ export function ProfilesScreen() {
                     muted={!detailQuery.data.profile.skillsDir}
                   />
                 </div>
-                <div className="rounded-xl border border-primary-200 bg-primary-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="text-xs font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                       Description
                     </div>
                     <Button
@@ -1225,14 +1225,14 @@ export function ProfilesScreen() {
                     value={descriptionDraft}
                     onChange={(event) => setDescriptionDraft(event.target.value)}
                     placeholder="What this profile is for, how it should behave, or what makes it different"
-                    className="min-h-[96px] w-full rounded-lg border border-primary-200 bg-primary-100/70 p-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+                    className="min-h-[96px] w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
                   />
-                  <p className="mt-2 text-xs text-primary-400 dark:text-neutral-500">
+                  <p className="mt-2 text-xs text-[var(--theme-muted)]">
                     Saved into the profile config, so manual file edits show up here after refresh.
                   </p>
                 </div>
-                <div className="rounded-xl border border-primary-200 bg-primary-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
-                  <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+                  <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                     <HugeiconsIcon
                       icon={Key01Icon}
                       size={14}
@@ -1240,13 +1240,13 @@ export function ProfilesScreen() {
                     />{' '}
                     Config
                   </div>
-                  <pre className="max-h-48 overflow-auto rounded-lg border border-primary-200 bg-primary-100/70 p-3 text-xs leading-relaxed text-primary-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+                  <pre className="max-h-48 overflow-auto rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-3 text-xs leading-relaxed text-primary-800">
                     {JSON.stringify(detailQuery.data.profile.config, null, 2)}
                   </pre>
                 </div>
               </div>
             ) : detailQuery.isLoading ? (
-              <div className="flex min-h-[120px] items-center justify-center text-sm text-primary-500 dark:text-neutral-400">
+              <div className="flex min-h-[120px] items-center justify-center text-sm text-[var(--theme-muted)]">
                 Loading profile\u2026
               </div>
             ) : (
@@ -1257,7 +1257,7 @@ export function ProfilesScreen() {
           </div>
 
           {/* Footer */}
-          <div className="shrink-0 flex justify-end border-t border-primary-200 px-6 py-3 dark:border-neutral-800">
+          <div className="shrink-0 flex justify-end border-t border-[var(--theme-border)] px-6 py-3">
             <Button
               variant="outline"
               size="sm"
@@ -1282,16 +1282,16 @@ function SummaryField({
   muted?: boolean
 }) {
   return (
-    <div className="rounded-lg border border-primary-200 bg-primary-100/60 p-2.5 dark:border-neutral-700 dark:bg-neutral-800/60">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-primary-400 dark:text-neutral-500">
+    <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-2.5">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
         {label}
       </div>
       <div
         className={cn(
           'mt-0.5 text-sm font-medium',
           muted
-            ? 'text-primary-400 dark:text-neutral-500'
-            : 'text-primary-900 dark:text-neutral-100',
+            ? 'text-[var(--theme-muted)]'
+            : 'text-[var(--theme-text)]',
         )}
       >
         {value}
@@ -1318,11 +1318,11 @@ function DetailField({
   return (
     <div
       className={cn(
-        'rounded-xl border border-primary-200 bg-primary-50/80 p-3 dark:border-neutral-800 dark:bg-neutral-900/60',
+        'rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3',
         full && 'sm:col-span-2',
       )}
     >
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-primary-400 dark:text-neutral-500">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
         {label}
       </div>
       <div
@@ -1330,10 +1330,10 @@ function DetailField({
           'mt-1 text-sm break-all',
           mono && 'font-mono text-xs',
           muted
-            ? 'text-primary-400 dark:text-neutral-500'
+            ? 'text-[var(--theme-muted)]'
             : accent
               ? 'font-semibold text-emerald-600 dark:text-emerald-400'
-              : 'text-primary-900 dark:text-neutral-100',
+              : 'text-[var(--theme-text)]',
         )}
       >
         {value}

@@ -51,7 +51,7 @@ export function MissionTimeline({
   }, [elapsedTime, tasks])
 
   const hasMissionCompleted = (missionState === 'completed' || missionState === 'stopped') && totalTasks > 0
-  const missionCardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm'
+  const missionCardCls = 'relative overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-sm'
 
   return (
     <section className={cn('mx-auto w-full max-w-[960px]', missionCardCls)}>
@@ -60,8 +60,8 @@ export function MissionTimeline({
         <li className="flex items-start gap-3">
           <span className="mt-1 h-[14px] w-[14px] rounded-full bg-orange-400" />
           <div>
-            <p className="text-[16px] font-bold text-neutral-900">Mission started</p>
-            <p className="text-xs text-neutral-500">{new Date(startedAt).toLocaleString()}</p>
+            <p className="text-[16px] font-bold text-[var(--theme-text)]">Mission started</p>
+            <p className="text-xs text-[var(--theme-muted)]">{new Date(startedAt).toLocaleString()}</p>
           </div>
         </li>
 
@@ -74,10 +74,10 @@ export function MissionTimeline({
               <li key={`dispatch-${task.id}`} className="flex items-start gap-3">
                 <span className="mt-1 h-3 w-3 rounded-full bg-blue-500" />
                 <div className="min-w-0">
-                  <p className="break-words text-base font-bold text-neutral-900">
+                  <p className="break-words text-base font-bold text-[var(--theme-text)]">
                     Agent dispatched: {member?.name ?? task.agentId}
                   </p>
-                  <p className="break-words text-sm text-neutral-500">
+                  <p className="break-words text-sm text-[var(--theme-muted)]">
                     {task.title} · {member?.modelId || 'Unknown model'}
                   </p>
                 </div>
@@ -93,18 +93,18 @@ export function MissionTimeline({
 
           return (
             <li key={`agent-${member.id}`} className="flex items-start gap-3">
-              <span className={cn('mt-2 h-3 w-3 rounded-full', isActive ? 'bg-emerald-500' : 'bg-neutral-300')} />
+              <span className={cn('mt-2 h-3 w-3 rounded-full', isActive ? 'bg-emerald-400 ring-pulse' : 'bg-[var(--theme-muted)]')} />
               <div className={cn('min-w-0 flex-1', missionCardCls)}>
                 <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
                 <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-base font-bold text-neutral-900">{member.name}</p>
+                  <p className="truncate text-base font-bold text-[var(--theme-text)]">{member.name}</p>
                   {isActive ? (
                     <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-xs text-white">Active</span>
                   ) : (
-                    <span className="text-sm text-neutral-400">Stopped</span>
+                    <span className="text-sm text-[var(--theme-muted)]">Stopped</span>
                   )}
                 </div>
-                <p className="mt-1 text-sm text-neutral-500">Assigned tasks: {assignedTaskCount}</p>
+                <p className="mt-1 text-sm text-[var(--theme-muted)]">Assigned tasks: {assignedTaskCount}</p>
 
                 {isActive ? (
                   <div className="mt-2 rounded-r-lg border-l-4 border-emerald-500 bg-emerald-50 px-3 py-2">
@@ -118,14 +118,14 @@ export function MissionTimeline({
                 <button
                   type="button"
                   onClick={() => setExpandedOutputs((prev) => ({ ...prev, [member.id]: !prev[member.id] }))}
-                  className="mt-3 text-sm text-neutral-600"
+                  className="mt-3 text-sm text-[var(--theme-muted)]"
                 >
                   {isExpanded ? '▼ Live output' : '▶ Live output'}
                 </button>
 
                 {isExpanded ? (
                   agentSessionMap?.[member.id] ? (
-                    <div className="mt-2 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+                    <div className="mt-2 overflow-hidden rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)]">
                       <AgentOutputPanel
                         compact
                         agentName={member.name}
@@ -135,8 +135,8 @@ export function MissionTimeline({
                       />
                     </div>
                   ) : (
-                    <div className="mt-2 rounded-lg border border-neutral-200 bg-white p-2">
-                      <p className="text-[11px] text-neutral-400">Waiting for agent session...</p>
+                    <div className="mt-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-2">
+                      <p className="text-[11px] text-[var(--theme-muted)]">Waiting for agent session...</p>
                     </div>
                   )
                 ) : null}
@@ -147,10 +147,10 @@ export function MissionTimeline({
 
         {hasMissionCompleted ? (
           <li className="flex items-start gap-3">
-            <span className="mt-1 h-3 w-3 rounded-full bg-neutral-300" />
+            <span className="mt-1 h-3 w-3 rounded-full bg-[var(--theme-muted)]" />
             <div>
-              <p className="text-base font-bold text-neutral-900">Mission stopped</p>
-              <p className="text-xs text-neutral-500">
+              <p className="text-base font-bold text-[var(--theme-text)]">Mission stopped</p>
+              <p className="text-xs text-[var(--theme-muted)]">
                 {completedTasks}/{totalTasks} tasks complete · total time {formatElapsed(elapsedTime)}
               </p>
             </div>

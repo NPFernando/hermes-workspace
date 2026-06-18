@@ -45,7 +45,7 @@ const PRIORITIES: Array<{
   { key: 'urgent', label: 'Urgent', badge: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300' },
   { key: 'high', label: 'High', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' },
   { key: 'normal', label: 'Normal', badge: 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-200' },
-  { key: 'low', label: 'Low', badge: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200' },
+  { key: 'low', label: 'Low', badge: 'bg-[var(--theme-card)] text-[var(--theme-muted)]' },
 ]
 function isTaskStatus(value: unknown): value is TaskStatus {
   return COLUMNS.some((column) => column.key === value)
@@ -302,11 +302,11 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
   }
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-neutral-800 bg-white dark:bg-neutral-950 px-4 py-3">
+      <div className="border-b border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-neutral-100">Tasks</h2>
-            <p className="truncate text-[11px] text-neutral-400">
+            <h2 className="text-sm font-semibold text-[var(--theme-text)]">Tasks</h2>
+            <p className="truncate text-[11px] text-[var(--theme-muted)]">
               {selectedAgentName ? `Focused agent: ${selectedAgentName}` : 'Showing all agents'}
             </p>
           </div>
@@ -317,8 +317,8 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
               className={cn(
                 'shrink-0 rounded-lg border px-2 py-1 text-[10px] font-medium transition-colors',
                 showAllTasks
-                  ? 'border-neutral-700 bg-neutral-800 text-neutral-300'
-                  : 'border-neutral-800 bg-neutral-900 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300',
+                  ? 'border-[var(--theme-accent)]/40 bg-[var(--theme-card2)] text-[var(--theme-text)]'
+                  : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] hover:border-[var(--theme-accent)]/40 hover:text-[var(--theme-text)]',
               )}
               title={showAllTasks ? 'Show only current mission tasks' : 'Show tasks from all missions'}
             >
@@ -327,14 +327,14 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
           ) : null}
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-x-auto bg-white dark:bg-neutral-950 px-4 py-3">
+      <div className="min-h-0 flex-1 overflow-x-auto bg-[var(--theme-bg)] px-4 py-3">
         <div className="flex h-full w-full gap-3">
           {COLUMNS.map((column) => {
             const columnTasks = tasksByColumn[column.key]
             return (
-              <div key={column.key} className="min-w-[200px] max-w-[240px] flex-1 rounded-xl border border-neutral-200 bg-neutral-50 p-2 dark:border-neutral-800 dark:bg-neutral-900">
+              <div key={column.key} className="min-w-[200px] max-w-[240px] flex-1 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-2">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{column.label}</h3>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">{column.label}</h3>
                   <div className="flex items-center gap-1.5">
                     {column.key === 'inbox' ? (
                       <button
@@ -343,14 +343,14 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                         className={cn(
                           'inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-colors',
                           isCreating
-                            ? 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700'
+                            ? 'bg-[var(--theme-card2)] text-[var(--theme-text)] hover:bg-[var(--theme-hover)]'
                             : 'bg-emerald-600 text-white hover:bg-emerald-500',
                         )}
                       >
                         {isCreating ? 'Cancel' : '+ New Task'}
                       </button>
                     ) : null}
-                    <span className="rounded-full bg-neutral-800 px-1.5 text-[10px] text-neutral-300">
+                    <span className="rounded-full bg-[var(--theme-card)] px-1.5 text-[10px] text-[var(--theme-muted)]">
                       {columnTasks.length}
                     </span>
                   </div>
@@ -371,13 +371,13 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                     setDragOverStatus(null)
                   }}
                   className={cn(
-                    'min-h-[240px] space-y-2 rounded-xl border border-dashed border-neutral-300 bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-950 p-2 transition-colors',
-                    dragOverStatus === column.key && 'border-emerald-500 bg-emerald-50 dark:bg-neutral-900',
+                    'min-h-[240px] space-y-2 rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] p-2 transition-colors',
+                    dragOverStatus === column.key && 'border-emerald-500 bg-emerald-500/10',
                   )}
                 >
                   {column.key === 'inbox' && isCreating ? (
                     <form
-                      className="space-y-2 rounded-lg border border-neutral-200 bg-white p-2.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+                      className="space-y-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-2.5 shadow-sm"
                       onSubmit={(event) => {
                         event.preventDefault()
                         handleCreateTask()
@@ -388,7 +388,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                         value={form.title}
                         onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
                         placeholder="Task title"
-                        className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                        className="w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 py-1.5 text-xs text-[var(--theme-text)] outline-none ring-[var(--theme-accent)] focus:ring-1"
                         required
                       />
                       <textarea
@@ -396,7 +396,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                         onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
                         placeholder="Description (optional)"
                         rows={3}
-                        className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                        className="w-full resize-none rounded-md border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 py-1.5 text-xs text-[var(--theme-text)] outline-none ring-[var(--theme-accent)] focus:ring-1"
                       />
                       <div className="flex flex-wrap gap-1">
                         {PRIORITIES.map((priority) => (
@@ -408,7 +408,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                               'rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors',
                               form.priority === priority.key
                                 ? priority.badge
-                                : 'bg-primary-100 text-primary-500 hover:bg-primary-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700',
+                                : 'bg-[var(--theme-card2)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
                             )}
                           >
                             {priority.label}
@@ -418,7 +418,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                       <select
                         value={form.agentId}
                         onChange={(event) => setForm((prev) => ({ ...prev, agentId: event.target.value }))}
-                        className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                        className="w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 py-1.5 text-xs text-[var(--theme-text)] outline-none ring-[var(--theme-accent)] focus:ring-1"
                       >
                         <option value="">Unassigned</option>
                         {agents.map((agent) => (
@@ -429,7 +429,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                         <button
                           type="button"
                           onClick={closeCreateForm}
-                          className="rounded-md px-2 py-1 text-[11px] font-medium text-primary-500 hover:bg-primary-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                          className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--theme-accent)] hover:bg-[var(--theme-accent-subtle)]"
                         >
                           Cancel
                         </button>
@@ -444,7 +444,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                     </form>
                   ) : null}
                   {columnTasks.length === 0 ? (
-                    <p className="py-8 text-center text-[11px] text-neutral-500">Drop tasks here</p>
+                    <p className="py-8 text-center text-[11px] text-[var(--theme-muted)]">Drop tasks here</p>
                   ) : null}
                   {columnTasks.map((task) => {
                     const priority = PRIORITIES.find((item) => item.key === task.priority)
@@ -477,30 +477,30 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                           }
                         }}
                         className={cn(
-                          'cursor-pointer rounded-lg border border-neutral-200 bg-white p-2.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 transition-colors active:cursor-grabbing',
+                          'cursor-pointer rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-2.5 shadow-sm transition-colors active:cursor-grabbing',
                           dimmed && 'opacity-50',
                           isExpanded && 'border-emerald-700',
                         )}
                       >
-                        <p className="text-xs font-semibold text-neutral-100">{task.title}</p>
+                        <p className="text-xs font-semibold text-[var(--theme-text)]">{task.title}</p>
                         {task.description && !isExpanded ? (
-                          <p className="mt-1 line-clamp-3 text-[11px] text-neutral-400">{task.description}</p>
+                          <p className="mt-1 line-clamp-3 text-[11px] text-[var(--theme-muted)]">{task.description}</p>
                         ) : null}
                         <div className="mt-2 flex items-center justify-between gap-2">
                           <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', priority?.badge)}>
                             {priority?.label ?? 'Normal'}
                           </span>
-                          <span className="truncate text-[10px] text-neutral-400">{assignee}</span>
+                          <span className="truncate text-[10px] text-[var(--theme-muted)]">{assignee}</span>
                         </div>
 
                         {/* Inline slide-down task detail panel */}
                         {isExpanded && taskEditDraft ? (
                           <div
-                            className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800"
+                            className="mt-3 space-y-2 border-t border-[var(--theme-border)] pt-3"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div>
-                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                                 Title
                               </label>
                               <input
@@ -511,11 +511,11 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                                     prev ? { ...prev, title: e.target.value } : prev,
                                   )
                                 }
-                                className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                                className="w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 py-1.5 text-xs text-[var(--theme-text)] outline-none ring-[var(--theme-accent)] focus:ring-1"
                               />
                             </div>
                             <div>
-                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                                 Description
                               </label>
                               <textarea
@@ -527,15 +527,15 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                                 }
                                 rows={2}
                                 placeholder="Add a description…"
-                                className="w-full resize-none rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                                className="w-full resize-none rounded-md border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 py-1.5 text-xs text-[var(--theme-text)] outline-none ring-[var(--theme-accent)] focus:ring-1"
                               />
                             </div>
-                            <p className="text-[11px] text-neutral-400">
+                            <p className="text-[11px] text-[var(--theme-muted)]">
                               <span className="font-semibold uppercase tracking-wide">Agent:</span>{' '}
                               {assignee}
                             </p>
                             <div>
-                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                                 Priority
                               </label>
                               <select
@@ -547,7 +547,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                                       : prev,
                                   )
                                 }
-                                className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                                className="w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 py-1.5 text-xs text-[var(--theme-text)] outline-none ring-[var(--theme-accent)] focus:ring-1"
                               >
                                 {PRIORITIES.map((p) => (
                                   <option key={p.key} value={p.key}>
@@ -557,7 +557,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                               </select>
                             </div>
                             <div>
-                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                                 Status
                               </label>
                               <select
@@ -569,7 +569,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                                       : prev,
                                   )
                                 }
-                                className="w-full rounded-md border border-primary-200 bg-white px-2 py-1.5 text-xs text-primary-900 outline-none ring-accent-400 focus:ring-1 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                                className="w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 py-1.5 text-xs text-[var(--theme-text)] outline-none ring-[var(--theme-accent)] focus:ring-1"
                               >
                                 {COLUMNS.map((col) => (
                                   <option key={col.key} value={col.key}>
@@ -589,7 +589,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                               <button
                                 type="button"
                                 onClick={closeTaskDetail}
-                                className="rounded-md px-2 py-1 text-[11px] font-medium text-neutral-300 transition-colors hover:bg-neutral-800"
+                                className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card)]"
                               >
                                 Cancel
                               </button>

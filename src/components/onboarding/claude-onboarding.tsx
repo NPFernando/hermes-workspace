@@ -623,8 +623,7 @@ export function ClaudeOnboarding() {
               <div className="flex gap-2">
                 <button
                   onClick={() => void checkBackend()}
-                  className="flex-1 rounded-xl border py-3 text-sm font-semibold transition-colors"
-                  style={{ borderColor: 'var(--theme-border)' }}
+                  className="flex-1 rounded-xl border py-3 text-sm font-semibold transition-colors border-[var(--theme-border)]"
                 >
                   Retry
                 </button>
@@ -768,8 +767,7 @@ export function ClaudeOnboarding() {
                             onClick={() =>
                               window.open(oauthVerificationUrl, '_blank')
                             }
-                            className="w-full rounded-lg border py-2 text-xs font-medium"
-                            style={{ borderColor: 'var(--theme-border)' }}
+                            className="w-full rounded-lg border py-2 text-xs font-medium border-[var(--theme-border)]"
                           >
                             Open Nous Portal ↗
                           </button>
@@ -1073,8 +1071,7 @@ export function ClaudeOnboarding() {
                     </button>
                     <button
                       onClick={() => setStep('provider')}
-                      className="flex-1 rounded-lg border py-2 text-xs font-medium"
-                      style={{ borderColor: 'var(--theme-border)' }}
+                      className="flex-1 rounded-lg border py-2 text-xs font-medium border-[var(--theme-border)]"
                     >
                       ← Back
                     </button>

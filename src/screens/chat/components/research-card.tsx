@@ -6,7 +6,7 @@ export function ResearchCard({ researchCard }: { researchCard: UseResearchCardRe
   if (!researchCard || researchCard.steps.length === 0) return null
 
   return (
-    <div className="border-t border-primary-200/60 dark:border-neutral-800 px-4 py-3 space-y-1.5 max-h-48 overflow-y-auto">
+    <div className="border-t border-primary-200/60 px-4 py-3 space-y-1.5 max-h-48 overflow-y-auto">
       {researchCard.steps.map((step) => (
         <div key={step.id} className="flex items-start gap-2 text-xs">
           <HugeiconsIcon
@@ -19,7 +19,7 @@ export function ResearchCard({ researchCard }: { researchCard: UseResearchCardRe
                 : 'mt-0.5 shrink-0 text-accent-500 opacity-70'
             }
           />
-          <span className="text-primary-600 dark:text-neutral-400">{step.label}</span>
+          <span className="text-primary-600">{step.label}</span>
         </div>
       ))}
       {researchCard.isActive && (

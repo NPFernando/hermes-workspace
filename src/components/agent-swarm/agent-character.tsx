@@ -114,11 +114,11 @@ export function AgentCharacter({
       </motion.div>
 
       {/* Role label */}
-      <span className="text-[9px] text-slate-400">{persona.role}</span>
+      <span className="text-[9px] text-[var(--theme-muted)]">{persona.role}</span>
 
       {/* Task snippet */}
       {task && (
-        <span className="max-w-[100px] truncate text-[8px] text-slate-500">
+        <span className="max-w-[100px] truncate text-[8px] text-[var(--theme-muted)]">
           {task}
         </span>
       )}

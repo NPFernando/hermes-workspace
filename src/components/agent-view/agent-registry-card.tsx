@@ -40,7 +40,7 @@ const STATUS_LABELS: Record<AgentRegistryStatus, string> = {
 const STATUS_DOT_CLASS: Record<AgentRegistryStatus, string> = {
   active: 'bg-emerald-500',
   idle: 'bg-yellow-500',
-  available: 'bg-neutral-400',
+  available: 'bg-[var(--theme-muted)]',
   paused: 'bg-red-500',
 }
 
@@ -140,21 +140,21 @@ export function AgentRegistryCard({
       }}
       className={`relative overflow-hidden rounded-2xl p-4 shadow-sm border border-white/20 ${CARD_GRADIENT_CLASS[agent.color]}`}
     >
-      <div className="bg-white/40 dark:bg-neutral-900/20 backdrop-blur-md rounded-xl p-3">
+      <div className="bg-white/40 backdrop-blur-md rounded-xl p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span
                 className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_CLASS[agent.status]}`}
               />
-              <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
+              <span className="text-xs font-medium text-[var(--theme-muted)]">
                 {STATUS_LABELS[agent.status]}
               </span>
             </div>
-            <h3 className="mt-1 truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+            <h3 className="mt-1 truncate text-sm font-semibold text-[var(--theme-text)]">
               {agent.name}
             </h3>
-            <p className="truncate text-xs text-neutral-600 dark:text-neutral-300">
+            <p className="truncate text-xs text-[var(--theme-muted)]">
               {agent.role || agent.category}
             </p>
           </div>
@@ -163,7 +163,7 @@ export function AgentRegistryCard({
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/60 text-neutral-700 shadow-sm border border-white/30 dark:bg-neutral-900/30 dark:text-neutral-100 dark:border-white/10"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/60 text-[var(--theme-text)] shadow-sm border border-white/30 dark:border-white/10"
               aria-label={`${agent.name} controls`}
               aria-expanded={menuOpen}
             >
@@ -178,14 +178,14 @@ export function AgentRegistryCard({
                   className="fixed inset-0 z-40"
                   onClick={() => setMenuOpen(false)}
                 />
-                <div className="absolute right-3 top-10 z-50 w-44 rounded-xl bg-white/90 dark:bg-neutral-900/90 backdrop-blur border border-white/30 dark:border-white/10 shadow-lg p-1">
+                <div className="absolute right-3 top-10 z-50 w-44 rounded-xl bg-white/90 backdrop-blur border border-white/30 dark:border-white/10 shadow-lg p-1">
                   <button
                     type="button"
                     onClick={() => {
                       setMenuOpen(false)
                       handleSteerIntent()
                     }}
-                    className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                    className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-xs font-medium text-[var(--theme-text)] hover:bg-[var(--theme-card2)] dark:hover:bg-neutral-800"
                   >
                     Steer
                   </button>
@@ -195,7 +195,7 @@ export function AgentRegistryCard({
                       void handlePauseToggle()
                     }}
                     disabled={pausePending}
-                    className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-60 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                    className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-xs font-medium text-[var(--theme-text)] hover:bg-[var(--theme-card2)] disabled:opacity-60 dark:hover:bg-neutral-800"
                   >
                     {pausePending
                       ? isPaused
@@ -222,7 +222,7 @@ export function AgentRegistryCard({
         </div>
 
         {notice ? (
-          <p className="mt-2 text-[11px] font-medium text-neutral-700 dark:text-neutral-200">
+          <p className="mt-2 text-[11px] font-medium text-[var(--theme-text)]">
             {notice}
           </p>
         ) : null}
@@ -233,21 +233,21 @@ export function AgentRegistryCard({
             onClick={() => {
               void onChat(agent)
             }}
-            className="rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
+            className="rounded-xl bg-white/60 backdrop-blur px-2 py-2 text-[11px] font-medium text-[var(--theme-text)] shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
           >
             Chat
           </button>
           <button
             type="button"
             onClick={handleSteerIntent}
-            className="rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
+            className="rounded-xl bg-white/60 backdrop-blur px-2 py-2 text-[11px] font-medium text-[var(--theme-text)] shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
           >
             Steer
           </button>
           <button
             type="button"
             onClick={() => onHistory(agent)}
-            className="rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
+            className="rounded-xl bg-white/60 backdrop-blur px-2 py-2 text-[11px] font-medium text-[var(--theme-text)] shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition"
           >
             History
           </button>
@@ -257,7 +257,7 @@ export function AgentRegistryCard({
               void onSpawn(agent)
             }}
             disabled={isSpawning}
-            className="rounded-xl bg-white/60 dark:bg-neutral-900/30 backdrop-blur px-2 py-2 text-[11px] font-medium text-neutral-800 dark:text-neutral-100 shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition disabled:opacity-60"
+            className="rounded-xl bg-white/60 backdrop-blur px-2 py-2 text-[11px] font-medium text-[var(--theme-text)] shadow-sm border border-white/30 dark:border-white/10 active:scale-[0.97] transition disabled:opacity-60"
           >
             {isSpawning ? '...' : 'Spawn'}
           </button>

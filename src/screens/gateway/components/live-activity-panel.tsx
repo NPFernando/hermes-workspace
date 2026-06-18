@@ -21,7 +21,7 @@ export type LiveActivityPanelProps = {
 type PanelTab = 'activity' | 'output'
 
 const MODEL_BADGE: Record<string, string> = {
-  auto:          'bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
+  auto:          'bg-[var(--theme-card)] text-[var(--theme-muted)]',
   opus:          'bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-400',
   sonnet:        'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-400',
   codex:         'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400',
@@ -71,7 +71,7 @@ function statusDotEl(status: AgentWorkingStatus) {
     status === 'idle' || status === 'ready' ? 'bg-amber-500' :
     status === 'error' ? 'bg-red-500' :
     status === 'paused' ? 'bg-amber-500' :
-    'bg-neutral-400'
+    'bg-[var(--theme-muted)]'
   return <span className={cn('inline-flex size-2 shrink-0 rounded-full', dotClass)} />
 }
 
@@ -97,16 +97,16 @@ function AgentCard({
   return (
     <div
       className={cn(
-        'rounded-2xl border bg-white/70 backdrop-blur dark:bg-neutral-900/50 dark:border-white/10 p-3 transition-all',
+        'rounded-2xl border bg-[var(--theme-panel)]/80 backdrop-blur border-[var(--theme-border)] p-3 transition-all',
         isSelected
           ? 'border-emerald-200 ring-1 ring-emerald-500/30 dark:border-emerald-800/50'
-          : 'border-neutral-200 dark:border-neutral-800',
+          : 'border-[var(--theme-border)]',
       )}
     >
       {/* Row 1: status dot + agent name + model badge */}
       <div className="flex items-center gap-2">
         {statusDotEl(agent.status)}
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-neutral-900 dark:text-neutral-100">
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--theme-text)]">
           {agent.name}
         </span>
         <span
@@ -120,7 +120,7 @@ function AgentCard({
       </div>
 
       {/* Row 2: current task */}
-      <p className="mt-1.5 truncate text-[11px] text-neutral-600 dark:text-neutral-400">
+      <p className="mt-1.5 truncate text-[11px] text-[var(--theme-muted)]">
         {agent.currentTask
           ? agent.currentTask
           : agent.status === 'none'
@@ -132,11 +132,11 @@ function AgentCard({
 
       {/* Row 3: most recent output line (dimmed, monospace) */}
       {agent.lastLine ? (
-        <p className="mt-1 truncate font-mono text-[9px] text-neutral-400 dark:text-neutral-600">
+        <p className="mt-1 truncate font-mono text-[9px] text-[var(--theme-muted)]">
           {agent.lastLine}
         </p>
       ) : (
-        <p className="mt-1 font-mono text-[9px] text-neutral-300 dark:text-neutral-700">
+        <p className="mt-1 font-mono text-[9px] text-[var(--theme-muted)]">
           {agent.status === 'active' ? '// working…' : '// idle'}
         </p>
       )}
@@ -150,7 +150,7 @@ function AgentCard({
             'flex-1 rounded-lg px-2 py-1 text-[11px] font-medium transition-colors',
             isSelected
               ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
-              : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-200',
+              : 'bg-[var(--theme-card)] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]',
           )}
         >
           {isSelected ? '✓ Viewing' : 'View'}
@@ -164,7 +164,7 @@ function AgentCard({
               e.stopPropagation()
               setMenuOpen((p) => !p)
             }}
-            className="rounded-lg px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+            className="rounded-lg px-2 py-1 text-[13px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card)] hover:text-[var(--theme-text)]"
             aria-label="Agent options"
           >
             ⋯
@@ -177,7 +177,7 @@ function AgentCard({
                 aria-hidden
               />
               <div
-                className="absolute right-0 top-full z-20 mt-1 min-w-[140px] rounded-xl border border-neutral-200 bg-white py-1 shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
+                className="absolute right-0 top-full z-20 mt-1 min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] py-1 shadow-xl"
                 style={{ overflow: 'visible' }}
               >
                 <button
@@ -186,7 +186,7 @@ function AgentCard({
                     setMenuOpen(false)
                     onView()
                   }}
-                  className="block w-full px-3 py-1.5 text-left text-[11px] text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  className="block w-full px-3 py-1.5 text-left text-[11px] text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]"
                 >
                   View Output
                 </button>
@@ -204,8 +204,8 @@ function AgentCard({
                 ) : null}
                 {agent.status !== 'none' && agent.status !== 'error' ? (
                   <>
-                    <div className="my-1 border-t border-neutral-100 dark:border-neutral-800" />
-                    <p className="px-3 pb-0.5 pt-1 text-[9px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-600">
+                    <div className="my-1 border-t border-[var(--theme-border)]" />
+                    <p className="px-3 pb-0.5 pt-1 text-[9px] font-bold uppercase tracking-wider text-[var(--theme-muted)]">
                       Warden
                     </p>
                     <button
@@ -220,7 +220,7 @@ function AgentCard({
                         if (!directive || !directive.trim()) return
                         onSteer(directive.trim())
                       }}
-                      className="block w-full px-3 py-1.5 text-left text-[11px] text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                      className="block w-full px-3 py-1.5 text-left text-[11px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)]"
                     >
                       Steer
                     </button>
@@ -230,13 +230,13 @@ function AgentCard({
                         setMenuOpen(false)
                         onPause?.(agent.status !== 'paused')
                       }}
-                      className="block w-full px-3 py-1.5 text-left text-[11px] text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                      className="block w-full px-3 py-1.5 text-left text-[11px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)]"
                     >
                       {agent.status === 'paused' ? 'Resume' : 'Pause'}
                     </button>
                   </>
                 ) : null}
-                <div className="my-1 border-t border-neutral-100 dark:border-neutral-800" />
+                <div className="my-1 border-t border-[var(--theme-border)]" />
                 <button
                   type="button"
                   onClick={() => {
@@ -302,8 +302,8 @@ export function LiveActivityPanel({
       return (
         <span className="font-mono text-[9px]">
           <span className="text-emerald-500">{activeCount} active</span>
-          <span className="text-neutral-400"> · </span>
-          <span className="text-neutral-500">{idleCount} idle</span>
+          <span className="text-[var(--theme-muted)]"> · </span>
+          <span className="text-[var(--theme-muted)]">{idleCount} idle</span>
         </span>
       )
     }
@@ -313,18 +313,18 @@ export function LiveActivityPanel({
       )
     }
     return (
-      <span className="font-mono text-[9px] text-neutral-500">
+      <span className="font-mono text-[9px] text-[var(--theme-muted)]">
         {agents.length} agent{agents.length !== 1 ? 's' : ''}
       </span>
     )
   }
 
   return (
-    <div className="flex h-full flex-col border-l border-neutral-200 bg-white dark:border-white/10 dark:bg-neutral-950">
+    <div className="flex h-full flex-col border-l border-[var(--theme-border)] bg-[var(--theme-bg)]">
       {/* ── Panel header + tab switcher ──────────────────────────────────── */}
-      <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-white/80 px-3 py-2 backdrop-blur dark:border-white/10 dark:bg-neutral-950/70">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--theme-border)] bg-[var(--theme-panel)]/80 px-3 py-2 backdrop-blur">
         <div className="flex items-center gap-2">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-[var(--theme-muted)]">
             Agents Working
           </h3>
           {missionRunning && activeCount > 0 ? (
@@ -337,15 +337,15 @@ export function LiveActivityPanel({
         </div>
 
         {/* Tab switcher */}
-        <div className="flex items-center rounded-lg border border-neutral-200 bg-neutral-100 p-0.5 dark:border-neutral-700 dark:bg-neutral-900">
+        <div className="flex items-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-0.5">
           <button
             type="button"
             onClick={() => setTab('activity')}
             className={cn(
               'rounded-md px-2.5 py-0.5 text-[10px] font-medium transition-colors',
               tab === 'activity'
-                ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
-                : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300',
+                ? 'bg-[var(--theme-card2)] text-[var(--theme-text)] shadow-sm'
+                : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] dark:hover:text-[var(--theme-muted)]',
             )}
           >
             Activity
@@ -356,8 +356,8 @@ export function LiveActivityPanel({
             className={cn(
               'rounded-md px-2.5 py-0.5 text-[10px] font-medium transition-colors',
               tab === 'output'
-                ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100'
-                : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300',
+                ? 'bg-[var(--theme-card2)] text-[var(--theme-text)] shadow-sm'
+                : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] dark:hover:text-[var(--theme-muted)]',
             )}
           >
             Output
@@ -375,10 +375,10 @@ export function LiveActivityPanel({
             <div className="flex h-full items-center justify-center py-12">
               <div className="text-center">
                 <p className="mb-1 text-2xl">🤖</p>
-                <p className="font-mono text-[10px] text-neutral-500 dark:text-neutral-600">
+                <p className="font-mono text-[10px] text-[var(--theme-muted)]">
                   // no agents configured
                 </p>
-                <p className="mt-1 text-[10px] text-neutral-400 dark:text-neutral-600">
+                <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
                   Add agents in the Team tab
                 </p>
               </div>
@@ -408,16 +408,16 @@ export function LiveActivityPanel({
 
               {/* Status legend */}
               <div className="mt-1 flex flex-wrap items-center justify-end gap-3 px-1 pt-1">
-                <span className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-600">
+                <span className="flex items-center gap-1 text-[9px] text-[var(--theme-muted)]">
                   <span className="size-1.5 rounded-full bg-emerald-500" /> Active
                 </span>
-                <span className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-600">
+                <span className="flex items-center gap-1 text-[9px] text-[var(--theme-muted)]">
                   <span className="size-1.5 rounded-full bg-amber-500" /> Idle
                 </span>
-                <span className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-600">
-                  <span className="size-1.5 rounded-full bg-neutral-400" /> No session
+                <span className="flex items-center gap-1 text-[9px] text-[var(--theme-muted)]">
+                  <span className="size-1.5 rounded-full bg-[var(--theme-muted)]" /> No session
                 </span>
-                <span className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-600">
+                <span className="flex items-center gap-1 text-[9px] text-[var(--theme-muted)]">
                   <span className="size-1.5 rounded-full bg-red-500" /> Error
                 </span>
               </div>
@@ -430,9 +430,9 @@ export function LiveActivityPanel({
       {tab === 'output' ? (
         <div className="flex min-h-0 flex-1 flex-col">
           {/* Output tab sub-header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-3 py-2 dark:border-white/10">
+          <div className="flex shrink-0 items-center justify-between border-b border-[var(--theme-border)] px-3 py-2 dark:border-white/10">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="truncate text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+              <span className="truncate text-xs font-semibold text-[var(--theme-text)]">
                 {selectedAgent ? selectedAgent.name : 'No agent selected'}
               </span>
               {selectedAgentId && (
@@ -450,7 +450,7 @@ export function LiveActivityPanel({
                   'rounded p-1 text-[11px] transition-colors',
                   pinnedOutput
                     ? 'text-accent-500'
-                    : 'text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300',
+                    : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] dark:hover:text-[var(--theme-muted)]',
                 )}
               >
                 📌
@@ -458,7 +458,7 @@ export function LiveActivityPanel({
               <button
                 type="button"
                 onClick={handleCloseOutput}
-                className="rounded p-1 text-[11px] text-neutral-400 transition-colors hover:text-neutral-700 dark:hover:text-neutral-300"
+                className="rounded p-1 text-[11px] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)] dark:hover:text-[var(--theme-muted)]"
                 aria-label="Close output"
               >
                 ✕
@@ -471,9 +471,9 @@ export function LiveActivityPanel({
             <div className="flex flex-1 items-center justify-center p-6">
               <div className="text-center">
                 <p className="mb-2 text-2xl opacity-40">📡</p>
-                <p className="text-xs text-neutral-500 dark:text-neutral-600">
+                <p className="text-xs text-[var(--theme-muted)]">
                   Click{' '}
-                  <strong className="text-neutral-700 dark:text-neutral-400">View</strong>{' '}
+                  <strong className="text-[var(--theme-text)]">View</strong>{' '}
                   on an agent to stream their output here.
                 </p>
               </div>

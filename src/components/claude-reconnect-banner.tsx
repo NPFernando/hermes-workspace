@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { cn } from '@/lib/utils'
 
 const POLL_INTERVAL_MS = 10_000
 const FLASH_DURATION_MS = 1_800
@@ -240,23 +241,16 @@ export function ClaudeReconnectBanner({
       style={{ top: 'var(--titlebar-h, 0px)' }}
     >
       <div
-        className="mx-auto flex min-h-12 w-full max-w-5xl items-center justify-between gap-3 rounded-lg border px-4 py-3 shadow-lg"
-        style={{
-          background: 'var(--theme-card)',
-          borderColor: isDisconnected
-            ? 'var(--theme-danger)'
-            : 'var(--theme-border)',
-          color: isDisconnected ? 'var(--theme-danger)' : 'inherit',
-        }}
+        className={cn(
+          'mx-auto flex min-h-12 w-full max-w-5xl items-center justify-between gap-3 rounded-lg border px-4 py-3 shadow-lg bg-[var(--theme-card)]',
+          isDisconnected
+            ? 'border-[var(--theme-danger)] text-[var(--theme-danger)]'
+            : 'border-[var(--theme-border)]',
+        )}
       >
         <div className="flex min-w-0 items-center gap-3">
           <span
-            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-            style={{
-              background: isDisconnected
-                ? 'var(--theme-danger)'
-                : 'var(--theme-border)',
-            }}
+            className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-full', isDisconnected ? 'bg-[var(--theme-danger)]' : 'bg-[var(--theme-border)]')}
           />
           <div className="min-w-0">
             <p className="text-sm font-semibold">
@@ -274,12 +268,7 @@ export function ClaudeReconnectBanner({
               type="button"
               onClick={() => void handleRetry()}
               disabled={isChecking || isStarting}
-              className="rounded-md border px-3 py-1.5 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
-              style={{
-                borderColor: 'var(--theme-border)',
-                background: 'var(--theme-card)',
-                color: 'inherit',
-              }}
+              className="rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isChecking ? 'Retrying…' : 'Retry'}
             </button>
@@ -287,10 +276,7 @@ export function ClaudeReconnectBanner({
               type="button"
               onClick={() => void handleStartAgent()}
               disabled={isStarting}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
-              style={{
-                background: 'var(--theme-danger)',
-              }}
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60 bg-[var(--theme-danger)]"
             >
               {isStarting ? 'Starting…' : 'Start Agent'}
             </button>

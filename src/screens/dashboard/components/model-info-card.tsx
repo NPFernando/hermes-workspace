@@ -86,11 +86,7 @@ export function ModelInfoCard({
   return (
     <>
       <div
-        className="relative flex h-full flex-col overflow-hidden rounded-xl border"
-        style={{
-          background: 'var(--theme-card)',
-          borderColor: 'var(--theme-border)',
-        }}
+        className="relative flex h-full flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
       >
         <div
           aria-hidden
@@ -186,11 +182,8 @@ export function ModelInfoCard({
           <button
             type="button"
             onClick={() => setShowInventory(true)}
-            className="mt-1 self-start rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
-            style={{
-              borderColor: 'var(--theme-border)',
-              color: palette.muted,
-            }}
+            className="mt-1 self-start rounded border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
+            style={{ color: palette.muted }}
           >
             Inventory →
           </button>
@@ -218,11 +211,7 @@ function CapabilityChip({
 }) {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em]"
-      style={{
-        borderColor: 'var(--theme-border)',
-        color: 'var(--theme-muted)',
-      }}
+      className="inline-flex items-center gap-1 rounded border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
     >
       <span>{label}</span>
       <span style={{ color: tone }}>{value}</span>
@@ -307,24 +296,20 @@ function ModelInventoryModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)]"
-        style={{ borderColor: 'var(--theme-border)' }}
+        className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className="flex items-center justify-between gap-3 border-b px-4 py-3"
-          style={{ borderColor: 'var(--theme-border)' }}
+          className="flex items-center justify-between gap-3 border-b px-4 py-3 border-[var(--theme-border)]"
         >
           <div>
             <h2
-              className="text-sm font-semibold uppercase tracking-[0.18em]"
-              style={{ color: 'var(--theme-text)' }}
+              className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
             >
               Model inventory
             </h2>
             <p
-              className="font-mono text-[10px] uppercase tracking-[0.1em]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
             >
               {models.length} models from {grouped.length || '—'} providers
             </p>
@@ -335,11 +320,7 @@ function ModelInventoryModal({
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="filter…"
-              className="rounded border bg-transparent px-2 py-1 font-mono text-[11px]"
-              style={{
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-text)',
-              }}
+              className="rounded border border-[var(--theme-border)] bg-transparent px-2 py-1 font-mono text-[11px] text-[var(--theme-text)]"
             />
             <button
               type="button"
@@ -351,7 +332,7 @@ function ModelInventoryModal({
                 icon={CancelIcon}
                 size={16}
                 strokeWidth={1.5}
-                style={{ color: 'var(--theme-muted)' }}
+                className="text-[var(--theme-muted)]"
               />
             </button>
           </div>
@@ -360,22 +341,19 @@ function ModelInventoryModal({
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
             <div
-              className="py-8 text-center text-[11px]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="py-8 text-center text-[11px] text-[var(--theme-muted)]"
             >
               Loading models…
             </div>
           ) : error ? (
             <div
-              className="py-8 text-center text-[11px]"
-              style={{ color: 'var(--theme-danger)' }}
+              className="py-8 text-center text-[11px] text-[var(--theme-danger,#ef4444)]"
             >
               {error}
             </div>
           ) : grouped.length === 0 ? (
             <div
-              className="py-8 text-center text-[11px]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="py-8 text-center text-[11px] text-[var(--theme-muted)]"
             >
               No matching models.
             </div>
@@ -383,8 +361,7 @@ function ModelInventoryModal({
             grouped.map(([provider, list]) => (
               <div key={provider} className="mb-4">
                 <h3
-                  className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em]"
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]"
                 >
                   {provider} · {list.length}
                 </h3>
@@ -406,8 +383,7 @@ function ModelInventoryModal({
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span
-                            className="truncate font-mono text-[11px] font-semibold"
-                            style={{ color: 'var(--theme-text)' }}
+                            className="truncate font-mono text-[11px] font-semibold text-[var(--theme-text)]"
                             title={m.id}
                           >
                             {m.name}
@@ -426,8 +402,7 @@ function ModelInventoryModal({
                           ) : null}
                         </div>
                         <div
-                          className="mt-0.5 truncate font-mono text-[9px]"
-                          style={{ color: 'var(--theme-muted)' }}
+                          className="mt-0.5 truncate font-mono text-[9px] text-[var(--theme-muted)]"
                           title={m.id}
                         >
                           {m.id}

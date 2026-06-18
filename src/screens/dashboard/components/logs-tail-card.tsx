@@ -43,11 +43,10 @@ export function LogsTailCard({
   return (
     <>
       <div
-        className="relative flex flex-col gap-2 overflow-hidden rounded-xl border p-3"
+        className="relative flex flex-col gap-2 overflow-hidden rounded-xl border border-[var(--theme-border)] p-3"
         style={{
           background:
             'linear-gradient(150deg, color-mix(in srgb, var(--theme-card) 96%, transparent), color-mix(in srgb, var(--theme-card) 92%, transparent))',
-          borderColor: 'var(--theme-border)',
         }}
       >
         <div className="flex items-center justify-between gap-2">
@@ -56,11 +55,10 @@ export function LogsTailCard({
               icon={TerminalIcon}
               size={14}
               strokeWidth={1.5}
-              style={{ color: 'var(--theme-muted)' }}
+              className="text-[var(--theme-muted)]"
             />
             <h3
-              className="text-[10px] font-semibold uppercase tracking-[0.15em]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]"
             >
               Logs · {logs.file}
             </h3>
@@ -98,28 +96,21 @@ export function LogsTailCard({
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="rounded border px-2 py-0.5 font-mono uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
-              style={{
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-muted)',
-              }}
+              className="rounded border border-[var(--theme-border)] px-2 py-0.5 font-mono uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
             >
               Tail →
             </button>
           </div>
         </div>
         <div
-          className="rounded border p-2 font-mono text-[10px] leading-snug"
+          className="rounded border border-[var(--theme-border)] p-2 font-mono text-[10px] leading-snug max-h-24 overflow-hidden"
           style={{
-            borderColor: 'var(--theme-border)',
             background:
               'color-mix(in srgb, var(--theme-card) 88%, transparent)',
-            maxHeight: 96,
-            overflow: 'hidden',
           }}
         >
           {previewLines.length === 0 ? (
-            <span style={{ color: 'var(--theme-muted)' }}>
+            <span className="text-[var(--theme-muted)]">
               no recent log lines.
             </span>
           ) : (
@@ -196,31 +187,27 @@ function LogsModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)]"
-        style={{ borderColor: 'var(--theme-border)' }}
+        className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className="flex items-center justify-between border-b px-4 py-3"
-          style={{ borderColor: 'var(--theme-border)' }}
+          className="flex items-center justify-between border-b px-4 py-3 border-[var(--theme-border)]"
         >
           <div className="flex items-center gap-3">
             <HugeiconsIcon
               icon={TerminalIcon}
               size={16}
               strokeWidth={1.5}
-              style={{ color: 'var(--theme-text)' }}
+              className="text-[var(--theme-text)]"
             />
             <div>
               <h2
-                className="text-sm font-semibold uppercase tracking-[0.18em]"
-                style={{ color: 'var(--theme-text)' }}
+                className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
               >
                 Live tail · {logs.file}
               </h2>
               <p
-                className="font-mono text-[10px] uppercase tracking-[0.1em]"
-                style={{ color: 'var(--theme-muted)' }}
+                className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
               >
                 {logs.lines.length} lines · {logs.errorCount} errors ·{' '}
                 {logs.warnCount} warns
@@ -260,7 +247,7 @@ function LogsModal({
                 icon={CancelIcon}
                 size={16}
                 strokeWidth={1.5}
-                style={{ color: 'var(--theme-muted)' }}
+                className="text-[var(--theme-muted)]"
               />
             </button>
           </div>
@@ -274,8 +261,7 @@ function LogsModal({
         >
           {filtered.length === 0 ? (
             <div
-              className="py-6 text-center text-[11px]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="py-6 text-center text-[11px] text-[var(--theme-muted)]"
             >
               No matching log lines.
             </div>

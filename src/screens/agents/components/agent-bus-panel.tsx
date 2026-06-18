@@ -117,13 +117,13 @@ function StatTile({
     <div
       className={cn(
         'rounded-2xl border px-4 py-3',
-        tone === 'good' && 'border-emerald-200 bg-emerald-50 text-emerald-900',
-        tone === 'warn' && 'border-amber-200 bg-amber-50 text-amber-950',
-        tone === 'bad' && 'border-red-200 bg-red-50 text-red-900',
-        tone === 'neutral' && 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-text)]',
+        tone === 'good' && 'border-emerald-400/40 bg-[var(--theme-card)] text-emerald-400',
+        tone === 'warn' && 'border-amber-400/40 bg-[var(--theme-card)] text-amber-400',
+        tone === 'bad' && 'border-red-400/40 bg-[var(--theme-card)] text-red-400',
+        tone === 'neutral' && 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]',
       )}
     >
-      <div className="text-2xl font-semibold leading-none">{value}</div>
+      <div className="text-2xl font-semibold leading-none terminal-glow-soft">{value}</div>
       <div className="mt-1 text-xs font-medium uppercase tracking-[0.08em] opacity-70">
         {label}
       </div>
@@ -200,7 +200,7 @@ export function AgentBusPanel() {
   }
 
   return (
-    <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 shadow-[0_24px_80px_var(--theme-shadow)]">
+    <section className="glass-panel rounded-3xl border border-[var(--theme-border)] p-5 shadow-[0_24px_80px_var(--theme-shadow)]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-accent-strong)]">
@@ -223,7 +223,7 @@ export function AgentBusPanel() {
           Loading Agent Bus…
         </div>
       ) : error ? (
-        <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-900">
+        <div className="mt-5 rounded-2xl border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-4 py-4 text-sm text-red-400">
           {error}
         </div>
       ) : (

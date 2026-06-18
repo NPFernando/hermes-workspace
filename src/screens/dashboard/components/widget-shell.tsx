@@ -65,12 +65,7 @@ export function WidgetShell({
             e.stopPropagation()
             layout.hide(id)
           }}
-          className="absolute -right-2 -top-2 z-10 inline-flex size-6 items-center justify-center rounded-full text-[14px] font-bold leading-none shadow-md transition-transform hover:scale-110"
-          style={{
-            background: 'var(--theme-card)',
-            color: 'var(--theme-danger)',
-            border: '1px solid var(--theme-border)',
-          }}
+          className="absolute -right-2 -top-2 z-10 inline-flex size-6 items-center justify-center rounded-full text-[14px] font-bold leading-none shadow-md transition-transform hover:scale-110 bg-[var(--theme-card)] text-[var(--theme-danger)] border border-[var(--theme-border)]"
           title={`Hide ${meta?.label ?? id}`}
           aria-label={`Hide widget ${meta?.label ?? id}`}
         >

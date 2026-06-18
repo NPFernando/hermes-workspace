@@ -129,8 +129,7 @@ export function ContextMeter({
         />
       </div>
       <span
-        className="text-[10px] shrink-0 tabular-nums"
-        style={{ color: 'var(--color-muted, #888)' }}
+        className="text-[10px] shrink-0 tabular-nums text-[var(--theme-muted)]"
       >
         {Math.round(pct)}%
       </span>

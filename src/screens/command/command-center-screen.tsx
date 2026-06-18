@@ -50,7 +50,7 @@ const TYPE_BADGE: Record<SisterType, { label: string; classes: string }> = {
   },
   business_agent: {
     label: 'Business',
-    classes: 'border-violet-400/40 bg-violet-400/10 text-violet-600',
+    classes: 'border-violet-400/40 bg-violet-400/10 text-violet-400',
   },
   delegation_profile: {
     label: 'Profile',
@@ -73,43 +73,44 @@ function StatTile({
     <div
       className={cn(
         'flex min-w-[80px] flex-col items-center gap-0.5 rounded-xl border px-3 py-2',
-        tone === 'good' && 'border-emerald-200 bg-emerald-50',
-        tone === 'warn' && 'border-amber-200 bg-amber-50',
-        tone === 'bad' && 'border-red-200 bg-red-50',
+        tone === 'good' && 'border-emerald-400/40 bg-[var(--theme-card)]',
+        tone === 'warn' && 'border-amber-400/40 bg-[var(--theme-card)]',
+        tone === 'bad' && 'border-red-400/40 bg-[var(--theme-card)]',
         tone === 'neutral' && 'border-primary-200 bg-[var(--theme-card)]',
       )}
     >
       <span
         className={cn(
           'text-lg font-bold leading-none',
-          tone === 'good' && 'text-emerald-700',
-          tone === 'warn' && 'text-amber-700',
-          tone === 'bad' && 'text-red-700',
+          tone === 'good' && 'text-emerald-500',
+          tone === 'warn' && 'text-amber-500',
+          tone === 'bad' && 'text-red-500',
           tone === 'neutral' && 'text-primary-900',
         )}
       >
         {value}
       </span>
-      <span className="text-[10px] font-medium uppercase tracking-wider text-primary-400">
+      <span className="micro-label">
         {label}
       </span>
     </div>
   )
 }
 
-function SisterCard({ sister, onChat }: { sister: Sister; onChat: () => void }) {
+function SisterCard({ sister, onChat, className }: { sister: Sister; onChat: () => void; className?: string }) {
   const badge = TYPE_BADGE[sister.type]
   return (
     <div
       className={cn(
-        'group flex flex-col gap-3 rounded-2xl border p-4 shadow-sm transition-colors',
+        'group flex flex-col gap-3 rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
         sister.isLive
-          ? 'border-primary-200 bg-[var(--theme-card)] hover:border-primary-300'
+          ? 'border-primary-200 bg-[var(--theme-card)] hover:border-[var(--theme-accent)]/30'
           : 'border-primary-100 bg-primary-50/60 opacity-70',
+        className,
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary-200 bg-white text-2xl shadow-sm">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary-200 bg-[var(--theme-card2)] text-2xl shadow-sm">
           {sister.emoji}
         </div>
         <div className="min-w-0 flex-1">
@@ -130,12 +131,12 @@ function SisterCard({ sister, onChat }: { sister: Sister; onChat: () => void }) 
           {badge.label}
         </span>
         {sister.growthLabel ? (
-          <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-300/50 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+          <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/40 bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] font-medium text-emerald-500">
             {sister.growthEmoji ?? '🌱'} {sister.growthLabel}
           </span>
         ) : null}
         {sister.hasProfile ? (
-          <span className="inline-flex items-center rounded-full border border-primary-200 bg-white px-2 py-0.5 text-[10px] font-medium text-primary-500">
+          <span className="inline-flex items-center rounded-full border border-primary-200 bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] font-medium text-primary-500">
             profile ✓
           </span>
         ) : null}
@@ -161,13 +162,13 @@ function SisterCard({ sister, onChat }: { sister: Sister; onChat: () => void }) 
   )
 }
 
-function PresetCard({ preset }: { preset: PersonalityPreset }) {
+function PresetCard({ preset, className }: { preset: PersonalityPreset; className?: string }) {
   const sep = ' — '
   const roleLabel = preset.label.startsWith(`${preset.name}${sep}`)
     ? preset.label.slice(preset.name.length + sep.length)
     : preset.label
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-4 shadow-sm">
+    <div className={cn('flex flex-col gap-2 rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--theme-accent)]/30', className)}>
       <div className="flex items-center gap-2">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-accent-500/30 bg-accent-500/10 text-sm font-bold text-accent-600">
           {preset.name.charAt(0)}
@@ -194,7 +195,7 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
 function Spinner() {
   return (
     <div className="flex h-24 items-center justify-center rounded-2xl border border-primary-200 bg-primary-50">
-      <div className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600" />
+      <div className="spinner-accent" />
     </div>
   )
 }
@@ -279,7 +280,7 @@ export function CommandCenterScreen() {
   )
 
   return (
-    <main className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+    <main data-route-page className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
       <section className="mx-auto w-full max-w-[1480px] space-y-6">
 
         {/* ── Header ── */}
@@ -344,6 +345,7 @@ export function CommandCenterScreen() {
                 <SisterCard
                   key={s.id}
                   sister={s}
+                  className="domino-item"
                   onChat={() => void navigate({ to: '/chat/$sessionKey', params: { sessionKey: getOperationsSessionKey(s.id) } })}
                 />
               ))}
@@ -360,6 +362,7 @@ export function CommandCenterScreen() {
                 <SisterCard
                   key={s.id}
                   sister={s}
+                  className="domino-item"
                   onChat={() => void navigate({ to: '/chat/$sessionKey', params: { sessionKey: getOperationsSessionKey(s.id) } })}
                 />
               ))}
@@ -376,6 +379,7 @@ export function CommandCenterScreen() {
                 <SisterCard
                   key={s.id}
                   sister={s}
+                  className="domino-item"
                   onChat={() => void navigate({ to: '/chat/$sessionKey', params: { sessionKey: getOperationsSessionKey(s.id) } })}
                 />
               ))}
@@ -393,7 +397,7 @@ export function CommandCenterScreen() {
             <Spinner />
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-              {presets.map((p) => <PresetCard key={p.key} preset={p} />)}
+              {presets.map((p) => <PresetCard key={p.key} preset={p} className="domino-item" />)}
             </div>
           )}
         </section>
@@ -418,7 +422,7 @@ export function CommandCenterScreen() {
                 {latestActivity.map((item) => (
                   <li
                     key={item.id}
-                    className="flex items-start gap-3 rounded-xl border border-primary-100 bg-[var(--theme-card)] px-4 py-3 shadow-sm"
+                    className="domino-item flex items-start gap-3 rounded-xl border border-primary-100 bg-[var(--theme-card)] px-4 py-3 shadow-sm transition-all hover:-translate-y-px hover:shadow-md"
                   >
                     <span
                       className={cn(

@@ -634,7 +634,7 @@ export function Swarm2ReportsView({
     const disabled = busyId === `reply:${row.id}`
     return (
       <div className="mt-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
-        <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]" htmlFor={`guidance-${row.id}`}>
+        <label className="mb-2 block micro-label" htmlFor={`guidance-${row.id}`}>
           Guidance for {row.workerId}
         </label>
         <textarea
@@ -965,14 +965,14 @@ export function Swarm2ReportsView({
                     <dl className="grid gap-2 md:grid-cols-2">
                       {row.details.map((detail) => (
                         <div key={detail.label} className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2">
-                          <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">{detail.label}</dt>
+                          <dt className="micro-label">{detail.label}</dt>
                           <dd className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-[var(--theme-text)]">{detail.value}</dd>
                         </div>
                       ))}
                     </dl>
                     {(row.artifacts.length > 0 || row.previews.length > 0) ? (
                       <div className="mt-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2">
-                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">Artifacts</div>
+                        <div className="mb-2 micro-label">Artifacts</div>
                         <div className="flex flex-wrap gap-1.5">
                           {row.artifacts.map((artifact) => (
                             <span key={artifact.id} title={artifact.path ?? artifact.label} className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[10px] text-[var(--theme-muted-2)]">

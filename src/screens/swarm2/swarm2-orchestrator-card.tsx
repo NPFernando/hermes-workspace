@@ -192,7 +192,7 @@ export function Swarm2OrchestratorCard({
             <button
               type="button"
               onClick={onOpenRouter}
-              className="inline-flex h-9 items-center gap-1 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+              className="inline-flex h-9 items-center gap-1 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 micro-label hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
             >
               <HugeiconsIcon
                 icon={MessageMultiple01Icon}

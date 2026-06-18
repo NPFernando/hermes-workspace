@@ -138,12 +138,12 @@ const LANES: Array<{ id: KanbanLane; label: string; hint: string }> = [
 ]
 
 const LANE_TONE: Record<KanbanLane, string> = {
-  backlog: 'border-slate-400/40 bg-slate-500/10 text-slate-700',
-  ready: 'border-blue-400/40 bg-blue-500/10 text-blue-700',
-  running: 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700',
-  review: 'border-violet-400/40 bg-violet-500/10 text-violet-700',
+  backlog: 'border-slate-400/40 bg-slate-500/10 text-slate-300',
+  ready: 'border-blue-400/40 bg-blue-500/10 text-blue-400',
+  running: 'border-emerald-400/40 bg-emerald-500/10 text-emerald-400',
+  review: 'border-violet-400/40 bg-violet-500/10 text-violet-400',
   blocked: 'border-red-400/40 bg-red-500/10 text-red-700',
-  done: 'border-green-400/40 bg-green-500/10 text-green-700',
+  done: 'border-green-400/40 bg-green-500/10 text-green-400',
 }
 
 async function fetchKanbanCards(): Promise<{ cards: Array<SwarmKanbanCard>; backend: KanbanBackendMeta | null }> {
@@ -205,8 +205,8 @@ type ParsedTaskLabel = { tier1: string; tier2?: string; color: string }
 
 const LABEL_COLORS = [
   'border-sky-400/50 bg-sky-500/10 text-sky-700',
-  'border-violet-400/50 bg-violet-500/10 text-violet-700',
-  'border-emerald-400/50 bg-emerald-500/10 text-emerald-700',
+  'border-violet-400/50 bg-violet-500/10 text-violet-400',
+  'border-emerald-400/50 bg-emerald-500/10 text-emerald-400',
   'border-amber-400/50 bg-amber-500/10 text-amber-700',
   'border-rose-400/50 bg-rose-500/10 text-rose-700',
   'border-cyan-400/50 bg-cyan-500/10 text-cyan-700',
@@ -368,7 +368,7 @@ export function Swarm2KanbanBoard({
   const blockedCount = cardsByLane.get('blocked')?.length ?? 0
 
   return (
-    <section className={cn('rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-[0_24px_80px_var(--theme-shadow)]', className)}>
+    <section data-route-page className={cn('rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-[0_24px_80px_var(--theme-shadow)]', className)}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Manual planning</div>
@@ -386,7 +386,7 @@ export function Swarm2KanbanBoard({
               rel="noopener noreferrer"
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full border px-2 py-1 font-medium transition-colors',
-                'border-emerald-400/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20',
+                'border-emerald-400/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20',
               )}
               title={`${backendPresentation.title ?? ''}\nOpen in Hermes Dashboard ↗`}
               aria-live="polite"
@@ -402,9 +402,9 @@ export function Swarm2KanbanBoard({
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full border px-2 py-1 font-medium',
                 backendPresentation.badgeTone === 'hermes-proxy'
-                  ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700'
+                  ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-400'
                   : backendPresentation.badgeTone === 'claude'
-                    ? 'border-violet-400/40 bg-violet-500/10 text-violet-700'
+                    ? 'border-violet-400/40 bg-violet-500/10 text-violet-400'
                     : backendPresentation.badgeTone === 'local'
                       ? 'border-amber-400/40 bg-amber-500/10 text-amber-700'
                       : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)]',
@@ -607,7 +607,7 @@ export function Swarm2KanbanBoard({
                       </div>
                     ) : null}
                     {card.status === 'running' || card.latestRun ? (
-                      <div className="mt-2 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-2 py-1.5 text-[10px] text-emerald-700">
+                      <div className="mt-2 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-2 py-1.5 text-[10px] text-emerald-400">
                         <div className="font-semibold">{card.status === 'running' ? `Running for ${formatElapsedSince(card.updatedAt)}` : 'Latest run'}</div>
                         {card.latestRun?.summary ? <div className="mt-0.5 line-clamp-2">{card.latestRun.summary}</div> : null}
                         {card.latestRun && (card.latestRun.status || card.latestRun.outcome) ? <div className="mt-0.5 opacity-75">{[card.latestRun.status, card.latestRun.outcome].filter(Boolean).join(' · ')}</div> : null}

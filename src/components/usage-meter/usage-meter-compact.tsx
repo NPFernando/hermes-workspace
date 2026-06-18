@@ -278,8 +278,8 @@ export function UsageMeterCompact() {
           className={cn(
             'flex items-center gap-1 rounded px-1 text-[9px] font-semibold uppercase tracking-widest transition-colors',
             canCycle
-              ? 'cursor-pointer text-neutral-400 hover:text-neutral-600'
-              : 'cursor-default text-neutral-400',
+              ? 'cursor-pointer text-[var(--theme-muted)] hover:text-[var(--theme-text)]'
+              : 'cursor-default text-[var(--theme-muted)]',
             providerFlash && 'text-emerald-500 ring-1 ring-accent-400',
           )}
           title={canCycle ? 'Click to switch provider' : undefined}
@@ -295,7 +295,7 @@ export function UsageMeterCompact() {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="text-[9px] text-neutral-300 hover:text-neutral-500 transition-colors cursor-pointer"
+          className="text-[9px] text-[var(--theme-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
           aria-expanded={expanded}
           aria-label={expanded ? 'Collapse usage' : 'Expand usage'}
         >
@@ -309,16 +309,16 @@ export function UsageMeterCompact() {
           {allRows.map((row) => (
             <div key={row.label} className="flex items-center gap-1.5">
               <div className="w-12 shrink-0">
-                <span className="block text-[9px] leading-none text-neutral-500">
+                <span className="block text-[9px] leading-none text-[var(--theme-muted)]">
                   {row.label}
                 </span>
                 {row.resetHint && (
-                  <span className="block text-[8px] leading-none text-neutral-400 mt-0.5">
+                  <span className="block text-[8px] leading-none text-[var(--theme-muted)] mt-0.5">
                     {row.resetHint}
                   </span>
                 )}
               </div>
-              <div className="h-1 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700">
+              <div className="h-1 flex-1 rounded-full bg-[var(--theme-card2)]">
                 <div
                   className={cn('h-full rounded-full transition-all', barColor(row.pct))}
                   style={{ width: `${row.pct}%` }}

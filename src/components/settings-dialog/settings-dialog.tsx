@@ -111,10 +111,10 @@ function SectionHeader({
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-500">
         Settings
       </p>
-      <h3 className="text-base font-semibold text-primary-900 dark:text-neutral-100">
+      <h3 className="text-base font-semibold text-primary-900">
         {title}
       </h3>
-      <p className="text-xs text-primary-500 dark:text-neutral-400">
+      <p className="text-xs text-primary-500">
         {description}
       </p>
     </div>
@@ -133,11 +133,11 @@ function Row({
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 py-1.5">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-primary-900 dark:text-neutral-100">
+        <p className="text-sm font-medium text-primary-900">
           {label}
         </p>
         {description && (
-          <p className="text-xs text-primary-500 dark:text-neutral-400">
+          <p className="text-xs text-primary-500">
             {description}
           </p>
         )}
@@ -763,7 +763,7 @@ function HermesContent() {
                   </Button>
                 </div>
 
-                <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+                <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-xs text-[var(--theme-muted)]">
                   {oauthMessage || 'Start the browser-based OAuth flow.'}
                   {oauthUserCode ? (
                     <div className="mt-2">
@@ -814,7 +814,7 @@ function HermesContent() {
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+                <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-xs text-[var(--theme-muted)]">
                   {disc?.online ? (
                     <>
                       Detected {disc.modelCount} model
@@ -971,8 +971,7 @@ function HermesContent() {
                           value={customBaseUrl}
                           onChange={(e) => setCustomBaseUrl(e.target.value)}
                           placeholder="http://127.0.0.1:38238/v1"
-                          className="w-full rounded border-0 bg-transparent py-0.5 text-[11px] outline-none"
-                          style={{ color: 'var(--theme-text)' }}
+                          className="w-full rounded border-0 bg-transparent py-0.5 text-[11px] outline-none text-[var(--theme-text)]"
                           autoFocus
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -986,14 +985,14 @@ function HermesContent() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={cn('size-2 rounded-full', hasValue ? 'bg-green-500' : 'bg-neutral-500')} />
+                    <span className={cn('size-2 rounded-full', hasValue ? 'bg-emerald-400' : 'bg-[var(--theme-muted)]')} />
                     {isEditing ? (
                       <>
                         <button type="button" onClick={() => { save({ config: { model: { provider: 'manifest' }, providers: { manifest: { type: 'openai', base_url: customBaseUrl, key_env: 'CUSTOM_API_KEY' } } } }).then(() => setEditingKey(null)) }} className="text-xs font-medium text-green-400">Save</button>
                         <button type="button" onClick={() => setEditingKey(null)} className="text-xs" style={mutedStyle}>Cancel</button>
                       </>
                     ) : (
-                      <button type="button" onClick={() => setEditingKey('custom_base_url')} className="text-xs font-medium" style={{ color: 'var(--theme-accent)' }}>
+                      <button type="button" onClick={() => setEditingKey('custom_base_url')} className="text-xs font-medium text-[var(--theme-accent)]">
                         {hasValue ? 'Edit' : 'Add'}
                       </button>
                     )}
@@ -1021,8 +1020,7 @@ function HermesContent() {
                           value={customModel}
                           onChange={(e) => setCustomModel(e.target.value)}
                           placeholder="e.g. gpt-4o-mini, llama3:8b"
-                          className="w-full rounded border-0 bg-transparent py-0.5 text-[11px] outline-none"
-                          style={{ color: 'var(--theme-text)' }}
+                          className="w-full rounded border-0 bg-transparent py-0.5 text-[11px] outline-none text-[var(--theme-text)]"
                           autoFocus
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') setEditingKey(null)
@@ -1040,7 +1038,7 @@ function HermesContent() {
                     <span
                       className={cn(
                         'size-2 rounded-full',
-                        hasValue ? 'bg-green-500' : 'bg-neutral-500',
+                        hasValue ? 'bg-emerald-400' : 'bg-[var(--theme-muted)]',
                       )}
                     />
                     {isEditing ? (
@@ -1055,8 +1053,7 @@ function HermesContent() {
                       <button
                         type="button"
                         onClick={() => setEditingKey('custom_model')}
-                        className="text-xs font-medium"
-                        style={{ color: 'var(--theme-accent)' }}
+                        className="text-xs font-medium text-[var(--theme-accent)]"
                       >
                         {hasValue ? 'Edit' : 'Add'}
                       </button>
@@ -1130,8 +1127,7 @@ function HermesContent() {
                         value={keyInput}
                         onChange={(e) => setKeyInput(e.target.value)}
                         placeholder={`Paste ${key}`}
-                        className="w-full rounded border-0 bg-transparent py-0.5 text-[11px] outline-none"
-                        style={{ color: 'var(--theme-text)' }}
+                        className="w-full rounded border-0 bg-transparent py-0.5 text-[11px] outline-none text-[var(--theme-text)]"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && keyInput) {
@@ -1156,7 +1152,7 @@ function HermesContent() {
                   <span
                     className={cn(
                       'size-2 rounded-full',
-                      hasKey ? 'bg-green-500' : 'bg-neutral-500',
+                      hasKey ? 'bg-emerald-400' : 'bg-[var(--theme-muted)]',
                     )}
                   />
                   {isEditing ? (
@@ -1180,8 +1176,7 @@ function HermesContent() {
                           setEditingKey(null)
                           setKeyInput('')
                         }}
-                        className="rounded-lg px-2 py-1 text-[11px] font-medium"
-                        style={{ color: 'var(--theme-muted)' }}
+                        className="rounded-lg px-2 py-1 text-[11px] font-medium text-[var(--theme-muted)]"
                       >
                         Cancel
                       </button>
@@ -1358,10 +1353,10 @@ function _ProfileContent() {
         <div className="flex items-center gap-3">
           <UserAvatar size={44} src={cs.avatarDataUrl} alt={displayName} />
           <div>
-            <p className="text-sm font-medium text-primary-900 dark:text-neutral-100">
+            <p className="text-sm font-medium text-primary-900">
               {displayName}
             </p>
-            <p className="text-xs text-primary-500 dark:text-neutral-400">
+            <p className="text-xs text-primary-500">
               No email connected
             </p>
           </div>
@@ -1400,7 +1395,7 @@ function _ProfileContent() {
                 onChange={handleAvatarUpload}
                 disabled={processing}
                 aria-label="Upload profile picture"
-                className="block max-w-[13rem] cursor-pointer text-xs text-primary-700 dark:text-neutral-300 file:mr-2 file:cursor-pointer file:rounded-lg file:border file:border-primary-200 file:bg-primary-100 file:px-2.5 file:py-1.5 file:text-xs file:font-medium file:text-primary-900 file:transition-colors hover:file:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50"
+                className="block max-w-[13rem] cursor-pointer text-xs text-primary-700 file:mr-2 file:cursor-pointer file:rounded-lg file:border file:border-primary-200 file:bg-primary-100 file:px-2.5 file:py-1.5 file:text-xs file:font-medium file:text-primary-900 file:transition-colors hover:file:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </label>
             <Button
@@ -1676,10 +1671,10 @@ function EnterpriseThemePicker() {
     <div className="space-y-3">
       <div className="flex items-center justify-between rounded-lg border border-primary-200 px-3 py-2">
         <div>
-          <p className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+          <p className="text-xs font-semibold text-primary-900">
             {currentMode === 'dark' ? 'Dark mode' : 'Light mode'}
           </p>
-          <p className="text-[11px] text-primary-500 dark:text-neutral-400">
+          <p className="text-[11px] text-primary-500">
             Toggle the current theme family between paired light and dark
             variants.
           </p>
@@ -1720,7 +1715,7 @@ function EnterpriseThemePicker() {
               <ThemeSwatch colors={t.preview} />
               <div className="flex items-center gap-1">
                 <span className="text-xs">{t.icon}</span>
-                <span className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+                <span className="text-xs font-semibold text-primary-900">
                   {t.label}
                 </span>
                 {isActive && (
@@ -1729,7 +1724,7 @@ function EnterpriseThemePicker() {
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-primary-500 dark:text-neutral-400 leading-tight">
+              <p className="text-[10px] text-primary-500 leading-tight">
                 {t.desc}
               </p>
             </button>
@@ -1936,7 +1931,7 @@ function NotificationsContent() {
               aria-valuemax={100}
               aria-valuenow={settings.usageThreshold}
             />
-            <span className="w-10 text-right text-sm tabular-nums text-primary-700 dark:text-neutral-300">
+            <span className="w-10 text-right text-sm tabular-nums text-primary-700">
               {settings.usageThreshold}%
             </span>
           </div>
@@ -2149,7 +2144,7 @@ function AgentBehaviorContent() {
             max={100}
             value={Number(config.max_turns) || 50}
             onChange={(e) => save('max_turns', Number(e.target.value))}
-            className="h-8 w-20 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-center text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+            className="h-8 w-20 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-center text-[var(--theme-text)] outline-none"
           />
         </Row>
         <Row label="Gateway timeout" description="Seconds before timeout">
@@ -2159,14 +2154,14 @@ function AgentBehaviorContent() {
             max={600}
             value={Number(config.gateway_timeout) || 120}
             onChange={(e) => save('gateway_timeout', Number(e.target.value))}
-            className="h-8 w-20 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-center text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+            className="h-8 w-20 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-center text-[var(--theme-text)] outline-none"
           />
         </Row>
         <Row label="Tool enforcement" description="When agent must use tools">
           <select
             value={String(config.tool_use_enforcement || 'auto')}
             onChange={(e) => save('tool_use_enforcement', e.target.value)}
-            className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+            className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
           >
             <option value="auto">Auto</option>
             <option value="required">Required</option>
@@ -2258,7 +2253,7 @@ function VoiceContent() {
           <select
             value={ttsProvider}
             onChange={(e) => saveTts('provider', e.target.value)}
-            className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+            className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
           >
             <option value="edge">Edge TTS</option>
             <option value="elevenlabs">ElevenLabs</option>
@@ -2280,7 +2275,7 @@ function VoiceContent() {
                   voice: e.target.value,
                 })
               }
-              className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+              className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
             >
               {['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map(
                 (v) => (
@@ -2307,7 +2302,7 @@ function VoiceContent() {
           <select
             value={sttProvider}
             onChange={(e) => saveStt('provider', e.target.value)}
-            className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+            className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
           >
             {STT_PROVIDER_OPTIONS.map((provider) => (
               <option key={provider.value} value={provider.value}>
@@ -2327,7 +2322,7 @@ function VoiceContent() {
                     model: e.target.value,
                   })
                 }
-                className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+                className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
               >
                 {GROQ_STT_MODELS.map((model) => (
                   <option key={model} value={model}>
@@ -2405,7 +2400,7 @@ function DisplayContent() {
           <select
             value={String(config.personality || 'default')}
             onChange={(e) => save('personality', e.target.value)}
-            className="h-8 rounded-lg border border-primary-200 bg-primary-50 px-2 text-sm text-primary-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+            className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
           >
             <option value="default">Default</option>
             <option value="concise">Concise</option>
@@ -2462,7 +2457,7 @@ function LanguageContent() {
             setLocale(e.target.value as LocaleId)
             window.location.reload()
           }}
-          className="h-9 w-full rounded-lg border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-800 px-3 text-sm text-primary-900 dark:text-neutral-100 outline-none md:max-w-xs"
+          className="h-9 w-full rounded-lg border border-primary-200 border-[var(--theme-border)] bg-[var(--theme-input)] px-3 text-sm text-[var(--theme-text)] outline-none md:max-w-xs"
         >
           {(Object.entries(LOCALE_LABELS) as Array<[LocaleId, string]>).map(
             ([id, label]) => (
@@ -2523,7 +2518,7 @@ export function SettingsDialog({
         <div className="flex h-full min-h-0 flex-col">
           <div className="flex items-center justify-between border-b border-primary-200 bg-primary-50/80 px-4 py-4 md:rounded-t-2xl md:px-5">
             <div>
-              <DialogTitle className="text-base font-semibold text-primary-900 dark:text-neutral-100">
+              <DialogTitle className="text-base font-semibold text-primary-900">
                 Settings
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -2535,7 +2530,7 @@ export function SettingsDialog({
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  className="rounded-full text-primary-500 hover:bg-primary-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                  className="rounded-full text-[var(--theme-muted)] hover:bg-[var(--theme-card)]"
                   aria-label="Close"
                 >
                   <HugeiconsIcon
@@ -2605,7 +2600,7 @@ export function SettingsDialog({
             </div>
           </SettingsErrorBoundary>
 
-          <div className="sticky bottom-0 z-10 border-t border-primary-200 bg-primary-50/60 px-4 py-3 text-xs text-primary-500 dark:text-neutral-400 md:rounded-b-2xl md:px-5">
+          <div className="sticky bottom-0 z-10 border-t border-primary-200 bg-primary-50/60 px-4 py-3 text-xs text-primary-500 md:rounded-b-2xl md:px-5">
             Most changes save automatically; the default model commits only when you click Set as default.{' '}
             <a
               href="/settings"

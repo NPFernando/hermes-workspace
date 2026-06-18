@@ -47,13 +47,11 @@ export function DiffBlock({ code }: { code: string }) {
 
   return (
     <div
-      className="my-2 overflow-hidden rounded-lg border text-xs font-mono"
-      style={{ borderColor: 'var(--theme-border)', background: 'var(--theme-bg)' }}
+      className="my-2 overflow-hidden rounded-lg border text-xs font-mono border-[var(--theme-border)] bg-[var(--theme-bg)]"
     >
       {/* Header bar */}
       <div
-        className="flex items-center justify-between border-b px-3 py-1.5"
-        style={{ borderColor: 'var(--theme-border)', background: 'var(--theme-card2)' }}
+        className="flex items-center justify-between border-b px-3 py-1.5 border-[var(--theme-border)] bg-[var(--theme-card2)]"
       >
         <span className="text-[10px] uppercase tracking-wider text-primary-400 font-medium">diff</span>
         <button

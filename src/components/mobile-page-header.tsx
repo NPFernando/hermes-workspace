@@ -40,8 +40,7 @@ export function MobilePageHeader({
           height="16"
           viewBox="0 0 20 16"
           fill="none"
-          className="opacity-70"
-          style={{ color: 'var(--color-ink, #111)' }}
+          className="opacity-70 text-[var(--theme-text)]"
         >
           <path
             d="M1 1.5H19M1 8H19M1 14.5H13"
@@ -52,8 +51,7 @@ export function MobilePageHeader({
         </svg>
       </button>
       <span
-        className="flex-1 text-center text-[15px] font-semibold truncate -ml-11"
-        style={{ color: 'var(--color-ink, #111)' }}
+        className="flex-1 text-center text-[15px] font-semibold truncate -ml-11 text-[var(--theme-text)]"
       >
         {title}
       </span>

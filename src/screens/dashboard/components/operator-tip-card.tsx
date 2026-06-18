@@ -253,11 +253,10 @@ export function OperatorTipCard({
 
   return (
     <div
-      className="relative flex items-stretch gap-3 overflow-hidden rounded-xl border p-3"
+      className="relative flex items-stretch gap-3 overflow-hidden rounded-xl border border-[var(--theme-border)] p-3"
       style={{
         background:
           'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 96%, transparent), color-mix(in srgb, var(--theme-card) 92%, transparent))',
-        borderColor: 'var(--theme-border)',
       }}
     >
       <div
@@ -297,11 +296,7 @@ export function OperatorTipCard({
               <button
                 type="button"
                 onClick={handleCta}
-                className="rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] transition-all hover:scale-[1.03] hover:bg-[var(--theme-card)]/70"
-                style={{
-                  borderColor: 'var(--theme-border)',
-                  color: 'var(--theme-text)',
-                }}
+                className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] transition-all hover:scale-[1.03] hover:bg-[var(--theme-card)]/70 text-[var(--theme-text)]"
               >
                 {tip.cta ?? 'Open'} →
               </button>
@@ -311,11 +306,7 @@ export function OperatorTipCard({
               onClick={handleNext}
               aria-label="Next tip"
               title="Next tip"
-              className="inline-flex size-6 items-center justify-center rounded-full border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70"
-              style={{
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-muted)',
-              }}
+              className="inline-flex size-6 items-center justify-center rounded-full border border-[var(--theme-border)] transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70 text-[var(--theme-muted)]"
             >
               <HugeiconsIcon
                 icon={Refresh01Icon}
@@ -326,14 +317,12 @@ export function OperatorTipCard({
           </div>
         </div>
         <h3
-          className="text-[12px] font-semibold leading-tight"
-          style={{ color: 'var(--theme-text)' }}
+          className="text-[12px] font-semibold leading-tight text-[var(--theme-text)]"
         >
           {tip.title}
         </h3>
         <p
-          className="text-[11px] leading-snug"
-          style={{ color: 'var(--theme-muted)' }}
+          className="text-[11px] leading-snug text-[var(--theme-muted)]"
         >
           {tip.body}
         </p>

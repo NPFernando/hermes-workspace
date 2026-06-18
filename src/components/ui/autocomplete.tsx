@@ -33,8 +33,7 @@ function AutocompleteInput({
 
   return (
     <div
-      className="relative not-has-[>*.w-full]:w-fit w-full has-disabled:opacity-64"
-      style={{ color: 'var(--theme-text)' }}
+      className="relative not-has-[>*.w-full]:w-fit w-full has-disabled:opacity-64 text-[var(--theme-text)]"
     >
       {startAddon && (
         <div
@@ -139,11 +138,10 @@ function AutocompleteItem({
   return (
     <AutocompletePrimitive.Item
       className={cn(
-        'flex min-h-8 cursor-default select-none items-center rounded-sm px-2 py-1 text-base outline-none data-disabled:pointer-events-none data-highlighted:bg-[var(--theme-card2)] data-disabled:opacity-64 sm:min-h-7 sm:text-sm',
+        'flex min-h-8 cursor-default select-none items-center rounded-sm px-2 py-1 text-base outline-none data-disabled:pointer-events-none data-highlighted:bg-[var(--theme-card2)] data-disabled:opacity-64 sm:min-h-7 sm:text-sm text-[var(--theme-text)]',
         className,
       )}
       data-slot="autocomplete-item"
-      style={{ color: 'var(--theme-text)' }}
       {...props}
     >
       {children}
@@ -183,9 +181,8 @@ function AutocompleteGroupLabel({
 }: AutocompletePrimitive.GroupLabel.Props) {
   return (
     <AutocompletePrimitive.GroupLabel
-      className={cn('px-2 py-1.5 font-medium text-xs', className)}
+      className={cn('px-2 py-1.5 font-medium text-xs text-[var(--theme-muted)]', className)}
       data-slot="autocomplete-group-label"
-      style={{ color: 'var(--theme-muted)' }}
       {...props}
     />
   )
@@ -198,11 +195,10 @@ function AutocompleteEmpty({
   return (
     <AutocompletePrimitive.Empty
       className={cn(
-        'not-empty:p-2 text-center text-base sm:text-sm',
+        'not-empty:p-2 text-center text-base sm:text-sm text-[var(--theme-muted)]',
         className,
       )}
       data-slot="autocomplete-empty"
-      style={{ color: 'var(--theme-muted)' }}
       {...props}
     />
   )
@@ -275,11 +271,10 @@ function AutocompleteStatus({
   return (
     <AutocompletePrimitive.Status
       className={cn(
-        'px-3 py-2 font-medium text-xs empty:m-0 empty:p-0',
+        'px-3 py-2 font-medium text-xs empty:m-0 empty:p-0 text-[var(--theme-muted)]',
         className,
       )}
       data-slot="autocomplete-status"
-      style={{ color: 'var(--theme-muted)' }}
       {...props}
     />
   )

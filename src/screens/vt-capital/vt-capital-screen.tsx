@@ -135,8 +135,7 @@ function MiniEvent({
 }) {
   return (
     <div
-      className="rounded-lg border p-3"
-      style={{ background: 'var(--theme-card2)', borderColor: 'var(--theme-border)' }}
+      className="rounded-lg border p-3 bg-[var(--theme-card2)] border-[var(--theme-border)]"
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
         {label}
@@ -282,8 +281,7 @@ export function VtCapitalScreen() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
         <h1
-          className="text-xl font-semibold"
-          style={{ color: 'var(--theme-danger)' }}
+          className="text-xl font-semibold text-[var(--theme-danger,#ef4444)]"
         >
           VT Capital non caricato
         </h1>
@@ -306,8 +304,7 @@ export function VtCapitalScreen() {
   return (
     <div
       data-plugin-surface="vt-capital"
-      className="min-h-full p-4 pb-28 pt-14 md:p-6 md:pb-28 lg:p-10 lg:pb-28"
-      style={{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }}
+      className="min-h-full p-4 pb-28 pt-14 md:p-6 md:pb-28 lg:p-10 lg:pb-28 bg-[var(--theme-bg)] text-[var(--theme-text)]"
     >
       <div className="mx-auto flex max-w-7xl flex-col gap-3 md:gap-5">
         <header

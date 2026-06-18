@@ -18,10 +18,12 @@ export const Route = createFileRoute('/api/hindsight/status')({
 
         const config = getHindsightConfig()
         const dlqCount = getDlqCount()
+        const url = new URL(request.url)
+        const bank = url.searchParams.get('bank') ?? undefined
 
         const [healthResult, statsResult] = await Promise.allSettled([
           getHindsightHealth(),
-          getHindsightStats(),
+          getHindsightStats(bank),
         ])
 
         const daemon =

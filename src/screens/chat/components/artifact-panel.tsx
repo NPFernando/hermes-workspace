@@ -35,7 +35,7 @@ function ArtifactBody({ artifact, showSource }: { artifact: InlineArtifact; show
         sandbox="allow-scripts"
         srcDoc={artifact.content}
         className="h-full w-full border-0"
-        style={{ background: 'white' }}
+        
       />
     )
   }
@@ -106,20 +106,17 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
 
   return (
     <div
-      className="flex h-full flex-col border-l"
-      style={{ borderColor: 'var(--theme-border)', background: 'var(--theme-bg)' }}
+      className="flex h-full flex-col border-l border-[var(--theme-border)] bg-[var(--theme-bg)]"
     >
       {/* Header */}
       <div
-        className="flex shrink-0 items-center gap-2 border-b px-3 py-2"
-        style={{ borderColor: 'var(--theme-border)' }}
+        className="flex shrink-0 items-center gap-2 border-b px-3 py-2 border-[var(--theme-border)]"
       >
         <span className="min-w-0 flex-1 truncate text-sm font-semibold" title={artifact.title}>
           {artifact.title}
         </span>
         <span
-          className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide shrink-0"
-          style={{ background: 'var(--theme-card2)', color: 'var(--theme-muted)' }}
+          className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide shrink-0 bg-[var(--theme-card2)] text-[var(--theme-muted)]"
         >
           {artifact.type}
         </span>
@@ -136,8 +133,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
       {/* Tab strip for multiple artifacts */}
       {artifacts.length > 1 && (
         <div
-          className="flex shrink-0 gap-0.5 overflow-x-auto border-b px-2 py-1.5"
-          style={{ borderColor: 'var(--theme-border)' }}
+          className="flex shrink-0 gap-0.5 overflow-x-auto border-b px-2 py-1.5 border-[var(--theme-border)]"
         >
           {artifacts.map((a, i) => (
             <button
@@ -174,8 +170,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
 
       {/* Footer actions */}
       <div
-        className="flex shrink-0 items-center gap-1.5 border-t px-3 py-2"
-        style={{ borderColor: 'var(--theme-border)' }}
+        className="flex shrink-0 items-center gap-1.5 border-t px-3 py-2 border-[var(--theme-border)]"
       >
         {!isEditing && canToggleSource && (
           <button

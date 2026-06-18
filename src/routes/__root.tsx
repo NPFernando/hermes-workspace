@@ -50,7 +50,7 @@ const APP_CSP = [
 ].join('; ')
 
 const THEME_STORAGE_KEY = 'claude-theme'
-const DEFAULT_THEME = 'claude-nous'
+const DEFAULT_THEME = 'odysseus'
 const VALID_THEMES = [
   'claude-nous',
   'claude-nous-light',
@@ -60,6 +60,11 @@ const VALID_THEMES = [
   'claude-classic-light',
   'claude-slate',
   'claude-slate-light',
+  'matrix',
+  'matrix-light',
+  'scifi',
+  'scifi-light',
+  'odysseus',
 ]
 
 const themeScript = `
@@ -70,7 +75,7 @@ const themeScript = `
     const root = document.documentElement
     const storedTheme = localStorage.getItem('${THEME_STORAGE_KEY}')
     const theme = ${JSON.stringify(VALID_THEMES)}.includes(storedTheme) ? storedTheme : '${DEFAULT_THEME}'
-    const lightThemes = ['claude-nous-light', 'claude-official-light', 'claude-classic-light', 'claude-slate-light']
+    const lightThemes = ['claude-nous-light', 'claude-official-light', 'claude-classic-light', 'claude-slate-light', 'matrix-light', 'scifi-light']
     const isDark = !lightThemes.includes(theme)
     root.classList.remove('light', 'dark', 'system')
     root.classList.add(isDark ? 'dark' : 'light')
@@ -101,9 +106,14 @@ const themeColorScript = `
       'claude-classic-light': '#F5F2ED',
       'claude-slate': '#0d1117',
       'claude-slate-light': '#F6F8FA',
+      'matrix': '#020804',
+      'matrix-light': '#F4FFF6',
+      'scifi': '#060b18',
+      'scifi-light': '#EEF1F5',
+      'odysseus': '#282c34',
     }
     const nextColor = colors[theme] || colors['${DEFAULT_THEME}']
-    const isDark = !['claude-nous-light', 'claude-official-light', 'claude-classic-light', 'claude-slate-light'].includes(String(theme))
+    const isDark = !['claude-nous-light', 'claude-official-light', 'claude-classic-light', 'claude-slate-light', 'matrix-light', 'scifi-light'].includes(String(theme))
 
     let meta = document.querySelector('meta[name="theme-color"]')
     if (!meta) {
@@ -118,10 +128,10 @@ const themeColorScript = `
 `
 
 const DEFAULT_SPLASH_HTML = `
-<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,#FFAC02 45%, transparent))" />
+<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px rgba(224,108,117,0.45))" />
 <img src="/claude-banner.png" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.5))" />
-<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:#9CB2AE">Workspace</div>
-<div style="margin-top:28px;width:140px;height:3px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;position:relative"><div id="splash-bar" style="width:0%;height:100%;background:#FFAC02;border-radius:3px;transition:width 0.4s ease"></div></div>
+<div style="font:400 14px/1 'JetBrains Mono Variable',ui-monospace,monospace;letter-spacing:0.06em;color:rgba(156,222,242,0.55)">Workspace</div>
+<div style="margin-top:28px;width:140px;height:3px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;position:relative"><div id="splash-bar" style="width:0%;height:100%;background:#e06c75;border-radius:3px;transition:width 0.4s ease"></div></div>
 `
 
 export const Route = createRootRoute({
@@ -162,7 +172,7 @@ export const Route = createRootRoute({
       // PWA meta tags
       {
         name: 'theme-color',
-        content: '#0A0E1A',
+        content: '#282c34',
       },
       {
         name: 'apple-mobile-web-app-capable',
@@ -268,12 +278,6 @@ function SettingsSyncMount() {
 function RootLayout() {
   const { settings } = useSettings()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const isHermesWorldLandingRoute =
-    pathname === '/hermes-world' ||
-    pathname.startsWith('/hermes-world/') ||
-    pathname === '/world' ||
-    pathname.startsWith('/world/')
-  const isGameSurfaceRoute = isHermesWorldLandingRoute || pathname === '/playground' || pathname.startsWith('/playground/')
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
     null,
   )
@@ -396,12 +400,12 @@ function RootLayout() {
               <Outlet />
             </ErrorBoundary>
           </WorkspaceShell>
-          {!isHermesWorldLandingRoute ? <SearchModal /> : null}
+          <SearchModal />
           {/* Keep UsageMeter mounted so search-modal OPEN_USAGE still works even when the pill is hidden by default. */}
-          {!isGameSurfaceRoute ? <UsageMeter visible={settings.showUsageMeter} /> : null}
-          {!isHermesWorldLandingRoute ? <KeyboardShortcutsModal /> : null}
-          {!isHermesWorldLandingRoute ? <UpdateCenterNotifier /> : null}
-          {rootSurfaceState.showPostOnboardingOverlays && !isGameSurfaceRoute ? (
+          <UsageMeter visible={settings.showUsageMeter} />
+          <KeyboardShortcutsModal />
+          <UpdateCenterNotifier />
+          {rootSurfaceState.showPostOnboardingOverlays ? (
             <>
               <MobilePromptTrigger />
               <OnboardingTour />
@@ -457,17 +461,25 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           dangerouslySetInnerHTML={{
             __html: wrapInlineScript(`
           (function(){
-            if (location.pathname === '/hermes-world' || location.pathname.indexOf('/hermes-world/') === 0 || location.pathname === '/world' || location.pathname.indexOf('/world/') === 0) return;
             var d = document.getElementById('splash-screen');
             if (!d) return;
-            var bg = '#031A1A', txt = '#F8F1E3', muted = '#9CB2AE', accent = '#FFAC02';
+            var bg = '#282c34', txt = '#9cdef2', muted = 'rgba(156,222,242,0.55)', accent = '#e06c75', dotGrid = false, monoFont = true;
             try {
               var theme = localStorage.getItem('${THEME_STORAGE_KEY}') || '${DEFAULT_THEME}';
-              if (theme === 'claude-nous') {
+              if (theme === 'odysseus') {
+                bg = '#282c34';
+                txt = '#9cdef2';
+                muted = 'rgba(156,222,242,0.55)';
+                accent = '#e06c75';
+                dotGrid = true;
+                monoFont = true;
+              } else if (theme === 'claude-nous') {
                 bg = '#031A1A';
                 txt = '#F8F1E3';
                 muted = '#9CB2AE';
                 accent = '#FFAC02';
+                dotGrid = false;
+                monoFont = false;
               } else if (theme === 'claude-nous-light') {
                 bg = '#F8FAF8';
                 txt = '#16315F';
@@ -478,6 +490,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 txt = '#eceff4';
                 muted = '#7f8a96';
                 accent = '#b98a44';
+              } else if (theme === 'claude-official') {
+                bg = '#0a0e1a';
+                txt = '#e6eaf2';
+                muted = '#9aa5bd';
+                accent = '#6366f1';
               } else if (theme === 'claude-official-light') {
                 bg = '#F7F7F1';
                 txt = '#16315F';
@@ -498,17 +515,41 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 txt = '#24292f';
                 muted = '#57606A';
                 accent = '#3b82f6';
+              } else if (theme === 'matrix') {
+                bg = '#020804';
+                txt = '#d8ffe3';
+                muted = 'rgba(216,255,227,0.58)';
+                accent = '#00ff41';
+              } else if (theme === 'matrix-light') {
+                bg = '#F4FFF6';
+                txt = '#062a12';
+                muted = 'rgba(6,42,18,0.55)';
+                accent = '#008f2d';
+              } else if (theme === 'scifi') {
+                bg = '#060b18';
+                txt = '#e0f7fa';
+                muted = '#5d9bb8';
+                accent = '#00f0ff';
+              } else if (theme === 'scifi-light') {
+                bg = '#eef1f5';
+                txt = '#0a1628';
+                muted = '#5a6a7e';
+                accent = '#0097a7';
               }
             } catch(e){}
 
-            var isDark = !['claude-nous-light','claude-official-light','claude-classic-light','claude-slate-light'].includes(theme);
-            var quips = ["Consulting the oracle...","Loading ancient knowledge...","Warming up the messenger...","Calibrating tool chain...","Summoning your agent...","Preparing the workspace...","Bridging realms...","Initializing agent runtime..."];
-            var quip = quips[Math.floor(Math.random() * quips.length)];
+            var isDark = !['claude-nous-light','claude-official-light','claude-classic-light','claude-slate-light','matrix-light','scifi-light'].includes(theme);
+            var fontStack = monoFont ? "'JetBrains Mono Variable',ui-monospace,monospace" : "system-ui,-apple-system,sans-serif";
+            var letterSpacing = monoFont ? '0.06em' : '0.04em';
+            var gridStyle = dotGrid ? ';background-image:radial-gradient(rgba(53,90,102,0.45) 1px,transparent 1px);background-size:20px 20px' : '';
+            var terminalQuips = ['> initializing agent runtime...','> loading ancient knowledge...','> calibrating tool chain...','> summoning your agent...','> bridging realms...','> connecting to Hermes...'];
+            var quip = (dotGrid || theme === 'matrix' || theme === 'scifi') ? terminalQuips[Math.floor(Math.random() * terminalQuips.length)] : '';
 
-            d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.5s ease;';
+            d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.5s ease'+gridStyle+';';
             d.innerHTML = '<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
               + '<img src="'+(isDark ? '/claude-banner.png' : '/claude-banner-light.png')+'" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px '+(isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')+')" />'
-              + '<div style="font:400 14px/1 system-ui,-apple-system,sans-serif;letter-spacing:0.04em;color:'+muted+'">Workspace</div>'
+              + '<div style="font:400 14px/1 '+fontStack+';letter-spacing:'+letterSpacing+';color:'+muted+'">Workspace</div>'
+              + (quip ? '<div style="margin-top:10px;font:400 11px/1 '+fontStack+';letter-spacing:0.08em;color:'+accent+';opacity:0.6">'+quip+'</div>' : '')
               + '<div style="margin-top:28px;width:140px;height:3px;background:'+(isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')+';border-radius:3px;overflow:hidden;position:relative"><div id=splash-bar style="width:0%;height:100%;background:'+accent+';border-radius:3px;transition:width 0.4s ease"></div></div>';
 
             var bar = document.getElementById('splash-bar');

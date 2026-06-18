@@ -193,11 +193,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
   const isOnTerminalRoute = pathname.startsWith('/terminal')
-  const isOnPlaygroundRoute = pathname === '/playground' || pathname.startsWith('/playground/')
-  const isOnHermesWorldLandingRoute = pathname === '/hermes-world' || pathname.startsWith('/hermes-world/') || pathname === '/world' || pathname.startsWith('/world/')
   const isEmbeddedSurface =
     search.embed === '1' || search.embed === 'true' || search.mode === 'embed'
-  const isChromeFreeSurface = isEmbeddedSurface || isOnHermesWorldLandingRoute
+  const isChromeFreeSurface = isEmbeddedSurface
   const hideChatSidebar = isOnChatRoute && chatFocusMode
   const showDesktopSidebarBackdrop =
     !isChromeFreeSurface && !isMobile && !isOnChatRoute && !sidebarCollapsed
@@ -294,9 +292,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleToggleEvent)
   }, [isMobile, setSidebarCollapsed, toggleSidebar])
 
-  // Public/launch surfaces should behave like normal web pages, not app-shell panes.
-  // This keeps /hermes-world and /world scrollable at the document level and avoids
-  // local-only workspace chrome for X/GitHub traffic.
+  // Embedded surfaces bypass the app shell chrome.
   if (isChromeFreeSurface) {
     return <>{children}</>
   }
@@ -335,8 +331,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             {/* Centered title */}
             <div className="flex-1 text-center">
               <span
-                className="text-[13px] font-medium select-none"
-                style={{ color: 'var(--theme-accent, #B98A44)' }}
+                className="text-[13px] font-medium select-none text-[var(--theme-accent)]"
               >
                 Hermes
               </span>
@@ -433,12 +428,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             </div>
           </main>
 
-          {/* Chat panel — visible on non-chat routes (but not in HermesWorld, which has its own in-game chat) */}
-          {!isOnChatRoute && !isOnPlaygroundRoute && !isMobile && <ChatPanel />}
+          {/* Chat panel — visible on non-chat routes */}
+          {!isOnChatRoute && !isMobile && <ChatPanel />}
         </div>
 
-        {/* Floating chat toggle — visible on non-chat routes (but not in HermesWorld) */}
-        {!isOnChatRoute && !isOnPlaygroundRoute && !isMobile && <ChatPanelToggle />}
+        {/* Floating chat toggle — visible on non-chat routes */}
+        {!isOnChatRoute && !isMobile && <ChatPanelToggle />}
 
         {showDesktopSidebarBackdrop ? (
           <button

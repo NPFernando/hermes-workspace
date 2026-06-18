@@ -57,15 +57,15 @@ function SectionCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-2xl border border-primary-200 bg-primary-50/80 p-4 shadow-sm backdrop-blur-xl dark:border-neutral-800 dark:bg-neutral-900/60 md:p-5">
+    <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm backdrop-blur-xl md:p-5">
       <div className="mb-4 flex items-start gap-3">
-        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary-200 bg-primary-100/70 dark:border-neutral-700 dark:bg-neutral-800">
+        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)]">
           <HugeiconsIcon icon={icon} size={15} strokeWidth={1.8} />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-primary-900 dark:text-neutral-100">{title}</h3>
+          <h3 className="text-sm font-semibold text-[var(--theme-text)]">{title}</h3>
           {description && (
-            <p className="mt-0.5 text-xs text-primary-500 dark:text-neutral-400">{description}</p>
+            <p className="mt-0.5 text-xs text-[var(--theme-muted)]">{description}</p>
           )}
         </div>
       </div>
@@ -91,7 +91,7 @@ function Toggle({
         'flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
         checked
           ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300'
-          : 'bg-primary-100 text-primary-600 hover:bg-primary-200 dark:bg-neutral-800 dark:text-neutral-400',
+          : 'bg-[var(--theme-hover)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
       )}
       aria-pressed={checked}
     >
@@ -118,7 +118,7 @@ function RoleBadge({ role }: { role: string }) {
     <span
       className={cn(
         'rounded-md px-1.5 py-0.5 text-[10px] font-medium',
-        colors[role] ?? 'bg-primary-100 text-primary-600 dark:bg-neutral-800 dark:text-neutral-400',
+        colors[role] ?? 'bg-[var(--theme-hover)] text-[var(--theme-muted)]',
       )}
     >
       {role.replace(/_/g, ' ')}
@@ -144,13 +144,13 @@ function TierModelRow({
   onRemove: () => void
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-primary-200 bg-surface px-3 py-2 text-sm dark:border-neutral-800">
+    <div className="flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-surface px-3 py-2 text-sm ">
       <div className="flex flex-col gap-0.5">
         <button
           type="button"
           onClick={onMoveUp}
           disabled={index === 0}
-          className="rounded p-0.5 text-primary-400 hover:bg-primary-100 disabled:opacity-30 dark:hover:bg-neutral-800"
+          className="rounded p-0.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] disabled:opacity-30"
         >
           <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={2} />
         </button>
@@ -158,7 +158,7 @@ function TierModelRow({
           type="button"
           onClick={onMoveDown}
           disabled={index === total - 1}
-          className="rounded p-0.5 text-primary-400 hover:bg-primary-100 disabled:opacity-30 dark:hover:bg-neutral-800"
+          className="rounded p-0.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] disabled:opacity-30"
         >
           <HugeiconsIcon icon={ArrowDown01Icon} size={13} strokeWidth={2} />
         </button>
@@ -166,18 +166,18 @@ function TierModelRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="truncate font-mono text-xs font-medium text-primary-900 dark:text-neutral-100">
+          <span className="truncate font-mono text-xs font-medium text-[var(--theme-text)]">
             {model.model}
           </span>
           <RoleBadge role={model.role} />
           {model.provider && model.provider !== 'openrouter' && (
-            <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] text-primary-600 dark:bg-neutral-800 dark:text-neutral-400">
+            <span className="rounded bg-[var(--theme-hover)] px-1.5 py-0.5 text-[10px] text-[var(--theme-muted)]">
               {model.provider}
             </span>
           )}
         </div>
         {model.notes && (
-          <p className="mt-0.5 text-[11px] text-primary-400 dark:text-neutral-500">
+          <p className="mt-0.5 text-[11px] text-[var(--theme-muted)]">
             {model.notes}
           </p>
         )}
@@ -186,7 +186,7 @@ function TierModelRow({
       <button
         type="button"
         onClick={onRemove}
-        className="ml-1 rounded p-1 text-primary-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30"
+        className="ml-1 rounded p-1 text-[var(--theme-muted)] hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30"
       >
         <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} />
       </button>
@@ -220,7 +220,7 @@ function AddModelForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-2 rounded-xl border border-dashed border-primary-200 px-3 py-2 text-xs text-primary-400 transition-colors hover:border-accent-400 hover:text-accent-500 dark:border-neutral-700 dark:hover:border-accent-500"
+        className="flex w-full items-center gap-2 rounded-xl border border-dashed border-[var(--theme-border)] px-3 py-2 text-xs text-[var(--theme-muted)] transition-colors hover:border-accent-400 hover:text-accent-500"
       >
         <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={2} />
         Add model
@@ -235,13 +235,13 @@ function AddModelForm({
           value={modelId}
           onChange={(e) => setModelId(e.target.value)}
           placeholder="provider/model-id"
-          className="h-8 rounded-lg border border-primary-200 bg-surface px-2 text-xs outline-none focus:border-accent-400 dark:border-neutral-700"
+          className="h-8 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-accent-400"
           autoFocus
         />
         <select
           value={role}
           onChange={(e) => setRole(e.target.value)}
-          className="h-8 rounded-lg border border-primary-200 bg-surface px-2 text-xs outline-none focus:border-accent-400 dark:border-neutral-700"
+          className="h-8 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-accent-400"
         >
           <option value="primary">primary</option>
           <option value="fallback">fallback</option>
@@ -254,13 +254,13 @@ function AddModelForm({
           value={provider}
           onChange={(e) => setProvider(e.target.value)}
           placeholder="provider (optional)"
-          className="h-8 rounded-lg border border-primary-200 bg-surface px-2 text-xs outline-none focus:border-accent-400 dark:border-neutral-700"
+          className="h-8 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-accent-400"
         />
         <input
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="notes (optional)"
-          className="h-8 rounded-lg border border-primary-200 bg-surface px-2 text-xs outline-none focus:border-accent-400 dark:border-neutral-700"
+          className="h-8 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-accent-400"
         />
       </div>
       <div className="flex gap-2">
@@ -276,7 +276,7 @@ function AddModelForm({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="rounded-lg px-3 py-1.5 text-xs text-primary-500 hover:bg-primary-100 dark:hover:bg-neutral-800"
+          className="rounded-lg px-3 py-1.5 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
         >
           Cancel
         </button>
@@ -301,10 +301,10 @@ function TierSection({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
           {tier.label}
         </h4>
-        <span className="rounded-md bg-primary-100 px-2 py-0.5 text-[10px] text-primary-500 dark:bg-neutral-800 dark:text-neutral-400">
+        <span className="rounded-md bg-[var(--theme-hover)] px-2 py-0.5 text-[10px] text-[var(--theme-muted)]">
           {tier.provider}
         </span>
       </div>
@@ -332,7 +332,7 @@ function TierSection({
           />
         ))}
         {tier.models.length === 0 && (
-          <p className="py-2 text-center text-xs text-primary-400 dark:text-neutral-500">
+          <p className="py-2 text-center text-xs text-[var(--theme-muted)]">
             No models configured
           </p>
         )}
@@ -391,7 +391,7 @@ function BlocklistSection({
       ))}
 
       {entries.length === 0 && (
-        <p className="py-1 text-xs text-primary-400 dark:text-neutral-500">No blocked models.</p>
+        <p className="py-1 text-xs text-[var(--theme-muted)]">No blocked models.</p>
       )}
 
       <div className="flex gap-2 pt-1">
@@ -400,14 +400,14 @@ function BlocklistSection({
           onChange={(e) => setModelId(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
           placeholder="provider/model-id"
-          className="h-8 flex-1 rounded-lg border border-primary-200 bg-surface px-2 text-xs outline-none focus:border-red-400 dark:border-neutral-700"
+          className="h-8 flex-1 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-red-400"
         />
         <input
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
           placeholder="reason (optional)"
-          className="h-8 flex-1 rounded-lg border border-primary-200 bg-surface px-2 text-xs outline-none focus:border-red-400 dark:border-neutral-700"
+          className="h-8 flex-1 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-red-400"
         />
         <button
           type="button"
@@ -462,11 +462,11 @@ function CapWidget({
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-primary-600 dark:text-neutral-400">
+      <label className="text-xs font-medium text-[var(--theme-muted)]">
         Paid benchmark cap (USD)
       </label>
       <div className="flex items-center gap-1.5">
-        <span className="text-xs text-primary-400 dark:text-neutral-500">$</span>
+        <span className="text-xs text-[var(--theme-muted)]">$</span>
         <input
           ref={inputRef}
           type="number"
@@ -474,10 +474,10 @@ function CapWidget({
           min={0}
           defaultValue={(dailyValue * multiplier).toFixed(2)}
           onBlur={handleBlur}
-          className="h-8 w-20 rounded-lg border border-primary-200 bg-surface px-2 text-xs outline-none focus:border-accent-400 dark:border-neutral-700"
+          className="h-8 w-20 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-accent-400"
         />
-        <span className="text-xs text-primary-400 dark:text-neutral-500">per</span>
-        <div className="flex overflow-hidden rounded-lg border border-primary-200 dark:border-neutral-700">
+        <span className="text-xs text-[var(--theme-muted)]">per</span>
+        <div className="flex overflow-hidden rounded-lg border border-[var(--theme-border)]">
           {(['day', 'week', 'month'] as Array<CapPeriod>).map((p) => (
             <button
               key={p}
@@ -487,7 +487,7 @@ function CapWidget({
                 'h-8 px-2.5 text-xs transition-colors',
                 p === period
                   ? 'bg-accent-500 font-medium text-white'
-                  : 'bg-surface text-primary-500 hover:bg-primary-100 dark:text-neutral-400 dark:hover:bg-neutral-800',
+                  : 'bg-surface text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
               )}
             >
               {CAP_LABELS[p]}
@@ -496,7 +496,7 @@ function CapWidget({
         </div>
       </div>
       {dailyHint && (
-        <p className="text-[10px] text-primary-400 dark:text-neutral-500">{dailyHint}</p>
+        <p className="text-[10px] text-[var(--theme-muted)]">{dailyHint}</p>
       )}
     </div>
   )
@@ -527,15 +527,15 @@ export function HarpConfigScreen() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 py-8 text-sm text-primary-500">
-        <span className="animate-spin">⟳</span> Loading HARP config…
+      <div className="flex items-center gap-2 py-8 text-sm text-[var(--theme-muted)]">
+        <span className="spinner-accent spinner-sm mr-1" /> Loading HARP config…
       </div>
     )
   }
 
   if (error || !data?.available) {
     return (
-      <div className="space-y-4">
+      <div data-route-page className="space-y-4">
         <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900/40 dark:bg-amber-950/20">
           <div className="mb-2 flex items-center gap-2 text-amber-700 dark:text-amber-300">
             <HugeiconsIcon icon={InformationCircleIcon} size={16} strokeWidth={1.8} />
@@ -576,7 +576,7 @@ export function HarpConfigScreen() {
   const { global: g, tiers, blocklist, autoImprove } = data
 
   const savingIndicator = mutation.isPending ? (
-    <span className="text-[11px] text-primary-400 dark:text-neutral-500">Saving…</span>
+    <span className="text-[11px] text-[var(--theme-muted)]">Saving…</span>
   ) : mutation.isSuccess ? (
     <span className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
       <HugeiconsIcon icon={CheckmarkCircle02Icon} size={12} strokeWidth={2} />
@@ -593,10 +593,10 @@ export function HarpConfigScreen() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold text-primary-900 dark:text-neutral-100">
+          <h2 className="text-base font-semibold text-[var(--theme-text)]">
             HARP-VM Routing
           </h2>
-          <p className="mt-0.5 text-xs text-primary-500 dark:text-neutral-400">
+          <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
             Tiered free-first model routing for your OCI VM
           </p>
         </div>
@@ -634,13 +634,13 @@ export function HarpConfigScreen() {
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-primary-600 dark:text-neutral-400">
+            <label className="text-xs font-medium text-[var(--theme-muted)]">
               Mode
             </label>
             <select
               value={g.mode}
               onChange={(e) => patch({ action: 'set-global', field: 'mode', value: e.target.value })}
-              className="h-8 rounded-lg border border-primary-200 bg-surface px-2 text-xs outline-none focus:border-accent-400 dark:border-neutral-700"
+              className="h-8 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-accent-400"
             >
               <option value="tiered_with_degradation">tiered_with_degradation</option>
               <option value="free_only">free_only</option>
@@ -664,7 +664,7 @@ export function HarpConfigScreen() {
         description="Model priority order — tried top to bottom. Reorder with arrows. Tier 1 & 2 are editable."
         icon={FlowCircleIcon}
       >
-        <div className="space-y-5 divide-y divide-primary-100 dark:divide-neutral-800">
+        <div className="space-y-5 divide-y divide-[var(--theme-border)] dark:divide-neutral-800">
           {tiers.map((tier) => (
             <div key={tier.key} className={cn('pt-4 first:pt-0', tier.key === 'tier1_free' && 'first:pt-0')}>
               <TierSection
@@ -712,7 +712,7 @@ export function HarpConfigScreen() {
 
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-primary-600 dark:text-neutral-400">
+              <label className="text-xs font-medium text-[var(--theme-muted)]">
                 Cron schedule
               </label>
               <input
@@ -720,13 +720,13 @@ export function HarpConfigScreen() {
                   ? (autoImprove.trigger.find((t: Record<string, unknown>) => t.cron) as Record<string, string> | undefined)?.cron ?? ''
                   : ''}
                 placeholder="0 4 * * 1"
-                className="h-8 rounded-lg border border-primary-200 bg-surface px-2 font-mono text-xs outline-none focus:border-accent-400 dark:border-neutral-700"
+                className="h-8 rounded-lg border border-[var(--theme-border)] bg-surface px-2 font-mono text-xs outline-none focus:border-accent-400"
                 readOnly
               />
-              <p className="text-[10px] text-primary-400">Edit in harp-config.yaml to change schedule</p>
+              <p className="text-[10px] text-[var(--theme-muted)]">Edit in harp-config.yaml to change schedule</p>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-primary-600 dark:text-neutral-400">
+              <label className="text-xs font-medium text-[var(--theme-muted)]">
                 Min evals to rank
               </label>
               <input
@@ -737,14 +737,14 @@ export function HarpConfigScreen() {
                   const v = parseInt(e.target.value, 10)
                   if (!isNaN(v) && v > 0) patch({ action: 'set-auto-improve', field: 'min_evals_to_rank', value: v })
                 }}
-                className="h-8 rounded-lg border border-primary-200 bg-surface px-2 text-xs outline-none focus:border-accent-400 dark:border-neutral-700"
+                className="h-8 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-accent-400"
               />
             </div>
           </div>
 
           {autoImprove.deliver && (
-            <div className="rounded-lg border border-primary-200 bg-primary-50/60 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/40">
-              <span className="text-xs text-primary-500 dark:text-neutral-400">
+            <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2">
+              <span className="text-xs text-[var(--theme-muted)]">
                 Reports delivered to: <code className="font-mono text-[11px]">{autoImprove.deliver}</code>
               </span>
             </div>

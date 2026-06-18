@@ -199,6 +199,13 @@ const THEME_PREVIEWS: Record<
     accent: '#0097A7',
     text: '#0A1628',
   },
+  'odysseus': {
+    bg: '#282c34',
+    panel: '#111111',
+    border: 'rgba(53,90,102,0.5)',
+    accent: '#e06c75',
+    text: '#9cdef2',
+  },
 }
 
 function WorkspaceThemePicker() {
@@ -1387,8 +1394,7 @@ function ClaudeConfigSection({
         icon={Settings02Icon}
       >
         <div
-          className="h-20 animate-pulse rounded-lg"
-          style={{ backgroundColor: 'var(--theme-panel)' }}
+          className="h-20 animate-pulse rounded-lg bg-[var(--theme-panel)]"
         />
       </SettingsSection>
     )
@@ -1401,7 +1407,7 @@ function ClaudeConfigSection({
         description="Could not load Hermes configuration."
         icon={Settings02Icon}
       >
-        <p className="text-sm" style={{ color: 'var(--theme-muted)' }}>
+        <p className="text-sm text-[var(--theme-muted)]">
           Make sure Hermes Agent is running on localhost:8642
         </p>
       </SettingsSection>
@@ -1799,8 +1805,7 @@ function ClaudeConfigSection({
                     ) : (
                       <div className="flex items-center gap-2">
                         <span
-                          className="text-xs font-mono"
-                          style={{ color: 'var(--theme-muted)' }}
+                          className="text-xs font-mono text-[var(--theme-muted)]"
                         >
                           {provider.maskedKeys[envKey] || 'Not set'}
                         </span>
@@ -1863,8 +1868,7 @@ function ClaudeConfigSection({
       >
         <SettingsRow label="Backend" description="Terminal execution backend.">
           <span
-            className="text-sm font-mono"
-            style={{ color: 'var(--theme-muted)' }}
+            className="text-sm font-mono text-[var(--theme-muted)]"
           >
             {(terminalConfig.backend as string) || 'local'}
           </span>
@@ -2242,8 +2246,7 @@ function ClaudeConfigSection({
                 ) : (
                   <div className="flex items-center gap-2">
                     <span
-                      className="text-xs font-mono"
-                      style={{ color: 'var(--theme-muted)' }}
+                      className="text-xs font-mono text-[var(--theme-muted)]"
                     >
                       {customApiKeyConfigured
                         ? customProviderCatalogEntry?.maskedKeys['CUSTOM_API_KEY'] || 'Set'
@@ -2330,8 +2333,7 @@ function ClaudeConfigSection({
                 ) : (
                   <div className="flex items-center gap-2">
                     <span
-                      className="text-xs font-mono"
-                      style={{ color: 'var(--theme-muted)' }}
+                      className="text-xs font-mono text-[var(--theme-muted)]"
                     >
                       {manifestBaseUrlOnly || 'Not set'}
                     </span>
@@ -2363,8 +2365,7 @@ function ClaudeConfigSection({
           description="Where Claude stores its configuration."
         >
           <span
-            className="text-xs font-mono"
-            style={{ color: 'var(--theme-muted)' }}
+            className="text-xs font-mono text-[var(--theme-muted)]"
           >
             {data.claudeHome}
           </span>
@@ -2374,8 +2375,7 @@ function ClaudeConfigSection({
           description="Current inference provider."
         >
           <span
-            className="text-sm font-medium"
-            style={{ color: 'var(--theme-accent)' }}
+            className="text-sm font-medium text-[var(--theme-accent)]"
           >
             {data.providers.find((p) => p.id === data.activeProvider)?.name ||
               data.activeProvider}
@@ -2793,8 +2793,7 @@ function ClaudeConfigSection({
       </SettingsRow>
       <SettingsRow label="Skin" description="CLI theme skin.">
         <span
-          className="text-sm font-mono"
-          style={{ color: 'var(--theme-muted)' }}
+          className="text-sm font-mono text-[var(--theme-muted)]"
         >
           {(displayConfig.skin as string) || 'default'}
         </span>

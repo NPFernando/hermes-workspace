@@ -46,8 +46,7 @@ export function EditModePanel({ layout }: { layout: DashboardLayout }) {
             Edit mode
           </span>
           <span
-            className="font-mono text-[10px] uppercase tracking-[0.15em]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
           >
             {layout.counts.visible} of {layout.counts.total} widgets shown
           </span>
@@ -56,12 +55,7 @@ export function EditModePanel({ layout }: { layout: DashboardLayout }) {
           <button
             type="button"
             onClick={layout.reset}
-            className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors hover:bg-[var(--theme-card)]"
-            style={{
-              background: 'var(--theme-card)',
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-text)',
-            }}
+            className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors hover:bg-[var(--theme-card)] bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]"
             title="Show every widget again"
           >
             Reset
@@ -102,8 +96,7 @@ function Group({
   return (
     <div className="flex flex-col gap-1.5">
       <span
-        className="font-mono text-[9px] uppercase tracking-[0.18em]"
-        style={{ color: 'var(--theme-muted)' }}
+        className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--theme-muted)]"
       >
         {title}
       </span>

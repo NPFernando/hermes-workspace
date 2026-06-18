@@ -108,13 +108,13 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
 
           <section className="space-y-2">
             <p className="text-xs font-medium text-primary-700">Max tokens per run</p>
-            <div className="inline-flex rounded-lg bg-neutral-100 dark:bg-neutral-800 p-1 gap-1">
+            <div className="inline-flex rounded-lg bg-[var(--theme-card2)] p-1 gap-1">
               {TOKEN_PRESETS.map((preset) => (
                 <button
                   key={preset.label}
                   type="button"
                   onClick={() => setMaxTokens(preset.value)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${maxTokens === preset.value ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' : 'text-neutral-600 hover:bg-white/70 dark:text-neutral-300 dark:hover:bg-neutral-700'}`}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${maxTokens === preset.value ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:bg-white/70 dark:hover:bg-neutral-700'}`}
                 >
                   {preset.label}
                 </button>
@@ -137,13 +137,13 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-medium text-primary-700">Mode</p>
-              <div className="inline-flex rounded-lg bg-neutral-100 dark:bg-neutral-800 p-1 gap-1">
+              <div className="inline-flex rounded-lg bg-[var(--theme-card2)] p-1 gap-1">
                 {(['allowlist', 'blocklist'] as const).map((mode) => (
                   <button
                     key={mode}
                     type="button"
                     onClick={() => setToolMode(mode)}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${toolMode === mode ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' : 'text-neutral-600 hover:bg-white/70 dark:text-neutral-300 dark:hover:bg-neutral-700'}`}
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${toolMode === mode ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:bg-white/70 dark:hover:bg-neutral-700'}`}
                   >
                     {mode === 'allowlist' ? 'Allowlist' : 'Blocklist'}
                   </button>

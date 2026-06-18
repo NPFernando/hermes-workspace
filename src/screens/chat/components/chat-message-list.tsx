@@ -318,7 +318,7 @@ function ThinkingBubble({
               <div className="flex items-center gap-1.5">
                 {isCompacting ? (
                   <span
-                    className="inline-block size-3 rounded-full border border-primary-300 border-t-primary-500 animate-spin"
+                    className="spinner-accent spinner-sm"
                     aria-hidden="true"
                   />
                 ) : (
@@ -1752,7 +1752,7 @@ function ChatMessageListComponent({
                 className="min-w-0 flex-1 rounded-md border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-sm text-primary-900 outline-none placeholder:text-primary-400 focus:border-primary-400 focus:ring-1 focus:ring-primary-400"
               />
               {isMessageSearchActive && (
-                <span className="shrink-0 text-xs text-primary-500 dark:text-neutral-400">
+                <span className="shrink-0 text-xs text-primary-500">
                   {messageSearchMatches.length > 0
                     ? `${activeSearchMatchIndex + 1} of ${messageSearchMatches.length}`
                     : 'No matches'}
@@ -1763,7 +1763,7 @@ function ChatMessageListComponent({
                   type="button"
                   onClick={jumpToPreviousMatch}
                   disabled={messageSearchMatches.length === 0}
-                  className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
+                  className="rounded p-1 text-primary-500 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
                   aria-label="Previous match"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1780,7 +1780,7 @@ function ChatMessageListComponent({
                   type="button"
                   onClick={jumpToNextMatch}
                   disabled={messageSearchMatches.length === 0}
-                  className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
+                  className="rounded p-1 text-primary-500 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
                   aria-label="Next match"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1796,7 +1796,7 @@ function ChatMessageListComponent({
                 <button
                   type="button"
                   onClick={closeMessageSearch}
-                  className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200"
+                  className="rounded p-1 text-primary-500 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200"
                   aria-label="Close search"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1865,20 +1865,20 @@ function ChatMessageListComponent({
               </div>
             ) : null}
             {loading && displayEntries.length === 0 ? (
-              <div className="flex flex-col gap-4 animate-pulse">
+              <div className="flex flex-col gap-4 skeleton-shimmer">
                 <div className="flex gap-3">
-                  <div className="size-6 rounded-full bg-primary-200" />
+                  <div className="size-6 rounded-full bg-[var(--theme-card2)]" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-primary-200 rounded w-3/4" />
-                    <div className="h-4 bg-primary-200 rounded w-1/2" />
+                    <div className="h-4 bg-[var(--theme-card2)] rounded w-3/4" />
+                    <div className="h-4 bg-[var(--theme-card2)] rounded w-1/2" />
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <div className="size-6 rounded-full bg-primary-200" />
+                  <div className="size-6 rounded-full bg-[var(--theme-card2)]" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-primary-200 rounded w-2/3" />
-                    <div className="h-4 bg-primary-200 rounded w-5/6" />
-                    <div className="h-4 bg-primary-200 rounded w-1/3" />
+                    <div className="h-4 bg-[var(--theme-card2)] rounded w-2/3" />
+                    <div className="h-4 bg-[var(--theme-card2)] rounded w-5/6" />
+                    <div className="h-4 bg-[var(--theme-card2)] rounded w-1/3" />
                   </div>
                 </div>
               </div>

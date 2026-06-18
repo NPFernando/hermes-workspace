@@ -95,17 +95,15 @@ export function AnalyticsHeroCard({
   return (
     <>
       <div
-        className="relative flex flex-col gap-3 overflow-hidden rounded-xl border p-4"
+        className="relative flex flex-col gap-3 overflow-hidden rounded-xl border border-[var(--theme-border)] p-4"
         style={{
           background:
             'linear-gradient(150deg, color-mix(in srgb, var(--theme-card) 96%, transparent), color-mix(in srgb, var(--theme-card) 90%, transparent))',
-          borderColor: 'var(--theme-border)',
         }}
       >
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full opacity-20 blur-3xl"
-          style={{ background: 'var(--theme-accent)' }}
+          className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full opacity-20 blur-3xl bg-[var(--theme-accent)]"
         />
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -113,18 +111,16 @@ export function AnalyticsHeroCard({
               icon={ChartLineData01Icon}
               size={16}
               strokeWidth={1.5}
-              style={{ color: 'var(--theme-accent)' }}
+              className="text-[var(--theme-accent)]"
             />
             <div>
               <h3
-                className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-                style={{ color: 'var(--theme-text)' }}
+                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
               >
                 Analytics · {analytics.windowDays}d
               </h3>
               <p
-                className="font-mono text-[10px] uppercase tracking-[0.1em]"
-                style={{ color: 'var(--theme-muted)' }}
+                className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
               >
                 {formatTokens(analytics.totalTokens)} tokens ·{' '}
                 {analytics.totalApiCalls.toLocaleString()} calls ·{' '}
@@ -136,11 +132,7 @@ export function AnalyticsHeroCard({
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
-              style={{
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-muted)',
-              }}
+              className="rounded border border-[var(--theme-border)] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
             >
               Expand →
             </button>
@@ -252,8 +244,7 @@ export function AnalyticsHeroCard({
             </div>
             <div className="space-y-1.5 lg:col-span-4">
               <div
-                className="text-[10px] font-semibold uppercase tracking-[0.15em]"
-                style={{ color: 'var(--theme-muted)' }}
+                className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]"
               >
                 By model · top 5
               </div>
@@ -264,21 +255,18 @@ export function AnalyticsHeroCard({
                   <div key={m.id} className="text-[11px]">
                     <div className="mb-0.5 flex items-center justify-between gap-2">
                       <span
-                        className="truncate font-mono"
-                        style={{ color: 'var(--theme-text)' }}
+                        className="truncate font-mono text-[var(--theme-text)]"
                         title={m.id}
                       >
                         <span
-                          className="mr-1.5 inline-block w-3 text-right tabular-nums"
-                          style={{ color: 'var(--theme-muted)' }}
+                          className="mr-1.5 inline-block w-3 text-right tabular-nums text-[var(--theme-muted)]"
                         >
                           {i + 1}
                         </span>
                         {formatModelName(m.id)}
                       </span>
                       <span
-                        className="font-mono text-[10px] tabular-nums"
-                        style={{ color: 'var(--theme-muted)' }}
+                        className="font-mono text-[10px] tabular-nums text-[var(--theme-muted)]"
                       >
                         {formatTokens(m.tokens)}
                       </span>
@@ -310,11 +298,7 @@ export function AnalyticsHeroCard({
           </div>
         ) : (
           <div
-            className="flex h-[120px] items-center justify-center rounded-md border border-dashed text-[11px]"
-            style={{
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-muted)',
-            }}
+            className="flex h-[120px] items-center justify-center rounded-md border border-dashed border-[var(--theme-border)] text-[11px] text-[var(--theme-muted)]"
           >
             No analytics usage in the last {analytics.windowDays}d.
           </div>
@@ -335,8 +319,7 @@ export function AnalyticsHeroCard({
 function LegendDot({ tone, label }: { tone: string; label: string }) {
   return (
     <span
-      className="flex items-center gap-1.5"
-      style={{ color: 'var(--theme-muted)' }}
+      className="flex items-center gap-1.5 text-[var(--theme-muted)]"
     >
       <span
         className="size-2 rounded-full"
@@ -365,24 +348,20 @@ function AnalyticsModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)]"
-        style={{ borderColor: 'var(--theme-border)' }}
+        className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className="flex items-center justify-between border-b px-5 py-3"
-          style={{ borderColor: 'var(--theme-border)' }}
+          className="flex items-center justify-between border-b px-5 py-3 border-[var(--theme-border)]"
         >
           <div>
             <h2
-              className="text-sm font-semibold uppercase tracking-[0.18em]"
-              style={{ color: 'var(--theme-text)' }}
+              className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
             >
               Analytics · last {analytics.windowDays}d
             </h2>
             <p
-              className="font-mono text-[10px] uppercase tracking-[0.1em]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
             >
               {formatTokens(analytics.totalTokens)} tokens ·{' '}
               {analytics.totalSessions.toLocaleString()} sessions ·{' '}
@@ -400,7 +379,7 @@ function AnalyticsModal({
               icon={CancelIcon}
               size={18}
               strokeWidth={1.5}
-              style={{ color: 'var(--theme-muted)' }}
+              className="text-[var(--theme-muted)]"
             />
           </button>
         </div>
@@ -408,8 +387,7 @@ function AnalyticsModal({
         <div className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto p-5 lg:grid-cols-12">
           <div className="lg:col-span-8">
             <h3
-              className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]"
             >
               Daily token mix
             </h3>
@@ -483,8 +461,7 @@ function AnalyticsModal({
 
           <div className="lg:col-span-4">
             <h3
-              className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]"
             >
               Models · ranked by tokens
             </h3>
@@ -492,52 +469,47 @@ function AnalyticsModal({
               {analytics.topModels.map((m, i) => (
                 <div
                   key={m.id}
-                  className="rounded border px-3 py-2"
-                  style={{ borderColor: 'var(--theme-border)' }}
+                  className="rounded border px-3 py-2 border-[var(--theme-border)]"
                 >
                   <div className="flex items-center justify-between">
                     <span
-                      className="font-mono text-[12px] font-semibold"
-                      style={{ color: 'var(--theme-text)' }}
+                      className="font-mono text-[12px] font-semibold text-[var(--theme-text)]"
                     >
                       <span
-                        className="mr-1.5 inline-block w-4 text-right tabular-nums"
-                        style={{ color: 'var(--theme-muted)' }}
+                        className="mr-1.5 inline-block w-4 text-right tabular-nums text-[var(--theme-muted)]"
                       >
                         {i + 1}
                       </span>
                       {formatModelName(m.id)}
                     </span>
                     <span
-                      className="font-mono text-[10px] tabular-nums"
-                      style={{ color: 'var(--theme-muted)' }}
+                      className="font-mono text-[10px] tabular-nums text-[var(--theme-muted)]"
                     >
                       {formatTokens(m.tokens)}
                     </span>
                   </div>
                   <div
-                    className="mt-1 truncate font-mono text-[10px]"
-                    style={{ color: 'var(--theme-muted)' }}
+                    className="mt-1 truncate font-mono text-[10px] text-[var(--theme-muted)]"
                     title={m.id}
                   >
                     {m.id}
                   </div>
                   <div className="mt-1 flex items-center gap-3 text-[10px]">
-                    <span style={{ color: 'var(--theme-muted)' }}>
+                    <span className="text-[var(--theme-muted)]">
                       sessions{' '}
-                      <span style={{ color: 'var(--theme-text)' }}>
+                      <span className="text-[var(--theme-text)]">
                         {m.sessions.toLocaleString()}
                       </span>
                     </span>
-                    <span style={{ color: 'var(--theme-muted)' }}>
+                    <span className="text-[var(--theme-muted)]">
                       calls{' '}
-                      <span style={{ color: 'var(--theme-text)' }}>
+                      <span className="text-[var(--theme-text)]">
                         {m.calls.toLocaleString()}
                       </span>
                     </span>
-                    <span style={{ color: 'var(--theme-muted)' }}>
+                    <span className="text-[var(--theme-muted)]">
                       cost{' '}
-                      <span style={{ color: 'var(--theme-text)' }}>
+                      <span className="text-[var(--theme-text)]">
                         {formatCost(m.cost)}
                       </span>
                     </span>

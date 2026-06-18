@@ -228,7 +228,7 @@ function CyclingStatus({ steps, intervalMs = 3000, isPaused = false }: { steps: 
 
   return (
     <div className="flex items-center gap-3 py-3">
-      <div className="size-3.5 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+      <div className="spinner-accent spinner-sm" />
       <p className="text-sm text-[var(--theme-muted)] transition-opacity duration-500">{steps[step]}</p>
     </div>
   )
@@ -358,7 +358,7 @@ function WorkerCard({
           </div>
           <p className="mt-1 text-xs text-[var(--theme-muted-2)]">{worker.displayName}</p>
         </div>
-        <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+        <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2.5 py-1 micro-label">
           {dot.label}
         </span>
       </div>
@@ -1187,14 +1187,14 @@ export function Conductor() {
                       Open in new tab ↗
                     </a>
                   </div>
-                  <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
+                  <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
                     <iframe src={selectedHistoryPreviewUrl!} className="h-[clamp(280px,55vh,520px)] w-full" sandbox="allow-scripts allow-same-origin" title="Mission history output preview" />
                   </div>
                 </section>
               ) : selectedHistoryOutputPath && selectedHistoryPreview.loading ? (
                 <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                   <div className="flex items-center gap-3 text-sm text-[var(--theme-muted)]">
-                    <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-border)] border-t-[var(--theme-accent)]" />
+                    <div className="spinner-accent" />
                     Loading output preview…
                   </div>
                 </section>
@@ -1764,7 +1764,7 @@ export function Conductor() {
                     <div className="max-h-[22rem] overflow-y-auto p-2">
                       {directoryBrowserLoading ? (
                         <div className="flex items-center justify-center gap-3 px-4 py-10 text-sm text-[var(--theme-muted)]">
-                          <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-border)] border-t-[var(--theme-accent)]" />
+                          <div className="spinner-accent" />
                           <span>Loading folders…</span>
                         </div>
                       ) : directoryBrowserEntries.length > 0 ? (
@@ -2010,14 +2010,14 @@ export function Conductor() {
                     </button>
                   </div>
                 </div>
-                <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-white">
+                <div className="mt-4 overflow-auto rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
                   <iframe src={previewUrl!} className="h-[clamp(280px,55vh,520px)] w-full" sandbox="allow-scripts allow-same-origin" title="Mission output preview" />
                 </div>
               </section>
             ) : completePhaseProjectPath && previewState.loading && !conductor.streamError ? (
               <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6 shadow-[0_24px_80px_var(--theme-shadow)]">
                 <div className="flex items-center gap-3 text-sm text-[var(--theme-muted)]">
-                  <div className="size-4 animate-spin rounded-full border-2 border-[var(--theme-border)] border-t-[var(--theme-accent)]" />
+                  <div className="spinner-accent" />
                   Loading output preview…
                 </div>
               </section>
@@ -2368,7 +2368,7 @@ export function Conductor() {
                         <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-8 text-center text-sm text-[var(--theme-muted)] md:col-span-2">
                           <div className="flex flex-col items-center gap-2">
                             <div className="flex items-center justify-center gap-3">
-                              <div className="size-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+                              <div className="spinner-accent" />
                               <span>Spawning workers...</span>
                             </div>
                             {conductor.planText ? <p className="max-w-xl text-xs text-[var(--theme-muted-2)]">{conductor.planText}</p> : null}
@@ -2390,7 +2390,7 @@ export function Conductor() {
                   <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-8 text-center text-sm text-[var(--theme-muted)] md:col-span-2">
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex items-center justify-center gap-3">
-                        <div className="size-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+                        <div className="spinner-accent" />
                         <span>Spawning workers...</span>
                       </div>
                       {conductor.planText ? <p className="max-w-xl text-xs text-[var(--theme-muted-2)]">{conductor.planText}</p> : null}

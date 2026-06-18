@@ -52,17 +52,13 @@ export function AgoraAvatar({
         {/* Self ring */}
         {isSelf && (
           <div
-            className="absolute -inset-1 rounded-full"
-            style={{
-              boxShadow: `0 0 0 2px var(--theme-accent)`,
-            }}
+            className="absolute -inset-1 rounded-full ring-2 ring-[var(--theme-accent)]"
           />
         )}
         {/* Speaking ring */}
         {speaking && (
           <motion.div
-            className="absolute -inset-2 rounded-full"
-            style={{ boxShadow: '0 0 0 3px #10b981' }}
+            className="absolute -inset-2 rounded-full ring-2 ring-emerald-500"
             animate={{ opacity: [0.5, 1, 0.5] }}
             transition={{ duration: 1.2, repeat: Infinity }}
           />
@@ -74,12 +70,10 @@ export function AgoraAvatar({
           width={size}
           height={size}
           draggable={false}
-          className="rounded-full object-cover"
+          className="rounded-full object-cover bg-[var(--theme-card)] border-2 border-[var(--theme-border)]"
           style={{
             width: size,
             height: size,
-            background: 'var(--theme-card)',
-            border: '2px solid var(--theme-border)',
           }}
           onError={(e) => {
             // Fallback to a generic placeholder if PNG missing
@@ -88,20 +82,15 @@ export function AgoraAvatar({
         />
         {/* Status dot */}
         <span
-          className="absolute bottom-0 right-0 block h-3 w-3 rounded-full"
-          style={{
-            background: STATUS_DOT_COLOR[status],
-            border: '2px solid var(--theme-bg)',
-          }}
+          className="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-[var(--theme-bg)]"
+          style={{ background: STATUS_DOT_COLOR[status] }}
         />
       </motion.div>
       {/* Name label */}
       <div
-        className="mt-1 max-w-[80px] truncate rounded px-1.5 py-0.5 text-[10px] font-medium"
+        className="mt-1 max-w-[80px] truncate rounded px-1.5 py-0.5 text-[10px] font-medium border border-[var(--theme-border)] text-[var(--theme-text)]"
         style={{
           background: 'color-mix(in srgb, var(--theme-bg) 80%, transparent)',
-          color: 'var(--theme-text)',
-          border: '1px solid var(--theme-border)',
         }}
         title={displayName}
       >

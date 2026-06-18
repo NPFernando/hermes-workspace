@@ -230,7 +230,7 @@ export function WorkspaceSkillsScreen() {
   }
 
   return (
-    <div className="min-h-full px-4 pb-10 pt-5 text-primary-900 md:px-6 md:pt-8">
+    <div data-route-page className="min-h-full px-4 pb-10 pt-5 text-primary-900 md:px-6 md:pt-8">
       <section className="mx-auto flex min-h-full w-full max-w-[1480px] flex-col gap-5">
         <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3">
@@ -248,7 +248,7 @@ export function WorkspaceSkillsScreen() {
           </div>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-xl border border-primary-200 bg-white shadow-sm lg:grid-cols-2">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] shadow-sm lg:grid-cols-2">
           <section className="min-h-0 border-b border-primary-200 lg:border-b-0">
             <div className="flex h-full min-h-0 flex-col p-4 sm:p-5">
               <div className="flex flex-col gap-3 border-b border-primary-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -401,13 +401,13 @@ export function WorkspaceSkillsScreen() {
                       {selectedSkill.name}
                     </span>
                   </div>
-                  <div className="rounded-xl border border-primary-200 bg-white p-3">
+                  <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
                     {skillContentQuery.isPending ? (
                       <div className="space-y-2">
                         {Array.from({ length: 4 }).map((_, index) => (
                           <div
                             key={index}
-                            className="h-4 animate-pulse rounded bg-primary-100"
+                            className="h-4 skeleton-shimmer rounded"
                           />
                         ))}
                       </div>
@@ -418,7 +418,7 @@ export function WorkspaceSkillsScreen() {
                           : 'Failed to load skill content'}
                       </div>
                     ) : (
-                      <div className="max-h-96 overflow-y-auto rounded-lg border border-primary-200 bg-white p-4 text-sm text-primary-800 prose prose-sm prose-primary max-w-none">
+                      <div className="max-h-96 overflow-y-auto rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 text-sm text-[var(--theme-text)] prose prose-sm prose-primary max-w-none">
                         <SkillMarkdown
                           content={
                             skillContentQuery.data?.trim() ||
@@ -469,7 +469,7 @@ export function WorkspaceSkillsScreen() {
                     value={memorySearch}
                     onChange={(event) => setMemorySearch(event.target.value)}
                     placeholder="Search memory..."
-                    className="w-full rounded-xl border border-primary-200 bg-white px-10 py-2.5 text-sm text-primary-900 outline-none transition-colors placeholder:text-primary-500 focus:border-accent-500/50"
+                    className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-input)] px-10 py-2.5 text-sm text-[var(--theme-text)] outline-none transition-colors placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
                   />
                 </div>
 
@@ -485,7 +485,7 @@ export function WorkspaceSkillsScreen() {
                           'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
                           active
                             ? 'border-accent-500/40 bg-accent-500/10 text-accent-400'
-                            : 'border-primary-200 bg-white text-primary-600 hover:border-primary-300 hover:text-primary-900',
+                            : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-muted)] hover:border-[var(--theme-accent)]/40 hover:text-[var(--theme-text)]',
                         )}
                       >
                         {filter}
@@ -603,7 +603,7 @@ function MemorySectionBlock({
                   'flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors',
                   active
                     ? 'border-accent-500/40 bg-accent-500/5'
-                    : 'border-primary-200 bg-white hover:border-primary-300',
+                    : 'border-[var(--theme-border)] bg-[var(--theme-card)] hover:border-[var(--theme-accent)]/40',
                 )}
               >
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-primary-200 bg-primary-50 text-primary-500">

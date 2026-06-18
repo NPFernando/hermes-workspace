@@ -20,13 +20,9 @@ export function AgoraOnlinePanel({ self, others, nearbyIds, onSelectUser }: Agor
   const all = [self, ...others]
   return (
     <div
-      className="flex h-full flex-col rounded-2xl"
-      style={{
-        background: 'var(--theme-card)',
-        border: '1px solid var(--theme-border)',
-      }}
+      className="flex h-full flex-col rounded-2xl bg-[var(--theme-card)] border border-[var(--theme-border)]"
     >
-      <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--theme-border)' }}>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--theme-border)]">
         <span className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">Online</span>
         <span className="text-[10px] opacity-50">{all.length}</span>
       </div>
@@ -45,8 +41,7 @@ export function AgoraOnlinePanel({ self, others, nearbyIds, onSelectUser }: Agor
                 alt={u.profile.displayName}
                 width={28}
                 height={28}
-                className="rounded-full"
-                style={{ border: '1px solid var(--theme-border)' }}
+                className="rounded-full border border-[var(--theme-border)]"
                 onError={(e) => {
                   ;(e.currentTarget as HTMLImageElement).src = '/avatars/hermes.png'
                 }}

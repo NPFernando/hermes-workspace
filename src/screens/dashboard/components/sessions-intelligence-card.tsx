@@ -180,24 +180,21 @@ export function SessionsIntelligenceCard({
       // vertical space when the parent column is taller than the
       // content (e.g. when the side rail extends below). Iter 013
       // ask: 'make sessions intelligence longer to fill the gap'.
-      className="relative flex h-full flex-1 flex-col gap-2 overflow-hidden rounded-xl border p-3"
+      className="relative flex h-full flex-1 flex-col gap-2 overflow-hidden rounded-xl border border-[var(--theme-border)] p-3"
       style={{
         background:
           'linear-gradient(150deg, color-mix(in srgb, var(--theme-card) 96%, transparent), color-mix(in srgb, var(--theme-card) 90%, transparent))',
-        borderColor: 'var(--theme-border)',
       }}
     >
       <div className="flex items-center justify-between gap-2">
         <h3
-          className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-text)' }}
+          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
         >
           Sessions intelligence
         </h3>
         <div className="flex items-center gap-2">
           <span
-            className="font-mono text-[10px] uppercase tracking-[0.15em]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
           >
             {sessions.length} recent
           </span>
@@ -209,11 +206,7 @@ export function SessionsIntelligenceCard({
                 params: { sessionKey: 'main' },
               })
             }
-            className="rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
-            style={{
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-muted)',
-            }}
+            className="rounded border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
           >
             Open chat →
           </button>
@@ -222,11 +215,7 @@ export function SessionsIntelligenceCard({
 
       {sessions.length === 0 ? (
         <div
-          className="flex h-[120px] items-center justify-center rounded-md border border-dashed text-[11px]"
-          style={{
-            borderColor: 'var(--theme-border)',
-            color: 'var(--theme-muted)',
-          }}
+          className="flex h-[120px] items-center justify-center rounded-md border border-dashed border-[var(--theme-border)] text-[11px] text-[var(--theme-muted)]"
         >
           No sessions yet — start a chat.
         </div>
@@ -269,8 +258,7 @@ export function SessionsIntelligenceCard({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span
-                        className="truncate text-[12px] font-semibold"
-                        style={{ color: 'var(--theme-text)' }}
+                        className="truncate text-[12px] font-semibold text-[var(--theme-text)]"
                         title={s.title}
                       >
                         {shortTitle(s)}
@@ -291,8 +279,7 @@ export function SessionsIntelligenceCard({
                       ))}
                     </div>
                     <div
-                      className="mt-0.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.05em]"
-                      style={{ color: 'var(--theme-muted)' }}
+                      className="mt-0.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.05em] text-[var(--theme-muted)]"
                     >
                       {s.model ? (
                         <span

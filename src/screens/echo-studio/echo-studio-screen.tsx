@@ -66,7 +66,7 @@ export function EchoStudioScreen() {
   }
 
   return (
-    <div className="min-h-full overflow-y-auto bg-surface text-ink">
+    <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
       <div className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-6">
@@ -85,7 +85,7 @@ export function EchoStudioScreen() {
               className={cn(
                 'flex-1 rounded-md px-4 py-2 text-sm font-medium capitalize transition-colors',
                 tab === t
-                  ? 'bg-primary-100 text-ink shadow-sm dark:bg-neutral-800'
+                  ? 'bg-primary-100 text-ink shadow-sm'
                   : 'text-primary-500 hover:text-ink',
               )}
             >
@@ -110,7 +110,7 @@ export function EchoStudioScreen() {
                     value={pageId}
                     onChange={(e) => setPageId(e.target.value)}
                     placeholder="e.g. tool-analytics"
-                    className="w-full rounded-xl border border-primary-200 bg-white px-4 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-primary-400 focus:border-accent-500 dark:bg-neutral-900"
+                    className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-input)] px-4 py-2.5 text-sm text-[var(--theme-text)] outline-none transition-colors placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
                   />
                 </div>
 
@@ -124,7 +124,7 @@ export function EchoStudioScreen() {
                     value={pageTitle}
                     onChange={(e) => setPageTitle(e.target.value)}
                     placeholder="e.g. Tool Analytics"
-                    className="w-full rounded-xl border border-primary-200 bg-white px-4 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-primary-400 focus:border-accent-500 dark:bg-neutral-900"
+                    className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-input)] px-4 py-2.5 text-sm text-[var(--theme-text)] outline-none transition-colors placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
                   />
                 </div>
 
@@ -138,7 +138,7 @@ export function EchoStudioScreen() {
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder={DEFAULT_PROMPT}
                     rows={5}
-                    className="w-full resize-y rounded-xl border border-primary-200 bg-white px-4 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-primary-400 focus:border-accent-500 dark:bg-neutral-900"
+                    className="w-full resize-y rounded-xl border border-[var(--theme-border)] bg-[var(--theme-input)] px-4 py-2.5 text-sm text-[var(--theme-text)] outline-none transition-colors placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
                   />
                 </div>
 
@@ -157,7 +157,7 @@ export function EchoStudioScreen() {
                   >
                     {creating ? (
                       <>
-                        <span className="inline-block size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        <span className="spinner-accent" />
                         Creating...
                       </>
                     ) : (

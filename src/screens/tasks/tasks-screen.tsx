@@ -30,7 +30,10 @@ import {
 } from '@/lib/tasks-api'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { isTypingTarget } from '@/screens/playground/components/keyboard-shortcuts-overlay'
+function isTypingTarget(target: EventTarget | null) {
+  const el = target as HTMLElement | null
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+}
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
 
 const QUERY_KEY = ['claude', 'tasks'] as const
@@ -41,7 +44,7 @@ export const TASKS_BOARD_HELP_TEXT =
 
 function SkeletonCard() {
   return (
-    <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 animate-pulse">
+    <div className="skeleton-shimmer rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
       <div className="h-3.5 bg-[var(--theme-hover)] rounded w-3/4 mb-2" />
       <div className="h-2.5 bg-[var(--theme-hover)] rounded w-full mb-1" />
       <div className="h-2.5 bg-[var(--theme-hover)] rounded w-2/3 mb-3" />
@@ -336,7 +339,7 @@ export function TasksScreen() {
   const colMaxWidth = Math.floor(1200 / visibleColumns.length)
 
   return (
-    <div className="h-full overflow-hidden flex flex-col bg-surface text-ink">
+    <div data-route-page className="h-full overflow-hidden flex flex-col bg-surface text-ink">
       <div className="shrink-0 mx-auto w-full max-w-[1200px] flex flex-col gap-3 px-4 pt-5 pb-2 sm:px-6 lg:px-8">
       {/* Header */}
       <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
@@ -345,7 +348,7 @@ export function TasksScreen() {
           <h1 className="text-2xl font-medium text-ink">Tasks</h1>
           {assigneeFilter && (
             <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
-              <span>Filtered by: <span className="capitalize" style={{ color: '#f59e0b' }}>{assigneeFilter}</span></span>
+              <span>Filtered by: <span className="capitalize text-amber-500">{assigneeFilter}</span></span>
               <button
                 type="button"
                 onClick={() => setAssigneeFilter(null)}
@@ -520,8 +523,7 @@ export function TasksScreen() {
                 render={
                   <button
                     type="button"
-                    className="rounded-lg px-2 py-1 text-xs font-mono transition-colors hover:bg-[var(--theme-hover)]"
-                    style={{ color: 'var(--theme-muted)' }}
+                    className="rounded-lg px-2 py-1 text-xs font-mono transition-colors hover:bg-[var(--theme-hover)] text-[var(--theme-muted)]"
                     aria-label="Keyboard shortcuts"
                   >
                     ?
@@ -529,17 +531,16 @@ export function TasksScreen() {
                 }
               />
               <TooltipContent side="bottom" className="space-y-1 text-[11px] leading-relaxed">
-                <div><kbd className="font-mono rounded px-1" style={{ background: 'var(--theme-hover)' }}>n</kbd> New task (Triage)</div>
-                <div><kbd className="font-mono rounded px-1" style={{ background: 'var(--theme-hover)' }}>/</kbd> Focus search</div>
-                <div><kbd className="font-mono rounded px-1" style={{ background: 'var(--theme-hover)' }}>d</kbd> Toggle Done column</div>
+                <div><kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">n</kbd> New task (Triage)</div>
+                <div><kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">/</kbd> Focus search</div>
+                <div><kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">d</kbd> Toggle Done column</div>
               </TooltipContent>
             </TooltipRoot>
           </TooltipProvider>
 
           <button
             onClick={() => { setCreateColumn('backlog'); setShowCreate(true) }}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
-            style={{ background: 'var(--theme-accent)' }}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 bg-[var(--theme-accent)]"
           >
             <HugeiconsIcon icon={Add01Icon} size={14} />
             New Task
@@ -552,8 +553,7 @@ export function TasksScreen() {
             <HugeiconsIcon
               icon={AiMagicIcon}
               size={14}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ color: nlParsing ? 'var(--theme-accent)' : 'var(--theme-muted)' }}
+              className={cn('absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none', nlParsing ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-muted)]')}
             />
             <input
               ref={nlInputRef}
@@ -563,22 +563,14 @@ export function TasksScreen() {
               onKeyDown={e => { if (e.key === 'Enter') void handleNlCreate() }}
               placeholder="Describe a task in plain language and press Enter…"
               disabled={nlParsing}
-              className="w-full rounded-lg border text-sm pl-8 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)] disabled:opacity-50"
-              style={{
-                background: 'var(--theme-input)',
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-text)',
-              }}
-              onFocus={e => (e.currentTarget.style.borderColor = 'var(--theme-accent)')}
-              onBlur={e => (e.currentTarget.style.borderColor = 'var(--theme-border)')}
+              className="w-full rounded-lg border text-sm pl-8 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)] focus:border-[var(--theme-accent)] disabled:opacity-50 bg-[var(--theme-input)] border-[var(--theme-border)] text-[var(--theme-text)]"
             />
           </div>
           <button
             type="button"
             onClick={() => void handleNlCreate()}
             disabled={!nlInput.trim() || nlParsing}
-            className="px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 shrink-0"
-            style={{ background: 'var(--theme-accent)', color: 'white' }}
+            className="px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 shrink-0 bg-[var(--theme-accent)] text-white"
           >
             {nlParsing ? '✦ Thinking…' : '✦ Create'}
           </button>
@@ -595,8 +587,7 @@ export function TasksScreen() {
           <HugeiconsIcon
             icon={Search01Icon}
             size={13}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ color: 'var(--theme-muted)' }}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--theme-muted)]"
           />
           <input
             ref={searchInputRef}
@@ -604,21 +595,13 @@ export function TasksScreen() {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search tasks… (/)"
-            className="w-full rounded-lg border pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1"
-            style={{
-              background: 'var(--theme-card)',
-              borderColor: 'var(--theme-border)',
-              color: 'var(--theme-text)',
-            }}
-            onFocus={e => (e.currentTarget.style.borderColor = 'var(--theme-accent)')}
-            onBlur={e => (e.currentTarget.style.borderColor = 'var(--theme-border)')}
+            className="w-full rounded-lg border pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-[var(--theme-accent)] bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2"
-              style={{ color: 'var(--theme-muted)' }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--theme-muted)]"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={12} />
             </button>
@@ -688,13 +671,12 @@ export function TasksScreen() {
 
         {/* Match counter + clear all */}
         {tasksByColumn.hasAnyFilter && (
-          <span className="ml-auto text-[10px] flex items-center gap-2 whitespace-nowrap" style={{ color: 'var(--theme-muted)' }}>
+          <span className="ml-auto text-[10px] flex items-center gap-2 whitespace-nowrap text-[var(--theme-muted)]">
             Showing {tasksByColumn.matchCount} of {tasksByColumn.totalTasks}
             <button
               type="button"
               onClick={clearAllFilters}
-              className="hover:underline"
-              style={{ color: 'var(--theme-accent)' }}
+              className="hover:underline text-[var(--theme-accent)]"
             >
               Clear all
             </button>

@@ -459,7 +459,7 @@ export function AgentOutputPanel({
               <div className="flex items-center gap-2">
                 <span className={cn(
                   'size-1.5 rounded-full',
-                  task.status === 'done' ? 'bg-emerald-500' : task.status === 'in_progress' ? 'bg-blue-500 animate-pulse' : 'bg-neutral-500',
+                  task.status === 'done' ? 'bg-emerald-400' : task.status === 'in_progress' ? 'bg-blue-400 animate-pulse' : 'bg-[var(--theme-muted)]',
                 )} />
                 <span className={cn('text-xs font-medium', compact ? 'text-[var(--theme-text)]' : 'text-[var(--theme-text)]')}>
                   {task.title}
@@ -523,7 +523,7 @@ export function AgentOutputPanel({
                   </Markdown>
                 </div>
               ))}
-              <span className="animate-pulse text-emerald-600 dark:text-emerald-400">▊</span>
+              <span className="animate-pulse text-emerald-500">▊</span>
             </>
           ) : messages.length === 0 && !sessionEnded ? (
             <p className="animate-pulse text-[var(--theme-muted)]">Waiting for response…</p>
@@ -580,7 +580,7 @@ export function AgentOutputPanel({
                 ),
               )}
               {!sessionEnded && messages.length > 0 && (
-                <span className="animate-pulse text-emerald-600 dark:text-emerald-400">▊</span>
+                <span className="animate-pulse text-emerald-500">▊</span>
               )}
             </>
           )}
@@ -596,7 +596,7 @@ export function AgentOutputPanel({
           ) : (
             <>
               <p className="text-[var(--theme-muted)]">$ Dispatching to {agentName}…</p>
-              <p className="animate-pulse text-emerald-600 dark:text-emerald-400">▊</p>
+              <p className="animate-pulse text-emerald-500">▊</p>
             </>
           )}
         </div>

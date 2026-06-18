@@ -83,14 +83,12 @@ export function TokenMixCard({
     >
       <div className="flex items-center justify-between gap-2">
         <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-text)' }}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
         >
           Token mix · {analytics.windowDays}d
         </h3>
         <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
           title="Output as % of input — proxy for how chatty the model is."
         >
           out/in {ratio.toFixed(1)}%
@@ -127,8 +125,7 @@ export function TokenMixCard({
           return (
             <li
               key={s.label}
-              className="flex items-center justify-between gap-2"
-              style={{ color: 'var(--theme-muted)' }}
+              className="flex items-center justify-between gap-2 text-[var(--theme-muted)]"
               title={s.hint}
             >
               <span className="flex items-center gap-1.5 truncate">
@@ -142,13 +139,11 @@ export function TokenMixCard({
                 </span>
               </span>
               <span
-                className="shrink-0 font-mono tabular-nums"
-                style={{ color: 'var(--theme-text)' }}
+                className="shrink-0 font-mono tabular-nums text-[var(--theme-text)]"
               >
                 {formatTokens(s.value)}
                 <span
-                  className="ml-1"
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="ml-1 text-[var(--theme-muted)]"
                 >
                   · {widthPct.toFixed(0)}%
                 </span>

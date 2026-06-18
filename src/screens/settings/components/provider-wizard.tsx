@@ -691,7 +691,7 @@ export function ProviderWizard({
                             setApiKeyInput(e.target.value)
                           }}
                           placeholder={`sk-... or your ${selectedProvider.name} API key`}
-                          className="flex-1 rounded-xl border border-primary-300 bg-white px-3 py-2 text-sm text-primary-900 placeholder:text-primary-400 focus:border-accent-400 focus:outline-none focus:ring-1 focus:ring-accent-400/50"
+                          className="flex-1 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-input)] px-3 py-2 text-sm text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:border-accent-400 focus:outline-none focus:ring-1 focus:ring-accent-400/50"
                           autoFocus
                         />
                         <Button

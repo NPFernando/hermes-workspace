@@ -111,8 +111,7 @@ export function OpsStrip({
 
   return (
     <div
-      className="flex flex-col gap-2 rounded-md border bg-[var(--theme-card)]/50 px-3 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4"
-      style={{ borderColor: 'var(--theme-border)' }}
+      className="flex flex-col gap-2 rounded-md border bg-[var(--theme-card)]/50 px-3 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4 border-[var(--theme-border)]"
     >
       {/* Gateway block: state + version + active agents */}
       <div className="flex flex-wrap items-center gap-3 text-[11px]">
@@ -129,31 +128,27 @@ export function OpsStrip({
             }}
           />
           <span
-            className="font-mono uppercase tracking-[0.15em]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="font-mono uppercase tracking-[0.15em] text-[var(--theme-muted)]"
           >
             {ok ? 'gateway' : `gateway ${status.gatewayState}`}
           </span>
         </span>
         {status.version ? (
           <span
-            className="font-mono text-[10px] uppercase tracking-[0.1em]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
           >
             v{status.version}
           </span>
         ) : null}
         <span
-          className="font-mono uppercase tracking-[0.15em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono uppercase tracking-[0.15em] text-[var(--theme-muted)]"
         >
           · {status.activeAgents} active{' '}
           {status.activeAgents === 1 ? 'run' : 'runs'}
         </span>
         {status.lastHeartbeatAt ? (
           <span
-            className="font-mono text-[9px] uppercase tracking-[0.15em]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
             title={`Last gateway heartbeat: ${status.lastHeartbeatAt}`}
           >
             · pulse {formatPulse(status.lastHeartbeatAt)}
@@ -199,11 +194,8 @@ export function OpsStrip({
             {platforms.map((platform) => (
               <span
                 key={platform.name}
-                className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em]"
-                style={{
-                  borderColor: 'var(--theme-border)',
-                  color: platformTone(platform.state),
-                }}
+                className="inline-flex items-center gap-1 rounded border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em]"
+                style={{ color: platformTone(platform.state) }}
                 title={
                   platform.errorMessage
                     ? `${platform.name}: ${platform.errorMessage}`
@@ -223,7 +215,7 @@ export function OpsStrip({
           <button
             type="button"
             onClick={() => navigate({ to: '/swarm2' })}
-            className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80"
+            className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
             style={{
               borderColor:
                 kanban.blocked > 0
@@ -233,22 +225,21 @@ export function OpsStrip({
                 kanban.blocked > 0
                   ? 'color-mix(in srgb, var(--theme-warning) 10%, transparent)'
                   : 'transparent',
-              color: 'var(--theme-muted)',
             }}
             title="Open Kanban board"
           >
             <span>board</span>
-            <span style={{ color: 'var(--theme-text)' }}>{kanban.total}</span>
+            <span className="text-[var(--theme-text)]">{kanban.total}</span>
             {kanban.ready > 0 ? (
-              <span style={{ color: 'var(--theme-text)' }}>· {kanban.ready} ready</span>
+              <span className="text-[var(--theme-text)]">· {kanban.ready} ready</span>
             ) : null}
             {kanban.running > 0 ? (
-              <span style={{ color: 'var(--theme-success)' }}>
+              <span className="text-[var(--theme-success,#50fa7b)]">
                 · {kanban.running} running
               </span>
             ) : null}
             {kanban.blocked > 0 ? (
-              <span style={{ color: 'var(--theme-warning)' }}>
+              <span className="text-amber-400">
                 · {kanban.blocked} blocked
               </span>
             ) : null}
@@ -262,7 +253,7 @@ export function OpsStrip({
             <button
               type="button"
               onClick={() => navigate({ to: '/jobs' })}
-              className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80"
+              className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
               style={{
                 borderColor: isWarn
                   ? 'color-mix(in srgb, var(--theme-warning) 35%, transparent)'
@@ -270,7 +261,6 @@ export function OpsStrip({
                 background: isWarn
                   ? 'color-mix(in srgb, var(--theme-warning) 10%, transparent)'
                   : 'transparent',
-                color: 'var(--theme-muted)',
               }}
               title={
                 isStale
@@ -279,14 +269,14 @@ export function OpsStrip({
               }
             >
               <span>cron</span>
-              <span style={{ color: 'var(--theme-text)' }}>{cron.total}</span>
+              <span className="text-[var(--theme-text)]">{cron.total}</span>
               {cron.paused > 0 ? (
-                <span style={{ color: 'var(--theme-warning)' }}>
+                <span className="text-amber-400">
                   · {cron.paused} paused
                 </span>
               ) : null}
               {cron.running > 0 ? (
-                <span style={{ color: 'var(--theme-success)' }}>
+                <span className="text-[var(--theme-success,#50fa7b)]">
                   · {cron.running} running
                 </span>
               ) : null}

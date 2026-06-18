@@ -133,13 +133,9 @@ function GlassCard({
   return (
     <div
       className={cn(
-        'relative flex flex-col overflow-hidden rounded-xl border transition-colors',
+        'relative flex flex-col overflow-hidden rounded-xl border transition-colors bg-[var(--theme-card)] border-[var(--theme-border)]',
         className,
       )}
-      style={{
-        background: 'var(--theme-card)',
-        borderColor: 'var(--theme-border)',
-      }}
     >
       {accentColor && (
         <div
@@ -288,7 +284,7 @@ function ActivityChart({
       accentColor={palette.accent}
       className="h-full"
     >
-      <Suspense fallback={<div className="h-[200px] w-full animate-pulse rounded-lg bg-primary-100/40" />}>
+      <Suspense fallback={<div className="h-[200px] w-full skeleton-shimmer rounded-lg" />}>
         <ActivityChartInner chartData={chartData} palette={palette} />
       </Suspense>
     </GlassCard>
@@ -345,11 +341,7 @@ function SkillsWidget({
     <button
       type="button"
       onClick={onOpen}
-      className="group relative flex w-full flex-col gap-1.5 overflow-hidden rounded-xl border px-4 py-3 text-left transition-colors hover:bg-[var(--theme-card)]/80"
-      style={{
-        background: 'var(--theme-card)',
-        borderColor: 'var(--theme-border)',
-      }}
+      className="group relative flex w-full flex-col gap-1.5 overflow-hidden rounded-xl border px-4 py-3 text-left transition-colors hover:bg-[var(--theme-card)]/80 bg-[var(--theme-card)] border-[var(--theme-border)]"
     >
       <div
         aria-hidden
@@ -360,27 +352,23 @@ function SkillsWidget({
       />
       <div className="flex items-center justify-between">
         <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]"
         >
           Skills
         </h3>
         <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
         >
           manage →
         </span>
       </div>
       <div
-        className="font-mono text-2xl font-bold tabular-nums leading-none"
-        style={{ color: 'var(--theme-text)' }}
+        className="font-mono text-2xl font-bold tabular-nums leading-none text-[var(--theme-text)]"
       >
         {installed}
       </div>
       <div
-        className="font-mono text-[10px] uppercase tracking-[0.1em]"
-        style={{ color: 'var(--theme-muted)' }}
+        className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
       >
         {installed === 0
           ? 'no skills installed'
@@ -466,8 +454,7 @@ function QuickAction({
         {icon}
       </div>
       <span
-        className="min-w-0 flex-1 text-xs font-semibold"
-        style={{ color: 'var(--theme-text)' }}
+        className="min-w-0 flex-1 text-xs font-semibold text-[var(--theme-text)]"
       >
         {label}
       </span>
@@ -518,7 +505,7 @@ function SessionRow({
           {session.started_at ? timeAgo(session.started_at) : ''}
         </span>
       </div>
-      <div className="mb-1.5 flex items-center gap-2 text-[10px] text-neutral-500">
+      <div className="mb-1.5 flex items-center gap-2 text-[10px] text-[var(--theme-muted)]">
         {session.model && (
           <span
             className="rounded px-1.5 py-0.5 font-mono text-[9px] font-medium"
@@ -750,7 +737,7 @@ export function DashboardScreen() {
   })
 
   return (
-    <div className="min-h-full">
+    <div data-route-page className="min-h-full">
       {/* Floating mobile nav: hamburger left, theme toggle right */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-2 h-12" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <button
@@ -785,8 +772,7 @@ export function DashboardScreen() {
             updateSettings({ theme: nextMode })
             setIsDark(nextMode === 'dark')
           }}
-          className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
-          style={{ color: 'var(--theme-muted)' }}
+          className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation text-[var(--theme-muted)]"
         >
           <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={20} strokeWidth={1.5} />
         </button>
@@ -983,7 +969,7 @@ export function DashboardScreen() {
         {layout.isVisible('analytics_chart') ? (
           <div className="lg:col-span-8">
             <WidgetShell id="analytics_chart" layout={layout}>
-              <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-primary-100/40" />}>
+              <Suspense fallback={<div className="h-64 skeleton-shimmer rounded-xl" />}>
                 <AnalyticsChartCard
                   analytics={overview?.analytics ?? null}
                   insights={overview?.insights ?? []}

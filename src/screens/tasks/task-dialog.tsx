@@ -120,7 +120,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[min(540px,95vw)] border-[var(--theme-border)] bg-[var(--theme-bg)] overflow-hidden">
         {/* Accent top border */}
-        <div className="h-[3px] w-full" style={{ background: 'var(--theme-accent)' }} />
+        <div className="h-[3px] w-full bg-[var(--theme-accent)]" />
 
         <div className="p-5 overflow-y-auto max-h-[85vh]">
           <DialogTitle className="text-base font-semibold text-[var(--theme-text)] mb-1">
@@ -241,7 +241,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                     size="sm"
                     onClick={() => void onBreakdown()}
                     disabled={isBreakingDown}
-                    style={{ background: isBreakingDown ? '#6d4fc7' : '#8b5cf6', color: 'white', opacity: isBreakingDown ? 0.7 : 1 }}
+                    className={isBreakingDown ? 'bg-violet-700 text-white opacity-70' : 'bg-violet-500 text-white'}
                   >
                     {isBreakingDown ? '⏳ Breaking down…' : '✦ Break Down'}
                   </Button>
@@ -252,7 +252,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                     size="sm"
                     onClick={() => void onExecute()}
                     disabled={isExecuting || task?.agent_state === 'working'}
-                    style={{ background: '#f59e0b', color: 'white', opacity: (isExecuting || task?.agent_state === 'working') ? 0.7 : 1 }}
+                    className={`bg-amber-500 text-white ${(isExecuting || task?.agent_state === 'working') ? 'opacity-70' : ''}`}
                   >
                     {isExecuting ? '⏳ Executing…' : task?.agent_state === 'working' ? '● Working…' : '🚀 Execute'}
                   </Button>
@@ -261,7 +261,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                   type="submit"
                   size="sm"
                   disabled={isSubmitting || !title.trim()}
-                  style={{ background: 'var(--theme-accent)', color: 'white' }}
+                  className="bg-[var(--theme-accent)] text-white"
                 >
                   {isSubmitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Task'}
                 </Button>
@@ -271,11 +271,10 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
 
           {/* Agent Activity feed — only shown when editing an existing task */}
           {isEdit && (
-            <div className="border-t mt-4 pt-4" style={{ borderColor: 'var(--theme-border)' }}>
+            <div className="border-t mt-4 pt-4 border-[var(--theme-border)]">
               <div className="flex items-center justify-between mb-3">
                 <h4
-                  className="text-[10px] font-semibold uppercase tracking-widest"
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="text-[10px] font-semibold uppercase tracking-widest text-[var(--theme-muted)]"
                 >
                   Agent Activity
                 </h4>
@@ -283,8 +282,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                   <button
                     type="button"
                     onClick={() => onOpenSession(task.session_id!)}
-                    className="text-[10px] hover:underline transition-opacity hover:opacity-80"
-                    style={{ color: 'var(--theme-accent)' }}
+                    className="text-[10px] hover:underline transition-opacity hover:opacity-80 text-[var(--theme-accent)]"
                   >
                     Open in Chat →
                   </button>
@@ -293,9 +291,9 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
 
               {/* Waiting for user input banner */}
               {task?.agent_state === 'waiting_for_input' && (
-                <div className="flex items-center gap-2 mb-3 rounded-md px-2.5 py-2" style={{ background: '#f59e0b11', border: '1px solid #f59e0b44' }}>
+                <div className="flex items-center gap-2 mb-3 rounded-md border border-amber-300/25 bg-amber-400/8 px-2.5 py-2">
                   <span className="text-base shrink-0">💬</span>
-                  <span className="text-xs font-medium" style={{ color: '#f59e0b' }}>
+                  <span className="text-xs font-medium text-amber-500">
                     Astra is waiting for your reply — answer below to continue.
                   </span>
                 </div>
@@ -303,9 +301,9 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
 
               {/* Live "currently working" pulse — mirrors card expand panel */}
               {(isExecuting || (task?.agent_state && task.agent_state !== 'waiting_for_input')) && (
-                <div className="flex items-center gap-2 mb-3 rounded-md px-2.5 py-2" style={{ background: '#a855f711', border: '1px solid #a855f733' }}>
-                  <span className="w-1.5 h-1.5 rounded-full animate-ping shrink-0" style={{ background: '#a855f7' }} />
-                  <span className="text-xs animate-pulse" style={{ color: '#a855f7' }}>
+                <div className="flex items-center gap-2 mb-3 rounded-md border border-violet-400/20 bg-violet-400/8 px-2.5 py-2">
+                  <span className="w-1.5 h-1.5 rounded-full animate-ping shrink-0 bg-violet-400" />
+                  <span className="text-xs animate-pulse text-violet-400">
                     {isExecuting ? 'Sending task to agent…' : task?.agent_state === 'reviewing' ? 'Astra reviewing…' : task?.agent_state === 'delegating' ? 'Delegating to specialist…' : 'Agent working on this task…'}
                   </span>
                 </div>
@@ -313,7 +311,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
 
               <div className="max-h-52 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
                 {history.length === 0 ? (
-                  <p className="text-xs italic" style={{ color: 'var(--theme-muted)' }}>
+                  <p className="text-xs italic text-[var(--theme-muted)]">
                     {isExecuting || task?.agent_state
                       ? 'Activity will appear here as the agent works…'
                       : 'No agent activity yet. Click "Execute" or "Deploy Agents" to start.'}
@@ -331,19 +329,19 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                           <span className="shrink-0 text-base leading-none mt-0.5">{entry.byEmoji}</span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1 flex-wrap">
-                              <span className="font-medium capitalize" style={{ color: isQuestion ? '#f59e0b' : 'var(--theme-text)' }}>
+                              <span className={isQuestion ? 'text-amber-500 font-medium capitalize' : 'font-medium capitalize text-[var(--theme-text)]'}>
                                 {entry.by}
                               </span>
-                              <span style={{ color: 'var(--theme-muted)' }}>·</span>
-                              <span className="capitalize" style={{ color: isQuestion ? '#f59e0b' : 'var(--theme-muted)' }}>
+                              <span className="text-[var(--theme-muted)]">·</span>
+                              <span className={isQuestion ? 'text-amber-500 capitalize' : 'text-[var(--theme-muted)] capitalize'}>
                                 {isQuestion ? 'asked' : entry.action}
                               </span>
-                              <span style={{ color: 'var(--theme-muted)' }}>·</span>
-                              <span style={{ color: 'var(--theme-muted)' }}>
+                              <span className="text-[var(--theme-muted)]">·</span>
+                              <span className="text-[var(--theme-muted)]">
                                 {relativeTime(entry.at)}
                               </span>
                             </div>
-                            <p className="mt-0.5 leading-relaxed" style={{ color: isQuestion ? '#f59e0b' : 'var(--theme-muted)' }}>
+                            <p className={`mt-0.5 leading-relaxed ${isQuestion ? 'text-amber-500' : 'text-[var(--theme-muted)]'}`}>
                               {entry.note}
                             </p>
                           </div>
@@ -375,7 +373,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                     size="sm"
                     onClick={() => void handlePostComment()}
                     disabled={!commentText.trim() || commentSending}
-                    style={{ background: 'var(--theme-accent)', color: 'white', flexShrink: 0 }}
+                    className="bg-[var(--theme-accent)] text-white shrink-0"
                   >
                     {commentSending ? 'Sending…' : 'Send'}
                   </Button>

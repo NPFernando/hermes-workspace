@@ -53,8 +53,7 @@ type AlertDialogTitleProps = React.ComponentProps<typeof AlertDialog.Title>
 function AlertDialogTitle({ className, ...props }: AlertDialogTitleProps) {
   return (
     <AlertDialog.Title
-      className={cn('text-lg font-medium', className)}
-      style={{ color: 'var(--theme-text)' }}
+      className={cn('text-lg font-medium text-[var(--theme-text)]', className)}
       {...props}
     />
   )
@@ -70,8 +69,7 @@ function AlertDialogDescription({
 }: AlertDialogDescriptionProps) {
   return (
     <AlertDialog.Description
-      className={cn('text-sm', className)}
-      style={{ color: 'var(--theme-muted)' }}
+      className={cn('text-sm text-[var(--theme-muted)]', className)}
       {...props}
     />
   )

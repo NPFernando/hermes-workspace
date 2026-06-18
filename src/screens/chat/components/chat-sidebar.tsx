@@ -5,7 +5,6 @@ import {
   ArrowRight01Icon,
   BrainIcon,
   Building01Icon,
-  Castle02Icon,
   Chat01Icon,
   CheckListIcon,
   Clock01Icon,
@@ -109,8 +108,7 @@ function ThemeToggleMini() {
         applyTheme(nextMode)
         updateSettings({ theme: nextMode })
       }}
-      className="shrink-0 rounded-lg p-1.5 transition-colors hover:opacity-80"
-      style={{ color: 'var(--theme-muted)' }}
+      className="shrink-0 rounded-lg p-1.5 transition-colors hover:opacity-80 text-[var(--theme-muted)]"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       <HugeiconsIcon
@@ -180,10 +178,12 @@ function NavItem({
 }) {
   const cls = cn(
     buttonVariants({ variant: 'ghost', size: 'sm' }),
-    'w-full h-auto min-h-11 gap-2.5 py-2 md:min-h-0',
+    'w-full h-auto min-h-11 gap-2.5 py-2 md:min-h-0 transition-transform hover:translate-x-0.5',
     isCollapsed ? 'justify-center px-0' : 'justify-start px-3',
     item.active
-      ? 'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15'
+      ? isCollapsed
+        ? 'text-accent-500 bg-accent-500/10'
+        : 'hover:translate-x-0 border-l-2 border-accent-500 pl-[calc(0.75rem-2px)] text-accent-500 bg-accent-500/5 hover:bg-accent-500/8'
       : 'text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
   )
 
@@ -378,7 +378,7 @@ function SectionLabel({
   if (isCollapsed) return null
 
   const labelContent = (
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 select-none">
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 select-none">
       {label}
     </span>
   )
@@ -393,7 +393,7 @@ function SectionLabel({
         {navigateTo ? (
           <Link
             to={navigateTo}
-            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
+            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 hover:text-primary-700 select-none transition-colors"
           >
             {label}
           </Link>
@@ -429,7 +429,7 @@ function SectionLabel({
       {navigateTo ? (
         <Link
           to={navigateTo}
-          className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
+          className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 hover:text-primary-700 select-none transition-colors"
         >
           {label}
         </Link>
@@ -579,7 +579,6 @@ function ChatSidebarComponent({
   const isSkillsActive = pathname === '/skills'
   const isMcpActive = pathname === '/mcp'
   const isFilesActive = pathname === '/files'
-  const isPlaygroundActive = pathname === '/playground'
   const isAgoraActive = pathname === '/agora'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
@@ -965,8 +964,7 @@ function ChatSidebarComponent({
                   className="size-6 rounded-lg"
                 />
                 <span
-                  className="text-sm font-semibold tracking-tight"
-                  style={{ color: 'var(--theme-text)' }}
+                  className="text-sm font-semibold tracking-tight text-[var(--theme-text)]"
                 >
                   Hermes Workspace
                 </span>
@@ -1055,45 +1053,6 @@ function ChatSidebarComponent({
         </div>
       )}
 
-      {/* ── HermesWorld featured link (gold castle, NEW badge) ────── */}
-      {/* Hide when VITE_HERMESWORLD_ENABLED is explicitly '0' */}
-      {!isVisuallyCollapsed &&
-        (import.meta as any).env?.VITE_HERMESWORLD_ENABLED !== '0' && (
-        <div className="px-2 pb-2">
-          <Link
-            to="/playground"
-            onClick={() => onSelectSession?.()}
-            className={cn(
-              buttonVariants({ variant: 'ghost', size: 'sm' }),
-              'group w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
-              isPlaygroundActive &&
-                'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
-            )}
-            data-tour="hermesworld"
-          >
-            <HugeiconsIcon
-              icon={Castle02Icon}
-              size={20}
-              strokeWidth={1.5}
-              className="size-5 shrink-0"
-              style={{ color: '#facc15' }}
-            />
-            <span>HermesWorld</span>
-            <span
-              className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
-              style={{
-                background:
-                  'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
-                color: '#0b1320',
-                boxShadow: '0 0 8px rgba(250,204,21,0.4)',
-                letterSpacing: '0.08em',
-              }}
-            >
-              NEW
-            </span>
-          </Link>
-        </div>
-      )}
 
       {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
@@ -1207,7 +1166,7 @@ function ChatSidebarComponent({
                     transition={transition}
                     className="flex-1 min-w-0 flex items-center gap-1.5"
                   >
-                    <span className="block truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
+                    <span className="block truncate text-sm font-medium text-primary-900">
                       {profileDisplayName}
                     </span>
                     <StatusDot />

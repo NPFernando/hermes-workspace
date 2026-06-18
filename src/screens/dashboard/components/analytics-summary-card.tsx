@@ -35,8 +35,7 @@ export function AnalyticsSummaryCard({
   const max = top?.tokens || 1
   return (
     <div
-      className="rounded-md border bg-[var(--theme-card)]/40 p-3"
-      style={{ borderColor: 'var(--theme-border)' }}
+      className="rounded-md border bg-[var(--theme-card)]/40 p-3 border-[var(--theme-border)]"
     >
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -44,26 +43,23 @@ export function AnalyticsSummaryCard({
             icon={ChartLineData01Icon}
             size={14}
             strokeWidth={1.5}
-            style={{ color: 'var(--theme-muted)' }}
+            className="text-[var(--theme-muted)]"
           />
           <h3
-            className="text-[10px] font-semibold uppercase tracking-[0.15em]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]"
           >
             Top Models · {analytics.windowDays}d
           </h3>
         </div>
         <div className="text-right">
           <div
-            className="text-[11px] font-mono"
-            style={{ color: 'var(--theme-text)' }}
+            className="text-[11px] font-mono text-[var(--theme-text)]"
           >
             {formatTokens(analytics.totalTokens)} tok
           </div>
           {analytics.estimatedCostUsd !== null ? (
             <div
-              className="text-[9px] font-mono uppercase tracking-[0.1em]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="text-[9px] font-mono uppercase tracking-[0.1em] text-[var(--theme-muted)]"
             >
               {formatCost(analytics.estimatedCostUsd)}
             </div>
@@ -72,8 +68,7 @@ export function AnalyticsSummaryCard({
       </div>
       {!hasData ? (
         <div
-          className="flex items-center justify-center py-3 text-[11px]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="flex items-center justify-center py-3 text-[11px] text-[var(--theme-muted)]"
         >
           No usage in the last {analytics.windowDays}d.
         </div>
@@ -85,14 +80,12 @@ export function AnalyticsSummaryCard({
             <div key={m.id} className="text-[11px]">
               <div className="mb-0.5 flex items-center justify-between">
                 <span
-                  className="truncate font-mono"
-                  style={{ color: 'var(--theme-text)' }}
+                  className="truncate font-mono text-[var(--theme-text)]"
                 >
                   {formatModelName(m.id)}
                 </span>
                 <span
-                  className="font-mono text-[10px]"
-                  style={{ color: 'var(--theme-muted)' }}
+                  className="font-mono text-[10px] text-[var(--theme-muted)]"
                 >
                   {formatTokens(m.tokens)} · {m.calls.toLocaleString()} calls
                 </span>

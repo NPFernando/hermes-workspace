@@ -68,20 +68,17 @@ export function CacheEfficiencyCard({
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-25 blur-2xl"
-        style={{ background: 'var(--theme-success)' }}
+        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-25 blur-2xl bg-[var(--theme-success,#50fa7b)]"
       />
 
       <div className="flex items-center justify-between">
         <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-text)' }}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
         >
           Cache efficiency
         </h3>
         <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
         >
           {analytics.windowDays}d
         </span>
@@ -89,14 +86,12 @@ export function CacheEfficiencyCard({
 
       <div className="flex items-baseline gap-2">
         <span
-          className="font-mono text-2xl font-bold leading-none tracking-tight tabular-nums"
-          style={{ color: 'var(--theme-text)' }}
+          className="font-mono text-2xl font-bold leading-none tracking-tight tabular-nums text-[var(--theme-text)]"
         >
           {ratePct.toFixed(1)}%
         </span>
         <span
-          className="font-mono text-[10px] uppercase tracking-[0.1em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
           title="Cache reads divided by (cache reads + first-pass input)."
         >
           hit rate
@@ -105,14 +100,13 @@ export function CacheEfficiencyCard({
 
       <div className="flex items-end justify-between gap-2">
         <div
-          className="font-mono text-[10px] leading-snug"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[10px] leading-snug text-[var(--theme-muted)]"
         >
-          <span style={{ color: 'var(--theme-text)' }}>
+          <span className="text-[var(--theme-text)]">
             {formatTokens(cache)}
           </span>{' '}
           cache /{' '}
-          <span style={{ color: 'var(--theme-text)' }}>
+          <span className="text-[var(--theme-text)]">
             {formatTokens(input)}
           </span>{' '}
           input

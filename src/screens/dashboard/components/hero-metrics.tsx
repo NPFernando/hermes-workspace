@@ -130,8 +130,7 @@ function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps
       />
       <div className="flex items-center justify-between">
         <span
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]"
         >
           {label}
         </span>
@@ -148,8 +147,7 @@ function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps
       </div>
       <div className="flex items-end justify-between gap-2">
         <span
-          className="font-mono text-3xl font-bold tabular-nums leading-none tracking-tight"
-          style={{ color: 'var(--theme-text)' }}
+          className="font-mono text-3xl font-bold tabular-nums leading-none tracking-tight text-[var(--theme-text)]"
         >
           {value}
         </span>
@@ -158,8 +156,7 @@ function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps
       <div className="flex items-center justify-between gap-2 text-[10px]">
         {sub ? (
           <span
-            className="truncate font-mono uppercase tracking-[0.12em]"
-            style={{ color: 'var(--theme-muted)' }}
+            className="truncate font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]"
           >
             {sub}
           </span>

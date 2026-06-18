@@ -145,14 +145,12 @@ export function ProviderMixCard({
 
       <div className="flex items-center justify-between">
         <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--theme-text)' }}
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
         >
           Provider mix
         </h3>
         <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em]"
-          style={{ color: 'var(--theme-muted)' }}
+          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
         >
           {analytics ? `${analytics.windowDays}d` : ''} · {buckets.length} fam
         </span>
@@ -170,20 +168,17 @@ export function ProviderMixCard({
             aria-hidden
           />
           <div
-            className="absolute inset-[10px] rounded-full"
-            style={{ background: 'var(--theme-card)' }}
+            className="absolute inset-[10px] rounded-full bg-[var(--theme-card)]"
             aria-hidden
           />
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center leading-none">
             <span
-              className="font-mono text-[12px] font-bold tabular-nums"
-              style={{ color: 'var(--theme-text)' }}
+              className="font-mono text-[12px] font-bold tabular-nums text-[var(--theme-text)]"
             >
               {topPct.toFixed(0)}%
             </span>
             <span
-              className="mt-0.5 font-mono text-[7px] uppercase tracking-[0.12em]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="mt-0.5 font-mono text-[7px] uppercase tracking-[0.12em] text-[var(--theme-muted)]"
             >
               {top.label}
             </span>
@@ -197,8 +192,7 @@ export function ProviderMixCard({
             return (
               <li
                 key={b.key}
-                className="flex items-center justify-between gap-2 text-[10px]"
-                style={{ color: 'var(--theme-muted)' }}
+                className="flex items-center justify-between gap-2 text-[10px] text-[var(--theme-muted)]"
                 title={`${b.sessions} sessions \u00b7 ${formatTokens(b.tokens)} tokens`}
               >
                 <span className="flex min-w-0 items-center gap-1.5 truncate">
@@ -208,8 +202,7 @@ export function ProviderMixCard({
                     style={{ background: b.tone }}
                   />
                   <span
-                    className="truncate font-mono uppercase tracking-[0.1em]"
-                    style={{ color: 'var(--theme-text)' }}
+                    className="truncate font-mono uppercase tracking-[0.1em] text-[var(--theme-text)]"
                   >
                     {b.label}
                   </span>
@@ -222,8 +215,7 @@ export function ProviderMixCard({
           })}
           {buckets.length > 4 ? (
             <li
-              className="text-[9px] font-mono uppercase tracking-[0.1em]"
-              style={{ color: 'var(--theme-muted)' }}
+              className="text-[9px] font-mono uppercase tracking-[0.1em] text-[var(--theme-muted)]"
             >
               +{buckets.length - 4} more
             </li>
