@@ -22,5 +22,23 @@
     "description": "Record successful APK downloads with timestamp and requester metadata server-side so PWA/TWA distribution can be monitored without exposing secrets.",
     "category": "backend",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Add startup-aware deployment health retries",
+    "description": "Retry JSON health checks for a short bounded window after service restarts so transient warm-up 502s are distinguished from real deployment failures.",
+    "category": "backend",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Split Vitest and Playwright test entrypoints",
+    "description": "Keep browser e2e specs out of the default Vitest run or install the Playwright dependency so repository-wide tests do not fail before executing relevant unit tests.",
+    "category": "config",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Introduce changed-file lint baseline reporting",
+    "description": "Keep repository-wide ESLint debt visible while letting auto-improvement cycles enforce zero new lint errors on touched files.",
+    "category": "config",
+    "estimated_effort": "low"
   }
 ]
