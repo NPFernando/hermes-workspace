@@ -1,6 +1,7 @@
 import {  useHermesWorldSettings } from './hermesworld-settings'
 import type {HermesWorldSettings} from './hermesworld-settings';
 import type { ChangeEvent, ReactNode } from 'react'
+import { SearchBar } from '@/components/SearchBar'
 
 type Props = {
   open: boolean
@@ -45,6 +46,7 @@ export function SettingsPanel({ open, onClose, signedInName, onSignOut }: Props)
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm">
+      {false && <SearchBar />}
       <div
         role="dialog"
         aria-modal="true"
