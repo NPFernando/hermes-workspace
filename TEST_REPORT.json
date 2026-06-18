@@ -29,5 +29,15 @@
   "modified_source_files_checked": [
     "src/routes/api/download-apk.ts",
     "src/routes/download-apk.tsx"
-  ]
+  ],
+  "deployment_health_followup": {
+    "issue": "Production /api/health returned HTML after the PWA/TWA deployment, so the mission health check could not validate JSON status.",
+    "fix": "Added src/routes/api/health.ts returning JSON {status:\"ok\"}.",
+    "checks": {
+      "npm run build": "passed",
+      "npx tsc --noEmit": "passed",
+      "npx eslint src/routes/api/health.ts": "passed",
+      "routeTree.gen.ts contains ApiHealthRoute": "passed"
+    }
+  }
 }
