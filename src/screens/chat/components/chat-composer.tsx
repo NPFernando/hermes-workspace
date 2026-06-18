@@ -8,6 +8,7 @@ import {
   Delete01Icon,
   Mic01Icon,
   StopIcon,
+  Telescope02Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -96,6 +97,7 @@ type ChatComposerProps = {
   /** Called when user changes thinking level */
   onThinkingLevelChange?: (level: ThinkingLevel) => void
   onAbort?: () => void
+  onResearch?: (query: string) => void
   /** Embedded inside another surface (e.g. Operations card), so mobile composer
    * must stay inline instead of docking fixed to the viewport bottom. */
   embedded?: boolean
@@ -880,6 +882,7 @@ function ChatComposerComponent({
   thinkingLevel: externalThinkingLevel,
   onThinkingLevelChange,
   onAbort,
+  onResearch,
   embedded = false,
   hideModelSelector = false,
 }: ChatComposerProps) {
@@ -2760,6 +2763,30 @@ function ChatComposerComponent({
                     />
                   </Button>
                 </PromptInputAction>
+                {onResearch && (
+                  <PromptInputAction tooltip="Deep research">
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="rounded-lg text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-accent-600"
+                      aria-label="Deep research"
+                      disabled={disabled || !value.trim()}
+                      onClick={() => {
+                        const q = value.trim()
+                        if (q) {
+                          onResearch(q)
+                          setValue('')
+                        }
+                      }}
+                    >
+                      <HugeiconsIcon
+                        icon={Telescope02Icon}
+                        size={20}
+                        strokeWidth={1.5}
+                      />
+                    </Button>
+                  </PromptInputAction>
+                )}
                 {hasDraft && !isLoading && (
                   <PromptInputAction tooltip="Clear draft">
                     <Button
@@ -2918,6 +2945,9 @@ function ChatComposerComponent({
                             </button>
                             {isThinkingMenuOpen && (
                               <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[10rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                                <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                                  Reasoning effort
+                                </div>
                                 {([
                                   ['off', 'None'],
                                   ['low', 'Low'],
@@ -2939,6 +2969,47 @@ function ChatComposerComponent({
                                     {thinkingLevel === level ? <span className="h-1.5 w-1.5 rounded-full bg-accent-500" /> : null}
                                   </button>
                                 ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="relative flex min-w-0 items-center">
+                            <button
+                              type="button"
+                              onClick={() => setIsWorkspaceMenuOpen((open) => !open)}
+                              className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
+                              title={workspaceButtonLabel}
+                            >
+                              <span className="truncate">{workspaceButtonLabel}</span>
+                              <HugeiconsIcon icon={ArrowDown01Icon} size={11} />
+                            </button>
+                            {isWorkspaceMenuOpen && (
+                              <div className="absolute bottom-full left-0 z-[200] mb-2 min-w-[14rem] overflow-hidden rounded-xl border border-neutral-200 bg-white p-1 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150 dark:border-neutral-700 dark:bg-neutral-900">
+                                <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                                  Workspace context
+                                </div>
+                                {workspaceEntries.map((ws) => (
+                                  <button
+                                    key={ws.path}
+                                    type="button"
+                                    onClick={() => workspaceSelectMutation.mutate({ path: ws.path, name: ws.name })}
+                                    className={cn(
+                                      'flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                                      ws.path === detectedWorkspacePath
+                                        ? 'bg-neutral-100 text-neutral-950 dark:bg-neutral-800 dark:text-neutral-50'
+                                        : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60',
+                                    )}
+                                  >
+                                    <span className="truncate font-medium">{ws.name || ws.path}</span>
+                                  </button>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={handleOpenWorkspaceManager}
+                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800/60"
+                                >
+                                  Open file explorer
+                                </button>
                               </div>
                             )}
                           </div>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { cn } from '@/lib/utils'
+import { AGENT_ACCENT_COLORS, AgentAvatar } from './agent-avatar'
 import type { AgentWorkingRow, AgentWorkingStatus } from './agents-working-panel'
 import type { ModelPresetId } from './team-panel'
-import { AGENT_ACCENT_COLORS, AgentAvatar } from './agent-avatar'
+import { cn } from '@/lib/utils'
 
 export type RemoteSession = {
   sessionKey: string
@@ -16,7 +16,7 @@ export type RemoteSession = {
 }
 
 export type OfficeViewProps = {
-  agentRows: AgentWorkingRow[]
+  agentRows: Array<AgentWorkingRow>
   missionRunning: boolean
   onViewOutput: (agentId: string) => void
   onNewMission?: () => void
@@ -25,7 +25,7 @@ export type OfficeViewProps = {
   processType: 'sequential' | 'hierarchical' | 'parallel'
   companyName?: string
   agentTasks?: Record<string, string>
-  remoteSessions?: RemoteSession[]
+  remoteSessions?: Array<RemoteSession>
   onViewRemoteOutput?: (sessionKey: string, label: string) => void
   /** Fixed pixel height for the office container (compact mode) */
   containerHeight?: number
@@ -113,21 +113,21 @@ const WARROOM_DESK_POSITIONS = [
   { x: 504, y: 420 }, { x: 642, y: 420 }, { x: 780, y: 420 },
 ]
 
-const GRID_SOCIAL_SPOTS: SocialSpot[] = [
+const GRID_SOCIAL_SPOTS: Array<SocialSpot> = [
   { x: 840, y: 140, type: 'coffee' as const },
   { x: 840, y: 300, type: 'water' as const },
   { x: 60, y: 440, type: 'plant' as const },
   { x: 840, y: 460, type: 'snack' as const },
 ]
 
-const ROUNDTABLE_SOCIAL_SPOTS: SocialSpot[] = [
+const ROUNDTABLE_SOCIAL_SPOTS: Array<SocialSpot> = [
   { x: 450, y: 320, type: 'plant' },
   { x: 510, y: 320, type: 'snack' },
   { x: 870, y: 120, type: 'coffee' },
   { x: 870, y: 480, type: 'water' },
 ]
 
-const WARROOM_SOCIAL_SPOTS: SocialSpot[] = [
+const WARROOM_SOCIAL_SPOTS: Array<SocialSpot> = [
   { x: 56, y: 300, type: 'coffee' },
   { x: 56, y: 350, type: 'water' },
   { x: 904, y: 300, type: 'snack' },
@@ -140,7 +140,7 @@ const DESK_POSITIONS_BY_TEMPLATE: Record<OfficeLayoutTemplate, Array<{ x: number
   warroom: WARROOM_DESK_POSITIONS,
 }
 
-const SOCIAL_SPOTS_BY_TEMPLATE: Record<OfficeLayoutTemplate, SocialSpot[]> = {
+const SOCIAL_SPOTS_BY_TEMPLATE: Record<OfficeLayoutTemplate, Array<SocialSpot>> = {
   grid: GRID_SOCIAL_SPOTS,
   roundtable: ROUNDTABLE_SOCIAL_SPOTS,
   warroom: WARROOM_SOCIAL_SPOTS,

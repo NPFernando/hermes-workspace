@@ -8,7 +8,7 @@ const VALID_STATES = new Set(['candidate', 'approved', 'rejected'])
 export type ExternalMemoryProvider = {
   id: string
   label: string
-  kind: 'custom'
+  kind: 'custom' | 'hindsight'
   capabilities: Array<string>
   dbPath: string
   configPath: string
@@ -64,6 +64,7 @@ type RawProviderConfig = {
   id?: unknown
   name?: unknown
   label?: unknown
+  kind?: unknown
   db_path?: unknown
   config_path?: unknown
 }
@@ -131,14 +132,18 @@ export function listExternalMemoryProviders(): {
     if (!dbPath) continue
     const configPath = resolveUnderHermesHome(hermesHome, item.config_path)
     seen.add(id)
+    const rawKind = String(item.kind || 'custom').trim().toLowerCase()
+    const kind: ExternalMemoryProvider['kind'] =
+      rawKind === 'hindsight' ? 'hindsight' : 'custom'
     providers.push({
       id,
       label: String(
         item.label ||
           id.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()),
       ),
-      kind: 'custom',
-      capabilities: ['review', 'search'],
+      kind,
+      capabilities:
+        kind === 'hindsight' ? ['review', 'search', 'commit'] : ['review', 'search'],
       dbPath,
       configPath,
       available: fs.existsSync(dbPath) || fs.existsSync(path.dirname(dbPath)),
@@ -146,6 +151,10 @@ export function listExternalMemoryProviders(): {
   }
 
   return { ok: true, active: providers[0]?.id || '', providers }
+}
+
+export function getExternalMemoryProviderById(id?: string): ExternalMemoryProvider {
+  return getProvider(id)
 }
 
 function getProvider(provider?: string): ExternalMemoryProvider {
@@ -390,6 +399,40 @@ export function rejectExternalMemoryCandidate(options: {
     mode: 'reject',
     value: options.reason || '',
   })
+}
+
+const META_UPDATE_SCRIPT = String.raw`import json, sqlite3, sys, time
+db, cid, meta_json = sys.argv[1], sys.argv[2], sys.argv[3]
+conn = sqlite3.connect(db)
+conn.row_factory = sqlite3.Row
+row = conn.execute("select metadata_json from candidates where id=?", (cid,)).fetchone()
+if row:
+    try: existing = json.loads(row["metadata_json"] or "{}")
+    except: existing = {}
+    existing.update(json.loads(meta_json))
+    conn.execute("update candidates set metadata_json=?, updated_at=? where id=?",
+        (json.dumps(existing, ensure_ascii=False, sort_keys=True), time.time(), cid))
+    conn.commit()
+conn.close()
+`
+
+export function updateExternalMemoryCandidateMeta(options: {
+  provider?: string
+  id: string
+  meta: Record<string, unknown>
+}): void {
+  const provider = getProvider(options.provider)
+  const id = String(options.id || '').trim()
+  if (!id || !fs.existsSync(provider.dbPath)) return
+  try {
+    execFileSync(
+      'python3',
+      ['-c', META_UPDATE_SCRIPT, provider.dbPath, id, JSON.stringify(options.meta)],
+      { encoding: 'utf-8', timeout: 3000, maxBuffer: 1024 * 64 },
+    )
+  } catch {
+    // best-effort — metadata update is non-critical
+  }
 }
 
 export function deleteExternalMemoryCandidate(options: {

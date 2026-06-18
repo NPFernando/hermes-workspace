@@ -1,13 +1,13 @@
 'use client'
 
 import {
+  
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
-  useState,
-  type CSSProperties,
+  useState
 } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -17,15 +17,17 @@ import {
   MessageMultiple01Icon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
-import type { CrewMember } from '@/hooks/use-crew-status'
-import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
-import { toast } from '@/components/ui/toast'
 import { OperationalWorkerCard } from './operational-worker-card'
 import { Swarm2OrchestratorCard } from './swarm2-orchestrator-card'
 import { Swarm2Wires } from './swarm2-wires'
 import { Swarm2ActivityFeed } from './swarm2-activity-feed'
 import { Swarm2KanbanBoard } from './swarm2-kanban-board'
-import { Swarm2ReportsView, buildSwarm2InboxLanes, type Swarm2InboxItem } from './swarm2-reports-view'
+import {  Swarm2ReportsView, buildSwarm2InboxLanes } from './swarm2-reports-view'
+import type {Swarm2InboxItem} from './swarm2-reports-view';
+import type {CSSProperties} from 'react';
+import type { CrewMember } from '@/hooks/use-crew-status'
+import { toast } from '@/components/ui/toast'
+import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
 import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
 import { WorkflowHelpModal } from '@/components/workflow-help-modal'
@@ -150,7 +152,9 @@ type RuntimeEntry = {
   cwd: string | null
   phase?: string | null
   lastSummary?: string | null
+  lastRealSummary?: string | null
   lastResult?: string | null
+  lastRealResult?: string | null
   blockedReason?: string | null
   checkpointStatus?: string | null
   state?: string | null
@@ -242,82 +246,82 @@ type RolePreset = {
 
 const ROLE_PRESETS: ReadonlyArray<RolePreset> = [
   {
-    role: 'Orchestrator',
+    role: 'Astra',
     specialty: 'control-plane state, dispatch, drift detection, escalation',
     mission: 'Run the swarm. Read /swarm-specs/ at start. Dispatch workers per their standing missions. Detect drift, re-prompt, escalate to main agent when stuck.',
-    systemPrompt: 'You are the Hermes Agent orchestrator for the swarm. Read /swarm-specs/SWARM_SPEC.md and /swarm-specs/projects/swarmN.md for every worker before dispatching. Apply the swarm-orchestrator skill: assign work, request proof-bearing checkpoints, detect drift, re-prompt with stronger framing, escalate when blocked. Never make irreversible external actions without main-agent ack.',
+    systemPrompt: 'You are Astra, the Hermes Agent orchestrator for the swarm. Read /swarm-specs/SWARM_SPEC.md and /swarm-specs/projects/swarmN.md for every worker before dispatching. Apply the swarm-orchestrator skill: assign work, request proof-bearing checkpoints, detect drift, re-prompt with stronger framing, escalate when blocked. Never make irreversible external actions without main-agent ack.',
     skills: ['swarm-orchestrator', 'swarm-worker-core', 'swarm-review-learning-loop', 'self-improvement'],
     defaultModel: 'GPT-5.4',
   },
   {
-    role: 'Builder',
+    role: 'Novus',
     specialty: 'full-stack implementation, fast ship cycles',
     mission: 'Implement features per dispatched briefs. Smallest landed artifact first. Tests + build + smoke before checkpoint.',
-    systemPrompt: 'You are a senior builder. Ship working code. Always read the brief, plan smallest landed artifact, implement, run tests + build + smoke, commit (not push), checkpoint with proof.',
+    systemPrompt: 'You are Novus, a senior builder. Ship working code. Always read the brief, plan smallest landed artifact, implement, run tests + build + smoke, commit (not push), checkpoint with proof.',
     skills: ['swarm-worker-core', 'byte-verified-code-review'],
     defaultModel: 'GPT-5.5',
   },
   {
-    role: 'Reviewer',
+    role: 'Vega',
     specialty: 'byte-verified code review, naming + tests + build gate',
     mission: 'No PR ships without you. Verify diff, byte-check naming, run tests/build/smoke, verdict APPROVED/CHANGES_REQUESTED/BLOCKED.',
-    systemPrompt: 'You are the merge gate. For every PR: pull branch, read diff, xxd byte-check naming-sensitive areas, run tests, run build, smoke test. Verdict APPROVED routes to main agent for merge ack. Never merge yourself.',
+    systemPrompt: 'You are Vega, the merge gate. For every PR: pull branch, read diff, xxd byte-check naming-sensitive areas, run tests, run build, smoke test. Verdict APPROVED routes to main agent for merge ack. Never merge yourself.',
     skills: ['swarm-worker-core', 'byte-verified-code-review', 'swarm-review-learning-loop'],
     defaultModel: 'GPT-5.4',
   },
   {
-    role: 'Triage',
-    specialty: 'autonomous PR/issues processor',
-    mission: 'Score open issues every 4h, repro top-1, fix branch + tests + PR, request review. Never merge or close.',
-    systemPrompt: 'You are the issues/PRs autopilot. Every 4h: gh issue list per repo, score by Impact x Tractability x (1 + locally-tested), pick top-1 unassigned, repro, fix branch, push, gh pr create, request reviewer. Never merge, never close, always escalate to main agent for greenlight.',
+    role: 'Keeper',
+    specialty: 'autonomous PR/issues processor, inbox triage, knowledge retention',
+    mission: 'Score open issues every 4h, repro top-1, fix branch + tests + PR, request review. Archive key facts. Never merge or close.',
+    systemPrompt: 'You are Keeper, the archivist and knowledge steward. Every 4h: gh issue list per repo, score by Impact x Tractability x (1 + locally-tested), pick top-1 unassigned, repro, fix branch, push, gh pr create, request reviewer. Retain key findings via hindsight_retain. Never merge, never close, always escalate to main agent for greenlight.',
     skills: ['swarm-worker-core', 'byte-verified-code-review', 'swarm-review-learning-loop'],
     defaultModel: 'GPT-5.5',
   },
   {
-    role: 'Lab',
-    specialty: 'local-model R&D, spec-dec, benchmarking',
+    role: 'Nova',
+    specialty: 'local-model R&D, spec-dec, benchmarking, deep research',
     mission: 'Run autonomous lab loop. Test new model pulls. Wire spec-dec/DFlash/TurboQuant. Push tk/s + quality. Document every experiment.',
-    systemPrompt: 'You are the local-model lab. Read /swarm-specs/projects/lane-c-lab.md. Iterate experiments from open hypothesis space. Log to lab-loop-runs.jsonl. Escalate breakthroughs (>=10% tk/s) and install requests to main agent.',
+    systemPrompt: 'You are Nova, the research and lab specialist. Read /swarm-specs/projects/lane-c-lab.md. Iterate experiments from open hypothesis space. Log to lab-loop-runs.jsonl. Escalate breakthroughs (>=10% tk/s) and install requests to main agent.',
     skills: ['swarm-worker-core', 'pc1-ollama-gguf-bench', 'swarm-bench-worker'],
     defaultModel: 'GPT-5.4',
   },
   {
-    role: 'Sage',
+    role: 'Atlas',
     specialty: 'research + scripts + X content + creative briefs',
     mission: 'Research what matters. Draft scripts, X content, briefs. Cite sources. Never post externally without ack.',
-    systemPrompt: 'You are the research/content scout. Find angles, write scripts and drafts, always cite sources. Never post X/Discord/blog without main-agent ack — always draft + escalate.',
+    systemPrompt: 'You are Atlas, the research/content strategist. Find angles, write scripts and drafts, always cite sources. Never post X/Discord/blog without main-agent ack — always draft + escalate.',
     skills: ['swarm-worker-core', 'last30days', 'pdf-and-paper-deep-reading'],
     defaultModel: 'GPT-5.5',
   },
   {
-    role: 'Scribe',
-    specialty: 'docs, skills hygiene, memory curation',
-    mission: 'Keep docs current. Hygiene the skills folder. Curate memory. Write submission/release copy.',
-    systemPrompt: 'You are the source-of-truth keeper. Audit /skills/ every 12h, flag stale/unused/poorly-documented. Maintain SWARM_SPEC and worker specs as system evolves. Draft READMEs and changelogs.',
+    role: 'Daiane',
+    specialty: 'docs, skills hygiene, memory curation, metrics reporting',
+    mission: 'Keep docs current. Hygiene the skills folder. Curate memory. Write submission/release copy. Produce data reports.',
+    systemPrompt: 'You are Daiane, the data analyst and reporter. Audit /skills/ every 12h, flag stale/unused/poorly-documented. Maintain SWARM_SPEC and worker specs as system evolves. Draft READMEs, changelogs, and structured metrics reports. Keep knowledge structured and up to date.',
     skills: ['swarm-worker-core', 'last30days', 'creative-writing'],
     defaultModel: 'GPT-5.5',
   },
   {
-    role: 'Foundation',
-    specialty: 'infra, repair playbook, autopilot wiring',
-    mission: 'Keep the swarm running. Apply repair playbook. Wire autopilot. Maintain loop infra.',
-    systemPrompt: 'You are infrastructure. Maintain /swarm-specs/playbooks/auto-repair.yaml. Health-check tmux sessions, autopilot tick, dev server. Apply known fixes; escalate novel failures.',
+    role: 'Bia',
+    specialty: 'infra monitoring, repair playbook, signal intelligence, autopilot wiring',
+    mission: 'Keep the swarm running. Apply repair playbook. Wire autopilot. Monitor signals and anomalies. Escalate with risk score.',
+    systemPrompt: 'You are Bia, the signal monitor and infra watchman. Maintain /swarm-specs/playbooks/auto-repair.yaml. Health-check tmux sessions, autopilot tick, dev server. Score anomalies by risk level. Apply known fixes; escalate novel failures with clear risk assessment.',
     skills: ['swarm-worker-core'],
     defaultModel: 'GPT-5.4',
   },
   {
-    role: 'QA',
+    role: 'Lyra',
     specialty: 'regression QA, render verification',
     mission: 'Run regression suite on every commit + render. Block bad ships.',
-    systemPrompt: 'You are QA. On commit: full test suite. On render: ffprobe + tone consistency + pacing. Verdict PASS/FAIL/FLAKY with evidence.',
+    systemPrompt: 'You are Lyra, the QA specialist. On commit: full test suite. On render: ffprobe + tone consistency + pacing. Verdict PASS/FAIL/FLAKY with evidence.',
     skills: ['swarm-worker-core', 'byte-verified-code-review'],
     defaultModel: 'GPT-5.4',
   },
   {
-    role: 'Mirror Integrations',
-    specialty: 'asset packs, upstream sync',
-    mission: 'Generate assets. Watch upstream. Pack integrations.',
-    systemPrompt: 'You produce assets and watch upstream. Generate art/audio per Lane A. Every 12h diff upstream Hermes Agent main, surface portable items. Never cross-org PR without ack.',
+    role: 'Sentinel',
+    specialty: 'asset packs, upstream sync, dependency maintenance, watchdog',
+    mission: 'Generate assets. Watch upstream for drift. Pack integrations. Keep dependencies current. Protect system integrity.',
+    systemPrompt: 'You are Sentinel, the watchdog and protector. Produce assets and watch upstream. Generate art/audio per Lane A. Every 12h diff upstream Hermes Agent main, surface portable items. Monitor for drift and anomalies. Never cross-org PR without ack.',
     skills: ['swarm-worker-core', 'claude-promo', 'songwriting-and-ai-music'],
     defaultModel: 'GPT-5.4',
   },
@@ -366,7 +370,7 @@ async function fetchRoster(): Promise<Array<SwarmRosterWorker>> {
   const res = await fetch('/api/swarm-roster')
   if (!res.ok) throw new Error(`Roster request failed: ${res.status}`)
   const data = (await res.json()) as SwarmRosterResponse
-  return Array.isArray(data.roster?.workers) ? data.roster!.workers! : []
+  return Array.isArray(data.roster?.workers) ? data.roster.workers : []
 }
 
 async function fetchMissions(): Promise<Array<SwarmMissionSummary>> {
@@ -508,7 +512,7 @@ function scrollNodeToTop(node: HTMLElement | null) {
 function withInstantScroll<T>(anchor: HTMLElement | null, fn: () => T): T {
   if (typeof window === 'undefined') return fn()
 
-  const targets: HTMLElement[] = []
+  const targets: Array<HTMLElement> = []
   if (document.documentElement instanceof HTMLElement) targets.push(document.documentElement)
   if (document.body instanceof HTMLElement) targets.push(document.body)
 
@@ -568,8 +572,8 @@ function scheduleScrollContextToTop(anchor: HTMLElement | null) {
   if (typeof window === 'undefined') return () => {}
 
   let cancelled = false
-  const timers: number[] = []
-  const frames: number[] = []
+  const timers: Array<number> = []
+  const frames: Array<number> = []
 
   const run = () => {
     if (cancelled) return
@@ -1008,7 +1012,7 @@ export function Swarm2Screen() {
   const availableModels = modelsQuery.data ?? []
   const [newWorkerId, setNewWorkerId] = useState('')
   const [newWorkerName, setNewWorkerName] = useState('')
-  const [newWorkerRole, setNewWorkerRole] = useState('Builder')
+  const [newWorkerRole, setNewWorkerRole] = useState('Novus')
   const [newWorkerSpecialty, setNewWorkerSpecialty] = useState('')
   const [newWorkerModel, setNewWorkerModel] = useState('')
   const [newWorkerMission, setNewWorkerMission] = useState('')
@@ -1053,28 +1057,21 @@ export function Swarm2Screen() {
           try { parsed = JSON.parse(text) } catch {}
           const msg = parsed.error || text || `HTTP ${res.status}`
           if (msg.includes('tmux not installed')) {
-            toast({
-              title: 'tmux not installed',
-              description:
-                `Swarm worker ${workerId} couldn't start because tmux is not installed on this host. Install tmux (‘brew install tmux’ or ‘apt install tmux’) and try again. See #244.`,
-              variant: 'destructive',
-            })
+            toast(
+              `tmux not installed: Swarm worker ${workerId} couldn't start because tmux is not installed on this host. Install tmux (brew install tmux or apt install tmux) and try again. See #244.`,
+              { type: 'error' },
+            )
           } else {
-            toast({
-              title: `Failed to start ${workerId}`,
-              description: msg,
-              variant: 'destructive',
-            })
+            toast(`Failed to start ${workerId}: ${msg}`, { type: 'error' })
           }
-          // eslint-disable-next-line no-console
+           
           console.error('[swarm2] start session failed:', res.status, text)
         }
       } catch (err) {
-        toast({
-          title: `Failed to start ${workerId}`,
-          description: err instanceof Error ? err.message : String(err),
-          variant: 'destructive',
-        })
+        toast(
+          `Failed to start ${workerId}: ${err instanceof Error ? err.message : String(err)}`,
+          { type: 'error' },
+        )
       } finally {
         setPendingTmux((prev) => {
           const next = new Set(prev)
@@ -1098,7 +1095,7 @@ export function Swarm2Screen() {
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')
-          // eslint-disable-next-line no-console
+           
           console.error('[swarm2] stop session failed:', res.status, text)
         }
       } finally {
@@ -1123,11 +1120,11 @@ export function Swarm2Screen() {
         })
         if (!res.ok) {
           const text = await res.text().catch(() => '')
-          // eslint-disable-next-line no-console
+           
           console.error('[swarm2] tmux scroll failed:', res.status, text)
         }
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('[swarm2] tmux scroll exception:', error)
       }
     },
@@ -1436,7 +1433,7 @@ export function Swarm2Screen() {
     while (existingIds.has(`swarm${next}`)) next += 1
     setNewWorkerId(`swarm${next}`)
     setNewWorkerName(`Swarm${next}`)
-    setNewWorkerRole('Builder')
+    setNewWorkerRole('Novus')
     setNewWorkerSpecialty('')
     setNewWorkerModel('')
     setNewWorkerMission('')

@@ -164,6 +164,7 @@ export const Route = createFileRoute('/api/terminal-stream')({
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
             Connection: 'keep-alive',
+            'X-Accel-Buffering': 'no',
           },
         })
       },

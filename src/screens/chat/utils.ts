@@ -1,3 +1,4 @@
+import { stripWorkspaceDirective } from '../../lib/workspace-message-scope'
 import type {
   ChatMessage,
   SessionMeta,
@@ -6,7 +7,6 @@ import type {
   SessionTitleStatus,
   ToolCallContent,
 } from './types'
-import { stripWorkspaceDirective } from '../../lib/workspace-message-scope'
 
 export function deriveFriendlyIdFromKey(key: string | undefined): string {
   if (!key) return 'main'

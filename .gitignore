@@ -95,7 +95,7 @@ tmp/
 # Task data (local persistence)
 data/
 dist/
-research/
+/research/
 BROWSER-RESEARCH.md
 CHAT-TEST-REPORT.md
 DEVELOPMENT-STATUS.md

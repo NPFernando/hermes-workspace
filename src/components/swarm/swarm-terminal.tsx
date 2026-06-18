@@ -38,7 +38,7 @@ type SwarmTerminalProps = {
 
 type ConnectionState = 'idle' | 'connecting' | 'connected' | 'closed' | 'error'
 
-export const SwarmTerminal = memo(function SwarmTerminal({
+export const SwarmTerminal = memo(function SwarmTerminalComponent({
   workerId,
   command,
   cwd,
@@ -58,6 +58,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
   const [error, setError] = useState<string | null>(null)
   const [reconnectKey, setReconnectKey] = useState(0)
   const [isFocused, setIsFocused] = useState(false)
+  const commandKey = command.join('|')
 
   const focusTerminal = useCallback(() => {
     try {
@@ -132,13 +133,11 @@ export const SwarmTerminal = memo(function SwarmTerminal({
   }, [stop])
 
   useEffect(() => {
-    let cancelled = false
+    const cancelledRef = { current: false }
 
     async function bootstrap() {
       if (!containerRef.current) return
       await ensureXterm()
-      if (cancelled || !containerRef.current) return
-
       const terminal = new TerminalCtor({
         cursorBlink: true,
         cursorStyle: 'bar',
@@ -172,13 +171,14 @@ export const SwarmTerminal = memo(function SwarmTerminal({
 
       const viewport = containerRef.current.querySelector(
         '.xterm-viewport',
-      ) as HTMLElement | null
-      const wheelHandler = (event: WheelEvent) => {
+      )
+      const wheelHandler: EventListener = (event) => {
+        const wheelEvent = event as WheelEvent
         // Make wheel scrolling reliably review terminal scrollback instead of
         // being interpreted as shell/tmux history navigation.
-        event.preventDefault()
-        event.stopPropagation()
-        const lines = Math.max(-8, Math.min(8, Math.round(event.deltaY / 40)))
+        wheelEvent.preventDefault()
+        wheelEvent.stopPropagation()
+        const lines = Math.max(-8, Math.min(8, Math.round(wheelEvent.deltaY / 40)))
         if (lines !== 0) {
           terminal.scrollLines(lines)
         }
@@ -201,7 +201,6 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         }),
       }).catch(() => null)
 
-      if (cancelled) return
       if (!response || !response.ok || !response.body) {
         setError(`Failed to start swarm terminal (${response?.status ?? 'no response'})`)
         setState('error')
@@ -242,8 +241,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
       window.addEventListener('resize', handleResize)
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        while (true) {
+        for (;;) {
           const readState = await reader.read().catch(() => ({ done: true, value: undefined }))
           if (readState.done) break
           const value = readState.value
@@ -292,14 +290,14 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         dataDisposable.dispose()
         resizeDisposable.dispose()
         window.removeEventListener('resize', handleResize)
-        if (!cancelled) setState('closed')
+        setState('closed')
       }
     }
 
     void bootstrap()
 
     return () => {
-      cancelled = true
+      cancelledRef.current = true
       stop()
       const terminal = terminalRef.current
       terminalRef.current = null
@@ -310,8 +308,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
         /* noop */
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workerId, command.join('|'), cwd, reconnectKey, focusTerminal, flushPendingInput])
+  }, [workerId, commandKey, cwd, reconnectKey, focusTerminal, flushPendingInput])
 
   useEffect(() => {
     if (!active) return
@@ -401,7 +398,7 @@ export const SwarmTerminal = memo(function SwarmTerminal({
           const data = keyToData()
           if (!data) return
           const activeEl = document.activeElement as HTMLElement | null
-          const isXtermTextarea = activeEl?.classList?.contains('xterm-helper-textarea')
+          const isXtermTextarea = activeEl ? activeEl.classList.contains('xterm-helper-textarea') : false
 
           if (isXtermTextarea) {
             // Prefer xterm's native onData path. On some macOS browser/input

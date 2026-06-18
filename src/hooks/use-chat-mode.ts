@@ -21,8 +21,13 @@ export function useChatMode(): ChatMode {
       if (!res.ok) return null
       return (await res.json()) as GatewayStatus
     },
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    staleTime: 15_000,
+    refetchInterval: (query) => {
+      const d = query.state.data
+      return d ? (d.capabilities.health ? 60_000 : 5_000) : 5_000
+    },
+    retry: 3,
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30_000),
   })
 
   if (!data?.capabilities) return 'disconnected'

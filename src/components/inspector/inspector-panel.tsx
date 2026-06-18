@@ -229,8 +229,8 @@ function MemoryTab() {
           const list = Array.isArray(json?.files) ? json.files : []
           setFiles(
             list.map((entry: Record<string, unknown>) => ({
-              path: String(entry?.path || ''),
-              name: String(entry?.name || entry?.path || ''),
+              path: String(entry.path || ''),
+              name: String(entry.name || entry.path || ''),
             })),
           )
           setLoading(false)
@@ -322,7 +322,7 @@ function SkillsTab() {
   if (skills.length === 0) return <EmptyState text="No skills found" />
 
   // Group by category
-  const grouped: Record<string, Array<SkillItem>> = {}
+  const grouped: Partial<Record<string, Array<SkillItem>>> = {}
   for (const skill of skills) {
     const cat = skill.category || 'Uncategorized'
     if (!grouped[cat]) grouped[cat] = []
@@ -334,7 +334,7 @@ function SkillsTab() {
       <p className="text-xs" style={{ color: 'var(--theme-muted)' }}>
         {skills.length} skills loaded
       </p>
-      {Object.entries(grouped).map(([category, items]) => (
+      {Object.entries(grouped).map(([category, items = []]) => (
         <div key={category}>
           <p
             className="text-[10px] uppercase tracking-wider mb-1 font-semibold"
@@ -402,16 +402,16 @@ function McpTab() {
       })
       .then((json) => {
         if (cancelled) return
-        const list = Array.isArray(json?.servers) ? json.servers : []
+        const list = Array.isArray(json.servers) ? json.servers : []
         setServers(
           list.map((entry: Record<string, unknown>) => ({
-            id: String(entry?.id || entry?.name || ''),
-            name: String(entry?.name || ''),
-            enabled: Boolean(entry?.enabled),
+            id: String(entry.id || entry.name || ''),
+            name: String(entry.name || ''),
+            enabled: Boolean(entry.enabled),
             status:
-              typeof entry?.status === 'string' ? entry.status : undefined,
+              typeof entry.status === 'string' ? entry.status : undefined,
             discoveredToolsCount:
-              typeof entry?.discoveredToolsCount === 'number'
+              typeof entry.discoveredToolsCount === 'number'
                 ? entry.discoveredToolsCount
                 : undefined,
           })),

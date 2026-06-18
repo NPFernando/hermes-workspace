@@ -30,7 +30,7 @@ type NpcPersona = {
   lore: string
 }
 
-const PERSONAS: Record<string, NpcPersona> = {
+const PERSONAS: Partial<Record<string, NpcPersona>> = {
   athena: {
     id: 'athena',
     name: 'Athena',
@@ -104,7 +104,6 @@ const FALLBACK = (npcId: string, _msg: string): string => {
  *   "You've hit your usage limit"
  */
 function looksLikeProviderError(text: string): boolean {
-  if (!text) return false
   const t = text.trim()
   if (t.length < 1 || t.length > 4000) return false
   return (

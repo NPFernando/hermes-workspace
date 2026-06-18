@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils'
 import { writeTextToClipboard } from '@/lib/clipboard'
 import { toast } from '@/components/ui/toast'
 
-type SkillsTab = 'installed' | 'marketplace' | 'featured'
+type SkillsTab = 'installed' | 'marketplace' | 'featured' | 'workspace'
 type SkillsSort = 'name' | 'category'
 
 type SecurityRisk = {
@@ -57,6 +57,11 @@ type ProfileSkillsResponse = {
   items: Array<ProfileSkillRaw>
   error?: string
 }
+
+const WorkspaceSkillsScreen = lazy(async () => {
+  const m = await import('./workspace-skills-screen')
+  return { default: m.WorkspaceSkillsScreen }
+})
 
 function titleCaseCategory(raw: string | null | undefined): string {
   const value = (raw || '').trim()
@@ -235,7 +240,7 @@ export function SkillsScreen() {
   // pattern (active first, then default, then any).
   useEffect(() => {
     if (!profiles.length || selectedProfile) return
-    setSelectedProfile(activeProfileName || profiles[0]!.name)
+    setSelectedProfile(activeProfileName || profiles[0].name)
   }, [profiles, activeProfileName, selectedProfile])
 
   const effectiveProfile = selectedProfile || activeProfileName
@@ -259,7 +264,7 @@ export function SkillsScreen() {
   // skills inside that profile's own skills/ dir. Snap back to 'installed'
   // so the page stays consistent when the user changes profile.
   useEffect(() => {
-    if (!isOnActiveProfile && tab !== 'installed') {
+    if (!isOnActiveProfile && tab !== 'installed' && tab !== 'workspace') {
       setTab('installed')
       setPage(1)
     }
@@ -604,7 +609,8 @@ export function SkillsScreen() {
     const parsedTab: SkillsTab =
       nextTab === 'installed' ||
       nextTab === 'marketplace' ||
-      nextTab === 'featured'
+      nextTab === 'featured' ||
+      nextTab === 'workspace'
         ? nextTab
         : 'installed'
 
@@ -751,6 +757,9 @@ export function SkillsScreen() {
                     Marketplace
                   </TabsTab>
                 ) : null}
+                <TabsTab value="workspace" className="min-w-[110px]">
+                  Workspace
+                </TabsTab>
               </TabsList>
             </div>
 
@@ -834,10 +843,16 @@ export function SkillsScreen() {
                 }
               />
             </TabsPanel>
+
+            <TabsPanel value="workspace" className="pt-2">
+              <Suspense fallback={<div className="py-8 text-center text-sm text-primary-500">Loading…</div>}>
+                <WorkspaceSkillsScreen />
+              </Suspense>
+            </TabsPanel>
           </Tabs>
         </section>
 
-        {tab !== 'marketplace' ? (
+        {tab !== 'marketplace' && tab !== 'workspace' ? (
           <footer className="flex items-center justify-between rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-2.5 text-sm text-primary-500 tabular-nums">
             <span>
               {(skillsQuery.data?.total || 0).toLocaleString()} total skills

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Copy01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
-import { createHighlighter } from 'shiki'
-import { formatLanguageName, normalizeLanguage, resolveLanguage } from './utils'
-import type { BundledLanguage, Highlighter } from 'shiki'
+import { ArrowExpandDiagonalIcon, Copy01Icon, DownloadIcon, Tick02Icon } from '@hugeicons/core-free-icons'
+import { createHighlighterCore } from 'shiki/core'
+import { createOnigurumaEngine } from 'shiki/engine/oniguruma'
+import { LANG_LOADERS, formatLanguageName, normalizeLanguage, resolveLanguage } from './utils'
+import type { HighlighterCore } from 'shiki/core'
 import { useResolvedTheme } from '@/hooks/use-chat-settings'
 import { writeTextToClipboard } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
@@ -14,15 +15,45 @@ type CodeBlockProps = {
   ariaLabel?: string
   language?: string
   className?: string
+  /** When provided, shows an expand icon button that calls this callback */
+  onExpand?: () => void
 }
 
-let highlighterPromise: Promise<Highlighter> | null = null
+const LANG_FILENAME_MAP: Record<string, string> = {
+  bash: 'script.sh', sh: 'script.sh',
+  python: 'script.py', py: 'script.py',
+  javascript: 'script.js', js: 'script.js',
+  typescript: 'script.ts', ts: 'script.ts',
+  json: 'data.json',
+  yaml: 'config.yaml', yml: 'config.yaml',
+  html: 'page.html',
+  css: 'styles.css',
+  sql: 'query.sql',
+  dockerfile: 'Dockerfile',
+  powershell: 'script.ps1', ps1: 'script.ps1',
+  kotlin: 'Script.kt',
+  java: 'Script.java',
+  xml: 'data.xml',
+  markdown: 'document.md', md: 'document.md',
+  toml: 'config.toml', ini: 'config.ini',
+  rust: 'main.rs', go: 'main.go', cpp: 'main.cpp', c: 'main.c',
+}
+
+function inferDownloadFilename(lang: string): string {
+  return LANG_FILENAME_MAP[lang.toLowerCase()] ?? 'code.txt'
+}
+
+let highlighterPromise: Promise<HighlighterCore> | null = null
 
 function getHighlighter() {
   if (!highlighterPromise) {
-    highlighterPromise = createHighlighter({
-      themes: ['vitesse-light', 'vitesse-dark'],
-      langs: ['text'],
+    highlighterPromise = createHighlighterCore({
+      themes: [
+        import('shiki/themes/vitesse-light.mjs'),
+        import('shiki/themes/vitesse-dark.mjs'),
+      ],
+      langs: [],
+      engine: createOnigurumaEngine(import('shiki/wasm')),
     })
   }
   return highlighterPromise
@@ -33,6 +64,7 @@ export function CodeBlock({
   ariaLabel,
   language = 'text',
   className,
+  onExpand,
 }: CodeBlockProps) {
   const resolvedTheme = useResolvedTheme()
   const [copied, setCopied] = useState(false)
@@ -60,13 +92,14 @@ export function CodeBlock({
         let lang = resolveLanguage(normalizedLanguage)
         if (lang !== 'text') {
           try {
-            await highlighter.loadLanguage(lang as BundledLanguage)
+            const loader = LANG_LOADERS[lang]
+            if (loader) await highlighter.loadLanguage(await loader())
           } catch {
             lang = 'text'
           }
         }
         const highlighted = highlighter.codeToHtml(content, {
-          lang: lang as BundledLanguage,
+          lang,
           theme: themeName,
         })
         if (active) {
@@ -92,6 +125,17 @@ export function CodeBlock({
     } catch {
       setCopied(false)
     }
+  }
+
+  function handleDownload() {
+    const filename = inferDownloadFilename(resolvedLanguage || language)
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const isSingleLine = content.split('\n').length === 1
@@ -125,6 +169,15 @@ export function CodeBlock({
           ) : null}
           <Button
             variant="ghost"
+            aria-label="Download file"
+            title="Download file"
+            className="h-auto px-0 text-xs font-medium text-primary-500 hover:text-primary-800 hover:bg-transparent"
+            onClick={handleDownload}
+          >
+            <HugeiconsIcon icon={DownloadIcon} size={16} strokeWidth={1.5} />
+          </Button>
+          <Button
+            variant="ghost"
             aria-label={ariaLabel ?? 'Copy code'}
             className="h-auto px-0 text-xs font-medium text-primary-500 hover:text-primary-800 hover:bg-transparent"
             onClick={() => {
@@ -138,6 +191,17 @@ export function CodeBlock({
             />
             {copied ? 'Copied' : 'Copy'}
           </Button>
+          {onExpand ? (
+            <Button
+              variant="ghost"
+              aria-label="Open in workspace"
+              title="Open in workspace"
+              className="h-auto px-0 text-xs font-medium text-primary-500 hover:text-primary-800 hover:bg-transparent"
+              onClick={onExpand}
+            >
+              <HugeiconsIcon icon={ArrowExpandDiagonalIcon} size={16} strokeWidth={1.5} />
+            </Button>
+          ) : null}
         </div>
       </div>
       <div className="flex min-w-0 overflow-x-auto">

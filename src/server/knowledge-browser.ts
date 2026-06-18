@@ -3,9 +3,10 @@ import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
 import {
-  readKnowledgeBaseConfig,
-  type KnowledgeBaseSource,
+  
+  readKnowledgeBaseConfig
 } from './knowledge-config'
+import type {KnowledgeBaseSource} from './knowledge-config';
 
 export type WikiPageMeta = {
   path: string
@@ -135,24 +136,42 @@ type GitHubEntry =
   | { type: 'file'; name: string; path: string; sha: string; content?: string }
   | { type: 'dir'; name: string; path: string; sha: string }
 
+function readGitHubToken(): string | null {
+  if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN
+  if (process.env.GH_TOKEN) return process.env.GH_TOKEN
+  try {
+    const envPath = path.join(os.homedir(), '.hermes', '.env')
+    const raw = fs.readFileSync(envPath, 'utf-8')
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const eqIdx = trimmed.indexOf('=')
+      if (eqIdx <= 0) continue
+      const key = trimmed.slice(0, eqIdx).trim()
+      const value = trimmed.slice(eqIdx + 1).trim().replace(/^['"]|['"]$/g, '')
+      if ((key === 'GITHUB_TOKEN' || key === 'GH_TOKEN') && value) return value
+    }
+  } catch {
+    // ignore
+  }
+  return null
+}
+
 class GitHubKnowledgeProvider {
+  private readonly repo: string
+  private readonly repoPath: string
   private readonly cacheDir: string
   private readonly branch: string
 
-  constructor(
-    private readonly repo: string,
-    branch: string,
-    private readonly repoPath: string,
-  ) {
-    const safeRepo = repo.replace('/', '_')
-    const safePath = repoPath.replace(/^\//, '').replace(/\//g, '_')
+  constructor(repo: string, branch: string, repoPath: string) {
+    this.repo = repo.replace(/\.git$/i, '')
+    this.repoPath = repoPath
     this.branch = branch
-    const base = path.join(os.homedir(), '.claude', 'knowledge-cache', 'github', safeRepo, branch, safePath)
-    this.cacheDir = base
-  }
-
-  private get cacheRoot(): string {
-    return path.join(os.homedir(), '.claude', 'knowledge-cache', 'github', this.repo.replace('/', '_'), this.branch)
+    const safeRepo = this.repo.replace('/', '_')
+    const safePath = repoPath.replace(/^\//, '').replace(/\//g, '_')
+    this.cacheDir = path.join(
+      os.homedir(), '.claude', 'knowledge-cache', 'github', safeRepo, branch, safePath || '__root__',
+    )
   }
 
   /** Fetch + decode the GitHub repo into the local cache directory. */
@@ -179,14 +198,37 @@ class GitHubKnowledgeProvider {
     return this.cacheDir
   }
 
+  private githubHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github.v3+json',
+      'User-Agent': 'hermes-workspace',
+    }
+    const token = readGitHubToken()
+    if (token) headers.Authorization = `Bearer ${token}`
+    return headers
+  }
+
   private async fetchDir(dirPath: string): Promise<void> {
     const url = `https://api.github.com/repos/${this.repo}/contents/${dirPath}?ref=${this.branch}`
-    const res = await fetch(url, {
-      headers: { Accept: 'application/vnd.github.v3+json', 'User-Agent': 'hermes-workspace' },
-    })
+    const res = await fetch(url, { headers: this.githubHeaders() })
     if (!res.ok) {
       const body = await res.text().catch(() => '')
-      throw new Error(`GitHub API ${res.status}: ${body}`)
+      let detail = body
+      try {
+        const parsed = JSON.parse(body) as { message?: string }
+        if (parsed.message?.toLowerCase().includes('empty')) {
+          detail = `Repository is empty — push at least one commit to ${this.repo} first`
+        } else if (res.status === 404 && dirPath) {
+          detail = `Path "${dirPath}" not found in ${this.repo} (branch: ${this.branch}). Check the sub-folder name.`
+        } else if (res.status === 401 || res.status === 403) {
+          detail = `Access denied to ${this.repo}. Check your GITHUB_TOKEN has repo read access.`
+        } else {
+          detail = parsed.message || body
+        }
+      } catch {
+        // use raw body
+      }
+      throw new Error(`GitHub API ${res.status}: ${detail}`)
     }
     const entries = (await res.json()) as Array<GitHubEntry>
 
@@ -211,9 +253,7 @@ class GitHubKnowledgeProvider {
 
   private async fetchFile(entry: { path: string; sha: string }): Promise<string> {
     const url = `https://api.github.com/repos/${this.repo}/contents/${entry.path}?ref=${this.branch}`
-    const res = await fetch(url, {
-      headers: { Accept: 'application/vnd.github.v3+json', 'User-Agent': 'hermes-workspace' },
-    })
+    const res = await fetch(url, { headers: this.githubHeaders() })
     if (!res.ok) {
       throw new Error(`GitHub API ${res.status} for ${entry.path}`)
     }

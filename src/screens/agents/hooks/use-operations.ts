@@ -1,10 +1,39 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { CronJob } from '@/components/cron-manager/cron-types'
+import type {GatewaySession} from '@/lib/gateway-api';
 import { toast } from '@/components/ui/toast'
 import { fetchCronJobs } from '@/lib/cron-api'
-import { fetchSessions, type GatewaySession } from '@/lib/gateway-api'
+import {  fetchSessions } from '@/lib/gateway-api'
 import { formatModelName, formatRelativeTime } from '@/screens/dashboard/lib/formatters'
+
+export type SisterInfo = {
+  id: string
+  name: string
+  emoji: string
+  description: string
+  role: string
+  type: 'ai_sister' | 'business_agent' | 'delegation_profile'
+  modelPreference?: string
+  priority?: number
+  handoffTo?: string
+  growthLevel?: number
+  growthLabel?: string
+  growthEmoji?: string
+  growthEntryCount?: number
+  lastNote?: string
+}
+
+async function fetchSisters(): Promise<Array<SisterInfo>> {
+  try {
+    const res = await fetch('/api/sisters')
+    if (!res.ok) return []
+    const payload = (await res.json()) as { ok?: boolean; sisters?: Array<SisterInfo> }
+    return Array.isArray(payload.sisters) ? payload.sisters : []
+  } catch {
+    return []
+  }
+}
 
 // Claude-Workspace adapter: Operations is backed by Hermes profiles
 // (each profile = one persistent agent). Profiles live at ~/.hermes/profiles/<name>/
@@ -63,15 +92,15 @@ export type OperationsAgent = GatewayConfigAgent & {
   shortModel: string
   status: OperationsAgentStatus
   sessionKey: string
-  sessions: GatewaySession[]
+  sessions: Array<GatewaySession>
   latestSession: GatewaySession | null
-  jobs: CronJob[]
+  jobs: Array<CronJob>
   nextRunAt: number | null
   lastActivityAt: number | null
   activityLabel: string
   progressValue: number
   progressStatus: 'running' | 'queued' | 'failed' | 'complete' | 'thinking'
-  recentOutputs: OperationsOutputItem[]
+  recentOutputs: Array<OperationsOutputItem>
   /**
    * True when the agent's profile has no model configured (blank model in
    * config.yaml). Dispatching into an unconfigured agent hangs because
@@ -87,7 +116,7 @@ type ConfigPayload = {
   payload?: {
     parsed?: {
       agents?: {
-        list?: unknown[]
+        list?: Array<unknown>
       }
       defaultModel?: string
       [key: string]: unknown
@@ -97,7 +126,7 @@ type ConfigPayload = {
   }
   parsed?: {
     agents?: {
-      list?: unknown[]
+      list?: Array<unknown>
     }
     defaultModel?: string
     [key: string]: unknown
@@ -190,10 +219,10 @@ function truncate(text: string, maxLength = 120): string {
   return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
 }
 
-function normalizeAgentList(input: unknown): GatewayConfigAgent[] {
+function normalizeAgentList(input: unknown): Array<GatewayConfigAgent> {
   if (!Array.isArray(input)) return []
 
-  const agents: GatewayConfigAgent[] = []
+  const agents: Array<GatewayConfigAgent> = []
 
   for (const entry of input) {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
@@ -225,14 +254,14 @@ function parseConfigPayload(payload: ConfigPayload): ConfigPayload {
   return payload
 }
 
-async function fetchClaudeProfiles(): Promise<ClaudeProfileSummary[]> {
+async function fetchClaudeProfiles(): Promise<Array<ClaudeProfileSummary>> {
   const response = await fetch('/api/profiles/list')
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('json')) {
     throw new Error('/api/profiles/list returned non-JSON')
   }
   const payload = (await response.json().catch(() => ({}))) as {
-    profiles?: ClaudeProfileSummary[]
+    profiles?: Array<ClaudeProfileSummary>
     error?: string
   }
   if (!response.ok || payload.error) {
@@ -247,7 +276,7 @@ async function fetchOperationsConfig(): Promise<ConfigPayload> {
   const profiles = await fetchClaudeProfiles()
   const list = profiles.map((profile) => ({
     id: profile.name,
-    name: profile.name === 'default' ? 'Workspace' : profile.name,
+    name: profile.name === 'default' ? 'Astra' : profile.name,
     model: profile.model || '',
     workspace: profile.path,
     agentDir: profile.path,
@@ -410,16 +439,22 @@ function persistSettings(settings: OperationsSettings) {
 
 
 
-function getAgentJobs(agentId: string, jobs: CronJob[]): CronJob[] {
-  return jobs.filter((job) => job.name?.startsWith(`ops:${agentId}:`))
+function getAgentJobs(agentId: string, jobs: Array<CronJob>): Array<CronJob> {
+  return jobs.filter((job) => job.name.startsWith(`ops:${agentId}:`))
 }
 
-function getAgentSessions(agentId: string, sessions: GatewaySession[]): GatewaySession[] {
+function getAgentSessions(agentId: string, sessions: Array<GatewaySession>): Array<GatewaySession> {
+  const expectedSessionKey = getOperationsSessionKey(agentId)
   return [...sessions]
     .filter((session) => {
       const label = readString(session.label)
       const key = readString(session.key)
-      return label.includes(agentId) || key.includes(agentId)
+      return (
+        key === expectedSessionKey ||
+        label === expectedSessionKey ||
+        label === agentId ||
+        key.endsWith(`ops-${agentId}`)
+      )
     })
     .sort((left, right) => {
       const leftTs = readTimestamp(left.updatedAt) ?? 0
@@ -553,6 +588,23 @@ export function useOperations() {
     refetchInterval: 30_000,
   })
 
+  const sistersQuery = useQuery({
+    queryKey: ['sisters'],
+    queryFn: fetchSisters,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  })
+
+  const sisterMap = useMemo(() => {
+    const map: Partial<Record<string, SisterInfo>> = {}
+    for (const s of sistersQuery.data ?? []) {
+      map[s.id] = s
+      // Astra IS the default profile — map 'default' → astra so the badge shows
+      if (s.id === 'astra') map['default'] = s
+    }
+    return map
+  }, [sistersQuery.data])
+
   const agents = useMemo(() => {
     const parsed = configQuery.data?.parsed
     const allAgents = normalizeAgentList(parsed?.agents?.list)
@@ -568,20 +620,24 @@ export function useOperations() {
         systemPrompt: agent.systemPrompt,
       })
       const agentSessions = getAgentSessions(agent.id, sessions)
-      const latestSession = agentSessions[0] ?? null
+      const latestSession = agentSessions.at(0) ?? null
       const jobs = getAgentJobs(agent.id, cronJobs)
-      const nextRunAt = jobs
-        .filter((job) => job.enabled)
-        .map((job) => readTimestamp(job.nextRunAt))
-        .filter((value): value is number => value !== null)
-        .sort((left, right) => left - right)[0] ?? null
-      const lastActivityAt =
-        readTimestamp(latestSession?.updatedAt) ??
+      const nextRunAt =
         jobs
-          .map((job) => readTimestamp(job.lastRun?.startedAt))
+          .filter((job) => job.enabled)
+          .map((job) => readTimestamp(job.nextRunAt))
           .filter((value): value is number => value !== null)
-          .sort((left, right) => right - left)[0] ??
-        null
+          .sort((left, right) => left - right)
+          .at(0) ?? null
+      const fromSession = readTimestamp(latestSession?.updatedAt)
+      const lastActivityAt =
+        fromSession !== null
+          ? fromSession
+          : jobs
+              .map((job) => readTimestamp(job.lastRun?.startedAt))
+              .filter((value): value is number => value !== null)
+              .sort((left, right) => right - left)
+              .at(0) ?? null
       const status = getAgentStatus(latestSession)
       const recentOutputs = [
         ...agentSessions.map((session) => buildSessionOutput(session, agent.id)),
@@ -759,6 +815,8 @@ export function useOperations() {
     configQuery,
     sessionsQuery,
     cronJobsQuery,
+    sistersQuery,
+    sisterMap,
     recentActivity,
     settings,
     saveSettings,

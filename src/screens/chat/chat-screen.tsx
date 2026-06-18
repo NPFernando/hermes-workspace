@@ -10,7 +10,6 @@ import {
 } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-
 import {
   deriveFriendlyIdFromKey,
   isMissingAuth,
@@ -67,6 +66,11 @@ import {
   CHAT_RUN_COMMAND_EVENT,
   CHAT_SUBMIT_SELECTION_EVENT,
 } from './chat-events'
+import { ArtifactPanel } from './components/artifact-panel'
+import {
+  ArtifactPanelContext
+  
+} from './contexts/artifact-panel-context'
 import type {
   ChatRunCommandDetail,
   ChatSubmitSelectionDetail,
@@ -81,6 +85,9 @@ import type {
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import type {AgentActivity} from '@/stores/chat-activity-store';
+import type {ArtifactPanelState} from './contexts/artifact-panel-context';
+import type { InlineArtifact } from './components/message-item'
+import KeyboardShortcuts from '@/components/KeyboardShortcuts'
 import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { playChatComplete } from '@/lib/sounds'
 import {
@@ -107,7 +114,7 @@ import { ErrorToastContainer, showErrorToast } from '@/components/error-toast'
 // ContextMeter removed — ContextBar (PR #32) replaces it
 import { persistRecoveryMessage, useChatStore } from '@/stores/chat-store'
 import { useSessionModelStore } from '@/stores/session-model-store'
-import { useResearchCard } from '@/hooks/use-research-card'
+import { setActiveResearch, useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 import { useChatMode } from '@/hooks/use-chat-mode'
@@ -503,6 +510,7 @@ export function ChatScreen({
     Array<ApprovalRequest>
   >([])
   const [isCompacting, setIsCompacting] = useState(false)
+  const [artifactPanelState, setArtifactPanelState] = useState<ArtifactPanelState | null>(null)
   const [researchResetKey, setResearchResetKey] = useState(0)
   // Per-session thinking level — stored in sessionStorage keyed by session
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(() => {
@@ -2548,6 +2556,20 @@ export function ChatScreen({
     setWaitingForResponse(false)
   }, [cancelStreaming, queryClient])
 
+  const handleRegenerate = useCallback(() => {
+    send('/retry', [], false, commandHelpers)
+  }, [commandHelpers, send])
+
+  const handleExport = useCallback(() => {
+    const exported = exportConversationTranscript({
+      sessionLabel: activeFriendlyId || 'conversation',
+      messages: finalDisplayMessages,
+    })
+    if (exported) {
+      toast('Conversation exported', { type: 'success' })
+    }
+  }, [activeFriendlyId, finalDisplayMessages])
+
   const runPaletteSlashCommand = useCallback(
     (command: string) => {
       const trimmedCommand = command.trim()
@@ -2680,6 +2702,25 @@ export function ChatScreen({
     resetKey: `${resolvedSessionKey || activeCanonicalKey || 'main'}:${researchResetKey}`,
   })
 
+  const handleResearch = useCallback(async (query: string) => {
+    const key = resolvedSessionKey || activeCanonicalKey || 'main'
+    try {
+      const res = await fetch('/api/odysseus/research/start', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query, max_rounds: 0, max_time: 300 }),
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { session_id?: string }
+        if (data.session_id) {
+          setActiveResearch(key, data.session_id)
+        }
+      }
+    } catch {
+      // ignore — research is best-effort from chat
+    }
+  }, [resolvedSessionKey, activeCanonicalKey])
+
   // Pull-to-refresh offset removed
 
   const handleOpenAgentDetails = useCallback(() => {
@@ -2716,7 +2757,13 @@ export function ChatScreen({
       window.removeEventListener('claude:chat-agent-details', handler)
   }, [])
 
+  const artifactPanelContextValue = {
+    open: (artifacts: Array<InlineArtifact>, index: number) =>
+      setArtifactPanelState({ artifacts, activeIndex: index }),
+  }
+
   return (
+    <ArtifactPanelContext.Provider value={artifactPanelContextValue}>
     <div
       className={cn(
         'relative min-w-0 flex flex-col overflow-hidden',
@@ -2724,6 +2771,7 @@ export function ChatScreen({
       )}
       style={{ background: 'var(--theme-bg)' }}
     >
+    <KeyboardShortcuts />
       <div
         className={cn(
           'flex-1 min-h-0 overflow-hidden',
@@ -2785,6 +2833,7 @@ export function ChatScreen({
               onToggleFocusMode={handleToggleFocusMode}
               onUndo={undefined}
               onClear={undefined}
+              onExport={handleExport}
             />
           )}
 
@@ -2895,12 +2944,14 @@ export function ChatScreen({
               researchCard={researchCard}
               isCompacting={isCompacting}
               sending={sending}
+              onRegenerate={handleRegenerate}
             />
           )}
           {showComposer ? (
             <ChatComposer
               onSubmit={send}
               onAbort={handleAbortStreaming}
+              onResearch={handleResearch}
               isLoading={sending || waitingForResponse}
               disabled={sending || hideUi}
               sessionKey={
@@ -2921,7 +2972,22 @@ export function ChatScreen({
             />
           ) : null}
         </main>
-        {!compact && !isFocusMode && <AgentViewPanel />}
+        {!compact && !isFocusMode && (
+          artifactPanelState ? (
+            <div className="h-full w-[480px] shrink-0">
+              <ArtifactPanel
+                artifacts={artifactPanelState.artifacts}
+                activeIndex={artifactPanelState.activeIndex}
+                onTabChange={(index) =>
+                  setArtifactPanelState((s) => s ? { ...s, activeIndex: index } : null)
+                }
+                onClose={() => setArtifactPanelState(null)}
+              />
+            </div>
+          ) : (
+            <AgentViewPanel />
+          )
+        )}
       </div>
       {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
 
@@ -2968,5 +3034,6 @@ export function ChatScreen({
 
       <ErrorToastContainer />
     </div>
+    </ArtifactPanelContext.Provider>
   )
 }

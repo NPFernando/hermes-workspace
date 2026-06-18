@@ -46,6 +46,7 @@ let homeDir: string
 let seedFile: string
 let originalHermesHome: string | undefined
 let originalSeedPath: string | undefined
+let originalStateDir: string | undefined
 
 function writeSeed(payload: unknown): void {
   writeFileSync(seedFile, JSON.stringify(payload))
@@ -63,7 +64,9 @@ beforeEach(() => {
   writeSeed(VALID_SEED)
   originalHermesHome = process.env.HERMES_HOME
   originalSeedPath = process.env.MCP_PRESETS_SEED_PATH
+  originalStateDir = process.env.HERMES_WORKSPACE_STATE_DIR
   process.env.HERMES_HOME = homeDir
+  process.env.HERMES_WORKSPACE_STATE_DIR = homeDir
   process.env.MCP_PRESETS_SEED_PATH = seedFile
   __resetPresetsCacheForTests()
 })
@@ -73,6 +76,8 @@ afterEach(() => {
   else process.env.HERMES_HOME = originalHermesHome
   if (originalSeedPath === undefined) delete process.env.MCP_PRESETS_SEED_PATH
   else process.env.MCP_PRESETS_SEED_PATH = originalSeedPath
+  if (originalStateDir === undefined) delete process.env.HERMES_WORKSPACE_STATE_DIR
+  else process.env.HERMES_WORKSPACE_STATE_DIR = originalStateDir
   rmSync(homeDir, { recursive: true, force: true })
   __resetPresetsCacheForTests()
 })
@@ -260,6 +265,7 @@ describe('readPresets', () => {
   it('honors HERMES_HOME override for the user file path', async () => {
     const altHome = mkdtempSync(join(tmpdir(), 'hermes-alt-'))
     process.env.HERMES_HOME = altHome
+    process.env.HERMES_WORKSPACE_STATE_DIR = altHome
     __resetPresetsCacheForTests()
     try {
       const result = await readPresets()
@@ -268,6 +274,7 @@ describe('readPresets', () => {
     } finally {
       rmSync(altHome, { recursive: true, force: true })
       process.env.HERMES_HOME = homeDir
+      process.env.HERMES_WORKSPACE_STATE_DIR = homeDir
       __resetPresetsCacheForTests()
     }
   })

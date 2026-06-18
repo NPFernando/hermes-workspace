@@ -3,6 +3,9 @@ import {
   ArrowDown01Icon,
   ArrowUp01Icon,
   BrainIcon,
+  CircleArrowReload01Icon,
+  CodeCircleIcon,
+  EyeIcon,
   PencilEdit02Icon,
   Search01Icon,
 } from '@hugeicons/core-free-icons'
@@ -10,6 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+import { Markdown } from '@/components/prompt-kit/markdown'
 
 type MemoryFileMeta = {
   path: string
@@ -103,6 +107,10 @@ function highlightMatch(
   return parts.length > 0 ? parts : [{ text, hit: false }]
 }
 
+function renderMemoryContent(content: string): string {
+  return content.replace(/\n§\n/g, '\n\n---\n\n').replace(/^§\n?/g, '').replace(/\n?§$/g, '')
+}
+
 export function MemoryBrowserScreen() {
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState('')
@@ -110,6 +118,7 @@ export function MemoryBrowserScreen() {
   const [mobileFilesOpen, setMobileFilesOpen] = useState(true)
   const [focusLine, setFocusLine] = useState<number | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [viewMode, setViewMode] = useState<'rendered' | 'raw'>('rendered')
   const [draftContent, setDraftContent] = useState('')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -402,7 +411,7 @@ export function MemoryBrowserScreen() {
           )}
         </aside>
 
-        <section className="min-h-0 rounded-2xl border border-primary-200 bg-primary-50 dark:border-neutral-800 dark:bg-neutral-950 md:col-span-2">
+        <section className="flex min-h-0 flex-col rounded-2xl border border-primary-200 bg-primary-50 dark:border-neutral-800 dark:bg-neutral-950 md:col-span-2">
           <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2 dark:border-neutral-800">
             <div className="min-w-0">
               <div className="truncate font-mono text-sm text-primary-900 dark:text-neutral-100">
@@ -416,57 +425,99 @@ export function MemoryBrowserScreen() {
                 </div>
               ) : null}
             </div>
-            {selectedPath ? (
-              <div className="ml-3 flex items-center gap-2">
-                {isEditing ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={isSaving}
-                      onClick={handleSaveEditing}
-                      className="rounded-md bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isSaving ? 'Saving...' : 'Save'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isSaving}
-                      onClick={handleCancelEditing}
-                      className="rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
-                    >
-                      Cancel
-                    </button>
-                    {hasUnsavedChanges ? (
-                      <span
-                        title="Unsaved changes"
-                        className="inline-block size-2 rounded-full bg-amber-400"
-                      />
-                    ) : null}
-                  </>
-                ) : (
+            <div className="ml-3 flex items-center gap-2">
+              {!isEditing && selectedPath ? (
+                <div className="flex items-center rounded-md border border-primary-200 dark:border-neutral-700">
                   <button
                     type="button"
-                    onClick={handleStartEditing}
-                    className="relative inline-flex items-center gap-1.5 rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                    onClick={() => setViewMode('rendered')}
+                    title="Rendered view"
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-l-md px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                      viewMode === 'rendered'
+                        ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
+                        : 'text-primary-500 hover:bg-primary-100 dark:text-neutral-400 dark:hover:bg-neutral-800',
+                    )}
                   >
-                    <HugeiconsIcon
-                      icon={PencilEdit02Icon}
-                      size={14}
-                      strokeWidth={1.7}
-                    />
-                    Edit
-                    {hasUnsavedChanges ? (
-                      <span className="absolute -right-1 -top-1 size-2 rounded-full bg-amber-400" />
-                    ) : null}
+                    <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={1.7} />
+                    Preview
                   </button>
-                )}
-              </div>
-            ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('raw')}
+                    title="Raw view"
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-r-md border-l border-primary-200 px-2.5 py-1.5 text-xs font-semibold transition-colors dark:border-neutral-700',
+                      viewMode === 'raw'
+                        ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
+                        : 'text-primary-500 hover:bg-primary-100 dark:text-neutral-400 dark:hover:bg-neutral-800',
+                    )}
+                  >
+                    <HugeiconsIcon icon={CodeCircleIcon} size={13} strokeWidth={1.7} />
+                    Raw
+                  </button>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                title="Refresh files"
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['memory'] })}
+                className="inline-flex items-center justify-center rounded-md border border-primary-200 p-1.5 text-primary-500 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+              >
+                <HugeiconsIcon icon={CircleArrowReload01Icon} size={14} strokeWidth={1.7} />
+              </button>
+              {selectedPath ? (
+                <>
+                  {isEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isSaving}
+                        onClick={handleSaveEditing}
+                        className="rounded-md bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isSaving ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSaving}
+                        onClick={handleCancelEditing}
+                        className="rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                      >
+                        Cancel
+                      </button>
+                      {hasUnsavedChanges ? (
+                        <span
+                          title="Unsaved changes"
+                          className="inline-block size-2 rounded-full bg-amber-400"
+                        />
+                      ) : null}
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleStartEditing}
+                      className="relative inline-flex items-center gap-1.5 rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                    >
+                      <HugeiconsIcon
+                        icon={PencilEdit02Icon}
+                        size={14}
+                        strokeWidth={1.7}
+                      />
+                      Edit
+                      {hasUnsavedChanges ? (
+                        <span className="absolute -right-1 -top-1 size-2 rounded-full bg-amber-400" />
+                      ) : null}
+                    </button>
+                  )}
+                </>
+              ) : null}
+            </div>
           </div>
 
           <div
             className={cn(
-              'h-full p-2 md:p-3',
+              'flex-1 min-h-0 p-2 md:p-3',
               isEditing ? 'overflow-hidden' : 'overflow-auto',
             )}
           >
@@ -503,6 +554,19 @@ export function MemoryBrowserScreen() {
                   }}
                   spellCheck={false}
                 />
+              </div>
+            ) : viewMode === 'rendered' ? (
+              <div
+                className="min-h-full rounded-xl p-4 md:p-5"
+                style={{
+                  border: '1px solid var(--theme-border)',
+                  backgroundColor: 'var(--theme-card)',
+                  color: 'var(--theme-text)',
+                }}
+              >
+                <Markdown className="prose prose-sm dark:prose-invert max-w-none prose-hr:my-4">
+                  {renderMemoryContent(content)}
+                </Markdown>
               </div>
             ) : (
               <div

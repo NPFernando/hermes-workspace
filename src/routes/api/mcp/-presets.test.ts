@@ -26,6 +26,7 @@ let seedFile: string
 const originalHermesHome = process.env.HERMES_HOME
 const originalSeedPath = process.env.MCP_PRESETS_SEED_PATH
 const originalPassword = process.env.CLAUDE_PASSWORD
+const originalHermesPassword = process.env.HERMES_PASSWORD
 
 interface PresetsRouteModule {
   Route: {
@@ -49,17 +50,23 @@ beforeEach(() => {
   seedFile = join(assetDir, 'mcp-presets.seed.json')
   writeFileSync(seedFile, JSON.stringify(VALID_SEED))
   process.env.HERMES_HOME = homeDir
+  process.env.HERMES_WORKSPACE_STATE_DIR = homeDir
   process.env.MCP_PRESETS_SEED_PATH = seedFile
+  delete process.env.HERMES_PASSWORD
+  delete process.env.CLAUDE_PASSWORD
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
   if (originalHermesHome === undefined) delete process.env.HERMES_HOME
   else process.env.HERMES_HOME = originalHermesHome
+  delete process.env.HERMES_WORKSPACE_STATE_DIR
   if (originalSeedPath === undefined) delete process.env.MCP_PRESETS_SEED_PATH
   else process.env.MCP_PRESETS_SEED_PATH = originalSeedPath
   if (originalPassword === undefined) delete process.env.CLAUDE_PASSWORD
   else process.env.CLAUDE_PASSWORD = originalPassword
+  if (originalHermesPassword === undefined) delete process.env.HERMES_PASSWORD
+  else process.env.HERMES_PASSWORD = originalHermesPassword
   rmSync(homeDir, { recursive: true, force: true })
 })
 

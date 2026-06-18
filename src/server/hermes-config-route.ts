@@ -3,7 +3,6 @@ import path from 'node:path'
 import YAML from 'yaml'
 import { z } from 'zod'
 
-import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 import { isAuthenticated } from './auth-middleware'
 import {
@@ -23,8 +22,13 @@ import {
   getDiscoveredModels,
   getDiscoveryStatus,
 } from './local-provider-discovery'
+import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type AuthResult = Response | true
+
+function unauthorizedResponse(): Response {
+  return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+}
 
 const ACTION_MESSAGES: Record<string, string> = {
   'set-default-model': 'Default model updated.',
@@ -72,8 +76,8 @@ const LegacyPatchSchema = z.object({
 })
 
 async function authorize(request: Request): Promise<AuthResult> {
-  const result = isAuthenticated(request) as AuthResult
-  if (result !== true) return result
+  const result = isAuthenticated(request)
+  if (result !== true) return unauthorizedResponse()
   await ensureGatewayProbed()
   return true
 }

@@ -82,8 +82,6 @@ export function OnboardingWizard() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  if (!isOpen) return null
-
   return (
     <AnimatePresence>
       {isOpen && (

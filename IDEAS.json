@@ -1,0 +1,20 @@
+[
+  {
+    "title": "Add dark mode toggle to workspace UI",
+    "description": "Implement a dark/light mode switch in the workspace header, storing preference in localStorage.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Improve error handling in agent tool calls",
+    "description": "Add retry logic with exponential backoff for transient tool failures, and display user-friendly error messages.",
+    "category": "backend",
+    "estimated_effort": "high"
+  },
+  {
+    "title": "Add keyboard shortcuts for common actions",
+    "description": "Implement keyboard shortcuts (e.g., Ctrl+S for save, Ctrl+F for search) in the workspace interface.",
+    "category": "ui",
+    "estimated_effort": "low"
+  }
+]

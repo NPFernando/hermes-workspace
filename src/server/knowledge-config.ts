@@ -41,7 +41,12 @@ export function writeKnowledgeBaseConfig(config: KnowledgeBaseConfig): void {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true })
   }
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
+  // Normalize github repo: strip .git suffix if present
+  const normalized: KnowledgeBaseConfig =
+    config.source.type === 'github'
+      ? { ...config, source: { ...config.source, repo: config.source.repo.replace(/\.git$/i, '') } }
+      : config
+  fs.writeFileSync(configPath, JSON.stringify(normalized, null, 2), 'utf-8')
 }
 
 export function getKnowledgeBaseEffectiveRoot(): string {

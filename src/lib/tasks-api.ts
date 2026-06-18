@@ -85,6 +85,18 @@ export function resetBackendResolution(): void {
 export type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'blocked' | 'done' | 'deleted'
 export type TaskPriority = 'high' | 'medium' | 'low'
 
+export type TaskAgentState = 'reviewing' | 'delegating' | 'working' | 'waiting_for_input' | null
+export type TaskSource = 'human' | 'idea_job' | 'astra' | null
+
+export type ActivityEntry = {
+  id: string
+  by: string
+  byEmoji: string
+  action: string
+  note: string
+  at: string
+}
+
 export type ClaudeTask = {
   id: string
   title: string
@@ -99,6 +111,13 @@ export type ClaudeTask = {
   created_at: string
   updated_at: string
   session_id?: string | null
+  agent_state?: TaskAgentState
+  agent_name?: string | null
+  agent_action_at?: string | null
+  source?: TaskSource
+  agent_comment?: string | null
+  agent_history?: Array<ActivityEntry>
+  waiting_for_user?: boolean
 }
 
 export type CreateTaskInput = {
@@ -112,7 +131,11 @@ export type CreateTaskInput = {
   created_by?: string
 }
 
-export type UpdateTaskInput = Partial<Omit<CreateTaskInput, 'created_by'>>
+export type UpdateTaskInput = Partial<Omit<CreateTaskInput, 'created_by'>> & {
+  agent_state?: TaskAgentState | null
+  agent_name?: string | null
+  agent_action_at?: string | null
+}
 
 export type TaskAssignee = {
   id: string
@@ -206,6 +229,57 @@ export async function launchSession(taskId: string): Promise<{ sessionId: string
   return res.json()
 }
 
+export async function breakdownTask(taskId: string): Promise<{ ok: boolean; count: number; titles: Array<string> }> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}?action=breakdown`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error((body as { error?: string }).error || `Breakdown failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function generateTaskFromText(text: string): Promise<CreateTaskInput> {
+  const res = await fetch('/api/tasks-from-text', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error((body as { error?: string }).error || `AI task generation failed: ${res.status}`)
+  }
+  const { suggestion } = (await res.json()) as { suggestion: CreateTaskInput }
+  return suggestion
+}
+
+export async function executeTask(taskId: string): Promise<{ ok: boolean; alreadyRunning?: boolean }> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}?action=execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+  if (!res.ok) throw new Error(`Failed to execute task: ${res.status}`)
+  return res.json()
+}
+
+export async function postTaskComment(taskId: string, text: string): Promise<{ resumed: boolean }> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}?action=comment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) throw new Error(`Failed to post comment: ${res.status}`)
+  const data = (await res.json()) as { resumed?: boolean }
+  return { resumed: data.resumed ?? false }
+}
+
 export async function moveTask(taskId: string, column: TaskColumn, movedBy = 'user'): Promise<ClaudeTask> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}?action=move`, {
@@ -248,6 +322,12 @@ export const COLUMN_COLORS: Record<TaskColumn, string> = {
   blocked: '#ef4444',
   done: '#22c55e',
   deleted: '#374151',
+}
+
+export async function askAstra(): Promise<{ sessionId: string }> {
+  const res = await fetch('/api/tasks-ask-astra', { method: 'POST' })
+  if (!res.ok) throw new Error(`Ask Astra failed: ${res.status}`)
+  return res.json() as Promise<{ sessionId: string }>
 }
 
 export function isOverdue(task: ClaudeTask): boolean {

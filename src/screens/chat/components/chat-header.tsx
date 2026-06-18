@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Folder01Icon } from '@hugeicons/core-free-icons'
+import { DownloadIcon, Folder01Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import {
   TooltipContent,
@@ -104,6 +104,7 @@ type ChatHeaderProps = {
   onToggleFocusMode?: () => void
   onUndo?: () => void
   onClear?: () => void
+  onExport?: () => void
 }
 
 function ChatHeaderComponent({
@@ -131,6 +132,7 @@ function ChatHeaderComponent({
   onToggleFocusMode,
   onUndo,
   onClear,
+  onExport,
 }: ChatHeaderProps) {
   const [clearConfirm, setClearConfirm] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -544,6 +546,27 @@ function ChatHeaderComponent({
             </TooltipRoot>
           </TooltipProvider>
         ) : null}
+        {/* Export */}
+        {onExport && (
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                onClick={onExport}
+                render={
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800"
+                    aria-label="Export conversation"
+                  >
+                    <HugeiconsIcon icon={DownloadIcon} size={16} strokeWidth={1.6} />
+                  </Button>
+                }
+              />
+              <TooltipContent side="bottom">Export conversation (.md)</TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+        )}
         {/* Undo / Clear actions */}
         {onUndo && (
           <TooltipProvider>

@@ -1,5 +1,5 @@
-import { GroupProps } from '@react-three/fiber'
 import { HERMESWORLD_CHARACTER_ARCHETYPES } from '../lib/character-config'
+import type { ThreeElements } from '@react-three/fiber'
 
 const PLAYER_ARCHETYPE = HERMESWORLD_CHARACTER_ARCHETYPES.find(
   (entry) => entry.id === 'player-adventurer',
@@ -12,7 +12,7 @@ const PLAYER_ARCHETYPE = HERMESWORLD_CHARACTER_ARCHETYPES.find(
  * wiring a real GLB + animation controller. The next pass should replace this
  * with a loaded character model + idle/walk/run/talk animation states.
  */
-export function PlayerCharacter(props: GroupProps) {
+export function PlayerCharacter(props: ThreeElements['group']) {
   return (
     <group {...props}>
       <mesh castShadow receiveShadow position={[0, 0.9, 0]}>

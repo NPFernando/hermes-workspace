@@ -12,8 +12,9 @@ import { getRootSurfaceState } from './-root-layout-state'
 import type {AuthStatus} from '@/lib/claude-auth';
 import { SearchModal } from '@/components/search/search-modal'
 import { UsageMeter } from '@/components/usage-meter'
-import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
-import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
+import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener';
+import { GlobalShortcutListener } from '@/components/global-shortcut-listener';
+import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrigger'
 import { Toaster } from '@/components/ui/toast'
@@ -22,6 +23,7 @@ import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { UpdateCenterNotifier } from '@/components/update-center-notifier'
 import { applyInterfacePreferences, initializeSettingsAppearance, useSettings } from '@/hooks/use-settings'
 import { useApplyChatWidth } from '@/hooks/use-chat-settings'
+import { useSettingsSync } from '@/hooks/use-settings-sync'
 import {
   ClaudeOnboarding,
   ONBOARDING_COMPLETE_EVENT,
@@ -38,9 +40,9 @@ const APP_CSP = [
   "form-action 'self'",
   // frame-ancestors is ignored in meta CSP and must be sent as an HTTP header.
   "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
   "img-src 'self' data: blob: https:",
-  "font-src 'self' data: https://fonts.gstatic.com",
+  "font-src 'self' data:",
   "connect-src 'self' ws: wss: http: https:",
   "worker-src 'self' blob:",
   "media-src 'self' blob: data:",
@@ -258,6 +260,11 @@ export async function registerAppServiceWorker({
     })
 }
 
+function SettingsSyncMount() {
+  useSettingsSync()
+  return null
+}
+
 function RootLayout() {
   const { settings } = useSettings()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
@@ -296,24 +303,6 @@ function RootLayout() {
 
     syncOnboardingCompletion()
 
-    void fetch('/api/connection-status')
-      .then((res) => (res.ok ? res.json() : null))
-      .then(
-        (
-          status: {
-            ok?: boolean
-            chatReady?: boolean
-            modelConfigured?: boolean
-          } | null,
-        ) => {
-          if (status?.ok || (status?.chatReady && status?.modelConfigured)) {
-            localStorage.setItem(ONBOARDING_KEY, 'true')
-            syncOnboardingCompletion()
-          }
-        },
-      )
-      .catch(() => undefined)
-
     const handleStorage = (event: StorageEvent) => {
       if (event.key && event.key !== ONBOARDING_KEY) return
       syncOnboardingCompletion()
@@ -349,11 +338,35 @@ function RootLayout() {
     let cancelled = false
     fetchClaudeAuthStatus()
       .then((status) => {
-        if (!cancelled) setAuthStatus(status)
+        if (cancelled) return
+        setAuthStatus(status)
+        if (status.authenticated || !status.authRequired) {
+          void fetch('/api/connection-status')
+            .then((res) => (res.ok ? res.json() : null))
+            .then(
+              (
+                connectionStatus: {
+                  ok?: boolean
+                  chatReady?: boolean
+                  modelConfigured?: boolean
+                } | null,
+              ) => {
+                if (
+                  !cancelled &&
+                  (connectionStatus?.ok ||
+                    (connectionStatus?.chatReady && connectionStatus.modelConfigured))
+                ) {
+                  localStorage.setItem(ONBOARDING_KEY, 'true')
+                  setOnboardingComplete(true)
+                }
+              },
+            )
+            .catch(() => undefined)
+        }
       })
       .catch(() => {
         if (!cancelled) {
-          setAuthStatus({ authenticated: true, authRequired: false })
+          setAuthStatus((prev) => prev ?? { authenticated: false, authRequired: true })
         }
       })
     return () => {
@@ -370,8 +383,10 @@ function RootLayout() {
       {mounted && rootSurfaceState.showOnboarding ? <ClaudeOnboarding /> : null}
       {rootSurfaceState.showWorkspaceShell ? (
         <>
+          <SettingsSyncMount />
           <GlobalShortcutListener />
           <TerminalShortcutListener />
+          <KeyboardShortcuts />
           <WorkspaceShell>
             <ErrorBoundary
               className="h-full min-h-0 flex-1"
@@ -535,14 +550,20 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           dangerouslySetInnerHTML={{
             __html: wrapInlineScript(`
           (function(){
-            var start = Date.now();
-            function check() {
-              var el = document.querySelector('nav, aside, .workspace-shell, [data-testid]');
-              var elapsed = Date.now() - start;
-              if (el && elapsed > 2500) { window.__dismissSplash && window.__dismissSplash(); }
-              else { setTimeout(check, 200); }
+            var fired = false;
+            function dismiss() {
+              if (fired) return;
+              fired = true;
+              if (obs) obs.disconnect();
+              window.__dismissSplash && window.__dismissSplash();
             }
-            setTimeout(check, 2500);
+            var obs = new MutationObserver(function() {
+              var el = document.querySelector('nav, aside, .workspace-shell, [data-testid]');
+              if (el) dismiss();
+            });
+            obs.observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
+            // Fallback: dismiss after 6s if MutationObserver never fires
+            setTimeout(dismiss, 6000);
           })()
         `),
           }}

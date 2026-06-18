@@ -1,5 +1,7 @@
+import {  useHermesWorldSettings } from './hermesworld-settings'
+import type {HermesWorldSettings} from './hermesworld-settings';
 import type { ChangeEvent, ReactNode } from 'react'
-import { useHermesWorldSettings, type HermesWorldSettings } from './hermesworld-settings'
+import { SearchBar } from '@/components/SearchBar'
 
 type Props = {
   open: boolean
@@ -44,6 +46,7 @@ export function SettingsPanel({ open, onClose, signedInName, onSignOut }: Props)
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm">
+      {false && <SearchBar />}
       <div
         role="dialog"
         aria-modal="true"
@@ -131,7 +134,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   return <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-3"><h2 className="mb-3 text-sm font-black uppercase tracking-[0.18em] text-[#F1C56D]">{title}</h2><div className="space-y-3">{children}</div></section>
 }
 
-function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (event: ChangeEvent<HTMLSelectElement>) => void }) {
+function Select({ label, value, options, onChange }: { label: string; value: string; options: Array<string>; onChange: (event: ChangeEvent<HTMLSelectElement>) => void }) {
   return <label className="block text-[11px] font-bold uppercase tracking-[0.12em] text-white/55">{label}<select value={value} onChange={onChange} className="mt-1 w-full rounded-xl border border-white/10 bg-black/45 px-3 py-2 text-sm normal-case tracking-normal text-white outline-none">{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
 }
 

@@ -1,6 +1,25 @@
+import { useRef, useState } from 'react'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Delete01Icon, MoreVerticalIcon, PlayIcon, Rocket01Icon, SplitIcon } from '@hugeicons/core-free-icons'
+import type { ClaudeTask, TaskAgentState, TaskColumn, TaskPriority } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
-import type { ClaudeTask } from '@/lib/tasks-api'
-import { PRIORITY_COLORS, isOverdue } from '@/lib/tasks-api'
+import { COLUMN_LABELS, COLUMN_ORDER, PRIORITY_COLORS, isOverdue } from '@/lib/tasks-api'
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from '@/components/ui/menu'
+
+function relativeTime(isoStr: string): string {
+  const diff = Date.now() - new Date(isoStr).getTime()
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
+function isStuckAgent(task: ClaudeTask): boolean {
+  if (!task.agent_state || !task.agent_action_at) return false
+  return Date.now() - new Date(task.agent_action_at).getTime() > 10 * 60_000
+}
 
 type Props = {
   task: ClaudeTask
@@ -8,6 +27,21 @@ type Props = {
   onClick: () => void
   onDragStart: (e: React.DragEvent) => void
   isDragging?: boolean
+  activeTagFilter: string | null
+  onTagClick: (tag: string) => void
+  onChangePriority: (priority: TaskPriority) => void
+  onMoveToColumn: (column: TaskColumn) => void
+  onDelete: () => void
+  onAssigneeClick?: (assignee: string) => void
+  onLaunch?: () => void
+  isLaunching?: boolean
+  onExecute?: () => void
+  isExecuting?: boolean
+  onBreakdown?: () => void
+  isBreakingDown?: boolean
+  onResetAgent?: () => void
+  onRequestRefresh?: () => void
+  onComment?: (taskId: string, text: string) => Promise<void>
 }
 
 export function formatTaskAssigneeLabel(
@@ -18,12 +52,88 @@ export function formatTaskAssigneeLabel(
   return `Assignee: ${resolvedLabel}`
 }
 
-export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDragging }: Props) {
+const AGENT_STATE_CONFIG: Record<
+  NonNullable<TaskAgentState>,
+  { label: string; color: string; pulse: boolean }
+> = {
+  reviewing: { label: 'Astra reviewing…', color: '#a855f7', pulse: true },
+  delegating: { label: 'Delegating…', color: '#f59e0b', pulse: true },
+  working: { label: 'Agent working…', color: '#3b82f6', pulse: true },
+  waiting_for_input: { label: 'Waiting for your reply', color: '#f59e0b', pulse: false },
+}
+
+function AgentStateBadge({ state, agentName }: { state: TaskAgentState; agentName?: string | null }) {
+  if (!state) return null
+  const cfg = AGENT_STATE_CONFIG[state]
+  const label = state === 'delegating' && agentName ? `→ ${agentName}` : cfg.label
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium"
+      style={{ background: `${cfg.color}22`, color: cfg.color, border: `1px solid ${cfg.color}44` }}
+    >
+      {cfg.pulse && (
+        <span
+          className="inline-block w-1.5 h-1.5 rounded-full animate-pulse"
+          style={{ background: cfg.color }}
+        />
+      )}
+      {label}
+    </span>
+  )
+}
+
+function SourceBadge({ source }: { source: ClaudeTask['source'] }) {
+  if (!source || source === 'human') return null
+  if (source === 'idea_job') {
+    return (
+      <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">
+        💡 idea
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
+      ✦ astra
+    </span>
+  )
+  return null
+}
+
+export function TaskCard({
+  task,
+  assigneeLabels = {},
+  onClick,
+  onDragStart,
+  isDragging,
+  activeTagFilter,
+  onTagClick,
+  onChangePriority,
+  onMoveToColumn,
+  onDelete,
+  onAssigneeClick,
+  onLaunch,
+  isLaunching,
+  onExecute,
+  isExecuting,
+  onBreakdown,
+  isBreakingDown,
+  onResetAgent,
+  onRequestRefresh,
+  onComment,
+}: Props) {
+  const [activityOpen, setActivityOpen] = useState(false)
+  const [replyText, setReplyText] = useState('')
+  const [replySending, setReplySending] = useState(false)
+  const replyInputRef = useRef<HTMLInputElement>(null)
   const overdue = isOverdue(task)
   const priorityColor = PRIORITY_COLORS[task.priority]
   const visibleTags = task.tags.slice(0, 2)
   const extraTagCount = task.tags.length - 2
   const assigneeLabel = formatTaskAssigneeLabel(task.assignee, assigneeLabels)
+  const isAgentActive = Boolean(task.agent_state)
+  const hasHistory = (task.agent_history?.length ?? 0) > 0
+  const stuck = isStuckAgent(task)
+  const isDimmed = Boolean(activeTagFilter && !task.tags.includes(activeTagFilter))
 
   return (
     <div
@@ -31,21 +141,147 @@ export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDr
       onDragStart={onDragStart}
       onClick={onClick}
       className={cn(
-        'relative rounded-lg border p-3 cursor-pointer transition-all select-none',
+        'relative rounded-lg border p-3 cursor-pointer transition-all select-none group',
         'bg-[var(--theme-card)] border-[var(--theme-border)]',
         'hover:border-[var(--theme-accent)]',
         isDragging ? 'opacity-40 rotate-1 shadow-2xl' : 'hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]',
+        isExecuting && 'ring-2 ring-amber-500/50',
+        isBreakingDown && !isExecuting && 'ring-2 ring-violet-500/50',
+        isAgentActive && !isExecuting && !isBreakingDown && 'ring-1 ring-violet-500/30',
+        isDimmed && 'opacity-40',
       )}
       style={{ borderLeftWidth: 3, borderLeftColor: priorityColor }}
     >
-      {/* Priority dot in top-right */}
+      {/* Priority dot */}
       <span
-        className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full shrink-0"
+        className="absolute top-2.5 right-10 w-2 h-2 rounded-full shrink-0"
         style={{ background: priorityColor }}
         title={`Priority: ${task.priority}`}
       />
 
-      <p className="text-sm font-medium text-[var(--theme-text)] leading-snug mb-1 line-clamp-2 pr-4">
+      {/* Agent state gradient banner — click to toggle activity panel */}
+      {isAgentActive && (
+        <button
+          type="button"
+          aria-label="Toggle agent activity"
+          onClick={(e) => { e.stopPropagation(); setActivityOpen(v => { if (!v) onRequestRefresh?.(); return !v }) }}
+          className="absolute inset-x-0 top-0 h-1 rounded-t-lg w-full cursor-pointer"
+          style={{ background: stuck ? 'linear-gradient(90deg, #ef4444, #f97316)' : 'linear-gradient(90deg, #a855f7, #3b82f6, #a855f7)', backgroundSize: '200%' }}
+          title={activityOpen ? 'Hide agent activity' : 'Show agent activity'}
+        />
+      )}
+
+      {/* Hover action buttons (▶ launch + ⋮ menu) */}
+      <div
+        className="absolute top-1.5 right-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* ▶ Launch Session */}
+        {onLaunch && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onLaunch() }}
+            disabled={isLaunching}
+            title="Launch chat session for this task"
+            className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
+          >
+            <HugeiconsIcon
+              icon={PlayIcon}
+              size={13}
+              className={isLaunching ? 'animate-pulse' : ''}
+              style={{ color: 'var(--theme-accent)' }}
+            />
+          </button>
+        )}
+        {/* 🚀 Execute with agent */}
+        {onExecute && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onExecute() }}
+            disabled={isExecuting}
+            title="Execute task with AI agent"
+            className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
+          >
+            <HugeiconsIcon
+              icon={Rocket01Icon}
+              size={13}
+              className={isExecuting ? 'animate-pulse' : ''}
+              style={{ color: '#f59e0b' }}
+            />
+          </button>
+        )}
+        <MenuRoot>
+          <MenuTrigger
+            type="button"
+            className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
+            aria-label="Task options"
+          >
+            <HugeiconsIcon icon={MoreVerticalIcon} size={13} className="text-[var(--theme-muted)]" />
+          </MenuTrigger>
+          <MenuContent side="bottom" align="end">
+            <div
+              className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest"
+              style={{ color: 'var(--theme-muted)' }}
+            >
+              Priority
+            </div>
+            {(['high', 'medium', 'low'] as Array<TaskPriority>).map(p => (
+              <MenuItem
+                key={p}
+                onClick={(e) => { e.stopPropagation(); onChangePriority(p) }}
+                className="text-xs capitalize flex items-center gap-2"
+              >
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: PRIORITY_COLORS[p] }} />
+                {p}
+                {task.priority === p && <span className="ml-auto text-[10px]">✓</span>}
+              </MenuItem>
+            ))}
+
+            <hr style={{ borderColor: 'var(--theme-border)', margin: '4px 0' }} />
+
+            <div
+              className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest"
+              style={{ color: 'var(--theme-muted)' }}
+            >
+              Move to
+            </div>
+            {COLUMN_ORDER.filter(c => c !== task.column && c !== 'deleted').map(col => (
+              <MenuItem
+                key={col}
+                onClick={(e) => { e.stopPropagation(); onMoveToColumn(col) }}
+                className="text-xs"
+              >
+                {COLUMN_LABELS[col]}
+              </MenuItem>
+            ))}
+
+            <hr style={{ borderColor: 'var(--theme-border)', margin: '4px 0' }} />
+
+            {onBreakdown && (
+              <MenuItem
+                onClick={(e) => { e.stopPropagation(); if (!isBreakingDown) onBreakdown() }}
+                className="text-xs flex items-center gap-2"
+                style={{ opacity: isBreakingDown ? 0.5 : 1, cursor: isBreakingDown ? 'wait' : 'pointer' }}
+              >
+                <HugeiconsIcon icon={SplitIcon} size={12} style={{ color: '#8b5cf6' }} />
+                {isBreakingDown ? 'Breaking down…' : 'Break Down'}
+              </MenuItem>
+            )}
+
+            <hr style={{ borderColor: 'var(--theme-border)', margin: '4px 0' }} />
+
+            <MenuItem
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+              className="text-xs flex items-center gap-2 text-red-400"
+            >
+              <HugeiconsIcon icon={Delete01Icon} size={12} />
+              Delete
+            </MenuItem>
+          </MenuContent>
+        </MenuRoot>
+      </div>{/* end hover actions */}
+
+      <p className="text-sm font-medium text-[var(--theme-text)] leading-snug mb-1 line-clamp-2 pr-12">
         {task.title}
       </p>
 
@@ -55,43 +291,206 @@ export function TaskCard({ task, assigneeLabels = {}, onClick, onDragStart, isDr
         </p>
       )}
 
-      <div className="flex items-center justify-between gap-2 mt-2 flex-wrap">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]">
-            {assigneeLabel}
-          </span>
-          {visibleTags.map((tag) => (
-            <span
-              key={tag}
-              className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]"
-            >
-              {tag}
-            </span>
-          ))}
-          {extraTagCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]">
-              +{extraTagCount} more
-            </span>
-          )}
-        </div>
-
-        {task.due_date && (
-          <div className="flex items-center gap-1 text-[10px] tabular-nums">
-            {overdue && (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                <span className="text-red-400 font-semibold">Overdue</span>
-                <span className="text-[var(--theme-muted)] mx-0.5">·</span>
-              </>
+      <div className="flex flex-col gap-1.5 mt-2">
+        {/* Agent state + source badges */}
+        {(isAgentActive || hasHistory || (task.source && task.source !== 'human')) && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {isAgentActive && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setActivityOpen(v => { if (!v) onRequestRefresh?.(); return !v }) }}
+                className="flex items-center"
+                title={activityOpen ? 'Hide agent activity' : 'Show agent activity'}
+              >
+                <AgentStateBadge state={task.agent_state ?? null} agentName={task.agent_name} />
+              </button>
             )}
-            <span className={overdue ? 'text-red-400 font-semibold' : 'text-[var(--theme-muted)]'}>
-              {(() => {
-                const [y, m, d] = task.due_date!.split('-').map(Number)
-                return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-              })()}
-            </span>
+            {stuck && onResetAgent && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onResetAgent() }}
+                title="Agent appears stuck — click to reset"
+                className="text-[9px] px-1.5 py-0.5 rounded-md border transition-colors"
+                style={{ borderColor: '#ef444466', color: '#ef4444', background: '#ef444411' }}
+              >
+                ✕ reset
+              </button>
+            )}
+            <SourceBadge source={task.source} />
           </div>
         )}
+
+        {/* Agent comment — latest reasoning shown at a glance (when panel is closed) */}
+        {task.agent_comment && !isAgentActive && !activityOpen && (
+          <p className="text-[10px] leading-relaxed line-clamp-2" style={{ color: 'var(--theme-muted)' }}>
+            <span style={{ color: '#a855f7' }}>✦</span> {task.agent_comment}
+          </p>
+        )}
+
+        {/* History note count — clickable to expand panel */}
+        {hasHistory && !isAgentActive && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setActivityOpen(v => !v) }}
+            className="text-[9px] text-left hover:underline"
+            style={{ color: 'var(--theme-muted)' }}
+          >
+            {activityOpen ? '▲ hide' : `💬 ${task.agent_history!.length} note${task.agent_history!.length !== 1 ? 's' : ''} — click to reply`}
+          </button>
+        )}
+
+        {/* Collapsible agent activity panel — shown when agent active OR when history panel toggled */}
+        {(isAgentActive || hasHistory) && activityOpen && (
+          <div
+            className="rounded-md p-2 space-y-1.5"
+            style={{ background: 'var(--theme-hover)', border: '1px solid var(--theme-border)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Live status indicator (only when active) */}
+            {isAgentActive && (() => {
+              const cfg = AGENT_STATE_CONFIG[task.agent_state!]
+              return (
+                <div className="flex items-center gap-1.5 text-[10px] pb-1" style={{ color: cfg.color, borderBottom: '1px solid var(--theme-border)' }}>
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.pulse ? 'animate-ping' : ''}`}
+                    style={{ background: cfg.color }}
+                  />
+                  <span className={cfg.pulse ? 'animate-pulse' : ''}>{cfg.label}</span>
+                </div>
+              )
+            })()}
+
+            {/* Activity entries */}
+            {hasHistory && task.agent_history!.slice(-4).map((entry) => (
+              <div key={entry.id} className="flex gap-1.5 text-[10px]">
+                <span className="shrink-0 leading-none mt-0.5">{entry.byEmoji}</span>
+                <div className="min-w-0">
+                  <span className="font-medium capitalize" style={{ color: entry.action === 'question' ? '#f59e0b' : 'var(--theme-text)' }}>{entry.by}</span>
+                  <span style={{ color: 'var(--theme-muted)' }}> · {entry.action === 'question' ? 'asked' : entry.action} · {relativeTime(entry.at)}</span>
+                  {entry.note && (
+                    <p className="mt-0.5 leading-relaxed line-clamp-3" style={{ color: entry.action === 'question' ? '#f59e0b' : 'var(--theme-muted)' }}>
+                      {entry.note}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Inline reply input */}
+            {onComment && (
+              <div className="flex gap-1.5 pt-1 border-t" style={{ borderColor: 'var(--theme-border)' }}>
+                <input
+                  ref={replyInputRef}
+                  className="flex-1 rounded px-2 py-1 text-[10px] min-w-0"
+                  style={{
+                    background: 'var(--theme-input, var(--theme-bg))',
+                    border: '1px solid var(--theme-border)',
+                    color: 'var(--theme-text)',
+                    outline: 'none',
+                  }}
+                  placeholder={task.agent_state === 'waiting_for_input' ? 'Reply to Astra…' : 'Continue…'}
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && replyText.trim() && !replySending) {
+                      e.preventDefault()
+                      setReplySending(true)
+                      try {
+                        await onComment(task.id, replyText.trim())
+                        setReplyText('')
+                      } finally {
+                        setReplySending(false)
+                      }
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={!replyText.trim() || replySending}
+                  onClick={async () => {
+                    if (!replyText.trim() || replySending) return
+                    setReplySending(true)
+                    try {
+                      await onComment(task.id, replyText.trim())
+                      setReplyText('')
+                    } finally {
+                      setReplySending(false)
+                    }
+                  }}
+                  className="rounded px-2 py-1 text-[10px] shrink-0 transition-opacity"
+                  style={{
+                    background: replySending ? '#a855f733' : '#a855f7',
+                    color: 'white',
+                    opacity: (!replyText.trim() || replySending) ? 0.5 : 1,
+                    cursor: (!replyText.trim() || replySending) ? 'default' : 'pointer',
+                  }}
+                >
+                  {replySending ? '…' : '↵'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {task.assignee && onAssigneeClick ? (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onAssigneeClick(task.assignee!) }}
+                className="text-[10px] px-1.5 py-0.5 rounded-md transition-colors hover:outline hover:outline-1 hover:outline-[var(--theme-accent)]"
+                style={{ background: 'var(--theme-hover)', color: 'var(--theme-muted)' }}
+                title="Filter by this assignee"
+              >
+                {assigneeLabel}
+              </button>
+            ) : (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]">
+                {assigneeLabel}
+              </span>
+            )}
+            {visibleTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onTagClick(tag) }}
+                className="text-[10px] px-1.5 py-0.5 rounded-md transition-colors"
+                style={{
+                  background: activeTagFilter === tag
+                    ? 'color-mix(in srgb, var(--theme-accent) 20%, var(--theme-hover))'
+                    : 'var(--theme-hover)',
+                  color: activeTagFilter === tag ? 'var(--theme-accent)' : 'var(--theme-muted)',
+                  outline: activeTagFilter === tag ? '1px solid var(--theme-accent)' : 'none',
+                }}
+              >
+                #{tag}
+              </button>
+            ))}
+            {extraTagCount > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]">
+                +{extraTagCount} more
+              </span>
+            )}
+          </div>
+
+          {task.due_date && (
+            <div className="flex items-center gap-1 text-[10px] tabular-nums">
+              {overdue && (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                  <span className="text-red-400 font-semibold">Overdue</span>
+                  <span className="text-[var(--theme-muted)] mx-0.5">·</span>
+                </>
+              )}
+              <span className={overdue ? 'text-red-400 font-semibold' : 'text-[var(--theme-muted)]'}>
+                {(() => {
+                  const [y, m, d] = task.due_date.split('-').map(Number)
+                  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                })()}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

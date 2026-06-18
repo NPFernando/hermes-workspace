@@ -12,13 +12,62 @@ import {
   Folder01Icon,
   Key01Icon,
   SparklesIcon,
+  ToggleOffIcon,
+  ToggleOnIcon,
   UserGroupIcon,
+  UserStar01Icon,
 } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { DialogContent, DialogRoot, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+
+type PersonalityPreset = { key: string; label: string; description: string; prompt: string }
+type WorkerRec = { workerId: string; name: string; role: string; recommendedPreset: string; presetLabel: string; isMain: boolean }
+type SwarmPersonalityData = { presets: Array<PersonalityPreset>; recommendations: Array<WorkerRec> }
+
+type SisterEntry = {
+  id: string
+  name: string
+  emoji: string
+  role: string
+  type: 'ai_sister' | 'business_agent' | 'delegation_profile'
+  description?: string
+  modelPreference?: string
+  growthLabel?: string
+  growthEmoji?: string
+  growthEntryCount?: number
+}
+
+const SISTER_BADGE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  astra:    { bg: 'bg-violet-500/15',  text: 'text-violet-400',  border: 'border-violet-400/30' },
+  novus:    { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-400/30' },
+  nova:     { bg: 'bg-sky-500/15',     text: 'text-sky-400',     border: 'border-sky-400/30' },
+  business: { bg: 'bg-amber-500/15',   text: 'text-amber-400',   border: 'border-amber-400/30' },
+  default:  { bg: 'bg-primary-500/10', text: 'text-primary-400', border: 'border-primary-300/20' },
+}
+
+function sisterBadgeStyle(s: SisterEntry) {
+  if (SISTER_BADGE_STYLES[s.id]) return SISTER_BADGE_STYLES[s.id]
+  if (s.type === 'business_agent') return SISTER_BADGE_STYLES.business
+  return SISTER_BADGE_STYLES.default
+}
+
+function SisterBadge({ sister }: { sister: SisterEntry }) {
+  const style = sisterBadgeStyle(sister)
+  return (
+    <span className={cn(
+      'mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+      style.bg, style.text, style.border,
+    )} title={sister.description || sister.role}>
+      {sister.emoji} {sister.name}
+      {(sister.growthEntryCount ?? 0) > 0 && sister.growthEmoji ? (
+        <span className="opacity-60">{sister.growthEmoji}</span>
+      ) : null}
+    </span>
+  )
+}
 
 type ProfileSummary = {
   name: string
@@ -120,6 +169,13 @@ export function ProfilesScreen() {
   const [busyName, setBusyName] = useState<string | null>(null)
   const [descriptionDraft, setDescriptionDraft] = useState('')
   const [savingDescription, setSavingDescription] = useState(false)
+  // Personality + swarm step
+  const [wizardPersonality, setWizardPersonality] = useState('')
+  const [wizardSelectedPreset, setWizardSelectedPreset] = useState('')
+  const [wizardEnableSwarm, setWizardEnableSwarm] = useState(false)
+  const [swarmData, setSwarmData] = useState<SwarmPersonalityData | null>(null)
+  const [loadingSwarm, setLoadingSwarm] = useState(false)
+  const [workerPresets, setWorkerPresets] = useState<Record<string, string>>({})
 
   const profilesQuery = useQuery({
     queryKey: ['profiles', 'list'],
@@ -128,6 +184,26 @@ export function ProfilesScreen() {
         '/api/profiles/list',
       ),
   })
+
+  const sistersQuery = useQuery({
+    queryKey: ['sisters'],
+    queryFn: async () => {
+      const res = await fetch('/api/sisters')
+      if (!res.ok) return []
+      const payload = (await res.json()) as { ok?: boolean; sisters?: Array<SisterEntry> }
+      return Array.isArray(payload.sisters) ? payload.sisters : []
+    },
+    staleTime: 60_000,
+  })
+
+  const sisterMap = useMemo(() => {
+    const map: Record<string, SisterEntry> = {}
+    for (const s of sistersQuery.data ?? []) {
+      map[s.id] = s
+      if (s.id === 'astra') map['default'] = s
+    }
+    return map
+  }, [sistersQuery.data])
 
   const detailQuery = useQuery({
     queryKey: ['profiles', 'read', detailsName],
@@ -183,6 +259,27 @@ export function ProfilesScreen() {
   }, [createOpen, wizardStep, allModels.length, fetchAllModels])
 
   useEffect(() => {
+    if (createOpen && wizardStep === 3 && !swarmData) {
+      setLoadingSwarm(true)
+      fetch('/api/personality-swarm')
+        .then((r) => r.json())
+        .then((data: SwarmPersonalityData & { ok?: boolean }) => {
+          if (data.ok !== false) {
+            setSwarmData(data)
+            // Pre-fill recommended presets
+            const defaults: Record<string, string> = {}
+            for (const rec of data.recommendations ?? []) {
+              defaults[rec.workerId] = rec.recommendedPreset
+            }
+            setWorkerPresets(defaults)
+          }
+        })
+        .catch(() => {/* ignore */})
+        .finally(() => setLoadingSwarm(false))
+    }
+  }, [createOpen, wizardStep, swarmData])
+
+  useEffect(() => {
     setDescriptionDraft(detailQuery.data?.profile?.description ?? '')
   }, [detailQuery.data?.profile?.description, detailsName])
 
@@ -197,6 +294,11 @@ export function ProfilesScreen() {
     setWizardModel('')
     setWizardStep(1)
     setAllModels([])
+    setWizardPersonality('')
+    setWizardSelectedPreset('')
+    setWizardEnableSwarm(false)
+    setSwarmData(null)
+    setWorkerPresets({})
   }
 
   async function handleCreate() {
@@ -209,6 +311,28 @@ export function ProfilesScreen() {
         ...(wizardModel ? { model: wizardModel } : {}),
         ...(wizardProvider ? { provider: wizardProvider } : {}),
       })
+
+      // Personality + swarm distribution
+      const personalityText = wizardPersonality.trim()
+      if (personalityText) {
+        const workers = wizardEnableSwarm && swarmData
+          ? swarmData.recommendations.map((rec) => ({
+              workerId: rec.workerId,
+              presetKey: workerPresets[rec.workerId] ?? rec.recommendedPreset,
+            }))
+          : []
+        try {
+          await postJson('/api/personality-swarm', {
+            name: newProfileName.trim(),
+            primaryPersonality: personalityText,
+            workers,
+          })
+        } catch {
+          // non-fatal — profile is created, personality failed
+          toast('Profile created but personality distribution had errors', { type: 'warning' })
+        }
+      }
+
       toast(`Created profile ${newProfileName.trim()}`, { type: 'success' })
       setCreateOpen(false)
       resetWizard()
@@ -389,6 +513,9 @@ export function ProfilesScreen() {
                 <span className="mt-1 inline-block rounded-full bg-primary-100 px-2.5 py-0.5 text-[11px] font-medium text-primary-600 dark:bg-neutral-800 dark:text-neutral-400">
                   {profile.provider || 'no provider'}
                 </span>
+                {sisterMap[profile.name] ? (
+                  <SisterBadge sister={sisterMap[profile.name]} />
+                ) : null}
                 <p className="mt-3 line-clamp-2 min-h-[2.5rem] px-6 text-center text-xs text-primary-500 dark:text-neutral-400">
                   {profile.description?.trim() || 'No description yet'}
                 </p>
@@ -516,14 +643,16 @@ export function ProfilesScreen() {
                     ? 'Name & template'
                     : wizardStep === 2
                       ? 'Choose model'
-                      : 'Review & create'}
+                      : wizardStep === 3
+                        ? 'Personality & swarm'
+                        : 'Review & create'}
                 </p>
               </div>
             </div>
 
             {/* Step indicator */}
             <div className="mt-4 flex items-center gap-2">
-              {[1, 2, 3].map((step) => (
+              {[1, 2, 3, 4].map((step) => (
                 <div key={step} className="flex flex-1 items-center gap-2">
                   <div
                     className={cn(
@@ -545,7 +674,7 @@ export function ProfilesScreen() {
                       step
                     )}
                   </div>
-                  {step < 3 && (
+                  {step < 4 && (
                     <div
                       className={cn(
                         'h-0.5 flex-1 rounded-full transition-colors',
@@ -685,7 +814,134 @@ export function ProfilesScreen() {
               </div>
             )}
 
+            {/* ── Step 3: Personality & Swarm ───────────────────────── */}
             {wizardStep === 3 && (
+              <div className="space-y-4">
+                {/* Preset selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-neutral-400">
+                    <span className="flex items-center gap-1.5">
+                      <HugeiconsIcon icon={UserStar01Icon} size={13} strokeWidth={1.8} />
+                      Personality preset
+                    </span>
+                  </label>
+                  {loadingSwarm ? (
+                    <p className="text-xs text-primary-400">Loading presets…</p>
+                  ) : (
+                    <select
+                      value={wizardSelectedPreset}
+                      onChange={(e) => {
+                        const key = e.target.value
+                        setWizardSelectedPreset(key)
+                        const preset = swarmData?.presets.find((p) => p.key === key)
+                        if (preset) setWizardPersonality(preset.prompt)
+                      }}
+                      className="h-11 w-full rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+                    >
+                      <option value="">— Choose a preset or write custom —</option>
+                      {(swarmData?.presets ?? []).map((p) => (
+                        <option key={p.key} value={p.key}>{p.label}</option>
+                      ))}
+                    </select>
+                  )}
+                  {wizardSelectedPreset && swarmData && (
+                    <p className="text-[11px] text-primary-400 dark:text-neutral-500">
+                      {swarmData.presets.find((p) => p.key === wizardSelectedPreset)?.description}
+                    </p>
+                  )}
+                </div>
+
+                {/* Custom prompt */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-neutral-400">
+                    System prompt
+                    <span className="ml-1 font-normal text-primary-400">(optional — skip to inherit default)</span>
+                  </label>
+                  <textarea
+                    value={wizardPersonality}
+                    onChange={(e) => {
+                      setWizardPersonality(e.target.value)
+                      if (wizardSelectedPreset) setWizardSelectedPreset('')
+                    }}
+                    placeholder="You are [name], a [role] assistant. Your goal is…"
+                    rows={5}
+                    className="w-full rounded-xl border border-primary-200 bg-primary-50 px-3 py-2.5 text-sm text-primary-900 outline-none transition-colors focus:border-accent-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+                  />
+                </div>
+
+                {/* Swarm distribution toggle */}
+                {swarmData && swarmData.recommendations.length > 0 && (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setWizardEnableSwarm((v) => !v)}
+                      className={cn(
+                        'flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition-colors',
+                        wizardEnableSwarm
+                          ? 'border-accent-300 bg-accent-50/60 text-accent-700 dark:border-accent-700/40 dark:bg-accent-950/20 dark:text-accent-300'
+                          : 'border-primary-200 bg-primary-50/60 text-primary-600 hover:border-primary-300 dark:border-neutral-800 dark:bg-neutral-900/40 dark:text-neutral-400',
+                      )}
+                    >
+                      <HugeiconsIcon
+                        icon={wizardEnableSwarm ? ToggleOnIcon : ToggleOffIcon}
+                        size={18}
+                        strokeWidth={1.6}
+                      />
+                      <div className="text-left">
+                        <div className="font-medium">Distribute to swarm workers</div>
+                        <div className="text-[11px] opacity-70">
+                          Push role-appropriate personalities to each worker profile
+                        </div>
+                      </div>
+                    </button>
+
+                    {wizardEnableSwarm && (
+                      <div className="space-y-2 rounded-xl border border-primary-200 bg-primary-50/60 p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
+                          Worker personalities
+                        </p>
+                        <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                          {swarmData.recommendations.map((rec) => (
+                            <div key={rec.workerId} className="flex items-center gap-2">
+                              <div className="w-24 shrink-0">
+                                <span className={cn(
+                                  'inline-block rounded-md px-2 py-0.5 text-[10px] font-medium',
+                                  rec.isMain
+                                    ? 'bg-accent-100 text-accent-700 dark:bg-accent-950/40 dark:text-accent-300'
+                                    : 'bg-primary-100 text-primary-600 dark:bg-neutral-800 dark:text-neutral-400',
+                                )}>
+                                  {rec.name || rec.workerId}
+                                </span>
+                                {rec.isMain && (
+                                  <span className="ml-1 text-[9px] text-accent-500">★ main</span>
+                                )}
+                              </div>
+                              <select
+                                value={workerPresets[rec.workerId] ?? rec.recommendedPreset}
+                                onChange={(e) =>
+                                  setWorkerPresets((prev) => ({ ...prev, [rec.workerId]: e.target.value }))
+                                }
+                                className="h-7 flex-1 rounded-lg border border-primary-200 bg-surface px-2 text-[11px] outline-none focus:border-accent-400 dark:border-neutral-700"
+                              >
+                                {(swarmData.presets ?? []).map((p) => (
+                                  <option key={p.key} value={p.key}>{p.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-primary-400 dark:text-neutral-500">
+                          Astra (orchestrator) uses the primary personality above. Other workers get their selected preset.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Step 4: Review & create ────────────────────────────── */}
+            {wizardStep === 4 && (
               <div className="space-y-4">
                 <div className="rounded-2xl border border-primary-200 bg-primary-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/60">
                   <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400">
@@ -706,6 +962,23 @@ export function ProfilesScreen() {
                       }
                       muted={!wizardModel}
                     />
+                    <SummaryField
+                      label="Personality"
+                      value={
+                        wizardSelectedPreset
+                          ? (swarmData?.presets.find((p) => p.key === wizardSelectedPreset)?.label ?? 'Custom')
+                          : wizardPersonality.trim()
+                            ? 'Custom'
+                            : 'Default'
+                      }
+                      muted={!wizardPersonality.trim()}
+                    />
+                    {wizardEnableSwarm && (
+                      <SummaryField
+                        label="Swarm"
+                        value={`${swarmData?.recommendations.length ?? 0} workers`}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -718,6 +991,11 @@ export function ProfilesScreen() {
                     with config.yaml
                     {cloneFrom ? ` cloned from ${cloneFrom}` : ''}, skills/, and
                     sessions/ directories.
+                    {wizardPersonality.trim() && (
+                      <> Personality will be applied to <strong>~/.hermes/config.yaml</strong>
+                      {wizardEnableSwarm ? ' and all swarm worker profiles' : ''}.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -731,7 +1009,7 @@ export function ProfilesScreen() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setWizardStep((s) => (s - 1) as 1 | 2 | 3)}
+                  onClick={() => setWizardStep((s) => (s - 1) as 1 | 2 | 3 | 4)}
                 >
                   Back
                 </Button>
@@ -748,10 +1026,10 @@ export function ProfilesScreen() {
               >
                 Cancel
               </Button>
-              {wizardStep < 3 ? (
+              {wizardStep < 4 ? (
                 <Button
                   size="sm"
-                  onClick={() => setWizardStep((s) => (s + 1) as 1 | 2 | 3)}
+                  onClick={() => setWizardStep((s) => (s + 1) as 1 | 2 | 3 | 4)}
                   disabled={wizardStep === 1 && !nameValid}
                   className="gap-1.5"
                 >

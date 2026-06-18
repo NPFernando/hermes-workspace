@@ -1,3 +1,5 @@
+import { getLocalMessages, getLocalSession } from './local-session-store'
+import { getActiveRunForSession } from './run-store'
 import {
   BEARER_TOKEN,
   CLAUDE_API,
@@ -6,8 +8,6 @@ import {
   getCapabilities,
 } from '@/server/gateway-capabilities'
 import { listSessions } from '@/server/claude-api'
-import { getLocalMessages, getLocalSession } from './local-session-store'
-import { getActiveRunForSession } from './run-store'
 import {
   resolveMainChatSessionId,
   shouldBindMainToPortableSession,

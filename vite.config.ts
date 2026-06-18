@@ -222,6 +222,73 @@ const config = defineConfig(({ mode, command }) => {
     )
   }
 
+  // ── Odysseus companion service auto-start ──────────────────────────────────
+  const odysseusDir = resolve('services/odysseus')
+  const odysseusVenvPython = resolve(odysseusDir, 'venv', 'bin', 'python')
+  let odysseusChild: ChildProcess | null = null
+  let odysseusStarted = false
+
+  const isOdysseusHealthy = async () => {
+    try {
+      const r = await fetch('http://127.0.0.1:7100/api/health', {
+        signal: AbortSignal.timeout(2000),
+      })
+      return r.ok
+    } catch {
+      return false
+    }
+  }
+
+  const startOdysseus = async () => {
+    if (odysseusStarted) return
+    if (!existsSync(odysseusVenvPython)) {
+      console.warn(
+        '[odysseus] venv not found — run: cd services/odysseus && python3 -m venv venv && venv/bin/pip install -r requirements.txt',
+      )
+      return
+    }
+    if (await isOdysseusHealthy()) {
+      console.log('[odysseus] Already running — reusing existing process')
+      odysseusStarted = true
+      return
+    }
+
+    const child = spawn(odysseusVenvPython, ['-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '7100'], {
+      cwd: odysseusDir,
+      detached: false,
+      stdio: 'pipe',
+      env: { ...process.env, PYTHONUNBUFFERED: '1' },
+    })
+    odysseusChild = child
+    odysseusStarted = true
+
+    child.stdout?.on('data', (d: Buffer) => {
+      const line = d.toString().trim()
+      if (line) console.log(`[odysseus] ${line}`)
+    })
+    child.stderr?.on('data', (d: Buffer) => {
+      const line = d.toString().trim()
+      if (line) console.log(`[odysseus] ${line}`)
+    })
+    child.on('exit', (code) => {
+      odysseusChild = null
+      odysseusStarted = false
+      if (code !== 0 && code !== null) {
+        console.warn(`[odysseus] Exited with code ${code}`)
+      }
+    })
+
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 1000))
+      if (await isOdysseusHealthy()) {
+        console.log('[odysseus] ✓ Ready on http://127.0.0.1:7100')
+        return
+      }
+    }
+    console.warn('[odysseus] Started but health check timed out — may still be loading')
+  }
+  // ── end Odysseus ────────────────────────────────────────────────────────────
+
   let workspaceDaemonStarted = false
   let workspaceDaemonStarting = false
   let workspaceDaemonShuttingDown = false
@@ -479,6 +546,18 @@ const config = defineConfig(({ mode, command }) => {
         'puppeteer-extra-plugin-stealth',
       ],
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            // Only split truly isolated libs that have no circular deps with the framework
+            if (id.includes('/@hugeicons/') || id.includes('/@lobehub/icons')) return 'vendor-icons'
+            return undefined
+          },
+        },
+      },
+    },
     server: {
       // Cross-origin isolation so the embedded HermesWorld WebGL client keeps
       // SharedArrayBuffer multithreading (matches the standalone web client at
@@ -684,6 +763,19 @@ const config = defineConfig(({ mode, command }) => {
               claudeAgentChild.kill('SIGTERM')
               claudeAgentChild = null
               claudeAgentStarted = false
+            }
+          })
+
+          // Auto-start Odysseus companion service
+          if (command === 'serve') {
+            void startOdysseus()
+          }
+          server.httpServer?.on('close', () => {
+            if (odysseusChild) {
+              console.log('[odysseus] Stopping...')
+              odysseusChild.kill('SIGTERM')
+              odysseusChild = null
+              odysseusStarted = false
             }
           })
 

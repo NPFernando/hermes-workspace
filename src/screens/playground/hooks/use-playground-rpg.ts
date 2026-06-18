@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  
   PLAYGROUND_QUESTS,
   PLAYGROUND_SKILLS,
   PLAYGROUND_WORLDS,
-  itemById,
-  type EquipmentSlot,
-  type PlaygroundItemId,
-  type PlaygroundQuest,
-  type PlaygroundSkillId,
-  type PlaygroundWorldId,
-  type PlayerProfile,
-  type QuestProgressEntry,
+  
+  
+  
+  
+  
+  
+  itemById
 } from '../lib/playground-rpg'
-import { AVATAR_PRESETS, saveAvatarConfig, type AvatarConfig } from '../lib/avatar-config'
+import { AVATAR_PRESETS,  saveAvatarConfig } from '../lib/avatar-config'
+import type {EquipmentSlot, PlayerProfile, PlaygroundItemId, PlaygroundQuest, PlaygroundSkillId, PlaygroundWorldId, QuestProgressEntry} from '../lib/playground-rpg';
+import type {AvatarConfig} from '../lib/avatar-config';
 
 export type PlaygroundRpg = ReturnType<typeof usePlaygroundRpg>
 
@@ -34,8 +36,8 @@ export type RewardToast = {
 export type PlaygroundRpgState = {
   playerProfile: PlayerProfile
   skillXp: Record<PlaygroundSkillId, number>
-  unlockedWorlds: PlaygroundWorldId[]
-  completedQuests: string[]
+  unlockedWorlds: Array<PlaygroundWorldId>
+  completedQuests: Array<string>
   hp: number
   hpMax: number
   mp: number
@@ -56,7 +58,7 @@ const EMPTY_EQUIPPED = {
   artifact: null,
 } satisfies PlayerProfile['equipped']
 
-const STARTER_INVENTORY: PlaygroundItemId[] = ['hermes-sigil', 'training-blade', 'novice-cloak']
+const STARTER_INVENTORY: Array<PlaygroundItemId> = ['hermes-sigil', 'training-blade', 'novice-cloak']
 
 function defaultQuestProgress(): Record<string, QuestProgressEntry> {
   return Object.fromEntries(
@@ -128,7 +130,7 @@ function normalizeState(raw: Partial<PlaygroundRpgState> | null): PlaygroundRpgS
   const rawProfile = raw?.playerProfile
   const completedQuests = Array.isArray(raw?.completedQuests) ? raw.completedQuests : []
   const legacy = raw as Partial<PlaygroundRpgState & {
-    inventory: PlaygroundItemId[]
+    inventory: Array<PlaygroundItemId>
     level: number
     xp: number
   }> | null
@@ -234,7 +236,7 @@ function completeQuestState(
 
 export function usePlaygroundRpg() {
   const [state, setState] = useState<PlaygroundRpgState>(() => loadState())
-  const [toasts, setToasts] = useState<RewardToast[]>([])
+  const [toasts, setToasts] = useState<Array<RewardToast>>([])
 
   useEffect(() => {
     try {
@@ -358,22 +360,23 @@ export function usePlaygroundRpg() {
       completedQuest = quest
       return completeQuestState(next, quest)
     })
-    if (completedQuest) {
-      pushToast('quest', 'Quest Complete', completedQuest.title)
-      pushToast('xp', '+ XP', `+${completedQuest.reward.xp} XP`)
-      if (completedQuest.reward.items?.length) {
-        for (const itemId of completedQuest.reward.items) {
+    const finishedQuest = completedQuest as PlaygroundQuest | null
+    if (finishedQuest) {
+      pushToast('quest', 'Quest Complete', finishedQuest.title)
+      pushToast('xp', '+ XP', `+${finishedQuest.reward.xp} XP`)
+      if (finishedQuest.reward.items?.length) {
+        for (const itemId of finishedQuest.reward.items) {
           const item = itemById(itemId)
           if (item) pushToast('item', '+ Item', item.name)
         }
       }
-      if (completedQuest.reward.title) {
-        pushToast('title', 'Title Unlocked', completedQuest.reward.title)
+      if (finishedQuest.reward.title) {
+        pushToast('title', 'Title Unlocked', finishedQuest.reward.title)
       }
     }
   }, [pushToast])
 
-  const grantItems = useCallback((items: PlaygroundItemId[]) => {
+  const grantItems = useCallback((items: Array<PlaygroundItemId>) => {
     if (!items?.length) return
     setState((prev) => ({
       ...prev,

@@ -1,31 +1,37 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, CheckListIcon, RefreshIcon } from '@hugeicons/core-free-icons'
+import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, PlayIcon, RefreshIcon, Search01Icon  } from '@hugeicons/core-free-icons'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
-import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn } from '@/lib/tasks-api'
-import { toast } from '@/components/ui/toast'
-import { cn } from '@/lib/utils'
+import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority, UpdateTaskInput } from '@/lib/tasks-api'
 import {
   COLUMN_COLORS,
   COLUMN_LABELS,
   COLUMN_ORDER,
+  PRIORITY_COLORS,
+  askAstra,
+  breakdownTask,
   createTask,
   deleteTask,
+  executeTask,
   fetchAssignees,
   fetchTasks,
+  generateTaskFromText,
   isOverdue,
   launchSession,
-  linkSession,
   moveTask,
+  postTaskComment,
   updateTask,
 } from '@/lib/tasks-api'
-import { stashPendingSend } from '@/screens/chat/pending-send'
+import { toast } from '@/components/ui/toast'
+import { cn } from '@/lib/utils'
+import { isTypingTarget } from '@/screens/playground/components/keyboard-shortcuts-overlay'
+import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
 
 const QUERY_KEY = ['claude', 'tasks'] as const
 const ASSIGNEES_KEY = ['claude', 'tasks', 'assignees'] as const
@@ -55,30 +61,58 @@ export function TasksScreen() {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<TaskColumn | null>(null)
   const [showDone, setShowDone] = useState(false)
+  const [astraReviewing, setAstraReviewing] = useState(false)
+  const [askingAstra, setAskingAstra] = useState(false)
+  const [ideasLoading, setIdeasLoading] = useState(false)
+  const [breakingDownId, setBreakingDownId] = useState<string | null>(null)
 
   const search = useSearch({ from: '/tasks' })
   const navigate = useNavigate()
   const initialAssignee = typeof search.assignee === 'string' ? search.assignee : null
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(initialAssignee)
 
+  const [launchingTaskId, setLaunchingTaskId] = useState<string | null>(null)
+  const [executingTaskId, setExecutingTaskId] = useState<string | null>(null)
+  const [nlInput, setNlInput] = useState('')
+  const [nlParsing, setNlParsing] = useState(false)
+  const nlInputRef = useRef<HTMLInputElement>(null)
+  const [createDefaults, setCreateDefaults] = useState<{
+    title?: string; description?: string; column?: TaskColumn
+    priority?: TaskPriority; assignee?: string; tags?: string
+  } | null>(null)
+  // Snapshot of column/priority taken when Deploy Agents fires; cleared when agents finish
+  const [deploySnapshot, setDeploySnapshot] = useState<Partial<Record<string, { column: TaskColumn; priority: TaskPriority }>> | null>(null)
+
+  // — Search + filter state
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const [filterOverdue, setFilterOverdue] = useState(false)
+  const [filterBlocked, setFilterBlocked] = useState(false)
+  const [filterActiveAgent, setFilterActiveAgent] = useState(false)
+  const [filterInReview, setFilterInReview] = useState(false)
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | null>(null)
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
+
   const tasksQuery = useQuery({
     queryKey: [...QUERY_KEY, showDone],
     queryFn: () => fetchTasks({ include_done: showDone }),
-    refetchInterval: 30_000,
+    refetchInterval: (query) => {
+      const tasks = query.state.data ?? []
+      const hasActiveAgent = tasks.some((t) => t.agent_state)
+      return hasActiveAgent ? 4_000 : 30_000
+    },
     placeholderData: keepPreviousData,
   })
 
-  // Load assignees dynamically from profiles + config
   const assigneesQuery = useQuery({
     queryKey: ASSIGNEES_KEY,
     queryFn: fetchAssignees,
-    staleTime: 5 * 60_000, // profiles don't change often
+    staleTime: 5 * 60_000,
   })
 
   const assignees: Array<TaskAssignee> = assigneesQuery.data?.assignees ?? []
   const humanReviewer = assigneesQuery.data?.humanReviewer ?? null
 
-  // Build a label map from dynamic assignees for TaskCard display
   const assigneeLabels = useMemo(() => {
     const map: Record<string, string> = {}
     for (const a of assignees) map[a.id] = a.label
@@ -88,18 +122,38 @@ export function TasksScreen() {
   const tasks = tasksQuery.data ?? []
 
   const tasksByColumn = useMemo(() => {
-    const map: Record<TaskColumn, Array<ClaudeTask>> = {
+    const columns: Record<TaskColumn, Array<ClaudeTask>> = {
       backlog: [], todo: [], in_progress: [], review: [], blocked: [], done: [], deleted: [],
     }
+    const q = searchQuery.trim().toLowerCase()
+    let matchCount = 0
+
     for (const t of tasks) {
       if (assigneeFilter && t.assignee !== assigneeFilter) continue
-      map[t.column].push(t)
+      if (q) {
+        const hit = t.title.toLowerCase().includes(q)
+          || t.description.toLowerCase().includes(q)
+          || t.tags.some(tag => tag.toLowerCase().includes(q))
+        if (!hit) continue
+      }
+      if (filterOverdue && !isOverdue(t)) continue
+      if (filterBlocked && t.column !== 'blocked') continue
+      if (filterActiveAgent && !t.agent_state) continue
+      if (filterInReview && t.column !== 'review') continue
+      if (priorityFilter && t.priority !== priorityFilter) continue
+      if (tagFilter && !t.tags.includes(tagFilter)) continue
+
+      columns[t.column].push(t)
+      matchCount++
     }
     for (const col of COLUMN_ORDER) {
-      map[col].sort((a, b) => a.position - b.position)
+      columns[col].sort((a, b) => a.position - b.position)
     }
-    return map
-  }, [tasks, assigneeFilter])
+    const hasAnyFilter = Boolean(assigneeFilter || q || filterOverdue || filterBlocked || filterActiveAgent || filterInReview || priorityFilter || tagFilter)
+    return { columns, matchCount, totalTasks: tasks.length, hasAnyFilter }
+  }, [tasks, assigneeFilter, searchQuery, filterOverdue, filterBlocked, filterActiveAgent, filterInReview, priorityFilter, tagFilter])
+
+  const columnMap = tasksByColumn.columns
 
   const stats = useMemo(() => {
     const total = tasks.length
@@ -108,7 +162,8 @@ export function TasksScreen() {
     const done = tasks.filter(t => t.column === 'done').length
     const overdue = tasks.filter(t => isOverdue(t) && t.column !== 'done').length
     const completion = total > 0 ? Math.round((done / total) * 100) : 0
-    return { total, running, blocked, done, overdue, completion }
+    const agentActive = tasks.filter(t => t.agent_state).length
+    return { total, running, blocked, done, overdue, completion, agentActive }
   }, [tasks])
 
   const invalidate = useCallback(() => {
@@ -139,6 +194,100 @@ export function TasksScreen() {
     onError: (e) => toast(e instanceof Error ? e.message : 'Failed to move task', { type: 'error' }),
   })
 
+  // Silent update mutation — for quick card actions (no dialog close side-effect)
+  const quickUpdateMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateTaskInput }) => updateTask(id, input),
+    onSuccess: () => invalidate(),
+    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to update task', { type: 'error' }),
+  })
+
+  async function handleTaskComment(taskId: string, text: string) {
+    const result = await postTaskComment(taskId, text)
+    invalidate()
+    if (result.resumed) {
+      toast('Astra is on it…')
+    }
+  }
+
+  async function handleNlCreate() {
+    const text = nlInput.trim()
+    if (!text || nlParsing) return
+    setNlParsing(true)
+    try {
+      const suggestion = await generateTaskFromText(text)
+      setNlInput('')
+      setCreateDefaults({
+        title: suggestion.title,
+        description: suggestion.description ?? '',
+        column: suggestion.column,
+        priority: suggestion.priority,
+        assignee: suggestion.assignee ?? '',
+        tags: Array.isArray(suggestion.tags) ? suggestion.tags.join(', ') : '',
+      })
+      setShowCreate(true)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'AI could not parse the task — try rephrasing', { type: 'error' })
+    } finally {
+      setNlParsing(false)
+    }
+  }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+
+      if (e.key === 'n') {
+        e.preventDefault()
+        setCreateColumn('backlog')
+        setShowCreate(true)
+        return
+      }
+      if (e.key === '/') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        return
+      }
+      if (e.key === 'd') {
+        e.preventDefault()
+        setShowDone(v => !v)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  // Agent deploy summary — fires when all agent_state clears after Deploy Agents was clicked
+  useEffect(() => {
+    if (!deploySnapshot) return
+    const anyActive = tasks.some(t => t.agent_state)
+    if (anyActive) return
+    // All agents finished — compute diff vs snapshot
+    let movedToReady = 0
+    let movedToBlocked = 0
+    let reprioritised = 0
+    let total = 0
+    for (const task of tasks) {
+      const before = deploySnapshot[task.id]
+      if (!before) continue
+      total++
+      if (before.column !== task.column) {
+        if (task.column === 'todo') movedToReady++
+        if (task.column === 'blocked') movedToBlocked++
+      }
+      if (before.priority !== task.priority) reprioritised++
+    }
+    if (total > 0) {
+      const parts: Array<string> = [`Reviewed ${total} task${total !== 1 ? 's' : ''}`]
+      if (movedToReady > 0) parts.push(`${movedToReady} → Ready`)
+      if (movedToBlocked > 0) parts.push(`${movedToBlocked} Blocked`)
+      if (reprioritised > 0) parts.push(`${reprioritised} reprioritised`)
+      toast(parts.join(' · '))
+    }
+    setDeploySnapshot(null)
+  }, [tasks, deploySnapshot])
+
   function handleDragStart(e: React.DragEvent, taskId: string) {
     e.dataTransfer.setData('text/plain', taskId)
     setDraggingId(taskId)
@@ -158,8 +307,6 @@ export function TasksScreen() {
       setDragOverColumn(null)
       return
     }
-    // Hybrid autonomy: if a human reviewer is configured, only they can move
-    // tasks into the 'done' column — agents may move to 'review' at most.
     if (targetColumn === 'done' && humanReviewer) {
       toast(`Only ${humanReviewer} can mark tasks as done`, { type: 'error' })
       setDraggingId(null)
@@ -176,12 +323,21 @@ export function TasksScreen() {
     setDragOverColumn(null)
   }
 
+  function clearAllFilters() {
+    setSearchQuery('')
+    setFilterOverdue(false)
+    setFilterBlocked(false)
+    setFilterActiveAgent(false)
+    setPriorityFilter(null)
+    setTagFilter(null)
+  }
+
   const visibleColumns = showDone ? COLUMN_ORDER : COLUMN_ORDER.filter(c => c !== 'done')
   const colMaxWidth = Math.floor(1200 / visibleColumns.length)
 
   return (
-    <div className="min-h-full overflow-y-auto bg-surface text-ink">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
+    <div className="h-full overflow-hidden flex flex-col bg-surface text-ink">
+      <div className="shrink-0 mx-auto w-full max-w-[1200px] flex flex-col gap-3 px-4 pt-5 pb-2 sm:px-6 lg:px-8">
       {/* Header */}
       <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
         <div className="flex items-center justify-between">
@@ -218,10 +374,107 @@ export function TasksScreen() {
             )}
             <span className="hidden sm:inline">·</span>
             <span className="hidden sm:inline">{stats.completion}% done</span>
+            {stats.agentActive > 0 && (
+              <>
+                <span>·</span>
+                <span className="flex items-center gap-1 text-violet-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse inline-block" />
+                  Astra reviewing {stats.agentActive}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {/* Ask Astra */}
+          <button
+            onClick={async () => {
+              setAskingAstra(true)
+              try {
+                const { sessionId } = await askAstra()
+                void navigate({ to: '/chat/$sessionKey', params: { sessionKey: sessionId } })
+              } catch {
+                toast('Failed to start Astra session', { type: 'error' })
+              } finally {
+                setAskingAstra(false)
+              }
+            }}
+            disabled={askingAstra}
+            title="Open a chat with Astra pre-briefed on the current board state"
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+              askingAstra
+                ? 'border-violet-500/50 bg-violet-500/10 text-violet-400 cursor-wait'
+                : 'border-[var(--theme-border)] text-violet-400 hover:bg-violet-500/10 hover:border-violet-500/50',
+            )}
+          >
+            <span className={askingAstra ? 'animate-pulse' : ''}>✦</span>
+            {askingAstra ? 'Opening…' : 'Ask Astra'}
+          </button>
+
+          {/* Deploy Agents */}
+          <button
+            onClick={async () => {
+              // Snapshot current states so we can compute diff when agents finish
+              const snapshot: Record<string, { column: TaskColumn; priority: TaskPriority }> = {}
+              for (const t of tasks) snapshot[t.id] = { column: t.column, priority: t.priority }
+              setDeploySnapshot(snapshot)
+              setAstraReviewing(true)
+              try {
+                await fetch('/api/tasks-deploy-agents', { method: 'POST' })
+                await tasksQuery.refetch()
+              } finally {
+                setAstraReviewing(false)
+              }
+            }}
+            disabled={astraReviewing}
+            title="Deploy agents: Astra reviews each task and delegates to specialist sisters as needed"
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+              astraReviewing
+                ? 'border-violet-500/50 bg-violet-500/10 text-violet-400 cursor-wait'
+                : 'border-[var(--theme-border)] text-violet-400 hover:bg-violet-500/10 hover:border-violet-500/50',
+            )}
+          >
+            <HugeiconsIcon icon={AiBrainIcon} size={13} strokeWidth={1.8} className={astraReviewing ? 'animate-pulse' : ''} />
+            {astraReviewing ? 'Deploying…' : 'Deploy Agents'}
+          </button>
+
+          {/* AI idea generation */}
+          <button
+            onClick={async () => {
+              setIdeasLoading(true)
+              try {
+                const res = await fetch('/api/tasks-generate-ideas', { method: 'POST' })
+                const data = await res.json() as { ok: boolean; injected: number; ideas: Array<string>; error?: string }
+                if (data.injected > 0) {
+                  await tasksQuery.refetch()
+                  toast(`Added ${data.injected} idea${data.injected > 1 ? 's' : ''} to backlog`)
+                } else if (data.error) {
+                  toast(`Idea scan failed: ${data.error}`, { type: 'error' })
+                } else {
+                  toast('AI scanned workspace — no new ideas to add right now', { type: 'info' })
+                }
+              } catch {
+                toast('Failed to reach idea generator', { type: 'error' })
+              } finally {
+                setIdeasLoading(false)
+              }
+            }}
+            disabled={ideasLoading}
+            title="Ask AI to scan the workspace and suggest feature ideas"
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+              ideasLoading
+                ? 'border-amber-500/50 bg-amber-500/10 text-amber-400 cursor-wait'
+                : 'border-[var(--theme-border)] text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50',
+            )}
+          >
+            <HugeiconsIcon icon={BulbIcon} size={13} strokeWidth={1.8} className={ideasLoading ? 'animate-pulse' : ''} />
+            {ideasLoading ? 'Scanning…' : 'Add Idea'}
+          </button>
+
           <button
             onClick={() => setShowDone(v => !v)}
             className={cn(
@@ -233,6 +486,25 @@ export function TasksScreen() {
           >
             {showDone ? 'Hide Done' : 'Show Done'}
           </button>
+
+          {/* Clear Done — only shown when Done column is visible and has tasks */}
+          {showDone && columnMap['done'].length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const doneTasks = columnMap['done']
+                if (!window.confirm(`Delete all ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}? This cannot be undone.`)) return
+                void Promise.all(doneTasks.map(t => deleteTask(t.id))).then(() => {
+                  invalidate()
+                  toast(`Cleared ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}`)
+                }).catch(() => toast('Failed to clear done tasks', { type: 'error' }))
+              }}
+              className="text-xs px-2.5 py-1 rounded-lg border transition-colors border-red-500/40 text-red-400 hover:bg-red-500/10"
+            >
+              Clear Done ({columnMap['done'].length})
+            </button>
+          )}
+
           <button
             onClick={invalidate}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
@@ -240,6 +512,30 @@ export function TasksScreen() {
           >
             <HugeiconsIcon icon={RefreshIcon} size={16} className="text-[var(--theme-muted)]" />
           </button>
+
+          {/* Keyboard shortcuts hint */}
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    className="rounded-lg px-2 py-1 text-xs font-mono transition-colors hover:bg-[var(--theme-hover)]"
+                    style={{ color: 'var(--theme-muted)' }}
+                    aria-label="Keyboard shortcuts"
+                  >
+                    ?
+                  </button>
+                }
+              />
+              <TooltipContent side="bottom" className="space-y-1 text-[11px] leading-relaxed">
+                <div><kbd className="font-mono rounded px-1" style={{ background: 'var(--theme-hover)' }}>n</kbd> New task (Triage)</div>
+                <div><kbd className="font-mono rounded px-1" style={{ background: 'var(--theme-hover)' }}>/</kbd> Focus search</div>
+                <div><kbd className="font-mono rounded px-1" style={{ background: 'var(--theme-hover)' }}>d</kbd> Toggle Done column</div>
+              </TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+
           <button
             onClick={() => { setCreateColumn('backlog'); setShowCreate(true) }}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
@@ -250,18 +546,170 @@ export function TasksScreen() {
           </button>
         </div>
       </div>
+        {/* Natural language task creation */}
+        <div className="flex gap-2 mt-3">
+          <div className="relative flex-1">
+            <HugeiconsIcon
+              icon={AiMagicIcon}
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+              style={{ color: nlParsing ? 'var(--theme-accent)' : 'var(--theme-muted)' }}
+            />
+            <input
+              ref={nlInputRef}
+              type="text"
+              value={nlInput}
+              onChange={e => setNlInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') void handleNlCreate() }}
+              placeholder="Describe a task in plain language and press Enter…"
+              disabled={nlParsing}
+              className="w-full rounded-lg border text-sm pl-8 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)] disabled:opacity-50"
+              style={{
+                background: 'var(--theme-input)',
+                borderColor: 'var(--theme-border)',
+                color: 'var(--theme-text)',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--theme-accent)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'var(--theme-border)')}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleNlCreate()}
+            disabled={!nlInput.trim() || nlParsing}
+            className="px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 shrink-0"
+            style={{ background: 'var(--theme-accent)', color: 'white' }}
+          >
+            {nlParsing ? '✦ Thinking…' : '✦ Create'}
+          </button>
+        </div>
         <p className="mt-3 text-xs text-[var(--theme-muted)]">
           {TASKS_BOARD_HELP_TEXT}
         </p>
       </header>
 
+      {/* Search + Filter Bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Text search */}
+        <div className="relative flex-1 min-w-[180px]">
+          <HugeiconsIcon
+            icon={Search01Icon}
+            size={13}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ color: 'var(--theme-muted)' }}
+          />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search tasks… (/)"
+            className="w-full rounded-lg border pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1"
+            style={{
+              background: 'var(--theme-card)',
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-text)',
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = 'var(--theme-accent)')}
+            onBlur={e => (e.currentTarget.style.borderColor = 'var(--theme-border)')}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2"
+              style={{ color: 'var(--theme-muted)' }}
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={12} />
+            </button>
+          )}
+        </div>
+
+        {/* Quick-filter chips */}
+        {([
+          ['Overdue', filterOverdue, () => setFilterOverdue(v => !v)],
+          ['Blocked', filterBlocked, () => setFilterBlocked(v => !v)],
+          ['Active Agent', filterActiveAgent, () => setFilterActiveAgent(v => !v)],
+          ['In Review', filterInReview, () => setFilterInReview(v => !v)],
+        ] as Array<[string, boolean, () => void]>).map(([label, active, toggle]) => (
+          <button
+            key={label}
+            type="button"
+            onClick={toggle}
+            className="text-[10px] px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
+            style={{
+              borderColor: active ? 'var(--theme-accent)' : 'var(--theme-border)',
+              color: active ? 'var(--theme-accent)' : 'var(--theme-muted)',
+              background: active ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' : 'transparent',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+
+        {/* Priority filter chips */}
+        {(['high', 'medium', 'low'] as Array<TaskPriority>).map(p => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => setPriorityFilter(prev => prev === p ? null : p)}
+            className="text-[10px] px-2.5 py-1 rounded-full border transition-colors capitalize"
+            style={{
+              borderColor: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-border)',
+              color: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-muted)',
+              background: priorityFilter === p ? `${PRIORITY_COLORS[p]}1a` : 'transparent',
+            }}
+          >
+            {p}
+          </button>
+        ))}
+
+        {/* Active tag filter chip */}
+        {tagFilter && (
+          <div
+            className="flex items-center gap-1 text-[10px] rounded-full px-2.5 py-1 border"
+            style={{
+              borderColor: 'var(--theme-accent)',
+              color: 'var(--theme-accent)',
+              background: 'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
+            }}
+          >
+            <span>#{tagFilter}</span>
+            <button
+              type="button"
+              onClick={() => setTagFilter(null)}
+              aria-label="Clear tag filter"
+              className="ml-0.5"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={10} />
+            </button>
+          </div>
+        )}
+
+        {/* Match counter + clear all */}
+        {tasksByColumn.hasAnyFilter && (
+          <span className="ml-auto text-[10px] flex items-center gap-2 whitespace-nowrap" style={{ color: 'var(--theme-muted)' }}>
+            Showing {tasksByColumn.matchCount} of {tasksByColumn.totalTasks}
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="hover:underline"
+              style={{ color: 'var(--theme-accent)' }}
+            >
+              Clear all
+            </button>
+          </span>
+        )}
+      </div>
+      </div>
+
       {/* Board */}
       <div
-        className="mx-auto flex w-full max-w-[1200px] flex-1 gap-3 overflow-x-auto overflow-y-hidden p-4 min-h-0"
+        className="flex-1 min-h-0 mx-auto w-full max-w-[1200px] flex gap-3 overflow-x-auto overflow-y-hidden px-4 pb-[calc(var(--tabbar-h,80px)+1rem)] pt-3 sm:px-6 lg:px-8"
         style={{ boxShadow: 'inset 0 8px 24px rgba(0,0,0,0.2)' }}
       >
         {visibleColumns.map((col) => {
-          const colTasks = tasksByColumn[col]
+          const colTasks = columnMap[col]
           const colColor = COLUMN_COLORS[col]
           const isDragOver = dragOverColumn === col
 
@@ -269,7 +717,7 @@ export function TasksScreen() {
             <div
               key={col}
               className={cn(
-                'flex flex-col rounded-xl border min-w-[180px] w-full shrink-0 flex-1',
+                'flex flex-col rounded-xl border min-w-[180px] w-full shrink-0 flex-1 min-h-0',
                 'bg-[var(--theme-card)] border-[var(--theme-border)]',
                 'transition-colors shadow-[0_2px_12px_rgba(0,0,0,0.25)]',
                 isDragOver && 'border-[var(--theme-accent)] bg-[var(--theme-hover)]',
@@ -303,7 +751,7 @@ export function TasksScreen() {
               </div>
 
               {/* Cards */}
-              <div className="flex flex-col gap-2 p-2 flex-1 overflow-y-auto">
+              <div className="flex flex-col gap-2 p-2 flex-1 min-h-0 overflow-y-auto scrollbar-thin">
                 {tasksQuery.isError ? (
                   <motion.div
                     key="error"
@@ -355,6 +803,62 @@ export function TasksScreen() {
                             isDragging={draggingId === task.id}
                             onDragStart={e => handleDragStart(e, task.id)}
                             onClick={() => setEditingTask(task)}
+                            activeTagFilter={tagFilter}
+                            onTagClick={(tag) => setTagFilter(prev => prev === tag ? null : tag)}
+                            onAssigneeClick={(assignee) => setAssigneeFilter(prev => prev === assignee ? null : assignee)}
+                            onChangePriority={(priority) =>
+                              quickUpdateMutation.mutate({ id: task.id, input: { priority } })
+                            }
+                            onMoveToColumn={(column) =>
+                              moveMutation.mutate({ id: task.id, column })
+                            }
+                            onDelete={() => {
+                              if (window.confirm(`Delete "${task.title}"?`))
+                                deleteMutation.mutate(task.id)
+                            }}
+                            isLaunching={launchingTaskId === task.id}
+                            onLaunch={async () => {
+                              setLaunchingTaskId(task.id)
+                              try {
+                                const { sessionId } = await launchSession(task.id)
+                                void navigate({ to: '/chat/$sessionKey', params: { sessionKey: sessionId } })
+                              } catch {
+                                toast('Failed to launch session', { type: 'error' })
+                              } finally {
+                                setLaunchingTaskId(null)
+                              }
+                            }}
+                            isExecuting={executingTaskId === task.id}
+                            onExecute={async () => {
+                              setExecutingTaskId(task.id)
+                              try {
+                                await executeTask(task.id)
+                                await tasksQuery.refetch()
+                                toast(`Agent is working on "${task.title}"…`)
+                              } catch {
+                                toast('Failed to start agent execution', { type: 'error' })
+                              } finally {
+                                setExecutingTaskId(null)
+                              }
+                            }}
+                            isBreakingDown={breakingDownId === task.id}
+                            onBreakdown={async () => {
+                              setBreakingDownId(task.id)
+                              try {
+                                const { count, titles } = await breakdownTask(task.id)
+                                invalidate()
+                                toast(`Created ${count} subtask${count !== 1 ? 's' : ''}: ${titles.slice(0, 2).join(', ')}${count > 2 ? '…' : ''}`)
+                              } catch (e) {
+                                toast(e instanceof Error ? e.message : 'Breakdown failed', { type: 'error' })
+                              } finally {
+                                setBreakingDownId(null)
+                              }
+                            }}
+                            onResetAgent={() => {
+                              quickUpdateMutation.mutate({ id: task.id, input: { agent_state: null, agent_name: null, agent_action_at: null } })
+                            }}
+                            onRequestRefresh={() => void tasksQuery.refetch()}
+                            onComment={handleTaskComment}
                           />
                         </motion.div>
                       ))
@@ -370,26 +874,54 @@ export function TasksScreen() {
       {/* Create dialog */}
       <TaskDialog
         open={showCreate}
-        onOpenChange={setShowCreate}
-        defaultColumn={createColumn}
+        onOpenChange={(open) => { setShowCreate(open); if (!open) setCreateDefaults(null) }}
+        defaultColumn={createDefaults?.column ?? createColumn}
+        defaultTags={createDefaults?.tags}
+        defaultTitle={createDefaults?.title}
+        defaultDescription={createDefaults?.description}
+        defaultPriority={createDefaults?.priority}
+        defaultAssignee={createDefaults?.assignee}
         assignees={assignees}
         isSubmitting={createMutation.isPending}
         onSubmit={async (input) => { await createMutation.mutateAsync(input) }}
       />
 
-      {/* Edit dialog */}
+      {/* Edit dialog — use live task data so agent_state reflects latest poll */}
       <TaskDialog
         open={editingTask !== null}
         onOpenChange={(open) => { if (!open) setEditingTask(null) }}
-        task={editingTask}
+        task={editingTask ? (tasks.find(t => t.id === editingTask.id) ?? editingTask) : null}
         assignees={assignees}
         isSubmitting={updateMutation.isPending}
         onSubmit={async (input) => {
           if (!editingTask) return
           await updateMutation.mutateAsync({ id: editingTask.id, input })
         }}
+        onComment={handleTaskComment}
+        onExecute={editingTask ? async () => {
+          setExecutingTaskId(editingTask.id)
+          try {
+            await executeTask(editingTask.id)
+            await tasksQuery.refetch()
+            toast(`Agent is working on "${editingTask.title}"…`)
+          } finally {
+            setExecutingTaskId(null)
+          }
+        } : undefined}
+        isExecuting={editingTask ? executingTaskId === editingTask.id : false}
+        onOpenSession={(sid) => { setEditingTask(null); void navigate({ to: '/chat/$sessionKey', params: { sessionKey: sid } }) }}
+        isBreakingDown={editingTask ? breakingDownId === editingTask.id : false}
+        onBreakdown={editingTask ? async () => {
+          setBreakingDownId(editingTask.id)
+          try {
+            const { count, titles } = await breakdownTask(editingTask.id)
+            invalidate()
+            toast(`Created ${count} subtask${count !== 1 ? 's' : ''}: ${titles.slice(0, 2).join(', ')}${count > 2 ? '…' : ''}`)
+          } finally {
+            setBreakingDownId(null)
+          }
+        } : undefined}
       />
-    </div>
     </div>
   )
 }

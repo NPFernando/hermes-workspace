@@ -6,6 +6,8 @@ import rehypeSanitize from 'rehype-sanitize'
 import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import { CodeBlock } from './code-block'
+import { DiffBlock } from './diff-block'
+import { MermaidBlock } from './mermaid-block'
 import type { Components } from 'react-markdown'
 import { cn } from '@/lib/utils'
 
@@ -23,7 +25,7 @@ export function rewriteLocalMediaSources(content: string): string {
     return `/api/media?path=${encodeURIComponent(path)}`
   }
 
-  const markdownImage = /(!\[[^\]]*\]\()MEDIA:([^\)\s]+)(\))/g
+  const markdownImage = /(!\[[^\]]*\]\()MEDIA:([^\s)]+)(\))/g
   const withMarkdownImages = content.replace(
     markdownImage,
     (_match, prefix: string, mediaPath: string, suffix: string) => {
@@ -49,6 +51,7 @@ export type MarkdownProps = {
   id?: string
   className?: string
   components?: Partial<Components>
+  onCodeExpand?: (code: string, language: string) => void
 }
 
 function parseMarkdownIntoBlocks(markdown: string): Array<string> {
@@ -110,6 +113,15 @@ const INITIAL_COMPONENTS: Partial<Components> = {
     }
 
     const language = extractLanguage(className)
+
+    if (language === 'mermaid') {
+      return <MermaidBlock code={String(children ?? '').trim()} />
+    }
+
+    if (language === 'diff' || language === 'patch' || language === 'udiff') {
+      return <DiffBlock code={String(children ?? '').trimEnd()} />
+    }
+
     return (
       <CodeBlock
         content={String(children ?? '')}
@@ -444,22 +456,61 @@ const MemoizedMarkdownBlock = memo(
   function MarkdownBlock({
     content,
     components = INITIAL_COMPONENTS,
+    onCodeExpand,
   }: {
     content: string
     components?: Partial<Components>
+    onCodeExpand?: (code: string, language: string) => void
   }) {
+    const resolvedComponents = useMemo(() => {
+      if (!onCodeExpand) return components
+      return {
+        ...components,
+        code: function CodeComponentWithExpand({ className, children }: { className?: string; children?: React.ReactNode }) {
+          const isInline = !className?.includes('language-')
+          if (isInline) {
+            return (
+              <code className="rounded bg-primary-100 px-1.5 py-0.5 text-[0.9em] font-mono text-primary-900 border border-primary-200">
+                {children}
+              </code>
+            )
+          }
+          const language = extractLanguage(className)
+          if (language === 'mermaid') {
+            return <MermaidBlock code={String(children ?? '').trim()} />
+          }
+          if (language === 'diff' || language === 'patch' || language === 'udiff') {
+            return <DiffBlock code={String(children ?? '').trimEnd()} />
+          }
+          const code = String(children ?? '')
+          return (
+            <CodeBlock
+              content={code}
+              language={language}
+              className="w-full my-2"
+              onExpand={() => onCodeExpand(code.trim(), language)}
+            />
+          )
+        },
+      }
+    }, [components, onCodeExpand])
+
     return (
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, HTML_SANITIZE_SCHEMA]]}
-        components={components}
+        components={resolvedComponents}
       >
         {content}
       </ReactMarkdown>
     )
   },
   function propsAreEqual(prevProps, nextProps) {
-    return prevProps.content === nextProps.content
+    return (
+      prevProps.content === nextProps.content &&
+      prevProps.components === nextProps.components &&
+      prevProps.onCodeExpand === nextProps.onCodeExpand
+    )
   },
 )
 
@@ -470,6 +521,7 @@ function MarkdownComponent({
   id,
   className,
   components = INITIAL_COMPONENTS,
+  onCodeExpand,
 }: MarkdownProps) {
   const generatedId = useId()
   const blockId = id ?? generatedId
@@ -490,6 +542,7 @@ function MarkdownComponent({
           key={`${blockId}-block-${index}`}
           content={block}
           components={components}
+          onCodeExpand={onCodeExpand}
         />
       ))}
     </div>

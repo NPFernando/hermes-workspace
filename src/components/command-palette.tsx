@@ -41,15 +41,15 @@ type CommandPaletteProps = {
   sessions: Array<SessionMeta>
 }
 
+type HugeiconsIconProps = React.ComponentProps<typeof HugeiconsIcon>
+
 type CommandAction = {
   id: string
   group: 'Screens' | 'Recent Sessions' | 'Slash Commands'
   label: string
   keywords: string
   shortcut?: string
-  icon: React.ComponentProps<
-    typeof import('@hugeicons/react').HugeiconsIcon
-  >['icon']
+  icon: HugeiconsIconProps['icon']
   onSelect: () => void
 }
 

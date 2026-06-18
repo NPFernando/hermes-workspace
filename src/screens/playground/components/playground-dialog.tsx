@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { NPC_DIALOG, type DialogChoice } from '../lib/npc-dialog'
+import {  NPC_DIALOG } from '../lib/npc-dialog'
 import { SpeechBubble } from './speech-bubble'
+import type {DialogChoice} from '../lib/npc-dialog';
+import type {
+  PlaygroundItemId,
+  PlaygroundQuest,
+  PlaygroundSkillId,
+} from '../lib/playground-rpg'
 
 // Tiny in-memory cache for ASCII portraits.
 const ASCII_PORTRAIT_CACHE: Record<string, string> = {}
@@ -23,17 +29,12 @@ function useAsciiPortrait(npcId: string | null) {
   }, [npcId])
   return art
 }
-import type {
-  PlaygroundItemId,
-  PlaygroundSkillId,
-  PlaygroundQuest,
-} from '../lib/playground-rpg'
 
 type Props = {
   npcId: string | null
   onClose: () => void
   onCompleteQuest: (questId: string) => void
-  onGrantItems: (items: PlaygroundItemId[]) => void
+  onGrantItems: (items: Array<PlaygroundItemId>) => void
   onGrantSkillXp: (skillXp: Partial<Record<PlaygroundSkillId, number>>) => void
   activeQuest: PlaygroundQuest | null
   onChoice?: (npcId: string, choiceId: string) => void
@@ -55,7 +56,7 @@ export function PlaygroundDialog({
   const [showLore, setShowLore] = useState(false)
   const [askingLLM, setAskingLLM] = useState(false)
   const [llmFreeform, setLlmFreeform] = useState('')
-  const [chatLog, setChatLog] = useState<ChatTurn[]>([])
+  const [chatLog, setChatLog] = useState<Array<ChatTurn>>([])
   const inFlight = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -83,7 +84,7 @@ export function PlaygroundDialog({
   function handleChoice(c: DialogChoice) {
     setReply(c.reply)
     setShowLore(false)
-    onChoice?.(npcId, c.id)
+    onChoice?.(npcId as string, c.id)
     if (c.completeQuest) onCompleteQuest(c.completeQuest)
     if (c.grantItems?.length) onGrantItems(c.grantItems)
     if (c.grantSkillXp) onGrantSkillXp(c.grantSkillXp)

@@ -12,7 +12,9 @@ import {
   PuzzleIcon,
   Rocket01Icon,
   Settings01Icon,
+  Telescope02Icon,
   UserGroupIcon,
+  UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import {
   useCallback,
@@ -52,6 +54,13 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     icon: DashboardSquare01Icon,
     to: '/dashboard',
     match: (p) => p === '/dashboard',
+  },
+  {
+    id: 'research',
+    label: 'Research',
+    icon: Telescope02Icon,
+    to: '/research',
+    match: (p) => p.startsWith('/research'),
   },
   {
     id: 'chat',
@@ -95,7 +104,13 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     to: '/swarm',
     match: (p) => p === '/swarm' || p.startsWith('/swarm2'),
   },
-
+  {
+    id: 'command',
+    label: 'Command',
+    icon: UserMultipleIcon,
+    to: '/command',
+    match: (p) => p.startsWith('/command') || p.startsWith('/operations') || p.startsWith('/agents'),
+  },
   {
     id: 'memory',
     label: 'Memory',

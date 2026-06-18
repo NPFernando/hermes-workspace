@@ -14,7 +14,16 @@ export function getRootSurfaceState(
   onboardingComplete: boolean | null,
   authStatus: RootAuthStatus | null = null,
 ): RootSurfaceState {
-  if (authStatus?.authRequired && !authStatus.authenticated) {
+  if (authStatus === null) {
+    return {
+      showLogin: false,
+      showOnboarding: false,
+      showWorkspaceShell: false,
+      showPostOnboardingOverlays: false,
+    }
+  }
+
+  if (authStatus.authRequired && !authStatus.authenticated) {
     return {
       showLogin: true,
       showOnboarding: false,

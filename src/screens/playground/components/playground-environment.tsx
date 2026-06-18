@@ -376,10 +376,10 @@ export function Flower({ position, color = '#fde68a' }: { position: [number, num
 }
 
 /* ── Cluster of small flowers in random positions inside a tile ── */
-export function FlowerPatch({ position, count = 6, palette = ['#fde68a', '#fda4af', '#c4b5fd', '#fef3c7'], seed = 1 }: { position: [number, number, number]; count?: number; palette?: string[]; seed?: number }) {
+export function FlowerPatch({ position, count = 6, palette = ['#fde68a', '#fda4af', '#c4b5fd', '#fef3c7'], seed = 1 }: { position: [number, number, number]; count?: number; palette?: Array<string>; seed?: number }) {
   const items = useMemo(() => {
     const r = rng(seed * 17 + Math.floor(position[0] * 13) + Math.floor(position[2] * 7))
-    const out: { pos: [number, number, number]; color: string }[] = []
+    const out: Array<{ pos: [number, number, number]; color: string }> = []
     for (let i = 0; i < count; i++) {
       const dx = (r() - 0.5) * 1.2
       const dz = (r() - 0.5) * 1.2
@@ -577,13 +577,13 @@ export function EnergyCore({ position, color = '#22d3ee' }: { position: [number,
 
 
 type SceneryInstance = { type: string; pos: [number, number, number]; color?: string; scale?: number }
-function InstancedRocks({ items }: { items: SceneryInstance[] }) {
+function InstancedRocks({ items }: { items: Array<SceneryInstance> }) {
   const ref = useRef<THREE.InstancedMesh>(null)
   const matrices = useMemo(() => { const dummy = new THREE.Object3D(); return items.map((item, index) => { const scale = item.scale ?? 0.8; dummy.position.set(item.pos[0], item.pos[1] + 0.16 * scale, item.pos[2]); dummy.rotation.set(0.2, index * 0.73, -0.1); dummy.scale.set(scale, scale * (0.7 + (index % 3) * 0.08), scale); dummy.updateMatrix(); return dummy.matrix.clone() }) }, [items])
   useLayoutEffect(() => { matrices.forEach((matrix, index) => ref.current?.setMatrixAt(index, matrix)); if (ref.current) ref.current.instanceMatrix.needsUpdate = true }, [matrices])
   return <instancedMesh ref={ref} args={[undefined, undefined, matrices.length]} castShadow={false} receiveShadow frustumCulled><dodecahedronGeometry args={[0.45, 0]} /><meshStandardMaterial color="#667085" roughness={0.82} /></instancedMesh>
 }
-function InstancedGrassTufts({ items }: { items: SceneryInstance[] }) {
+function InstancedGrassTufts({ items }: { items: Array<SceneryInstance> }) {
   const ref = useRef<THREE.InstancedMesh>(null)
   const matrices = useMemo(() => { const dummy = new THREE.Object3D(); return items.map((item, index) => { const scale = 0.65 + (index % 4) * 0.08; dummy.position.set(item.pos[0], item.pos[1] + 0.16, item.pos[2]); dummy.rotation.set(0, index * 0.91, 0); dummy.scale.set(scale, scale, scale); dummy.updateMatrix(); return dummy.matrix.clone() }) }, [items])
   useLayoutEffect(() => { matrices.forEach((matrix, index) => ref.current?.setMatrixAt(index, matrix)); if (ref.current) ref.current.instanceMatrix.needsUpdate = true }, [matrices])
@@ -595,12 +595,12 @@ export function ScatteredScenery({
   worldId,
   seed = 1,
 }: {
-  worldId: 'agora' | 'forge' | 'grove' | 'oracle' | 'arena'
+  worldId: 'training' | 'agora' | 'forge' | 'grove' | 'oracle' | 'arena'
   seed?: number
 }) {
   const items = useMemo(() => {
     const r = rng(seed * 100 + worldId.length)
-    const out: { type: string; pos: [number, number, number]; color?: string; scale?: number }[] = []
+    const out: Array<{ type: string; pos: [number, number, number]; color?: string; scale?: number }> = []
 
     function maybeOnEdge(): [number, number, number] {
       // Place on ring 14-22 from center
@@ -629,7 +629,7 @@ export function ScatteredScenery({
       out.push({ type: 'fountain', pos: [0, 0, 0], color: '#7dd3fc' })
 
       // Dirt paths radiating to NPC zones / portal / arch
-      const pathTargets: [number, number][] = [
+      const pathTargets: Array<[number, number]> = [
         [12, -6], [-12, -6], [12, 6], [-12, 6], [0, 14], [0, -14],
       ]
       for (const t of pathTargets) {
@@ -645,7 +645,7 @@ export function ScatteredScenery({
       out.push({ type: 'building', pos: [2, 0, 18], color: '#f3e1bb', roofColor: '#b91c1c', sign: 'Tavern' } as any)
 
       // Market street: stalls + merchants behind them
-      const stallSetup: { stall: [number, number, number]; merchant: [number, number, number]; mColor: string; mRot: number; awning: string }[] = [
+      const stallSetup: Array<{ stall: [number, number, number]; merchant: [number, number, number]; mColor: string; mRot: number; awning: string }> = [
         { stall: [-3, 0, 11], merchant: [-3, 0, 11.7], mColor: '#7c3aed', mRot: Math.PI, awning: '#dc2626' },
         { stall: [3, 0, 11], merchant: [3, 0, 11.7], mColor: '#0891b2', mRot: Math.PI, awning: '#1d4ed8' },
         { stall: [-5, 0, 13.5], merchant: [-5, 0, 14.2], mColor: '#16a34a', mRot: Math.PI, awning: '#16a34a' },
@@ -673,7 +673,7 @@ export function ScatteredScenery({
       for (let i = 0; i < 26; i++) {
         const ang = r() * Math.PI * 2
         const rad = 18 + r() * 6
-        out.push({ type: r() < 0.5 ? 'pine' : 'broadleaf', pos: [Math.cos(ang) * rad, 0, Math.sin(ang) * rad], scale: 0.8 + r() * 0.6, color: r() < 0.5 ? '#1f8b4f' : '#2bbf6f', glow: '#86efac' })
+        out.push({ type: r() < 0.5 ? 'pine' : 'broadleaf', pos: [Math.cos(ang) * rad, 0, Math.sin(ang) * rad], scale: 0.8 + r() * 0.6, color: r() < 0.5 ? '#1f8b4f' : '#2bbf6f', glow: '#86efac' } as any)
       }
       // Flowers and grass tufts in the green band, off the paths
       for (let i = 0; i < 28; i++) {
@@ -727,7 +727,7 @@ export function ScatteredScenery({
     }
 
     if (worldId === 'grove') {
-      for (let i = 0; i < 38; i++) out.push({ type: 'pine', pos: maybeOnEdge(), scale: 0.7 + r() * 0.7, color: '#1f8b4f', glow: '#86efac' })
+      for (let i = 0; i < 38; i++) out.push({ type: 'pine', pos: maybeOnEdge(), scale: 0.7 + r() * 0.7, color: '#1f8b4f', glow: '#86efac' } as any)
       for (let i = 0; i < 16; i++) out.push({ type: 'broadleaf', pos: maybeOnEdge(), scale: 0.8 + r() * 0.5, color: '#2bbf6f' })
       for (let i = 0; i < 18; i++) {
         const ang = r() * Math.PI * 2

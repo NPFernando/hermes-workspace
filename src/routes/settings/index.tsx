@@ -22,6 +22,7 @@ import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import type { ThemeId } from '@/lib/theme'
 import type { SettingsNavId } from '@/components/settings/settings-sidebar'
 import type {LocaleId} from '@/lib/i18n';
+import { HarpConfigScreen } from '@/screens/settings/harp-config-screen'
 import { GROQ_STT_MODELS, STT_PROVIDER_OPTIONS } from '@/lib/stt-config'
 import {
   SETTINGS_NAV_ITEMS,
@@ -360,6 +361,8 @@ function SettingsRoute() {
           {activeSection === 'routing' && (
             <ClaudeConfigSection activeView="routing" />
           )}
+          {/* ── HARP Routing ──────────────────────────────────── */}
+          {activeSection === 'harp' && <HarpConfigScreen />}
           {activeSection === 'voice' && (
             <ClaudeConfigSection activeView="voice" />
           )}
@@ -2243,7 +2246,7 @@ function ClaudeConfigSection({
                       style={{ color: 'var(--theme-muted)' }}
                     >
                       {customApiKeyConfigured
-                        ? customProviderCatalogEntry.maskedKeys['CUSTOM_API_KEY'] || 'Set'
+                        ? customProviderCatalogEntry?.maskedKeys['CUSTOM_API_KEY'] || 'Set'
                         : 'Not set'}
                     </span>
                     <Button

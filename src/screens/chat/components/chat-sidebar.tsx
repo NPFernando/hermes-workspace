@@ -21,6 +21,7 @@ import {
   Search01Icon,
   Settings01Icon,
   Sun02Icon,
+  Telescope02Icon,
   UserGroupIcon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
@@ -254,7 +255,7 @@ function NavItem({
               render={
                 <Link
                   to={item.to}
-                  search={item.search}
+                  search={item.search as never}
                   hash={item.hash}
                   onClick={handleSelect}
                   className={cls}
@@ -272,7 +273,7 @@ function NavItem({
     return (
       <Link
         to={item.to}
-        search={item.search}
+        search={item.search as never}
         hash={item.hash}
         onClick={handleSelect}
         className={cls}
@@ -585,8 +586,9 @@ function ChatSidebarComponent({
   const isMemoryActive = pathname === '/memory'
   const isTasksActive = pathname === '/tasks'
   const isConductorActive = pathname === '/conductor'
-  const isOperationsActive = pathname === '/operations'
+  const isCommandActive = pathname.startsWith('/command')
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
+  const isResearchActive = pathname.startsWith('/research')
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
   )
@@ -793,6 +795,13 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
+      to: '/research',
+      icon: Telescope02Icon,
+      label: 'Research',
+      active: isResearchActive,
+    },
+    {
+      kind: 'link',
       to: '/chat',
       icon: MessageMultiple01Icon,
       label: t('nav.chat'),
@@ -836,10 +845,10 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/operations',
+      to: '/command',
       icon: UserMultipleIcon,
-      label: 'Operations',
-      active: isOperationsActive,
+      label: 'Command Center',
+      active: isCommandActive,
     },
     {
       kind: 'link',

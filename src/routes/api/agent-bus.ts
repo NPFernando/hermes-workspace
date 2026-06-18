@@ -18,7 +18,7 @@ const AGENT_BUS_SCRIPT =
   process.env.AGENT_BUS_SCRIPT ||
   '/opt/central-inteligencia/services/hermes-agent-bus/agent_bus.py'
 
-const HANDOFF_CONTRACTS: Record<string, { businessScope: string; reason: string }> = {
+const HANDOFF_CONTRACTS: Partial<Record<string, { businessScope: string; reason: string }>> = {
   'dona-helena->larissinha': {
     businessScope: 'DES',
     reason: 'duvida_juridica_interna',
@@ -128,8 +128,15 @@ function writeMission(payload: Record<string, unknown>): string {
 }
 
 async function syncRoadmap() {
+  const busRoot = '/opt/central-inteligencia'
+  if (!existsSync(busRoot) || !existsSync(AGENT_BUS_SCRIPT)) {
+    return {
+      stdout: '',
+      stderr: 'Agent Bus infrastructure not deployed on this host. Set AGENT_BUS_SCRIPT and AGENT_BUS_OUTPUT_DIR env vars to point to your installation.',
+    }
+  }
   const result = await execFileAsync('/usr/bin/python3', [AGENT_BUS_SCRIPT, '--sync-roadmap'], {
-    cwd: '/opt/central-inteligencia',
+    cwd: busRoot,
     timeout: 60_000,
   })
   return {
