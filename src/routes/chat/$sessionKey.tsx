@@ -18,13 +18,13 @@ export const Route = createFileRoute('/chat/$sessionKey')({
   ssr: false,
   errorComponent: function ChatError({ error, reset }) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-primary-50">
+      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-[var(--theme-panel)]">
         <div className="max-w-md">
           <div className="mb-4 text-5xl">💬</div>
-          <h2 className="text-xl font-semibold text-primary-900 mb-3">
+          <h2 className="text-xl font-semibold text-[var(--theme-text)] mb-3">
             Chat Error
           </h2>
-          <p className="text-sm text-primary-600 mb-6">
+          <p className="text-sm text-[var(--theme-muted)] mb-6">
             {error instanceof Error
               ? error.message
               : 'Failed to load chat session'}
@@ -41,7 +41,7 @@ export const Route = createFileRoute('/chat/$sessionKey')({
                 if (typeof window !== 'undefined')
                   window.location.href = '/chat'
               }}
-              className="px-4 py-2 border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors"
+              className="px-4 py-2 border border-[var(--theme-border)] text-[var(--theme-muted)] rounded-lg hover:bg-[var(--theme-hover)] transition-colors"
             >
               Return to Main
             </button>
@@ -122,7 +122,7 @@ function ChatRoute() {
 
   if (!mounted) {
     return (
-      <div className="flex h-full items-center justify-center text-primary-400">
+      <div className="flex h-full items-center justify-center text-[var(--theme-muted)]">
         Loading chat…
       </div>
     )
@@ -132,7 +132,7 @@ function ChatRoute() {
     <ErrorBoundary>
       <Suspense
         fallback={
-          <div className="flex h-full items-center justify-center text-primary-400">
+          <div className="flex h-full items-center justify-center text-[var(--theme-muted)]">
             Loading chat…
           </div>
         }

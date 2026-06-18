@@ -46,7 +46,7 @@ export function MessageTimestamp({ timestamp }: MessageTimestampProps) {
 
   return (
     <span
-      className="inline-flex items-center text-xs text-primary-600"
+      className="inline-flex items-center text-xs text-[var(--theme-muted)]"
       title={fullLabel}
     >
       {shortLabel}

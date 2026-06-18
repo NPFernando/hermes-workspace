@@ -123,7 +123,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
         <button
           type="button"
           onClick={onClose}
-          className="ml-1 shrink-0 rounded p-1 text-primary-400 hover:bg-primary-100 hover:text-primary-700 dark:hover:bg-primary-800 transition-colors"
+          className="ml-1 shrink-0 rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] dark:hover:bg-[var(--theme-hover)] transition-colors"
           aria-label="Close artifact panel"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.6} />
@@ -144,7 +144,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
                 'shrink-0 rounded px-2.5 py-1 text-xs transition-colors',
                 i === activeIndex
                   ? 'bg-accent-500/10 text-accent-600 font-medium'
-                  : 'text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800',
+                  : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)]',
               )}
             >
               {a.title.length > 20 ? `${a.title.slice(0, 18)}…` : a.title}
@@ -157,7 +157,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
       <div className="min-h-0 flex-1 overflow-hidden">
         {isEditing ? (
           <textarea
-            className="h-full w-full resize-none border-0 bg-transparent p-4 font-mono text-sm text-primary-900 dark:text-primary-100 outline-none focus:ring-0"
+            className="h-full w-full resize-none border-0 bg-transparent p-4 font-mono text-sm text-[var(--theme-text)] outline-none focus:ring-0"
             value={editedContent}
             onChange={(e) => setEditedContent(e.target.value)}
             spellCheck={false}
@@ -176,7 +176,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
           <button
             type="button"
             onClick={() => setShowSource((v) => !v)}
-            className="rounded px-2 py-1 text-xs text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 transition-colors"
+            className="rounded px-2 py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)] transition-colors"
           >
             {showSource ? 'Preview' : 'Source'}
           </button>
@@ -188,7 +188,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
             'inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors',
             isEditing
               ? 'bg-accent-500/10 text-accent-600 font-medium'
-              : 'text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800',
+              : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)]',
           )}
           title={isEditing ? 'Done editing' : 'Edit content'}
         >
@@ -199,7 +199,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
         <button
           type="button"
           onClick={() => { handleCopy().catch(() => {}) }}
-          className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)] transition-colors"
         >
           <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={14} strokeWidth={1.6} />
           {copied ? 'Copied' : 'Copy'}
@@ -207,7 +207,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
         <button
           type="button"
           onClick={handleDownload}
-          className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)] transition-colors"
           title="Download file"
         >
           <HugeiconsIcon icon={DownloadIcon} size={14} strokeWidth={1.6} />

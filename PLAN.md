@@ -1,24 +1,33 @@
-# Implementation Plan
+# Auto-Improvement Plan: Fix APK download API TypeScript body handling
 
 ## Summary of the change
-Implement a global search bar that allows users to search across all agent conversations and stored memories.
+
+The current PWA/TWA branch adds `/api/download-apk`, but `npx tsc --noEmit` fails because the route passes a Node `Buffer` directly to `new Response(...)`. The DOM `Response` type expects a `BodyInit`, and this repository's TypeScript configuration does not accept `Buffer` as a body. The improvement is to convert the file bytes to a `Uint8Array` before constructing the response while preserving the existing authentication, content type, filename, content length, and no-store cache behavior.
 
 ## Files to modify
-- ~/hermes-workspace/src/ (specific files to be determined during implementation)
 
-## Step-by-step implementation instructions
-1. Examine the current codebase to locate the relevant components for ui changes.
-2. Design the necessary UI/backend changes.
-3. Implement the changes in the appropriate files.
-4. Add any necessary state management or API endpoints.
-5. Write unit tests for the new functionality.
-6. Update documentation if needed.
+- `src/routes/api/download-apk.ts`
+- `IDEAS.json`
+- `PLAN.md`
+- `TEST_REPORT.json`
+- `CLOSE_SUMMARY.md`
+
+## Steps
+
+1. In `src/routes/api/download-apk.ts`, keep reading the APK with `fs.readFile`.
+2. Convert the `Buffer` to a `Uint8Array` (or equivalent `ArrayBuffer`-backed body) before passing it to `new Response(...)`.
+3. Keep `Content-Length` based on the original byte length so clients receive a correct download size.
+4. Run `npx tsc --noEmit` from `/home/ubuntu/hermes-workspace`.
+5. Run the project test command and lint command, or capture scoped fallback results if the full commands fail because of pre-existing repository-wide issues.
+6. Commit the resulting workspace changes on the current branch with an `auto-improve:` commit message.
 
 ## How to verify the change works
-- Manual testing: Verify that the new feature works as expected in the UI.
-- Automated tests: Ensure existing tests pass and add new tests for the feature.
-- Check for any regression in related functionality.
+
+- `cd /home/ubuntu/hermes-workspace && npx tsc --noEmit` exits 0.
+- `cd /home/ubuntu/hermes-workspace && pnpm test` result is captured in `TEST_REPORT.json`.
+- `cd /home/ubuntu/hermes-workspace && pnpm lint` result is captured in `TEST_REPORT.json` with an explicit lint error count.
+- `git -C /home/ubuntu/hermes-workspace log --oneline -1` shows an `auto-improve:` commit.
 
 ## Rollback procedure
-- Revert the commit(s) made for this feature.
-- If any database migrations were made, revert them as well.
+
+Run `git -C /home/ubuntu/hermes-workspace revert HEAD` to undo the auto-improvement commit, or restore only `src/routes/api/download-apk.ts` from the previous commit if the artifact updates should be retained.

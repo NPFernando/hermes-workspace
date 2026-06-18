@@ -58,7 +58,7 @@ function renderLoader(loaderStyle: LoaderStyle, iconClassName?: string) {
           preset={preset}
           size={18}
           speed={120}
-          className={cn('text-primary-500', iconClassName)}
+          className={cn('text-[var(--theme-accent)]', iconClassName)}
         />
       </span>
     )

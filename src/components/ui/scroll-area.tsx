@@ -58,7 +58,7 @@ function ScrollAreaThumb({ className, ...props }: ScrollAreaThumbProps) {
   return (
     <ScrollArea.Thumb
       className={cn(
-        'flex-1 rounded-full bg-primary-500 outline-none focus-visible:outline-none',
+        'flex-1 rounded-full bg-[var(--theme-panel)]0 outline-none focus-visible:outline-none',
         className,
       )}
       {...props}
@@ -72,7 +72,7 @@ function ScrollAreaCorner({ className, ...props }: ScrollAreaCornerProps) {
   return (
     <ScrollArea.Corner
       className={cn(
-        'bg-primary-100 outline-none focus-visible:outline-none',
+        'bg-[var(--theme-hover)] outline-none focus-visible:outline-none',
         className,
       )}
       {...props}

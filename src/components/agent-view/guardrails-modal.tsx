@@ -107,7 +107,7 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
           </div>
 
           <section className="space-y-2">
-            <p className="text-xs font-medium text-primary-700">Max tokens per run</p>
+            <p className="text-xs font-medium text-[var(--theme-muted)]">Max tokens per run</p>
             <div className="inline-flex rounded-lg bg-[var(--theme-card2)] p-1 gap-1">
               {TOKEN_PRESETS.map((preset) => (
                 <button
@@ -130,13 +130,13 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
                 const parsed = Number(event.target.value)
                 if (Number.isFinite(parsed) && parsed >= 0) setMaxTokens(Math.floor(parsed))
               }}
-              className="w-full rounded-lg border border-primary-200 bg-primary-100/70 px-3 py-2 text-sm text-primary-900 outline-none transition-colors focus:border-accent-400"
+              className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)]/70 px-3 py-2 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-400"
             />
           </section>
 
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-medium text-primary-700">Mode</p>
+              <p className="text-xs font-medium text-[var(--theme-muted)]">Mode</p>
               <div className="inline-flex rounded-lg bg-[var(--theme-card2)] p-1 gap-1">
                 {(['allowlist', 'blocklist'] as const).map((mode) => (
                   <button
@@ -155,22 +155,22 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
               value={toolsText}
               onChange={(event) => setToolsText(event.target.value)}
               placeholder={'read\nwrite\nexec\nbrowser'}
-              className="w-full resize-y rounded-lg border border-primary-200 bg-primary-100/70 px-3 py-2 text-sm font-mono text-primary-900 outline-none transition-colors focus:border-accent-400"
+              className="w-full resize-y rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)]/70 px-3 py-2 text-sm font-mono text-[var(--theme-text)] outline-none transition-colors focus:border-accent-400"
             />
-            <p className="text-[11px] text-primary-600">Enter tool names, one per line. Leave empty to allow all.</p>
+            <p className="text-[11px] text-[var(--theme-muted)]">Enter tool names, one per line. Leave empty to allow all.</p>
           </section>
 
           <section className="space-y-1">
-            <p className="text-xs font-medium text-primary-700">Auto-Stop Triggers</p>
+            <p className="text-xs font-medium text-[var(--theme-muted)]">Auto-Stop Triggers</p>
             {stopRows.map((row) => (
               <button
                 key={row.label}
                 type="button"
                 onClick={row.onToggle}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800 cursor-pointer text-left"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-50 cursor-pointer text-left"
               >
                 <span>{row.checked ? '☑' : '☐'}</span>
-                <span className="text-sm text-primary-900 dark:text-primary-100">{row.label}</span>
+                <span className="text-sm text-[var(--theme-text)] dark:text-[var(--theme-text)]">{row.label}</span>
               </button>
             ))}
           </section>

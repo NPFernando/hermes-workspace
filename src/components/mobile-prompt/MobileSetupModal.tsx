@@ -80,7 +80,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
       body: 'Hermes Workspace can talk to any OpenAI-compatible backend on mobile too. Make sure both the workspace and backend stay reachable over Tailscale or your local network.',
       showTailscaleIcon: false,
       action: (
-        <div className="rounded-lg border border-primary-700 bg-primary-950 px-4 py-3 text-sm text-primary-200">
+        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-muted)]">
           Enhanced Hermes Agent gateway APIs are optional. If core chat already works
           on desktop, mobile access mainly depends on network reachability.
         </div>
@@ -96,7 +96,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
             href="https://apps.apple.com/app/apple-store/id425072860"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center rounded-lg border border-primary-700 bg-primary-950 px-3 py-2 text-xs font-medium text-primary-100 transition-colors hover:bg-primary-800"
+            className="inline-flex items-center justify-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-hover)]"
           >
             iOS App
           </a>
@@ -104,7 +104,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
             href="https://play.google.com/store/apps/details?id=com.tailscale.ipn"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center rounded-lg border border-primary-700 bg-primary-950 px-3 py-2 text-xs font-medium text-primary-100 transition-colors hover:bg-primary-800"
+            className="inline-flex items-center justify-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-hover)]"
           >
             Android App
           </a>
@@ -126,12 +126,12 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
           onClick={() =>
             networkUrl && writeTextToClipboard(networkUrl.url).catch(() => {})
           }
-          className="group flex w-full items-center justify-between rounded-lg border border-primary-700 bg-primary-950 px-4 py-3 transition-colors hover:border-accent-500/50"
+          className="group flex w-full items-center justify-between rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 transition-colors hover:border-accent-500/50"
         >
           <span className="break-all font-mono text-sm text-accent-300">
             {networkUrl?.url ?? '…'}
           </span>
-          <span className="ml-3 shrink-0 text-primary-500 group-hover:text-accent-400">
+          <span className="ml-3 shrink-0 text-[var(--theme-muted)] group-hover:text-accent-400">
             {networkUrl?.source === 'tailscale' && (
               <svg viewBox="0 0 100 100" className="size-4 opacity-60">
                 <circle
@@ -183,6 +183,29 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
         </button>
       ),
     },
+    {
+      title: 'Get the Android app',
+      body: 'Install the native Hermes app on Android for a full-screen experience with shortcuts to Chat, Operations, and Tasks.',
+      showTailscaleIcon: false,
+      action: (
+        <div className="flex flex-col gap-2">
+          <a
+            href="/download-apk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-400"
+          >
+            <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden>
+              <path d="M12 16l-5-5 1.41-1.41L11 13.17V4h2v9.17l2.59-2.58L17 11zM5 20h14v-2H5z" />
+            </svg>
+            Download APK
+          </a>
+          <p className="text-xs text-[var(--theme-muted)]">
+            Open that link on your phone, download the APK, then tap to install. Allow unknown sources if prompted.
+          </p>
+        </div>
+      ),
+    },
   ]
 
   const currentStep = steps[step]
@@ -208,12 +231,12 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
         initial={{ opacity: 0, y: 12, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 12, scale: 0.98 }}
-        className="relative w-full max-w-md rounded-2xl border border-primary-800/60 bg-primary-950 p-5 text-white shadow-2xl shadow-black/40"
+        className="relative w-full max-w-md rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5 text-white shadow-2xl shadow-black/40"
       >
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 rounded-lg p-1.5 text-primary-400 transition-colors hover:bg-primary-900 hover:text-primary-200"
+          className="absolute top-4 right-4 rounded-lg p-1.5 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-muted)]"
           aria-label="Close mobile setup"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={2} />
@@ -232,7 +255,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
                 <span
                   key={`step-indicator-${index}`}
                   className={`h-2 w-6 rounded-full transition-colors ${
-                    index === step ? 'bg-accent-500' : 'bg-primary-700'
+                    index === step ? 'bg-accent-500' : 'bg-[var(--theme-border)]'
                   }`}
                 />
               ))}
@@ -240,7 +263,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
           </div>
         </div>
 
-        <div className="rounded-xl bg-primary-900 p-4">
+        <div className="rounded-xl bg-[var(--theme-bg)] p-4">
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
@@ -251,11 +274,11 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
             >
               <div className="mb-2 flex items-center gap-2">
                 {currentStep.showTailscaleIcon ? <TailscaleIcon /> : null}
-                <h3 className="text-sm font-semibold text-primary-100">
+                <h3 className="text-sm font-semibold text-[var(--theme-text)]">
                   {currentStep.title}
                 </h3>
               </div>
-              <p className="mb-4 text-sm text-primary-300">
+              <p className="mb-4 text-sm text-[var(--theme-muted)]">
                 {currentStep.body}
               </p>
               <div>{currentStep.action}</div>
@@ -268,7 +291,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
             type="button"
             onClick={handleBack}
             disabled={step === 0}
-            className="rounded-lg px-3 py-2 text-sm text-primary-400 transition-colors hover:text-primary-200 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg px-3 py-2 text-sm text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-muted)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Back
           </button>
@@ -276,7 +299,7 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-3 py-2 text-sm text-primary-400 transition-colors hover:text-primary-200"
+              className="rounded-lg px-3 py-2 text-sm text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-muted)]"
             >
               Close
             </button>

@@ -9,19 +9,23 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
 import { getRootSurfaceState } from './-root-layout-state'
-import type {AuthStatus} from '@/lib/claude-auth';
+import type { AuthStatus } from '@/lib/claude-auth'
 import { SearchModal } from '@/components/search/search-modal'
 import { UsageMeter } from '@/components/usage-meter'
-import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener';
-import { GlobalShortcutListener } from '@/components/global-shortcut-listener';
-import KeyboardShortcuts from '@/components/KeyboardShortcuts';
+import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
+import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
+import KeyboardShortcuts from '@/components/KeyboardShortcuts'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrigger'
 import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { UpdateCenterNotifier } from '@/components/update-center-notifier'
-import { applyInterfacePreferences, initializeSettingsAppearance, useSettings } from '@/hooks/use-settings'
+import {
+  applyInterfacePreferences,
+  initializeSettingsAppearance,
+  useSettings,
+} from '@/hooks/use-settings'
 import { useApplyChatWidth } from '@/hooks/use-chat-settings'
 import { useSettingsSync } from '@/hooks/use-settings-sync'
 import {
@@ -31,7 +35,7 @@ import {
 } from '@/components/onboarding/claude-onboarding'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { LoginScreen } from '@/components/auth/login-screen'
-import {  fetchClaudeAuthStatus } from '@/lib/claude-auth'
+import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 
 const APP_CSP = [
   "default-src 'self'",
@@ -130,8 +134,8 @@ const themeColorScript = `
 const DEFAULT_SPLASH_HTML = `
 <img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px rgba(224,108,117,0.45))" />
 <img src="/claude-banner.png" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.5))" />
-<div style="font:400 14px/1 'JetBrains Mono Variable',ui-monospace,monospace;letter-spacing:0.06em;color:rgba(156,222,242,0.55)">Workspace</div>
-<div style="margin-top:28px;width:140px;height:3px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;position:relative"><div id="splash-bar" style="width:0%;height:100%;background:#e06c75;border-radius:3px;transition:width 0.4s ease"></div></div>
+<div style="font:400 14px/1 'JetBrains Mono Variable',ui-monospace,monospace;letter-spacing:0.06em;color:rgba(156,222,242,0.65)">Workspace</div>
+<div style="margin-top:28px;width:140px;height:3px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;position:relative"><div id="splash-bar" style="width:0%;height:100%;background:#f08090;border-radius:3px;transition:width 0.4s ease"></div></div>
 `
 
 export const Route = createRootRoute({
@@ -143,7 +147,7 @@ export const Route = createRootRoute({
       {
         name: 'viewport',
         content:
-          'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual',
+          'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover, interactive-widget=resizes-visual',
       },
       {
         title: 'Hermes Workspace',
@@ -210,11 +214,11 @@ export const Route = createRootRoute({
   component: RootLayout,
   errorComponent: function RootError({ error }) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-primary-50">
-        <h1 className="text-2xl font-semibold text-primary-900 mb-4">
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-[var(--theme-panel)]">
+        <h1 className="text-2xl font-semibold text-[var(--theme-text)] mb-4">
           Something went wrong
         </h1>
-        <pre className="p-4 bg-primary-100 rounded-lg text-sm text-primary-700 max-w-full overflow-auto mb-6">
+        <pre className="p-4 bg-[var(--theme-hover)] rounded-lg text-sm text-[var(--theme-muted)] max-w-full overflow-auto mb-6">
           {error instanceof Error ? error.message : String(error)}
         </pre>
         <button
@@ -241,7 +245,10 @@ export function wrapInlineScript(source: string): string {
 }
 
 type ServiceWorkerLike = {
-  register: (scriptURL: string, options?: RegistrationOptions) => Promise<unknown>
+  register: (
+    scriptURL: string,
+    options?: RegistrationOptions,
+  ) => Promise<unknown>
 }
 
 type CachesLike = {
@@ -251,18 +258,10 @@ type CachesLike = {
 
 export async function registerAppServiceWorker({
   serviceWorker,
-  cachesApi,
 }: {
   serviceWorker?: ServiceWorkerLike
   cachesApi?: CachesLike
 }): Promise<void> {
-  await cachesApi
-    ?.keys()
-    .then((names) =>
-      Promise.allSettled(names.map((name) => cachesApi.delete(name))),
-    )
-    .catch(() => undefined)
-
   await serviceWorker
     ?.register('/sw.js', { scope: '/' })
     .catch((error: unknown) => {
@@ -277,7 +276,9 @@ function SettingsSyncMount() {
 
 function RootLayout() {
   const { settings } = useSettings()
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(
     null,
   )
@@ -358,7 +359,8 @@ function RootLayout() {
                 if (
                   !cancelled &&
                   (connectionStatus?.ok ||
-                    (connectionStatus?.chatReady && connectionStatus.modelConfigured))
+                    (connectionStatus?.chatReady &&
+                      connectionStatus.modelConfigured))
                 ) {
                   localStorage.setItem(ONBOARDING_KEY, 'true')
                   setOnboardingComplete(true)
@@ -370,7 +372,9 @@ function RootLayout() {
       })
       .catch(() => {
         if (!cancelled) {
-          setAuthStatus((prev) => prev ?? { authenticated: false, authRequired: true })
+          setAuthStatus(
+            (prev) => prev ?? { authenticated: false, authRequired: true },
+          )
         }
       })
     return () => {
@@ -469,8 +473,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               if (theme === 'odysseus') {
                 bg = '#282c34';
                 txt = '#9cdef2';
-                muted = 'rgba(156,222,242,0.55)';
-                accent = '#e06c75';
+                muted = 'rgba(156,222,242,0.65)';
+                accent = '#f08090';
                 dotGrid = true;
                 monoFont = true;
               } else if (theme === 'claude-nous') {

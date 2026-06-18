@@ -277,10 +277,10 @@ function ChatHeaderComponent({
           <button
             type="button"
             onClick={onOpenSessions}
-            className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-primary-100/70 hover:bg-primary-200/80 transition-colors"
+            className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-[var(--theme-hover)]/70 hover:bg-[var(--theme-hover)]/80 transition-colors"
             aria-label="Switch session"
           >
-            <span className="truncate text-[13px] font-medium text-primary-600 dark:text-primary-300">
+            <span className="truncate text-[13px] font-medium text-[var(--theme-muted)] dark:text-[var(--theme-muted)]">
               {mobileTitle === 'new' ? 'New Chat' : mobileTitle}
             </span>
             <svg
@@ -319,7 +319,7 @@ function ChatHeaderComponent({
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    className="mr-2 text-primary-800 hover:bg-primary-100 dark:hover:bg-primary-800"
+                    className="mr-2 text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
                     aria-label={
                       fileExplorerCollapsed ? 'Show files' : 'Hide files'
                     }
@@ -359,7 +359,7 @@ function ChatHeaderComponent({
                   cancelTitleEdit()
                 }
               }}
-              className="h-7 w-full min-w-0 border-b border-transparent bg-transparent px-0 text-sm font-medium text-balance text-ink outline-none transition-colors focus:border-primary-300"
+              className="h-7 w-full min-w-0 border-b border-transparent bg-transparent px-0 text-sm font-medium text-balance text-ink outline-none transition-colors focus:border-[var(--theme-accent)]-300"
               aria-label="Session name"
             />
           ) : (
@@ -379,7 +379,7 @@ function ChatHeaderComponent({
                 <button
                   type="button"
                   onClick={startTitleEdit}
-                  className="text-xs text-primary-400 opacity-0 group-hover:opacity-100 hover:text-primary-600 transition-opacity shrink-0"
+                  className="text-xs text-[var(--theme-muted)] opacity-0 group-hover:opacity-100 hover:text-[var(--theme-muted)] transition-opacity shrink-0"
                   title="Rename session"
                 >
                   ✏️
@@ -548,7 +548,7 @@ function ChatHeaderComponent({
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    className="text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800"
+                    className="text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
                     aria-label="Export conversation"
                   >
                     <HugeiconsIcon icon={DownloadIcon} size={16} strokeWidth={1.6} />
@@ -569,7 +569,7 @@ function ChatHeaderComponent({
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    className="text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800"
+                    className="text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
                     aria-label="Undo last message"
                   >
                     <span className="text-sm">↩️</span>
@@ -598,8 +598,8 @@ function ChatHeaderComponent({
                     size="icon-sm"
                     variant="ghost"
                     className={cn(
-                      'hover:bg-primary-100 dark:hover:bg-primary-800',
-                      clearConfirm ? 'text-red-500' : 'text-primary-500',
+                      'hover:bg-[var(--theme-hover)]',
+                      clearConfirm ? 'text-red-500' : 'text-[var(--theme-muted)]',
                     )}
                     aria-label={
                       clearConfirm ? 'Confirm clear' : 'Clear session'

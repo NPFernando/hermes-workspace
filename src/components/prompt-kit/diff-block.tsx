@@ -18,8 +18,8 @@ const LINE_STYLES: Record<DiffLineType, string> = {
   add: 'bg-green-50 text-green-900 dark:bg-green-950/40 dark:text-green-200',
   remove: 'bg-red-50 text-red-900 dark:bg-red-950/40 dark:text-red-200',
   hunk: 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 font-medium',
-  file: 'text-primary-500 font-semibold',
-  normal: 'text-primary-800 dark:text-primary-200',
+  file: 'text-[var(--theme-muted)] font-semibold',
+  normal: 'text-[var(--theme-text)] dark:text-[var(--theme-muted)]',
 }
 
 const LINE_PREFIX_STYLES: Record<DiffLineType, string> = {
@@ -27,7 +27,7 @@ const LINE_PREFIX_STYLES: Record<DiffLineType, string> = {
   remove: 'text-red-500 dark:text-red-400 select-none w-5 shrink-0 text-center',
   hunk: 'w-5 shrink-0',
   file: 'w-5 shrink-0',
-  normal: 'text-primary-400 select-none w-5 shrink-0 text-center',
+  normal: 'text-[var(--theme-muted)] select-none w-5 shrink-0 text-center',
 }
 
 export function DiffBlock({ code }: { code: string }) {
@@ -53,11 +53,11 @@ export function DiffBlock({ code }: { code: string }) {
       <div
         className="flex items-center justify-between border-b px-3 py-1.5 border-[var(--theme-border)] bg-[var(--theme-card2)]"
       >
-        <span className="text-[10px] uppercase tracking-wider text-primary-400 font-medium">diff</span>
+        <span className="text-[10px] uppercase tracking-wider text-[var(--theme-muted)] font-medium">diff</span>
         <button
           type="button"
           onClick={() => { handleCopy().catch(() => {}) }}
-          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 transition-colors"
+          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
         >
           <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={12} strokeWidth={1.6} />
           <span className="text-[10px]">{copied ? 'Copied' : 'Copy'}</span>

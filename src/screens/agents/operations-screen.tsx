@@ -269,18 +269,18 @@ export function OperationsScreen() {
   return (
     <main
       data-route-page
-      className="min-h-full bg-surface px-3 pb-24 pt-5 text-primary-900 md:px-5 md:pt-8"
+      className="min-h-full bg-surface px-3 pb-24 pt-5 text-[var(--theme-text)] md:px-5 md:pt-8"
       style={THEME_STYLE}
     >
       <section className="mx-auto w-full max-w-[1320px] space-y-4">
-        <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
+        <header className="flex flex-col gap-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-accent)] shadow-sm">
               <HugeiconsIcon icon={AiBrain03Icon} size={22} strokeWidth={1.8} />
             </div>
             <div>
-              <h1 className="text-base font-semibold text-primary-900">Operations</h1>
-              <p className="mt-1 text-sm text-primary-600">
+              <h1 className="text-base font-semibold text-[var(--theme-text)]">Operations</h1>
+              <p className="mt-1 text-sm text-[var(--theme-muted)]">
                 Your persistent agent team
               </p>
             </div>
@@ -293,7 +293,7 @@ export function OperationsScreen() {
                 className={cn(
                   'rounded-lg px-4 py-2 text-sm font-medium transition-all',
                   view === 'overview'
-                    ? 'bg-[var(--theme-accent)] text-primary-950'
+                    ? 'bg-[var(--theme-accent)] text-[var(--theme-text)]'
                     : 'text-[var(--theme-muted)] hover:bg-[var(--theme-card2)]',
                 )}
               >
@@ -305,7 +305,7 @@ export function OperationsScreen() {
                 className={cn(
                   'rounded-lg px-4 py-2 text-sm font-medium transition-all',
                   view === 'outputs'
-                    ? 'bg-[var(--theme-accent)] text-primary-950'
+                    ? 'bg-[var(--theme-accent)] text-[var(--theme-text)]'
                     : 'text-[var(--theme-muted)] hover:bg-[var(--theme-card2)]',
                 )}
               >

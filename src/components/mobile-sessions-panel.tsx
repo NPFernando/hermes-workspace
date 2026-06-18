@@ -95,12 +95,12 @@ export function MobileSessionsPanel({
         }}
       >
         <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-primary-200 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-[var(--theme-border)] px-4 py-3">
             <h2 className="text-sm font-semibold text-ink">Sessions</h2>
             <button
               type="button"
               onClick={onNewChat}
-              className="inline-flex items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-xs font-medium text-primary-700 transition-colors hover:border-accent-200 hover:text-accent-600"
+              className="inline-flex items-center gap-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2.5 py-1.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:border-accent-200 hover:text-accent-600"
             >
               <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.8} />
               New Chat
@@ -109,10 +109,10 @@ export function MobileSessionsPanel({
 
           <div className="flex-1 overflow-y-auto p-2">
             {sessions.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-primary-500">
+              <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-[var(--theme-muted)]">
                 <HugeiconsIcon icon={Chat01Icon} size={24} strokeWidth={1.6} />
                 <p className="text-sm">No sessions yet.</p>
-                <p className="text-xs text-primary-400">
+                <p className="text-xs text-[var(--theme-muted)]">
                   Start a conversation to see it here.
                 </p>
               </div>
@@ -130,13 +130,13 @@ export function MobileSessionsPanel({
                         'w-full rounded-lg border px-3 py-2 text-left transition-colors',
                         active
                           ? 'border-accent-300 bg-accent-50'
-                          : 'border-transparent bg-primary-50 hover:border-primary-200',
+                          : 'border-transparent bg-[var(--theme-panel)] hover:border-[var(--theme-border)]',
                       )}
                     >
                       <div className="truncate text-sm font-medium text-ink">
                         {getSessionTitle(session)}
                       </div>
-                      <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-primary-500">
+                      <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-[var(--theme-muted)]">
                         <span className="truncate">{session.friendlyId}</span>
                         {timestamp ? <span>{timestamp}</span> : null}
                       </div>

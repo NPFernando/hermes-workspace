@@ -10,9 +10,9 @@
 
 /* ── Odysseus-inspired radius scale — sharper, more precise ── */
 @theme {
-  --radius-xl:  0.5rem;    /* 8px  — was 12px */
-  --radius-2xl: 0.625rem;  /* 10px — was 16px */
-  --radius-3xl: 0.875rem;  /* 14px — was 24px */
+  --radius-xl: 0.5rem; /* 8px  — was 12px */
+  --radius-2xl: 0.625rem; /* 10px — was 16px */
+  --radius-3xl: 0.875rem; /* 14px — was 24px */
 }
 
 /* Tailwind v4 — enable dark: variant on .dark class (set by __root.tsx) */
@@ -30,24 +30,31 @@
 
   /* Accent soft — fallback to already-defined accent vars so all themes inherit */
   --theme-accent-soft: var(--theme-accent-subtle, rgba(128, 128, 128, 0.1));
-  --theme-accent-soft-strong: var(--theme-accent-border, rgba(128, 128, 128, 0.25));
+  --theme-accent-soft-strong: var(
+    --theme-accent-border,
+    rgba(128, 128, 128, 0.25)
+  );
   /* Accent strong — slightly brighter accent, used for labels/badges */
   --theme-accent-strong: var(--theme-accent-secondary, var(--theme-accent));
   /* Hover — subtle surface tint for icon buttons and list items */
   --theme-hover: color-mix(in srgb, var(--theme-text, #888) 8%, transparent);
 
   /* Secondary border — slightly stronger than --theme-border for nested dividers */
-  --theme-border2: color-mix(in srgb, var(--theme-border, rgba(128,128,128,0.3)) 160%, transparent);
+  --theme-border2: color-mix(
+    in srgb,
+    var(--theme-border, rgba(128, 128, 128, 0.3)) 160%,
+    transparent
+  );
   /* Shadow base color — used inside color-mix() in components */
   --theme-shadow: var(--theme-text, #888);
 
   /* Semantic soft backgrounds — danger */
-  --theme-danger-soft: rgba(239, 68, 68, 0.10);
-  --theme-danger-border: rgba(239, 68, 68, 0.30);
+  --theme-danger-soft: rgba(239, 68, 68, 0.1);
+  --theme-danger-border: rgba(239, 68, 68, 0.3);
   --theme-danger-soft-strong: rgba(239, 68, 68, 0.18);
   /* Semantic soft backgrounds — warning */
-  --theme-warning-soft: rgba(245, 158, 11, 0.10);
-  --theme-warning-border: rgba(245, 158, 11, 0.30);
+  --theme-warning-soft: rgba(245, 158, 11, 0.1);
+  --theme-warning-border: rgba(245, 158, 11, 0.3);
   --theme-warning-soft-strong: rgba(245, 158, 11, 0.18);
 }
 
@@ -65,7 +72,12 @@
   scrollbar-color: transparent transparent;
 }
 *:hover {
-  scrollbar-color: color-mix(in srgb, var(--theme-accent, #888) 45%, transparent) transparent;
+  scrollbar-color: color-mix(
+      in srgb,
+      var(--theme-accent, #888) 45%,
+      transparent
+    )
+    transparent;
 }
 *::-webkit-scrollbar {
   width: 6px;
@@ -80,7 +92,11 @@
   transition: background-color 0.2s;
 }
 *:hover::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--theme-accent, #888) 45%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--theme-accent, #888) 45%,
+    transparent
+  );
 }
 
 .root {
@@ -100,7 +116,11 @@
 
 /* Sidebar glassmorphism — override opacity on the aside element only */
 aside.theme-sidebar {
-  background-color: color-mix(in srgb, var(--theme-sidebar) 88%, transparent) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--theme-sidebar) 88%,
+    transparent
+  ) !important;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
@@ -233,20 +253,27 @@ aside.theme-sidebar {
 }
 
 :root {
-  --interface-font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --interface-font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
   --interface-density-scale: 1;
 }
 
 [data-interface-font='inter'] {
-  --interface-font-family: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --interface-font-family:
+    'Inter Variable', ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 [data-interface-font='serif'] {
-  --interface-font-family: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+  --interface-font-family:
+    ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
 }
 
 [data-interface-font='mono'] {
-  --interface-font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  --interface-font-family:
+    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, 'Liberation Mono', monospace;
 }
 
 [data-interface-density='compact'] {
@@ -280,8 +307,8 @@ body {
   border-radius: 0.5rem;
   color: var(--color-primary-900);
   font-family:
-    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    'Liberation Mono', 'Courier New', monospace;
+    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, 'Liberation Mono', 'Courier New', monospace;
   font-size: 0.95em;
   padding: 0.1rem 0.4rem;
   white-space: nowrap;
@@ -802,19 +829,39 @@ code {
 /* ── Odysseus spring entrance animations ── */
 
 @keyframes spring-enter-up {
-  from { opacity: 0; transform: translateY(12px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes spring-modal-in {
-  from { opacity: 0; transform: scale(0.94) translateY(10px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 @keyframes domino-in {
-  0%   { opacity: 0; transform: translateY(10px) scale(0.95); }
-  60%  { opacity: 1; }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .animate-spring-enter {
@@ -828,15 +875,33 @@ code {
 .domino-item {
   animation: domino-in 0.28s var(--spring) both;
 }
-.domino-item:nth-child(1)   { animation-delay: 0.04s; }
-.domino-item:nth-child(2)   { animation-delay: 0.08s; }
-.domino-item:nth-child(3)   { animation-delay: 0.12s; }
-.domino-item:nth-child(4)   { animation-delay: 0.16s; }
-.domino-item:nth-child(5)   { animation-delay: 0.20s; }
-.domino-item:nth-child(6)   { animation-delay: 0.24s; }
-.domino-item:nth-child(7)   { animation-delay: 0.28s; }
-.domino-item:nth-child(8)   { animation-delay: 0.32s; }
-.domino-item:nth-child(n+9) { animation-delay: 0.36s; }
+.domino-item:nth-child(1) {
+  animation-delay: 0.04s;
+}
+.domino-item:nth-child(2) {
+  animation-delay: 0.08s;
+}
+.domino-item:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.domino-item:nth-child(4) {
+  animation-delay: 0.16s;
+}
+.domino-item:nth-child(5) {
+  animation-delay: 0.2s;
+}
+.domino-item:nth-child(6) {
+  animation-delay: 0.24s;
+}
+.domino-item:nth-child(7) {
+  animation-delay: 0.28s;
+}
+.domino-item:nth-child(8) {
+  animation-delay: 0.32s;
+}
+.domino-item:nth-child(n + 9) {
+  animation-delay: 0.36s;
+}
 
 /* Glassmorphism utilities */
 .glass {
@@ -859,7 +924,9 @@ code {
 /* ── Terminal glow utilities ── */
 /* Apply to live numbers, accent headings, key status text */
 .terminal-glow {
-  text-shadow: 0 0 8px currentColor, 0 0 16px currentColor;
+  text-shadow:
+    0 0 8px currentColor,
+    0 0 16px currentColor;
 }
 .terminal-glow-soft {
   text-shadow: 0 0 6px color-mix(in srgb, currentColor 60%, transparent);
@@ -872,8 +939,15 @@ code {
 }
 /* Accent pulse on a live indicator dot */
 @keyframes terminal-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 4px 1px currentColor; }
-  50%       { opacity: 0.7; box-shadow: 0 0 8px 3px currentColor; }
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 4px 1px currentColor;
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 8px 3px currentColor;
+  }
 }
 .terminal-dot-live {
   animation: terminal-pulse 2s ease-in-out infinite;
@@ -899,8 +973,14 @@ code {
 
 /* Terminal cursor blink — add .cursor-blink to headings in loading states */
 @keyframes cursor-blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 .cursor-blink::after {
   content: '▋';
@@ -929,8 +1009,12 @@ code {
 
 /* ── Shimmer skeleton — replaces flat animate-pulse with a sweeping highlight ── */
 @keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position:  200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 .skeleton-shimmer {
   background: linear-gradient(
@@ -949,7 +1033,9 @@ code {
   backdrop-filter: blur(12px) saturate(1.4);
   -webkit-backdrop-filter: blur(12px) saturate(1.4);
   border: 1px solid var(--theme-border);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px color-mix(in srgb, var(--theme-text) 5%, transparent);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px color-mix(in srgb, var(--theme-text) 5%, transparent);
 }
 
 /* ── Sliding tab underline ── */
@@ -984,8 +1070,14 @@ code {
 
 /* ── Pulse ring on live/active badges ── */
 @keyframes ring-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--theme-accent) 60%, transparent); }
-  50%       { box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme-accent) 0%, transparent); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--theme-accent) 60%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px
+      color-mix(in srgb, var(--theme-accent) 0%, transparent);
+  }
 }
 .ring-pulse {
   animation: ring-pulse 2.4s ease-in-out infinite;
@@ -993,8 +1085,14 @@ code {
 
 /* ── Page fade-in on route change ── */
 @keyframes page-enter {
-  from { opacity: 0; transform: translateY(5px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .page-enter {
   animation: page-enter 0.22s var(--snappy) both;
@@ -1008,14 +1106,21 @@ code {
 [data-theme='odysseus'] .card-glow,
 [data-theme='matrix'] .card-glow,
 [data-theme='scifi'] .card-glow {
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
 [data-theme='odysseus'] .card-glow:hover,
 [data-theme='matrix'] .card-glow:hover,
 [data-theme='scifi'] .card-glow:hover {
-  border-color: color-mix(in srgb, var(--theme-accent) 50%, var(--theme-border));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--theme-accent) 15%, transparent),
-              0 4px 20px color-mix(in srgb, var(--theme-accent) 8%, transparent);
+  border-color: color-mix(
+    in srgb,
+    var(--theme-accent) 50%,
+    var(--theme-border)
+  );
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--theme-accent) 15%, transparent),
+    0 4px 20px color-mix(in srgb, var(--theme-accent) 8%, transparent);
 }
 
 /* ── Accent scrollbar (all themes) ── */
@@ -1024,7 +1129,12 @@ code {
   scrollbar-color: var(--theme-border) transparent;
 }
 :root:hover {
-  scrollbar-color: color-mix(in srgb, var(--theme-accent) 45%, var(--theme-border)) transparent;
+  scrollbar-color: color-mix(
+      in srgb,
+      var(--theme-accent) 45%,
+      var(--theme-border)
+    )
+    transparent;
 }
 
 /* ── Focus ring using accent color ── */
@@ -1051,7 +1161,9 @@ code {
 
 /* ── Stat number glow (stronger than terminal-glow-soft) ── */
 .stat-glow {
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--theme-accent) 55%, transparent));
+  filter: drop-shadow(
+    0 0 8px color-mix(in srgb, var(--theme-accent) 55%, transparent)
+  );
   color: var(--theme-accent);
 }
 
@@ -1100,21 +1212,40 @@ code {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 .chip.chip-active,
 .chip:hover {
-  border-color: color-mix(in srgb, var(--theme-accent) 50%, var(--theme-border));
+  border-color: color-mix(
+    in srgb,
+    var(--theme-accent) 50%,
+    var(--theme-border)
+  );
   color: var(--theme-accent);
 }
-.chip.chip-success { border-color: rgba(52, 211, 153, 0.4); color: #34d399; }
-.chip.chip-danger  { border-color: rgba(248, 113, 113, 0.4); color: #f87171; }
-.chip.chip-warn    { border-color: rgba(251, 191, 36, 0.4);  color: #fbbf24; }
+.chip.chip-success {
+  border-color: rgba(52, 211, 153, 0.4);
+  color: #34d399;
+}
+.chip.chip-danger {
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #f87171;
+}
+.chip.chip-warn {
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fbbf24;
+}
 
 /* ── Subtle badge shine (cosmetic shimmer on static badges) ── */
 @keyframes badge-shine {
-  0%   { background-position: -200% center; }
-  100% { background-position: 200% center; }
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
 }
 .badge-shine {
   background-image: linear-gradient(
@@ -1129,7 +1260,9 @@ code {
 
 /* ── Spinning loader using accent color ── */
 @keyframes spin-accent {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .spinner-accent {
   width: 1rem;
@@ -1140,14 +1273,28 @@ code {
   animation: spin-accent 0.7s linear infinite;
   display: inline-block;
 }
-.spinner-accent.spinner-sm { width: 0.75rem; height: 0.75rem; border-width: 1.5px; }
-.spinner-accent.spinner-lg { width: 1.5rem;  height: 1.5rem;  border-width: 2.5px; }
-.spinner-accent.spinner-xl { width: 2rem;    height: 2rem;    border-width: 3px;   }
+.spinner-accent.spinner-sm {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-width: 1.5px;
+}
+.spinner-accent.spinner-lg {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-width: 2.5px;
+}
+.spinner-accent.spinner-xl {
+  width: 2rem;
+  height: 2rem;
+  border-width: 3px;
+}
 
 /* ── Height expand / collapse transition utility ── */
 .expand-collapse {
   overflow: hidden;
-  transition: height 0.22s var(--snappy), opacity 0.18s ease;
+  transition:
+    height 0.22s var(--snappy),
+    opacity 0.18s ease;
 }
 
 /* ── Ghost link — text link with accent hover, no underline by default ── */
@@ -1258,15 +1405,15 @@ kbd {
   --theme-border: rgba(53, 90, 102, 0.5);
   --theme-border-subtle: rgba(53, 90, 102, 0.25);
   --theme-text: #9cdef2;
-  --theme-muted: rgba(156, 222, 242, 0.55);
-  --theme-muted-2: rgba(156, 222, 242, 0.38);
+  --theme-muted: rgba(156, 222, 242, 0.65);
+  --theme-muted-2: rgba(156, 222, 242, 0.5);
   --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45);
   --theme-shadow-2: 0 4px 16px rgba(0, 0, 0, 0.55);
   --theme-shadow-3: 0 8px 32px rgba(0, 0, 0, 0.65);
   --theme-glass: rgba(40, 44, 52, 0.82);
-  --theme-focus: #e06c75;
-  --theme-accent: #e06c75;
-  --theme-accent-secondary: #f08090;
+  --theme-focus: #f08090;
+  --theme-accent: #f08090;
+  --theme-accent-secondary: #f59aaa;
   --theme-accent-subtle: rgba(224, 108, 117, 0.12);
   --theme-accent-border: rgba(224, 108, 117, 0.32);
   --theme-active: #e06c75;
@@ -1294,7 +1441,8 @@ kbd {
   --code-border: rgba(53, 90, 102, 0.3);
   --code-foreground: #50fa7b;
   --theme-input: #1e2228;
-  --interface-font-family: 'JetBrains Mono Variable', 'Fira Code', ui-monospace, monospace;
+  --interface-font-family:
+    'JetBrains Mono Variable', 'Fira Code', ui-monospace, monospace;
 }
 
 /* Odysseus dot-grid background — subtle terminal grid visible between cards */
@@ -1316,7 +1464,7 @@ kbd {
   --theme-border-subtle: rgba(0, 255, 65, 0.13);
   --theme-text: #d8ffe3;
   --theme-muted: rgba(216, 255, 227, 0.58);
-  --theme-muted-2: rgba(216, 255, 227, 0.40);
+  --theme-muted-2: rgba(216, 255, 227, 0.4);
   --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.72);
   --theme-shadow-2: 0 10px 28px rgba(0, 0, 0, 0.62);
   --theme-shadow-3: 0 18px 54px rgba(0, 0, 0, 0.72);
@@ -1459,7 +1607,7 @@ kbd {
   --theme-border-subtle: #222933;
   --theme-text: #eceff4;
   --theme-muted: #7f8a96;
-  --theme-muted-2: rgba(236, 239, 244, 0.40);
+  --theme-muted-2: rgba(236, 239, 244, 0.4);
   --theme-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.55);
   --theme-shadow-2: 0 6px 16px rgba(0, 0, 0, 0.52);
   --theme-shadow-3: 0 16px 36px rgba(0, 0, 0, 0.62);
@@ -1554,7 +1702,7 @@ kbd {
   --theme-border-subtle: #e3e8e7;
   --theme-text: #16315f;
   --theme-muted: #6f7d96;
-  --theme-muted-2: rgba(22, 49, 95, 0.50);
+  --theme-muted-2: rgba(22, 49, 95, 0.5);
   --theme-shadow-1: 0 0 0 rgba(22, 49, 95, 0);
   --theme-shadow-2: 0 1px 2px rgba(22, 49, 95, 0.03);
   --theme-shadow-3: 0 8px 24px rgba(22, 49, 95, 0.05);
@@ -1748,7 +1896,7 @@ kbd {
   --theme-border-subtle: rgba(30, 74, 92, 0.1);
   --theme-text: #16315f;
   --theme-muted: rgba(22, 49, 95, 0.6);
-  --theme-muted-2: rgba(22, 49, 95, 0.50);
+  --theme-muted-2: rgba(22, 49, 95, 0.5);
   --theme-shadow-1: 0 0 0 rgba(22, 49, 95, 0);
   --theme-shadow-2: 0 1px 2px rgba(22, 49, 95, 0.03);
   --theme-shadow-3: 0 8px 24px rgba(22, 49, 95, 0.05);
@@ -1882,6 +2030,7 @@ kbd {
   --color-accent-400: var(--theme-accent-secondary) !important;
   --color-accent-500: var(--theme-accent) !important;
   --color-accent-600: var(--theme-accent) !important;
+  --theme-accent-border: rgba(0, 151, 167, 0.2);
 }
 
 /* Force light theme text and backgrounds to prevent dark mode leakage */

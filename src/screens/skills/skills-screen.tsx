@@ -698,7 +698,7 @@ export function SkillsScreen() {
                     ? 'Search Skills Hub, GitHub, and local fallback'
                     : 'Search by name, tags, or description'
                 }
-                className="h-9 w-full min-w-0 flex-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-sm text-ink outline-none transition-colors focus:border-primary sm:min-w-[220px]"
+                className="h-9 w-full min-w-0 flex-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-sm text-ink outline-none transition-colors focus:border-[var(--theme-accent)] sm:min-w-[220px]"
               />
 
               {tab === 'installed' ? (
@@ -1105,8 +1105,7 @@ function SecurityBadge({
         </button>
         {expanded && (
           <div
-            className="absolute left-0 bottom-[calc(100%+6px)] z-50 w-72 overflow-hidden rounded-xl border border-[var(--theme-border)] p-0 shadow-xl"
-            style={{ backgroundColor: 'var(--color-primary-50)' }}
+            className="absolute left-0 bottom-[calc(100%+6px)] z-50 w-72 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-0 shadow-xl"
           >
             <SecurityScanCard security={security} />
           </div>

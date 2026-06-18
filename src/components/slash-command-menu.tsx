@@ -159,7 +159,7 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenuComponent(
   return (
     <div className="pointer-events-none absolute inset-x-2 bottom-[calc(100%+0.5rem)] z-[70]">
       <div
-        className="pointer-events-auto overflow-hidden rounded-xl border border-primary-200 shadow-lg"
+        className="pointer-events-auto overflow-hidden rounded-xl border border-[var(--theme-border)] shadow-lg"
         style={{
           background: 'var(--color-surface, var(--theme-card, #1a1f2e))',
         }}
@@ -173,7 +173,7 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenuComponent(
           keepHighlight={false}
         >
           {filteredCommands.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-primary-600">
+            <div className="px-3 py-2 text-sm text-[var(--theme-muted)]">
               No commands found
             </div>
           ) : (
@@ -195,7 +195,7 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenuComponent(
                   <span className="font-mono text-[var(--color-accent,#6366f1)]">
                     {item.command}
                   </span>
-                  <span className="text-primary-600">{item.description}</span>
+                  <span className="text-[var(--theme-muted)]">{item.description}</span>
                 </CommandItem>
               ))}
             </CommandList>

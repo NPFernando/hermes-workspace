@@ -115,7 +115,7 @@ export function BackgroundRunsSection() {
     .length
 
   return (
-    <section className="rounded-2xl bg-primary-200/15 p-2">
+    <section className="rounded-2xl bg-[var(--theme-hover)]/15 p-2">
       <Collapsible open={expanded} onOpenChange={setExpanded}>
         <div className="flex items-center justify-between">
           <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
@@ -131,7 +131,7 @@ export function BackgroundRunsSection() {
               'rounded-full px-2 py-0.5 text-[11px] tabular-nums',
               staleCount > 0
                 ? 'bg-amber-400/20 text-amber-700'
-                : 'bg-primary-300/70 text-primary-800',
+                : 'bg-[var(--theme-muted)]/70 text-[var(--theme-text)]',
             )}
             title={
               staleCount > 0
@@ -156,7 +156,7 @@ export function BackgroundRunsSection() {
               return (
                 <div
                   key={`${run.sessionKey}:${run.runId}`}
-                  className="rounded-lg px-2 py-1.5 hover:bg-primary-200/50"
+                  className="rounded-lg px-2 py-1.5 hover:bg-[var(--theme-hover)]"
                 >
                   <div className="flex items-center gap-1.5">
                     <span
@@ -166,7 +166,7 @@ export function BackgroundRunsSection() {
                       )}
                     />
                     <span
-                      className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary-800"
+                      className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--theme-text)]"
                       title={run.sessionKey}
                     >
                       {run.friendlyId || run.sessionKey}
@@ -174,13 +174,13 @@ export function BackgroundRunsSection() {
                     <span
                       className={cn(
                         'shrink-0 text-[10px] tabular-nums',
-                        isStale ? 'text-amber-600' : 'text-primary-500',
+                        isStale ? 'text-amber-600' : 'text-[var(--theme-muted)]',
                       )}
                     >
                       {formatAge(run.stalenessMs)}
                     </span>
                   </div>
-                  <p className="mt-0.5 truncate pl-3 text-[10px] text-primary-500">
+                  <p className="mt-0.5 truncate pl-3 text-[10px] text-[var(--theme-muted)]">
                     {run.status} · {snippet}
                   </p>
                   <div className="mt-1 flex justify-end gap-1 pl-3">

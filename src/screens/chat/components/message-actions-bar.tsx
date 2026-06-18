@@ -83,7 +83,7 @@ export function MessageActionsBar({
   return (
     <div
       className={cn(
-        'flex items-center gap-1.5 text-xs text-primary-600 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 duration-100 ease-out',
+        'flex items-center gap-1.5 text-xs text-[var(--theme-muted)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 duration-100 ease-out',
         forceVisible || isQueued || isFailed ? 'opacity-100' : 'opacity-0',
         positionClass,
       )}
@@ -110,7 +110,7 @@ export function MessageActionsBar({
             <TooltipTrigger
               type="button"
               onClick={onRegenerate}
-              className="inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 text-primary-500 hover:text-primary-900 hover:bg-primary-100 dark:hover:bg-primary-800 transition-colors"
+              className="inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)] transition-colors"
             >
               <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.6} />
             </TooltipTrigger>
@@ -130,7 +130,7 @@ export function MessageActionsBar({
                   'inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 transition-colors',
                   thumbs === 'up'
                     ? 'text-green-600 bg-green-50 dark:bg-green-900/30'
-                    : 'text-primary-500 hover:text-primary-900 hover:bg-primary-100 dark:hover:bg-primary-800',
+                    : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
                 )}
               >
                 <HugeiconsIcon icon={ThumbsUpIcon} size={14} strokeWidth={1.6} />
@@ -147,7 +147,7 @@ export function MessageActionsBar({
                   'inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 transition-colors',
                   thumbs === 'down'
                     ? 'text-red-600 bg-red-50 dark:bg-red-900/30'
-                    : 'text-primary-500 hover:text-primary-900 hover:bg-primary-100 dark:hover:bg-primary-800',
+                    : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
                 )}
               >
                 <HugeiconsIcon icon={ThumbsDownIcon} size={14} strokeWidth={1.6} />
@@ -165,7 +165,7 @@ export function MessageActionsBar({
             onClick={() => {
               handleCopy().catch(() => {})
             }}
-            className="inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 text-primary-700 hover:text-primary-900 hover:bg-primary-100 dark:hover:bg-primary-800"
+            className="inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
           >
             <HugeiconsIcon
               icon={copied ? Tick02Icon : Copy01Icon}

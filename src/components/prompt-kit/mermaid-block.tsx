@@ -63,25 +63,25 @@ export function MermaidBlock({ code }: { code: string }) {
 
   if (!svg) {
     return (
-      <div className="my-2 rounded-lg border border-primary-200 bg-primary-50 px-4 py-8 text-center text-xs text-primary-400 animate-pulse">
+      <div className="my-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-8 text-center text-xs text-[var(--theme-muted)] animate-pulse">
         Rendering diagram…
       </div>
     )
   }
 
   return (
-    <div className="my-2 rounded-lg border border-primary-200 overflow-hidden">
+    <div className="my-2 rounded-lg border border-[var(--theme-border)] overflow-hidden">
       <div
         className="flex items-center justify-between px-3 py-1.5 bg-[var(--theme-card2)]"
       >
-        <span className="rounded border border-primary-200 bg-primary-100/80 px-2 py-0.5 text-xs font-medium text-primary-700">
+        <span className="rounded border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-0.5 text-xs font-medium text-[var(--theme-muted)]">
           Diagram
         </span>
         <button
           type="button"
           onClick={() => { handleCopy().catch(() => {}) }}
           className={cn(
-            'inline-flex items-center gap-1 text-xs text-primary-500 hover:text-primary-800 transition-colors',
+            'inline-flex items-center gap-1 text-xs text-[var(--theme-muted)] hover:text-[var(--theme-text)] transition-colors',
           )}
         >
           <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={14} strokeWidth={1.5} />

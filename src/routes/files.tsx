@@ -90,11 +90,11 @@ export const Route = createFileRoute('/files')({
   component: FilesRoute,
   errorComponent: function FilesError({ error }) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-primary-50">
-        <h2 className="text-xl font-semibold text-primary-900 mb-3">
+      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-[var(--theme-panel)]">
+        <h2 className="text-xl font-semibold text-[var(--theme-text)] mb-3">
           Failed to Load Files
         </h2>
-        <p className="text-sm text-primary-600 mb-4 max-w-md">
+        <p className="text-sm text-[var(--theme-muted)] mb-4 max-w-md">
           {error instanceof Error
             ? error.message
             : 'An unexpected error occurred'}
@@ -113,7 +113,7 @@ export const Route = createFileRoute('/files')({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="spinner-accent spinner-xl mb-3" />
-          <p className="text-sm text-primary-500">Loading file explorer...</p>
+          <p className="text-sm text-[var(--theme-muted)]">Loading file explorer...</p>
         </div>
       </div>
     )
@@ -250,7 +250,7 @@ function FilesRoute() {
   )
 
   return (
-    <div className="h-full min-h-0 overflow-hidden bg-surface text-primary-900">
+    <div className="h-full min-h-0 overflow-hidden bg-surface text-[var(--theme-text)]">
       <div className="flex h-full min-h-0 overflow-hidden">
         <FileExplorerSidebar
           collapsed={fileExplorerCollapsed}
@@ -260,11 +260,11 @@ function FilesRoute() {
           activePath={loaded?.path ?? null}
         />
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="flex items-center gap-3 border-b border-primary-200 px-3 py-2 md:px-4 md:py-3">
+          <header className="flex items-center gap-3 border-b border-[var(--theme-border)] px-3 py-2 md:px-4 md:py-3">
             <button
               type="button"
               onClick={() => setFileExplorerCollapsed((prev) => !prev)}
-              className="rounded-lg p-1.5 text-primary-600 hover:bg-primary-100 transition-colors"
+              className="rounded-lg p-1.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
               aria-label={fileExplorerCollapsed ? 'Show files' : 'Hide files'}
               title={fileExplorerCollapsed ? 'Show files' : 'Hide files'}
             >
@@ -279,7 +279,7 @@ function FilesRoute() {
                   >
                     {loaded.name}
                   </h1>
-                  <p className="hidden truncate text-xs text-primary-500 sm:block">
+                  <p className="hidden truncate text-xs text-[var(--theme-muted)] sm:block">
                     {loaded.path}
                     {loaded.dirty && (
                       <span className="ml-2 text-accent-500">
@@ -294,7 +294,7 @@ function FilesRoute() {
               ) : (
                 <>
                   <h1 className="text-base font-medium md:text-lg">Files</h1>
-                  <p className="hidden text-sm text-primary-600 sm:block">
+                  <p className="hidden text-sm text-[var(--theme-muted)] sm:block">
                     Click a file in the sidebar to load it into the editor.
                   </p>
                 </>
@@ -306,7 +306,7 @@ function FilesRoute() {
                   <button
                     type="button"
                     onClick={() => setRenderMarkdown((v) => !v)}
-                    className="rounded-md border border-primary-200 px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100"
+                    className="rounded-md border border-[var(--theme-border)] px-2.5 py-1 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
                   >
                     {renderMarkdown ? 'Edit' : 'Preview'}
                   </button>
@@ -324,7 +324,7 @@ function FilesRoute() {
                 <button
                   type="button"
                   onClick={handleOpenInTab}
-                  className="inline-flex items-center gap-1 rounded-md border border-primary-200 px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100"
+                  className="inline-flex items-center gap-1 rounded-md border border-[var(--theme-border)] px-2.5 py-1 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
                   title="Open this file in a new browser tab"
                 >
                   <HugeiconsIcon
@@ -337,7 +337,7 @@ function FilesRoute() {
                 <button
                   type="button"
                   onClick={handleDownload}
-                  className="inline-flex items-center gap-1 rounded-md border border-primary-200 px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100"
+                  className="inline-flex items-center gap-1 rounded-md border border-[var(--theme-border)] px-2.5 py-1 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
                   title="Download this file to your computer"
                 >
                   <HugeiconsIcon
@@ -352,7 +352,7 @@ function FilesRoute() {
           </header>
           <div className="min-h-0 flex-1 pb-24 md:pb-0">
             {loaded?.loading ? (
-              <div className="flex h-full items-center justify-center text-sm text-primary-500">
+              <div className="flex h-full items-center justify-center text-sm text-[var(--theme-muted)]">
                 Loading…
               </div>
             ) : loaded?.error ? (
@@ -364,13 +364,13 @@ function FilesRoute() {
                 <img
                   src={loaded.imageDataUrl}
                   alt={loaded.name}
-                  className="max-h-full max-w-full rounded-lg border border-primary-200 shadow-sm object-contain"
+                  className="max-h-full max-w-full rounded-lg border border-[var(--theme-border)] shadow-sm object-contain"
                 />
               </div>
             ) : isMarkdown && renderMarkdown ? (
               <ScrollAreaRoot className="h-full">
                 <ScrollAreaViewport>
-                  <div className="markdown-preview mx-auto max-w-4xl px-6 py-5 text-sm text-primary-900">
+                  <div className="markdown-preview mx-auto max-w-4xl px-6 py-5 text-sm text-[var(--theme-text)]">
                     <Markdown className="gap-3">{loaded.content}</Markdown>
                   </div>
                 </ScrollAreaViewport>

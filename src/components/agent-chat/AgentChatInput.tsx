@@ -44,9 +44,9 @@ export function AgentChatInput({
   return (
     <form
       onSubmit={handleFormSubmit}
-      className="border-t border-primary-300/70 bg-primary-100/60 p-3 backdrop-blur-sm"
+      className="border-t border-[var(--theme-border)] bg-[var(--theme-hover)] p-3 backdrop-blur-sm"
     >
-      <div className="flex items-end gap-2 rounded-2xl border border-primary-300/70 bg-primary-50/80 p-2 shadow-sm">
+      <div className="flex items-end gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-2 shadow-sm">
         <textarea
           value={value}
           rows={1}
@@ -57,7 +57,7 @@ export function AgentChatInput({
           }}
           onKeyDown={handleTextareaKeyDown}
           className={cn(
-            'max-h-36 min-h-8 flex-1 resize-y bg-transparent px-2 py-1 text-sm text-primary-900 outline-none placeholder:text-primary-600',
+            'max-h-36 min-h-8 flex-1 resize-y bg-transparent px-2 py-1 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)]',
             disabled ? 'cursor-not-allowed opacity-60' : '',
           )}
         />
@@ -72,7 +72,7 @@ export function AgentChatInput({
           <HugeiconsIcon icon={ArrowUp01Icon} size={20} strokeWidth={1.5} />
         </Button>
       </div>
-      <p className="mt-1 px-2 text-[11px] text-primary-700 text-pretty tabular-nums">
+      <p className="mt-1 px-2 text-[11px] text-[var(--theme-muted)] text-pretty tabular-nums">
         Enter to send · Shift+Enter for a new line
       </p>
     </form>

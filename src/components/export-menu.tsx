@@ -78,7 +78,7 @@ export function ExportMenu({ onExport, disabled }: ExportMenuProps) {
               className="justify-between"
             >
               <span>{label}</span>
-              <span className="text-xs text-primary-600 tabular-nums">
+              <span className="text-xs text-[var(--theme-muted)] tabular-nums">
                 {ext}
               </span>
             </MenuItem>

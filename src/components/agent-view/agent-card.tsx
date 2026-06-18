@@ -90,15 +90,15 @@ function getModelBadgeClassName(model: string): string {
   if (model === 'codex')
     return 'bg-accent-500/20 text-accent-200 ring-accent-500/40'
   if (model === 'swarm')
-    return 'bg-primary-300/70 text-primary-800 ring-primary-400/50'
-  return 'bg-primary-300/70 text-primary-800 ring-primary-400/50'
+    return 'bg-[var(--theme-hover)]/70 text-[var(--theme-text)] ring-[var(--theme-accent)]/50'
+  return 'bg-[var(--theme-hover)]/70 text-[var(--theme-text)] ring-[var(--theme-accent)]/50'
 }
 
 function getStatusRingClassName(status: AgentNodeStatus): string {
   if (status === 'failed') return 'ring-red-500/70'
   if (status === 'thinking') return 'ring-accent-500/70'
   if (status === 'complete') return 'ring-emerald-500/70'
-  if (status === 'queued') return 'ring-primary-500/70'
+  if (status === 'queued') return 'ring-[var(--theme-accent)]/70'
   return 'ring-emerald-500/70'
 }
 
@@ -106,7 +106,7 @@ function getStatusTextClassName(status: AgentNodeStatus): string {
   if (status === 'failed') return 'text-red-300'
   if (status === 'thinking') return 'text-accent-300'
   if (status === 'complete') return 'text-emerald-300'
-  if (status === 'queued') return 'text-primary-700'
+  if (status === 'queued') return 'text-[var(--theme-muted)]'
   return 'text-emerald-300'
 }
 
@@ -240,8 +240,8 @@ export function AgentCard({
         <MenuTrigger
           type="button"
           className={cn(
-            'inline-flex items-center justify-center rounded-md text-primary-700 hover:bg-primary-200 hover:text-primary-900',
-            'aria-expanded:bg-primary-200',
+            'inline-flex items-center justify-center rounded-md text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]',
+            'aria-expanded:bg-[var(--theme-hover)]',
             triggerClassName,
           )}
           aria-label={`${node.name} controls`}
@@ -325,7 +325,7 @@ export function AgentCard({
         initial={{ opacity: 0.9 }}
         animate={{ opacity: 1 }}
         className={cn(
-          'group relative overflow-visible rounded-3xl border border-primary-300/35 bg-primary-100/70 shadow-md backdrop-blur-sm',
+          'group relative overflow-visible rounded-3xl border border-[var(--theme-border)]/35 bg-[var(--theme-hover)]/70 shadow-md backdrop-blur-sm',
           'w-full p-3',
           isCompact ? 'col-span-2' : '',
           className,
@@ -342,10 +342,10 @@ export function AgentCard({
             Back
           </Button>
           <div className="min-w-0 flex-1">
-            <h4 className="truncate text-sm font-medium text-primary-900" title={node.name}>
+            <h4 className="truncate text-sm font-medium text-[var(--theme-text)]" title={node.name}>
               {node.name}
             </h4>
-            <p className="mt-0.5 text-[11px] font-mono text-primary-700">
+            <p className="mt-0.5 text-[11px] font-mono text-[var(--theme-muted)]">
               {node.model}
             </p>
           </div>
@@ -354,39 +354,39 @@ export function AgentCard({
         </div>
 
         {/* Status + model row */}
-        <div className="mb-3 flex items-center gap-2 rounded-xl border border-primary-300/30 bg-primary-200/24 p-2.5">
+        <div className="mb-3 flex items-center gap-2 rounded-xl border border-[var(--theme-border)]/30 bg-[var(--theme-hover)]/24 p-2.5">
           <span
             className={cn(
               'inline-flex size-2 shrink-0 rounded-full',
               node.status === 'failed' ? 'bg-red-400' :
               node.status === 'thinking' ? 'bg-accent-400 animate-pulse' :
               node.status === 'complete' ? 'bg-emerald-400' :
-              node.status === 'queued' ? 'bg-primary-500' :
+              node.status === 'queued' ? 'bg-[var(--theme-panel)]0' :
               'bg-emerald-400 animate-pulse',
             )}
           />
           <span className={cn('text-[11px] font-medium capitalize', getStatusTextClassName(node.status))}>
             {getStatusLabel(node.status)}
           </span>
-          <span className="ml-auto font-mono text-[10px] text-primary-600 truncate max-w-[120px]">
+          <span className="ml-auto font-mono text-[10px] text-[var(--theme-muted)] truncate max-w-[120px]">
             {node.model.split('/').pop()}
           </span>
         </div>
 
         {/* Last output / task preview */}
-        <div className="mb-3 rounded-xl border border-primary-300/30 bg-primary-200/24 p-2.5">
-          <p className="mb-1 text-[10px] font-medium text-primary-600">Last message</p>
-          <p className="text-[11px] leading-relaxed text-primary-800">
+        <div className="mb-3 rounded-xl border border-[var(--theme-border)]/30 bg-[var(--theme-hover)]/24 p-2.5">
+          <p className="mb-1 text-[10px] font-medium text-[var(--theme-muted)]">Last message</p>
+          <p className="text-[11px] leading-relaxed text-[var(--theme-text)]">
             {node.task.length > 80 ? `${node.task.slice(0, 80)}…` : node.task}
           </p>
         </div>
 
         {/* Compact stats */}
-        <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary-300/30 bg-primary-200/24 px-2.5 py-2 text-[10px] tabular-nums text-primary-600">
+        <div className="mb-3 flex items-center gap-3 rounded-lg border border-[var(--theme-border)]/30 bg-[var(--theme-hover)]/24 px-2.5 py-2 text-[10px] tabular-nums text-[var(--theme-muted)]">
           <span>{formatRuntime(node.runtimeSeconds)}</span>
-          <span className="text-primary-300">·</span>
+          <span className="text-[var(--theme-muted)]">·</span>
           <span>{node.tokenCount.toLocaleString()} tok</span>
-          <span className="text-primary-300">·</span>
+          <span className="text-[var(--theme-muted)]">·</span>
           <span>${node.cost.toFixed(2)}</span>
         </div>
 
@@ -447,7 +447,7 @@ export function AgentCard({
         x: { duration: 0.3, ease: 'easeOut' },
       }}
       className={cn(
-        'group relative rounded-3xl border border-primary-300/35 bg-primary-100/70 shadow-md backdrop-blur-sm',
+        'group relative rounded-3xl border border-[var(--theme-border)]/35 bg-[var(--theme-hover)]/70 shadow-md backdrop-blur-sm',
         isCompact
           ? 'w-full min-w-0 overflow-visible rounded-xl p-2'
           : 'w-full overflow-hidden p-2.5',
@@ -468,7 +468,7 @@ export function AgentCard({
                 strokeWidth={2.5}
                 className="absolute inset-0"
               />
-              <div className="absolute inset-1 inline-flex items-center justify-center rounded-full border border-primary-300/35 bg-primary-200/72">
+              <div className="absolute inset-1 inline-flex items-center justify-center rounded-full border border-[var(--theme-border)]/35 bg-[var(--theme-hover)]/72">
                 {node.isMain ? (
                   <AgentAvatar size="sm" />
                 ) : (
@@ -484,7 +484,7 @@ export function AgentCard({
 
             <div className="min-w-0 flex-1">
               <div className="flex items-start gap-2">
-                <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-primary-900" title={node.name}>
+                <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--theme-text)]" title={node.name}>
                   {node.name}
                 </h4>
                 {renderWardenMenu('size-6 shrink-0 rounded-md')}
@@ -499,7 +499,7 @@ export function AgentCard({
                       : node.status === 'thinking'
                         ? 'bg-accent-400'
                         : node.status === 'queued'
-                          ? 'bg-primary-500'
+                          ? 'bg-[var(--theme-panel)]0'
                           : 'bg-emerald-400',
                   )}
                 />
@@ -509,14 +509,14 @@ export function AgentCard({
               </div>
 
               <p
-                className="mt-0.5 max-w-[20ch] truncate text-[10px] font-mono leading-none text-primary-600"
+                className="mt-0.5 max-w-[20ch] truncate text-[10px] font-mono leading-none text-[var(--theme-muted)]"
                 title={node.model}
               >
                 {compactModelLabel}
               </p>
 
-              <p className="mt-1 truncate text-[11px] text-primary-700">{node.task}</p>
-              <p className="mt-0.5 truncate text-[10px] tabular-nums text-primary-600">
+              <p className="mt-1 truncate text-[11px] text-[var(--theme-muted)]">{node.task}</p>
+              <p className="mt-0.5 truncate text-[10px] tabular-nums text-[var(--theme-muted)]">
                 {formatRuntime(node.runtimeSeconds)} · {node.tokenCount.toLocaleString()} tokens · ${node.cost.toFixed(2)}
               </p>
 
@@ -579,7 +579,7 @@ export function AgentCard({
                   )}
                 />
               ) : null}
-              <div className="absolute inset-1.5 inline-flex items-center justify-center rounded-full border border-primary-300/35 bg-primary-200/72">
+              <div className="absolute inset-1.5 inline-flex items-center justify-center rounded-full border border-[var(--theme-border)]/35 bg-[var(--theme-hover)]/72">
                 {node.isMain ? (
                   <AgentAvatar size="md" />
                 ) : (
@@ -597,7 +597,7 @@ export function AgentCard({
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute -right-0.5 -bottom-0.5 inline-flex size-5 items-center justify-center rounded-full bg-emerald-500 text-primary-50"
+                    className="absolute -right-0.5 -bottom-0.5 inline-flex size-5 items-center justify-center rounded-full bg-emerald-500 text-[var(--theme-text)]"
                   >
                     <HugeiconsIcon
                       icon={CheckmarkCircle01Icon}
@@ -617,7 +617,7 @@ export function AgentCard({
           {/* Right: Text content */}
           <div className="flex-1 min-w-0 pt-0.5">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <h4 className="truncate font-medium text-primary-900 text-xs" title={node.name}>
+              <h4 className="truncate font-medium text-[var(--theme-text)] text-xs" title={node.name}>
                 {node.name}
               </h4>
               <span
@@ -657,9 +657,9 @@ export function AgentCard({
       )}
 
       {!isCompact ? (
-        <div className="mt-2 max-h-0 overflow-hidden text-primary-700 tabular-nums opacity-0 transition-all duration-200 group-hover:max-h-48 group-hover:opacity-100">
-          <p className="line-clamp-2 text-pretty text-[11px] text-primary-700">{node.task}</p>
-          <p className="mt-0.5 truncate text-[10px] tabular-nums text-primary-600">
+        <div className="mt-2 max-h-0 overflow-hidden text-[var(--theme-muted)] tabular-nums opacity-0 transition-all duration-200 group-hover:max-h-48 group-hover:opacity-100">
+          <p className="line-clamp-2 text-pretty text-[11px] text-[var(--theme-muted)]">{node.task}</p>
+          <p className="mt-0.5 truncate text-[10px] tabular-nums text-[var(--theme-muted)]">
             {formatRuntime(node.runtimeSeconds)} · {node.tokenCount.toLocaleString()} tokens · {formatCost(node.cost)}
           </p>
 

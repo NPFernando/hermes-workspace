@@ -144,7 +144,7 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        'group relative min-w-0 overflow-hidden rounded-lg border border-primary-200',
+        'group relative min-w-0 overflow-hidden rounded-lg border border-[var(--theme-border)]',
         className,
       )}
     >
@@ -152,14 +152,14 @@ export function CodeBlock({
         className={cn('flex items-center justify-between gap-2 px-3 pt-2')}
         style={{ backgroundColor: headerBg }}
       >
-        <span className="rounded border border-primary-200 bg-primary-100/80 px-2 py-0.5 text-xs font-medium text-primary-700">
+        <span className="rounded border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-0.5 text-xs font-medium text-[var(--theme-muted)]">
           {displayLanguage}
         </span>
         <div className="flex items-center gap-2">
           {canShowLineNumbers ? (
             <Button
               variant="ghost"
-              className="h-auto px-0 text-xs font-medium text-primary-500 hover:text-primary-800 hover:bg-transparent"
+              className="h-auto px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
               onClick={() => {
                 setShowLineNumbers((current) => !current)
               }}
@@ -171,7 +171,7 @@ export function CodeBlock({
             variant="ghost"
             aria-label="Download file"
             title="Download file"
-            className="h-auto px-0 text-xs font-medium text-primary-500 hover:text-primary-800 hover:bg-transparent"
+            className="h-auto px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
             onClick={handleDownload}
           >
             <HugeiconsIcon icon={DownloadIcon} size={16} strokeWidth={1.5} />
@@ -179,7 +179,7 @@ export function CodeBlock({
           <Button
             variant="ghost"
             aria-label={ariaLabel ?? 'Copy code'}
-            className="h-auto px-0 text-xs font-medium text-primary-500 hover:text-primary-800 hover:bg-transparent"
+            className="h-auto px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
             onClick={() => {
               handleCopy().catch(() => {})
             }}
@@ -196,7 +196,7 @@ export function CodeBlock({
               variant="ghost"
               aria-label="Open in workspace"
               title="Open in workspace"
-              className="h-auto px-0 text-xs font-medium text-primary-500 hover:text-primary-800 hover:bg-transparent"
+              className="h-auto px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
               onClick={onExpand}
             >
               <HugeiconsIcon icon={ArrowExpandDiagonalIcon} size={16} strokeWidth={1.5} />
@@ -206,7 +206,7 @@ export function CodeBlock({
       </div>
       <div className="flex min-w-0 overflow-x-auto">
         {showLineNumbers ? (
-          <ol className="sticky left-0 z-10 select-none border-r border-primary-200 bg-primary-100/60 px-2 py-3 text-right text-xs text-primary-600 tabular-nums">
+          <ol className="sticky left-0 z-10 select-none border-r border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-3 text-right text-xs text-[var(--theme-muted)] tabular-nums">
             {Array.from({ length: lineCount }, (_, index) => (
               <li key={`line-${index + 1}`} className="leading-6">
                 {index + 1}
@@ -218,7 +218,7 @@ export function CodeBlock({
           {html ? (
             <div
               className={cn(
-                'text-sm text-primary-900 [&>pre]:m-0 [&>pre]:overflow-visible [&>pre]:leading-6',
+                'text-sm text-[var(--theme-text)] [&>pre]:m-0 [&>pre]:overflow-visible [&>pre]:leading-6',
                 isSingleLine
                   ? '[&>pre]:whitespace-pre [&>pre]:px-3 [&>pre]:py-2'
                   : '[&>pre]:px-3 [&>pre]:py-3',
@@ -228,7 +228,7 @@ export function CodeBlock({
           ) : (
             <pre
               className={cn(
-                'text-sm leading-6 text-primary-900',
+                'text-sm leading-6 text-[var(--theme-text)]',
                 isSingleLine ? 'whitespace-pre px-3 py-2' : 'px-3 py-3',
               )}
             >

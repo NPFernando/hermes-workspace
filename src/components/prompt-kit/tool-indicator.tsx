@@ -38,7 +38,7 @@ function ToolIndicator({ tools, defaultOpen = false }: ToolIndicatorProps) {
           render={
             <Button
               variant="ghost"
-              className="h-auto gap-1.5 px-2 py-1 -mx-2 text-primary-500 hover:text-primary-700 hover:bg-primary-50"
+              className="h-auto gap-1.5 px-2 py-1 -mx-2 text-[var(--theme-muted)] hover:text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]"
             />
           }
         >
@@ -57,7 +57,7 @@ function ToolIndicator({ tools, defaultOpen = false }: ToolIndicatorProps) {
           />
         </CollapsibleTrigger>
         <CollapsiblePanel className="mt-2">
-          <div className="flex flex-col gap-2 pl-2 border-l-2 border-primary-200">
+          <div className="flex flex-col gap-2 pl-2 border-l-2 border-[var(--theme-border)]">
             {tools.map((toolPart) => (
               <Tool
                 key={toolPart.toolCallId || toolPart.type}

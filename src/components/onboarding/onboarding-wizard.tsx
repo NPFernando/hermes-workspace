@@ -97,7 +97,7 @@ export function OnboardingWizard() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative w-[min(520px,92vw)] min-w-[320px] overflow-hidden rounded-2xl border border-primary-200 bg-primary-50 shadow-2xl"
+            className="relative w-[min(520px,92vw)] min-w-[320px] overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-2xl"
           >
             {/* Subtle gradient background pattern */}
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent-500/5 via-transparent to-transparent" />
@@ -105,7 +105,7 @@ export function OnboardingWizard() {
             {/* Skip button */}
             <button
               onClick={skip}
-              className="absolute right-4 top-4 z-10 rounded-full p-2 text-primary-500 transition-colors hover:bg-primary-100 hover:text-primary-700"
+              className="absolute right-4 top-4 z-10 rounded-full p-2 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]"
               aria-label="Skip onboarding"
             >
               <HugeiconsIcon icon={Cancel01Icon} className="size-5" />
@@ -157,11 +157,11 @@ export function OnboardingWizard() {
                         )}
                       </motion.div>
 
-                      <h2 className="mb-3 text-2xl font-semibold text-primary-900">
+                      <h2 className="mb-3 text-2xl font-semibold text-[var(--theme-text)]">
                         {step.title}
                       </h2>
 
-                      <p className="mb-8 max-w-md text-base leading-relaxed text-primary-600">
+                      <p className="mb-8 max-w-md text-base leading-relaxed text-[var(--theme-muted)]">
                         {step.description}
                       </p>
                     </>
@@ -184,8 +184,8 @@ export function OnboardingWizard() {
                       'size-2.5 rounded-full transition-all duration-200',
                       index === currentStep
                         ? 'w-6 bg-accent-500'
-                        : 'bg-primary-300',
-                      index < currentStep && 'hover:bg-primary-400',
+                        : 'bg-[var(--theme-muted)]',
+                      index < currentStep && 'hover:bg-[var(--theme-hover)]',
                       index > currentStep && 'cursor-not-allowed opacity-50',
                     )}
                     aria-label={`Go to step ${index + 1}`}
@@ -205,7 +205,7 @@ export function OnboardingWizard() {
                   Back
                 </Button>
 
-                <span className="text-sm text-primary-500">
+                <span className="text-sm text-[var(--theme-muted)]">
                   {currentStep + 1} / {totalSteps}
                 </span>
 

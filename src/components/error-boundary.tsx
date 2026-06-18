@@ -98,15 +98,15 @@ export class ErrorBoundary extends Component<
     return (
       <div
         className={cn(
-          'flex h-full min-h-0 items-center justify-center bg-primary-50 p-6',
+          'flex h-full min-h-0 items-center justify-center bg-[var(--theme-panel)] p-6',
           this.props.className,
         )}
       >
-        <div className="w-full max-w-md rounded-xl border border-primary-200 bg-primary-100 p-6 text-center shadow-sm">
-          <h2 className="text-balance text-xl font-medium text-primary-900">
+        <div className="w-full max-w-md rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)] p-6 text-center shadow-sm">
+          <h2 className="text-balance text-xl font-medium text-[var(--theme-text)]">
             {title}
           </h2>
-          <p className="mt-2 text-pretty text-sm text-primary-700">
+          <p className="mt-2 text-pretty text-sm text-[var(--theme-muted)]">
             {description}
           </p>
           <pre className="mt-3 max-h-32 overflow-auto rounded bg-red-50 p-2 text-left text-[10px] text-red-800">

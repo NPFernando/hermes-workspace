@@ -472,7 +472,7 @@ export function ProfilesScreen() {
                       'rounded-full p-1',
                       profile.active
                         ? 'bg-gradient-to-br from-emerald-400 via-accent-500 to-emerald-500 shadow-lg shadow-emerald-500/20'
-                        : 'bg-gradient-to-br from-primary-200 to-primary-300',
+                        : 'bg-gradient-to-br from-[var(--theme-muted)]/30 to-[var(--theme-muted)]/50',
                     )}
                   >
                     <img
@@ -482,7 +482,7 @@ export function ProfilesScreen() {
                         'size-20 rounded-full border-2 object-cover',
                         profile.active
                           ? 'border-white'
-                          : 'border-primary-50',
+                          : 'border-[var(--theme-border)]',
                       )}
                       style={{
                         filter: profile.active
@@ -522,7 +522,7 @@ export function ProfilesScreen() {
               </div>
 
               {/* Stats ring */}
-              <div className="mx-4 mt-4 grid grid-cols-4 divide-x divide-primary-200 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]">
+              <div className="mx-4 mt-4 grid grid-cols-4 divide-x divide-[var(--theme-border)] rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]">
                 <ProfileStat label="Skills" value={profile.skillCount} />
                 <ProfileStat label="Sessions" value={profile.sessionCount} />
                 <ProfileStat
@@ -1240,7 +1240,7 @@ export function ProfilesScreen() {
                     />{' '}
                     Config
                   </div>
-                  <pre className="max-h-48 overflow-auto rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-3 text-xs leading-relaxed text-primary-800">
+                  <pre className="max-h-48 overflow-auto rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-3 text-xs leading-relaxed text-[var(--theme-text)]">
                     {JSON.stringify(detailQuery.data.profile.config, null, 2)}
                   </pre>
                 </div>

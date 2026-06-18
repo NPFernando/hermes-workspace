@@ -137,7 +137,7 @@ function ContextBarComponent({
         </div>
         {/* Label floats below bar on tap */}
         {showLabel && (
-          <div className="absolute right-2 top-[5px] z-20 flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary-900/85 shadow-sm animate-in fade-in duration-150">
+          <div className="absolute right-2 top-[5px] z-20 flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--theme-bg)]/85 shadow-sm animate-in fade-in duration-150">
             <span className="text-[10px] font-semibold tabular-nums text-white">
               {Math.round(clampedPct)}%
             </span>
@@ -177,7 +177,7 @@ function ContextBarComponent({
       >
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-primary-900">
+            <span className="text-[11px] font-medium text-[var(--theme-text)]">
               Context Window
             </span>
             <span
@@ -199,12 +199,12 @@ function ContextBarComponent({
             />
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-primary-500 tabular-nums">
+            <span className="text-[10px] text-[var(--theme-muted)] tabular-nums">
               {formatTokens(ctx.usedTokens)} / {formatTokens(ctx.maxTokens)}{' '}
               tokens
             </span>
             {ctx.model && (
-              <span className="text-[10px] text-primary-400 truncate max-w-[100px]">
+              <span className="text-[10px] text-[var(--theme-muted)] truncate max-w-[100px]">
                 {ctx.model}
               </span>
             )}

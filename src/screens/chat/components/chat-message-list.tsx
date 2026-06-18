@@ -123,7 +123,7 @@ function LiveEventLog({ events }: { events: Array<LiveEvent> }) {
       {visible.map((event, i) => (
         <li
           key={`${event.timestamp}-${i}`}
-          className="lifecycle-entry flex items-center gap-1.5 text-[10px] text-primary-500 dark:text-primary-400"
+          className="lifecycle-entry flex items-center gap-1.5 text-[10px] text-[var(--theme-muted)] dark:text-[var(--theme-muted)]"
         >
           <span className="text-[11px] leading-none shrink-0">{event.emoji}</span>
           <span className="truncate">{event.text}</span>
@@ -164,7 +164,7 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
 
   return (
     <div
-      className="rounded-lg border border-primary-200 bg-primary-50 text-[11px] overflow-hidden"
+      className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] text-[11px] overflow-hidden"
       style={{
         borderLeftWidth: '3px',
         borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
@@ -176,7 +176,7 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
         <span className="font-mono font-semibold text-ink">{displayName}</span>
         <span className="flex-1" />
         {isRunning && (
-          <span className="text-[10px] tabular-nums text-primary-400">
+          <span className="text-[10px] tabular-nums text-[var(--theme-muted)]">
             {elapsedLabel}
           </span>
         )}
@@ -187,7 +187,7 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
         )}
       </div>
       {isRunning && (
-        <div className="px-2.5 pb-1.5 text-[10px] text-primary-400">
+        <div className="px-2.5 pb-1.5 text-[10px] text-[var(--theme-muted)]">
           {verb}
           {'.'.repeat(dots)}
         </div>
@@ -305,7 +305,7 @@ function ThinkingBubble({
       </div>
 
       {/* Chat bubble */}
-      <div className="relative max-w-[36rem] overflow-hidden rounded-2xl rounded-bl-sm border border-primary-200 dark:border-primary-200/20 bg-primary-100 dark:bg-primary-100 thinking-shimmer-bubble">
+      <div className="relative max-w-[36rem] overflow-hidden rounded-2xl rounded-bl-sm border border-[var(--theme-border)] dark:border-[var(--theme-border)] bg-[var(--theme-hover)] dark:bg-[var(--theme-hover)] thinking-shimmer-bubble">
         {/* Shimmer overlay */}
         <div
           className="thinking-shimmer-sweep pointer-events-none absolute inset-0"
@@ -333,7 +333,7 @@ function ThinkingBubble({
                     'thinking-label ml-1.5 text-xs font-medium transition-opacity duration-300',
                     isStale
                       ? 'text-amber-500 dark:text-amber-400'
-                      : 'text-primary-500 dark:text-primary-500',
+                      : 'text-[var(--theme-muted)] dark:text-[var(--theme-muted)]',
                   )}
                   style={{ opacity: visible ? 1 : 0 }}
                 >
@@ -346,7 +346,7 @@ function ThinkingBubble({
                 </span>
               </div>
               {canExpandResearch ? (
-                <div className="mt-1 flex items-center gap-2 text-[11px] text-primary-500 dark:text-primary-400">
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--theme-muted)] dark:text-[var(--theme-muted)]">
                   <span>
                     {completedResearchSteps}/
                     {expandedResearchCard?.steps.length ?? 0} tools
@@ -370,7 +370,7 @@ function ThinkingBubble({
                     !expandedResearchCard.collapsed,
                   )
                 }
-                className="relative z-10 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-primary-200/80 bg-primary-50/90 text-primary-500 transition-colors hover:bg-primary-100 dark:border-primary-800 dark:bg-primary-900/80 dark:text-primary-300 dark:hover:bg-primary-800"
+                className="relative z-10 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-bg)] dark:text-[var(--theme-muted)] dark:hover:bg-[var(--theme-hover)]"
                 aria-label={
                   expandedResearchCard?.collapsed
                     ? 'Expand research timeline'
@@ -431,7 +431,7 @@ function StatusLine() {
       : `${elapsed}s`
 
   return (
-    <div className="flex items-center gap-2 text-[11px] text-primary-400 dark:text-primary-500 py-0.5">
+    <div className="flex items-center gap-2 text-[11px] text-[var(--theme-muted)] dark:text-[var(--theme-muted)] py-0.5">
       <span className="inline-block size-1.5 rounded-full bg-amber-400 animate-pulse" />
       <span className="opacity-80">
         {heartbeatActivity || 'Working…'}
@@ -1742,17 +1742,17 @@ function ChatMessageListComponent({
       >
         <div className="w-full">
           {isMessageSearchOpen && (
-            <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-primary-200 bg-primary-50/95 px-3 py-2 backdrop-blur-sm">
+            <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 backdrop-blur-sm">
               <input
                 ref={searchInputRef}
                 type="text"
                 value={messageSearchValue}
                 onChange={(e) => setMessageSearchValue(e.target.value)}
                 placeholder="Search messages..."
-                className="min-w-0 flex-1 rounded-md border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-sm text-primary-900 outline-none placeholder:text-primary-400 focus:border-primary-400 focus:ring-1 focus:ring-primary-400"
+                className="min-w-0 flex-1 rounded-md border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2.5 py-1.5 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-border)] focus:ring-1 focus:ring-[var(--theme-accent)]"
               />
               {isMessageSearchActive && (
-                <span className="shrink-0 text-xs text-primary-500">
+                <span className="shrink-0 text-xs text-[var(--theme-muted)]">
                   {messageSearchMatches.length > 0
                     ? `${activeSearchMatchIndex + 1} of ${messageSearchMatches.length}`
                     : 'No matches'}
@@ -1763,7 +1763,7 @@ function ChatMessageListComponent({
                   type="button"
                   onClick={jumpToPreviousMatch}
                   disabled={messageSearchMatches.length === 0}
-                  className="rounded p-1 text-primary-500 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
+                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] disabled:opacity-30"
                   aria-label="Previous match"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1780,7 +1780,7 @@ function ChatMessageListComponent({
                   type="button"
                   onClick={jumpToNextMatch}
                   disabled={messageSearchMatches.length === 0}
-                  className="rounded p-1 text-primary-500 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
+                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] disabled:opacity-30"
                   aria-label="Next match"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1796,7 +1796,7 @@ function ChatMessageListComponent({
                 <button
                   type="button"
                   onClick={closeMessageSearch}
-                  className="rounded p-1 text-primary-500 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200"
+                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]"
                   aria-label="Close search"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1885,7 +1885,7 @@ function ChatMessageListComponent({
             ) : empty && !notice && !isMessageSearchActive ? (
               (emptyState ?? <div aria-hidden></div>)
             ) : isMessageSearchActive && visibleEntries.length === 0 ? (
-              <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-6 text-sm text-primary-600">
+              <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-6 text-sm text-[var(--theme-muted)]">
                 No messages match “{messageSearchValue.trim()}”.
               </div>
             ) : hasGroup ? (
@@ -2129,7 +2129,7 @@ function getToolGroupClass(
   }
 
   if (previousUserIndex === -1 || nextUserIndex === -1) return ''
-  return 'border-l border-primary-200/70 pl-3'
+  return 'border-l border-[var(--theme-border)] pl-3'
 }
 
 function getStableMessageId(message: ChatMessage, index: number): string {

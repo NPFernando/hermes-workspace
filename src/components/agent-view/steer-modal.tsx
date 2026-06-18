@@ -71,7 +71,7 @@ export function SteerModal({
             onChange={function onChangeMessage(event) {
               setMessage(event.target.value)
             }}
-            className="w-full resize-y rounded-lg border border-primary-200 bg-primary-100/70 px-3 py-2 text-sm text-primary-900 outline-none transition-colors focus:border-accent-400 disabled:cursor-not-allowed disabled:opacity-70"
+            className="w-full resize-y rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 py-2 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-400 disabled:cursor-not-allowed disabled:opacity-70"
           />
 
           <div className="flex items-center justify-end gap-2">

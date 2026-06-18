@@ -504,7 +504,7 @@ export function getCheckpointStatusBadgeClass(
   if (status === 'rejected') {
     return 'border-red-500/30 bg-red-500/10 text-red-300'
   }
-  return 'border-primary-700 bg-primary-800/70 text-primary-300'
+  return 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-muted)]'
 }
 
 export function getCheckpointActionButtonClass(

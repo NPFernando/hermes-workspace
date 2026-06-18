@@ -196,10 +196,10 @@ export function ProviderSelectStep({
     <div className="w-full">
       {/* Header */}
       <div className="mb-6 text-center">
-        <h2 className="mb-2 text-2xl font-semibold text-primary-900">
+        <h2 className="mb-2 text-2xl font-semibold text-[var(--theme-text)]">
           Choose AI Provider
         </h2>
-        <p className="text-sm text-primary-600">
+        <p className="text-sm text-[var(--theme-muted)]">
           Pick the AI provider you want to start with. You can switch or add
           more providers later.
         </p>
@@ -223,7 +223,7 @@ export function ProviderSelectStep({
                 'group relative flex items-start gap-3 rounded-xl border p-4 text-left transition-all duration-150',
                 isSelected
                   ? 'border-accent-500 bg-accent-50/50 ring-1 ring-accent-500/30'
-                  : 'border-primary-200 bg-primary-50 hover:border-primary-300 hover:bg-primary-100/50',
+                  : 'border-[var(--theme-border)] bg-[var(--theme-panel)] hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]/50',
               )}
             >
               {/* Radio indicator */}
@@ -232,21 +232,21 @@ export function ProviderSelectStep({
                   'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
                   isSelected
                     ? 'border-accent-500 bg-accent-500'
-                    : 'border-primary-300',
+                    : 'border-[var(--theme-border)]',
                 )}
               >
                 {isSelected && <div className="size-2 rounded-full bg-white" />}
               </div>
 
               {/* Logo */}
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-100/80 text-primary-700">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--theme-hover)]/80 text-[var(--theme-muted)]">
                 {provider.logo}
               </div>
 
               {/* Text */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-primary-900">
+                  <span className="text-sm font-semibold text-[var(--theme-text)]">
                     {provider.name}
                   </span>
                   {provider.badge && (
@@ -262,7 +262,7 @@ export function ProviderSelectStep({
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 text-xs leading-relaxed text-primary-500">
+                <p className="mt-0.5 text-xs leading-relaxed text-[var(--theme-muted)]">
                   {provider.description}
                 </p>
               </div>
@@ -273,9 +273,9 @@ export function ProviderSelectStep({
 
       {/* API Key Input (shown when provider selected) */}
       {selected && (
-        <div className="mb-5 rounded-xl border border-primary-200 bg-primary-50 p-4">
+        <div className="mb-5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
           <div className="mb-3 flex items-center justify-between">
-            <label className="text-sm font-medium text-primary-900">
+            <label className="text-sm font-medium text-[var(--theme-text)]">
               {selected.name} API Key
             </label>
             <a
@@ -305,7 +305,7 @@ export function ProviderSelectStep({
                 <button
                   type="button"
                   onClick={() => setShowKey(!showKey)}
-                  className="inline-flex size-8 items-center justify-center rounded-md text-primary-400 hover:text-primary-600"
+                  className="inline-flex size-8 items-center justify-center rounded-md text-[var(--theme-muted)] hover:text-[var(--theme-muted)]"
                   title={showKey ? 'Hide' : 'Show'}
                 >
                   <HugeiconsIcon
@@ -317,7 +317,7 @@ export function ProviderSelectStep({
                 <button
                   type="button"
                   onClick={handlePaste}
-                  className="inline-flex size-8 items-center justify-center rounded-md text-primary-400 hover:text-primary-600"
+                  className="inline-flex size-8 items-center justify-center rounded-md text-[var(--theme-muted)] hover:text-[var(--theme-muted)]"
                   title="Paste from clipboard"
                 >
                   <HugeiconsIcon

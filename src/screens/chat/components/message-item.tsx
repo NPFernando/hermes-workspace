@@ -231,7 +231,7 @@ function InteractiveSelectionCard({ card }: { card: SelectionCardContent }) {
             type="button"
             onClick={() => submit()}
             disabled={selected.size === 0}
-            className="rounded-full bg-[var(--theme-accent)] px-3 py-1.5 font-semibold text-primary-950 disabled:opacity-50"
+            className="rounded-full bg-[var(--theme-accent)] px-3 py-1.5 font-semibold text-[var(--theme-text)] disabled:opacity-50"
           >
             {card.submitLabel || 'Send choice'}
           </button>
@@ -1112,7 +1112,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
 
   return (
     <div
-      className="rounded-lg border border-primary-200 bg-primary-50 text-[11px] max-w-full overflow-hidden"
+      className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] text-[11px] max-w-full overflow-hidden"
       style={{
         borderLeftWidth: '3px',
         borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
@@ -1140,7 +1140,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
         )}
         <span className="flex-1" />
         {elapsed && (
-          <span className="shrink-0 text-[10px] tabular-nums text-primary-400">
+          <span className="shrink-0 text-[10px] tabular-nums text-[var(--theme-muted)]">
             {elapsed}
           </span>
         )}
@@ -1151,7 +1151,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
         )}
       </button>
       {isRunning && !expanded && (
-        <div className="px-2.5 pb-1.5 text-[10px] text-primary-400">
+        <div className="px-2.5 pb-1.5 text-[10px] text-[var(--theme-muted)]">
           <span>
             {verb}
             {dots}
@@ -1216,7 +1216,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
           {/* Running indicator when expanded */}
           {isRunning && (
             <div
-              className="px-2.5 py-1.5 text-[10px] text-primary-400 border-t border-[var(--theme-border)]"
+              className="px-2.5 py-1.5 text-[10px] text-[var(--theme-muted)] border-t border-[var(--theme-border)]"
             >
               <span>
                 {verb}
@@ -1242,7 +1242,7 @@ function AgentWorkSummary({ toolSections }: { toolSections: Array<InlineToolSect
 
   return (
     <details className="group/agentwork w-full max-w-[var(--chat-content-max-width)]">
-      <summary className="flex cursor-pointer select-none list-none items-center gap-2 rounded-lg border border-primary-200/60 bg-primary-50/50 px-3 py-1.5 text-[11px] text-primary-500 transition-colors hover:bg-primary-100/60 dark:border-primary-800/60 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-800/30 [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer select-none list-none items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-1.5 text-[11px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)] dark:bg-[var(--theme-hover)]/20 [&::-webkit-details-marker]:hidden">
         <span className="shrink-0 opacity-70">⚙</span>
         <span className="flex-1 font-medium">
           Agent Work
@@ -1253,13 +1253,13 @@ function AgentWorkSummary({ toolSections }: { toolSections: Array<InlineToolSect
         </span>
         <span className="shrink-0 text-[10px] opacity-50 transition-transform group-open/agentwork:rotate-180">▾</span>
       </summary>
-      <div className="mt-1 rounded-lg border border-primary-200/40 bg-primary-50/30 px-3 py-2 dark:border-primary-800/40 dark:bg-primary-900/10">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-primary-400 mb-1">Tools used</div>
+      <div className="mt-1 rounded-lg border border-[var(--theme-border)]/40 bg-[var(--theme-panel)]/30 px-3 py-2 dark:bg-[var(--theme-hover)]/10">
+        <div className="text-[10px] font-medium uppercase tracking-wide text-[var(--theme-muted)] mb-1">Tools used</div>
         <div className="flex flex-wrap gap-1">
           {toolNames.map((name) => (
             <span
               key={name}
-              className="rounded-full border border-primary-200 bg-primary-100/80 px-2 py-0.5 text-[10px] text-primary-600 dark:border-primary-800 dark:bg-primary-900/50 dark:text-primary-400"
+              className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-hover)]/80 px-2 py-0.5 text-[10px] text-[var(--theme-muted)] dark:bg-[var(--theme-hover)]/50 dark:text-[var(--theme-muted)]"
             >
               {name}
             </span>
@@ -1390,20 +1390,20 @@ function MarkdownDocumentCard({
   return (
     <div
       className={cn(
-        'w-full max-w-[36rem] overflow-hidden rounded-2xl border border-primary-200 bg-primary-50/70',
+        'w-full max-w-[36rem] overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70',
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-3 border-b border-primary-200 px-3 py-2.5">
+      <div className="flex items-start justify-between gap-3 border-b border-[var(--theme-border)] px-3 py-2.5">
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-primary-900">
+          <div className="truncate text-sm font-medium text-[var(--theme-text)]">
             {title}
           </div>
-          <div className="text-[11px] text-primary-600">Markdown document</div>
+          <div className="text-[11px] text-[var(--theme-muted)]">Markdown document</div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {hasContent ? (
-            <div className="flex items-center rounded-lg border border-primary-200 bg-primary-100/70 p-0.5">
+            <div className="flex items-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)]/70 p-0.5">
               <Button
                 type="button"
                 variant="ghost"
@@ -1411,7 +1411,7 @@ function MarkdownDocumentCard({
                 className={cn(
                   'h-7 px-2.5 text-xs',
                   viewMode === 'preview' &&
-                    'bg-primary-200 text-primary-900 hover:bg-primary-200',
+                    'bg-[var(--theme-hover)] text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
                 )}
                 onClick={() => setViewMode('preview')}
               >
@@ -1424,7 +1424,7 @@ function MarkdownDocumentCard({
                 className={cn(
                   'h-7 px-2.5 text-xs',
                   viewMode === 'source' &&
-                    'bg-primary-200 text-primary-900 hover:bg-primary-200',
+                    'bg-[var(--theme-hover)] text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
                 )}
                 onClick={() => setViewMode('source')}
               >
@@ -1437,7 +1437,7 @@ function MarkdownDocumentCard({
               href={openHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-primary-700 underline decoration-primary-300 underline-offset-4 hover:decoration-primary-500"
+              className="text-xs text-[var(--theme-muted)] underline decoration-[var(--theme-muted)] underline-offset-4 hover:decoration-[var(--theme-accent)]"
             >
               Open
             </a>
@@ -1453,7 +1453,7 @@ function MarkdownDocumentCard({
             <CodeBlock content={content} language="markdown" className="my-0" />
           )
         ) : (
-          <div className="text-sm text-primary-600">
+          <div className="text-sm text-[var(--theme-muted)]">
             Preview unavailable for this markdown content.
           </div>
         )}
@@ -1917,7 +1917,7 @@ function InlineToolSectionItem({
           ) : null}
           {hasInputData && !showRawJson && !isArtifact ? (
             <div>
-              <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">
+              <div className="text-[9px] uppercase tracking-widest text-[var(--theme-muted)] mb-0.5 font-sans">
                 Input
               </div>
               {toolSection.type === 'exec' && headerArg ? (
@@ -1954,7 +1954,7 @@ function InlineToolSectionItem({
               </div>
             ) : toolSection.outputText ? (
               <div>
-                <div className="text-[9px] uppercase tracking-widest text-primary-500 mb-0.5 font-sans">
+                <div className="text-[9px] uppercase tracking-widest text-[var(--theme-muted)] mb-0.5 font-sans">
                   Output
                 </div>
                 <pre
@@ -1989,7 +1989,7 @@ function InlineToolSectionItem({
                     e.stopPropagation()
                     setShowFullOutput((v) => !v)
                   }}
-                  className="text-[9px] text-primary-500 hover:text-primary-700"
+                  className="text-[9px] text-[var(--theme-muted)] hover:text-[var(--theme-muted)]"
                 >
                   {showFullOutput ? 'less' : 'more'}
                 </button>
@@ -2000,7 +2000,7 @@ function InlineToolSectionItem({
                   e.stopPropagation()
                   setShowRawJson((v) => !v)
                 }}
-                className="text-[9px] text-primary-500 hover:text-primary-700"
+                className="text-[9px] text-[var(--theme-muted)] hover:text-[var(--theme-muted)]"
               >
                 {showRawJson ? 'formatted' : 'raw'}
               </button>
@@ -2008,7 +2008,7 @@ function InlineToolSectionItem({
           )}
           {/* Fallback when no args or output available */}
           {!isArtifact && !hasInputData && !hasOutputData && !isRunning && (
-            <div className="text-[10px] text-primary-400 italic">
+            <div className="text-[10px] text-[var(--theme-muted)] italic">
               No detail available for this tool call
             </div>
           )}
@@ -2614,13 +2614,13 @@ function MessageItemComponent({
             : undefined
         }
         className={cn(
-          'flex items-center justify-center gap-2 py-1 text-xs text-primary-300',
+          'flex items-center justify-center gap-2 py-1 text-xs text-[var(--theme-muted)]',
           wrapperClassName,
         )}
       >
         <span className="font-semibold">{statusIcon}</span>
         <span className="font-medium">{execNotification.name}</span>
-        <span className="text-primary-400">{exitLabel}</span>
+        <span className="text-[var(--theme-muted)]">{exitLabel}</span>
       </div>
     )
   }
@@ -2707,12 +2707,12 @@ function MessageItemComponent({
       {/* Narration messages (tool-call activity) — compact collapsible row */}
       {!isUser && (message as any).__isNarration && hasText && (
         <div className="w-full max-w-[var(--chat-content-max-width)]">
-          <details className="group/narration rounded-lg border border-primary-200/50 bg-primary-50/30 hover:bg-primary-50 dark:hover:bg-primary-800/50 transition-colors">
+          <details className="group/narration rounded-lg border border-[var(--theme-border)]/50 bg-[var(--theme-panel)]/30 hover:bg-[var(--theme-panel)]/50 transition-colors">
             <summary className="flex items-center gap-2 cursor-pointer select-none px-3 py-2 list-none [&::-webkit-details-marker]:hidden">
               <span className="size-6 flex items-center justify-center rounded-full bg-accent-500/15 shrink-0">
                 <span className="text-xs">⚡</span>
               </span>
-              <span className="text-xs font-medium truncate flex-1 text-primary-700">
+              <span className="text-xs font-medium truncate flex-1 text-[var(--theme-muted)]">
                 {displayText.slice(0, 120)}
                 {displayText.length > 120 ? '...' : ''}
               </span>
@@ -2720,10 +2720,10 @@ function MessageItemComponent({
                 icon={ArrowDown01Icon}
                 size={16}
                 strokeWidth={1.5}
-                className="text-primary-400 shrink-0 transition-transform group-open/narration:rotate-180"
+                className="text-[var(--theme-muted)] shrink-0 transition-transform group-open/narration:rotate-180"
               />
             </summary>
-            <div className="px-3 pb-3 pt-1 text-[13px] text-primary-600 whitespace-pre-wrap text-pretty max-h-[400px] overflow-y-auto">
+            <div className="px-3 pb-3 pt-1 text-[13px] text-[var(--theme-muted)] whitespace-pre-wrap text-pretty max-h-[400px] overflow-y-auto">
               {displayText}
             </div>
           </details>
@@ -2786,7 +2786,7 @@ function MessageItemComponent({
                         href={source}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block overflow-hidden rounded-lg border border-primary-200 hover:border-primary-400 transition-colors max-w-full"
+                        className="block overflow-hidden rounded-lg border border-[var(--theme-border)] hover:border-[var(--theme-accent)] transition-colors max-w-full"
                       >
                         <img
                           src={source}
@@ -2818,13 +2818,13 @@ function MessageItemComponent({
                       href={source}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex max-w-full items-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-700 hover:border-primary-400"
+                      className="inline-flex max-w-full items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-sm text-[var(--theme-muted)] hover:border-[var(--theme-accent)]"
                     >
                       <span>📄</span>
                       <span className="truncate">
                         {attachment.name || 'Attachment'}
                       </span>
-                      <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] uppercase text-primary-600">
+                      <span className="rounded bg-[var(--theme-hover)] px-1.5 py-0.5 text-[10px] uppercase text-[var(--theme-muted)]">
                         {ext || 'file'}
                       </span>
                     </a>
@@ -2840,7 +2840,7 @@ function MessageItemComponent({
                     href={img.src}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block overflow-hidden rounded-lg border border-primary-200 hover:border-primary-400 transition-colors max-w-full"
+                    className="block overflow-hidden rounded-lg border border-[var(--theme-border)] hover:border-[var(--theme-accent)] transition-colors max-w-full"
                   >
                     <img
                       src={img.src}
@@ -2890,7 +2890,7 @@ function MessageItemComponent({
                     <MessageContent
                       markdown
                       className={cn(
-                        'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
+                        'text-[var(--theme-text)] bg-transparent w-full text-pretty transition-all duration-100',
                         effectiveIsStreaming && 'chat-streaming-content',
                       )}
                       onCodeExpand={artifactPanelForExpand ? handleCodeExpand : undefined}
@@ -2932,7 +2932,7 @@ function MessageItemComponent({
       )}
       {/* Bottom thinking bubble handles empty streaming states; avoid duplicate in-thread working copy. */}
       {hasAssistantMetadata ? (
-        <div className="flex flex-wrap justify-end gap-x-2 gap-y-0.5 pl-10 pr-1 mt-0.5 font-mono text-[10px] tabular-nums text-primary-400 leading-relaxed">
+        <div className="flex flex-wrap justify-end gap-x-2 gap-y-0.5 pl-10 pr-1 mt-0.5 font-mono text-[10px] tabular-nums text-[var(--theme-muted)] leading-relaxed">
           {usageMetadata.inputTokens !== null && (
             <span>↑{formatCompactNumber(usageMetadata.inputTokens)}</span>
           )}

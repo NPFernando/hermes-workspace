@@ -15,12 +15,12 @@ function getStatusClassName(statusLabel: string): string {
   if (normalized === 'failed')
     return 'border-red-500/45 bg-red-500/10 text-red-300'
   if (normalized === 'queued')
-    return 'border-primary-400/55 bg-primary-300/70 text-primary-800'
+    return 'border-[var(--theme-accent)]/55 bg-[var(--theme-hover)]/70 text-[var(--theme-text)]'
   if (normalized === 'complete')
     return 'border-emerald-500/45 bg-emerald-500/10 text-emerald-300'
   if (normalized === 'thinking')
     return 'border-accent-500/45 bg-accent-500/10 text-accent-300'
-  return 'border-primary-400/55 bg-primary-200/60 text-primary-800'
+  return 'border-[var(--theme-accent)]/55 bg-[var(--theme-hover)]/60 text-[var(--theme-text)]'
 }
 
 export function AgentChatHeader({
@@ -30,9 +30,9 @@ export function AgentChatHeader({
   onClose,
 }: AgentChatHeaderProps) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-primary-300/70 bg-primary-100/65 px-4 py-3 backdrop-blur-sm">
+    <div className="flex items-start justify-between gap-3 border-b border-[var(--theme-border)] bg-[var(--theme-hover)]/65 px-4 py-3 backdrop-blur-sm">
       <div className="min-w-0 space-y-1">
-        <h3 className="flex items-center gap-1.5 text-base font-medium text-balance text-primary-900">
+        <h3 className="flex items-center gap-1.5 text-base font-medium text-balance text-[var(--theme-text)]">
           <HugeiconsIcon icon={Message01Icon} size={20} strokeWidth={1.5} />
           <span className="truncate">{agentName}</span>
         </h3>

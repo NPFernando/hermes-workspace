@@ -16,15 +16,15 @@ type MemoryPreviewProps = {
 
 function MemoryPreview({ path, content }: MemoryPreviewProps) {
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-primary-100/30">
-      <header className="border-b border-primary-200 px-3 py-2.5">
+    <section className="flex min-h-0 flex-1 flex-col bg-[var(--theme-hover)]/30">
+      <header className="border-b border-[var(--theme-border)] px-3 py-2.5">
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={EyeIcon} size={20} strokeWidth={1.5} />
-          <h2 className="text-sm font-medium text-balance text-primary-900">
+          <h2 className="text-sm font-medium text-balance text-[var(--theme-text)]">
             Preview
           </h2>
         </div>
-        <p className="text-xs text-primary-600 text-pretty tabular-nums">
+        <p className="text-xs text-[var(--theme-muted)] text-pretty tabular-nums">
           {path || 'Select a memory file to preview markdown.'}
         </p>
       </header>

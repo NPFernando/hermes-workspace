@@ -663,7 +663,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
         return 'text-amber-600 bg-amber-100 border-amber-200'
       if (agentActivity.activeAgents > 0)
         return 'text-emerald-600 bg-emerald-100 border-emerald-200'
-      return 'text-primary-600 bg-primary-50 border-primary-200'
+      return 'text-[var(--theme-muted)] bg-[var(--theme-panel)] border-[var(--theme-border)]'
     }
     if (statsView === 'provider' && primaryProvider) {
       const allProgress = primaryProvider.lines.filter(
@@ -726,25 +726,25 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
         return (
           <>
             <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+              <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
                 In
               </span>
               <span>{formatTokens(usage.inputTokens)}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+              <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
                 Out
               </span>
               <span>{formatTokens(usage.outputTokens)}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+              <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
                 Ctx
               </span>
               <span>{Math.round(usage.contextPercent)}%</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+              <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
                 Cost
               </span>
               <span>{formatCurrency(usage.dailyCost)}</span>
@@ -757,11 +757,11 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
           return (
             <>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
                   {primaryProvider.displayName.split(' ')[0]}
                 </span>
                 {primaryProvider.plan && (
-                  <span className="text-[9px] uppercase text-primary-500">
+                  <span className="text-[9px] uppercase text-[var(--theme-muted)]">
                     {primaryProvider.plan}
                   </span>
                 )}
@@ -771,7 +771,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
                   key={`${line.label}-${i}`}
                   className="flex items-center gap-1"
                 >
-                  <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                  <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
                     {line.label
                       .replace('Session (5h)', 'Sess')
                       .replace('Weekly', 'Wk')
@@ -796,7 +796,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
             <>
               {providers.slice(0, 3).map(([name, tokens]) => (
                 <div key={name} className="flex items-center gap-1">
-                  <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                  <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
                     {name}
                   </span>
                   <span>{formatTokens(tokens.input)}</span>
@@ -806,7 +806,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
           )
         }
         return (
-          <span className="text-[10px] text-primary-500">No provider data</span>
+          <span className="text-[10px] text-[var(--theme-muted)]">No provider data</span>
         )
       }
 
@@ -819,7 +819,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
             <>
               {sortedModels.slice(0, 3).map((model) => (
                 <div key={model.model} className="flex items-center gap-1">
-                  <span className="text-[10px] uppercase tracking-wide text-primary-600">
+                  <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
                     {model.model
                       .replace('claude-', '')
                       .replace('gpt-', '')
@@ -829,7 +829,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
                 </div>
               ))}
               {usage.models.length > 3 && (
-                <span className="text-[10px] text-primary-500">
+                <span className="text-[10px] text-[var(--theme-muted)]">
                   +{usage.models.length - 3}
                 </span>
               )}
@@ -838,7 +838,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
         }
         return (
           <div className="flex items-center gap-1">
-            <span className="text-[10px] uppercase tracking-wide text-primary-600">
+            <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
               Total
             </span>
             <span>{formatCurrency(usage.dailyCost)}</span>
@@ -850,19 +850,19 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
         return (
           <>
             <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+              <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
                 Active
               </span>
               <span>{agentActivity.activeAgents}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+              <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
                 Spawned
               </span>
               <span>{agentActivity.totalSpawned}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[10px] uppercase tracking-wide text-primary-600">
+              <span className="text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
                 Cost
               </span>
               <span>{formatCurrency(agentActivity.totalAgentCost)}</span>
@@ -883,15 +883,15 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
             className={cn(
               "absolute bottom-2 right-2",
               'ml-auto rounded-full border px-3 py-1 text-xs font-medium',
-              'flex items-center gap-3 transition hover:bg-primary-100 cursor-pointer',
+              'flex items-center gap-3 transition hover:bg-[var(--theme-hover)] cursor-pointer',
               alertTone,
             )}
             data-tour="usage-meter"
           >
-            <span className="text-[9px] uppercase tracking-widest text-primary-500 opacity-75">
+            <span className="text-[9px] uppercase tracking-widest text-[var(--theme-muted)] opacity-75">
               {STATS_VIEW_LABELS[statsView].split(' ')[0]}
             </span>
-            <span className="text-primary-300">|</span>
+            <span className="text-[var(--theme-muted)]">|</span>
             {renderPillContent()}
           </MenuTrigger>
           <MenuContent align="end" className="min-w-[180px]">
@@ -907,7 +907,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
                 {statsView === view && <span className="text-amber-600">✓</span>}
               </MenuItem>
             ))}
-            <div className="my-1 h-px bg-primary-100" />
+            <div className="my-1 h-px bg-[var(--theme-hover)]" />
             <MenuItem onClick={() => setOpen(true)}>View Details…</MenuItem>
           </MenuContent>
         </MenuRoot>

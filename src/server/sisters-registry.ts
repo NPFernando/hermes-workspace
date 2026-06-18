@@ -101,7 +101,7 @@ export const SISTER_COLORS: Partial<Record<string, { bg: string; text: string; b
   researcher: { bg: 'bg-sky-500/15',     text: 'text-sky-400',     border: 'border-sky-400/30' },
   coder:      { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-400/30' },
   business:   { bg: 'bg-amber-500/15',   text: 'text-amber-400',   border: 'border-amber-400/30' },
-  default:    { bg: 'bg-primary-500/10', text: 'text-primary-400', border: 'border-primary-300/20' },
+  default:    { bg: 'bg-[var(--theme-accent)]/10', text: 'text-[var(--theme-muted)]', border: 'border-[var(--theme-border)]/20' },
 }
 
 export function colorForSister(id: string, type: SisterType) {

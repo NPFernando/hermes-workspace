@@ -44,7 +44,7 @@ function ScrollToBottomButton({
         >
           <HugeiconsIcon icon={ArrowDown01Icon} size={20} strokeWidth={1.5} />
           {unreadCount > 0 ? (
-            <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-primary-900 px-1.5 text-xs font-medium tabular-nums text-primary-50">
+            <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--theme-bg)] px-1.5 text-xs font-medium tabular-nums text-[var(--theme-text)]">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           ) : null}

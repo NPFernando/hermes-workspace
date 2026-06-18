@@ -270,7 +270,7 @@ export function ResearchScreen() {
   return (
     <div data-route-page className="flex h-full min-h-0 flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-primary-200 px-4 py-3">
+      <div className="flex items-center gap-3 border-b border-[var(--theme-border)] px-4 py-3">
         <HugeiconsIcon icon={Search01Icon} size={20} strokeWidth={1.5} className="text-accent-500 shrink-0" />
         <h1 className="text-base font-semibold">Deep Research</h1>
         <div className="ml-auto flex gap-2">
@@ -281,7 +281,7 @@ export function ResearchScreen() {
               'rounded-lg px-3 py-1.5 text-sm transition-colors',
               activeTab === 'new'
                 ? 'bg-accent-500/10 text-accent-500'
-                : 'text-primary-500 hover:text-primary-900 dark:hover:text-neutral-100',
+                : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] dark:hover:text-neutral-100',
             )}
           >
             New
@@ -293,7 +293,7 @@ export function ResearchScreen() {
               'rounded-lg px-3 py-1.5 text-sm transition-colors',
               activeTab === 'library'
                 ? 'bg-accent-500/10 text-accent-500'
-                : 'text-primary-500 hover:text-primary-900 dark:hover:text-neutral-100',
+                : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] dark:hover:text-neutral-100',
             )}
           >
             Library
@@ -317,7 +317,7 @@ export function ResearchScreen() {
               animate={{ opacity: 1, y: 0 }}
               className="mx-auto w-full max-w-2xl"
             >
-              <p className="mb-4 text-sm text-primary-500">
+              <p className="mb-4 text-sm text-[var(--theme-muted)]">
                 Enter a research question. Odysseus will iteratively search, extract, and synthesize a detailed report.
               </p>
               <textarea
@@ -328,15 +328,15 @@ export function ResearchScreen() {
                 }}
                 placeholder="What do you want to research?"
                 rows={4}
-                className="w-full rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm outline-none transition-colors focus:border-accent-400"
+                className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-3 text-sm outline-none transition-colors focus:border-accent-400"
               />
-              <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-primary-500">
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-[var(--theme-muted)]">
                 <label className="flex items-center gap-2">
                   <span>Rounds</span>
                   <select
                     value={maxRounds}
                     onChange={(e) => setMaxRounds(Number(e.target.value))}
-                    className="rounded-lg border border-primary-200 bg-transparent px-2 py-1 text-xs"
+                    className="rounded-lg border border-[var(--theme-border)] bg-transparent px-2 py-1 text-xs"
                   >
                     <option value={0}>Auto</option>
                     {[3, 5, 8, 10, 15, 20].map((n) => (
@@ -349,7 +349,7 @@ export function ResearchScreen() {
                   <select
                     value={maxTime}
                     onChange={(e) => setMaxTime(Number(e.target.value))}
-                    className="rounded-lg border border-primary-200 bg-transparent px-2 py-1 text-xs"
+                    className="rounded-lg border border-[var(--theme-border)] bg-transparent px-2 py-1 text-xs"
                   >
                     {[60, 120, 180, 300, 600, 900, 1200].map((s) => (
                       <option key={s} value={s}>{s < 60 ? `${s}s` : `${s / 60}m`}</option>
@@ -379,7 +379,7 @@ export function ResearchScreen() {
               >
                 {/* Query label */}
                 <div className="mb-4 flex items-start justify-between gap-4">
-                  <p className="text-sm font-medium text-primary-900 leading-snug">
+                  <p className="text-sm font-medium text-[var(--theme-text)] leading-snug">
                     {query}
                   </p>
                   <div className="flex shrink-0 gap-2">
@@ -398,11 +398,11 @@ export function ResearchScreen() {
                 </div>
 
                 {/* Steps */}
-                <div className="space-y-1.5 rounded-xl border border-primary-200 bg-primary-50/50 p-3">
+                <div className="space-y-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
                   {steps.map((step) => (
                     <div key={step.id} className="flex items-start gap-2 text-xs">
                       <span className="mt-0.5 shrink-0">{phaseIcon(step.phase)}</span>
-                      <span className="text-primary-600">{step.message}</span>
+                      <span className="text-[var(--theme-muted)]">{step.message}</span>
                     </div>
                   ))}
                   {isRunning && (
@@ -432,7 +432,7 @@ export function ResearchScreen() {
                 animate={{ opacity: 1, y: 0 }}
                 className="mx-auto w-full max-w-2xl"
               >
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-400">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                   Research Report
                 </div>
                 <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 text-sm text-[var(--theme-text)] [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-semibold [&_h3]:font-semibold">
@@ -498,7 +498,7 @@ function LibraryView({
 }) {
   if (entries.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-primary-400">
+      <div className="flex flex-1 items-center justify-center text-sm text-[var(--theme-muted)]">
         <div className="text-center">
           <HugeiconsIcon icon={BookOpen02Icon} size={32} strokeWidth={1} className="mx-auto mb-2 opacity-40" />
           No past research found
@@ -515,10 +515,10 @@ function LibraryView({
             key={entry.session_id}
             type="button"
             onClick={() => onSelect(entry)}
-            className="w-full rounded-xl border border-primary-200 bg-primary-50/50 p-3 text-left text-sm transition-colors hover:border-accent-400/50 hover:bg-accent-50/20 dark:hover:border-accent-500/30"
+            className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3 text-left text-sm transition-colors hover:border-accent-400/50 hover:bg-accent-50/20 dark:hover:border-accent-500/30"
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="font-medium text-primary-900 line-clamp-2">
+              <span className="font-medium text-[var(--theme-text)] line-clamp-2">
                 {entry.query}
               </span>
               <span
@@ -526,14 +526,14 @@ function LibraryView({
                   'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium',
                   entry.status === 'done'
                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-primary-100 text-primary-500',
+                    : 'bg-[var(--theme-hover)] text-[var(--theme-muted)]',
                 )}
               >
                 {entry.status}
               </span>
             </div>
             {entry.created_at && (
-              <span className="mt-1 block text-xs text-primary-400">
+              <span className="mt-1 block text-xs text-[var(--theme-muted)]">
                 {new Date(entry.created_at).toLocaleString()}
               </span>
             )}

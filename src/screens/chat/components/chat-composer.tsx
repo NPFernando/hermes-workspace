@@ -2122,7 +2122,7 @@ function ChatComposerComponent({
             ? [
                 // Embedded mobile composer: stay inside the card, no fixed bottom.
                 'relative z-40 w-full',
-                'bg-surface border-t border-primary-200/60',
+                'bg-surface border-t border-[var(--theme-border)]',
               ].join(' ')
             : [
                 'fixed z-[70] transition-all duration-200',
@@ -2131,7 +2131,7 @@ function ChatComposerComponent({
                       // iMessage-style: edge-to-edge, docked to bottom
                       'left-0 right-0',
                       'bg-surface/95 backdrop-blur-xl',
-                      'border-t border-primary-200/60',
+                      'border-t border-[var(--theme-border)]',
                     ].join(' ')
                   : [
                       // scroll-hide / integrated: floating pill above tab bar
@@ -2175,7 +2175,7 @@ function ChatComposerComponent({
           isMobileViewport &&
             'py-0 gap-0 !rounded-none !bg-transparent shadow-none outline-none',
           isDraggingOver &&
-            'outline-primary-500 ring-2 ring-primary-300 bg-primary-50/80',
+            'outline-[var(--theme-accent)] ring-2 ring-[var(--theme-accent)]/50 bg-[var(--theme-panel)]',
           isLoading &&
             'ring-2 ring-accent-400/70 shadow-[0_0_20px_rgba(48,80,255,0.35)] animate-pulse-glow',
         )}
@@ -2194,7 +2194,7 @@ function ChatComposerComponent({
         />
 
         {isDraggingOver ? (
-          <div className="pointer-events-none absolute inset-1 z-20 flex items-center justify-center rounded-[18px] border-2 border-dashed border-primary-400 bg-primary-50/90 text-sm font-medium text-primary-700">
+          <div className="pointer-events-none absolute inset-1 z-20 flex items-center justify-center rounded-[18px] border-2 border-dashed border-[var(--theme-accent)] bg-[var(--theme-panel)]/90 text-sm font-medium text-[var(--theme-muted)]">
             Drop files to attach
           </div>
         ) : null}
@@ -2218,7 +2218,7 @@ function ChatComposerComponent({
                     {isImageAttachment ? (
                       <button
                         type="button"
-                        className="aspect-square w-full overflow-hidden rounded-xl border border-primary-200 bg-primary-50"
+                        className="aspect-square w-full overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]"
                         onClick={() =>
                           setPreviewImage({
                             url: attachment.previewUrl || '',
@@ -2234,7 +2234,7 @@ function ChatComposerComponent({
                         />
                       </button>
                     ) : (
-                      <div className="rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-700">
+                      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-sm text-[var(--theme-muted)]">
                         <span className="mr-1">📄</span>
                         <span className="truncate">{attachment.name}</span>
                       </div>
@@ -2247,7 +2247,7 @@ function ChatComposerComponent({
                         event.stopPropagation()
                         handleRemoveAttachment(attachment.id)
                       }}
-                      className="absolute right-1 top-1 z-10 inline-flex size-6 items-center justify-center rounded-full bg-primary-900/80 text-primary-50 opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100 focus-visible:opacity-100"
+                      className="absolute right-1 top-1 z-10 inline-flex size-6 items-center justify-center rounded-full bg-[var(--theme-bg)]/80 text-[var(--theme-text)] opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100 focus-visible:opacity-100"
                     >
                       <HugeiconsIcon
                         icon={Cancel01Icon}
@@ -2255,10 +2255,10 @@ function ChatComposerComponent({
                         strokeWidth={1.5}
                       />
                     </button>
-                    <div className="mt-1 truncate text-xs font-medium text-primary-700">
+                    <div className="mt-1 truncate text-xs font-medium text-[var(--theme-muted)]">
                       {attachment.name}
                     </div>
-                    <div className="text-[11px] text-primary-400">
+                    <div className="text-[11px] text-[var(--theme-muted)]">
                       {formatFileSize(attachment.size)}
                     </div>
                   </div>
@@ -2282,7 +2282,7 @@ function ChatComposerComponent({
                   setIsModelMenuOpen(false)
                   setIsMobileActionsMenuOpen((prev) => !prev)
                 }}
-                className="size-8 shrink-0 rounded-full bg-[var(--theme-card)] flex items-center justify-center text-primary-600 active:bg-[var(--theme-card2)] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                className="size-8 shrink-0 rounded-full bg-[var(--theme-card)] flex items-center justify-center text-[var(--theme-muted)] active:bg-[var(--theme-card2)] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={1.5} />
               </button>
@@ -2366,7 +2366,7 @@ function ChatComposerComponent({
                         ? 'text-red-600 bg-red-100 animate-pulse'
                         : voiceInput.isListening
                           ? 'text-red-500 bg-red-50 animate-pulse'
-                          : 'text-primary-500 bg-[var(--theme-card)]',
+                          : 'text-[var(--theme-muted)] bg-[var(--theme-card)]',
                     )}
                   >
                     <HugeiconsIcon
@@ -2751,7 +2751,7 @@ function ChatComposerComponent({
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    className="rounded-lg text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-primary-500"
+                    className="rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]"
                     aria-label="Add attachment"
                     disabled={disabled}
                     onClick={handleOpenAttachmentPicker}
@@ -2768,7 +2768,7 @@ function ChatComposerComponent({
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      className="rounded-lg text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-accent-600"
+                      className="rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-accent-600"
                       aria-label="Deep research"
                       disabled={disabled || !value.trim()}
                       onClick={() => {
@@ -2792,7 +2792,7 @@ function ChatComposerComponent({
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      className="rounded-lg text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-red-600"
+                      className="rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-red-600"
                       aria-label="Clear draft"
                       onClick={handleClearDraft}
                     >
@@ -2806,7 +2806,7 @@ function ChatComposerComponent({
                 )}
                 {/* Token counter — bottom bar, mirrors Hermes style, triggers at ~25 tokens */}
                 {value.length >= 100 && (
-                  <span className="ml-1 text-[10px] text-primary-400 tabular-nums select-none">
+                  <span className="ml-1 text-[10px] text-[var(--theme-muted)] tabular-nums select-none">
                     ~{Math.ceil(value.length / 4)} tokens
                   </span>
                 )}
@@ -2824,7 +2824,7 @@ function ChatComposerComponent({
                         setIsThinkingMenuOpen(false)
                         setIsModelMenuOpen(false)
                       }}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary-100/70 px-2 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60"
                       title={`Chat controls · ${modelButtonLabel}`}
                       aria-label={`Chat controls, current model: ${modelButtonLabel}`}
                     >
@@ -2867,7 +2867,7 @@ function ChatComposerComponent({
                                 setIsModelMenuOpen(false)
                               }}
                               disabled={disabled || profileActivateMutation.isPending}
-                              className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-primary-800/60"
+                              className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80 disabled:cursor-not-allowed disabled:opacity-50/60"
                               title={
                                 activeProfile
                                   ? `${activeProfile.name}${profileMeta(activeProfile) ? ` · ${profileMeta(activeProfile)}` : ''}`
@@ -2931,7 +2931,7 @@ function ChatComposerComponent({
                                 setIsModelMenuOpen(false)
                               }}
                               className={cn(
-                                'inline-flex h-8 items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60',
+                                'inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60',
                                 thinkingLevel === 'off' && 'opacity-70',
                               )}
                               title={`Reasoning effort: ${thinkingLabel(thinkingLevel)}`}
@@ -2977,7 +2977,7 @@ function ChatComposerComponent({
                             <button
                               type="button"
                               onClick={() => setIsWorkspaceMenuOpen((open) => !open)}
-                              className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-primary-100/70 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-200/80 dark:hover:bg-primary-800/60"
+                              className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60"
                               title={workspaceButtonLabel}
                             >
                               <span className="truncate">{workspaceButtonLabel}</span>
@@ -3026,7 +3026,7 @@ function ChatComposerComponent({
                                 setIsThinkingMenuOpen(false)
                               }}
                               disabled={isModelSwitcherDisabled}
-                              className="inline-flex h-8 max-w-[9rem] items-center rounded-full bg-primary-100/70 px-2 md:max-w-none md:px-3 text-xs font-medium text-primary-600 hover:bg-primary-200/80 dark:hover:bg-primary-800/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex h-8 max-w-[9rem] items-center rounded-full bg-[var(--theme-hover)]/70 px-2 md:max-w-none md:px-3 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]/80/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                               title={modelButtonLabel}
                             >
                               <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">{modelButtonLabel}</span>
@@ -3167,7 +3167,7 @@ function ChatComposerComponent({
                           ? 'text-red-600 bg-red-100 hover:bg-red-200 animate-pulse'
                           : voiceInput.isListening
                             ? 'text-red-500 bg-red-50 hover:bg-red-100 animate-pulse'
-                            : 'text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-primary-700',
+                            : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]',
                       )}
                       aria-label={
                         voiceRecorder.isRecording

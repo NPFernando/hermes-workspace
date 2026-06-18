@@ -80,7 +80,7 @@ function stateClass(state: string | undefined): string {
     return 'bg-amber-500/15 text-amber-200 border-amber-500/30'
   if (state === 'blocked' || state === 'offline')
     return 'bg-red-500/15 text-red-200 border-red-500/30'
-  return 'bg-primary-500/15 text-primary-200 border-primary-500/30'
+  return 'bg-[var(--theme-panel)]0/15 text-[var(--theme-muted)] border-[var(--theme-accent)]/30'
 }
 
 function modeLabel(mode: string): string {
