@@ -112,15 +112,15 @@ export function McpLogsDrawer({ server, open, onClose }: Props) {
       <aside className="relative flex h-full w-full max-w-md flex-col border-l border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-xl">
         <header className="flex items-center justify-between border-b border-[var(--theme-border)] px-4 py-3">
           <div className="min-w-0">
-            <h3 className="truncate text-sm font-semibold text-primary-900">
+            <h3 className="truncate text-sm font-semibold text-[var(--theme-text)]">
               {server.name} logs
             </h3>
-            <p className="text-xs text-primary-500">
+            <p className="text-xs text-[var(--theme-muted)]">
               {status === 'open' ? 'streaming' : status} · {lines.length}/{MAX_LINES}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1 text-xs text-primary-600">
+            <label className="flex items-center gap-1 text-xs text-[var(--theme-muted)]">
               <input
                 type="checkbox"
                 checked={autoScroll}
@@ -130,7 +130,7 @@ export function McpLogsDrawer({ server, open, onClose }: Props) {
             </label>
             <button
               type="button"
-              className="rounded border border-primary-300 px-2 py-1 text-xs text-primary-700 hover:bg-primary-50"
+              className="rounded border border-[var(--theme-border)] px-2 py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]"
               onClick={onClose}
             >
               Close
@@ -139,10 +139,10 @@ export function McpLogsDrawer({ server, open, onClose }: Props) {
         </header>
         <div
           ref={scrollerRef}
-          className="flex-1 overflow-y-auto bg-primary-950/95 px-3 py-2 font-mono text-xs text-primary-100"
+          className="flex-1 overflow-y-auto bg-[var(--theme-bg)]/95 px-3 py-2 font-mono text-xs text-[var(--theme-text)]"
         >
           {lines.length === 0 ? (
-            <p className="text-primary-300">Waiting for logs…</p>
+            <p className="text-[var(--theme-muted)]">Waiting for logs…</p>
           ) : (
             <ul className="space-y-0.5">
               {lines.map((line) => (

@@ -80,7 +80,7 @@ export function ConnectionCheckStep({
             ? 'bg-emerald-100 text-emerald-600'
             : status === 'disconnected'
               ? 'bg-red-100 text-red-600'
-              : 'bg-primary-100 text-primary-500',
+              : 'bg-[var(--theme-hover)] text-[var(--theme-muted)]',
         )}
       >
         <HugeiconsIcon
@@ -96,11 +96,11 @@ export function ConnectionCheckStep({
         />
       </div>
 
-      <h2 className="mb-3 text-2xl font-semibold text-primary-900">
+      <h2 className="mb-3 text-2xl font-semibold text-[var(--theme-text)]">
         Connection Check
       </h2>
 
-      <p className="mb-6 max-w-md text-base leading-relaxed text-primary-600">
+      <p className="mb-6 max-w-md text-base leading-relaxed text-[var(--theme-muted)]">
         {status === 'connected'
           ? 'Your backend is reachable and ready for setup.'
           : status === 'checking'
@@ -208,18 +208,18 @@ export function ModelConfigurationStep({
         />
       </div>
 
-      <h2 className="mb-3 text-2xl font-semibold text-primary-900">
+      <h2 className="mb-3 text-2xl font-semibold text-[var(--theme-text)]">
         Model Configuration
       </h2>
 
-      <p className="mb-6 max-w-md text-base leading-relaxed text-primary-600">
+      <p className="mb-6 max-w-md text-base leading-relaxed text-[var(--theme-muted)]">
         Core chat works with any OpenAI-compatible backend. Hermes Agent gateway APIs
         make provider and model setup editable from the workspace.
       </p>
 
-      <div className="mb-6 w-full rounded-2xl border border-primary-200 bg-primary-100/70 p-4 text-left">
+      <div className="mb-6 w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-hover)]/70 p-4 text-left">
         {status === 'loading' && (
-          <p className="text-sm text-primary-600">
+          <p className="text-sm text-[var(--theme-muted)]">
             Loading current provider and model information...
           </p>
         )}
@@ -239,7 +239,7 @@ export function ModelConfigurationStep({
         )}
 
         {status === 'ready' && hasModel && (
-          <p className="text-sm font-medium text-primary-900">
+          <p className="text-sm font-medium text-[var(--theme-text)]">
             Current model: <span className="text-accent-700">{model}</span> via{' '}
             <span className="text-accent-700">{provider}</span>
           </p>

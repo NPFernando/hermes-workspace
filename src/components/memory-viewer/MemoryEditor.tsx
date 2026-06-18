@@ -58,18 +58,18 @@ function MemoryEditor({
   const disabled = !path || loading || Boolean(error)
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col border-primary-200 bg-primary-50/40 lg:border-r">
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-primary-200 px-3 py-2.5">
+    <section className="flex min-h-0 flex-1 flex-col border-[var(--theme-border)] bg-[var(--theme-panel)] lg:border-r">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--theme-border)] px-3 py-2.5">
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-medium text-balance text-primary-900">
+          <h2 className="truncate text-sm font-medium text-balance text-[var(--theme-text)]">
             {path || 'No file selected'}
           </h2>
-          <p className="text-xs text-primary-600 text-pretty tabular-nums">
+          <p className="text-xs text-[var(--theme-muted)] text-pretty tabular-nums">
             {getStatusLabel(saveState, lastSavedAt)}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <label className="inline-flex items-center gap-1.5 text-xs text-primary-700 tabular-nums">
+          <label className="inline-flex items-center gap-1.5 text-xs text-[var(--theme-muted)] tabular-nums">
             <HugeiconsIcon icon={LockIcon} size={20} strokeWidth={1.5} />
             Read-only
             <Switch
@@ -93,7 +93,7 @@ function MemoryEditor({
       </header>
       <div className="min-h-0 flex-1">
         {loading ? (
-          <div className="flex h-full items-center justify-center text-sm text-primary-600 text-pretty">
+          <div className="flex h-full items-center justify-center text-sm text-[var(--theme-muted)] text-pretty">
             Loading file content...
           </div>
         ) : error ? (

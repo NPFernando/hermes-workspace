@@ -43,7 +43,7 @@ export function ThemeToggle({ variant = 'pill' }: ThemeToggleProps) {
       <button
         type="button"
         onClick={() => setTheme(isDark ? 'light' : 'dark')}
-        className="inline-flex size-7 items-center justify-center rounded-md text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
+        className="inline-flex size-7 items-center justify-center rounded-md text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-muted)] dark:hover:text-[var(--theme-muted)]"
         aria-label={`Theme is ${currentThemeLabel}. Switch to ${isDark ? 'light' : 'dark'} mode`}
         title={isDark ? 'Light mode' : 'Dark mode'}
       >
@@ -58,7 +58,7 @@ export function ThemeToggle({ variant = 'pill' }: ThemeToggleProps) {
 
   return (
     <div
-      className="inline-flex items-center gap-0.5 rounded-full border border-primary-200 bg-primary-100/70 p-0.5 dark:border-primary-700 dark:bg-primary-800/80"
+      className="inline-flex items-center gap-0.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-hover)]/70 p-0.5"
       role="group"
       aria-label={`Theme mode. Current: ${currentThemeLabel}`}
     >
@@ -73,7 +73,7 @@ export function ThemeToggle({ variant = 'pill' }: ThemeToggleProps) {
               'inline-flex size-7 items-center justify-center rounded-full transition-all duration-200',
               active
                 ? 'bg-accent-500 text-white shadow-sm'
-                : 'text-primary-500 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-200',
+                : 'text-[var(--theme-muted)] hover:text-[var(--theme-muted)] dark:text-[var(--theme-muted)] dark:hover:text-[var(--theme-muted)]',
             )}
             aria-label={
               active ? `${mode.label} theme (current)` : `${mode.label} theme`

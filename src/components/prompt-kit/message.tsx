@@ -87,7 +87,7 @@ function MessageActions({
 }: MessageActionsProps) {
   return (
     <div
-      className={cn('text-primary-600 flex items-center gap-2', className)}
+      className={cn('text-[var(--theme-muted)] flex items-center gap-2', className)}
       {...props}
     >
       {children}

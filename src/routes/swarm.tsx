@@ -10,11 +10,11 @@ export const Route = createFileRoute('/swarm')({
   },
   errorComponent: function SwarmError({ error }) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-primary-50">
-        <h2 className="text-xl font-semibold text-primary-900 mb-3">
+      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-[var(--theme-panel)]">
+        <h2 className="text-xl font-semibold text-[var(--theme-text)] mb-3">
           Failed to Load Swarm
         </h2>
-        <p className="text-sm text-primary-600 mb-4 max-w-md">
+        <p className="text-sm text-[var(--theme-muted)] mb-4 max-w-md">
           {error instanceof Error
             ? error.message
             : 'An unexpected error occurred'}
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/swarm')({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="spinner-accent spinner-xl mb-3" />
-          <p className="text-sm text-primary-500">Loading swarm...</p>
+          <p className="text-sm text-[var(--theme-muted)]">Loading swarm...</p>
         </div>
       </div>
     )

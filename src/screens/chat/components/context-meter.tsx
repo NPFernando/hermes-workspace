@@ -41,10 +41,10 @@ function ContextMeterComponent({ usedTokens, maxTokens }: ContextMeterProps) {
       <PreviewCardTrigger
         className={cn(
           buttonVariants({ size: 'icon-sm', variant: 'ghost' }),
-          'text-primary-800 hover:bg-primary-100 dark:hover:bg-primary-800',
+          'text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
         )}
       >
-        <div className="size-4 text-primary-200">
+        <div className="size-4 text-[var(--theme-muted)]">
           <svg
             viewBox="0 0 36 36"
             className="size-4 -rotate-90"
@@ -57,7 +57,7 @@ function ContextMeterComponent({ usedTokens, maxTokens }: ContextMeterProps) {
               fill="none"
               stroke="currentColor"
               strokeWidth="4"
-              className="text-primary-300"
+              className="text-[var(--theme-muted)]"
             />
             <circle
               cx="18"
@@ -65,7 +65,7 @@ function ContextMeterComponent({ usedTokens, maxTokens }: ContextMeterProps) {
               r="15.5"
               fill="none"
               stroke="currentColor"
-              className="text-primary-600"
+              className="text-[var(--theme-muted)]"
               strokeWidth="4"
               strokeLinecap="round"
               strokeDasharray={`${(percentage / 100) * 97.4} 97.4`}
@@ -74,12 +74,12 @@ function ContextMeterComponent({ usedTokens, maxTokens }: ContextMeterProps) {
         </div>
       </PreviewCardTrigger>
       <PreviewCardPopup align="end" sideOffset={8} className="w-52 px-2 py-1">
-        <div className="space-y-0.5 text-xs text-primary-900">
-          <div className="text-primary-950 font-[450]">Context window:</div>
-          <div className="tabular-nums text-primary-700">
+        <div className="space-y-0.5 text-xs text-[var(--theme-text)]">
+          <div className="text-[var(--theme-text)] font-[450]">Context window:</div>
+          <div className="tabular-nums text-[var(--theme-muted)]">
             {percentage.toFixed(0)}% used ({leftPercentage.toFixed(0)}% left)
           </div>
-          <div className="tabular-nums text-primary-700">{usedLabel}</div>
+          <div className="tabular-nums text-[var(--theme-muted)]">{usedLabel}</div>
         </div>
       </PreviewCardPopup>
     </PreviewCard>

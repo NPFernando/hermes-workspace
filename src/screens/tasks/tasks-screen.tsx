@@ -342,7 +342,7 @@ export function TasksScreen() {
     <div data-route-page className="h-full overflow-hidden flex flex-col bg-surface text-ink">
       <div className="shrink-0 mx-auto w-full max-w-[1200px] flex flex-col gap-3 px-4 pt-5 pb-2 sm:px-6 lg:px-8">
       {/* Header */}
-      <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
+      <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 backdrop-blur-xl">
         <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="text-2xl font-medium text-ink">Tasks</h1>

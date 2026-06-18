@@ -297,7 +297,7 @@ export function OperationsAgentDetail({
               Cancel
             </Button>
             <Button
-              className="bg-[var(--theme-accent)] text-primary-950 hover:bg-[var(--theme-accent-strong)]"
+              className="bg-[var(--theme-accent)] text-[var(--theme-text)] hover:bg-[var(--theme-accent-strong)]"
               onClick={() =>
                 void onSave({
                   agentId: agent.id,

@@ -132,7 +132,7 @@ export function ModeSelector({
             setIsMenuOpen((prev) => !prev)
           }}
           className={cn(
-            'inline-flex h-8 items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-3 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-100',
+            'inline-flex h-8 items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]',
             disabled && 'cursor-not-allowed opacity-50',
           )}
           aria-haspopup="menu"
@@ -156,10 +156,10 @@ export function ModeSelector({
         </button>
 
         {!disabled && isMenuOpen && (
-          <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-40 min-w-[14rem] max-w-[20rem] rounded-xl border border-primary-200 bg-surface shadow-lg">
+          <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-40 min-w-[14rem] max-w-[20rem] rounded-xl border border-[var(--theme-border)] bg-surface shadow-lg">
             <div className="max-h-[20rem] overflow-y-auto p-1">
               {modes.length === 0 ? (
-                <div className="p-4 text-center text-sm text-primary-500">
+                <div className="p-4 text-center text-sm text-[var(--theme-muted)]">
                   No modes saved
                 </div>
               ) : (
@@ -180,8 +180,8 @@ export function ModeSelector({
                           handleApplyMode(mode)
                         }}
                         className={cn(
-                          'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-primary-700 transition-colors hover:bg-primary-100',
-                          isApplied && 'bg-primary-100 text-primary-900',
+                          'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]',
+                          isApplied && 'bg-[var(--theme-hover)] text-[var(--theme-text)]',
                         )}
                         role="menuitem"
                         aria-label={`Apply mode ${mode.name}`}
@@ -205,7 +205,7 @@ export function ModeSelector({
                         )}
                         {isApplied && !drift && (
                           <span
-                            className="text-primary-900"
+                            className="text-[var(--theme-text)]"
                             aria-label="Currently active"
                           >
                             ✓
@@ -217,7 +217,7 @@ export function ModeSelector({
                 </>
               )}
 
-              <div className="my-1 border-t border-primary-200" />
+              <div className="my-1 border-t border-[var(--theme-border)]" />
 
               <button
                 type="button"
@@ -226,7 +226,7 @@ export function ModeSelector({
                   setIsMenuOpen(false)
                   setShowSaveDialog(true)
                 }}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-primary-700 transition-colors hover:bg-primary-100"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]"
                 role="menuitem"
                 aria-label="Save current settings as new mode"
               >
@@ -241,7 +241,7 @@ export function ModeSelector({
                     setIsMenuOpen(false)
                     setShowManageModal(true)
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-primary-700 transition-colors hover:bg-primary-100"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]"
                   role="menuitem"
                   aria-label="Manage modes"
                 >

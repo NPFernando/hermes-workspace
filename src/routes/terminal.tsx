@@ -13,11 +13,11 @@ export const Route = createFileRoute('/terminal')({
   component: TerminalRoute,
   errorComponent: function TerminalError({ error }) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-primary-50">
-        <h2 className="text-xl font-semibold text-primary-900 mb-3">
+      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-[var(--theme-panel)]">
+        <h2 className="text-xl font-semibold text-[var(--theme-text)] mb-3">
           Terminal Error
         </h2>
-        <p className="text-sm text-primary-600 mb-4 max-w-md">
+        <p className="text-sm text-[var(--theme-muted)] mb-4 max-w-md">
           {error instanceof Error
             ? error.message
             : 'Failed to initialize terminal'}

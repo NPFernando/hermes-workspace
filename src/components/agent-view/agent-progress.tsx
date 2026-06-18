@@ -20,7 +20,7 @@ function getProgressStrokeClassName(status: AgentProgressStatus): string {
   if (status === 'failed') return 'text-red-400'
   if (status === 'thinking') return 'text-accent-400'
   if (status === 'complete') return 'text-emerald-400'
-  if (status === 'queued') return 'text-primary-500'
+  if (status === 'queued') return 'text-[var(--theme-muted)]'
   return 'text-emerald-400'
 }
 
@@ -48,7 +48,7 @@ export function AgentProgress({
         cy={size / 2}
         r={radius}
         strokeWidth={strokeWidth}
-        className="fill-none stroke-primary-300/70"
+        className="fill-none stroke-[var(--theme-muted)]/70"
       />
       <motion.circle
         cx={size / 2}

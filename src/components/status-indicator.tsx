@@ -156,7 +156,7 @@ export function StatusIndicator({
             className={`relative inline-flex h-1.5 w-1.5 rounded-full ${dotColor}`}
           />
         </span>
-        <span className="text-[10px] text-primary-400 dark:text-gray-500">
+        <span className="text-[10px] text-[var(--theme-muted)]">
           {label}
         </span>
       </span>
@@ -176,7 +176,7 @@ export function StatusIndicator({
         />
       </span>
       {!collapsed && (
-        <span className="truncate text-[11px] text-primary-500 dark:text-gray-400">
+        <span className="truncate text-[11px] text-[var(--theme-muted)]">
           {label}
         </span>
       )}

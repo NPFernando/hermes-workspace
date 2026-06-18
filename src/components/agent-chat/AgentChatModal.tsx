@@ -302,7 +302,7 @@ export function AgentChatModal({
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[min(85vh,720px)] w-[min(860px,96vw)] overflow-hidden rounded-3xl border border-primary-300/70 bg-primary-100/55 p-0 backdrop-blur-xl max-md:bottom-0 max-md:left-0 max-md:h-[90dvh] max-md:w-screen max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-3xl max-md:top-auto z-50">
+      <DialogContent className="h-[min(85vh,720px)] w-[min(860px,96vw)] overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-hover)]/55 p-0 backdrop-blur-xl max-md:bottom-0 max-md:left-0 max-md:h-[90dvh] max-md:w-screen max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-3xl max-md:top-auto z-50">
         <motion.div
           initial={false}
           animate={{ opacity: 1 }}
@@ -317,7 +317,7 @@ export function AgentChatModal({
             }}
           />
 
-          <div className="min-h-0 flex-1 overflow-y-auto bg-linear-to-b from-primary-100/55 via-primary-100/45 to-primary-200/35">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-linear-to-b from-[var(--theme-hover)]/55 via-[var(--theme-hover)]/45 to-[var(--theme-hover)]/35">
             <AgentChatMessages
               messages={messages}
               isLoading={isLoadingHistory}
@@ -332,7 +332,7 @@ export function AgentChatModal({
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                className="border-t border-primary-300/70 bg-primary-100/70 px-4 py-2 text-xs text-pretty text-red-300"
+                className="border-t border-[var(--theme-border)] bg-[var(--theme-hover)]/70 px-4 py-2 text-xs text-pretty text-red-300"
               >
                 {errorMessage}
               </motion.p>

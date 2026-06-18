@@ -642,12 +642,12 @@ function formatTokenCount(value: number): string {
 function getSessionStatusBadgeClasses(session: SessionEntry): string {
   const status = normalizeToken(readString(session.status))
   if (PAUSED_STATUSES.has(status)) {
-    return 'border border-primary-700 bg-primary-800 text-primary-200'
+    return 'border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-muted)]'
   }
   if (RUNNING_STATUSES.has(status) || status.length === 0) {
     return 'border border-accent-500/40 bg-accent-500/15 text-accent-300'
   }
-  return 'border border-primary-800 bg-primary-900 text-primary-300'
+  return 'border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)]'
 }
 
 async function readResponseError(response: Response): Promise<string> {
@@ -1258,7 +1258,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
             style={agentHubPullIndicatorStyle}
             aria-hidden
           >
-            <div className="flex items-center gap-1.5 rounded-full border border-primary-200 bg-[var(--theme-card)]/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
+            <div className="flex items-center gap-1.5 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)]/90 px-3 py-1.5 shadow-md backdrop-blur-sm">
               <span
                 className={[
                   'size-3 rounded-full border-2 border-accent-500',
@@ -1284,25 +1284,25 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
   }
 
   return (
-    <div className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pb-4 md:pt-8">
+    <div className="min-h-full bg-surface px-4 pb-24 pt-5 text-[var(--theme-text)] md:px-6 md:pb-4 md:pt-8">
       <div className="mx-auto w-full max-w-[1200px]">
-        <header className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm">
+        <header className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-3 shadow-sm">
           <div>
-            <h1 className="text-lg font-bold text-primary-900 md:text-xl">
+            <h1 className="text-lg font-bold text-[var(--theme-text)] md:text-xl">
               Gateway Agents
             </h1>
-            <p className="text-xs text-primary-500">
+            <p className="text-xs text-[var(--theme-muted)]">
               Registered agents and their status
             </p>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             {agentsQuery.isFetching && !agentsQuery.isLoading ? (
-              <span className="text-[10px] text-primary-500 animate-pulse">
+              <span className="text-[10px] text-[var(--theme-muted)] animate-pulse">
                 syncing…
               </span>
             ) : null}
             {lastUpdated ? (
-              <span className="text-[10px] text-primary-500">
+              <span className="text-[10px] text-[var(--theme-muted)]">
                 Updated {lastUpdated}
               </span>
             ) : null}
@@ -1321,7 +1321,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
         <div className="flex-1 overflow-auto">
           {agentsQuery.isLoading && !agentsQuery.data ? (
             <div className="flex h-32 items-center justify-center">
-              <div className="flex items-center gap-2 text-primary-500">
+              <div className="flex items-center gap-2 text-[var(--theme-muted)]">
                 <div className="spinner-accent" />
                 <span className="text-sm">Loading registry...</span>
               </div>
@@ -1380,10 +1380,10 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
               {unmatchedSessions.length > 0 ? (
                 <section className="space-y-2">
                   <div className="flex items-center justify-between px-1">
-                    <h2 className="text-[10px] font-bold uppercase tracking-widest text-primary-400">
+                    <h2 className="text-[10px] font-bold uppercase tracking-widest text-[var(--theme-muted)]">
                       Active Sessions
                     </h2>
-                    <span className="text-[11px] font-medium text-primary-400">
+                    <span className="text-[11px] font-medium text-[var(--theme-muted)]">
                       {unmatchedSessions.length}
                     </span>
                   </div>
@@ -1397,14 +1397,14 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                       return (
                         <div
                           key={`${sessionKey}-${index}`}
-                          className="rounded-2xl border border-primary-800 bg-primary-900 p-4 shadow-sm"
+                          className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-4 shadow-sm"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-primary-100">
+                              <p className="truncate text-sm font-semibold text-[var(--theme-text)]">
                                 {getSessionTitle(session)}
                               </p>
-                              <p className="mt-1 truncate text-xs text-primary-400">
+                              <p className="mt-1 truncate text-xs text-[var(--theme-muted)]">
                                 {sessionKey}
                               </p>
                             </div>
@@ -1415,7 +1415,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                             </span>
                           </div>
 
-                          <div className="mt-3 flex items-center justify-between gap-3 text-xs text-primary-300">
+                          <div className="mt-3 flex items-center justify-between gap-3 text-xs text-[var(--theme-muted)]">
                             {sessionModel ? (
                               <span className="truncate">
                                 {formatModelName(sessionModel)}
@@ -1430,7 +1430,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                           {sessionTarget ? (
                             <a
                               href={`/chat/${encodeURIComponent(sessionTarget)}`}
-                              className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-primary-700 px-3 py-1.5 text-xs font-semibold text-accent-300 transition-colors hover:border-accent-500 hover:text-accent-300 sm:px-4 sm:py-2 sm:text-sm"
+                              className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-[var(--theme-border)] px-3 py-1.5 text-xs font-semibold text-accent-300 transition-colors hover:border-accent-500 hover:text-accent-300 sm:px-4 sm:py-2 sm:text-sm"
                             >
                               Open Chat
                             </a>
@@ -1451,21 +1451,21 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
           <button
             type="button"
             aria-label="Close agent config"
-            className="absolute inset-0 bg-primary-950/25 backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--theme-bg)]/25 backdrop-blur-sm"
             onClick={handleCloseAgentConfig}
           />
 
-          <aside className="absolute right-0 top-0 flex h-full w-full max-w-3xl flex-col border-l border-primary-200 bg-surface shadow-2xl">
-            <header className="border-b border-primary-200 bg-primary-50/85 px-5 py-4">
+          <aside className="absolute right-0 top-0 flex h-full w-full max-w-3xl flex-col border-l border-[var(--theme-border)] bg-surface shadow-2xl">
+            <header className="border-b border-[var(--theme-border)] bg-[var(--theme-panel)] px-5 py-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary-500">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--theme-muted)]">
                     Agent Config
                   </p>
-                  <h2 className="mt-1 truncate text-xl font-semibold text-primary-900">
+                  <h2 className="mt-1 truncate text-xl font-semibold text-[var(--theme-text)]">
                     {selectedConfigAgent.name}
                   </h2>
-                  <p className="mt-1 text-sm text-primary-600">
+                  <p className="mt-1 text-sm text-[var(--theme-muted)]">
                     {selectedAgentConfig?.name && selectedAgentConfig.name !== selectedConfigAgent.name
                       ? `${selectedConfigAgent.role} · ${selectedAgentConfig.name}`
                       : selectedConfigAgent.role}
@@ -1510,7 +1510,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
               {agentConfigQuery.isLoading && !selectedAgentConfig ? (
                 <div className="flex h-40 items-center justify-center">
-                  <div className="flex items-center gap-2 text-primary-500">
+                  <div className="flex items-center gap-2 text-[var(--theme-muted)]">
                     <div className="spinner-accent" />
                     <span className="text-sm">Loading agent config...</span>
                   </div>
@@ -1523,7 +1523,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                 </div>
               ) : (
                 <Tabs value={detailTab} onValueChange={setDetailTab}>
-                  <TabsList className="mb-5 flex w-full flex-wrap gap-2 rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-1 text-primary-500 shadow-sm">
+                  <TabsList className="mb-5 flex w-full flex-wrap gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1 text-[var(--theme-muted)] shadow-sm">
                     <TabsTrigger value="overview" className="min-w-[110px] flex-1">
                       Overview
                     </TabsTrigger>
@@ -1543,39 +1543,39 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
 
                   <TabsContent value="overview" className="space-y-4">
                     <div className="grid gap-3 md:grid-cols-3">
-                      <div className="rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-4 shadow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
                           Agent ID
                         </p>
-                        <p className="mt-2 text-sm font-medium text-primary-900">
+                        <p className="mt-2 text-sm font-medium text-[var(--theme-text)]">
                           {selectedConfigAgent.id}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-4 shadow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
                           Name
                         </p>
-                        <p className="mt-2 text-sm font-medium text-primary-900">
+                        <p className="mt-2 text-sm font-medium text-[var(--theme-text)]">
                           {selectedAgentConfig?.name || selectedConfigAgent.name}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-4 shadow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
                           Workspace Path
                         </p>
-                        <p className="mt-2 break-all text-sm font-medium text-primary-900">
+                        <p className="mt-2 break-all text-sm font-medium text-[var(--theme-text)]">
                           {selectedAgentConfig?.workspacePath || 'Unavailable'}
                         </p>
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-4 shadow-sm">
+                    <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-sm">
                       <div className="grid gap-4 md:grid-cols-2">
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
                             Primary Model
                           </p>
-                          <p className="mt-2 text-sm font-medium text-primary-900">
+                          <p className="mt-2 text-sm font-medium text-[var(--theme-text)]">
                             {selectedAgentConfig?.primaryModel
                               ? formatModelName(selectedAgentConfig.primaryModel)
                               : 'Unavailable'}
@@ -1583,7 +1583,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                         </div>
 
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
                             Fallbacks
                           </p>
                           <div className="mt-2 flex flex-wrap gap-2">
@@ -1591,13 +1591,13 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                               selectedAgentConfig?.fallbackModels.map((fallback) => (
                                 <span
                                   key={fallback}
-                                  className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700"
+                                  className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2.5 py-1 text-xs font-medium text-[var(--theme-muted)]"
                                 >
                                   {formatModelName(fallback)}
                                 </span>
                               ))
                             ) : (
-                              <span className="text-sm text-primary-500">No fallback models</span>
+                              <span className="text-sm text-[var(--theme-muted)]">No fallback models</span>
                             )}
                           </div>
                         </div>
@@ -1605,7 +1605,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
 
                       <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
                         <label className="block">
-                          <span className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
                             Model Override
                           </span>
                           <select
@@ -1626,7 +1626,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                                   : previous,
                               )
                             }}
-                            className="mt-2 h-10 w-full rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm text-primary-900 outline-none transition focus:border-primary-300"
+                            className="mt-2 h-10 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-sm text-[var(--theme-text)] outline-none transition focus:border-[var(--theme-border)]"
                           >
                             <option value="">Use agent default</option>
                             {modelOverrideOptions.map((option) => (
@@ -1637,7 +1637,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                           </select>
                         </label>
 
-                        <div className="rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-600">
+                        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-xs text-[var(--theme-muted)]">
                           {selectedAgentConfig?.sourceMethod
                             ? `Loaded via ${selectedAgentConfig.sourceMethod}`
                             : selectedAgentConfig?.readOnly
@@ -1650,20 +1650,20 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
 
                   <TabsContent value="tools" className="space-y-3">
                     {(selectedAgentConfig?.tools ?? []).length === 0 ? (
-                      <div className="rounded-2xl border border-primary-200 bg-[var(--theme-card)] px-4 py-6 text-sm text-primary-500 shadow-sm">
+                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-6 text-sm text-[var(--theme-muted)] shadow-sm">
                         No tool policy was exposed for this agent.
                       </div>
                     ) : (
                       selectedAgentConfig?.tools.map((tool) => (
                         <div
                           key={tool.id}
-                          className="flex items-center justify-between gap-4 rounded-2xl border border-primary-200 bg-[var(--theme-card)] px-4 py-3 shadow-sm"
+                          className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 shadow-sm"
                         >
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-primary-900">
+                            <p className="text-sm font-medium text-[var(--theme-text)]">
                               {prettyLabel(tool.id)}
                             </p>
-                            <p className="text-xs text-primary-500">
+                            <p className="text-xs text-[var(--theme-muted)]">
                               {tool.source === 'allowed'
                                 ? 'Allowed by policy'
                                 : tool.source === 'denied'
@@ -1690,20 +1690,20 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
 
                   <TabsContent value="skills" className="space-y-3">
                     {(selectedAgentConfig?.skills ?? []).length === 0 ? (
-                      <div className="rounded-2xl border border-primary-200 bg-[var(--theme-card)] px-4 py-6 text-sm text-primary-500 shadow-sm">
+                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-6 text-sm text-[var(--theme-muted)] shadow-sm">
                         No active skills were exposed for this agent.
                       </div>
                     ) : (
                       selectedAgentConfig?.skills.map((skill) => (
                         <div
                           key={skill.id}
-                          className="flex items-center justify-between gap-4 rounded-2xl border border-primary-200 bg-[var(--theme-card)] px-4 py-3 shadow-sm"
+                          className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 shadow-sm"
                         >
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-primary-900">
+                            <p className="text-sm font-medium text-[var(--theme-text)]">
                               {prettyLabel(skill.id)}
                             </p>
-                            <p className="text-xs text-primary-500">{skill.id}</p>
+                            <p className="text-xs text-[var(--theme-muted)]">{skill.id}</p>
                           </div>
                           <Switch
                             checked={agentConfigDraft?.skills[skill.id] ?? skill.enabled}
@@ -1722,7 +1722,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
 
                   <TabsContent value="channels" className="space-y-3">
                     {(selectedAgentConfig?.channels ?? []).length === 0 ? (
-                      <div className="rounded-2xl border border-primary-200 bg-[var(--theme-card)] px-4 py-6 text-sm text-primary-500 shadow-sm">
+                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-6 text-sm text-[var(--theme-muted)] shadow-sm">
                         No per-channel config was exposed for this agent.
                       </div>
                     ) : (
@@ -1733,14 +1733,14 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                         return (
                           <div
                             key={channel.id}
-                            className="rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-4 shadow-sm"
+                            className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-sm"
                           >
                             <div className="flex items-start justify-between gap-4">
                               <div className="min-w-0">
-                                <p className="text-sm font-medium text-primary-900">
+                                <p className="text-sm font-medium text-[var(--theme-text)]">
                                   {prettyLabel(channel.id)}
                                 </p>
-                                <p className="text-xs text-primary-500">
+                                <p className="text-xs text-[var(--theme-muted)]">
                                   Responds on {channel.id}
                                 </p>
                               </div>
@@ -1756,19 +1756,19 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                                   }
                                 />
                               ) : (
-                                <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-600">
+                                <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2.5 py-1 text-[11px] font-medium text-[var(--theme-muted)]">
                                   Display only
                                 </span>
                               )}
                             </div>
 
-                            <div className="mt-3 rounded-xl border border-primary-100 bg-primary-50/70 p-3">
+                            <div className="mt-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
                               {channelJson ? (
-                                <pre className="overflow-x-auto text-xs leading-5 text-primary-700">
+                                <pre className="overflow-x-auto text-xs leading-5 text-[var(--theme-muted)]">
                                   {channelJson}
                                 </pre>
                               ) : (
-                                <p className="text-xs text-primary-500">
+                                <p className="text-xs text-[var(--theme-muted)]">
                                   No extra channel config provided.
                                 </p>
                               )}
@@ -1780,12 +1780,12 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                   </TabsContent>
 
                   <TabsContent value="cron" className="space-y-3">
-                    <div className="flex items-center justify-between rounded-2xl border border-primary-200 bg-[var(--theme-card)] px-4 py-3 shadow-sm">
+                    <div className="flex items-center justify-between rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 shadow-sm">
                       <div>
-                        <p className="text-sm font-medium text-primary-900">
+                        <p className="text-sm font-medium text-[var(--theme-text)]">
                           Assigned cron jobs
                         </p>
-                        <p className="text-xs text-primary-500">
+                        <p className="text-xs text-[var(--theme-muted)]">
                           Matched against agent id, name, aliases, payload, and delivery config.
                         </p>
                       </div>
@@ -1799,7 +1799,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                     </div>
 
                     {cronJobsQuery.isLoading ? (
-                      <div className="rounded-2xl border border-primary-200 bg-[var(--theme-card)] px-4 py-6 text-sm text-primary-500 shadow-sm">
+                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-6 text-sm text-[var(--theme-muted)] shadow-sm">
                         Loading cron jobs...
                       </div>
                     ) : cronJobsQuery.isError ? (
@@ -1809,44 +1809,44 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                           : 'Failed to load cron jobs'}
                       </div>
                     ) : selectedCronJobs.length === 0 ? (
-                      <div className="rounded-2xl border border-primary-200 bg-[var(--theme-card)] px-4 py-6 text-sm text-primary-500 shadow-sm">
+                      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-6 text-sm text-[var(--theme-muted)] shadow-sm">
                         No cron jobs matched this agent.
                       </div>
                     ) : (
                       selectedCronJobs.map((job) => (
                         <div
                           key={job.id}
-                          className="rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-4 shadow-sm"
+                          className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-sm"
                         >
                           <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-primary-900">
+                              <p className="truncate text-sm font-medium text-[var(--theme-text)]">
                                 {job.name}
                               </p>
-                              <p className="mt-1 text-xs text-primary-500">
+                              <p className="mt-1 text-xs text-[var(--theme-muted)]">
                                 {job.id}
                               </p>
                             </div>
-                            <span className="rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-700">
+                            <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2.5 py-1 text-[11px] font-medium text-[var(--theme-muted)]">
                               {job.enabled ? 'Enabled' : 'Disabled'}
                             </span>
                           </div>
 
-                          <div className="mt-3 grid gap-3 text-sm text-primary-700 md:grid-cols-3">
+                          <div className="mt-3 grid gap-3 text-sm text-[var(--theme-muted)] md:grid-cols-3">
                             <div>
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary-500">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
                                 Schedule
                               </p>
                               <p className="mt-1">{job.schedule}</p>
                             </div>
                             <div>
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary-500">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
                                 Status
                               </p>
                               <p className="mt-1">{job.status || 'Unknown'}</p>
                             </div>
                             <div>
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary-500">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
                                 Last Run
                               </p>
                               <p className="mt-1">

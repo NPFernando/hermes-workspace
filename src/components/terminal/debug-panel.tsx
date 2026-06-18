@@ -31,24 +31,24 @@ export function DebugPanel({
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        'absolute inset-y-0 right-0 z-40 flex h-full w-[400px] max-w-full translate-x-0 flex-col border-l border-primary-700/40 bg-[#0d0d0d] text-primary-100 shadow-2xl transition-transform duration-200',
+        'absolute inset-y-0 right-0 z-40 flex h-full w-[400px] max-w-full translate-x-0 flex-col border-l border-[var(--theme-border)] bg-[#0d0d0d] text-[var(--theme-text)] shadow-2xl transition-transform duration-200',
       )}
       role="complementary"
       aria-label="Debug analyzer"
     >
-      <div className="flex items-center gap-2 border-b border-primary-700/40 px-4 py-3">
+      <div className="flex items-center gap-2 border-b border-[var(--theme-border)] px-4 py-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-medium text-primary-100 text-balance">
+          <h3 className="text-sm font-medium text-[var(--theme-text)] text-balance">
             Debug Analyzer
           </h3>
-          <p className="text-xs text-primary-400 text-pretty">
+          <p className="text-xs text-[var(--theme-muted)] text-pretty">
             AI-assisted issue diagnosis for the active terminal
           </p>
         </div>
         <Button
           size="icon-sm"
           variant="ghost"
-          className="text-primary-300 hover:bg-primary-900 hover:text-primary-100"
+          className="text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
           onClick={onClose}
           aria-label="Close debug analyzer panel"
         >
@@ -58,12 +58,12 @@ export function DebugPanel({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {isLoading ? (
-          <div className="flex items-center gap-2 rounded-lg border border-primary-700/50 bg-primary-900/40 px-3 py-2 text-sm text-primary-300">
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-sm text-[var(--theme-muted)]">
             <BrailleSpinner
               preset="claude"
               size={18}
               speed={100}
-              className="text-primary-400"
+              className="text-[var(--theme-muted)]"
             />
             <span className="text-pretty">Analyzing...</span>
           </div>
@@ -80,17 +80,17 @@ export function DebugPanel({
               </p>
             </section>
 
-            <section className="rounded-lg border border-primary-700/50 bg-primary-900/40 p-3">
-              <h4 className="text-xs font-medium text-primary-300 text-balance">
+            <section className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
+              <h4 className="text-xs font-medium text-[var(--theme-muted)] text-balance">
                 Root Cause
               </h4>
-              <p className="mt-1 text-sm text-primary-100 text-pretty">
+              <p className="mt-1 text-sm text-[var(--theme-text)] text-pretty">
                 {analysis.rootCause}
               </p>
             </section>
 
             <section>
-              <h4 className="text-xs font-medium text-primary-300 text-balance">
+              <h4 className="text-xs font-medium text-[var(--theme-muted)] text-balance">
                 Suggested Commands
               </h4>
               {analysis.suggestedCommands.length > 0 ? (
@@ -100,16 +100,16 @@ export function DebugPanel({
                       return (
                         <li
                           key={`${item.command}-${index}`}
-                          className="rounded-lg border border-primary-700/50 bg-primary-900/40 p-3"
+                          className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3"
                         >
                           <div className="flex items-start gap-2">
-                            <code className="min-w-0 flex-1 truncate text-xs text-primary-100 tabular-nums">
+                            <code className="min-w-0 flex-1 truncate text-xs text-[var(--theme-text)] tabular-nums">
                               {item.command}
                             </code>
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 shrink-0 border border-primary-600 px-2 text-xs text-primary-200 hover:bg-primary-800 hover:text-primary-100"
+                              className="h-7 shrink-0 border border-[var(--theme-border)] px-2 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]"
                               onClick={function runCommand() {
                                 onRunCommand(item.command)
                               }}
@@ -117,7 +117,7 @@ export function DebugPanel({
                               ▶ Run
                             </Button>
                           </div>
-                          <p className="mt-2 text-xs text-primary-400 text-pretty">
+                          <p className="mt-2 text-xs text-[var(--theme-muted)] text-pretty">
                             {item.description}
                           </p>
                         </li>
@@ -126,22 +126,22 @@ export function DebugPanel({
                   )}
                 </ul>
               ) : (
-                <p className="mt-2 text-xs text-primary-500 text-pretty">
+                <p className="mt-2 text-xs text-[var(--theme-muted)] text-pretty">
                   No command suggestions were returned.
                 </p>
               )}
             </section>
 
             {analysis.docsLink ? (
-              <section className="rounded-lg border border-primary-700/50 bg-primary-900/30 p-3">
-                <h4 className="text-xs font-medium text-primary-300 text-balance">
+              <section className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3">
+                <h4 className="text-xs font-medium text-[var(--theme-muted)] text-balance">
                   Documentation
                 </h4>
                 <a
                   href={analysis.docsLink}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-1 inline-block text-xs text-primary-200 underline decoration-primary-500/60 underline-offset-2"
+                  className="mt-1 inline-block text-xs text-[var(--theme-muted)] underline decoration-[var(--theme-muted)]/60 underline-offset-2"
                 >
                   {analysis.docsLink}
                 </a>
@@ -151,7 +151,7 @@ export function DebugPanel({
         ) : null}
 
         {!isLoading && !analysis ? (
-          <p className="text-sm text-primary-500 text-pretty">
+          <p className="text-sm text-[var(--theme-muted)] text-pretty">
             Click Debug to analyze the most recent terminal output.
           </p>
         ) : null}

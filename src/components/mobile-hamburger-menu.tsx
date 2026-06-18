@@ -140,7 +140,7 @@ export function HamburgerTrigger({ className }: { className?: string }) {
       onClick={openHamburgerMenu}
       className={cn(
         'flex items-center justify-center size-9 rounded-xl',
-        'text-primary-400 hover:text-primary-200 active:scale-90 transition-all duration-150',
+        'text-[var(--theme-muted)] hover:text-[var(--theme-muted)] active:scale-90 transition-all duration-150',
         'touch-manipulation select-none',
         className,
       )}

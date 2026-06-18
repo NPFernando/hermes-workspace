@@ -16,13 +16,13 @@ function ProfilesRoute() {
   return (
     <div className="min-h-full overflow-y-auto bg-surface text-ink">
       <div className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mb-5 flex gap-1 rounded-lg border border-primary-200 bg-primary-50/85 p-1 backdrop-blur-xl">
+        <div className="mb-5 flex gap-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] p-1 backdrop-blur-xl">
           <button
             onClick={() => setTab('profiles')}
             className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
               tab === 'profiles'
-                ? 'bg-primary-100 text-ink shadow-sm dark:bg-primary-900/40'
-                : 'text-primary-500 hover:text-ink'
+                ? 'bg-[var(--theme-hover)] text-ink shadow-sm dark:bg-[var(--theme-bg)]'
+                : 'text-[var(--theme-muted)] hover:text-ink'
             }`}
           >
             Profiles
@@ -31,8 +31,8 @@ function ProfilesRoute() {
             onClick={() => setTab('monitoring')}
             className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
               tab === 'monitoring'
-                ? 'bg-primary-100 text-ink shadow-sm dark:bg-primary-900/40'
-                : 'text-primary-500 hover:text-ink'
+                ? 'bg-[var(--theme-hover)] text-ink shadow-sm dark:bg-[var(--theme-bg)]'
+                : 'text-[var(--theme-muted)] hover:text-ink'
             }`}
           >
             Monitoring

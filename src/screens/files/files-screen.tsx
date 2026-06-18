@@ -426,12 +426,12 @@ function DiffModal({
       <DialogContent className="max-w-5xl w-full">
         <div className="flex flex-col max-h-[85vh]">
           {/* Header */}
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-primary-200 px-5 py-3">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--theme-border)] px-5 py-3">
             <div className="min-w-0">
-              <DialogTitle className="text-sm font-semibold text-primary-900 truncate">
+              <DialogTitle className="text-sm font-semibold text-[var(--theme-text)] truncate">
                 Review changes — {fileName}
               </DialogTitle>
-              <DialogDescription className="mt-0.5 text-xs text-primary-500">
+              <DialogDescription className="mt-0.5 text-xs text-[var(--theme-muted)]">
                 <span className="text-emerald-600 font-medium">
                   +{addedCount} added
                 </span>
@@ -452,10 +452,10 @@ function DiffModal({
           </div>
 
           {/* Split diff view */}
-          <div className="flex flex-1 min-h-0 overflow-hidden divide-x divide-primary-200 dark:divide-neutral-800">
+          <div className="flex flex-1 min-h-0 overflow-hidden divide-x divide-[var(--theme-border)]">
             {/* Left — original */}
             <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-              <div className="shrink-0 px-3 py-1.5 text-[11px] font-semibold text-primary-500 bg-primary-100/60 border-b border-primary-200 uppercase tracking-wide">
+              <div className="shrink-0 px-3 py-1.5 text-[11px] font-semibold text-[var(--theme-muted)] bg-[var(--theme-hover)] border-b border-[var(--theme-border)] uppercase tracking-wide">
                 Original
               </div>
               <div className="flex-1 overflow-auto">
@@ -470,7 +470,7 @@ function DiffModal({
                           : '',
                       )}
                     >
-                      <span className="shrink-0 w-10 select-none px-2 text-right text-primary-300 text-[10px] leading-relaxed border-r border-primary-200">
+                      <span className="shrink-0 w-10 select-none px-2 text-right text-[var(--theme-muted)] text-[10px] leading-relaxed border-r border-[var(--theme-border)]">
                         {line.leftNum ?? ''}
                       </span>
                       <span
@@ -488,7 +488,7 @@ function DiffModal({
                           'flex-1 whitespace-pre-wrap break-all px-1',
                           line.kind === 'removed'
                             ? 'text-red-800 dark:text-red-300'
-                            : 'text-primary-800',
+                            : 'text-[var(--theme-text)]',
                         )}
                       >
                         {line.text || ' '}
@@ -501,7 +501,7 @@ function DiffModal({
 
             {/* Right — new */}
             <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-              <div className="shrink-0 px-3 py-1.5 text-[11px] font-semibold text-primary-500 bg-primary-100/60 border-b border-primary-200 uppercase tracking-wide">
+              <div className="shrink-0 px-3 py-1.5 text-[11px] font-semibold text-[var(--theme-muted)] bg-[var(--theme-hover)] border-b border-[var(--theme-border)] uppercase tracking-wide">
                 New
               </div>
               <div className="flex-1 overflow-auto">
@@ -516,7 +516,7 @@ function DiffModal({
                           : '',
                       )}
                     >
-                      <span className="shrink-0 w-10 select-none px-2 text-right text-primary-300 text-[10px] leading-relaxed border-r border-primary-200">
+                      <span className="shrink-0 w-10 select-none px-2 text-right text-[var(--theme-muted)] text-[10px] leading-relaxed border-r border-[var(--theme-border)]">
                         {line.rightNum ?? ''}
                       </span>
                       <span
@@ -534,7 +534,7 @@ function DiffModal({
                           'flex-1 whitespace-pre-wrap break-all px-1',
                           line.kind === 'added'
                             ? 'text-emerald-800 dark:text-emerald-300'
-                            : 'text-primary-800',
+                            : 'text-[var(--theme-text)]',
                         )}
                       >
                         {line.text || ' '}
@@ -597,14 +597,14 @@ function TreeNode({
           'flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left text-sm transition-colors',
           isSelected
             ? 'bg-accent-500/15 text-accent-600 dark:text-accent-400'
-            : 'text-primary-900 hover:bg-primary-200',
+            : 'text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
         )}
         style={{ paddingLeft }}
       >
         {entry.type === 'folder' ? (
           <span
             className={cn(
-              'shrink-0 text-primary-400 transition-transform duration-150 text-xs',
+              'shrink-0 text-[var(--theme-muted)] transition-transform duration-150 text-xs',
               isExpanded ? 'rotate-90' : 'rotate-0',
             )}
           >
@@ -646,18 +646,18 @@ function TreeNode({
 function Breadcrumb({ path }: { path: string }) {
   const parts = path ? path.split('/').filter(Boolean) : []
   return (
-    <div className="flex items-center gap-1 truncate text-xs text-primary-500 min-w-0">
+    <div className="flex items-center gap-1 truncate text-xs text-[var(--theme-muted)] min-w-0">
       <span className="shrink-0">workspace</span>
       {parts.map((part, i) => (
         <span key={i} className="flex items-center gap-1 min-w-0">
-          <span className="shrink-0 text-primary-300">
+          <span className="shrink-0 text-[var(--theme-muted)]">
             /
           </span>
           <span
             className={cn(
               'truncate',
               i === parts.length - 1
-                ? 'text-primary-700 font-medium'
+                ? 'text-[var(--theme-muted)] font-medium'
                 : '',
             )}
           >
@@ -792,7 +792,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
     return (
       <>
         {diffModal}
-        <div className="flex h-full items-center justify-center text-center text-primary-400">
+        <div className="flex h-full items-center justify-center text-center text-[var(--theme-muted)]">
           <div>
             <div className="text-5xl mb-3 opacity-40">📂</div>
             <p className="text-sm">Select a file to preview or edit</p>
@@ -806,7 +806,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
     return (
       <>
         {diffModal}
-        <div className="flex h-full items-center justify-center text-center text-primary-400">
+        <div className="flex h-full items-center justify-center text-center text-[var(--theme-muted)]">
           <div>
             <div className="text-5xl mb-3 opacity-40">📁</div>
             <p className="text-sm font-medium">{selectedEntry.name}</p>
@@ -822,10 +822,10 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
   // ── Shared header / footer ─────────────────────────────────────────────────
 
   const header = (
-    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-primary-200 px-4 py-2.5">
+    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--theme-border)] px-4 py-2.5">
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-lg">{getFileIcon(selectedEntry)}</span>
-        <span className="truncate text-sm font-semibold text-primary-900">
+        <span className="truncate text-sm font-semibold text-[var(--theme-text)]">
           {selectedEntry.name}
         </span>
       </div>
@@ -854,7 +854,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
   )
 
   const footer = (
-    <div className="flex shrink-0 items-center gap-4 border-t border-primary-200 px-4 py-1.5 text-xs text-primary-400">
+    <div className="flex shrink-0 items-center gap-4 border-t border-[var(--theme-border)] px-4 py-1.5 text-xs text-[var(--theme-muted)]">
       {selectedEntry.size !== undefined && (
         <span>{formatBytes(selectedEntry.size)}</span>
       )}
@@ -875,7 +875,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
         {diffModal}
         <div data-route-page className="flex h-full flex-col">
           {header}
-          <div className="flex flex-1 items-center justify-center text-sm text-primary-400">
+          <div className="flex flex-1 items-center justify-center text-sm text-[var(--theme-muted)]">
             Loading…
           </div>
           {footer}
@@ -912,10 +912,10 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
               <img
                 src={dataUrl}
                 alt={selectedEntry.name}
-                className="max-h-full max-w-full rounded-lg border border-primary-200 shadow-sm object-contain"
+                className="max-h-full max-w-full rounded-lg border border-[var(--theme-border)] shadow-sm object-contain"
               />
             ) : (
-              <div className="text-sm text-primary-400">No preview</div>
+              <div className="text-sm text-[var(--theme-muted)]">No preview</div>
             )}
           </div>
           {footer}
@@ -934,7 +934,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
           {header}
           <ScrollAreaRoot className="flex-1 min-h-0">
             <ScrollAreaViewport>
-              <div className="markdown-preview px-6 py-5 text-sm text-primary-900">
+              <div className="markdown-preview px-6 py-5 text-sm text-[var(--theme-text)]">
                 <Markdown className="gap-3">{content}</Markdown>
               </div>
             </ScrollAreaViewport>
@@ -982,7 +982,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
           {header}
           <ScrollAreaRoot className="flex-1 min-h-0">
             <ScrollAreaViewport>
-              <pre className="code-viewer whitespace-pre-wrap break-words px-4 py-4 text-xs font-mono leading-relaxed text-primary-800">
+              <pre className="code-viewer whitespace-pre-wrap break-words px-4 py-4 text-xs font-mono leading-relaxed text-[var(--theme-text)]">
                 <code>{displayContent}</code>
               </pre>
             </ScrollAreaViewport>
@@ -1010,9 +1010,9 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
         <div className="flex-1 min-h-0 p-3">
           <textarea
             className={cn(
-              'h-full w-full resize-none rounded-lg border border-primary-200',
+              'h-full w-full resize-none rounded-lg border border-[var(--theme-border)]',
               'bg-[var(--theme-card)] px-3 py-2 font-mono text-xs leading-relaxed',
-              'text-primary-900 placeholder:text-primary-300',
+              'text-[var(--theme-text)] placeholder:text-[var(--theme-muted)]',
               'focus:outline-none focus:ring-2 focus:ring-accent-500/30',
             )}
             value={editValue}
@@ -1200,25 +1200,25 @@ export function FilesScreen() {
   const selectedPath = selectedEntry?.path ?? null
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden bg-primary-50/95">
+    <div className="flex h-full min-h-0 overflow-hidden bg-[var(--theme-panel)]/95">
       {/* ── Left panel — directory tree ─────────────────────────────────── */}
       <aside
         className={cn(
           'flex h-full w-[260px] shrink-0 flex-col overflow-hidden',
-          'rounded-xl border border-primary-200 bg-primary-50/95 shadow-sm',
+          'rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 shadow-sm',
           'border-[var(--theme-border)]',
           'm-2 mr-0',
         )}
       >
         {/* Tree header */}
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-primary-200 px-3">
+        <div className="flex h-11 shrink-0 items-center justify-between border-b border-[var(--theme-border)] px-3">
           <Breadcrumb path={selectedEntry?.path ?? ''} />
           <div className="flex shrink-0 items-center gap-0.5 ml-2">
             <button
               type="button"
               onClick={openNewFolderPrompt}
               title="New folder"
-              className="rounded p-1 text-sm text-primary-400 hover:bg-primary-200 hover:text-primary-600 transition-colors leading-none"
+              className="rounded p-1 text-sm text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors leading-none"
             >
               📁+
             </button>
@@ -1226,7 +1226,7 @@ export function FilesScreen() {
               type="button"
               onClick={() => void loadTree()}
               title="Refresh"
-              className="rounded p-1 text-lg text-primary-400 hover:bg-primary-200 hover:text-primary-600 transition-colors leading-none"
+              className="rounded p-1 text-lg text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors leading-none"
             >
               ↺
             </button>
@@ -1236,25 +1236,25 @@ export function FilesScreen() {
         {/* Tree body */}
         <ScrollAreaRoot className="flex-1 min-h-0">
           <ScrollAreaViewport className="px-1 py-1">
-            <div className="mx-2 mb-2 rounded-md border border-primary-200 bg-primary-50/80 px-2 py-1.5 text-[11px] text-primary-500">
-              <span className="font-medium text-primary-700">
+            <div className="mx-2 mb-2 rounded-md border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2 py-1.5 text-[11px] text-[var(--theme-muted)]">
+              <span className="font-medium text-[var(--theme-muted)]">
                 {FILE_BROWSER_MODE_LABEL}
               </span>{' '}
               · {FILE_BROWSER_REMOTE_HELP}
             </div>
             {treeLoading ? (
-              <div className="px-3 py-2 text-xs text-primary-400">
+              <div className="px-3 py-2 text-xs text-[var(--theme-muted)]">
                 Loading server workspace…
               </div>
             ) : treeError ? (
               <div className="space-y-1 px-3 py-2 text-xs text-red-500">
                 <div>{treeError}</div>
-                <div className="text-primary-400">
+                <div className="text-[var(--theme-muted)]">
                   Check the server workspace catalog or HERMES_WORKSPACE_DIR; this browser no longer needs local folder access.
                 </div>
               </div>
             ) : entries.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-primary-400">
+              <div className="px-3 py-2 text-xs text-[var(--theme-muted)]">
                 Server workspace is empty. Agent-created files will appear here after they are written to the configured workspace path.
               </div>
             ) : (
@@ -1285,7 +1285,7 @@ export function FilesScreen() {
       <main
         className={cn(
           'flex h-full flex-1 min-w-0 flex-col overflow-hidden',
-          'rounded-xl border border-primary-200 bg-primary-50/95 shadow-sm',
+          'rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 shadow-sm',
           'border-[var(--theme-border)]',
           'm-2',
         )}
@@ -1296,12 +1296,12 @@ export function FilesScreen() {
       {/* ── Context menu ──────────────────────────────────────────────────── */}
       {contextMenu ? (
         <div
-          className="fixed z-50 min-w-[160px] rounded-lg bg-primary-50 p-1 text-sm text-primary-900 shadow-lg outline outline-primary-900/10 dark:outline-neutral-700"
+          className="fixed z-50 min-w-[160px] rounded-lg bg-[var(--theme-panel)] p-1 text-sm text-[var(--theme-text)] shadow-lg outline outline-[var(--theme-border)]/20 dark:outline-neutral-700"
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-primary-100"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--theme-hover)]"
             onClick={() => {
               openRenamePrompt(contextMenu.entry)
               setContextMenu(null)
@@ -1311,7 +1311,7 @@ export function FilesScreen() {
           </button>
           {contextMenu.entry.type === 'folder' ? (
             <button
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-primary-100"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--theme-hover)]"
               onClick={() => {
                 setPromptState({
                   mode: 'new-folder',
@@ -1325,7 +1325,7 @@ export function FilesScreen() {
             </button>
           ) : (
             <button
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-primary-100"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--theme-hover)]"
               onClick={() => {
                 void handleDownload(contextMenu.entry)
                 setContextMenu(null)
@@ -1369,7 +1369,7 @@ export function FilesScreen() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handlePromptSubmit()
               }}
-              className="w-full rounded-md border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-300"
+              className="w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-sm text-[var(--theme-text)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)]"
               autoFocus
             />
             <div className="flex justify-end gap-2 pt-2">

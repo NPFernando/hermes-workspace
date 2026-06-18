@@ -141,15 +141,15 @@ function SessionItemComponent({
         'w-full text-left pl-1.5 pr-0.5 h-14 rounded-lg transition-colors duration-0',
         'select-none',
         active
-          ? 'bg-primary-200 text-primary-950'
-          : 'bg-transparent text-primary-950 [&:hover:not(:has(button:hover))]:bg-primary-200',
+          ? 'bg-[var(--theme-hover)] text-[var(--theme-text)]'
+          : 'bg-transparent text-[var(--theme-text)] [&:hover:not(:has(button:hover))]:bg-[var(--theme-hover)]',
       )}
     >
       <div className="flex-1 min-w-0 py-1.5">
         <div
           className={cn(
             'truncate text-sm font-[500]',
-            isGenerating ? 'text-primary-700' : '',
+            isGenerating ? 'text-[var(--theme-muted)]' : '',
           )}
         >
           <span className={cn(isGenerating ? 'animate-pulse' : undefined)}>
@@ -158,7 +158,7 @@ function SessionItemComponent({
         </div>
         <div
           className={cn(
-            'mt-0.5 text-[11px] text-primary-600 truncate',
+            'mt-0.5 text-[11px] text-[var(--theme-muted)] truncate',
             isError ? 'text-red-600' : undefined,
           )}
         >
@@ -173,9 +173,9 @@ function SessionItemComponent({
             event.stopPropagation()
           }}
           className={cn(
-            'ml-2 inline-flex size-7 items-center justify-center rounded-md text-primary-700',
-            'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary-200 dark:hover:bg-primary-800',
-            'aria-expanded:opacity-100 aria-expanded:bg-primary-200',
+            'ml-2 inline-flex size-7 items-center justify-center rounded-md text-[var(--theme-muted)]',
+            'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)]',
+            'aria-expanded:opacity-100 aria-expanded:bg-[var(--theme-hover)]',
           )}
           aria-label="Session options"
         >

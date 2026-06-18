@@ -107,11 +107,11 @@ export function TerminalPanel() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 32, opacity: 0 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="absolute inset-x-0 bottom-0 z-40 border-t border-primary-300 bg-primary-50 shadow-[0_-12px_40px_rgba(0,0,0,0.45)]"
+          className="absolute inset-x-0 bottom-0 z-40 border-t border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-[0_-12px_40px_rgba(0,0,0,0.45)]"
           style={{ height: panelHeight }}
         >
           <div
-            className="absolute inset-x-0 top-0 h-1 cursor-row-resize bg-primary-300/50 transition-colors hover:bg-[#ea580c]/80"
+            className="absolute inset-x-0 top-0 h-1 cursor-row-resize bg-[var(--theme-border)]/50 transition-colors hover:bg-[#ea580c]/80"
             onMouseDown={handleResizeStart}
             role="separator"
             aria-label="Resize terminal panel"
@@ -119,7 +119,7 @@ export function TerminalPanel() {
           <div className="h-full pt-1">
             <Suspense
               fallback={
-                <div className="flex h-full items-center justify-center text-xs text-primary-500">
+                <div className="flex h-full items-center justify-center text-xs text-[var(--theme-muted)]">
                   Loading terminal…
                 </div>
               }

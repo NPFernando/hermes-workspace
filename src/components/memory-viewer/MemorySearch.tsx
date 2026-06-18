@@ -19,13 +19,13 @@ function MemorySearch({
   onSelectResult,
 }: MemorySearchProps) {
   return (
-    <section className="border-b border-primary-200 bg-primary-100/40 px-3 py-2">
+    <section className="border-b border-[var(--theme-border)] bg-[var(--theme-hover)]/40 px-3 py-2">
       <label className="relative block">
         <HugeiconsIcon
           icon={Search01Icon}
           size={20}
           strokeWidth={1.5}
-          className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-primary-500"
+          className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-[var(--theme-muted)]"
         />
         <input
           value={query}
@@ -33,17 +33,17 @@ function MemorySearch({
             onQueryChange(event.target.value)
           }}
           placeholder="Search across MEMORY.md and memory/*.md"
-          className="h-9 w-full rounded-lg border border-primary-200 bg-primary-50 pr-3 pl-9 text-sm text-primary-900 outline-none focus:border-accent-500/40"
+          className="h-9 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] pr-3 pl-9 text-sm text-[var(--theme-text)] outline-none focus:border-accent-500/40"
         />
       </label>
       {query.trim() ? (
-        <div className="mt-2 rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5">
+        <div className="mt-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2 py-1.5">
           {searching ? (
-            <p className="text-xs text-primary-600 text-pretty">
+            <p className="text-xs text-[var(--theme-muted)] text-pretty">
               Searching memory files...
             </p>
           ) : results.length === 0 ? (
-            <p className="text-xs text-primary-600 text-pretty">
+            <p className="text-xs text-[var(--theme-muted)] text-pretty">
               No matches found.
             </p>
           ) : (
@@ -57,14 +57,14 @@ function MemorySearch({
                       onSelectResult(result)
                     }}
                     className={cn(
-                      'w-full rounded-md border border-primary-200 px-2 py-1.5 text-left',
-                      'hover:bg-primary-100',
+                      'w-full rounded-md border border-[var(--theme-border)] px-2 py-1.5 text-left',
+                      'hover:bg-[var(--theme-hover)]',
                     )}
                   >
-                    <p className="truncate text-xs font-medium text-primary-900 tabular-nums">
+                    <p className="truncate text-xs font-medium text-[var(--theme-text)] tabular-nums">
                       {result.path}:{result.line}
                     </p>
-                    <p className="line-clamp-2 text-xs text-primary-700 text-pretty">
+                    <p className="line-clamp-2 text-xs text-[var(--theme-muted)] text-pretty">
                       {result.snippet}
                     </p>
                   </button>

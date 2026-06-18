@@ -149,12 +149,12 @@ export function ChatPanel() {
             }}
           >
             {/* Panel header */}
-            <div className="flex items-center justify-between h-10 px-3 border-b border-primary-200 shrink-0">
+            <div className="flex items-center justify-between h-10 px-3 border-b border-[var(--theme-border)] shrink-0">
               <div className="flex items-center gap-1.5 min-w-0">
                 <button
                   type="button"
                   onClick={() => setShowSessionList((v) => !v)}
-                  className="text-xs font-medium text-primary-700 hover:text-primary-900 truncate max-w-[200px] transition-colors"
+                  className="text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] truncate max-w-[200px] transition-colors"
                   title={panelTitle}
                 >
                   {panelTitle}
@@ -169,7 +169,7 @@ export function ChatPanel() {
                         <Button
                           size="icon-sm"
                           variant="ghost"
-                          className="text-primary-600 hover:text-primary-900"
+                          className="text-[var(--theme-muted)] hover:text-[var(--theme-text)]"
                           aria-label="New chat"
                         >
                           <HugeiconsIcon
@@ -189,7 +189,7 @@ export function ChatPanel() {
                         <Button
                           size="icon-sm"
                           variant="ghost"
-                          className="text-primary-600 hover:text-primary-900"
+                          className="text-[var(--theme-muted)] hover:text-[var(--theme-text)]"
                           aria-label="Expand to full chat"
                         >
                           <HugeiconsIcon
@@ -207,7 +207,7 @@ export function ChatPanel() {
                   size="icon-sm"
                   variant="ghost"
                   onClick={handleClose}
-                  className="text-primary-600 hover:text-primary-900"
+                  className="text-[var(--theme-muted)] hover:text-[var(--theme-text)]"
                   aria-label="Close chat panel"
                 >
                   <HugeiconsIcon
@@ -227,7 +227,7 @@ export function ChatPanel() {
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.15 }}
-                  className="border-b border-primary-200 overflow-hidden"
+                  className="border-b border-[var(--theme-border)] overflow-hidden"
                 >
                   <div className="max-h-48 overflow-y-auto py-1">
                     {sessions.map((s) => (
@@ -241,7 +241,7 @@ export function ChatPanel() {
                         className={`w-full text-left px-3 py-1.5 text-xs truncate transition-colors ${
                           s.friendlyId === activeFriendlyId
                             ? 'bg-accent-500/10 text-accent-600'
-                            : 'text-primary-700 hover:bg-primary-100'
+                            : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]'
                         }`}
                       >
                         {s.label || s.title || s.derivedTitle || s.friendlyId}

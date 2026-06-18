@@ -318,7 +318,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         {/* Electron: native-style title bar (absolute over the padding) */}
         {isElectron && (
           <div
-            className="absolute inset-x-0 top-0 flex h-10 items-center border-b border-primary-200 z-40"
+            className="absolute inset-x-0 top-0 flex h-10 items-center border-b border-[var(--theme-border)] z-40"
             style={
               {
                 WebkitAppRegion: 'drag',

@@ -114,7 +114,7 @@ export function ConnectionStatusMessage({
       className={cn(
         'mx-auto max-w-lg rounded-lg border px-3 py-2 transition-all duration-300',
         isChecking
-          ? 'border-primary-200 bg-primary-50 text-primary-600'
+          ? 'border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)]'
           : 'border-amber-200 bg-amber-50 text-amber-800',
         fadingOut && 'opacity-0 translate-y-[-4px]',
         className,
@@ -128,7 +128,7 @@ export function ConnectionStatusMessage({
           strokeWidth={1.5}
           className={cn(
             'mt-0.5 shrink-0',
-            isChecking ? 'text-primary-500' : 'text-amber-600',
+            isChecking ? 'text-[var(--theme-muted)]' : 'text-amber-600',
           )}
         />
         <div className="flex-1 text-xs">

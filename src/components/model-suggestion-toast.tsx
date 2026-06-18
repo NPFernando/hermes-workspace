@@ -34,15 +34,15 @@ export function ModelSuggestionToast({
 
   return (
     <div className="fixed bottom-[calc(var(--tabbar-h,0px)+1.5rem)] right-4 z-50 animate-in slide-in-from-bottom-2">
-      <div className="flex max-w-[380px] w-[calc(100vw-2rem)] flex-col gap-3 rounded-xl border border-primary-200 bg-primary-50/95 p-4 shadow-lg backdrop-blur-xl">
+      <div className="flex max-w-[380px] w-[calc(100vw-2rem)] flex-col gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-lg backdrop-blur-xl">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2">
             <span className="text-lg">💡</span>
             <div>
-              <p className="text-sm font-medium text-primary-900">
+              <p className="text-sm font-medium text-[var(--theme-text)]">
                 Try {getModelDisplayName(suggestedModel)}?
               </p>
-              <p className="mt-0.5 text-xs text-primary-600">{reason}</p>
+              <p className="mt-0.5 text-xs text-[var(--theme-muted)]">{reason}</p>
               {costImpact && (
                 <p className="mt-1 text-xs font-medium text-emerald-700">
                   {costImpact}
@@ -53,7 +53,7 @@ export function ModelSuggestionToast({
           <button
             type="button"
             onClick={onDismiss}
-            className="shrink-0 rounded-md p-1 text-primary-500 hover:bg-primary-200 hover:text-primary-900"
+            className="shrink-0 rounded-md p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]"
             aria-label="Dismiss"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.5} />

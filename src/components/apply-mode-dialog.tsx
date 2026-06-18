@@ -71,16 +71,16 @@ export function ApplyModeDialog({
         role="dialog"
         aria-labelledby="apply-mode-title"
         aria-modal="true"
-        className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-primary-200 bg-surface p-6 shadow-xl"
+        className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--theme-border)] bg-surface p-6 shadow-xl"
       >
         <h2
           id="apply-mode-title"
-          className="mb-2 text-lg font-semibold text-primary-900"
+          className="mb-2 text-lg font-semibold text-[var(--theme-text)]"
         >
           Switch Model?
         </h2>
 
-        <p className="mb-6 text-sm text-primary-600">
+        <p className="mb-6 text-sm text-[var(--theme-muted)]">
           Mode "{mode.name}" uses{' '}
           <span className="font-medium">{mode.preferredModel}</span>. Would you
           like to switch to this model now?
@@ -90,14 +90,14 @@ export function ApplyModeDialog({
           <button
             type="button"
             onClick={handleSkip}
-            className="rounded-lg border border-primary-200 bg-surface px-4 py-2 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-400"
+            className="rounded-lg border border-[var(--theme-border)] bg-surface px-4 py-2 text-sm font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-panel)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)]"
           >
             Skip
           </button>
           <button
             type="button"
             onClick={handleSwitchNow}
-            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400"
+            className="rounded-lg bg-[var(--theme-accent)] px-4 py-2 text-sm font-medium text-[var(--theme-bg)] transition-colors hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)]"
           >
             Switch Now
           </button>

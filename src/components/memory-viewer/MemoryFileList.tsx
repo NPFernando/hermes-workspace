@@ -67,11 +67,11 @@ function MemoryFileList({
       animate={{ width: collapsed ? 0 : 320, opacity: collapsed ? 0 : 1 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
       className={cn(
-        'border-primary-200 bg-primary-100/50 lg:border-r',
+        'border-[var(--theme-border)] bg-[var(--theme-hover)]/50 lg:border-r',
         collapsed ? 'pointer-events-none overflow-hidden' : 'overflow-hidden',
       )}
     >
-      <div className="border-b border-primary-200 px-3 py-3">
+      <div className="border-b border-[var(--theme-border)] px-3 py-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <HugeiconsIcon icon={BrainIcon} size={20} strokeWidth={1.5} />
@@ -104,7 +104,7 @@ function MemoryFileList({
             </Button>
           </div>
         </div>
-        <p className="text-xs text-primary-600 text-pretty">
+        <p className="text-xs text-[var(--theme-muted)] text-pretty">
           {isDemo
             ? 'Demo mode enabled because memory API data is unavailable.'
             : 'Browse MEMORY.md and daily notes in memory/ or memories/.'}
@@ -114,7 +114,7 @@ function MemoryFileList({
       <ScrollAreaRoot className="h-[calc(100%-96px)]">
         <ScrollAreaViewport className="px-2 py-2">
           {loading ? (
-            <div className="rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-600 text-pretty">
+            <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-xs text-[var(--theme-muted)] text-pretty">
               Loading memory files...
             </div>
           ) : null}
@@ -133,8 +133,8 @@ function MemoryFileList({
                   isRoot
                 />
               ) : null}
-              <div className="rounded-lg border border-primary-200 bg-primary-50/70 p-1">
-                <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-primary-700 tabular-nums">
+              <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-1">
+                <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-[var(--theme-muted)] tabular-nums">
                   <HugeiconsIcon
                     icon={Folder01Icon}
                     size={20}
@@ -143,14 +143,14 @@ function MemoryFileList({
                   <span className="truncate">memory/ or memories/</span>
                 </div>
                 {groups.length === 0 ? (
-                  <div className="px-2 py-1.5 text-xs text-primary-500 text-pretty">
+                  <div className="px-2 py-1.5 text-xs text-[var(--theme-muted)] text-pretty">
                     No daily memory files found.
                   </div>
                 ) : (
                   groups.map(function renderGroup(group) {
                     return (
                       <section key={group.id} className="mt-1">
-                        <h3 className="px-2 py-1 text-[11px] font-medium text-primary-500 tabular-nums">
+                        <h3 className="px-2 py-1 text-[11px] font-medium text-[var(--theme-muted)] tabular-nums">
                           {group.label}
                         </h3>
                         <div className="space-y-1">
@@ -205,16 +205,16 @@ function MemoryRow({
         'w-full rounded-md border px-2 py-1.5 text-left transition-colors',
         selected
           ? 'border-accent-500/40 bg-accent-500/10'
-          : 'border-primary-200 bg-primary-50 hover:bg-primary-100',
+          : 'border-[var(--theme-border)] bg-[var(--theme-panel)] hover:bg-[var(--theme-hover)]',
       )}
     >
       <div className="flex items-center gap-2">
         <HugeiconsIcon icon={File01Icon} size={20} strokeWidth={1.5} />
-        <span className="truncate text-sm font-medium text-primary-900 tabular-nums">
+        <span className="truncate text-sm font-medium text-[var(--theme-text)] tabular-nums">
           {isRoot ? 'MEMORY.md' : file.name}
         </span>
       </div>
-      <div className="mt-1 grid grid-cols-2 gap-x-2 text-[11px] text-primary-600 tabular-nums">
+      <div className="mt-1 grid grid-cols-2 gap-x-2 text-[11px] text-[var(--theme-muted)] tabular-nums">
         <span className="truncate">{formatSize(file.size)}</span>
         <span className="truncate text-right">
           {formatModifiedAt(file.modifiedAt)}

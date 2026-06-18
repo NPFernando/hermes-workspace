@@ -710,7 +710,7 @@ export function TerminalWorkspace({
 
   return (
     <div
-      className="relative flex min-h-0 flex-col bg-primary-50"
+      className="relative flex min-h-0 flex-col bg-[var(--theme-panel)]"
       style={
         termHeight
           ? { height: termHeight, maxHeight: termHeight }
@@ -719,7 +719,7 @@ export function TerminalWorkspace({
     >
       {/* fullscreen header removed — tab bar handles everything */}
 
-      <div className="flex h-8 items-center border-b border-primary-300 bg-primary-100 px-1">
+      <div className="flex h-8 items-center border-b border-[var(--theme-border)] bg-[var(--theme-hover)] px-1">
         <div className="flex min-w-0 flex-1 items-center overflow-x-auto">
           {tabs.map(function renderTab(tab) {
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
@@ -743,10 +743,10 @@ export function TerminalWorkspace({
                   })
                 }}
                 className={cn(
-                  'group relative flex h-8 max-w-[220px] items-center gap-2 px-3 text-xs text-primary-700 transition-colors',
+                  'group relative flex h-8 max-w-[220px] items-center gap-2 px-3 text-xs text-[var(--theme-muted)] transition-colors',
                   isActive
-                    ? 'bg-primary-50 text-primary-900'
-                    : 'hover:bg-primary-200/70',
+                    ? 'bg-[var(--theme-panel)] text-[var(--theme-text)]'
+                    : 'hover:bg-[var(--theme-hover)]',
                 )}
               >
                 <span
@@ -754,7 +754,7 @@ export function TerminalWorkspace({
                     'size-2 rounded-full',
                     isActive || tab.status === 'active'
                       ? 'bg-emerald-400'
-                      : 'bg-primary-500',
+                      : 'bg-[var(--theme-panel)]0',
                   )}
                 />
                 <HugeiconsIcon
@@ -780,7 +780,7 @@ export function TerminalWorkspace({
                         handleCloseTab(tab)
                       }
                     }}
-                    className="hidden rounded p-0.5 text-primary-600 hover:bg-primary-300 hover:text-primary-900 group-hover:inline-flex"
+                    className="hidden rounded p-0.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)] group-hover:inline-flex"
                   >
                     <HugeiconsIcon
                       icon={Cancel01Icon}
@@ -865,7 +865,7 @@ export function TerminalWorkspace({
       </div>
 
       <div
-        className="relative flex-1 overflow-hidden bg-primary-50"
+        className="relative flex-1 overflow-hidden bg-[var(--theme-panel)]"
         style={{ backgroundColor: TERMINAL_BG }}
       >
         {tabs.map(function renderTerminal(tab) {
@@ -888,7 +888,7 @@ export function TerminalWorkspace({
                 onClick={function tapToFocus() {
                   terminalMapRef.current.get(tab.id)?.focus()
                 }}
-                className="h-full w-full bg-primary-50 font-mono text-primary-900"
+                className="h-full w-full bg-[var(--theme-panel)] font-mono text-[var(--theme-text)]"
                 style={{ backgroundColor: TERMINAL_BG }}
               />
             </div>
@@ -909,7 +909,7 @@ export function TerminalWorkspace({
 
       {contextMenu ? (
         <div
-          className="fixed z-50 min-w-36 rounded-md border border-primary-300 bg-primary-100 p-1 shadow-lg"
+          className="fixed z-50 min-w-36 rounded-md border border-[var(--theme-border)] bg-[var(--theme-hover)] p-1 shadow-lg"
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onClick={function stop(event) {
             event.stopPropagation()
@@ -917,7 +917,7 @@ export function TerminalWorkspace({
         >
           <button
             type="button"
-            className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-primary-900 hover:bg-primary-200"
+            className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
             onClick={function renameTabFromMenu() {
               const menuTab = tabs.find((tab) => tab.id === contextMenu.tabId)
               setContextMenu(null)
@@ -934,7 +934,7 @@ export function TerminalWorkspace({
           </button>
           <button
             type="button"
-            className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-primary-900 hover:bg-primary-200"
+            className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
             onClick={function closeTabFromMenu() {
               const menuTab = tabs.find((tab) => tab.id === contextMenu.tabId)
               setContextMenu(null)

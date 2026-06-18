@@ -10,11 +10,11 @@ export const Route = createFileRoute('/echo-studio')({
   },
   errorComponent: function EchoStudioError({ error }) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-primary-50 p-6 text-center">
-        <h2 className="mb-3 text-xl font-semibold text-primary-900">
+      <div className="flex h-full flex-col items-center justify-center bg-[var(--theme-panel)] p-6 text-center">
+        <h2 className="mb-3 text-xl font-semibold text-[var(--theme-text)]">
           Failed to Load Echo Studio
         </h2>
-        <p className="mb-4 max-w-md text-sm text-primary-600">
+        <p className="mb-4 max-w-md text-sm text-[var(--theme-muted)]">
           {error instanceof Error ? error.message : 'An unexpected error occurred'}
         </p>
         <button

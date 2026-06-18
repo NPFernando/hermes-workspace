@@ -45,7 +45,7 @@ export function AttachmentPreview({
               'relative flex items-center gap-1 rounded-md border p-1 max-w-[220px]',
               hasError
                 ? 'border-red-300 bg-red-50'
-                : 'border-primary-200 bg-primary-50',
+                : 'border-[var(--theme-border)] bg-[var(--theme-panel)]',
               className,
             )}
           >
@@ -57,24 +57,24 @@ export function AttachmentPreview({
                   className="size-7 rounded object-cover"
                 />
               ) : (
-                <div className="flex size-7 items-center justify-center rounded bg-primary-100">
+                <div className="flex size-7 items-center justify-center rounded bg-[var(--theme-hover)]">
                   <HugeiconsIcon
                     icon={File01Icon}
                     size={14}
-                    className="text-primary-500"
+                    className="text-[var(--theme-muted)]"
                   />
                 </div>
               )}
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="line-clamp-1 text-[10px] font-medium text-primary-900">
+              <p className="line-clamp-1 text-[10px] font-medium text-[var(--theme-text)]">
                 {attachment.file.name}
               </p>
               {hasError ? (
                 <p className="text-[9px] text-red-600">{attachment.error}</p>
               ) : (
-                <p className="text-[9px] text-primary-500">
+                <p className="text-[9px] text-[var(--theme-muted)]">
                   {getFileExtension(attachment.file.name)} •{' '}
                   {formatFileSize(attachment.file.size)}
                 </p>
@@ -85,7 +85,7 @@ export function AttachmentPreview({
               variant="ghost"
               size="icon-sm"
               onClick={() => onRemove(attachment.id)}
-              className="size-5 shrink-0 rounded-full hover:bg-primary-200"
+              className="size-5 shrink-0 rounded-full hover:bg-[var(--theme-hover)]"
               aria-label="Remove attachment"
               type="button"
             >
@@ -104,8 +104,8 @@ export function AttachmentPreview({
               className="max-h-36 w-full rounded-md object-cover"
             />
           ) : (
-            <div className="flex items-center justify-center rounded-md bg-primary-100 p-4">
-              <div className="flex items-center gap-2 text-xs text-primary-600">
+            <div className="flex items-center justify-center rounded-md bg-[var(--theme-hover)] p-4">
+              <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
                 <HugeiconsIcon icon={File01Icon} size={20} />
                 <span className="tabular-nums">
                   {getFileExtension(attachment.file.name) || 'FILE'}
@@ -113,8 +113,8 @@ export function AttachmentPreview({
               </div>
             </div>
           )}
-          <div className="space-y-0.5 text-xs text-primary-600">
-            <div className="line-clamp-2 text-primary-900">
+          <div className="space-y-0.5 text-xs text-[var(--theme-muted)]">
+            <div className="line-clamp-2 text-[var(--theme-text)]">
               {attachment.file.name}
             </div>
             <div className="tabular-nums">

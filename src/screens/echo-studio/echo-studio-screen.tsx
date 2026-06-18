@@ -71,13 +71,13 @@ export function EchoStudioScreen() {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight">Echo Studio</h1>
-          <p className="mt-1 text-sm text-primary-500">
+          <p className="mt-1 text-sm text-[var(--theme-muted)]">
             Describe what you want. I'll build the full page with backend API.
           </p>
         </div>
 
         {/* Tabs */}
-        <div className="mb-6 flex gap-1 rounded-lg border border-primary-200 bg-primary-50/85 p-1 backdrop-blur-xl">
+        <div className="mb-6 flex gap-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)]/85 p-1 backdrop-blur-xl">
           {(['create', 'manage', 'theme'] as Array<Tab>).map((t) => (
             <button
               key={t}
@@ -85,8 +85,8 @@ export function EchoStudioScreen() {
               className={cn(
                 'flex-1 rounded-md px-4 py-2 text-sm font-medium capitalize transition-colors',
                 tab === t
-                  ? 'bg-primary-100 text-ink shadow-sm'
-                  : 'text-primary-500 hover:text-ink',
+                  ? 'bg-[var(--theme-hover)] text-ink shadow-sm'
+                  : 'text-[var(--theme-muted)] hover:text-ink',
               )}
             >
               {t}
@@ -98,11 +98,11 @@ export function EchoStudioScreen() {
         {tab === 'create' && (
           <div className="space-y-6">
             {/* Form */}
-            <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-6">
+            <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-6">
               <div className="space-y-5">
                 {/* Page ID */}
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]">
                     Page ID (URL Slug)
                   </label>
                   <input
@@ -116,7 +116,7 @@ export function EchoStudioScreen() {
 
                 {/* Page Title */}
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]">
                     Page Title
                   </label>
                   <input
@@ -130,7 +130,7 @@ export function EchoStudioScreen() {
 
                 {/* Prompt */}
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]">
                     What should this page do?
                   </label>
                   <textarea
@@ -151,7 +151,7 @@ export function EchoStudioScreen() {
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all',
                       creating || !pageId.trim() || !pageTitle.trim() || !prompt.trim()
-                        ? 'cursor-not-allowed bg-primary-300 opacity-60'
+                        ? 'cursor-not-allowed bg-[var(--theme-hover)] opacity-60'
                         : 'bg-accent-500 hover:bg-accent-600 active:scale-[0.98]',
                     )}
                   >
@@ -173,7 +173,7 @@ export function EchoStudioScreen() {
 
             {/* Quick Templates */}
             <div>
-              <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
+              <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]">
                 Quick Templates
               </h2>
               <div className="flex flex-wrap gap-3">
@@ -182,7 +182,7 @@ export function EchoStudioScreen() {
                     key={t.id}
                     type="button"
                     onClick={() => handleTemplate(t.id)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-primary-200 bg-primary-50/50 px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-accent-500 hover:bg-accent-50/50 dark:hover:bg-accent-900/20"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-accent-500 hover:bg-accent-50/50 dark:hover:bg-accent-900/20"
                   >
                     <span className="text-base">{t.icon}</span>
                     {t.label}
@@ -202,9 +202,9 @@ export function EchoStudioScreen() {
 
         {/* Manage Tab */}
         {tab === 'manage' && (
-          <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-8 text-center">
-            <p className="text-lg text-primary-500">No screens created yet.</p>
-            <p className="mt-1 text-sm text-primary-400">
+          <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-8 text-center">
+            <p className="text-lg text-[var(--theme-muted)]">No screens created yet.</p>
+            <p className="mt-1 text-sm text-[var(--theme-muted)]">
               Use the Create tab to build your first dashboard.
             </p>
           </div>
@@ -212,9 +212,9 @@ export function EchoStudioScreen() {
 
         {/* Theme Tab */}
         {tab === 'theme' && (
-          <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-8 text-center">
-            <p className="text-lg text-primary-500">Theme customization coming soon.</p>
-            <p className="mt-1 text-sm text-primary-400">
+          <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-8 text-center">
+            <p className="text-lg text-[var(--theme-muted)]">Theme customization coming soon.</p>
+            <p className="mt-1 text-sm text-[var(--theme-muted)]">
               Choose from light, dark, and custom color schemes for your dashboards.
             </p>
           </div>
@@ -226,8 +226,8 @@ export function EchoStudioScreen() {
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-primary-200 bg-primary-50/50 p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
+    <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]">
         {label}
       </p>
       <p className="mt-1 text-2xl font-semibold tracking-tight text-ink">{value}</p>

@@ -15,14 +15,14 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
 const CSS = `
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   .lp-root{
-    --bg:#020c18;--card:#091929;--input:#050f1a;
-    --border:#162d42;--border-f:#0ea5e9;
-    --text:#e2e8f0;--sub:#94a3b8;--muted:#4d7a9e;
-    --accent:#0ea5e9;
-    --grad:linear-gradient(135deg,#0284c7 0%,#0ea5e9 50%,#38bdf8 100%);
-    --err:#ef4444;--ok:#22c55e;
+    --bg:var(--theme-bg);--card:var(--theme-card);--input:var(--theme-input);
+    --border:var(--theme-border);--border-f:var(--theme-accent);
+    --text:var(--theme-text);--sub:var(--theme-muted);--muted:var(--theme-muted);
+    --accent:var(--theme-accent);
+    --grad:linear-gradient(135deg,var(--theme-accent) 0%,var(--theme-accent-secondary) 50%,var(--theme-accent) 100%);
+    --err:var(--theme-danger);--ok:var(--theme-success);
     --shadow:0 25px 50px -12px rgba(0,0,0,0.7);
-    --glow:0 0 40px rgba(14,165,233,0.12);
+    --glow:0 0 40px rgba(224,108,117,0.12);
     min-height:100vh;display:flex;align-items:center;justify-content:center;
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     background:var(--bg);color:var(--text);
@@ -33,8 +33,8 @@ const CSS = `
   .lp-grid{
     position:fixed;inset:0;pointer-events:none;
     background-image:
-      linear-gradient(rgba(14,165,233,0.04) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(14,165,233,0.04) 1px,transparent 1px);
+      linear-gradient(rgba(224,108,117,0.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(224,108,117,0.04) 1px,transparent 1px);
     background-size:60px 60px;
     animation:lpGrid 20s linear infinite;
   }
@@ -42,9 +42,9 @@ const CSS = `
 
   /* Orbs */
   .lp-orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:0.45;animation:lpOrb 8s ease-in-out infinite;pointer-events:none}
-  .lp-orb-1{width:400px;height:400px;background:radial-gradient(circle,rgba(2,132,199,0.28),transparent 70%);top:-100px;left:-100px}
-  .lp-orb-2{width:300px;height:300px;background:radial-gradient(circle,rgba(14,165,233,0.18),transparent 70%);bottom:-50px;right:-50px;animation-delay:-4s}
-  .lp-orb-3{width:200px;height:200px;background:radial-gradient(circle,rgba(56,189,248,0.12),transparent 70%);top:45%;left:55%;animation-delay:-2s}
+  .lp-orb-1{width:400px;height:400px;background:radial-gradient(circle,rgba(224,108,117,0.28),transparent 70%);top:-100px;left:-100px}
+  .lp-orb-2{width:300px;height:300px;background:radial-gradient(circle,rgba(224,108,117,0.18),transparent 70%);bottom:-50px;right:-50px;animation-delay:-4s}
+  .lp-orb-3{width:200px;height:200px;background:radial-gradient(circle,rgba(224,108,117,0.12),transparent 70%);top:45%;left:55%;animation-delay:-2s}
   @keyframes lpOrb{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(28px,-18px) scale(1.05)}66%{transform:translate(-18px,14px) scale(0.95)}}
 
   /* Card */
@@ -63,11 +63,11 @@ const CSS = `
   .lp-logo-icon{
     width:64px;height:64px;margin:0 auto 16px;background:var(--grad);
     border-radius:18px;display:flex;align-items:center;justify-content:center;
-    box-shadow:0 8px 24px rgba(2,132,199,0.35);
+    box-shadow:0 8px 24px rgba(224,108,117,0.35);
     animation:lpLogoPulse 3s ease-in-out infinite;
   }
   .lp-logo-icon svg{width:32px;height:32px;fill:none;stroke:white;stroke-width:1.8}
-  @keyframes lpLogoPulse{0%,100%{box-shadow:0 8px 24px rgba(2,132,199,0.35)}50%{box-shadow:0 8px 36px rgba(14,165,233,0.55)}}
+  @keyframes lpLogoPulse{0%,100%{box-shadow:0 8px 24px rgba(224,108,117,0.35)}50%{box-shadow:0 8px 36px rgba(224,108,117,0.55)}}
   .lp-logo-title{
     font-size:24px;font-weight:700;letter-spacing:-0.5px;
     background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
@@ -82,27 +82,21 @@ const CSS = `
   }
   @keyframes lpMsgIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
   .lp-msg svg{width:18px;height:18px;flex-shrink:0}
-  .lp-msg-err{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:var(--err)}
-  .lp-msg-ok{background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);color:var(--ok)}
-
-  /* Shake on error */
-  .lp-shake{animation:lpShake 0.5s ease-in-out}
-  @keyframes lpShake{0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-5px)}20%,40%,60%,80%{transform:translateX(5px)}}
-
   /* Google button */
   .lp-google{
     width:100%;padding:13px 16px;
-    background:#fff;border:1.5px solid #d1dae6;border-radius:12px;
-    color:#1a1f36;font-size:15px;font-weight:500;font-family:inherit;
+    background:var(--theme-card);
+    border:1.5px solid var(--theme-border);
+    color:var(--theme-text);
+    font-size:15px;
+    font-weight:500;
+    font-family:inherit;
     cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;
     transition:all 0.2s ease;margin-bottom:4px;
   }
-  .lp-google:hover{background:#f4f8fd;border-color:#b8c8d8;box-shadow:0 2px 10px rgba(0,0,0,0.15);transform:translateY(-1px)}
+  .lp-google:hover{background:var(--theme-card2);border-color:var(--theme-accent);box-shadow:0 2px 10px rgba(224,108,117,0.15);transform:translateY(-1px)}
   .lp-google:active{transform:translateY(0)}
   .lp-google:disabled{opacity:0.55;cursor:not-allowed;transform:none}
-
-  /* Dividers */
-  .lp-divider{display:flex;align-items:center;gap:16px;margin:20px 0;color:var(--muted);font-size:12px}
   .lp-divider::before,.lp-divider::after{content:'';flex:1;height:1px;background:var(--border)}
 
   /* Form */
@@ -116,7 +110,7 @@ const CSS = `
     transition:all 0.25s ease;
   }
   .lp-input::placeholder{color:var(--muted)}
-  .lp-input:focus{border-color:var(--border-f);box-shadow:0 0 0 3px rgba(14,165,233,0.15)}
+  .lp-input:focus{border-color:var(--border-f);box-shadow:0 0 0 3px rgba(224,108,117,0.15)}
   .lp-input:disabled{opacity:0.5}
   .lp-pw-toggle{
     position:absolute;right:14px;top:50%;transform:translateY(-50%);
@@ -128,7 +122,7 @@ const CSS = `
   .lp-attempts{font-size:12px;color:var(--muted);text-align:right;min-height:18px;margin-top:4px}
 
   /* Remember + submit */
-  .lp-remember{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--sub);margin:16px 0 24px}
+  .lp-remember{display:flex;alignients:center;gap:8px;cursor:pointer;font-size:13px;color:var(--sub);margin:16px 0 24px}
   .lp-remember input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
   .lp-btn{
     width:100%;padding:14px;background:var(--grad);
@@ -138,14 +132,14 @@ const CSS = `
   }
   .lp-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.1),transparent);opacity:0;transition:opacity 0.25s}
   .lp-btn:hover:not(:disabled)::before{opacity:1}
-  .lp-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 24px rgba(2,132,199,0.45)}
+  .lp-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 24px rgba(224,108,117,0.45)}
   .lp-btn:active:not(:disabled){transform:translateY(0)}
   .lp-btn:disabled{opacity:0.55;cursor:not-allowed}
   .lp-spinner{display:inline-block;width:20px;height:20px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:lpSpin 0.6s linear infinite;vertical-align:middle}
   @keyframes lpSpin{to{transform:rotate(360deg)}}
 
   /* Status bar */
-  .lp-status-bar{display:flex;align-items:center;justify-content:center;gap:20px;padding-top:20px;margin-top:20px;border-top:1px solid var(--border)}
+  .lp-status-bar{display:flex;alignients:center;justify-content:center;gap:20px;padding-top:20px;margin-top:20px;border-top:1px solid var(--border)}
   .lp-status-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
   .lp-dot{width:6px;height:6px;border-radius:50%}
   .lp-dot-online{background:var(--ok);animation:lpPulse 2s ease-in-out infinite}
@@ -156,7 +150,7 @@ const CSS = `
   .lp-footer{text-align:center;margin-top:28px;font-size:12px;color:var(--muted)}
 
   @media(max-width:480px){.lp-card{padding:36px 24px}.lp-logo-title{font-size:20px}}
-`
+`;
 
 export function LoginScreen() {
   const [password, setPassword] = useState('')

@@ -104,7 +104,7 @@ function getStoredAgentName(): string {
 }
 
 const STATE_GLOW: Record<string, string> = {
-  idle: 'border-primary-200/20',
+  idle: 'border-[var(--theme-border)]/20',
   reading: 'border-blue-400/50 shadow-[0_0_8px_rgba(59,130,246,0.15)]',
   thinking: 'border-yellow-400/50 shadow-[0_0_8px_rgba(234,179,8,0.15)]',
   responding: 'border-emerald-400/50 shadow-[0_0_8px_rgba(34,197,94,0.2)]',
@@ -356,7 +356,7 @@ function OrchestratorCard({
     <div
       ref={cardRef}
       className={cn(
-        'relative rounded-2xl border bg-gradient-to-br from-primary-100/80 via-primary-100/60 to-primary-200/40 transition-all duration-500',
+        'relative rounded-2xl border bg-gradient-to-br from-[var(--theme-hover)]/80 via-[var(--theme-hover)]/60 to-[var(--theme-hover)]/40 transition-all duration-500',
         compact ? 'p-2' : 'p-3',
         glowClass,
       )}
@@ -398,7 +398,7 @@ function OrchestratorCard({
                   if (e.key === 'Escape') setIsEditing(false)
                 }}
                 placeholder="Agent name..."
-                className="w-24 rounded border border-primary-200/25 bg-primary-50 px-1.5 py-0.5 text-xs font-semibold text-primary-900 outline-none focus:border-accent-400"
+                className="w-24 rounded border border-[var(--theme-border)]/25 bg-[var(--theme-panel)] px-1.5 py-0.5 text-xs font-semibold text-[var(--theme-text)] outline-none focus:border-accent-400"
                 maxLength={20}
               />
             ) : (
@@ -406,7 +406,7 @@ function OrchestratorCard({
                 type="button"
                 onClick={startEdit}
                 className={cn(
-                  'font-semibold text-primary-900 transition-colors hover:text-accent-600',
+                  'font-semibold text-[var(--theme-text)] transition-colors hover:text-accent-600',
                   compact ? 'text-sm' : 'text-base',
                 )}
                 title="Click to rename"
@@ -419,7 +419,7 @@ function OrchestratorCard({
           <div className={cn('flex items-center gap-1.5 mt-0.5', !compact && 'justify-center')}>
             <span className={cn(
               'inline-block h-1.5 w-1.5 rounded-full shrink-0',
-              state === 'idle' ? 'bg-primary-400' :
+              state === 'idle' ? 'bg-[var(--theme-accent)]' :
               state === 'thinking' ? 'bg-yellow-400 animate-pulse' :
               state === 'tool-use' ? 'bg-violet-400 animate-pulse' :
               state === 'responding' ? 'bg-emerald-400 animate-pulse' :
@@ -427,15 +427,15 @@ function OrchestratorCard({
               'bg-accent-400 animate-pulse'
             )} />
             <p className={cn(
-              'text-primary-600',
+              'text-[var(--theme-muted)]',
               compact ? 'text-[9px]' : 'text-[10px]',
-              state !== 'idle' && 'font-medium text-primary-700',
+              state !== 'idle' && 'font-medium text-[var(--theme-muted)]',
             )}>
               {label}
             </p>
           </div>
           {!compact && model ? (
-            <p className="mt-0.5 truncate text-[9px] font-mono text-primary-400 text-center">
+            <p className="mt-0.5 truncate text-[9px] font-mono text-[var(--theme-muted)] text-center">
               {model}
             </p>
           ) : null}
@@ -444,7 +444,7 @@ function OrchestratorCard({
 
       {/* ── Usage section ── */}
       {displayRows.length > 0 && (
-        <div className={cn('border-t border-primary-200/20 pt-2 space-y-1.5', compact ? 'mt-1.5 px-2' : 'mt-2 px-3')}>
+        <div className={cn('border-t border-[var(--theme-border)]/20 pt-2 space-y-1.5', compact ? 'mt-1.5 px-2' : 'mt-2 px-3')}>
           {/* Provider header row — centered */}
           <div className="flex w-full items-center justify-between">
             <div className="flex-1" />
@@ -454,8 +454,8 @@ function OrchestratorCard({
               className={cn(
                 'flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold tracking-wide transition-colors',
                 canCycleOc
-                  ? 'cursor-pointer text-primary-500 hover:bg-primary-200/60 hover:text-primary-700'
-                  : 'cursor-default text-primary-400',
+                  ? 'cursor-pointer text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]'
+                  : 'cursor-default text-[var(--theme-muted)]',
                 providerFlash && 'text-emerald-500',
               )}
               title={canCycleOc ? 'Click to switch provider' : undefined}
@@ -468,7 +468,7 @@ function OrchestratorCard({
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
               ) : (
-                <span className="h-3 w-3 rounded-full bg-primary-300/60 inline-block" />
+                <span className="h-3 w-3 rounded-full bg-[var(--theme-muted)]/60 inline-block" />
               )}
               <span className="capitalize">{usageHeader}</span>
               {canCycleOc && <span className="text-[9px] opacity-50">↻</span>}
@@ -477,7 +477,7 @@ function OrchestratorCard({
               <button
                 type="button"
                 onClick={() => setUsageExpanded((v) => !v)}
-                className="rounded p-0.5 text-[9px] text-primary-300 hover:text-primary-500 transition-colors cursor-pointer"
+                className="rounded p-0.5 text-[9px] text-[var(--theme-muted)] hover:text-[var(--theme-muted)] transition-colors cursor-pointer"
                 aria-expanded={usageExpanded}
               >
                 {usageExpanded ? '▲' : '▼'}
@@ -490,19 +490,19 @@ function OrchestratorCard({
               {displayRows.filter(row => !(row.label === 'Ctx' && row.pct === 0) && row.pct > 0).map((row) => (
                 <div key={row.label} className="space-y-0.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-medium text-primary-500 leading-none">{row.label}</span>
+                    <span className="text-[9px] font-medium text-[var(--theme-muted)] leading-none">{row.label}</span>
                     <span className={cn('text-[9px] tabular-nums font-semibold', ocTextColor(row.pct))}>
                       {row.pct}%
                     </span>
                   </div>
-                  <div className="h-1 w-full rounded-full bg-primary-200/70">
+                  <div className="h-1 w-full rounded-full bg-[var(--theme-hover)]">
                     <div
                       className={cn('h-full rounded-full transition-all duration-500', ocBarColor(row.pct))}
                       style={{ width: `${row.pct}%` }}
                     />
                   </div>
                   {row.resetHint && (
-                    <p className="text-[8px] text-primary-400/70 text-right leading-none">
+                    <p className="text-[8px] text-[var(--theme-muted)]/70 text-right leading-none">
                       {row.resetHint}
                     </p>
                   )}
@@ -852,7 +852,7 @@ export function AgentViewPanel() {
                     'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums cursor-default',
                     activeCount > 0
                       ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-700'
-                      : 'border-primary-300/35 bg-primary-200/35 text-primary-700',
+                      : 'border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
                   )}
                   title={`${activeCount} agent${activeCount !== 1 ? 's' : ''} running · ${historyAgents.length} in history · ${queuedAgents.length} queued`}
                 >
@@ -874,14 +874,14 @@ export function AgentViewPanel() {
                       )}
                     />
                   ) : (
-                    <span className="size-1.5 rounded-full bg-primary-400/50" />
+                    <span className="size-1.5 rounded-full bg-[var(--theme-accent)]/50" />
                   )}
                   {activeCount}
                 </span>
               </div>
 
               {/* Center — title */}
-              <h2 className="text-sm font-semibold text-primary-900">
+              <h2 className="text-sm font-semibold text-[var(--theme-text)]">
                 Agent View
               </h2>
 
@@ -916,10 +916,10 @@ export function AgentViewPanel() {
                 <OrchestratorCard compact={false} />
 
                 {/* Agents — agent cards — only show when there's something */}
-                {(activeCount > 0 || queuedAgents.length > 0 || historyAgents.length > 0) && <section className="rounded-2xl bg-primary-200/15 p-1">
+                {(activeCount > 0 || queuedAgents.length > 0 || historyAgents.length > 0) && <section className="rounded-2xl bg-[var(--theme-hover)]/15 p-1">
                   {/* Centered Agents pill */}
                   <div className="mb-1 flex justify-center">
-                    <span className="rounded-full bg-primary-200/30 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary-500">
+                    <span className="rounded-full bg-[var(--theme-hover)]/30 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--theme-muted)]">
                       Agents
                     </span>
                   </div>
@@ -931,7 +931,7 @@ export function AgentViewPanel() {
                           Mission: {activeMissionName} · {missionStateLabel}
                         </p>
                       ) : null}
-                      <p className="text-[10px] text-primary-600 tabular-nums">
+                      <p className="text-[10px] text-[var(--theme-muted)] tabular-nums">
                         {isLoading
                           ? 'syncing...'
                           : statusCounts.running === 0 &&
@@ -958,7 +958,7 @@ export function AgentViewPanel() {
                         </p>
                       ) : null}
                     </div>
-                    <div className="text-right text-[10px] text-primary-500 tabular-nums">
+                    <div className="text-right text-[10px] text-[var(--theme-muted)] tabular-nums">
                       <p>
                         {isLoading
                           ? ''
@@ -981,7 +981,7 @@ export function AgentViewPanel() {
                             damping: 30,
                           },
                         }}
-                        className="relative rounded-xl bg-primary-200/15 p-1"
+                        className="relative rounded-xl bg-[var(--theme-hover)]/15 p-1"
                       >
                         <AnimatePresence initial={false}>
                           {spawningNodes.map(
@@ -1097,7 +1097,7 @@ export function AgentViewPanel() {
 
                         {queuedNodes.length > 0 ? (
                           <motion.div layout className="mt-1.5 space-y-1">
-                            <p className="text-[10px] text-primary-600 tabular-nums">
+                            <p className="text-[10px] text-[var(--theme-muted)] tabular-nums">
                               Queue
                             </p>
                             <motion.div
@@ -1132,7 +1132,7 @@ export function AgentViewPanel() {
                         ref={
                           networkLayerRef as React.RefObject<HTMLParagraphElement>
                         }
-                        className="text-[11px] text-pretty text-primary-600 py-1"
+                        className="text-[11px] text-pretty text-[var(--theme-muted)] py-1"
                       >
 
 
@@ -1144,7 +1144,7 @@ export function AgentViewPanel() {
                 <BackgroundRunsSection />
 
                 {(cliAgentsQuery.isLoading || visibleCliAgents.length > 0) ? (
-                  <section className="rounded-2xl bg-primary-200/15 p-2">
+                  <section className="rounded-2xl bg-[var(--theme-hover)]/15 p-2">
                     <Collapsible
                       open={cliAgentsExpanded}
                       onOpenChange={setCliAgentsExpanded}
@@ -1162,14 +1162,14 @@ export function AgentViewPanel() {
                           />
                           ⚡ Active Agents
                         </CollapsibleTrigger>
-                        <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
+                        <span className="rounded-full bg-[var(--theme-muted)]/70 px-2 py-0.5 text-[11px] text-[var(--theme-text)] tabular-nums">
                           {visibleCliAgents.length}
                         </span>
                       </div>
                       <CollapsiblePanel contentClassName="pt-1">
                         <div className="space-y-0.5">
                           {cliAgentsQuery.isLoading ? (
-                            <p className="px-2 py-1 text-[11px] text-primary-500 tabular-nums">
+                            <p className="px-2 py-1 text-[11px] text-[var(--theme-muted)] tabular-nums">
                               Scanning...
                             </p>
                           ) : null}
@@ -1186,7 +1186,7 @@ export function AgentViewPanel() {
                             return (
                               <div
                                 key={agent.pid}
-                                className="rounded-lg px-2 py-1.5 hover:bg-primary-200/50"
+                                className="rounded-lg px-2 py-1.5 hover:bg-[var(--theme-hover)]/50"
                               >
                                 <div className="flex items-center gap-1.5">
                                   <span
@@ -1197,10 +1197,10 @@ export function AgentViewPanel() {
                                         : 'bg-[var(--theme-muted)]',
                                     )}
                                   />
-                                  <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary-800">
+                                  <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--theme-text)]">
                                     {agent.name}
                                   </span>
-                                  <span className="shrink-0 text-[10px] text-primary-500 tabular-nums">
+                                  <span className="shrink-0 text-[10px] text-[var(--theme-muted)] tabular-nums">
                                     {formatRuntimeLabel(agent.runtimeSeconds)}
                                   </span>
                                   <button
@@ -1211,27 +1211,27 @@ export function AgentViewPanel() {
                                         cliAgentsQuery.refetch()
                                       } catch { /* noop */ }
                                     }}
-                                    className="shrink-0 rounded px-1 py-0.5 text-[9px] text-primary-400 hover:bg-red-100 hover:text-red-500 transition-colors"
+                                    className="shrink-0 rounded px-1 py-0.5 text-[9px] text-[var(--theme-muted)] hover:bg-red-100 hover:text-red-500 transition-colors"
                                     title="Kill agent"
                                   >
                                     ✕
                                   </button>
                                 </div>
                                 {agent.task ? (
-                                  <p className="mt-0.5 truncate pl-3 text-[10px] text-primary-500">
+                                  <p className="mt-0.5 truncate pl-3 text-[10px] text-[var(--theme-muted)]">
                                     {summarizeTask(agent.task)}
                                   </p>
                                 ) : (
-                                  <p className="mt-0.5 pl-3 text-[10px] text-primary-400 italic">
+                                  <p className="mt-0.5 pl-3 text-[10px] text-[var(--theme-muted)] italic">
                                     {agent.runtimeSeconds > 7200 ? '⚠ stale — no task' : 'no task description'}
                                   </p>
                                 )}
-                                <div className="mt-1 ml-3 h-1 overflow-hidden rounded-full bg-primary-200">
+                                <div className="mt-1 ml-3 h-1 overflow-hidden rounded-full bg-[var(--theme-hover)]">
                                   <div
                                     className={cn(
                                       'h-full rounded-full transition-all duration-500',
                                       agent.status === 'finished'
-                                        ? 'bg-primary-400'
+                                        ? 'bg-[var(--theme-accent)]'
                                         : 'bg-emerald-400',
                                     )}
                                     style={{ width: `${progressPct}%` }}
@@ -1274,37 +1274,37 @@ export function AgentViewPanel() {
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-                className="fixed inset-x-0 bottom-0 z-[81] max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-primary-300/70 bg-primary-100/95 backdrop-blur-xl"
+                className="fixed inset-x-0 bottom-0 z-[81] max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-[var(--theme-border)] bg-[var(--theme-hover)]/95 backdrop-blur-xl"
               >
                 {/* Drag handle */}
-                <div className="sticky top-0 z-10 flex justify-center bg-primary-100/95 pt-2 pb-1 backdrop-blur-xl">
-                  <div className="h-1 w-10 rounded-full bg-primary-400/50" />
+                <div className="sticky top-0 z-10 flex justify-center bg-[var(--theme-hover)]/95 pt-2 pb-1 backdrop-blur-xl">
+                  <div className="h-1 w-10 rounded-full bg-[var(--theme-accent)]/50" />
                 </div>
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-primary-300/70 px-4 pb-2">
+                <div className="flex items-center justify-between border-b border-[var(--theme-border)] px-4 pb-2">
                   <div className="flex items-center gap-1.5">
                     <span
                       className={cn(
                         'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums',
                         activeCount > 0
                           ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700'
-                          : 'border-primary-300/70 bg-primary-200/50 text-primary-700',
+                          : 'border-[var(--theme-border)] bg-[var(--theme-hover)]/50 text-[var(--theme-muted)]',
                       )}
                     >
                       <span
                         className={cn(
                           'size-1.5 rounded-full',
-                          activeCount > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-primary-400/50',
+                          activeCount > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-[var(--theme-accent)]/50',
                         )}
                       />
                       {activeCount}
                     </span>
                   </div>
-                  <h2 className="text-sm font-semibold text-primary-900">Agent View</h2>
+                  <h2 className="text-sm font-semibold text-[var(--theme-text)]">Agent View</h2>
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
-                    className="rounded-lg p-1.5 text-primary-500 hover:bg-primary-200"
+                    className="rounded-lg p-1.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
                     aria-label="Close"
                   >
                     <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
@@ -1316,14 +1316,14 @@ export function AgentViewPanel() {
                 <div className="space-y-3 p-3">
                   <OrchestratorCard compact={false} />
 
-                  <section className="rounded-2xl bg-primary-200/15 p-1">
+                  <section className="rounded-2xl bg-[var(--theme-hover)]/15 p-1">
                     <div className="mb-1 flex justify-center">
-                      <span className="rounded-full bg-primary-200/30 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary-500">
+                      <span className="rounded-full bg-[var(--theme-hover)]/30 px-3 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--theme-muted)]">
                         Agents
                       </span>
                     </div>
                     <div className="mb-1 flex items-center justify-between px-1">
-                      <p className="text-[10px] text-primary-600 tabular-nums">
+                      <p className="text-[10px] text-[var(--theme-muted)] tabular-nums">
                         {isLoading
                           ? 'syncing...'
                           : activeNodes.length === 0 && queuedNodes.length === 0
@@ -1350,7 +1350,7 @@ export function AgentViewPanel() {
                                 {missionSessionIds.has(node.id) ? (
                                   <span className="text-[10px] text-accent-400">Active mission</span>
                                 ) : nonMissionActiveAgents.length > 0 ? (
-                                  <span className="text-[10px] text-primary-500">Outside mission</span>
+                                  <span className="text-[10px] text-[var(--theme-muted)]">Outside mission</span>
                                 ) : <span />}
                                 <button
                                   type="button"
@@ -1367,11 +1367,11 @@ export function AgentViewPanel() {
                     ) : null}
                   </section>
                   {historyAgents.length > 0 ? (
-                    <section className="rounded-2xl bg-primary-200/15 p-2">
+                    <section className="rounded-2xl bg-[var(--theme-hover)]/15 p-2">
                       <button
                         type="button"
                         onClick={() => setHistoryOpen(!historyOpen)}
-                        className="flex w-full items-center justify-between text-[11px] font-medium text-primary-700"
+                        className="flex w-full items-center justify-between text-[11px] font-medium text-[var(--theme-muted)]"
                       >
                         <span>History ({historyAgents.length})</span>
                         <span>{historyOpen ? '▾' : '▸'}</span>
@@ -1419,7 +1419,7 @@ export function AgentViewPanel() {
             onClick={function handleOpenPanel() {
               setOpen(true)
             }}
-            className="fixed right-4 bottom-4 z-30 inline-flex size-12 items-center justify-center rounded-full bg-linear-to-br from-accent-500 to-accent-600 text-primary-50 shadow-lg"
+            className="fixed right-4 bottom-4 z-30 inline-flex size-12 items-center justify-center rounded-full bg-linear-to-br from-accent-500 to-accent-600 text-[var(--theme-text)] shadow-lg"
             aria-label="Open Agent View"
           >
             <motion.span
@@ -1440,7 +1440,7 @@ export function AgentViewPanel() {
             >
               <HugeiconsIcon icon={BotIcon} size={20} strokeWidth={1.5} />
             </motion.span>
-            <span className="absolute -top-1 -right-1 inline-flex size-5 items-center justify-center rounded-full bg-primary-950 text-[11px] font-medium text-primary-50 tabular-nums">
+            <span className="absolute -top-1 -right-1 inline-flex size-5 items-center justify-center rounded-full bg-[var(--theme-bg)] text-[11px] font-medium text-[var(--theme-text)] tabular-nums">
               {activeCount}
             </span>
           </motion.button>

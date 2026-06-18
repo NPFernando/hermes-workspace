@@ -24,10 +24,10 @@ const SISTER_BADGE_STYLES: Partial<Record<string, { bg: string; text: string; bo
   novus:    { bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-400/30' },
   nova:     { bg: 'bg-sky-500/15',     text: 'text-sky-300',     border: 'border-sky-400/30' },
   business: { bg: 'bg-amber-500/15',   text: 'text-amber-300',   border: 'border-amber-400/30' },
-  default:  { bg: 'bg-primary-500/10', text: 'text-primary-400', border: 'border-primary-300/20' },
+  default:  { bg: 'bg-[var(--theme-panel)]0/10', text: 'text-[var(--theme-muted)]', border: 'border-[var(--theme-border)]/20' },
 }
 
-const FALLBACK_STYLE = { bg: 'bg-primary-500/10', text: 'text-primary-400', border: 'border-primary-300/20' }
+const FALLBACK_STYLE = { bg: 'bg-[var(--theme-panel)]0/10', text: 'text-[var(--theme-muted)]', border: 'border-[var(--theme-border)]/20' }
 
 function badgeStyle(sister: SisterInfo): { bg: string; text: string; border: string } {
   return SISTER_BADGE_STYLES[sister.id]
@@ -92,8 +92,8 @@ function getStatusStyles(status: OperationsAgent['status']) {
   }
 
   return {
-    dot: 'bg-primary-300',
-    ring: 'text-primary-300',
+    dot: 'bg-[var(--theme-hover)]',
+    ring: 'text-[var(--theme-muted)]',
     label: 'Idle',
   }
 }
@@ -208,7 +208,7 @@ export function OperationsInlineChat({
           />
           <Button
             size="icon-sm"
-            className="rounded-lg bg-[var(--theme-accent)] text-primary-950 hover:bg-[var(--theme-accent-strong)]"
+            className="rounded-lg bg-[var(--theme-accent)] text-[var(--theme-text)] hover:bg-[var(--theme-accent-strong)]"
             onClick={() => void handleSend()}
             disabled={!draft.trim() || isSending}
             aria-label={isSending ? 'Sending message' : 'Send message'}
@@ -439,7 +439,7 @@ export function OperationsAgentCard({
                             className="peer sr-only"
                             aria-label={job.enabled ? 'Disable job' : 'Enable job'}
                           />
-                          <span className="h-5 w-9 rounded-full bg-primary-200 transition-colors peer-checked:bg-[var(--theme-accent)]" />
+                          <span className="h-5 w-9 rounded-full bg-[var(--theme-hover)] transition-colors peer-checked:bg-[var(--theme-accent)]" />
                           <span className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-[var(--theme-card)] shadow-sm transition-transform peer-checked:translate-x-4" />
                         </label>
                         <div className="min-w-0 flex-1">

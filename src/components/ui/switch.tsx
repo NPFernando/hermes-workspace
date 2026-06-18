@@ -20,7 +20,7 @@ function Switch({ className, ...props }: SwitchPrimitive.Root.Props) {
   return (
     <SwitchPrimitive.Root
       className={cn(
-        'relative inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2.4-2px)] shrink-0 items-center rounded-full p-px outline-none transition-[background-color,box-shadow] duration-200 [--thumb-size:--spacing(5)] focus-visible:ring-2 focus-visible:ring-primary-950 focus-visible:ring-offset-1 focus-visible:ring-offset-background data-checked:bg-emerald-600 data-unchecked:bg-primary-300 dark:data-unchecked:bg-primary-700 border border-primary-300 dark:border-primary-600 data-checked:border-emerald-700 data-disabled:opacity-64 sm:[--thumb-size:--spacing(4)]',
+        'relative inline-flex h-[calc(var(--thumb-size)+2px)] w-[calc(var(--thumb-size)*2.4-2px)] shrink-0 items-center rounded-full p-px outline-none transition-[background-color,box-shadow] duration-200 [--thumb-size:--spacing(5)] focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-background data-checked:bg-emerald-600 data-unchecked:bg-[var(--theme-border)] border border-[var(--theme-border)] data-checked:border-emerald-700 data-disabled:opacity-64 sm:[--thumb-size:--spacing(4)]',
         className,
       )}
       data-slot="switch"
@@ -39,7 +39,7 @@ function Switch({ className, ...props }: SwitchPrimitive.Root.Props) {
           of the thumb. Muted so it doesn't shout. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute right-1 select-none text-[8px] font-bold uppercase tracking-wide text-primary-700 opacity-100 transition-opacity duration-150 dark:text-primary-300 in-data-checked:opacity-0"
+        className="pointer-events-none absolute right-1 select-none text-[8px] font-bold uppercase tracking-wide text-[var(--theme-muted)] opacity-100 transition-opacity duration-150 dark:text-[var(--theme-muted)] in-data-checked:opacity-0"
       >
         OFF
       </span>

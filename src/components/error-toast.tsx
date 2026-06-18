@@ -90,7 +90,7 @@ function ToastItem({ entry, onDismiss }: ToastItemProps) {
       <button
         type="button"
         onClick={() => onDismiss(entry.id)}
-        className="shrink-0 text-primary-400 hover:text-primary-600 transition-colors text-lg leading-none"
+        className="shrink-0 text-[var(--theme-muted)] hover:text-[var(--theme-muted)] transition-colors text-lg leading-none"
         aria-label="Dismiss"
       >
         ×

@@ -286,16 +286,16 @@ export function MemoryBrowserScreen() {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 md:grid-cols-3 md:p-4">
-        <aside className="flex min-h-0 flex-col rounded-2xl border border-primary-200 bg-primary-50 md:col-span-1">
+        <aside className="flex min-h-0 flex-col rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] md:col-span-1">
           <button
             type="button"
             className="flex items-center justify-between px-3 py-2 text-left md:cursor-default"
             onClick={() => setMobileFilesOpen((value) => !value)}
           >
-            <span className="text-xs font-semibold uppercase tracking-wide text-primary-500">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
               Memory Files ({fileItems.length})
             </span>
-            <span className="md:hidden text-primary-500">
+            <span className="md:hidden text-[var(--theme-muted)]">
               <HugeiconsIcon
                 icon={mobileFilesOpen ? ArrowUp01Icon : ArrowDown01Icon}
                 size={16}
@@ -306,16 +306,16 @@ export function MemoryBrowserScreen() {
 
           {searchEnabled ? (
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-              <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-primary-400">
+              <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
                 Search Results
               </div>
               <div className="space-y-1">
                 {searchQuery.isLoading ? (
-                  <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-400">
+                  <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-xs text-[var(--theme-muted)]">
                     Searching...
                   </div>
                 ) : searchResults.length === 0 ? (
-                  <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-400">
+                  <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-xs text-[var(--theme-muted)]">
                     No matches
                   </div>
                 ) : (
@@ -328,12 +328,12 @@ export function MemoryBrowserScreen() {
                           setMobileFilesOpen(false)
                         }
                       }}
-                      className="w-full rounded-lg border border-primary-200 bg-primary-50/80 px-2.5 py-2 text-left hover:border-primary-300 hover:bg-primary-100 dark:hover:border-neutral-700 dark:hover:bg-neutral-900"
+                      className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2.5 py-2 text-left hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]"
                     >
-                      <div className="truncate text-[11px] text-primary-500">
+                      <div className="truncate text-[11px] text-[var(--theme-muted)]">
                         {result.path}:{result.line}
                       </div>
-                      <div className="mt-0.5 line-clamp-2 text-xs text-primary-700">
+                      <div className="mt-0.5 line-clamp-2 text-xs text-[var(--theme-muted)]">
                         {highlightMatch(result.text, searchTerm).map(
                           (part, partIndex) => (
                             <span
@@ -372,11 +372,11 @@ export function MemoryBrowserScreen() {
                   />
                 ) : null}
 
-                <div className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-primary-400">
+                <div className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
                   memory/ or memories/
                 </div>
                 {memoryFiles.length === 0 ? (
-                  <div className="rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2 text-xs text-primary-400">
+                  <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-xs text-[var(--theme-muted)]">
                     No files in memory/ or memories/
                   </div>
                 ) : (
@@ -396,14 +396,14 @@ export function MemoryBrowserScreen() {
           )}
         </aside>
 
-        <section className="flex min-h-0 flex-col rounded-2xl border border-primary-200 bg-primary-50 md:col-span-2">
-          <div className="flex items-center justify-between border-b border-primary-200 px-3 py-2">
+        <section className="flex min-h-0 flex-col rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] md:col-span-2">
+          <div className="flex items-center justify-between border-b border-[var(--theme-border)] px-3 py-2">
             <div className="min-w-0">
-              <div className="truncate font-mono text-sm text-primary-900">
+              <div className="truncate font-mono text-sm text-[var(--theme-text)]">
                 {selectedPath || 'Select a file'}
               </div>
               {selectedPath ? (
-                <div className="text-xs text-primary-400">
+                <div className="text-xs text-[var(--theme-muted)]">
                   {selectedFileMeta?.size != null
                     ? `${formatBytes(selectedFileMeta.size)} · ${formatModified(selectedFileMeta.modified)}`
                     : 'Loading metadata...'}
@@ -412,7 +412,7 @@ export function MemoryBrowserScreen() {
             </div>
             <div className="ml-3 flex items-center gap-2">
               {!isEditing && selectedPath ? (
-                <div className="flex items-center rounded-md border border-primary-200">
+                <div className="flex items-center rounded-md border border-[var(--theme-border)]">
                   <button
                     type="button"
                     onClick={() => setViewMode('rendered')}
@@ -421,7 +421,7 @@ export function MemoryBrowserScreen() {
                       'inline-flex items-center gap-1 rounded-l-md px-2.5 py-1.5 text-xs font-semibold transition-colors',
                       viewMode === 'rendered'
                         ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
-                        : 'text-primary-500 hover:bg-primary-100 dark:hover:bg-neutral-800',
+                        : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
                     )}
                   >
                     <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={1.7} />
@@ -432,10 +432,10 @@ export function MemoryBrowserScreen() {
                     onClick={() => setViewMode('raw')}
                     title="Raw view"
                     className={cn(
-                      'inline-flex items-center gap-1 rounded-r-md border-l border-primary-200 px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                      'inline-flex items-center gap-1 rounded-r-md border-l border-[var(--theme-border)] px-2.5 py-1.5 text-xs font-semibold transition-colors',
                       viewMode === 'raw'
                         ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
-                        : 'text-primary-500 hover:bg-primary-100 dark:hover:bg-neutral-800',
+                        : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
                     )}
                   >
                     <HugeiconsIcon icon={CodeCircleIcon} size={13} strokeWidth={1.7} />
@@ -447,7 +447,7 @@ export function MemoryBrowserScreen() {
                 type="button"
                 title="Refresh files"
                 onClick={() => queryClient.invalidateQueries({ queryKey: ['memory'] })}
-                className="inline-flex items-center justify-center rounded-md border border-primary-200 p-1.5 text-primary-500 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                className="inline-flex items-center justify-center rounded-md border border-[var(--theme-border)] p-1.5 text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]"
               >
                 <HugeiconsIcon icon={CircleArrowReload01Icon} size={14} strokeWidth={1.7} />
               </button>
@@ -467,7 +467,7 @@ export function MemoryBrowserScreen() {
                         type="button"
                         disabled={isSaving}
                         onClick={handleCancelEditing}
-                        className="rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                        className="rounded-md border border-[var(--theme-border)] px-3 py-1.5 text-xs font-semibold transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Cancel
                       </button>
@@ -482,7 +482,7 @@ export function MemoryBrowserScreen() {
                     <button
                       type="button"
                       onClick={handleStartEditing}
-                      className="relative inline-flex items-center gap-1.5 rounded-md border border-primary-200 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary-300 hover:bg-primary-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                      className="relative inline-flex items-center gap-1.5 rounded-md border border-[var(--theme-border)] px-3 py-1.5 text-xs font-semibold transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]"
                     >
                       <HugeiconsIcon
                         icon={PencilEdit02Icon}
@@ -554,19 +554,19 @@ export function MemoryBrowserScreen() {
                           lineRefs.current[lineNumber] = node
                         }}
                         className={cn(
-                          'grid grid-cols-[56px_1fr] gap-0 border-b border-primary-200/80 last:border-b-0',
+                          'grid grid-cols-[56px_1fr] gap-0 border-b border-[var(--theme-border)] last:border-b-0',
                           highlighted && 'bg-yellow-300/10',
                         )}
                       >
                         <div
                           className={cn(
-                            'select-none border-r border-primary-200 px-2 py-0.5 text-right text-primary-400',
+                            'select-none border-r border-[var(--theme-border)] px-2 py-0.5 text-right text-[var(--theme-muted)]',
                             highlighted && 'text-yellow-200',
                           )}
                         >
                           {lineNumber}
                         </div>
-                        <pre className="overflow-x-auto whitespace-pre-wrap break-words px-3 py-0.5 text-primary-800">
+                        <pre className="overflow-x-auto whitespace-pre-wrap break-words px-3 py-0.5 text-[var(--theme-text)]">
                           {line || ' '}
                         </pre>
                       </div>
@@ -599,13 +599,13 @@ function FileRow({
         'w-full rounded-lg border px-2.5 py-2 text-left transition-colors',
         selected
           ? 'border-accent-500/70 bg-accent-500/10'
-          : 'border-primary-200 bg-primary-50/80 hover:border-primary-300 hover:bg-primary-100 dark:hover:border-neutral-700 dark:hover:bg-neutral-900',
+          : 'border-[var(--theme-border)] bg-[var(--theme-panel)] hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]',
       )}
     >
-      <div className="truncate font-mono text-xs text-primary-900">
+      <div className="truncate font-mono text-xs text-[var(--theme-text)]">
         {file.path}
       </div>
-      <div className="mt-0.5 text-[11px] text-primary-400">
+      <div className="mt-0.5 text-[11px] text-[var(--theme-muted)]">
         {formatBytes(file.size)} · {formatModified(file.modified)}
       </div>
     </button>
@@ -619,7 +619,7 @@ function StateBox({ label, error }: { label: string; error?: boolean }) {
         'flex min-h-32 items-center justify-center rounded-xl border px-4 text-sm',
         error
           ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300'
-          : 'border-primary-200 bg-primary-50 text-primary-500',
+          : 'border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)]',
       )}
     >
       {label}

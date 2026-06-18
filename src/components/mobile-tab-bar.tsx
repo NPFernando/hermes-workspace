@@ -267,7 +267,7 @@ export function MobileTabBar() {
           // Keep the pill visually isolated from page and error-state backgrounds
           'bg-surface/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-surface/90',
           'rounded-full',
-          'border border-primary-200/40',
+          'border border-[var(--theme-border)]',
           // Inner padding
           'px-3 py-2',
           // Hide/show animation
@@ -318,7 +318,7 @@ export function MobileTabBar() {
                     circleSize,
                     isActive
                       ? 'bg-accent-500 text-white shadow-sm'
-                      : 'text-primary-500',
+                      : 'text-[var(--theme-muted)]',
                   )}
                 >
                   <HugeiconsIcon

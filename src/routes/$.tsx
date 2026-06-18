@@ -12,7 +12,7 @@ function NotFoundPage() {
   usePageTitle('404 — Not Found')
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-primary-50">
+    <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-[var(--theme-panel)]">
       <div className="max-w-md">
         {/* 404 Icon */}
         <div className="mb-6 flex items-center justify-center">
@@ -29,10 +29,10 @@ function NotFoundPage() {
         </div>
 
         {/* Message */}
-        <h1 className="text-2xl font-semibold text-primary-900 mb-2">
+        <h1 className="text-2xl font-semibold text-[var(--theme-text)] mb-2">
           Page Not Found
         </h1>
-        <p className="text-primary-600 mb-8">
+        <p className="text-[var(--theme-muted)] mb-8">
           The page you're looking for doesn't exist or has been moved.
         </p>
 
@@ -55,8 +55,8 @@ function NotFoundPage() {
         </div>
 
         {/* Helpful Links */}
-        <div className="mt-12 pt-8 border-t border-primary-200">
-          <p className="text-sm text-primary-500 mb-3">Quick Links</p>
+        <div className="mt-12 pt-8 border-t border-[var(--theme-border)]">
+          <p className="text-sm text-[var(--theme-muted)] mb-3">Quick Links</p>
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
             <Link
               to={'/chat' as string}

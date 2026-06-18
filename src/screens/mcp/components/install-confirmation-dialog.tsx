@@ -58,7 +58,7 @@ const TRUST_PILL: Record<
 }
 
 const FIELD =
-  'h-9 w-full rounded-lg border border-primary-200 bg-primary-100/60 px-3 text-sm text-ink outline-none transition-colors focus:border-primary'
+  'h-9 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-sm text-ink outline-none transition-colors focus:border-[var(--theme-accent)]'
 
 /** Apply placeholder overrides to a template copy before POSTing. */
 function applyOverrides(
@@ -192,7 +192,7 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
 
   return (
     <DialogRoot open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[min(640px,95vw)] border-primary-200 bg-primary-50/95 backdrop-blur-sm">
+      <DialogContent className="w-[min(640px,95vw)] border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-sm">
         {entry && trustConfig && template ? (
           <div className="flex flex-col gap-4 p-1">
             {/* Header */}
@@ -206,21 +206,21 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
                 >
                   {trustConfig.label}
                 </span>
-                <span className="rounded-md border border-primary-200 bg-primary-100/60 px-2 py-0.5 text-[11px] font-medium text-primary-500">
+                <span className="rounded-md border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-0.5 text-[11px] font-medium text-[var(--theme-muted)]">
                   {template.transportType}
                 </span>
               </div>
-              <DialogDescription className="text-sm text-primary-500 text-pretty">
+              <DialogDescription className="text-sm text-[var(--theme-muted)] text-pretty">
                 {entry.description || 'No description provided.'}
               </DialogDescription>
             </div>
 
             {/* Template preview */}
-            <div className="rounded-xl border border-primary-200 bg-primary-100/40 p-4 space-y-3 text-sm">
+            <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]/40 p-4 space-y-3 text-sm">
               {/* Command */}
               {template.command ? (
                 <div>
-                  <p className="mb-1 text-xs font-medium uppercase text-primary-400 tracking-wide">
+                  <p className="mb-1 text-xs font-medium uppercase text-[var(--theme-muted)] tracking-wide">
                     Command
                   </p>
                   <p className="font-mono text-ink break-all">{template.command}</p>
@@ -230,7 +230,7 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
               {/* Args */}
               {template.args && template.args.length > 0 ? (
                 <div>
-                  <p className="mb-1 text-xs font-medium uppercase text-primary-400 tracking-wide">
+                  <p className="mb-1 text-xs font-medium uppercase text-[var(--theme-muted)] tracking-wide">
                     Args
                   </p>
                   <ul className="space-y-0.5">
@@ -246,7 +246,7 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
               {/* URL (http transport) */}
               {template.url ? (
                 <div>
-                  <p className="mb-1 text-xs font-medium uppercase text-primary-400 tracking-wide">
+                  <p className="mb-1 text-xs font-medium uppercase text-[var(--theme-muted)] tracking-wide">
                     URL
                   </p>
                   <p className="font-mono text-ink break-all">{template.url}</p>
@@ -256,15 +256,15 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
               {/* Env */}
               {envKeys.length > 0 ? (
                 <div>
-                  <p className="mb-1 text-xs font-medium uppercase text-primary-400 tracking-wide">
+                  <p className="mb-1 text-xs font-medium uppercase text-[var(--theme-muted)] tracking-wide">
                     Environment Variables
                   </p>
                   <ul className="space-y-0.5">
                     {envKeys.map((key) => (
                       <li key={key} className="font-mono text-ink">
-                        <span className="text-primary-600">{key}</span>
-                        <span className="text-primary-400"> = </span>
-                        <span className="text-primary-400">***</span>
+                        <span className="text-[var(--theme-muted)]">{key}</span>
+                        <span className="text-[var(--theme-muted)]"> = </span>
+                        <span className="text-[var(--theme-muted)]">***</span>
                       </li>
                     ))}
                   </ul>
@@ -282,11 +282,11 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
                   This template contains placeholder values. Fill in the fields below before installing.
                 </p>
                 {placeholders.map((ph) => (
-                  <label key={ph.path} className="flex flex-col gap-1 text-sm text-primary-500">
-                    <span className="font-mono text-xs text-primary-600">
+                  <label key={ph.path} className="flex flex-col gap-1 text-sm text-[var(--theme-muted)]">
+                    <span className="font-mono text-xs text-[var(--theme-muted)]">
                       {ph.path}
                       {ph.currentValue ? (
-                        <span className="ml-1 text-primary-400">(was: {ph.currentValue})</span>
+                        <span className="ml-1 text-[var(--theme-muted)]">(was: {ph.currentValue})</span>
                       ) : null}
                     </span>
                     <input
@@ -304,7 +304,7 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
             ) : null}
 
             {/* Meta */}
-            <div className="space-y-1 text-xs text-primary-500">
+            <div className="space-y-1 text-xs text-[var(--theme-muted)]">
               {entry.homepage ? (
                 <p>
                   Homepage:{' '}
@@ -332,7 +332,7 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
             ) : null}
 
             {/* Footer actions */}
-            <div className="flex items-center justify-end gap-2 border-t border-primary-200 pt-3">
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--theme-border)] pt-3">
               <Button variant="ghost" size="sm" onClick={onClose} disabled={installing}>
                 Cancel
               </Button>

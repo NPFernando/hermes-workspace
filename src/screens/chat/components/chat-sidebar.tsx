@@ -184,7 +184,7 @@ function NavItem({
       ? isCollapsed
         ? 'text-accent-500 bg-accent-500/10'
         : 'hover:translate-x-0 border-l-2 border-accent-500 pl-[calc(0.75rem-2px)] text-accent-500 bg-accent-500/5 hover:bg-accent-500/8'
-      : 'text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
+      : 'text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
   )
 
   const iconEl =
@@ -378,7 +378,7 @@ function SectionLabel({
   if (isCollapsed) return null
 
   const labelContent = (
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 select-none">
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] select-none">
       {label}
     </span>
   )
@@ -393,7 +393,7 @@ function SectionLabel({
         {navigateTo ? (
           <Link
             to={navigateTo}
-            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 hover:text-primary-700 select-none transition-colors"
+            className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] hover:text-[var(--theme-muted)] select-none transition-colors"
           >
             {label}
           </Link>
@@ -403,7 +403,7 @@ function SectionLabel({
         <button
           type="button"
           onClick={onToggle}
-          className="ml-auto p-0.5 rounded hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors"
+          className="ml-auto p-0.5 rounded hover:bg-[var(--theme-hover)] transition-colors"
           aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
         >
           <HugeiconsIcon
@@ -411,7 +411,7 @@ function SectionLabel({
             size={12}
             strokeWidth={2}
             className={cn(
-              'text-primary-500 transition-transform duration-150',
+              'text-[var(--theme-muted)] transition-transform duration-150',
               expanded ? 'rotate-0' : '-rotate-90',
             )}
           />
@@ -429,7 +429,7 @@ function SectionLabel({
       {navigateTo ? (
         <Link
           to={navigateTo}
-          className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 hover:text-primary-700 select-none transition-colors"
+          className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] hover:text-[var(--theme-muted)] select-none transition-colors"
         >
           {label}
         </Link>
@@ -1036,7 +1036,7 @@ function ChatSidebarComponent({
             }}
             className={cn(
               buttonVariants({ variant: 'ghost', size: 'sm' }),
-              'w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
+              'w-full justify-start gap-2.5 px-3 py-2 text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
               isNewSessionActive &&
                 'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
             )}
@@ -1148,7 +1148,7 @@ function ChatSidebarComponent({
             <MenuTrigger
               data-tour="settings"
               className={cn(
-                'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200 dark:hover:bg-neutral-800 flex-1 min-w-0',
+                'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-[var(--theme-hover)] flex-1 min-w-0',
                 isVisuallyCollapsed ? 'justify-center px-0' : 'px-1.5',
               )}
             >
@@ -1166,7 +1166,7 @@ function ChatSidebarComponent({
                     transition={transition}
                     className="flex-1 min-w-0 flex items-center gap-1.5"
                   >
-                    <span className="block truncate text-sm font-medium text-primary-900">
+                    <span className="block truncate text-sm font-medium text-[var(--theme-text)]">
                       {profileDisplayName}
                     </span>
                     <StatusDot />
@@ -1199,7 +1199,7 @@ function ChatSidebarComponent({
               <button
                 type="button"
                 onClick={() => handleOpenSettings('claude')}
-                className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
+                className="shrink-0 rounded-lg p-1.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors"
                 aria-label="Settings"
               >
                 <HugeiconsIcon

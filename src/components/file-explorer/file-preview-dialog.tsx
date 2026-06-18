@@ -114,7 +114,7 @@ export default function FilePreviewDialog({
       }}
     >
       <DialogContent className="w-[min(900px,96vw)]">
-        <div className="p-5 border-b border-primary-200 flex items-center justify-between">
+        <div className="p-5 border-b border-[var(--theme-border)] flex items-center justify-between">
           <DialogTitle className="text-base font-semibold">
             {path || 'File'}
           </DialogTitle>
@@ -130,7 +130,7 @@ export default function FilePreviewDialog({
 
         <div className="p-4">
           {loading ? (
-            <div className="text-sm text-primary-500">Loading…</div>
+            <div className="text-sm text-[var(--theme-muted)]">Loading…</div>
           ) : error ? (
             <div className="text-sm text-red-600">{error}</div>
           ) : path && isImageFile(path) ? (
@@ -139,7 +139,7 @@ export default function FilePreviewDialog({
                 <img
                   src={dataUrl}
                   alt={path}
-                  className="max-h-[60vh] max-w-full rounded-lg border border-primary-200"
+                  className="max-h-[60vh] max-w-full rounded-lg border border-[var(--theme-border)]"
                 />
               ) : null}
             </div>

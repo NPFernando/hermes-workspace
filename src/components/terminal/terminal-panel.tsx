@@ -375,7 +375,7 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
   if (isMobile) return null
 
   return (
-    <div className="flex flex-col bg-surface border-t border-primary-200">
+    <div className="flex flex-col bg-surface border-t border-[var(--theme-border)]">
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-2 text-sm font-medium">
           <HugeiconsIcon
@@ -398,7 +398,7 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
       {isOpen ? (
         <div
           ref={panelRef}
-          className="relative border-t border-primary-200"
+          className="relative border-t border-[var(--theme-border)]"
           style={{ height }}
         >
           <div
@@ -407,7 +407,7 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
           />
 
           <div className="flex h-full flex-col">
-            <div className="flex items-center gap-2 border-b border-primary-200 px-3 py-2">
+            <div className="flex items-center gap-2 border-b border-[var(--theme-border)] px-3 py-2">
               <div className="flex items-center gap-2 overflow-x-auto">
                 {tabs.map((tab) => (
                   <button
@@ -416,8 +416,8 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
                       'flex items-center gap-2 rounded-full border px-3 py-1 text-xs',
                       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
                       tab.id === activeTab?.id
-                        ? 'border-primary-400 bg-primary-100 text-primary-900'
-                        : 'border-primary-200 text-primary-700',
+                        ? 'border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-text)]'
+                        : 'border-[var(--theme-border)] text-[var(--theme-muted)]',
                     )}
                     onClick={() => setActiveTabId(tab.id)}
                     // Suppress the browser native context menu on tab
@@ -433,7 +433,7 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
                           event.stopPropagation()
                           void handleCloseTab(tab.id)
                         }}
-                        className="text-primary-500 hover:text-primary-900"
+                        className="text-[var(--theme-muted)] hover:text-[var(--theme-text)]"
                       >
                         <HugeiconsIcon icon={Cancel01Icon} size={12} />
                       </span>
@@ -451,11 +451,11 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
               </Button>
             </div>
 
-            <div className="flex items-center gap-2 border-b border-primary-200 px-3 py-2">
-              <div className="flex items-center gap-2 text-xs text-primary-500">
+            <div className="flex items-center gap-2 border-b border-[var(--theme-border)] px-3 py-2">
+              <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
                 <HugeiconsIcon icon={Search01Icon} size={14} />
                 <input
-                  className="rounded border border-primary-200 bg-transparent px-2 py-1 text-xs focus:outline-none"
+                  className="rounded border border-[var(--theme-border)] bg-transparent px-2 py-1 text-xs focus:outline-none"
                   placeholder="Search output"
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
@@ -467,7 +467,7 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
                   }}
                 />
               </div>
-              <div className="ml-auto text-xs text-primary-500">
+              <div className="ml-auto text-xs text-[var(--theme-muted)]">
                 cwd: {DEFAULT_CWD}
               </div>
             </div>
@@ -528,7 +528,7 @@ function TerminalView({
     <div
       ref={containerRef}
       className={cn(
-        'h-full w-full bg-[#0b0f1a] text-primary-100',
+        'h-full w-full bg-[#0b0f1a] text-[var(--theme-text)]',
         isActive ? 'block' : 'hidden',
       )}
       // Clicking the container should always restore xterm focus — the

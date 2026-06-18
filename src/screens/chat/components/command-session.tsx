@@ -103,7 +103,7 @@ function CommandSessionDialog({
           <CommandInput placeholder="Search sessions" />
           <CommandPanel className="flex min-h-0 flex-1 flex-col">
             {isEmpty ? (
-              <div className="h-72 min-h-0 flex items-center justify-center text-sm text-primary-600">
+              <div className="h-72 min-h-0 flex items-center justify-center text-sm text-[var(--theme-muted)]">
                 No sessions found.
               </div>
             ) : (
@@ -136,9 +136,9 @@ function CommandSessionDialog({
             )}
           </CommandPanel>
           <CommandFooter>
-            <div className="flex items-center gap-4 text-primary-700">
+            <div className="flex items-center gap-4 text-[var(--theme-muted)]">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-md border border-primary-200 bg-surface px-2 py-1 text-[11px] font-medium text-primary-700">
+                <span className="inline-flex items-center gap-1 rounded-md border border-[var(--theme-border)] bg-surface px-2 py-1 text-[11px] font-medium text-[var(--theme-muted)]">
                   <HugeiconsIcon
                     icon={ArrowUp01Icon}
                     size={14}
@@ -153,14 +153,14 @@ function CommandSessionDialog({
                 <span>Navigate</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="rounded-md border border-primary-200 bg-surface px-2 py-1 text-[11px] font-medium text-primary-700">
+                <span className="rounded-md border border-[var(--theme-border)] bg-surface px-2 py-1 text-[11px] font-medium text-[var(--theme-muted)]">
                   Enter
                 </span>
                 <span>Open</span>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-primary-700">
-              <span className="rounded-md border border-primary-200 bg-surface px-2 py-1 text-[11px] font-medium text-primary-700">
+            <div className="flex items-center gap-2 text-[var(--theme-muted)]">
+              <span className="rounded-md border border-[var(--theme-border)] bg-surface px-2 py-1 text-[11px] font-medium text-[var(--theme-muted)]">
                 Esc
               </span>
               <span>Close</span>

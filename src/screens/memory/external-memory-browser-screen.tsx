@@ -260,26 +260,26 @@ export function ExternalMemoryBrowserScreen() {
   if (!providersQuery.isLoading && providers.length === 0) {
     return (
       <div className="flex h-full items-center justify-center px-4">
-        <div className="max-w-xl rounded-2xl border border-primary-200 bg-primary-50 p-6">
+        <div className="max-w-xl rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-6">
           <HugeiconsIcon
             icon={BrainIcon}
-            className="mx-auto mb-4 size-8 text-primary-400"
+            className="mx-auto mb-4 size-8 text-[var(--theme-muted)]"
           />
-          <h2 className="text-center text-lg font-semibold text-primary-900">
+          <h2 className="text-center text-lg font-semibold text-[var(--theme-text)]">
             No external memory providers
           </h2>
-          <p className="mt-2 text-center text-sm text-primary-600">
+          <p className="mt-2 text-center text-sm text-[var(--theme-muted)]">
             This tab shows a human review queue for memories the agent has flagged
             before committing them to long-term storage.
           </p>
           <div className="mt-4 space-y-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4">
-            <p className="text-xs font-medium text-primary-700">
+            <p className="text-xs font-medium text-[var(--theme-muted)]">
               To enable: create{' '}
-              <code className="rounded bg-primary-100 px-1 font-mono">
+              <code className="rounded bg-[var(--theme-hover)] px-1 font-mono">
                 ~/.hermes/external_memory_providers.json
               </code>
             </p>
-            <pre className="overflow-x-auto rounded-lg bg-primary-50 p-3 text-xs text-primary-800">{`{
+            <pre className="overflow-x-auto rounded-lg bg-[var(--theme-panel)] p-3 text-xs text-[var(--theme-text)]">{`{
   "providers": [{
     "id": "hindsight",
     "label": "Hindsight (Long-term Memory)",
@@ -287,7 +287,7 @@ export function ExternalMemoryBrowserScreen() {
     "config_path": "hindsight/config.json"
   }]
 }`}</pre>
-            <p className="text-xs text-primary-500">
+            <p className="text-xs text-[var(--theme-muted)]">
               Memories written by Astra during sessions will appear here as candidates
               for you to approve, reject, or edit before they enter long-term recall.
             </p>
@@ -300,12 +300,12 @@ export function ExternalMemoryBrowserScreen() {
   return (
     <div data-route-page className="grid h-full min-h-0 grid-cols-1 gap-0 lg:grid-cols-[380px_minmax(0,1fr)]">
       <aside className="flex min-h-0 flex-col border-b border-[var(--theme-border)] bg-[var(--theme-bg)] lg:border-r lg:border-b-0">
-        <div className="space-y-3 border-b border-primary-200 p-4">
+        <div className="space-y-3 border-b border-[var(--theme-border)] p-4">
           <div>
-            <h2 className="text-sm font-semibold text-primary-900">
+            <h2 className="text-sm font-semibold text-[var(--theme-text)]">
               External memory
             </h2>
-            <p className="text-xs text-primary-500">
+            <p className="text-xs text-[var(--theme-muted)]">
               Review queues backed by custom providers.
             </p>
           </div>
@@ -325,7 +325,7 @@ export function ExternalMemoryBrowserScreen() {
           <div className="relative">
             <HugeiconsIcon
               icon={Search01Icon}
-              className="pointer-events-none absolute top-2.5 left-3 size-4 text-primary-400"
+              className="pointer-events-none absolute top-2.5 left-3 size-4 text-[var(--theme-muted)]"
             />
             <input
               value={searchInput}
@@ -345,8 +345,8 @@ export function ExternalMemoryBrowserScreen() {
                 className={cn(
                   'rounded-lg border px-2 py-1.5 capitalize transition disabled:opacity-40',
                   state === item
-                    ? 'border-primary-500 bg-primary-100 text-primary-900 dark:border-blue-500 dark:bg-blue-500/15 dark:text-blue-100'
-                    : 'border-primary-200 text-primary-600 hover:bg-primary-50 dark:hover:bg-neutral-900',
+                    ? 'border-[var(--theme-accent)] bg-[var(--theme-hover)] text-[var(--theme-text)] dark:border-blue-500 dark:bg-blue-500/15 dark:text-blue-100'
+                    : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]',
                 )}
               >
                 {formatStateFilterLabel(item, stateCounts)}
@@ -357,7 +357,7 @@ export function ExternalMemoryBrowserScreen() {
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {isLoading ? (
-            <p className="p-3 text-sm text-primary-500">
+            <p className="p-3 text-sm text-[var(--theme-muted)]">
               Loading...
             </p>
           ) : null}
@@ -368,11 +368,11 @@ export function ExternalMemoryBrowserScreen() {
           ) : null}
           {!isLoading && candidates.length === 0 ? (
             <div className="px-3 py-6 text-center">
-              <p className="text-sm text-primary-500">
+              <p className="text-sm text-[var(--theme-muted)]">
                 No {state === 'all' ? '' : state + ' '}candidates yet.
               </p>
               {state === 'candidate' ? (
-                <p className="mt-1 text-xs text-primary-400">
+                <p className="mt-1 text-xs text-[var(--theme-muted)]">
                   Memory candidates appear here as Astra saves notes during sessions.
                 </p>
               ) : null}
@@ -387,12 +387,12 @@ export function ExternalMemoryBrowserScreen() {
                 className={cn(
                   'w-full rounded-xl border p-3 text-left transition',
                   selectedId === candidate.id
-                    ? 'border-primary-500 bg-primary-50 dark:border-blue-500 dark:bg-blue-500/10'
+                    ? 'border-[var(--theme-accent)] bg-[var(--theme-panel)] dark:border-blue-500 dark:bg-blue-500/10'
                     : 'border-[var(--theme-border)] bg-[var(--theme-bg)] hover:bg-[var(--theme-card)]',
                 )}
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="truncate font-mono text-xs text-primary-500">
+                  <span className="truncate font-mono text-xs text-[var(--theme-muted)]">
                     {candidate.id}
                   </span>
                   <span
@@ -404,10 +404,10 @@ export function ExternalMemoryBrowserScreen() {
                     {candidate.state}
                   </span>
                 </div>
-                <p className="line-clamp-3 text-sm text-primary-900">
+                <p className="line-clamp-3 text-sm text-[var(--theme-text)]">
                   {candidate.text}
                 </p>
-                <p className="mt-2 text-xs text-primary-500">
+                <p className="mt-2 text-xs text-[var(--theme-muted)]">
                   {formatTimestamp(candidate.updatedAt)}
                 </p>
               </button>
@@ -419,10 +419,10 @@ export function ExternalMemoryBrowserScreen() {
       <main className="min-h-0 overflow-y-auto bg-[var(--theme-bg)] p-4">
         {selected ? (
           <article className="mx-auto max-w-4xl space-y-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-primary-100 pb-4">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--theme-border)] pb-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-mono text-xs text-primary-500">
+                  <p className="font-mono text-xs text-[var(--theme-muted)]">
                     {selected.id}
                   </p>
                   {activeProvider?.kind === 'hindsight' ? (
@@ -431,7 +431,7 @@ export function ExternalMemoryBrowserScreen() {
                     </span>
                   ) : null}
                 </div>
-                <h1 className="mt-1 text-xl font-semibold text-primary-950">
+                <h1 className="mt-1 text-xl font-semibold text-[var(--theme-text)]">
                   {activeProvider?.label || selected.provider}
                 </h1>
               </div>
@@ -459,7 +459,7 @@ export function ExternalMemoryBrowserScreen() {
                         ? 'border-rose-500/40 text-rose-600 hover:bg-rose-500/10 dark:text-rose-300'
                         : label.startsWith('Approve')
                           ? 'border-violet-400/40 text-violet-700 hover:bg-violet-500/10 dark:border-violet-700 dark:text-violet-300 dark:hover:bg-violet-500/10'
-                          : 'border-primary-200 text-primary-700 hover:bg-primary-50 dark:hover:bg-neutral-900',
+                          : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]',
                     )}
                   >
                     {label}
@@ -482,26 +482,26 @@ export function ExternalMemoryBrowserScreen() {
 
             <dl className="grid gap-3 text-sm md:grid-cols-2">
               <div>
-                <dt className="text-xs uppercase tracking-wide text-primary-400">
+                <dt className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
                   Source
                 </dt>
-                <dd className="mt-1 text-primary-900">
+                <dd className="mt-1 text-[var(--theme-text)]">
                   {selected.source}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase tracking-wide text-primary-400">
+                <dt className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
                   Updated
                 </dt>
-                <dd className="mt-1 text-primary-900">
+                <dd className="mt-1 text-[var(--theme-text)]">
                   {formatTimestamp(selected.updatedAt)}
                 </dd>
               </div>
               <div className="md:col-span-2">
-                <dt className="text-xs uppercase tracking-wide text-primary-400">
+                <dt className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
                   Metadata
                 </dt>
-                <dd className="mt-1 text-primary-900">
+                <dd className="mt-1 text-[var(--theme-text)]">
                   {metadataPreview(selected.metadata)}
                 </dd>
               </div>
@@ -516,17 +516,17 @@ export function ExternalMemoryBrowserScreen() {
                 </div>
               ) : null}
               <div className="md:col-span-2">
-                <dt className="text-xs uppercase tracking-wide text-primary-400">
+                <dt className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
                   SHA-256
                 </dt>
-                <dd className="mt-1 break-all font-mono text-xs text-primary-700">
+                <dd className="mt-1 break-all font-mono text-xs text-[var(--theme-muted)]">
                   {selected.contentSha256}
                 </dd>
               </div>
             </dl>
           </article>
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-primary-500">
+          <div className="flex h-full items-center justify-center text-sm text-[var(--theme-muted)]">
             Select a memory row.
           </div>
         )}

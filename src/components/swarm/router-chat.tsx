@@ -401,7 +401,7 @@ export function RouterChat({
                     'inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold',
                     dispatching || decomposing
                       ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-text)]'
-                      : 'bg-[var(--theme-accent)] text-primary-950 hover:bg-[var(--theme-accent-strong)] disabled:opacity-50',
+                      : 'bg-[var(--theme-accent)] text-[var(--theme-text)] hover:bg-[var(--theme-accent-strong)] disabled:opacity-50',
                   )}
                 >
                   <HugeiconsIcon
@@ -622,7 +622,7 @@ function RouterClosedDock({
           </span>
         </span>
       </span>
-      <span className="shrink-0 rounded-full bg-[var(--theme-accent)] px-3 py-1 text-xs font-semibold text-primary-950">
+      <span className="shrink-0 rounded-full bg-[var(--theme-accent)] px-3 py-1 text-xs font-semibold text-[var(--theme-text)]">
         Open
       </span>
     </button>
@@ -645,7 +645,7 @@ function ModeToggle({
           onClick={() => setMode(m)}
           className={cn(
             'rounded-lg px-3 py-1 transition-colors',
-            mode === m ? 'bg-[var(--theme-accent)] text-primary-950' : 'hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]',
+            mode === m ? 'bg-[var(--theme-accent)] text-[var(--theme-text)]' : 'hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]',
           )}
         >
           {m === 'manual' ? 'one agent' : m}

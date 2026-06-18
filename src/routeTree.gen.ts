@@ -24,6 +24,7 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as EchoStudioRouteImport } from './routes/echo-studio'
+import { Route as DownloadApkRouteImport } from './routes/download-apk'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as CommandRouteImport } from './routes/command'
@@ -108,6 +109,7 @@ import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-repr
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
+import { Route as ApiDownloadApkRouteImport } from './routes/api/download-apk'
 import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
@@ -279,6 +281,11 @@ const FilesRoute = FilesRouteImport.update({
 const EchoStudioRoute = EchoStudioRouteImport.update({
   id: '/echo-studio',
   path: '/echo-studio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadApkRoute = DownloadApkRouteImport.update({
+  id: '/download-apk',
+  path: '/download-apk',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -700,6 +707,11 @@ const ApiEventsRoute = ApiEventsRouteImport.update({
 const ApiEnvResetRoute = ApiEnvResetRouteImport.update({
   id: '/api/env-reset',
   path: '/api/env-reset',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDownloadApkRoute = ApiDownloadApkRouteImport.update({
+  id: '/api/download-apk',
+  path: '/api/download-apk',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDebugAnalyzeRoute = ApiDebugAnalyzeRouteImport.update({
@@ -1204,6 +1216,7 @@ export interface FileRoutesByFullPath {
   '/command': typeof CommandRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/download-apk': typeof DownloadApkRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
@@ -1242,6 +1255,7 @@ export interface FileRoutesByFullPath {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
+  '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
@@ -1402,6 +1416,7 @@ export interface FileRoutesByTo {
   '/command': typeof CommandRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/download-apk': typeof DownloadApkRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
@@ -1439,6 +1454,7 @@ export interface FileRoutesByTo {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
+  '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
@@ -1600,6 +1616,7 @@ export interface FileRoutesById {
   '/command': typeof CommandRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/download-apk': typeof DownloadApkRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
   '/jobs': typeof JobsRoute
@@ -1638,6 +1655,7 @@ export interface FileRoutesById {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
+  '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
@@ -1800,6 +1818,7 @@ export interface FileRouteTypes {
     | '/command'
     | '/conductor'
     | '/dashboard'
+    | '/download-apk'
     | '/echo-studio'
     | '/files'
     | '/jobs'
@@ -1838,6 +1857,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/debug-analyze'
+    | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
     | '/api/files'
@@ -1998,6 +2018,7 @@ export interface FileRouteTypes {
     | '/command'
     | '/conductor'
     | '/dashboard'
+    | '/download-apk'
     | '/echo-studio'
     | '/files'
     | '/jobs'
@@ -2035,6 +2056,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/debug-analyze'
+    | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
     | '/api/files'
@@ -2195,6 +2217,7 @@ export interface FileRouteTypes {
     | '/command'
     | '/conductor'
     | '/dashboard'
+    | '/download-apk'
     | '/echo-studio'
     | '/files'
     | '/jobs'
@@ -2233,6 +2256,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/debug-analyze'
+    | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
     | '/api/files'
@@ -2394,6 +2418,7 @@ export interface RootRouteChildren {
   CommandRoute: typeof CommandRoute
   ConductorRoute: typeof ConductorRoute
   DashboardRoute: typeof DashboardRoute
+  DownloadApkRoute: typeof DownloadApkRoute
   EchoStudioRoute: typeof EchoStudioRoute
   FilesRoute: typeof FilesRoute
   JobsRoute: typeof JobsRoute
@@ -2432,6 +2457,7 @@ export interface RootRouteChildren {
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
   ApiDebugAnalyzeRoute: typeof ApiDebugAnalyzeRoute
+  ApiDownloadApkRoute: typeof ApiDownloadApkRoute
   ApiEnvResetRoute: typeof ApiEnvResetRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
@@ -2654,6 +2680,13 @@ declare module '@tanstack/react-router' {
       path: '/echo-studio'
       fullPath: '/echo-studio'
       preLoaderRoute: typeof EchoStudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/download-apk': {
+      id: '/download-apk'
+      path: '/download-apk'
+      fullPath: '/download-apk'
+      preLoaderRoute: typeof DownloadApkRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -3242,6 +3275,13 @@ declare module '@tanstack/react-router' {
       path: '/api/env-reset'
       fullPath: '/api/env-reset'
       preLoaderRoute: typeof ApiEnvResetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/download-apk': {
+      id: '/api/download-apk'
+      path: '/api/download-apk'
+      fullPath: '/api/download-apk'
+      preLoaderRoute: typeof ApiDownloadApkRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/debug-analyze': {
@@ -4172,6 +4212,7 @@ const rootRouteChildren: RootRouteChildren = {
   CommandRoute: CommandRoute,
   ConductorRoute: ConductorRoute,
   DashboardRoute: DashboardRoute,
+  DownloadApkRoute: DownloadApkRoute,
   EchoStudioRoute: EchoStudioRoute,
   FilesRoute: FilesRoute,
   JobsRoute: JobsRoute,
@@ -4210,6 +4251,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiCrewStatusRoute: ApiCrewStatusRoute,
   ApiDebugAnalyzeRoute: ApiDebugAnalyzeRoute,
+  ApiDownloadApkRoute: ApiDownloadApkRoute,
   ApiEnvResetRoute: ApiEnvResetRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,

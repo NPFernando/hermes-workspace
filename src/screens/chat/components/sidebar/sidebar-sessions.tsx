@@ -69,14 +69,14 @@ export const SidebarSessions = memo(function SidebarSessions({
       className="flex h-full flex-col flex-1 min-h-0 w-full"
       defaultOpen={defaultOpen}
     >
-      <CollapsibleTrigger className="w-full flex items-center gap-1.5 rounded-none px-5 pt-3 pb-1 shrink-0 text-[10px] font-semibold uppercase tracking-wider hover:bg-transparent data-panel-open:text-primary-500">
+      <CollapsibleTrigger className="w-full flex items-center gap-1.5 rounded-none px-5 pt-3 pb-1 shrink-0 text-[10px] font-semibold uppercase tracking-wider hover:bg-transparent data-panel-open:text-[var(--theme-muted)]">
         <span className="select-none">Sessions</span>
-        <span className="ml-auto p-0.5 rounded hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors">
+        <span className="ml-auto p-0.5 rounded hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)] transition-colors">
           <HugeiconsIcon
             icon={ArrowDown01Icon}
             size={12}
             strokeWidth={2}
-            className="text-primary-500 transition-transform duration-150 -rotate-90 group-data-panel-open:rotate-0"
+            className="text-[var(--theme-muted)] transition-transform duration-150 -rotate-90 group-data-panel-open:rotate-0"
           />
         </span>
       </CollapsibleTrigger>
@@ -107,11 +107,11 @@ export const SidebarSessions = memo(function SidebarSessions({
           <ScrollAreaViewport className="min-h-0">
             <div className="flex flex-col gap-px pl-3 pr-2">
               {loading ? (
-                <div className="px-2 py-2 text-xs text-primary-500">
+                <div className="px-2 py-2 text-xs text-[var(--theme-muted)]">
                   Loading sessions…
                 </div>
               ) : error ? (
-                <div className="px-2 py-2 text-xs text-primary-500">
+                <div className="px-2 py-2 text-xs text-[var(--theme-muted)]">
                   <div className="mb-2">Failed to load sessions.</div>
                   <div className="text-[11px] opacity-80">{error}</div>
                   <Button
@@ -127,7 +127,7 @@ export const SidebarSessions = memo(function SidebarSessions({
               ) : unpinnedSessions.length > 0 ? (
                 <>
                   {pinnedSessions.length > 0 ? (
-                    <div className="my-1 border-t border-primary-200/80" />
+                    <div className="my-1 border-t border-[var(--theme-border)]" />
                   ) : null}
                   {unpinnedSessions.map((session) => (
                     <SessionItem
@@ -143,14 +143,14 @@ export const SidebarSessions = memo(function SidebarSessions({
                   ))}
                 </>
               ) : (
-                <div className="px-2 py-2 text-xs text-primary-500">
+                <div className="px-2 py-2 text-xs text-[var(--theme-muted)]">
                   {pinnedSessions.length > 0
                     ? 'All sessions are pinned.'
                     : 'No sessions yet. Start a conversation →'}
                 </div>
               )}
               {fetching && !loading && !error && sessions.length > 0 ? (
-                <div className="px-2 py-1 text-[11px] text-primary-400">
+                <div className="px-2 py-1 text-[11px] text-[var(--theme-muted)]">
                   Updating…
                 </div>
               ) : null}

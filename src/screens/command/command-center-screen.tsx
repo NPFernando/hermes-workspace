@@ -54,7 +54,7 @@ const TYPE_BADGE: Record<SisterType, { label: string; classes: string }> = {
   },
   delegation_profile: {
     label: 'Profile',
-    classes: 'border-primary-300 bg-primary-100 text-primary-600',
+    classes: 'border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
   },
 }
 
@@ -76,7 +76,7 @@ function StatTile({
         tone === 'good' && 'border-emerald-400/40 bg-[var(--theme-card)]',
         tone === 'warn' && 'border-amber-400/40 bg-[var(--theme-card)]',
         tone === 'bad' && 'border-red-400/40 bg-[var(--theme-card)]',
-        tone === 'neutral' && 'border-primary-200 bg-[var(--theme-card)]',
+        tone === 'neutral' && 'border-[var(--theme-border)] bg-[var(--theme-card)]',
       )}
     >
       <span
@@ -85,7 +85,7 @@ function StatTile({
           tone === 'good' && 'text-emerald-500',
           tone === 'warn' && 'text-amber-500',
           tone === 'bad' && 'text-red-500',
-          tone === 'neutral' && 'text-primary-900',
+          tone === 'neutral' && 'text-[var(--theme-text)]',
         )}
       >
         {value}
@@ -104,25 +104,25 @@ function SisterCard({ sister, onChat, className }: { sister: Sister; onChat: () 
       className={cn(
         'group flex flex-col gap-3 rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
         sister.isLive
-          ? 'border-primary-200 bg-[var(--theme-card)] hover:border-[var(--theme-accent)]/30'
-          : 'border-primary-100 bg-primary-50/60 opacity-70',
+          ? 'border-[var(--theme-border)] bg-[var(--theme-card)] hover:border-[var(--theme-accent)]/30'
+          : 'border-[var(--theme-border)] bg-[var(--theme-panel)] opacity-70',
         className,
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary-200 bg-[var(--theme-card2)] text-2xl shadow-sm">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] text-2xl shadow-sm">
           {sister.emoji}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-semibold text-primary-900">{sister.name}</p>
+            <p className="truncate text-sm font-semibold text-[var(--theme-text)]">{sister.name}</p>
             {!sister.isLive && (
-              <span className="shrink-0 rounded-full border border-primary-200 bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-500">
+              <span className="shrink-0 rounded-full border border-[var(--theme-border)] bg-[var(--theme-hover)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--theme-muted)]">
                 offline
               </span>
             )}
           </div>
-          <p className="mt-0.5 truncate text-xs capitalize text-primary-500">{sister.role}</p>
+          <p className="mt-0.5 truncate text-xs capitalize text-[var(--theme-muted)]">{sister.role}</p>
         </div>
       </div>
 
@@ -136,23 +136,23 @@ function SisterCard({ sister, onChat, className }: { sister: Sister; onChat: () 
           </span>
         ) : null}
         {sister.hasProfile ? (
-          <span className="inline-flex items-center rounded-full border border-primary-200 bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] font-medium text-primary-500">
+          <span className="inline-flex items-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-muted)]">
             profile ✓
           </span>
         ) : null}
       </div>
 
       {sister.model ? (
-        <p className="truncate text-[11px] text-primary-400">{sister.model}</p>
+        <p className="truncate text-[11px] text-[var(--theme-muted)]">{sister.model}</p>
       ) : null}
       {sister.description ? (
-        <p className="line-clamp-2 text-xs text-primary-600">{sister.description}</p>
+        <p className="line-clamp-2 text-xs text-[var(--theme-muted)]">{sister.description}</p>
       ) : null}
       {sister.hasProfile && (
         <button
           type="button"
           onClick={onChat}
-          className="mt-auto flex items-center gap-1.5 self-start rounded-lg border border-primary-200 bg-[var(--theme-bg)] px-2.5 py-1 text-[11px] font-medium text-primary-600 opacity-0 transition-opacity group-hover:opacity-100 hover:border-accent-500/40 hover:bg-accent-500/5 hover:text-accent-600"
+          className="mt-auto flex items-center gap-1.5 self-start rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--theme-muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:border-accent-500/40 hover:bg-accent-500/5 hover:text-accent-600"
         >
           <HugeiconsIcon icon={Chat01Icon} size={12} strokeWidth={2} />
           Chat
@@ -168,17 +168,17 @@ function PresetCard({ preset, className }: { preset: PersonalityPreset; classNam
     ? preset.label.slice(preset.name.length + sep.length)
     : preset.label
   return (
-    <div className={cn('flex flex-col gap-2 rounded-2xl border border-primary-200 bg-[var(--theme-card)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--theme-accent)]/30', className)}>
+    <div className={cn('flex flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--theme-accent)]/30', className)}>
       <div className="flex items-center gap-2">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-accent-500/30 bg-accent-500/10 text-sm font-bold text-accent-600">
           {preset.name.charAt(0)}
         </span>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-primary-900">{preset.name}</p>
-          <p className="truncate text-[11px] text-primary-500">{roleLabel}</p>
+          <p className="truncate text-sm font-semibold text-[var(--theme-text)]">{preset.name}</p>
+          <p className="truncate text-[11px] text-[var(--theme-muted)]">{roleLabel}</p>
         </div>
       </div>
-      <p className="line-clamp-2 text-xs text-primary-600">{preset.description}</p>
+      <p className="line-clamp-2 text-xs text-[var(--theme-muted)]">{preset.description}</p>
     </div>
   )
 }
@@ -186,15 +186,15 @@ function PresetCard({ preset, className }: { preset: PersonalityPreset; classNam
 function SectionHeader({ title, count }: { title: string; count: number }) {
   return (
     <div className="flex items-center justify-between px-1">
-      <h2 className="text-[11px] font-bold uppercase tracking-widest text-primary-500">{title}</h2>
-      <span className="text-[11px] font-medium text-primary-400">{count}</span>
+      <h2 className="text-[11px] font-bold uppercase tracking-widest text-[var(--theme-muted)]">{title}</h2>
+      <span className="text-[11px] font-medium text-[var(--theme-muted)]">{count}</span>
     </div>
   )
 }
 
 function Spinner() {
   return (
-    <div className="flex h-24 items-center justify-center rounded-2xl border border-primary-200 bg-primary-50">
+    <div className="flex h-24 items-center justify-center rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]">
       <div className="spinner-accent" />
     </div>
   )
@@ -280,18 +280,18 @@ export function CommandCenterScreen() {
   )
 
   return (
-    <main data-route-page className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 md:px-6 md:pt-8">
+    <main data-route-page className="min-h-full bg-surface px-4 pb-24 pt-5 text-[var(--theme-text)] md:px-6 md:pt-8">
       <section className="mx-auto w-full max-w-[1480px] space-y-6">
 
         {/* ── Header ── */}
-        <header className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
+        <header className="flex flex-col gap-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3">
             <div className="flex size-11 items-center justify-center rounded-xl border border-accent-500/30 bg-accent-500/10 text-2xl">
               🌟
             </div>
             <div>
-              <h1 className="text-base font-semibold text-primary-900">Command Center</h1>
-              <p className="mt-1 text-sm text-primary-600">
+              <h1 className="text-base font-semibold text-[var(--theme-text)]">Command Center</h1>
+              <p className="mt-1 text-sm text-[var(--theme-muted)]">
                 {sisters.length > 0
                   ? `${sisters.length} agents · ${aiSisters.length} AI sisters · ${presets.length} swarm roles`
                   : 'Unified agent roster and operations dashboard'}
@@ -312,7 +312,7 @@ export function CommandCenterScreen() {
               />
             </div>
             <Button
-              className="bg-accent-500 text-primary-950 hover:bg-accent-400"
+              className="bg-accent-500 text-[var(--theme-text)] hover:bg-accent-400"
               onClick={() => void navigate({ to: '/conductor' })}
             >
               <HugeiconsIcon icon={Rocket01Icon} size={16} strokeWidth={1.8} />
@@ -320,7 +320,7 @@ export function CommandCenterScreen() {
             </Button>
             <Button
               variant="secondary"
-              className="border border-primary-200 bg-[var(--theme-card)] text-primary-700 hover:bg-primary-50"
+              className="border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]"
               onClick={() => void navigate({ to: '/settings' })}
             >
               <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.8} />
@@ -335,9 +335,9 @@ export function CommandCenterScreen() {
           {sistersQuery.isLoading ? (
             <Spinner />
           ) : aiSisters.length === 0 ? (
-            <p className="rounded-2xl border border-primary-200 bg-primary-50 px-4 py-6 text-sm text-primary-500">
+            <p className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-6 text-sm text-[var(--theme-muted)]">
               No AI sisters configured.{' '}
-              <code className="rounded bg-primary-100 px-1 text-xs">~/.hermes/config/sisters.yaml</code>
+              <code className="rounded bg-[var(--theme-hover)] px-1 text-xs">~/.hermes/config/sisters.yaml</code>
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -390,7 +390,7 @@ export function CommandCenterScreen() {
         {/* ── Swarm Personality Roster ── */}
         <section className="space-y-3">
           <SectionHeader title="Swarm Personality Roster" count={presets.length} />
-          <p className="px-1 text-xs text-primary-500">
+          <p className="px-1 text-xs text-[var(--theme-muted)]">
             Named roles assigned to swarm workers during multi-agent missions. Dispatch via Conductor.
           </p>
           {presetsQuery.isLoading ? (
@@ -414,7 +414,7 @@ export function CommandCenterScreen() {
           <section className="space-y-3">
             <SectionHeader title="Recent Activity" count={latestActivity.length} />
             {latestActivity.length === 0 ? (
-              <p className="rounded-2xl border border-primary-200 bg-primary-50 px-4 py-6 text-sm text-primary-500">
+              <p className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-6 text-sm text-[var(--theme-muted)]">
                 No recent activity yet.
               </p>
             ) : (
@@ -422,21 +422,21 @@ export function CommandCenterScreen() {
                 {latestActivity.map((item) => (
                   <li
                     key={item.id}
-                    className="domino-item flex items-start gap-3 rounded-xl border border-primary-100 bg-[var(--theme-card)] px-4 py-3 shadow-sm transition-all hover:-translate-y-px hover:shadow-md"
+                    className="domino-item flex items-start gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 shadow-sm transition-all hover:-translate-y-px hover:shadow-md"
                   >
                     <span
                       className={cn(
                         'mt-0.5 shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider',
                         item.source === 'cron'
                           ? 'border-violet-300/50 bg-violet-50 text-violet-600'
-                          : 'border-primary-200 bg-primary-50 text-primary-500',
+                          : 'border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)]',
                       )}
                     >
                       {item.source}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-xs text-primary-700">{item.summary}</p>
-                      <p className="mt-0.5 text-[10px] text-primary-400">
+                      <p className="line-clamp-2 text-xs text-[var(--theme-muted)]">{item.summary}</p>
+                      <p className="mt-0.5 text-[10px] text-[var(--theme-muted)]">
                         {item.agentId} · {formatRelativeTime(item.timestamp)}
                       </p>
                     </div>

@@ -23,7 +23,7 @@ const STATUS_COLORS: Record<McpServer['status'], string> = {
   failed:
     'border border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200',
   unknown:
-    'border border-primary-200 bg-primary-100/60 text-primary-500',
+    'border border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
 }
 
 function Badge({
@@ -60,7 +60,7 @@ export function McpServerCard({ server, onEdit }: Props) {
   const [testResult, setTestResult] = useState<McpTestResult | null>(null)
 
   return (
-    <article className="flex flex-col gap-3 rounded-xl border border-primary-200 bg-primary-50/85 p-4">
+    <article className="flex flex-col gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/85 p-4">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -68,11 +68,11 @@ export function McpServerCard({ server, onEdit }: Props) {
               {server.name}
             </h3>
             <Badge className={STATUS_COLORS[server.status]}>{server.status}</Badge>
-            <Badge className="border border-primary-200 bg-primary-100/60 text-primary-500">
+            <Badge className="border border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]">
               {server.transportType}
             </Badge>
           </div>
-          <p className="truncate font-mono text-xs text-primary-500">
+          <p className="truncate font-mono text-xs text-[var(--theme-muted)]">
             {server.transportType === 'http' ? server.url : server.command}
           </p>
         </div>
@@ -86,7 +86,7 @@ export function McpServerCard({ server, onEdit }: Props) {
         />
       </header>
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-primary-500">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-[var(--theme-muted)]">
         <div className="flex items-center gap-1.5">
           <dt>Tools:</dt>
           <dd className="font-medium text-ink tabular-nums">
@@ -169,7 +169,7 @@ export function McpServerCard({ server, onEdit }: Props) {
       </div>
 
       {testResult ? (
-        <p className="text-xs text-primary-500">
+        <p className="text-xs text-[var(--theme-muted)]">
           {testResult.ok
             ? `Connected (${testResult.latencyMs ?? '?'}ms, ${testResult.discoveredTools.length} tools)`
             : `Failed: ${testResult.error || 'unknown error'}`}

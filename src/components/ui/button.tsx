@@ -9,7 +9,7 @@ import type * as React from 'react'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[colors,transform] focus-visible:ring-2 focus-visible:ring-primary-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0] select-none duration-150 active:scale-[0.97]',
+  'relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[colors,transform] focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0] select-none duration-150 active:scale-[0.97]',
   {
     defaultVariants: {
       size: 'default',
@@ -27,13 +27,13 @@ const buttonVariants = cva(
       },
       variant: {
         default:
-          'bg-primary-950 text-primary-50 hover:bg-primary-900 shadow-sm outline outline-primary-900/10 shadow-2xs',
+          'bg-[var(--theme-bg)] text-[var(--theme-text)] hover:bg-[var(--theme-bg)] shadow-sm outline outline-[var(--theme-border)]/20 shadow-2xs',
         secondary:
-          'bg-primary-50 text-primary-950 hover:bg-primary-200 outline outline-primary-900/10 shadow-2xs',
+          'bg-[var(--theme-panel)] text-[var(--theme-text)] hover:bg-[var(--theme-hover)] outline outline-[var(--theme-border)]/20 shadow-2xs',
         outline:
-          'border-primary-200 bg-transparent text-primary-900 hover:bg-primary-50 shadow-2xs outline outline-primary-900/10',
-        ghost: 'text-primary-900 hover:bg-primary-200 hover:text-primary-950',
-        destructive: 'bg-red-600 text-primary-50 hover:bg-red-700 shadow-sm',
+          'border-[var(--theme-border)] bg-transparent text-[var(--theme-text)] hover:bg-[var(--theme-panel)] shadow-2xs outline outline-[var(--theme-border)]/20',
+        ghost: 'text-[var(--theme-text)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]',
+        destructive: 'bg-red-600 text-[var(--theme-text)] hover:bg-red-700 shadow-sm',
       },
     },
   },

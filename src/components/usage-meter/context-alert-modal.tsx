@@ -67,14 +67,14 @@ function ContextAlertModalComponent({
               </svg>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-primary-900">
+              <h3 className="text-sm font-semibold text-[var(--theme-text)]">
                 {isCritical
                   ? 'Context Window Almost Full'
                   : isDanger
                     ? 'Context Window Getting Full'
                     : 'Auto-Compaction Warning'}
               </h3>
-              <p className="text-xs text-primary-500 mt-0.5">
+              <p className="text-xs text-[var(--theme-muted)] mt-0.5">
                 {Math.round(contextPercent)}% of your model's context window is
                 in use
               </p>
@@ -82,7 +82,7 @@ function ContextAlertModalComponent({
           </div>
 
           {/* Progress bar */}
-          <div className="w-full h-2.5 rounded-full bg-primary-100 overflow-hidden mb-4">
+          <div className="w-full h-2.5 rounded-full bg-[var(--theme-hover)] overflow-hidden mb-4">
             <div
               className={cn(
                 'h-full rounded-full transition-all duration-500',
@@ -93,11 +93,11 @@ function ContextAlertModalComponent({
           </div>
 
           {/* What this means */}
-          <div className="bg-primary-50 rounded-lg p-3 mb-4">
-            <p className="text-xs font-medium text-primary-800 mb-2">
+          <div className="bg-[var(--theme-panel)] rounded-lg p-3 mb-4">
+            <p className="text-xs font-medium text-[var(--theme-text)] mb-2">
               What does this mean?
             </p>
-            <p className="text-xs text-primary-600 leading-relaxed">
+            <p className="text-xs text-[var(--theme-muted)] leading-relaxed">
               {isCritical
                 ? "Your conversation history is nearly at the model's limit. Responses may become less accurate as the model loses access to earlier context. You should start a new chat soon."
                 : isDanger
@@ -108,7 +108,7 @@ function ContextAlertModalComponent({
 
           {/* Recommendations */}
           <div className="space-y-2 mb-5">
-            <p className="text-xs font-medium text-primary-800">
+            <p className="text-xs font-medium text-[var(--theme-text)]">
               Recommendations
             </p>
             <div className="space-y-1.5">
@@ -136,14 +136,14 @@ function ContextAlertModalComponent({
           <div className="flex justify-end gap-2">
             <button
               onClick={onClose}
-              className="rounded-lg border border-primary-200 bg-surface px-4 py-2 text-xs font-medium text-primary-700 hover:bg-primary-50 transition-colors"
+              className="rounded-lg border border-[var(--theme-border)] bg-surface px-4 py-2 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-panel)] transition-colors"
             >
               Got it
             </button>
             {isDanger && (
               <a
                 href="/new"
-                className="rounded-lg bg-primary-900 px-4 py-2 text-xs font-medium text-white hover:bg-primary-800 transition-colors"
+                className="rounded-lg bg-[var(--theme-bg)] px-4 py-2 text-xs font-medium text-white hover:bg-[var(--theme-card)] transition-colors"
               >
                 New Chat
               </a>
@@ -169,8 +169,8 @@ function Recommendation({
       <span className="text-xs shrink-0 mt-px">{icon}</span>
       <span
         className={cn(
-          'text-xs text-primary-600 leading-relaxed',
-          emphasis && 'font-medium text-primary-800',
+          'text-xs text-[var(--theme-muted)] leading-relaxed',
+          emphasis && 'font-medium text-[var(--theme-text)]',
         )}
       >
         {text}

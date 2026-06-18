@@ -79,7 +79,7 @@ export function ProviderModelIcon({
     return (
       <span
         className={cn(
-          'inline-flex items-center justify-center rounded-sm bg-primary-200 text-primary-600 font-mono font-bold',
+          'inline-flex items-center justify-center rounded-sm bg-[var(--theme-hover)] text-[var(--theme-muted)] font-mono font-bold',
           className,
         )}
         style={{ width: size, height: size, fontSize: size * 0.6, ...style }}

@@ -126,8 +126,8 @@ function ProviderLineRenderer({ line }: { line: UsageLine }) {
     return (
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-primary-600">{line.label}</span>
-          <span className="font-medium text-primary-900">
+          <span className="text-[var(--theme-muted)]">{line.label}</span>
+          <span className="font-medium text-[var(--theme-text)]">
             {formatLineValue(line)}
             {line.limit && line.format === 'dollars'
               ? ` / $${line.limit.toFixed(2)}`
@@ -135,14 +135,14 @@ function ProviderLineRenderer({ line }: { line: UsageLine }) {
             {line.limit && line.format === 'percent' ? '' : ''}
           </span>
         </div>
-        <div className="h-2 w-full rounded-full bg-primary-100">
+        <div className="h-2 w-full rounded-full bg-[var(--theme-hover)]">
           <div
             className={`h-2 rounded-full transition-all ${progressColor(line.used, line.limit)}`}
             style={{ width: `${pct}%` }}
           />
         </div>
         {line.resetsAt ? (
-          <div className="text-[10px] text-primary-400">
+          <div className="text-[10px] text-[var(--theme-muted)]">
             {formatResetTime(line.resetsAt)}
           </div>
         ) : null}
@@ -153,7 +153,7 @@ function ProviderLineRenderer({ line }: { line: UsageLine }) {
   if (line.type === 'badge') {
     return (
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-primary-600">{line.label}</span>
+        <span className="text-[var(--theme-muted)]">{line.label}</span>
         <span
           className="rounded-full px-2 py-0.5 text-[10px] font-medium"
           style={{
@@ -170,8 +170,8 @@ function ProviderLineRenderer({ line }: { line: UsageLine }) {
   // text
   return (
     <div className="flex items-center justify-between text-xs">
-      <span className="text-primary-600">{line.label}</span>
-      <span className="font-medium text-primary-900">
+      <span className="text-[var(--theme-muted)]">{line.label}</span>
+      <span className="font-medium text-[var(--theme-text)]">
         {formatLineValue(line)}
       </span>
     </div>
@@ -324,10 +324,10 @@ export function UsageDetailsModal({
             Live usage from your gateway session and connected providers.
           </DialogDescription>
         </div>
-        <DialogClose className="text-primary-700">Close</DialogClose>
+        <DialogClose className="text-[var(--theme-muted)]">Close</DialogClose>
       </div>
 
-      <div className="flex w-fit items-center gap-1 rounded-full border border-primary-100 bg-primary-50 p-1 text-xs">
+      <div className="flex w-fit items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] p-1 text-xs">
         {(['session', 'providers'] as const).map((tab) => (
           <button
             key={tab}
@@ -335,8 +335,8 @@ export function UsageDetailsModal({
             onClick={() => setActiveTab(tab)}
             className={`rounded-full px-3 py-1 font-medium transition ${
               activeTab === tab
-                ? 'bg-primary-100 text-primary-800 shadow-sm'
-                : 'text-primary-600 hover:text-primary-800'
+                ? 'bg-[var(--theme-hover)] text-[var(--theme-text)] shadow-sm'
+                : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]'
             }`}
           >
             {tab === 'session' ? 'Session' : 'Providers'}
@@ -354,55 +354,55 @@ export function UsageDetailsModal({
             ) : null}
 
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-3">
-                <div className="text-xs uppercase tracking-wide text-primary-500">
+              <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
+                <div className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
                   Input Tokens
                 </div>
-                <div className="text-xl font-semibold text-primary-900">
+                <div className="text-xl font-semibold text-[var(--theme-text)]">
                   {formatTokens(usage.inputTokens)}
                 </div>
               </div>
-              <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-3">
-                <div className="text-xs uppercase tracking-wide text-primary-500">
+              <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
+                <div className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
                   Output Tokens
                 </div>
-                <div className="text-xl font-semibold text-primary-900">
+                <div className="text-xl font-semibold text-[var(--theme-text)]">
                   {formatTokens(usage.outputTokens)}
                 </div>
               </div>
-              <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-3">
-                <div className="text-xs uppercase tracking-wide text-primary-500">
+              <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
+                <div className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
                   Daily Cost
                 </div>
-                <div className="text-xl font-semibold text-primary-900">
+                <div className="text-xl font-semibold text-[var(--theme-text)]">
                   {formatCurrency(usage.dailyCost)}
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-primary-200 bg-primary-50/70 p-4">
-              <div className="mb-3 text-sm font-semibold text-primary-900">
+            <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+              <div className="mb-3 text-sm font-semibold text-[var(--theme-text)]">
                 Cost per model
               </div>
               <div className="grid gap-2">
                 {usage.models.length === 0 ? (
-                  <div className="text-sm text-primary-500">
+                  <div className="text-sm text-[var(--theme-muted)]">
                     No model usage reported yet. Send a message to start tracking usage here.
                   </div>
                 ) : (
                   usage.models.map((model) => (
                     <div
                       key={model.model}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-100 bg-primary-50 px-3 py-2 text-sm"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-sm"
                     >
-                      <div className="font-medium text-primary-800">
+                      <div className="font-medium text-[var(--theme-text)]">
                         {formatModelName(model.model)}
                       </div>
-                      <div className="text-primary-600">
+                      <div className="text-[var(--theme-muted)]">
                         {formatTokens(model.inputTokens)} in ·{' '}
                         {formatTokens(model.outputTokens)} out
                       </div>
-                      <div className="font-semibold text-primary-900">
+                      <div className="font-semibold text-[var(--theme-text)]">
                         {formatCurrency(model.costUsd)}
                       </div>
                     </div>
@@ -411,38 +411,38 @@ export function UsageDetailsModal({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-primary-200 bg-primary-50/70 p-4">
-              <div className="mb-3 text-sm font-semibold text-primary-900">
+            <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+              <div className="mb-3 text-sm font-semibold text-[var(--theme-text)]">
                 Session history
               </div>
               <div className="grid gap-2">
                 {usage.sessions.length === 0 ? (
-                  <div className="text-sm text-primary-500">
+                  <div className="text-sm text-[var(--theme-muted)]">
                     No sessions reported yet. Start a chat to see session history here.
                   </div>
                 ) : (
                   usage.sessions.map((session) => (
                     <div
                       key={session.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-100 bg-primary-50 px-3 py-2 text-sm"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-sm"
                     >
                       <div>
-                        <div className="font-medium text-primary-800">
+                        <div className="font-medium text-[var(--theme-text)]">
                           {session.id}
                         </div>
-                        <div className="text-xs text-primary-500">
+                        <div className="text-xs text-[var(--theme-muted)]">
                           {formatModelName(session.model)}
                         </div>
                       </div>
-                      <div className="text-primary-600">
+                      <div className="text-[var(--theme-muted)]">
                         {formatTokens(session.inputTokens)} in ·{' '}
                         {formatTokens(session.outputTokens)} out
                       </div>
-                      <div className="text-xs text-primary-500">
+                      <div className="text-xs text-[var(--theme-muted)]">
                         {formatTimestamp(session.startedAt)} →{' '}
                         {formatTimestamp(session.updatedAt)}
                       </div>
-                      <div className="font-semibold text-primary-900">
+                      <div className="font-semibold text-[var(--theme-text)]">
                         {formatCurrency(session.costUsd)}
                       </div>
                     </div>
@@ -452,7 +452,7 @@ export function UsageDetailsModal({
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-xs text-primary-500">
+              <div className="text-xs text-[var(--theme-muted)]">
                 Context usage: {Math.round(usage.contextPercent)}%
               </div>
               <Button size="sm" variant="outline" onClick={handleExport}>
@@ -469,7 +469,7 @@ export function UsageDetailsModal({
             ) : null}
 
             <div className="flex items-center justify-between gap-3">
-              <div className="text-xs text-primary-500">
+              <div className="text-xs text-[var(--theme-muted)]">
                 Auto-polls every 30s · Last updated{' '}
                 {formatTimestamp(providerUpdatedAt ?? undefined)}
               </div>
@@ -485,11 +485,11 @@ export function UsageDetailsModal({
 
             <div className="grid gap-3">
               {providerUsage.length === 0 ? (
-                <div className="rounded-2xl border border-primary-200 bg-primary-50/70 p-6 text-center">
-                  <div className="text-sm font-medium text-primary-700">
+                <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-6 text-center">
+                  <div className="text-sm font-medium text-[var(--theme-muted)]">
                     No providers connected. Add a provider in Settings to start chatting.
                   </div>
-                  <div className="mt-1 text-xs text-primary-500">
+                  <div className="mt-1 text-xs text-[var(--theme-muted)]">
                     Open Settings -{'>'} Providers to connect Claude CLI or add an API key.
                   </div>
                 </div>
@@ -502,17 +502,17 @@ export function UsageDetailsModal({
                       key={provider.provider}
                       className={`rounded-2xl border p-4 ${
                         isDefault
-                          ? 'border-primary-300 bg-primary-50/50'
-                          : 'border-primary-200 bg-primary-50/70'
+                          ? 'border-[var(--theme-border)] bg-[var(--theme-panel)]'
+                          : 'border-[var(--theme-border)] bg-[var(--theme-panel)]'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <div className="text-sm font-semibold text-primary-900">
+                          <div className="text-sm font-semibold text-[var(--theme-text)]">
                             {provider.displayName}
                           </div>
                           {provider.plan ? (
-                            <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary-700">
+                            <span className="rounded-full bg-[var(--theme-hover)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-muted)]">
                               {provider.plan}
                             </span>
                           ) : null}
@@ -524,7 +524,7 @@ export function UsageDetailsModal({
                         </div>
                         <div className="flex items-center gap-2">
                           {statusBadge(provider.status)}
-                          <span className="text-[10px] text-primary-400">
+                          <span className="text-[10px] text-[var(--theme-muted)]">
                             {formatTimestamp(provider.updatedAt)}
                           </span>
                         </div>
@@ -546,7 +546,7 @@ export function UsageDetailsModal({
                               provider.status,
                               provider.message,
                             ) ? (
-                            <div className="text-[10px] text-primary-500">
+                            <div className="text-[10px] text-[var(--theme-muted)]">
                               Details: {provider.message}
                             </div>
                           ) : null}
@@ -561,7 +561,7 @@ export function UsageDetailsModal({
                                 onClick={() =>
                                   handleSetDefault(provider.provider)
                                 }
-                                className="rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700 transition hover:bg-primary-100"
+                                className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-1.5 text-xs font-medium text-[var(--theme-muted)] transition hover:bg-[var(--theme-hover)]"
                               >
                                 Set as Default
                               </button>

@@ -28,17 +28,17 @@ function Thinking({ content }: ThinkingProps) {
             />
           }
         >
-          <span className="text-sm font-medium text-primary-900">Thinking</span>
+          <span className="text-sm font-medium text-[var(--theme-text)]">Thinking</span>
           <HugeiconsIcon
             icon={ArrowDown01Icon}
             size={14}
             strokeWidth={1.5}
-            className="text-primary-900 transition-transform duration-150 group-data-panel-open:rotate-180"
+            className="text-[var(--theme-text)] transition-transform duration-150 group-data-panel-open:rotate-180"
           />
         </CollapsibleTrigger>
         <CollapsiblePanel>
           <div className="pt-1 mb-3">
-            <p className="text-sm text-primary-700 whitespace-pre-wrap">
+            <p className="text-sm text-[var(--theme-muted)] whitespace-pre-wrap">
               {content}
             </p>
           </div>
