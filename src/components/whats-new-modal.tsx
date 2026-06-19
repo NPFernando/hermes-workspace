@@ -1,11 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
-import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { AnimatePresence, motion } from 'motion/react'
+import { useEffect, useState } from 'react'
+
+import type { ChangeKind, VersionEntry } from '@/lib/changelog'
+
+import { CHANGELOG } from '@/lib/changelog'
 import { cn } from '@/lib/utils'
-import { CHANGELOG, type ChangeKind, type VersionEntry } from '@/lib/changelog'
 
 const SEEN_KEY = 'hermes-workspace-seen-version'
 

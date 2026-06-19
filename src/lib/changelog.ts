@@ -10,10 +10,10 @@ export type VersionEntry = {
   date: string          // ISO date e.g. "2026-06-19"
   apkVersion?: string   // e.g. "1.2" — set when APK also shipped this release
   summary: string       // one-line headline
-  changes: ChangeEntry[]
+  changes: Array<ChangeEntry>
 }
 
-export const CHANGELOG: VersionEntry[] = [
+export const CHANGELOG: Array<VersionEntry> = [
   {
     version: '2.4.0',
     date: '2026-06-19',
