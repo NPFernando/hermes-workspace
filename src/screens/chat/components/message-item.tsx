@@ -183,7 +183,7 @@ function InteractiveSelectionCard({ card }: { card: SelectionCardContent }) {
   }
 
   return (
-    <div className="my-2 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-sm">
+    <div className="card-glow my-2 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-sm">
       <div className="border-b border-[var(--theme-border)] px-3 py-2">
         <div className="text-sm font-semibold text-[var(--theme-text)]">
           {card.title || 'Choose an option'}
@@ -2748,11 +2748,10 @@ function MessageItemComponent({
           <div
             data-chat-message-bubble={isUser ? 'user' : 'assistant'}
             className={cn(
-              'break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
-              '',
-              !isUser
-                ? 'border rounded-2xl rounded-bl-[2px]'
-                : 'text-white rounded-2xl rounded-br-[2px]',
+                'chat-message-bubble break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
+              isUser
+                ? 'chat-message-bubble-user text-white rounded-2xl rounded-br-[2px]'
+                : 'chat-message-bubble-assistant border rounded-2xl rounded-bl-[2px]',
               isQueued && isUser && !isFailed && 'opacity-70',
               isFailed && isUser && 'bg-red-50/50 border border-red-300',
               bubbleClassName,
