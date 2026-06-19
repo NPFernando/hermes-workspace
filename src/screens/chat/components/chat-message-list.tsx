@@ -196,15 +196,76 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
   )
 }
 
+type ResponsePhase = 'queued' | 'thinking' | 'using_tools' | 'responding' | 'compacting'
+
 type ThinkingBubbleProps = {
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
   liveToolActivity?: Array<{ name: string; timestamp: number }>
   lifecycleEvents?: Array<LiveEvent>
   researchCard?: UseResearchCardResult
   isCompacting?: boolean
+  responsePhase?: ResponsePhase
   /** When true, always show "Thinking…" regardless of activity. Used for the
    * first few seconds before the delayed activity feed appears. */
   forceSimple?: boolean
+}
+
+const RESPONSE_PHASES: Array<{
+  id: ResponsePhase
+  label: string
+  shortLabel: string
+}> = [
+  { id: 'queued', label: 'Sent', shortLabel: 'Sent' },
+  { id: 'thinking', label: 'Thinking', shortLabel: 'Think' },
+  { id: 'using_tools', label: 'Tools', shortLabel: 'Tools' },
+  { id: 'responding', label: 'Responding', shortLabel: 'Reply' },
+]
+
+function getResponsePhaseIndex(phase: ResponsePhase): number {
+  if (phase === 'compacting') return 1
+  const index = RESPONSE_PHASES.findIndex((item) => item.id === phase)
+  return index >= 0 ? index : 1
+}
+
+function ResponsePhaseRail({ phase }: { phase: ResponsePhase }) {
+  const activeIndex = getResponsePhaseIndex(phase)
+
+  return (
+    <div className="mt-2 flex items-center gap-1.5" aria-label="Response progress">
+      {RESPONSE_PHASES.map((item, index) => {
+        const isActive = index === activeIndex
+        const isComplete = index < activeIndex
+        return (
+          <div key={item.id} className="flex min-w-0 items-center gap-1.5">
+            <span
+              className={cn(
+                'inline-flex h-1.5 w-5 rounded-full transition-all duration-300 md:w-7',
+                isActive
+                  ? 'bg-[var(--theme-accent)] shadow-[0_0_14px_color-mix(in_srgb,var(--theme-accent)_55%,transparent)]'
+                  : isComplete
+                    ? 'bg-[var(--theme-accent)]/55'
+                    : 'bg-[var(--theme-border)]',
+              )}
+              aria-hidden="true"
+            />
+            <span
+              className={cn(
+                'hidden font-mono text-[9px] uppercase tracking-[0.12em] transition-colors sm:inline',
+                isActive
+                  ? 'text-[var(--theme-text)]'
+                  : isComplete
+                    ? 'text-[var(--theme-muted)]'
+                    : 'text-[var(--theme-muted)]/65',
+              )}
+            >
+              <span className="md:hidden">{item.shortLabel}</span>
+              <span className="hidden md:inline">{item.label}</span>
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 /**
@@ -218,6 +279,7 @@ function ThinkingBubble({
   lifecycleEvents = [],
   researchCard,
   isCompacting = false,
+  responsePhase = 'thinking',
   forceSimple = false,
 }: ThinkingBubbleProps) {
   // Fallback activity from heartbeat — shows last known agent activity
@@ -361,6 +423,7 @@ function ThinkingBubble({
                   </span>
                 </div>
               ) : null}
+              <ResponsePhaseRail phase={responsePhase} />
             </div>
             {canExpandResearch ? (
               <button
@@ -1288,6 +1351,16 @@ function ChatMessageListComponent({
     liveToolActivity.length > 0 ||
     lifecycleEvents.length > 0
 
+  const responsePhase: ResponsePhase = isCompacting
+    ? 'compacting'
+    : isStreaming && streamingText && streamingText.trim().length > 0
+      ? 'responding'
+      : activeToolCalls.length > 0 || liveToolActivity.length > 0
+        ? 'using_tools'
+        : sending
+          ? 'queued'
+          : 'thinking'
+
   const shouldBottomPin =
     visibleEntries.length > 0 ||
     showToolOnlyNotice ||
@@ -2008,6 +2081,7 @@ function ChatMessageListComponent({
                   lifecycleEvents={lifecycleEvents}
                   researchCard={researchCard}
                   isCompacting={isCompacting}
+                  responsePhase={responsePhase}
                   forceSimple={!showActivityFeed}
                 />
                 {/* After 10s of thinking, show activity feed. With tool calls:
