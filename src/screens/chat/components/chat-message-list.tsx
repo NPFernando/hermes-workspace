@@ -637,9 +637,8 @@ export function buildDisplayEntries(
     }
 
     if (message.role === 'tool' || message.role === 'toolResult') {
-      const previousEntry = entries[entries.length - 1]
-      if (previousEntry?.message.role === 'assistant') {
-        previousEntry.attachedToolMessages.push(message)
+      if (entries.length > 0 && entries[entries.length - 1].message.role === 'assistant') {
+        entries[entries.length - 1].attachedToolMessages.push(message)
       } else if (pendingAssistantToolMessages.length > 0) {
         pendingAssistantToolMessages.push(message)
       }
@@ -678,13 +677,14 @@ export function getTrailingToolOnlyTurnSummary(
     }
   }
 
-  if (trailingStart >= messages.length) return null
 
-  const lastVisible = messages[trailingStart - 1]
-  if (!lastVisible || lastVisible.role !== 'assistant' || isAssistantToolCallOnlyMessage(lastVisible)) {
-    return null
+  if (trailingStart === 0) {
+    return null;
   }
-
+  const lastVisible = messages[trailingStart - 1];
+  if (lastVisible.role !== 'assistant' || isAssistantToolCallOnlyMessage(lastVisible)) {
+    return null;
+  }
   const trailing = messages.slice(trailingStart)
   const toolNames = Array.from(
     new Set(
@@ -1203,8 +1203,12 @@ function ChatMessageListComponent({
     return count
   }, [messages])
 
+
+  // Virtualization disabled — causes scroll glitches
+  const shouldVirtualize = false
+
+
   const showToolOnlyNotice =
-    !isMessageSearchActive &&
     !loading &&
     !empty &&
     visibleEntries.length > 0 &&
@@ -1252,6 +1256,23 @@ function ChatMessageListComponent({
     .filter(({ message }) => message.role === 'user')
     .map(({ index }) => index)
     .pop()
+
+  const lastAssistantMessageHasToolSectionsAndText = () => {
+    for (let i = visibleEntries.length - 1; i >= 0; i--) {
+      const entry = visibleEntries[i];
+      if (entry.message.role === 'assistant') {
+        const hasToolSections =
+          getToolCallsFromMessage(entry.message).length > 0 ||
+          entry.attachedToolMessages.length > 0;
+        const hasText = textFromMessage(entry.message).length > 0;
+        if (hasToolSections && hasText) {
+          return true;
+        }
+        break;
+      }
+    }
+    return false;
+  };
   // Show typing indicator when waiting for response and no visible text yet.
   // Bug 2 fix: also show during grace period (thinkingGrace) so there's no
   // blank-space flash between waitingForResponse clearing and the response
@@ -1282,20 +1303,25 @@ function ChatMessageListComponent({
     if (!effectivelyWaiting) return false
     // If streaming has visible text, hide indicator — response is rendering
     if (isStreaming && streamingText && streamingText.length > 0) return false
-    const lastEntry = visibleEntries[visibleEntries.length - 1]
-    const lastMessage = lastEntry?.message
-    if (lastMessage && lastMessage.role === 'assistant') {
-      const lastId = getStableMessageId(lastMessage, lastEntry.sourceIndex)
-      const isBeingTypewritten = streamingState.streamingTargets.has(lastId)
-      if (isBeingTypewritten) return false
-      // If we're in grace period waiting for a NEW response, the last assistant
-      // message is from the PREVIOUS turn — don't let its text hide the bubble.
-      // Only suppress once we know this IS the new response (i.e. not waiting).
-      if (thinkingGrace || waitingForResponse || sending) return true
-      // Check if assistant message has visible text — if not, keep showing indicator
-      const msgText = textFromMessage(lastMessage)
-      if (!msgText || msgText.trim().length === 0) return true
-      return false
+    let lastEntry = null
+    if (visibleEntries.length > 0) {
+      lastEntry = visibleEntries[visibleEntries.length - 1]
+    }
+    if (lastEntry) {
+      const msg = lastEntry.message
+      if (msg && msg.role === 'assistant') {
+        const lastId = getStableMessageId(msg, lastEntry.sourceIndex)
+        const isBeingTypewritten = streamingState.streamingTargets.has(lastId)
+        if (isBeingTypewritten) return false
+        // If we're in grace period waiting for a NEW response, the last assistant
+        // message is from the PREVIOUS turn — don't let its text hide the bubble.
+        // Only suppress once we know this IS the new response (i.e. not waiting).
+        if (thinkingGrace || waitingForResponse || sending) return true
+        // Check if assistant message has visible text — if not, keep showing indicator
+        const msgText = textFromMessage(msg)
+        if (!msgText || msgText.trim().length === 0) return true
+        return false
+      }
     }
     return true
   })()
@@ -1420,39 +1446,16 @@ function ChatMessageListComponent({
   // Pin the last user+assistant group without adding bottom padding.
   const groupStartIndex = typeof lastUserIndex === 'number' ? lastUserIndex : -1
   const hasGroup = pinToTop && groupStartIndex >= 0
-  const shouldVirtualize = false // Disabled — causes scroll glitches
 
+  // Virtualization disabled — causes scroll glitches
   const virtualRange = useMemo(() => {
-    if (!shouldVirtualize || scrollMetrics.clientHeight <= 0) {
-      return {
-        startIndex: 0,
-        endIndex: visibleEntries.length,
-        topSpacerHeight: 0,
-        bottomSpacerHeight: 0,
-      }
-    }
-
-    const startIndex = Math.max(
-      0,
-      Math.floor(scrollMetrics.scrollTop / VIRTUAL_ROW_HEIGHT) -
-        VIRTUAL_OVERSCAN,
-    )
-    const visibleCount = Math.ceil(
-      scrollMetrics.clientHeight / VIRTUAL_ROW_HEIGHT,
-    )
-    const endIndex = Math.min(
-      visibleEntries.length,
-      startIndex + visibleCount + VIRTUAL_OVERSCAN * 2,
-    )
-
     return {
-      startIndex,
-      endIndex,
-      topSpacerHeight: startIndex * VIRTUAL_ROW_HEIGHT,
-      bottomSpacerHeight:
-        (visibleEntries.length - endIndex) * VIRTUAL_ROW_HEIGHT,
-    }
-  }, [scrollMetrics, shouldVirtualize, visibleEntries.length])
+      startIndex: 0,
+      endIndex: visibleEntries.length,
+      topSpacerHeight: 0,
+      bottomSpacerHeight: 0,
+    };
+  }, [scrollMetrics, visibleEntries.length])
 
   function isMessageStreaming(message: ChatMessage, index: number) {
     if (!isStreaming || !streamingMessageId) return false
@@ -2036,23 +2039,13 @@ function ChatMessageListComponent({
               </>
             ) : (
               <>
-                {shouldVirtualize && virtualRange.topSpacerHeight > 0 ? (
-                  <div
-                    aria-hidden="true"
-                    style={{ height: `${virtualRange.topSpacerHeight}px` }}
-                  />
-                ) : null}
+                null
                 {visibleEntries
                   .slice(virtualRange.startIndex, virtualRange.endIndex)
                   .map((entry, index) =>
                     renderMessage(entry, virtualRange.startIndex + index),
                   )}
-                {shouldVirtualize && virtualRange.bottomSpacerHeight > 0 ? (
-                  <div
-                    aria-hidden="true"
-                    style={{ height: `${virtualRange.bottomSpacerHeight}px` }}
-                  />
-                ) : null}
+                null
               </>
             )}
             {/* Bottom shimmer + branch TUI card. Hide as soon as the

@@ -2599,6 +2599,30 @@ function MessageItemComponent({
     return () => window.clearTimeout(timer)
   }, [isUser, message, message.status])
 
+  // Helper to create a message copy with toolCall parts removed from content.
+  // Used to prevent duplicate rendering of tool calls when we show the grouped
+  // tool card above the message bubble.
+  const messageForBubble = useMemo(() => {
+    // If we are rendering the grouped tool card above, suppress toolCall parts
+    // inside the bubble to avoid duplication.
+    const showGroupedToolCard =
+      !isUser &&
+      finalToolSections.length > 0 &&
+      (hasText || !effectiveIsStreaming)
+    if (!showGroupedToolCard) {
+      return message
+    }
+    // Shallow copy of the message with filtered content.
+    const filteredContent = Array.isArray(message.content)
+      ? message.content.filter((part) => part.type !== 'toolCall')
+      : message.content
+    return {
+      ...message,
+      content: filteredContent,
+    }
+  }, [isUser, finalToolSections.length, hasText, effectiveIsStreaming, message])
+
+
   if (execNotification) {
     const isSuccess = execNotification.ok ?? execNotification.exitCode === 0
     const statusIcon = isSuccess ? '✓' : '✗'
