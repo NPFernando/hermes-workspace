@@ -848,7 +848,7 @@ function ChatMessageListComponent({
   }, [contentStyle, isMobileViewport])
 
   // Simple scroll handler — only tracks if user is near bottom via refs (no state updates)
-  const handleUserScroll = useCallback(function handleUserScroll(metrics: {
+  const handleUserScroll = useCallback(function handleUserScrollEvent(metrics: {
     scrollTop: number
     scrollHeight: number
     clientHeight: number
@@ -873,7 +873,7 @@ function ChatMessageListComponent({
   }, [])
 
   // Simple scroll to bottom — find viewport and scroll
-  const scrollToBottom = useCallback(function scrollToBottom(
+  const scrollToBottom = useCallback(function scrollToBottomViewport(
     behavior: ScrollBehavior = 'auto',
   ) {
     const anchor = anchorRef.current
@@ -1032,7 +1032,7 @@ function ChatMessageListComponent({
         clearTimeout(thinkingGraceTimerRef.current)
       }
     }
-  }, [displayEntries, waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displayEntries, waitingForResponse])
 
   const normalizedMessageSearch = useMemo(
     function getNormalizedMessageSearch() {
@@ -1074,23 +1074,23 @@ function ChatMessageListComponent({
     [messageSearchMatches],
   )
 
-  const activeSearchMatch = messageSearchMatches[activeSearchMatchIndex] ?? null
+  const activeSearchMatch = messageSearchMatches.at(activeSearchMatchIndex) ?? null
 
-  const focusSearchInput = useCallback(function focusSearchInput() {
+  const focusSearchInput = useCallback(function focusSearchInputFieldSoon() {
     window.requestAnimationFrame(function focusSearchInputField() {
       searchInputRef.current?.focus()
       searchInputRef.current?.select()
     })
   }, [])
 
-  const closeMessageSearch = useCallback(function closeMessageSearch() {
+  const closeMessageSearch = useCallback(function closeMessageSearchPanel() {
     setIsMessageSearchOpen(false)
     setMessageSearchValue('')
     setActiveSearchMatchIndex(0)
   }, [])
 
   const openMessageSearch = useCallback(
-    function openMessageSearch() {
+    function openMessageSearchPanel() {
       setIsMessageSearchOpen(true)
       setActiveSearchMatchIndex(0)
       focusSearchInput()
@@ -1099,7 +1099,7 @@ function ChatMessageListComponent({
   )
 
   const jumpToPreviousMatch = useCallback(
-    function jumpToPreviousMatch() {
+    function jumpToPreviousSearchMatch() {
       if (messageSearchMatches.length === 0) return
       setActiveSearchMatchIndex(function setPreviousMatchIndex(currentIndex) {
         return (
@@ -1112,7 +1112,7 @@ function ChatMessageListComponent({
   )
 
   const jumpToNextMatch = useCallback(
-    function jumpToNextMatch() {
+    function jumpToNextSearchMatch() {
       if (messageSearchMatches.length === 0) return
       setActiveSearchMatchIndex(function setNextMatchIndex(currentIndex) {
         return (currentIndex + 1) % messageSearchMatches.length
@@ -1121,7 +1121,7 @@ function ChatMessageListComponent({
     [messageSearchMatches.length],
   )
 
-  const scrollToMessageById = useCallback(function scrollToMessageById(
+  const scrollToMessageById = useCallback(function scrollToMessageElementById(
     messageId: string,
     behavior: ScrollBehavior = 'smooth',
   ) {
@@ -1244,7 +1244,6 @@ function ChatMessageListComponent({
       streamingTargets: new Set<string>(),
       signatureById: nextSignatures,
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayEntries, streamingCleared])
 
   const lastAssistantIndex = visibleEntries
@@ -1309,7 +1308,7 @@ function ChatMessageListComponent({
     }
     if (lastEntry) {
       const msg = lastEntry.message
-      if (msg && msg.role === 'assistant') {
+      if (msg.role === 'assistant') {
         const lastId = getStableMessageId(msg, lastEntry.sourceIndex)
         const isBeingTypewritten = streamingState.streamingTargets.has(lastId)
         if (isBeingTypewritten) return false
@@ -1539,15 +1538,11 @@ function ChatMessageListComponent({
                   ? 'bg-amber-50/30'
                   : undefined
             }
-            toolCalls={
-              messageIsStreaming ? normalizedStreamingToolCalls : undefined
-            }
+            toolCalls={normalizedStreamingToolCalls}
             isStreaming={messageIsStreaming}
             streamingText={streamingText}
-            streamingThinking={
-              messageIsStreaming ? streamingThinking : undefined
-            }
-            lifecycleEvents={messageIsStreaming ? lifecycleEvents : undefined}
+            streamingThinking={streamingThinking}
+            lifecycleEvents={lifecycleEvents}
             simulateStreaming={simulateStreaming}
             streamingKey={signature}
             expandAllToolSections={expandAllToolSections}
@@ -1574,13 +1569,7 @@ function ChatMessageListComponent({
               ? 'bg-amber-50/30'
               : undefined
         }
-        toolCalls={
-          messageIsStreaming ? normalizedStreamingToolCalls : undefined
-        }
         isStreaming={messageIsStreaming}
-        streamingText={messageIsStreaming ? streamingText : undefined}
-        streamingThinking={messageIsStreaming ? streamingThinking : undefined}
-        lifecycleEvents={messageIsStreaming ? lifecycleEvents : undefined}
         simulateStreaming={simulateStreaming}
         streamingKey={signature}
         expandAllToolSections={expandAllToolSections}
@@ -1620,8 +1609,7 @@ function ChatMessageListComponent({
     if (isNearBottomRef.current) {
       // Use smooth scroll only when user is near bottom (<200px) and new messages arrive;
       // use instant scroll during streaming to avoid choppiness.
-      const behavior: ScrollBehavior =
-        isNearBottomRef.current && !isStreaming ? 'smooth' : 'auto'
+      const behavior: ScrollBehavior = !isStreaming ? 'smooth' : 'auto'
       frameId = window.requestAnimationFrame(() => scrollToBottom(behavior))
     }
 
@@ -1765,7 +1753,7 @@ function ChatMessageListComponent({
   }, [activeSearchMatch, scrollToMessageById])
 
   const handleScrollToBottom = useCallback(
-    function handleScrollToBottom() {
+    function handleScrollToBottomClick() {
       stickToBottomRef.current = true
       isNearBottomRef.current = true
       setIsNearBottom(true)
@@ -2174,7 +2162,7 @@ function getToolGroupClass(
   messages: Array<ChatMessage>,
   index: number,
 ): string {
-  const message = messages[index]
+  const message = messages.at(index)
   if (!message || message.role !== 'assistant') return ''
   const hasToolCalls = getToolCallsFromMessage(message).length > 0
   if (!hasToolCalls) return ''
