@@ -1102,25 +1102,62 @@ code {
   animation: page-enter 0.22s var(--snappy) both;
 }
 
-/* ── Card hover glow (Odysseus/terminal themes) ── */
+/* ── Unified interactive surface glow (Odysseus/terminal themes) ── */
 [data-theme='odysseus'] .card-glow,
 [data-theme='matrix'] .card-glow,
-[data-theme='scifi'] .card-glow {
+[data-theme='scifi'] .card-glow,
+[data-theme='odysseus'] .kpi-card,
+[data-theme='matrix'] .kpi-card,
+[data-theme='scifi'] .kpi-card {
+  position: relative;
   transition:
+    transform 0.18s var(--snappy),
     border-color 0.18s ease,
-    box-shadow 0.18s ease;
+    box-shadow 0.18s ease,
+    background 0.18s ease;
 }
 [data-theme='odysseus'] .card-glow:hover,
 [data-theme='matrix'] .card-glow:hover,
-[data-theme='scifi'] .card-glow:hover {
+[data-theme='scifi'] .card-glow:hover,
+[data-theme='odysseus'] .kpi-card:hover,
+[data-theme='matrix'] .kpi-card:hover,
+[data-theme='scifi'] .kpi-card:hover {
+  transform: translateY(-1px);
   border-color: color-mix(
     in srgb,
     var(--theme-accent) 50%,
     var(--theme-border)
   );
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--theme-accent) 15%, transparent),
-    0 4px 20px color-mix(in srgb, var(--theme-accent) 8%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--theme-accent) 14%, transparent),
+    0 8px 26px color-mix(in srgb, var(--theme-accent) 10%, transparent),
+    var(--theme-shadow-1);
+}
+[data-theme='odysseus'] .card-glow:focus-within,
+[data-theme='matrix'] .card-glow:focus-within,
+[data-theme='scifi'] .card-glow:focus-within {
+  border-color: color-mix(in srgb, var(--theme-accent) 58%, var(--theme-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--theme-accent) 16%, transparent),
+    0 0 34px color-mix(in srgb, var(--theme-accent) 9%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='odysseus'] .card-glow,
+  [data-theme='matrix'] .card-glow,
+  [data-theme='scifi'] .card-glow,
+  [data-theme='odysseus'] .kpi-card,
+  [data-theme='matrix'] .kpi-card,
+  [data-theme='scifi'] .kpi-card {
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  [data-theme='odysseus'] .card-glow:hover,
+  [data-theme='matrix'] .card-glow:hover,
+  [data-theme='scifi'] .card-glow:hover,
+  [data-theme='odysseus'] .kpi-card:hover,
+  [data-theme='matrix'] .kpi-card:hover,
+  [data-theme='scifi'] .kpi-card:hover {
+    transform: none;
+  }
 }
 
 /* ── Accent scrollbar (all themes) ── */

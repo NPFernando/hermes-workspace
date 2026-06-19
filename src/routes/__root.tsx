@@ -625,7 +625,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               window.__dismissSplash && window.__dismissSplash();
             }
             var obs = new MutationObserver(function() {
-              var el = document.querySelector('nav, aside, .workspace-shell, [data-testid]');
+              var el = document.querySelector('nav, aside, .workspace-shell, .lp-card, [data-testid]');
               if (el) dismiss();
             });
             obs.observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
