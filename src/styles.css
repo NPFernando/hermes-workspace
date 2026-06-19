@@ -1102,7 +1102,52 @@ code {
   animation: page-enter 0.22s var(--snappy) both;
 }
 
-/* ── Unified interactive surface glow (Odysseus/terminal themes) ── */
+/* ── Unified surface system: container, highlight, motion ── */
+.surface-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--theme-border);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--theme-card) 96%, transparent),
+      color-mix(in srgb, var(--theme-panel) 92%, transparent)
+    );
+  box-shadow: var(--theme-shadow-1);
+}
+.surface-card::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      520px circle at var(--surface-x, 50%) var(--surface-y, 0%),
+      color-mix(in srgb, var(--theme-accent) 10%, transparent),
+      transparent 42%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--theme-accent) 8%, transparent),
+      transparent 38%,
+      color-mix(in srgb, var(--theme-text) 4%, transparent)
+    );
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.surface-card:hover::before,
+.surface-card:focus-within::before {
+  opacity: 1;
+}
+.surface-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-theme='odysseus'] .surface-card,
+[data-theme='matrix'] .surface-card,
+[data-theme='scifi'] .surface-card,
 [data-theme='odysseus'] .card-glow,
 [data-theme='matrix'] .card-glow,
 [data-theme='scifi'] .card-glow,
@@ -1142,6 +1187,9 @@ code {
     0 0 34px color-mix(in srgb, var(--theme-accent) 9%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
+[data-theme='odysseus'] .surface-card,
+  [data-theme='matrix'] .surface-card,
+  [data-theme='scifi'] .surface-card,
   [data-theme='odysseus'] .card-glow,
   [data-theme='matrix'] .card-glow,
   [data-theme='scifi'] .card-glow,

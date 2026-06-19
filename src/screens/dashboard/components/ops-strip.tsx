@@ -122,7 +122,7 @@ export function OpsStrip({
 
   return (
     <div
-      className="flex flex-col gap-2 rounded-md border bg-[var(--theme-card)]/50 px-3 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4 border-[var(--theme-border)]"
+      className="surface-card card-glow flex flex-col gap-2 rounded-md border bg-[var(--theme-card)]/50 px-3 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4 border-[var(--theme-border)]"
     >
       {/* Gateway block: state + version + active agents */}
       <div className="flex flex-wrap items-center gap-3 text-[11px]">

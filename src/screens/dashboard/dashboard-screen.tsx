@@ -133,7 +133,7 @@ function GlassCard({
   return (
     <div
       className={cn(
-        'relative flex flex-col overflow-hidden rounded-xl border transition-colors bg-[var(--theme-card)] border-[var(--theme-border)]',
+        'surface-card card-glow relative flex flex-col overflow-hidden rounded-xl border transition-colors bg-[var(--theme-card)] border-[var(--theme-border)]',
         className,
       )}
     >

@@ -22,9 +22,10 @@ import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import type { ThemeId } from '@/lib/theme'
 import type { SettingsNavId } from '@/components/settings/settings-sidebar'
 import type {LocaleId} from '@/lib/i18n';
+import type { ChangeKind } from '@/lib/changelog'
 import { HarpConfigScreen } from '@/screens/settings/harp-config-screen'
 import { GROQ_STT_MODELS, STT_PROVIDER_OPTIONS } from '@/lib/stt-config'
-import { CHANGELOG, type ChangeKind } from '@/lib/changelog'
+import { CHANGELOG } from '@/lib/changelog'
 import {
   SETTINGS_NAV_ITEMS,
   SettingsMobilePills,
@@ -229,7 +230,7 @@ function WorkspaceThemePicker() {
             type="button"
             onClick={() => applyWorkspaceTheme(t.id)}
             className={cn(
-              'flex min-h-[112px] flex-col gap-2.5 rounded-xl border p-3.5 text-left transition-all',
+              'card-glow flex min-h-[112px] flex-col gap-2.5 rounded-xl border p-3.5 text-left transition-all',
               isActive
                 ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-subtle)] text-[var(--theme-text)] shadow-sm'
                 : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:-translate-y-0.5 hover:bg-[var(--theme-card2)]',
@@ -264,7 +265,7 @@ type SectionProps = {
 
 function SettingsSection({ title, description, icon, children }: SectionProps) {
   return (
-    <section className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm backdrop-blur-xl md:p-5">
+    <section className="surface-card card-glow rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm backdrop-blur-xl md:p-5">
       <div className="mb-4 flex items-start gap-3">
         <span className="inline-flex size-9 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]">
           <HugeiconsIcon icon={icon} size={20} strokeWidth={1.5} />
@@ -1008,7 +1009,7 @@ function MobileAppSection() {
       icon={CloudIcon}
     >
       {/* App card */}
-      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+      <div className="card-glow rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-[var(--theme-text)]">Hermes Workspace</p>
@@ -1087,7 +1088,7 @@ function NetworkAccessSection() {
       icon={Link01Icon}
     >
       {/* Tailscale */}
-      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 space-y-3">
+      <div className="card-glow rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-[var(--theme-text)]">Tailscale</p>
@@ -1118,7 +1119,7 @@ function NetworkAccessSection() {
       </div>
 
       {/* Local network */}
-      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 space-y-2">
+      <div className="card-glow rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 space-y-2">
         <p className="text-sm font-semibold text-[var(--theme-text)]">Local network</p>
         <p className="text-xs text-[var(--theme-muted)]">
           Any device on the same Wi-Fi — no setup needed.
