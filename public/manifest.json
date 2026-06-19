@@ -25,6 +25,13 @@
       "purpose": "any maskable"
     }
   ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "com.fernandofamily.hermes"
+    }
+  ],
+  "prefer_related_applications": false,
   "shortcuts": [
     {
       "name": "New Chat",

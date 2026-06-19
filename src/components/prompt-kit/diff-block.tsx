@@ -19,7 +19,7 @@ const LINE_STYLES: Record<DiffLineType, string> = {
   remove: 'bg-red-50 text-red-900 dark:bg-red-950/40 dark:text-red-200',
   hunk: 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 font-medium',
   file: 'text-[var(--theme-muted)] font-semibold',
-  normal: 'text-[var(--theme-text)] dark:text-[var(--theme-muted)]',
+  normal: 'text-[var(--theme-text)]',
 }
 
 const LINE_PREFIX_STYLES: Record<DiffLineType, string> = {

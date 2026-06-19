@@ -13,6 +13,9 @@ export type SettingsNavId =
   | 'notifications'
   | 'language'
   | 'harp'
+  | 'mobile'
+  | 'network'
+  | 'whatsnew'
 
 type NavItem = { id: SettingsNavId; label: string }
 
@@ -27,6 +30,9 @@ export const SETTINGS_NAV_ITEMS: Array<NavItem> = [
   { id: 'chat', label: 'Chat' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'language', label: 'Language' },
+  { id: 'mobile', label: 'Android App' },
+  { id: 'network', label: 'Network Access' },
+  { id: 'whatsnew', label: "What's New" },
 ]
 
 type ItemRendererArgs = {

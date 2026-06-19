@@ -123,7 +123,7 @@ function LiveEventLog({ events }: { events: Array<LiveEvent> }) {
       {visible.map((event, i) => (
         <li
           key={`${event.timestamp}-${i}`}
-          className="lifecycle-entry flex items-center gap-1.5 text-[10px] text-[var(--theme-muted)] dark:text-[var(--theme-muted)]"
+          className="lifecycle-entry flex items-center gap-1.5 text-[10px] text-[var(--theme-muted)]"
         >
           <span className="text-[11px] leading-none shrink-0">{event.emoji}</span>
           <span className="truncate">{event.text}</span>
@@ -305,7 +305,7 @@ function ThinkingBubble({
       </div>
 
       {/* Chat bubble */}
-      <div className="relative max-w-[36rem] overflow-hidden rounded-2xl rounded-bl-sm border border-[var(--theme-border)] dark:border-[var(--theme-border)] bg-[var(--theme-hover)] dark:bg-[var(--theme-hover)] thinking-shimmer-bubble">
+      <div className="relative max-w-[36rem] overflow-hidden rounded-2xl rounded-bl-sm border border-[var(--theme-border)] bg-[var(--theme-hover)] thinking-shimmer-bubble">
         {/* Shimmer overlay */}
         <div
           className="thinking-shimmer-sweep pointer-events-none absolute inset-0"
@@ -333,7 +333,7 @@ function ThinkingBubble({
                     'thinking-label ml-1.5 text-xs font-medium transition-opacity duration-300',
                     isStale
                       ? 'text-amber-500 dark:text-amber-400'
-                      : 'text-[var(--theme-muted)] dark:text-[var(--theme-muted)]',
+                      : 'text-[var(--theme-muted)]',
                   )}
                   style={{ opacity: visible ? 1 : 0 }}
                 >
@@ -346,7 +346,7 @@ function ThinkingBubble({
                 </span>
               </div>
               {canExpandResearch ? (
-                <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--theme-muted)] dark:text-[var(--theme-muted)]">
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--theme-muted)]">
                   <span>
                     {completedResearchSteps}/
                     {expandedResearchCard?.steps.length ?? 0} tools
@@ -370,7 +370,7 @@ function ThinkingBubble({
                     !expandedResearchCard.collapsed,
                   )
                 }
-                className="relative z-10 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)] dark:border-[var(--theme-border)] dark:bg-[var(--theme-bg)] dark:text-[var(--theme-muted)] dark:hover:bg-[var(--theme-hover)]"
+                className="relative z-10 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]"
                 aria-label={
                   expandedResearchCard?.collapsed
                     ? 'Expand research timeline'
@@ -431,7 +431,7 @@ function StatusLine() {
       : `${elapsed}s`
 
   return (
-    <div className="flex items-center gap-2 text-[11px] text-[var(--theme-muted)] dark:text-[var(--theme-muted)] py-0.5">
+    <div className="flex items-center gap-2 text-[11px] text-[var(--theme-muted)] py-0.5">
       <span className="inline-block size-1.5 rounded-full bg-amber-400 animate-pulse" />
       <span className="opacity-80">
         {heartbeatActivity || 'Working…'}
@@ -1763,7 +1763,7 @@ function ChatMessageListComponent({
                   type="button"
                   onClick={jumpToPreviousMatch}
                   disabled={messageSearchMatches.length === 0}
-                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] disabled:opacity-30"
+                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] disabled:opacity-30"
                   aria-label="Previous match"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1780,7 +1780,7 @@ function ChatMessageListComponent({
                   type="button"
                   onClick={jumpToNextMatch}
                   disabled={messageSearchMatches.length === 0}
-                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] disabled:opacity-30"
+                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] disabled:opacity-30"
                   aria-label="Next match"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1796,7 +1796,7 @@ function ChatMessageListComponent({
                 <button
                   type="button"
                   onClick={closeMessageSearch}
-                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]"
+                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]"
                   aria-label="Close search"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">

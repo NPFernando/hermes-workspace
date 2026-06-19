@@ -247,7 +247,7 @@ export function KanbanBoard({
                 }}
                 className={cn(
                   'flex min-h-0 min-w-0 flex-col rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)]',
-                  'max-h-[calc(100vh-15rem)] lg:max-h-[calc(100vh-13rem)]',
+                  'max-h-[calc(var(--vvh,100dvh)-15rem)] lg:max-h-[calc(var(--vvh,100dvh)-13rem)]',
                   dragOverColumn === column.key && 'border-orange-400/70 bg-[var(--theme-card2)]',
                 )}
               >

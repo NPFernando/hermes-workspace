@@ -39,7 +39,7 @@ function Switch({ className, ...props }: SwitchPrimitive.Root.Props) {
           of the thumb. Muted so it doesn't shout. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute right-1 select-none text-[8px] font-bold uppercase tracking-wide text-[var(--theme-muted)] opacity-100 transition-opacity duration-150 dark:text-[var(--theme-muted)] in-data-checked:opacity-0"
+        className="pointer-events-none absolute right-1 select-none text-[8px] font-bold uppercase tracking-wide text-[var(--theme-muted)] opacity-100 transition-opacity duration-150 in-data-checked:opacity-0"
       >
         OFF
       </span>

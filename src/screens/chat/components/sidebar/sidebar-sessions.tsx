@@ -71,7 +71,7 @@ export const SidebarSessions = memo(function SidebarSessions({
     >
       <CollapsibleTrigger className="w-full flex items-center gap-1.5 rounded-none px-5 pt-3 pb-1 shrink-0 text-[10px] font-semibold uppercase tracking-wider hover:bg-transparent data-panel-open:text-[var(--theme-muted)]">
         <span className="select-none">Sessions</span>
-        <span className="ml-auto p-0.5 rounded hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)] transition-colors">
+        <span className="ml-auto p-0.5 rounded hover:bg-[var(--theme-hover)] transition-colors">
           <HugeiconsIcon
             icon={ArrowDown01Icon}
             size={12}
@@ -101,7 +101,7 @@ export const SidebarSessions = memo(function SidebarSessions({
 
       <CollapsiblePanel
         className="w-full min-h-0"
-        contentClassName="flex flex-col overflow-y-auto max-h-[calc(100vh-300px)]"
+        contentClassName="flex flex-col overflow-y-auto max-h-[calc(var(--vvh,100dvh)-300px)]"
       >
         <ScrollAreaRoot className="flex-1 min-h-0">
           <ScrollAreaViewport className="min-h-0">

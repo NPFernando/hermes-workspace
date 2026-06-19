@@ -170,7 +170,7 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-50 cursor-pointer text-left"
               >
                 <span>{row.checked ? '☑' : '☐'}</span>
-                <span className="text-sm text-[var(--theme-text)] dark:text-[var(--theme-text)]">{row.label}</span>
+                <span className="text-sm text-[var(--theme-text)]">{row.label}</span>
               </button>
             ))}
           </section>

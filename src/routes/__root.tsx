@@ -21,6 +21,7 @@ import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { UpdateCenterNotifier } from '@/components/update-center-notifier'
+import { WhatsNewModal } from '@/components/whats-new-modal'
 import {
   applyInterfacePreferences,
   initializeSettingsAppearance,
@@ -214,7 +215,7 @@ export const Route = createRootRoute({
   component: RootLayout,
   errorComponent: function RootError({ error }) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-[var(--theme-panel)]">
+      <div className="flex flex-col items-center justify-center min-h-dvh p-6 text-center bg-[var(--theme-panel)]">
         <h1 className="text-2xl font-semibold text-[var(--theme-text)] mb-4">
           Something went wrong
         </h1>
@@ -382,41 +383,62 @@ function RootLayout() {
     }
   }, [])
 
-  const rootSurfaceState = getRootSurfaceState(onboardingComplete, authStatus)
+  const isPublicSurface = pathname === '/download-apk'
+  const rootSurfaceState = isPublicSurface
+    ? {
+        showLogin: false,
+        showOnboarding: false,
+        showWorkspaceShell: true,
+        showPostOnboardingOverlays: false,
+      }
+    : getRootSurfaceState(onboardingComplete, authStatus)
 
   return (
     <QueryClientProvider client={queryClient}>
       <Toaster />
-      {mounted && rootSurfaceState.showLogin ? <LoginScreen /> : null}
-      {mounted && rootSurfaceState.showOnboarding ? <ClaudeOnboarding /> : null}
-      {rootSurfaceState.showWorkspaceShell ? (
+      {isPublicSurface ? (
+        <ErrorBoundary
+          className="min-h-dvh"
+          title="Something went wrong"
+          description="This page failed to render. Reload to try again."
+        >
+          <Outlet />
+        </ErrorBoundary>
+      ) : (
         <>
-          <SettingsSyncMount />
-          <GlobalShortcutListener />
-          <TerminalShortcutListener />
-          <KeyboardShortcuts />
-          <WorkspaceShell>
-            <ErrorBoundary
-              className="h-full min-h-0 flex-1"
-              title="Something went wrong"
-              description="This page failed to render. Reload to try again."
-            >
-              <Outlet />
-            </ErrorBoundary>
-          </WorkspaceShell>
-          <SearchModal />
-          {/* Keep UsageMeter mounted so search-modal OPEN_USAGE still works even when the pill is hidden by default. */}
-          <UsageMeter visible={settings.showUsageMeter} />
-          <KeyboardShortcutsModal />
-          <UpdateCenterNotifier />
-          {rootSurfaceState.showPostOnboardingOverlays ? (
+          {mounted && rootSurfaceState.showLogin ? <LoginScreen /> : null}
+          {mounted && rootSurfaceState.showOnboarding ? <ClaudeOnboarding /> : null}
+          {rootSurfaceState.showWorkspaceShell ? (
             <>
-              <MobilePromptTrigger />
-              <OnboardingTour />
+              <SettingsSyncMount />
+              <GlobalShortcutListener />
+              <TerminalShortcutListener />
+              <KeyboardShortcuts />
+              <WorkspaceShell>
+                <ErrorBoundary
+                  className="h-full min-h-0 flex-1"
+                  title="Something went wrong"
+                  description="This page failed to render. Reload to try again."
+                >
+                  <Outlet />
+                </ErrorBoundary>
+              </WorkspaceShell>
+              <SearchModal />
+              {/* Keep UsageMeter mounted so search-modal OPEN_USAGE still works even when the pill is hidden by default. */}
+              <UsageMeter visible={settings.showUsageMeter} />
+              <KeyboardShortcutsModal />
+              <UpdateCenterNotifier />
+              <WhatsNewModal />
+              {rootSurfaceState.showPostOnboardingOverlays ? (
+                <>
+                  <MobilePromptTrigger />
+                  <OnboardingTour />
+                </>
+              ) : null}
             </>
           ) : null}
         </>
-      ) : null}
+      )}
     </QueryClientProvider>
   )
 }

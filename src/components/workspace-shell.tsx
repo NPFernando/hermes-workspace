@@ -72,6 +72,19 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     [],
   )
 
+  // TWA / installed PWA: standalone display-mode means no browser chrome.
+  // On Android TWA, env(safe-area-inset-top) == status bar height.
+  // We expose this as --titlebar-h so every consumer (sidebar, fixed panels)
+  // clears the status bar without hardcoding pixel values.
+  const isStandalone = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    return (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: window-controls-overlay)').matches ||
+      !!(navigator as Navigator & { standalone?: boolean }).standalone
+    )
+  }, [])
+
   const { settings } = useSettings()
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
@@ -195,7 +208,8 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const isOnTerminalRoute = pathname.startsWith('/terminal')
   const isEmbeddedSurface =
     search.embed === '1' || search.embed === 'true' || search.mode === 'embed'
-  const isChromeFreeSurface = isEmbeddedSurface
+  const isPublicSurface = pathname === '/download-apk'
+  const isChromeFreeSurface = isEmbeddedSurface || isPublicSurface
   const hideChatSidebar = isOnChatRoute && chatFocusMode
   const showDesktopSidebarBackdrop =
     !isChromeFreeSurface && !isMobile && !isOnChatRoute && !sidebarCollapsed
@@ -244,12 +258,29 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   useEffect(() => {
     if (typeof document === 'undefined') return
-    const titlebarHeight = isElectron ? '40px' : '0px'
-    document.documentElement.style.setProperty('--titlebar-h', titlebarHeight)
+    if (isElectron) {
+      document.documentElement.style.setProperty('--titlebar-h', '40px')
+    } else if (isStandalone) {
+      // In TWA / installed PWA: set --titlebar-h to the OS status bar height
+      // so fixed panels clear it. env() is not usable in JS directly, so we
+      // read it via a throw-away element.
+      const tmp = document.createElement('div')
+      tmp.style.cssText =
+        'position:fixed;top:env(safe-area-inset-top,0px);left:0;width:0;height:0;visibility:hidden;pointer-events:none'
+      document.body.appendChild(tmp)
+      const safeTop = tmp.getBoundingClientRect().top
+      document.body.removeChild(tmp)
+      const px = Math.max(Math.round(safeTop), 0)
+      document.documentElement.style.setProperty('--titlebar-h', `${px}px`)
+      document.documentElement.classList.add('is-standalone')
+    } else {
+      document.documentElement.style.setProperty('--titlebar-h', '0px')
+    }
     return () => {
       document.documentElement.style.removeProperty('--titlebar-h')
+      document.documentElement.classList.remove('is-standalone')
     }
-  }, [isElectron])
+  }, [isElectron, isStandalone])
 
   // Keep mobile sidebar state closed after resize and route changes.
   useEffect(() => {
@@ -304,7 +335,8 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   const shellStyle: React.CSSProperties & Record<'--titlebar-h', string> = {
     height: 'var(--vvh, 100dvh)',
-    paddingTop: isElectron ? 40 : 0,
+    // Electron: native titlebar. TWA/standalone: status bar safe area. Web: none.
+    paddingTop: isElectron ? 40 : isStandalone ? 'env(safe-area-inset-top, 0px)' : 0,
     '--titlebar-h': isElectron ? '40px' : '0px',
   }
 

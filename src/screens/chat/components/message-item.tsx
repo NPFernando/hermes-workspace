@@ -1242,7 +1242,7 @@ function AgentWorkSummary({ toolSections }: { toolSections: Array<InlineToolSect
 
   return (
     <details className="group/agentwork w-full max-w-[var(--chat-content-max-width)]">
-      <summary className="flex cursor-pointer select-none list-none items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-1.5 text-[11px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)] dark:bg-[var(--theme-hover)]/20 [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer select-none list-none items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-1.5 text-[11px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/20 [&::-webkit-details-marker]:hidden">
         <span className="shrink-0 opacity-70">⚙</span>
         <span className="flex-1 font-medium">
           Agent Work
@@ -1253,13 +1253,13 @@ function AgentWorkSummary({ toolSections }: { toolSections: Array<InlineToolSect
         </span>
         <span className="shrink-0 text-[10px] opacity-50 transition-transform group-open/agentwork:rotate-180">▾</span>
       </summary>
-      <div className="mt-1 rounded-lg border border-[var(--theme-border)]/40 bg-[var(--theme-panel)]/30 px-3 py-2 dark:bg-[var(--theme-hover)]/10">
+      <div className="mt-1 rounded-lg border border-[var(--theme-border)]/40 bg-[var(--theme-panel)]/30 px-3 py-2/10">
         <div className="text-[10px] font-medium uppercase tracking-wide text-[var(--theme-muted)] mb-1">Tools used</div>
         <div className="flex flex-wrap gap-1">
           {toolNames.map((name) => (
             <span
               key={name}
-              className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-hover)]/80 px-2 py-0.5 text-[10px] text-[var(--theme-muted)] dark:bg-[var(--theme-hover)]/50 dark:text-[var(--theme-muted)]"
+              className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-hover)]/80 px-2 py-0.5 text-[10px] text-[var(--theme-muted)]/50"
             >
               {name}
             </span>

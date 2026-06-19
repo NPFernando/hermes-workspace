@@ -24,6 +24,7 @@ import type { SettingsNavId } from '@/components/settings/settings-sidebar'
 import type {LocaleId} from '@/lib/i18n';
 import { HarpConfigScreen } from '@/screens/settings/harp-config-screen'
 import { GROQ_STT_MODELS, STT_PROVIDER_OPTIONS } from '@/lib/stt-config'
+import { CHANGELOG, type ChangeKind } from '@/lib/changelog'
 import {
   SETTINGS_NAV_ITEMS,
   SettingsMobilePills,
@@ -344,7 +345,7 @@ function SettingsRoute() {
   const activeSection: SettingsSectionId = section ?? 'claude'
 
   return (
-    <div className="min-h-screen bg-surface text-[var(--theme-text)]">
+    <div className="min-h-dvh bg-surface text-[var(--theme-text)]">
       <div className="pointer-events-none fixed inset-0 bg-radial from-[var(--theme-accent)]/10 via-transparent to-transparent" />
       <div className="pointer-events-none fixed inset-0 bg-gradient-to-br from-[var(--theme-hover)]/60 via-transparent to-[var(--theme-hover)]/30" />
 
@@ -482,7 +483,7 @@ function SettingsRoute() {
                     onChange={(e) =>
                       updateSettings({ editorFontSize: Number(e.target.value) })
                     }
-                    className="w-full accent-[var(--theme-text)] dark:accent-[var(--theme-accent)]"
+                    className="w-full accent-[var(--theme-text)]"
                     aria-label={`Editor font size: ${settings.editorFontSize} pixels`}
                     aria-valuemin={12}
                     aria-valuemax={20}
@@ -585,7 +586,7 @@ function SettingsRoute() {
                           usageThreshold: Number(e.target.value),
                         })
                       }
-                      className="w-full accent-[var(--theme-text)] dark:accent-[var(--theme-accent)] disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full accent-[var(--theme-text)] disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={!settings.notificationsEnabled}
                       aria-label={`Usage threshold: ${settings.usageThreshold} percent`}
                       aria-valuemin={50}
@@ -677,6 +678,15 @@ function SettingsRoute() {
               </SettingsSection>
             </>
           )}
+
+          {/* ── Android App ─────────────────────────────────────── */}
+          {activeSection === 'mobile' && <MobileAppSection />}
+
+          {/* ── Network Access ──────────────────────────────────── */}
+          {activeSection === 'network' && <NetworkAccessSection />}
+
+          {/* ── What's New ──────────────────────────────────────── */}
+          {activeSection === 'whatsnew' && <WhatsNewSection />}
 
           <footer className="mt-auto pt-4">
             <div className="flex items-center gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3 text-sm text-[var(--theme-muted)] backdrop-blur-sm">
@@ -956,8 +966,241 @@ function ChatDisplaySection() {
           />
         </SettingsRow>
       </SettingsSection>
-      {/* Mobile Navigation removed — not relevant for Hermes Workspace */}
     </>
+  )
+}
+
+// ── Mobile App Section ──────────────────────────────────────────────────
+
+function MobileAppSection() {
+  const [version, setVersion] = useState<{
+    versionCode: number
+    versionName: string
+  } | null>(null)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [reminderEnabled, setReminderEnabled] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/app-version')
+      .then((r) => r.json() as Promise<{ versionCode: number; versionName: string }>)
+      .then((v) => {
+        setVersion(v)
+        const stored = parseInt(localStorage.getItem('hermes-apk-downloaded-version') ?? '0', 10)
+        setUpdateAvailable(stored > 0 && v.versionCode > stored)
+      })
+      .catch(() => {})
+    setReminderEnabled(localStorage.getItem('claude-mobile-access-dismissed') !== 'true')
+  }, [])
+
+  const toggleReminder = (checked: boolean) => {
+    setReminderEnabled(checked)
+    if (checked) {
+      localStorage.removeItem('claude-mobile-access-dismissed')
+    } else {
+      localStorage.setItem('claude-mobile-access-dismissed', 'true')
+    }
+  }
+
+  return (
+    <SettingsSection
+      title="Android App"
+      description="Native Hermes experience with home screen shortcuts for Chat, Operations, and Tasks."
+      icon={CloudIcon}
+    >
+      {/* App card */}
+      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[var(--theme-text)]">Hermes Workspace</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <p className="text-xs text-[var(--theme-muted)]">
+                {version ? `APK v${version.versionName}` : 'Loading…'}
+              </p>
+              {version && (
+                <a
+                  href="/settings?section=whatsnew"
+                  className="text-[10px] text-[var(--theme-accent)] underline-offset-2 hover:underline"
+                >
+                  release notes
+                </a>
+              )}
+            </div>
+          </div>
+          {version && (
+            updateAvailable ? (
+              <span className="shrink-0 rounded-full bg-[var(--theme-accent)]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[var(--theme-accent)]">
+                Update available
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-500">
+                Up to date
+              </span>
+            )
+          )}
+        </div>
+        <a
+          href="/download-apk"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-400 active:scale-[0.98]"
+        >
+          <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden>
+            <path d="M12 16l-5-5 1.41-1.41L11 13.17V4h2v9.17l2.59-2.58L17 11zM5 20h14v-2H5z" />
+          </svg>
+          {updateAvailable ? 'Download Update' : 'Download APK'}
+        </a>
+      </div>
+
+      {/* Install steps */}
+      <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3.5 text-xs text-[var(--theme-muted)]">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">How to install</p>
+        <ol className="list-inside list-decimal space-y-1.5">
+          <li>Open <span className="font-medium text-[var(--theme-text)]">agent.fernandofamily.com/download-apk</span> on your phone</li>
+          <li>Tap <span className="font-medium text-[var(--theme-text)]">Download APK</span> and open the file when it finishes</li>
+          <li>Tap <span className="font-medium text-[var(--theme-text)]">Install</span> — allow unknown sources if prompted (one-time only)</li>
+          <li>Updates install over the existing app and keep all your data</li>
+        </ol>
+      </div>
+
+      {/* Preferences */}
+      <SettingsRow
+        label="Show install reminder"
+        description="Display a banner when the app is not installed or a new version is available."
+      >
+        <Switch
+          checked={reminderEnabled}
+          onCheckedChange={toggleReminder}
+          aria-label="Show install reminder"
+        />
+      </SettingsRow>
+    </SettingsSection>
+  )
+}
+
+// ── Network Access Section ──────────────────────────────────────────────
+
+function NetworkAccessSection() {
+  return (
+    <SettingsSection
+      title="Network Access"
+      description="Connect to Hermes Workspace from your phone or other devices."
+      icon={Link01Icon}
+    >
+      {/* Tailscale */}
+      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[var(--theme-text)]">Tailscale</p>
+            <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
+              Secure private network — works anywhere, no port forwarding needed.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-[var(--theme-accent)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--theme-accent)]">
+            Recommended
+          </span>
+        </div>
+        <ol className="list-inside list-decimal space-y-1 text-xs text-[var(--theme-muted)]">
+          <li>Install Tailscale on this server and sign in</li>
+          <li>Install Tailscale on your phone with the same account</li>
+          <li>Open the server&apos;s Tailscale IP in your phone browser</li>
+        </ol>
+        <a
+          href="https://tailscale.com/download"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-border)]"
+        >
+          tailscale.com/download
+          <svg viewBox="0 0 24 24" className="size-3 fill-none stroke-current" strokeWidth={2.5} aria-hidden>
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </a>
+      </div>
+
+      {/* Local network */}
+      <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 space-y-2">
+        <p className="text-sm font-semibold text-[var(--theme-text)]">Local network</p>
+        <p className="text-xs text-[var(--theme-muted)]">
+          Any device on the same Wi-Fi — no setup needed.
+        </p>
+        <p className="text-xs text-[var(--theme-muted)]">
+          Run{' '}
+          <code className="rounded bg-[var(--theme-hover)] px-1 py-0.5 font-mono">ip addr</code>
+          {' '}on the server to find the LAN IP, then open{' '}
+          <code className="rounded bg-[var(--theme-hover)] px-1 py-0.5 font-mono">http://&lt;LAN-IP&gt;:3000</code>
+          {' '}on your phone.
+        </p>
+      </div>
+
+      {/* Gateway tip */}
+      <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-3 text-xs text-[var(--theme-muted)]">
+        <span className="font-semibold text-[var(--theme-text)]">Gateway tip — </span>
+        set the connection URL in{' '}
+        <span className="font-medium text-[var(--theme-text)]">Settings → Connection</span>
+        {' '}to the Tailscale IP (e.g.{' '}
+        <code className="rounded bg-[var(--theme-panel)] px-1 font-mono">http://100.x.y.z:8642</code>
+        ). Also add{' '}
+        <code className="rounded bg-[var(--theme-panel)] px-1 font-mono">API_SERVER_HOST=0.0.0.0</code>
+        {' '}to the agent <code className="rounded bg-[var(--theme-panel)] px-1 font-mono">.env</code>.
+      </div>
+    </SettingsSection>
+  )
+}
+
+// ── What's New Section ──────────────────────────────────────────────────
+
+const KIND_LABEL: Record<ChangeKind, string> = {
+  added:    'New',
+  fixed:    'Fix',
+  improved: 'Better',
+  removed:  'Removed',
+}
+const KIND_CLASS: Record<ChangeKind, string> = {
+  added:    'bg-emerald-500/10 text-emerald-500',
+  fixed:    'bg-rose-500/10 text-rose-400',
+  improved: 'bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]',
+  removed:  'bg-[var(--theme-muted)]/10 text-[var(--theme-muted)]',
+}
+
+function WhatsNewSection() {
+  return (
+    <SettingsSection
+      title="What's New"
+      description="Version history — changes, fixes, and improvements across workspace and Android app."
+      icon={SparklesIcon}
+    >
+      <div className="space-y-5">
+        {CHANGELOG.map((entry, idx) => (
+          <div key={entry.version} className={idx > 0 ? 'border-t border-[var(--theme-border)] pt-5' : ''}>
+            {/* Version header */}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-[var(--theme-accent)]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[var(--theme-accent)]">
+                v{entry.version}
+              </span>
+              {entry.apkVersion && (
+                <span className="rounded-full bg-[var(--theme-hover)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--theme-muted)]">
+                  APK v{entry.apkVersion}
+                </span>
+              )}
+              <span className="text-xs text-[var(--theme-muted)]">{entry.date}</span>
+              <span className="flex-1 text-xs text-[var(--theme-text)] font-medium">{entry.summary}</span>
+            </div>
+
+            {/* Changes */}
+            <div className="space-y-2">
+              {entry.changes.map((c, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <span className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${KIND_CLASS[c.kind]}`}>
+                    {KIND_LABEL[c.kind]}
+                  </span>
+                  <span className="text-xs text-[var(--theme-muted)] leading-relaxed">{c.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </SettingsSection>
   )
 }
 
@@ -2360,6 +2603,22 @@ function ClaudeConfigSection({
         description="Hermes Agent runtime information."
         icon={Notification03Icon}
       >
+        <SettingsRow
+          label="Workspace version"
+          description="Current web workspace release."
+        >
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-[var(--theme-accent)]/10 px-2.5 py-0.5 text-xs font-semibold text-[var(--theme-accent)]">
+              v{CHANGELOG[0].version}
+            </span>
+            <a
+              href="/settings?section=whatsnew"
+              className="text-xs text-[var(--theme-muted)] underline-offset-2 hover:text-[var(--theme-accent)] hover:underline"
+            >
+              What's New
+            </a>
+          </div>
+        </SettingsRow>
         <SettingsRow
           label="Config location"
           description="Where Claude stores its configuration."

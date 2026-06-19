@@ -1,229 +1,52 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
-import { writeTextToClipboard } from '@/lib/clipboard'
+import { markVersionDownloaded } from './MobilePromptTrigger'
 
-const STORAGE_KEY_SEEN = 'claude-mobile-setup-seen'
+type Platform = 'android' | 'ios' | 'desktop' | 'unknown'
+
+function detectPlatform(): Platform {
+  if (typeof navigator === 'undefined') return 'unknown'
+  const ua = navigator.userAgent || ''
+  const touchMac = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1
+  if (/Android/i.test(ua)) return 'android'
+  if (/iPhone|iPad|iPod/i.test(ua) || touchMac) return 'ios'
+  return 'desktop'
+}
 
 interface MobileSetupModalProps {
   isOpen: boolean
   onClose: () => void
 }
 
-function TailscaleIcon() {
-  return (
-    <svg viewBox="0 0 100 100" className="size-5">
-      <circle cx="50" cy="10" r="10" fill="#fff" opacity="0.9" />
-      <circle cx="50" cy="50" r="10" fill="#fff" />
-      <circle cx="50" cy="90" r="10" fill="#fff" opacity="0.9" />
-      <circle cx="10" cy="30" r="10" fill="#fff" opacity="0.6" />
-      <circle cx="90" cy="30" r="10" fill="#fff" opacity="0.6" />
-      <circle cx="10" cy="70" r="10" fill="#fff" opacity="0.6" />
-      <circle cx="90" cy="70" r="10" fill="#fff" opacity="0.6" />
-      <circle cx="10" cy="50" r="10" fill="#fff" opacity="0.3" />
-      <circle cx="90" cy="50" r="10" fill="#fff" opacity="0.3" />
-    </svg>
-  )
-}
-
 export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
-  const [step, setStep] = useState(0)
-  const [networkUrl, setNetworkUrl] = useState<{
-    url: string
-    source: 'tailscale' | 'lan' | 'localhost'
-  } | null>(null)
+  const [version, setVersion] = useState<{ versionCode: number; versionName: string } | null>(null)
+  const [platform, setPlatform] = useState<Platform>('unknown')
 
   useEffect(() => {
-    fetch(`/api/network-url?port=${window.location.port || 3000}`)
-      .then(
-        (r) =>
-          r.json() as Promise<{
-            url: string
-            source: 'tailscale' | 'lan' | 'localhost'
-          }>,
-      )
-      .then((data) => setNetworkUrl(data))
-      .catch(() =>
-        setNetworkUrl({ url: window.location.origin, source: 'localhost' }),
-      )
+    setPlatform(detectPlatform())
+    fetch('/api/app-version')
+      .then((r) => r.json() as Promise<{ versionCode: number; versionName: string }>)
+      .then(setVersion)
+      .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    if (isOpen) setStep(0)
-  }, [isOpen])
+  if (!isOpen) return null
 
-  if (!isOpen) {
-    return null
-  }
-
-  const steps = [
-    {
-      title: 'Install Tailscale on your desktop',
-      body: 'Install Tailscale on the machine running Hermes Workspace, then sign in.',
-      showTailscaleIcon: true,
-      action: (
-        <a
-          href="https://tailscale.com/download"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-400"
-        >
-          Open Tailscale Downloads
-        </a>
-      ),
-    },
-    {
-      title: 'Keep your backend reachable',
-      body: 'Hermes Workspace can talk to any OpenAI-compatible backend on mobile too. Make sure both the workspace and backend stay reachable over Tailscale or your local network.',
-      showTailscaleIcon: false,
-      action: (
-        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-muted)]">
-          Enhanced Hermes Agent gateway APIs are optional. If core chat already works
-          on desktop, mobile access mainly depends on network reachability.
-        </div>
-      ),
-    },
-    {
-      title: 'Install Tailscale on your phone',
-      body: 'Install Tailscale on iOS or Android and sign in with the same account.',
-      showTailscaleIcon: true,
-      action: (
-        <div className="flex gap-2">
-          <a
-            href="https://apps.apple.com/app/apple-store/id425072860"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-hover)]"
-          >
-            iOS App
-          </a>
-          <a
-            href="https://play.google.com/store/apps/details?id=com.tailscale.ipn"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-hover)]"
-          >
-            Android App
-          </a>
-        </div>
-      ),
-    },
-    {
-      title: 'Open Hermes Workspace on your phone',
-      body:
-        networkUrl?.source === 'tailscale'
-          ? 'Your Tailscale address. Open this on your phone browser to use the same workspace.'
-          : networkUrl?.source === 'lan'
-            ? 'Your local network address. Your phone must be on the same WiFi.'
-            : 'Start Tailscale on this machine if you want a shareable address outside localhost.',
-      showTailscaleIcon: networkUrl?.source === 'tailscale',
-      action: (
-        <button
-          type="button"
-          onClick={() =>
-            networkUrl && writeTextToClipboard(networkUrl.url).catch(() => {})
-          }
-          className="group flex w-full items-center justify-between rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 transition-colors hover:border-accent-500/50"
-        >
-          <span className="break-all font-mono text-sm text-accent-300">
-            {networkUrl?.url ?? '…'}
-          </span>
-          <span className="ml-3 shrink-0 text-[var(--theme-muted)] group-hover:text-accent-400">
-            {networkUrl?.source === 'tailscale' && (
-              <svg viewBox="0 0 100 100" className="size-4 opacity-60">
-                <circle
-                  cx="50"
-                  cy="10"
-                  r="10"
-                  fill="currentColor"
-                  opacity="0.9"
-                />
-                <circle cx="50" cy="50" r="10" fill="currentColor" />
-                <circle
-                  cx="50"
-                  cy="90"
-                  r="10"
-                  fill="currentColor"
-                  opacity="0.9"
-                />
-                <circle
-                  cx="10"
-                  cy="30"
-                  r="10"
-                  fill="currentColor"
-                  opacity="0.6"
-                />
-                <circle
-                  cx="90"
-                  cy="30"
-                  r="10"
-                  fill="currentColor"
-                  opacity="0.6"
-                />
-                <circle
-                  cx="10"
-                  cy="70"
-                  r="10"
-                  fill="currentColor"
-                  opacity="0.6"
-                />
-                <circle
-                  cx="90"
-                  cy="70"
-                  r="10"
-                  fill="currentColor"
-                  opacity="0.6"
-                />
-              </svg>
-            )}
-          </span>
-        </button>
-      ),
-    },
-    {
-      title: 'Get the Android app',
-      body: 'Install the native Hermes app on Android for a full-screen experience with shortcuts to Chat, Operations, and Tasks.',
-      showTailscaleIcon: false,
-      action: (
-        <div className="flex flex-col gap-2">
-          <a
-            href="/download-apk"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-400"
-          >
-            <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden>
-              <path d="M12 16l-5-5 1.41-1.41L11 13.17V4h2v9.17l2.59-2.58L17 11zM5 20h14v-2H5z" />
-            </svg>
-            Download APK
-          </a>
-          <p className="text-xs text-[var(--theme-muted)]">
-            Open that link on your phone, download the APK, then tap to install. Allow unknown sources if prompted.
-          </p>
-        </div>
-      ),
-    },
-  ]
-
-  const currentStep = steps[step]
-  const isLastStep = step === steps.length - 1
-
-  const handleNext = () => {
-    if (!isLastStep) {
-      setStep((prev) => prev + 1)
-      return
-    }
-
-    localStorage.setItem(STORAGE_KEY_SEEN, 'true')
+  const handleDownload = () => {
+    if (version) markVersionDownloaded(version.versionCode)
     onClose()
   }
 
-  const handleBack = () => {
-    setStep((prev) => Math.max(prev - 1, 0))
-  }
+  const isIos = platform === 'ios'
+  const isAndroid = platform === 'android'
+  const title = isIos ? 'Use Hermes on iPhone / iPad' : 'Get the Android App'
+  const subtitle = isIos
+    ? 'Install from Safari with Add to Home Screen'
+    : `${version ? `v${version.versionName} · ` : ''}Native full-screen experience`
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
@@ -231,86 +54,76 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
         initial={{ opacity: 0, y: 12, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 12, scale: 0.98 }}
-        className="relative w-full max-w-md rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5 text-white shadow-2xl shadow-black/40"
+        className="relative w-full max-w-sm rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-5 shadow-2xl shadow-black/40"
       >
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 rounded-lg p-1.5 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-muted)]"
-          aria-label="Close mobile setup"
+          className="absolute top-4 right-4 rounded-lg p-1.5 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]"
+          aria-label="Close"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={2} />
         </button>
 
-        <div className="mb-4 flex items-center gap-3 pr-10">
-          <img
-            src="/claude-avatar.webp"
-            alt="Hermes Agent"
-            className="size-9 rounded-xl"
-          />
-          <div className="flex-1">
-            <h2 className="text-lg font-semibold text-white">Mobile Setup</h2>
-            <div className="mt-1 flex items-center gap-1.5">
-              {steps.map((_, index) => (
-                <span
-                  key={`step-indicator-${index}`}
-                  className={`h-2 w-6 rounded-full transition-colors ${
-                    index === step ? 'bg-accent-500' : 'bg-[var(--theme-border)]'
-                  }`}
-                />
-              ))}
-            </div>
+        {/* Header */}
+        <div className="mb-4 flex items-center gap-3 pr-8">
+          <img src="/claude-avatar.webp" alt="Hermes" className="size-10 rounded-xl" />
+          <div>
+            <h2 className="text-base font-semibold text-[var(--theme-text)]">{title}</h2>
+            <p className="text-xs text-[var(--theme-muted)]">
+              {subtitle}
+            </p>
           </div>
         </div>
 
-        <div className="rounded-xl bg-[var(--theme-bg)] p-4">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={step}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="mb-2 flex items-center gap-2">
-                {currentStep.showTailscaleIcon ? <TailscaleIcon /> : null}
-                <h3 className="text-sm font-semibold text-[var(--theme-text)]">
-                  {currentStep.title}
-                </h3>
-              </div>
-              <p className="mb-4 text-sm text-[var(--theme-muted)]">
-                {currentStep.body}
-              </p>
-              <div>{currentStep.action}</div>
-            </motion.div>
-          </AnimatePresence>
+        {/* Install steps */}
+        <div className="mb-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3.5">
+          {isIos ? (
+            <ol className="space-y-1.5 text-xs text-[var(--theme-muted)] list-decimal list-inside">
+              <li>Tap <span className="font-medium text-[var(--theme-text)]">Open Web App</span></li>
+              <li>Use Safari&apos;s <span className="font-medium text-[var(--theme-text)]">Share</span> button</li>
+              <li>Choose <span className="font-medium text-[var(--theme-text)]">Add to Home Screen</span></li>
+            </ol>
+          ) : (
+            <ol className="space-y-1.5 text-xs text-[var(--theme-muted)] list-decimal list-inside">
+              <li>Open <span className="font-medium text-[var(--theme-text)]">agent.fernandofamily.com/download-apk</span> on your Android device</li>
+              <li>Tap <span className="font-medium text-[var(--theme-text)]">Download APK</span> and open the file</li>
+              <li>Tap <span className="font-medium text-[var(--theme-text)]">Install</span> — allow unknown sources if prompted</li>
+            </ol>
+          )}
         </div>
 
-        <div className="mt-5 flex items-center justify-between">
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={handleBack}
-            disabled={step === 0}
-            className="rounded-lg px-3 py-2 text-sm text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={onClose}
+            className="rounded-lg px-3 py-2 text-sm text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
           >
-            Back
+            Dismiss
           </button>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
+          {isIos ? (
+            <a
+              href="/chat/new?source=mobile-setup-ios"
               onClick={onClose}
-              className="rounded-lg px-3 py-2 text-sm text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-muted)]"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-400"
             >
-              Close
-            </button>
-            <button
-              type="button"
-              onClick={handleNext}
-              className="rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-400"
+              Open Web App
+            </a>
+          ) : (
+            <a
+              href="/download-apk"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleDownload}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-400"
             >
-              {isLastStep ? 'Finish' : 'Next'}
-            </button>
-          </div>
+              <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden>
+                <path d="M12 16l-5-5 1.41-1.41L11 13.17V4h2v9.17l2.59-2.58L17 11zM5 20h14v-2H5z" />
+              </svg>
+              {isAndroid ? 'Open Download Page' : 'Send to Android'}
+            </a>
+          )}
         </div>
       </motion.div>
     </div>

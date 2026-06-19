@@ -2295,3 +2295,30 @@ kbd {
   outline: 2px solid color-mix(in srgb, var(--theme-accent) 70%, transparent);
   outline-offset: 2px;
 }
+
+/* ── Cross-platform / dynamic sizing ────────────────────────────────────────
+   --vvh: visual viewport height (set by useMobileKeyboard, tracks keyboard).
+   --kb-inset: keyboard height offset (0 when closed).
+   --titlebar-h: electron titlebar OR TWA safe-area-inset-top.
+   --tabbar-h: mobile tab bar total height (set by MobileTabBar).
+
+   Rule of thumb: prefer var(--vvh,100dvh) over 100vh for scrollable panels
+   so they shrink when the mobile keyboard is open.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Standalone (TWA / installed PWA) overrides */
+.is-standalone {
+  /* Bottom safe area already handled per-component via env(); this ensures
+     the document body doesn't bleed behind the home indicator on iOS */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Scrollbars: hide on mobile, subtle on desktop */
+@media (max-width: 767px) {
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
+}

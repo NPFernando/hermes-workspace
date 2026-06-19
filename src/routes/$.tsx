@@ -12,7 +12,7 @@ function NotFoundPage() {
   usePageTitle('404 — Not Found')
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-[var(--theme-panel)]">
+    <div className="flex flex-col items-center justify-center min-h-dvh p-6 text-center bg-[var(--theme-panel)]">
       <div className="max-w-md">
         {/* 404 Icon */}
         <div className="mb-6 flex items-center justify-center">

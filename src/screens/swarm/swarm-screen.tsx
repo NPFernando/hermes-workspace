@@ -212,7 +212,7 @@ export function SwarmScreen() {
   return (
     <div
       data-route-page
-      className="relative flex h-full min-h-screen flex-col gap-4 overflow-auto bg-[#0a0d0b] p-4 pb-[420px] text-emerald-50 md:p-6"
+      className="relative flex h-full min-h-dvh flex-col gap-4 overflow-auto bg-[#0a0d0b] p-4 pb-[420px] text-emerald-50 md:p-6"
       style={{ background: 'radial-gradient(circle at top, rgba(34,197,94,0.10), transparent 28%), linear-gradient(180deg, #0a0d0b 0%, #0c110d 100%)' }}
     >
       <header className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-400/20 bg-black/45 px-4 py-2.5 backdrop-blur">

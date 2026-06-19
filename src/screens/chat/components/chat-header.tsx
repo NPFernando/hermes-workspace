@@ -280,7 +280,7 @@ function ChatHeaderComponent({
             className="flex items-center gap-1 min-w-0 max-w-[55vw] px-3 py-1.5 rounded-full bg-[var(--theme-hover)]/70 hover:bg-[var(--theme-hover)]/80 transition-colors"
             aria-label="Switch session"
           >
-            <span className="truncate text-[13px] font-medium text-[var(--theme-muted)] dark:text-[var(--theme-muted)]">
+            <span className="truncate text-[13px] font-medium text-[var(--theme-muted)]">
               {mobileTitle === 'new' ? 'New Chat' : mobileTitle}
             </span>
             <svg

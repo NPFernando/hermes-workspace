@@ -73,7 +73,7 @@ function ArtifactsTab() {
   }
 
   return (
-    <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+    <div className="space-y-2 p-3 overflow-auto max-h-[calc(var(--vvh,100dvh)-140px)]">
       <p className="text-xs text-[var(--theme-muted)]">
         {artifacts.length} artifacts emitted by the agent
       </p>
@@ -129,7 +129,7 @@ function ActivityTab() {
   return (
     <div
       ref={scrollRef}
-      className="space-y-1 p-3 overflow-auto max-h-[calc(100vh-140px)]"
+      className="space-y-1 p-3 overflow-auto max-h-[calc(var(--vvh,100dvh)-140px)]"
     >
       {events.map((event: ActivityEvent, i: number) => (
         <div
@@ -242,7 +242,7 @@ function MemoryTab() {
     return <EmptyState text="No memory files available" />
 
   return (
-    <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+    <div className="space-y-2 p-3 overflow-auto max-h-[calc(var(--vvh,100dvh)-140px)]">
       <p className="mb-1 text-xs text-[var(--theme-muted)]">
         {files.length} memory files available
       </p>
@@ -314,7 +314,7 @@ function SkillsTab() {
   }
 
   return (
-    <div className="space-y-3 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+    <div className="space-y-3 p-3 overflow-auto max-h-[calc(var(--vvh,100dvh)-140px)]">
       <p className="text-xs text-[var(--theme-muted)]">
         {skills.length} skills loaded
       </p>
@@ -416,7 +416,7 @@ function McpTab() {
     return <EmptyState text="No MCP servers configured" />
 
   return (
-    <div className="space-y-2 p-3 overflow-auto max-h-[calc(100vh-140px)]">
+    <div className="space-y-2 p-3 overflow-auto max-h-[calc(var(--vvh,100dvh)-140px)]">
       <p className="mb-1 text-xs text-[var(--theme-muted)]">
         {servers.length} MCP server{servers.length === 1 ? '' : 's'}
       </p>

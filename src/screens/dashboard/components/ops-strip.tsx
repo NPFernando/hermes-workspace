@@ -1,6 +1,10 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { cn } from '@/lib/utils'
+import { CHANGELOG } from '@/lib/changelog'
+
+const SEEN_KEY = 'hermes-workspace-seen-version'
 
 function formatPulse(iso: string | null): string {
   if (!iso) return '—'
@@ -93,6 +97,13 @@ export function OpsStrip({
   platforms: DashboardOverview['platforms']
 }) {
   const navigate = useNavigate()
+  const [hasUnread, setHasUnread] = useState(false)
+
+  useEffect(() => {
+    const seen = localStorage.getItem(SEEN_KEY)
+    setHasUnread(seen !== CHANGELOG[0].version)
+  }, [])
+
   if (!status) return null
 
   const ok =
@@ -286,6 +297,25 @@ export function OpsStrip({
             </button>
           )
         })() : null}
+
+        {/* Workspace version + What's New */}
+        <button
+          type="button"
+          onClick={() => { setHasUnread(false); navigate({ to: '/settings', search: { section: 'whatsnew' } }) }}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80',
+            hasUnread
+              ? 'border-[var(--theme-accent)]/40 text-[var(--theme-accent)]'
+              : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:text-[var(--theme-accent)]',
+          )}
+          title={hasUnread ? "What's New — unread" : 'View release notes'}
+        >
+          {hasUnread && (
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--theme-accent)] animate-pulse" />
+          )}
+          <span>ws</span>
+          <span className="text-[var(--theme-accent)]">v{CHANGELOG[0].version}</span>
+        </button>
       </div>
     </div>
   )

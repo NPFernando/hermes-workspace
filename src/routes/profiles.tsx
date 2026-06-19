@@ -21,7 +21,7 @@ function ProfilesRoute() {
             onClick={() => setTab('profiles')}
             className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
               tab === 'profiles'
-                ? 'bg-[var(--theme-hover)] text-ink shadow-sm dark:bg-[var(--theme-bg)]'
+                ? 'bg-[var(--theme-hover)] text-ink shadow-sm'
                 : 'text-[var(--theme-muted)] hover:text-ink'
             }`}
           >
@@ -31,7 +31,7 @@ function ProfilesRoute() {
             onClick={() => setTab('monitoring')}
             className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
               tab === 'monitoring'
-                ? 'bg-[var(--theme-hover)] text-ink shadow-sm dark:bg-[var(--theme-bg)]'
+                ? 'bg-[var(--theme-hover)] text-ink shadow-sm'
                 : 'text-[var(--theme-muted)] hover:text-ink'
             }`}
           >

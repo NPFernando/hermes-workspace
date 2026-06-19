@@ -174,7 +174,7 @@ function SessionItemComponent({
           }}
           className={cn(
             'ml-2 inline-flex size-7 items-center justify-center rounded-md text-[var(--theme-muted)]',
-            'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--theme-hover)] dark:hover:bg-[var(--theme-hover)]',
+            'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--theme-hover)]',
             'aria-expanded:opacity-100 aria-expanded:bg-[var(--theme-hover)]',
           )}
           aria-label="Session options"

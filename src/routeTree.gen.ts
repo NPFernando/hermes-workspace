@@ -36,6 +36,7 @@ import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
+import { Route as ApiWorkspaceVersionRouteImport } from './routes/api/workspace-version'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiVtCapitalRouteImport } from './routes/api/vt-capital'
 import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
@@ -131,6 +132,7 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as ApiAppVersionRouteImport } from './routes/api/app-version'
 import { Route as ApiAgentPauseRouteImport } from './routes/api/agent-pause'
 import { Route as ApiAgentDispatchRouteImport } from './routes/api/agent-dispatch'
 import { Route as ApiAgentBusRouteImport } from './routes/api/agent-bus'
@@ -342,6 +344,11 @@ const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
   path: '/chat/$sessionKey',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkspaceVersionRoute = ApiWorkspaceVersionRouteImport.update({
+  id: '/api/workspace-version',
+  path: '/api/workspace-version',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
@@ -820,6 +827,11 @@ const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   path: '/api/artifacts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAppVersionRoute = ApiAppVersionRouteImport.update({
+  id: '/api/app-version',
+  path: '/api/app-version',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAgentPauseRoute = ApiAgentPauseRouteImport.update({
   id: '/api/agent-pause',
   path: '/api/agent-pause',
@@ -1241,6 +1253,7 @@ export interface FileRoutesByFullPath {
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
+  '/api/app-version': typeof ApiAppVersionRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -1336,6 +1349,7 @@ export interface FileRoutesByFullPath {
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
+  '/api/workspace-version': typeof ApiWorkspaceVersionRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
@@ -1441,6 +1455,7 @@ export interface FileRoutesByTo {
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
+  '/api/app-version': typeof ApiAppVersionRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -1536,6 +1551,7 @@ export interface FileRoutesByTo {
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
+  '/api/workspace-version': typeof ApiWorkspaceVersionRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
@@ -1643,6 +1659,7 @@ export interface FileRoutesById {
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
+  '/api/app-version': typeof ApiAppVersionRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -1738,6 +1755,7 @@ export interface FileRoutesById {
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
+  '/api/workspace-version': typeof ApiWorkspaceVersionRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
@@ -1846,6 +1864,7 @@ export interface FileRouteTypes {
     | '/api/agent-bus'
     | '/api/agent-dispatch'
     | '/api/agent-pause'
+    | '/api/app-version'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -1941,6 +1960,7 @@ export interface FileRouteTypes {
     | '/api/validate-provider'
     | '/api/vt-capital'
     | '/api/workspace'
+    | '/api/workspace-version'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
@@ -2046,6 +2066,7 @@ export interface FileRouteTypes {
     | '/api/agent-bus'
     | '/api/agent-dispatch'
     | '/api/agent-pause'
+    | '/api/app-version'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -2141,6 +2162,7 @@ export interface FileRouteTypes {
     | '/api/validate-provider'
     | '/api/vt-capital'
     | '/api/workspace'
+    | '/api/workspace-version'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat'
@@ -2247,6 +2269,7 @@ export interface FileRouteTypes {
     | '/api/agent-bus'
     | '/api/agent-dispatch'
     | '/api/agent-pause'
+    | '/api/app-version'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -2342,6 +2365,7 @@ export interface FileRouteTypes {
     | '/api/validate-provider'
     | '/api/vt-capital'
     | '/api/workspace'
+    | '/api/workspace-version'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
@@ -2449,6 +2473,7 @@ export interface RootRouteChildren {
   ApiAgentBusRoute: typeof ApiAgentBusRoute
   ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentPauseRoute: typeof ApiAgentPauseRoute
+  ApiAppVersionRoute: typeof ApiAppVersionRoute
   ApiArtifactsRoute: typeof ApiArtifactsRouteWithChildren
   ApiAuthRoute: typeof ApiAuthRouteWithChildren
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
@@ -2544,6 +2569,7 @@ export interface RootRouteChildren {
   ApiValidateProviderRoute: typeof ApiValidateProviderRoute
   ApiVtCapitalRoute: typeof ApiVtCapitalRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRouteWithChildren
+  ApiWorkspaceVersionRoute: typeof ApiWorkspaceVersionRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiClaudeProxySplatRoute: typeof ApiClaudeProxySplatRoute
@@ -2777,6 +2803,13 @@ declare module '@tanstack/react-router' {
       path: '/chat/$sessionKey'
       fullPath: '/chat/$sessionKey'
       preLoaderRoute: typeof ChatSessionKeyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace-version': {
+      id: '/api/workspace-version'
+      path: '/api/workspace-version'
+      fullPath: '/api/workspace-version'
+      preLoaderRoute: typeof ApiWorkspaceVersionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/workspace': {
@@ -3442,6 +3475,13 @@ declare module '@tanstack/react-router' {
       path: '/api/artifacts'
       fullPath: '/api/artifacts'
       preLoaderRoute: typeof ApiArtifactsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/app-version': {
+      id: '/api/app-version'
+      path: '/api/app-version'
+      fullPath: '/api/app-version'
+      preLoaderRoute: typeof ApiAppVersionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/agent-pause': {
@@ -4251,6 +4291,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAgentBusRoute: ApiAgentBusRoute,
   ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentPauseRoute: ApiAgentPauseRoute,
+  ApiAppVersionRoute: ApiAppVersionRoute,
   ApiArtifactsRoute: ApiArtifactsRouteWithChildren,
   ApiAuthRoute: ApiAuthRouteWithChildren,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
@@ -4346,6 +4387,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiValidateProviderRoute: ApiValidateProviderRoute,
   ApiVtCapitalRoute: ApiVtCapitalRoute,
   ApiWorkspaceRoute: ApiWorkspaceRouteWithChildren,
+  ApiWorkspaceVersionRoute: ApiWorkspaceVersionRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiClaudeProxySplatRoute: ApiClaudeProxySplatRoute,

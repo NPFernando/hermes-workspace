@@ -23,7 +23,7 @@ const CSS = `
     --err:var(--theme-danger);--ok:var(--theme-success);
     --shadow:0 25px 50px -12px rgba(0,0,0,0.7);
     --glow:0 0 40px rgba(224,108,117,0.12);
-    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    min-height:100dvh;display:flex;align-items:center;justify-content:center;
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     background:var(--bg);color:var(--text);
     position:relative;overflow:hidden;padding:24px;
