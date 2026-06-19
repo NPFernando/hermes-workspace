@@ -4,8 +4,8 @@
  */
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
-import { cn } from '@/lib/utils'
 import type { AgoraAvatarId, AgoraProfile, AgoraStatus, AgoraUser } from '../lib/agora-types'
+import { cn } from '@/lib/utils'
 
 const ALL_AVATARS: Array<{ id: AgoraAvatarId; label: string; tier: 'greek' | 'emoji' }> = [
   { id: 'hermes', label: 'Hermes', tier: 'greek' },
@@ -54,7 +54,7 @@ export function AgoraProfileDrawer({
   useEffect(() => {
     if (user) {
       setEditName(user.profile.displayName)
-      setEditBio(user.profile.bio ?? '')
+      setEditBio(user.profile.bio)
       setEditStatus(user.profile.status)
     }
   }, [user?.profile.id])

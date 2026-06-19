@@ -44,11 +44,11 @@ function loadProfile(): AgoraProfile {
       window.localStorage.setItem(AGORA_PROFILE_STORAGE_KEY, JSON.stringify(initial))
       return initial
     }
-    const parsed = JSON.parse(raw) as AgoraProfile
-    if (!parsed.id || !parsed.handle || !parsed.displayName || !parsed.avatarId) {
+    const parsed = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null || !('id' in parsed) || !('handle' in parsed) || !('displayName' in parsed) || !('avatarId' in parsed)) {
       return generateInitialProfile()
     }
-    return parsed
+    return parsed as AgoraProfile
   } catch {
     return generateInitialProfile()
   }
