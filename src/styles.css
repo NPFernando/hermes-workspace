@@ -19,6 +19,8 @@
 @variant dark (&:where(.dark, .dark *));
 
 :root {
+  --mobile-header-height: 48px;
+  --composer-height: 48px;
   --tabbar-h: 80px;
   /* Chat content max-width — controlled by Settings > Chat Display (see #89).
    * Keep 900px default to match prior layout; 'wide' = 1200px, 'full' = 100%. */
@@ -253,6 +255,8 @@ aside.theme-sidebar {
 }
 
 :root {
+  --mobile-header-height: 48px;
+  --composer-height: 48px;
   --interface-font-family:
     ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
     sans-serif;
@@ -1287,6 +1291,8 @@ code {
 
 /* ── Accent scrollbar (all themes) ── */
 :root {
+  --mobile-header-height: 48px;
+  --composer-height: 48px;
   scrollbar-width: thin;
   scrollbar-color: var(--theme-border) transparent;
 }
@@ -1614,6 +1620,70 @@ kbd {
     transparent 1px
   );
   background-size: 20px 20px;
+}
+
+/* ============================================================
+   Odysseus Light — monospace terminal in daylight
+   bg #f4f4f0 (warm paper), accent #c84050 (coral-red),
+   text #282c34 (dark blue-gray — mirrors the dark theme's bg)
+   ============================================================ */
+
+[data-theme='odysseus-light'] {
+  color-scheme: light !important;
+  --theme-bg: #f4f4f0;
+  --theme-sidebar: #eaeae6;
+  --theme-panel: #efefeb;
+  --theme-card: #ffffff;
+  --theme-card2: #f7f7f3;
+  --theme-border: rgba(40, 44, 52, 0.13);
+  --theme-border-subtle: rgba(40, 44, 52, 0.065);
+  --theme-text: #282c34;
+  --theme-muted: rgba(40, 44, 52, 0.55);
+  --theme-muted-2: rgba(40, 44, 52, 0.4);
+  --theme-shadow-1: 0 1px 2px rgba(40, 44, 52, 0.07);
+  --theme-shadow-2: 0 4px 16px rgba(40, 44, 52, 0.09);
+  --theme-shadow-3: 0 8px 32px rgba(40, 44, 52, 0.13);
+  --theme-glass: rgba(244, 244, 240, 0.9);
+  --theme-focus: #c84050;
+  --theme-accent: #c84050;
+  --theme-accent-secondary: #e06c75;
+  --theme-accent-subtle: rgba(200, 64, 80, 0.1);
+  --theme-accent-border: rgba(200, 64, 80, 0.26);
+  --theme-active: #b03040;
+  --theme-link: #1a6a7a;
+  --theme-success: #2d8a50;
+  --theme-warning: #b07800;
+  --theme-danger: #c0392b;
+  --theme-stripe: rgba(40, 44, 52, 0.04);
+  --theme-header-bg: #eaeae6;
+  --theme-header-border: rgba(40, 44, 52, 0.11);
+  --chat-user-bg: #eef0ec;
+  --chat-user-border: rgba(200, 64, 80, 0.2);
+  --chat-user-foreground: #282c34;
+  --chat-assistant-bg: #ffffff;
+  --chat-assistant-border: rgba(40, 44, 52, 0.09);
+  --chat-assistant-foreground: #282c34;
+  --composer-bg: #eaeae6;
+  --composer-border: rgba(40, 44, 52, 0.13);
+  --composer-placeholder: rgba(40, 44, 52, 0.38);
+  --tool-card-bg: #efefeb;
+  --tool-card-border: rgba(40, 44, 52, 0.11);
+  --tool-card-title: #282c34;
+  --tool-card-muted: rgba(40, 44, 52, 0.52);
+  --code-bg: #e8e8e4;
+  --code-border: rgba(40, 44, 52, 0.13);
+  --code-foreground: #2d8a50;
+  --theme-input: #ffffff;
+  --interface-font-family:
+    'JetBrains Mono Variable', 'Fira Code', ui-monospace, monospace;
+}
+
+[data-theme='odysseus-light'] html,
+[data-theme='odysseus-light'] body,
+[data-theme='odysseus-light'] #root,
+[data-theme='odysseus-light'] .light {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
 }
 
 [data-theme='matrix'] {
@@ -2173,7 +2243,8 @@ kbd {
 [data-theme='claude-classic-light'],
 [data-theme='claude-slate-light'],
 [data-theme='matrix-light'],
-[data-theme='scifi-light'] {
+[data-theme='scifi-light'],
+[data-theme='odysseus-light'] {
   color-scheme: light !important;
   --color-primary-50: var(--theme-card) !important;
   --color-primary-100: var(--theme-card2) !important;
@@ -2309,6 +2380,8 @@ kbd {
 
 /* Square corner radius variables for component opt-in */
 :root {
+  --mobile-header-height: 48px;
+  --composer-height: 48px;
   --radius-editorial-card: 6px;
   --radius-editorial-panel: 8px;
   --radius-editorial-dialog: 10px;
@@ -2482,5 +2555,12 @@ kbd {
   }
   *::-webkit-scrollbar {
     display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .chat-container {
+    padding-top: env(safe-area-inset-top, var(--mobile-header-height));
+    padding-bottom: env(safe-area-inset-bottom, var(--composer-height));
   }
 }

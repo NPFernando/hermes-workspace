@@ -453,7 +453,7 @@ export const Route = createFileRoute('/api/send-stream')({
 
         const stream = new ReadableStream({
           async start(controller) {
-            let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+            let hbTimer: ReturnType<typeof setInterval> | null = null
             let lastClientEventAt = Date.now()
             // Track the last human-readable activity so the heartbeat can
             // forward it to the UI. Without this the ThinkingBubble shows a
@@ -477,7 +477,7 @@ export const Route = createFileRoute('/api/send-stream')({
             // lightweight recognized event periodically so public Workspace chats
             // do not sit at "Thinking…" until the frontend reports failure.
             enqueueRaw(`: ${' '.repeat(2048)}\n\n`)
-            heartbeatTimer = setInterval(() => {
+            hbTimer = setInterval(() => {
               if (streamClosed) return
               if (Date.now() - lastClientEventAt < 10_000) return
               // Heartbeat to keep Cloudflare/Access from culling the SSE stream.
@@ -493,7 +493,7 @@ export const Route = createFileRoute('/api/send-stream')({
               streamClosed = true
               if (heartbeatTimer) {
                 clearInterval(heartbeatTimer)
-                heartbeatTimer = null
+                hbTimer = null
               }
               if (unregisterTimer) {
                 clearTimeout(unregisterTimer)
@@ -754,7 +754,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
                   }
 
-                  const stream = await openaiChat(portableMessages, {
+                  const aiStream = await openaiChat(portableMessages, {
                     model: localBaseUrl ? bareModel : (typeof body.model === 'string' ? body.model : undefined),
                     temperature:
                       typeof body.temperature === 'number'
@@ -766,16 +766,16 @@ export const Route = createFileRoute('/api/send-stream')({
                     baseUrl: localBaseUrl,
                   })
 
-                  let thinking = ''
+                  let thinkingText = ''
                   let toolEventCount = 0
-                  for await (const chunk of stream) {
+                  for await (const chunk of aiStream) {
                     if (chunk.type === 'reasoning') {
-                      thinking += chunk.text
+                      thinkingText += chunk.text
                       persistActiveRun((runSessionKey, activeId) =>
-                        setRunThinking(runSessionKey, activeId, thinking),
+                        setRunThinking(runSessionKey, activeId, thinkingText),
                       )
                       sendEvent('thinking', {
-                        text: thinking,
+                        text: thinkingText,
                         sessionKey: portableSessionKey,
                         runId,
                       })
@@ -1058,13 +1058,13 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
 
                     if (event === 'message.started') {
-                      const message =
+                      const eventMessage =
                         data.message && typeof data.message === 'object'
                           ? (data.message as Record<string, unknown>)
                           : {}
                       const translated = {
                         message: {
-                          id: message.id,
+                          id: eventMessage.id,
                           role: 'assistant',
                           content: [],
                         },

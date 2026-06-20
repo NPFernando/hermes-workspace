@@ -5,7 +5,7 @@ import { CHANGELOG } from '@/lib/changelog'
 export const Route = createFileRoute('/api/workspace-version')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: () => {
         const latest = CHANGELOG[0]
         return json({
           version: latest.version,

@@ -5,7 +5,7 @@ import { buildGoogleAuthUrl, isGoogleOAuthEnabled, storeOAuthState } from '../..
 export const Route = createFileRoute('/api/auth/google')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         const url = new URL(request.url)
 
         // ?check=1 — used by the login screen to detect if Google OAuth is configured

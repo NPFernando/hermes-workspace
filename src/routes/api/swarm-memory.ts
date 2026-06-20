@@ -59,7 +59,7 @@ function asEventType(value: unknown): SwarmMemoryEventType {
 export const Route = createFileRoute('/api/swarm-memory')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }

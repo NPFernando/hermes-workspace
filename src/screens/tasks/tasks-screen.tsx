@@ -31,6 +31,7 @@ import {
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 
 function isTypingTarget(target: EventTarget | null) {
   const el = target as HTMLElement | null
@@ -69,6 +70,7 @@ export function TasksScreen() {
   const [askingAstra, setAskingAstra] = useState(false)
   const [ideasLoading, setIdeasLoading] = useState(false)
   const [breakingDownId, setBreakingDownId] = useState<string | null>(null)
+  useKeyboardShortcuts()
 
   const search = useSearch({ from: '/tasks' })
   const navigate = useNavigate()

@@ -12,6 +12,7 @@ export type ThemeId =
   | 'scifi'
   | 'scifi-light'
   | 'odysseus'
+  | 'odysseus-light'
 
 export const THEMES: Array<{
   id: ThemeId
@@ -97,6 +98,12 @@ export const THEMES: Array<{
     description: 'Minimal monospace-forward dark — blue-gray background, coral-red accent, cyan text',
     icon: '◎',
   },
+  {
+    id: 'odysseus-light',
+    label: 'Odysseus Light',
+    description: 'Monospace terminal in daylight — warm paper, coral-red accent, dark text',
+    icon: '◎',
+  },
 ]
 
 const STORAGE_KEY = 'claude-theme'
@@ -112,7 +119,7 @@ const LIGHT_THEME_MAP: Partial<Record<
   'claude-classic': 'claude-classic-light',
   'claude-slate': 'claude-slate-light',
   'scifi': 'scifi-light',
-  // odysseus: no light variant — stays as-is when light mode is requested
+  'odysseus': 'odysseus-light',
 }
 const DARK_THEME_MAP: Record<
   Extract<ThemeId, `${string}-light`>,
@@ -124,6 +131,7 @@ const DARK_THEME_MAP: Record<
   'claude-classic-light': 'claude-classic',
   'claude-slate-light': 'claude-slate',
   'scifi-light': 'scifi',
+  'odysseus-light': 'odysseus',
 }
 
 const LIGHT_THEMES = new Set<ThemeId>([
@@ -133,6 +141,7 @@ const LIGHT_THEMES = new Set<ThemeId>([
   'claude-classic-light',
   'claude-slate-light',
   'scifi-light',
+  'odysseus-light',
 ])
 
 export function isValidTheme(

@@ -6,7 +6,7 @@ import { searchSwarmMemory } from '../../../server/swarm-memory'
 export const Route = createFileRoute('/api/swarm-memory/search')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }

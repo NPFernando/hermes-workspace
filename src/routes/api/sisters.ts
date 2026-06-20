@@ -6,7 +6,7 @@ import { bootstrapOnceLazy, listSisters } from '../../server/sisters-registry'
 export const Route = createFileRoute('/api/sisters')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

@@ -62,7 +62,7 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
         }
       },
 
-      DELETE: async ({ request }) => {
+      DELETE: ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }

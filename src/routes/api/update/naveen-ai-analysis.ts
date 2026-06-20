@@ -18,7 +18,7 @@ import type {ConflictFile} from '../../../server/naveen-update';
 export const Route = createFileRoute('/api/update/naveen-ai-analysis')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

@@ -39,7 +39,7 @@ function readSkillContent(skillId: string): string | null {
 export const Route = createFileRoute('/api/workspace/skills/$skillId/content')({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

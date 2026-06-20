@@ -6,7 +6,7 @@ import { readUserSettings, writeUserSettings } from '../../server/user-settings'
 export const Route = createFileRoute('/api/user-settings')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }

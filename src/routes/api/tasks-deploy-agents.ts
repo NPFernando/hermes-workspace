@@ -6,7 +6,7 @@ import { runAgentDeployBackground } from '../../server/astra-tasks'
 export const Route = createFileRoute('/api/tasks-deploy-agents')({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

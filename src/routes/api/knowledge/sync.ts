@@ -49,7 +49,7 @@ export const Route = createFileRoute('/api/knowledge/sync')({
           )
         }
       },
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }

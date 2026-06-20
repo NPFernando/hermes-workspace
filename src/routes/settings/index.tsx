@@ -208,6 +208,13 @@ const THEME_PREVIEWS: Record<
     accent: '#e06c75',
     text: '#9cdef2',
   },
+  'odysseus-light': {
+    bg: '#F7F3EA',
+    panel: '#FFFDF8',
+    border: 'rgba(92,74,58,0.22)',
+    accent: '#c2414b',
+    text: '#1f2933',
+  },
 }
 
 function WorkspaceThemePicker() {

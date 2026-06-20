@@ -6,7 +6,7 @@ import { runAstraReviewBackground } from '../../server/astra-tasks'
 export const Route = createFileRoute('/api/tasks-astra-review')({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

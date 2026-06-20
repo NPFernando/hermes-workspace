@@ -7,7 +7,7 @@ import { getGrowthLevel, getGrowthLog } from '../../server/sisters-growth'
 export const Route = createFileRoute('/api/sisters-growth')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

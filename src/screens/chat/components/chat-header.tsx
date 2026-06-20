@@ -8,15 +8,18 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
+import { cn, safeText } from '@/lib/utils'
+
+const WORKSPACE_DIRECTIVE_TITLE_RE =
+  /^\s*<workspace_context\s+active="true"\s+name="([^"]*)"\s+path="([^"]*)"\s*\/?>\s*/i
 
 function toTitleCase(value: string): string {
   return value
     .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/\\s+/g, ' ')
     .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .replace(/\\b\\w/g, (char) => char.toUpperCase())
 }
 
 function formatMobileSessionTitle(rawTitle: string): string {
@@ -29,6 +32,8 @@ function formatMobileSessionTitle(rawTitle: string): string {
   if (normalized === 'agent:main:main' || normalized === 'agent:main') {
     return 'Main Chat'
   }
+
+
   const parts = title
     .split(':')
     .map((part) => part.trim())
@@ -52,7 +57,7 @@ function formatMobileSessionTitle(rawTitle: string): string {
   const MAX_LEN = 20
   if (title.length > MAX_LEN) {
     // Extract first few meaningful words
-    const words = title.split(/\s+/)
+    const words = title.split(/\\s+/)
     let result = ''
     for (const word of words) {
       if ((result + ' ' + word).trim().length > MAX_LEN) break
@@ -61,6 +66,18 @@ function formatMobileSessionTitle(rawTitle: string): string {
     return result.length > 0 ? `${result}…` : `${title.slice(0, MAX_LEN)}…`
   }
 
+  return title
+}
+
+function formatSessionTitle(title: string): string {
+  if (!title) return title
+  const match = title.match(WORKSPACE_DIRECTIVE_TITLE_RE)
+  if (match) {
+    const [, name, path] = match
+    const pathParts = path.split('/').filter(Boolean)
+    const lastPart = pathParts.pop() || ''
+    return name || lastPart || 'Workspace'
+  }
   return title
 }
 
@@ -281,7 +298,7 @@ function ChatHeaderComponent({
             aria-label="Switch session"
           >
             <span className="truncate text-[13px] font-medium text-[var(--theme-muted)]">
-              {mobileTitle === 'new' ? 'New Chat' : mobileTitle}
+              {safeText(mobileTitle) === 'new' ? 'New Chat' : safeText(formatSessionTitle(mobileTitle))}
             </span>
             <svg
               width="8"
@@ -295,13 +312,11 @@ function ChatHeaderComponent({
                 stroke="currentColor"
                 strokeWidth="1.5"
                 strokeLinecap="round"
-                strokeLinejoin="round"
               />
             </svg>
           </button>
 
           <div className="flex-1" />
-
         </div>
       </div>
     )
@@ -373,7 +388,7 @@ function ChatHeaderComponent({
                 className="min-w-0 truncate text-sm font-medium text-balance hover:text-accent-600 transition-colors rounded-sm text-left"
                 title="Click to switch session"
               >
-                {activeTitle}
+                {safeText(formatSessionTitle(activeTitle))}
               </button>
               {canRenameTitle && !renamingTitle && (
                 <button
@@ -386,7 +401,9 @@ function ChatHeaderComponent({
                 </button>
               )}
               {sessionPopoverOpen && (
-                <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-80 overflow-hidden rounded-xl border border-[var(--theme-border)] shadow-2xl">
+                <div
+                  className="absolute left-0 top-[calc(100%+6px)] z-50 w-80 overflow-hidden rounded-xl border border-[var(--theme-border)] shadow-2xl"
+                >
                   <div
                     className="border-b border-[var(--theme-border)] px-3 py-2 bg-[var(--theme-card)]"
                   >
@@ -601,9 +618,6 @@ function ChatHeaderComponent({
                       'hover:bg-[var(--theme-hover)]',
                       clearConfirm ? 'text-red-500' : 'text-[var(--theme-muted)]',
                     )}
-                    aria-label={
-                      clearConfirm ? 'Confirm clear' : 'Clear session'
-                    }
                   >
                     <span className="text-sm">
                       {clearConfirm ? '⚠️' : '🗑️'}

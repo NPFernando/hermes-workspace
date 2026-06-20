@@ -227,7 +227,7 @@ function parseAssignments(value: unknown): Array<AssignmentRequest> {
     const workerId = typeof obj.workerId === 'string' ? obj.workerId.trim() : ''
     const task = typeof obj.task === 'string' ? obj.task.trim() : ''
     const rationale = typeof obj.rationale === 'string' ? obj.rationale.trim() : undefined
-    const dependsOn = Array.isArray(obj.dependsOn) ? obj.dependsOn.filter((value): value is string => typeof value === 'string' && value.trim().length > 0) : undefined
+    const dependsOn = Array.isArray(obj.dependsOn) ? obj.dependsOn.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : undefined
     const reviewRequired = typeof obj.reviewRequired === 'boolean' ? obj.reviewRequired : undefined
     const direct = typeof obj.direct === 'boolean' ? obj.direct : undefined
     if (!workerId || !task || !validateWorkerId(workerId)) continue

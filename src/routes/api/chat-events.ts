@@ -5,17 +5,10 @@ import {
   subscribeToChatEvents,
 } from '../../server/chat-event-bus'
 
-/**
- * SSE endpoint for chat events.
- *
- * Claude does not expose a global browser-facing event stream, so the server
- * keeps a local singleton bus of translated chat events and fans that out to
- * any browser SSE subscribers.
- */
 export const Route = createFileRoute('/api/chat-events')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return new Response(
             JSON.stringify({ ok: false, error: 'Unauthorized' }),
@@ -37,7 +30,7 @@ export const Route = createFileRoute('/api/chat-events')({
             const sendEvent = (event: string, data: unknown) => {
               if (streamClosed) return
               try {
-                const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+                const payload = `event: ${event}\\ndata: ${JSON.stringify(data)}\\n\\n`
                 controller.enqueue(encoder.encode(payload))
               } catch {
                 /* stream closed */

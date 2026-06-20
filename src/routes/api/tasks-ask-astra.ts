@@ -14,7 +14,7 @@ function jsonResponse(data: unknown, status = 200) {
 export const Route = createFileRoute('/api/tasks-ask-astra')({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }

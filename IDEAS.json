@@ -1,20 +1,26 @@
 [
   {
-    "title": "Refactor hub-utils.tsx into focused utility modules",
-    "description": "The hub-utils.tsx file exports many helper functions extracted from various places, making it a dumping ground. Split it into domain-specific utility files (e.g., math-utils.tsx, string-utils.tsx, array-utils.tsx) to improve maintainability.",
-    "category": "ui",
-    "estimated_effort": "medium"
-  },
-  {
-    "title": "Implement smarter timing for re-enabling real-time chat history updates",
-    "description": "The TODO in use-realtime-chat-history.ts suggests re-enabling a feature with smarter timing (e.g., only after history confirms the message). Implement a mechanism that waits for message confirmation before re-enabling real-time updates to reduce unnecessary fetches.",
+    "title": "Repair mobile chat TypeScript regressions",
+    "description": "Fix syntax and type errors introduced in recent mobile chat UI work so the workspace compiles again and the chat activity/status components can be validated safely.",
     "category": "ui",
     "estimated_effort": "low"
   },
   {
-    "title": "Add proper error handling for missing assistant reply in session-send",
-    "description": "The route /api/session-send has a XXX comment indicating a missing error handling case where the sender never sees their assistant reply. Add proper error handling and user feedback for this scenario.",
-    "category": "backend",
+    "title": "Normalize chat event stream imports",
+    "description": "Keep the newer /api/chat-events SSE route aligned with existing auth and chat-event-bus modules so session-filtered activity streams type-check and remain authenticated.",
+    "category": "api",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Harden sister picker keyboard behavior",
+    "description": "Make the sister picker trigger use a real ref and keyboard handler instead of overloading click handlers, preserving accessibility without type errors.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Clean stale untracked workspace scratch files",
+    "description": "Review backup files and one-off fix scripts left in the workspace root and chat directories, then either remove them or codify them as tracked utilities.",
+    "category": "config",
     "estimated_effort": "low"
   }
 ]

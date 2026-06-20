@@ -11,7 +11,7 @@ import type { HarpPatch } from '../../server/harp-config-store'
 export const Route = createFileRoute('/api/harp-config')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

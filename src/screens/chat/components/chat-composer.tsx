@@ -950,6 +950,7 @@ function ChatComposerComponent({
   // Falls back to internal state if no external controller provided
   const [internalThinkingLevel, setInternalThinkingLevel] =
     useState<ThinkingLevel>('low')
+  const [isFocused, setIsFocused] = useState(false)
   const thinkingLevel = externalThinkingLevel ?? internalThinkingLevel
   // Thinking toggle removed for Claude (not supported) — keeping state for type compat
   const _handleThinkingToggle = useCallback(() => {
@@ -2147,42 +2148,18 @@ function ChatComposerComponent({
 
   return (
     <div
-      className={cn(
-        'no-swipe pointer-events-auto touch-manipulation',
-        isMobileViewport
-          ? embedded
-            ? [
-                // Embedded mobile composer: stay inside the card, no fixed bottom.
-                'relative z-40 w-full',
-                'bg-surface border-t border-[var(--theme-border)]',
-              ].join(' ')
-            : [
-                'fixed z-[70] transition-all duration-200',
-                chatNavMode === 'dock'
-                  ? [
-                      // iMessage-style: edge-to-edge, docked to bottom
-                      'left-0 right-0',
-                      'bg-surface/95 backdrop-blur-xl',
-                      'border-t border-[var(--theme-border)]',
-                    ].join(' ')
-                  : [
-                      // scroll-hide / integrated: floating pill above tab bar
-                      'left-4 right-4',
-                      'bg-surface/95 backdrop-blur-2xl',
-                      'shadow-[0_8px_32px_rgba(0,0,0,0.15)]',
-                      'rounded-[22px]',
-                    ].join(' '),
-              ].join(' ')
-          : [
-              'relative z-40 shrink-0 w-full mx-auto px-3 pt-2 sm:px-5',
-              'bg-surface',
-            ].join(' '),
-        // Mobile: pin above tab bar + safe-area inset. Desktop: normal bottom padding.
-        !isMobileViewport
-          ? 'pb-[max(var(--safe-b),8px)] md:pb-[calc(var(--safe-b)+0.75rem)]'
-          : '',
-        'md:bg-surface/95 md:backdrop-blur md:transition-[padding-bottom,background-color,backdrop-filter] md:duration-200',
-      )}
+        className={cn(
+          'relative z-50 transition-all duration-300 border-[var(--theme-border)]',
+          // On mobile: remove PromptInput's built-in rounded/bg/padding — outer wrapper owns the container
+          isMobileViewport &&
+            'py-0 gap-0 !rounded-none !bg-transparent shadow-none outline-none',
+          isDraggingOver &&
+            'outline-[var(--theme-accent)] ring-2 ring-[var(--theme-accent)]/50 bg-[var(--theme-panel)]',
+          isLoading &&
+            'ring-2 ring-accent-400/70 shadow-[0_0_20px_rgba(48,80,255,0.35)] animate-pulse-glow',
+          isFocused &&
+            'ring-2 ring-[var(--theme-accent)]',
+        )}
       style={composerWrapperStyle}
       ref={setWrapperRefs}
     >
@@ -2198,6 +2175,8 @@ function ChatComposerComponent({
         value={value}
         onValueChange={handleValueChange}
         onSubmit={handlePromptSubmit}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         isLoading={isLoading}
         disabled={disabled}
         maxHeight={isMobileViewport ? 120 : 240}

@@ -1,21 +1,34 @@
-# Implementation Plan
+# Plan: Repair mobile chat TypeScript regressions
 
 ## Summary of the change
-Implement smarter timing for re-enabling real-time chat history updates by waiting for message confirmation before re-enabling the listener, reducing unnecessary fetches.
+Restore the Hermes workspace chat UI to a compiling state after recent mobile-focused edits left malformed JSX, invalid navigation calls, missing imports, and stale activity-summary behavior.
 
-## Exact files to modify (paths relative to ~/hermes-workspace/src/)
-- src/screens/chat/hooks/use-realtime-chat-history.ts
+## Files to modify
+- `src/hooks/use-keyboard-shortcuts.ts`
+- `src/routes/api/chat-events.ts`
+- `src/routes/settings/index.tsx`
+- `src/screens/chat/components/chat-composer.tsx`
+- `src/screens/chat/components/chat-header.tsx`
+- `src/screens/chat/components/chat-message-list.tsx`
+- `src/screens/chat/components/message-item.tsx`
+- `src/screens/chat/components/sister-picker.tsx`
+- `src/lib/theme.ts`
+- Existing in-progress mobile UI files already modified on the current branch
 
-## Step-by-step implementation instructions
-1. Examine the current use-realtime-chat-history.ts hook to understand the TODO.
-2. Identify where the real-time listener is being re-enabled.
-3. Add a condition to only re-enable the listener after confirming that the message has been successfully sent/received (e.g., after a message acknowledgment).
-4. This may involve modifying the dependency array of a useEffect or adding a state variable to track confirmation.
-5. Ensure that the change does not break existing functionality.
-6. Run the linter and TypeScript compiler.
+## Steps
+1. Fix malformed JSX/TSX syntax in chat composer, chat header, chat message list, and message item.
+2. Add/repair imports for authenticated chat-events SSE and workspace directive title parsing.
+3. Update keyboard shortcut navigation to the current TanStack Router object form.
+4. Add the missing Odysseus Light settings preview entry to match the theme registry.
+5. Convert the sister picker popover trigger to use a DOM ref plus explicit keyboard handler.
+6. Repair trailing tool-only turn summary logic so it returns `null` when the thread already ends with assistant text.
+7. Verify with `npx tsc --noEmit`, focused ESLint on modified files, and focused Vitest coverage for chat rendering/workspace directive behavior.
 
 ## How to verify the change works
-- Run `npx tsc --noEmit` to ensure TypeScript compiles without errors.
-- Run `npm run lint` to ensure no linting errors.
-- Test the chat functionality: send a message and verify that real-time updates still work correctly.
-- Ensure that excessive re-enabling does not occur (can be monitored by reducing network traffic or logging).
+- `npx tsc --noEmit` exits 0.
+- `npx eslint <modified-files>` exits 0, allowing existing warnings only.
+- `npx vitest run src/screens/chat/components/chat-message-list.test.tsx src/screens/chat/components/message-item.streaming-activity.test.tsx src/lib/workspace-message-scope.test.ts src/screens/chat/utils.test.ts` passes.
+- Full `npm test` was attempted; remaining failures are unrelated existing environment/baseline issues recorded in `TEST_REPORT.json`.
+
+## Rollback procedure
+Revert the generated `auto-improve: repair mobile chat regressions` commit or restore the touched files from the previous branch state with `git checkout HEAD~1 -- <file>`.

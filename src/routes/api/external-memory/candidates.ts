@@ -111,7 +111,7 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
           )
         }
       },
-      DELETE: async ({ request }) => {
+      DELETE: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }

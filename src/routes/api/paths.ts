@@ -10,7 +10,7 @@ const CLAUDE_HOME =
 export const Route = createFileRoute('/api/paths')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

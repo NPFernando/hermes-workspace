@@ -678,12 +678,12 @@ export function getTrailingToolOnlyTurnSummary(
   }
 
 
-  if (trailingStart === 0) {
-    return null;
+  if (trailingStart === messages.length || trailingStart === 0) {
+    return null
   }
-  const lastVisible = messages[trailingStart - 1];
+  const lastVisible = messages[trailingStart - 1]
   if (lastVisible.role !== 'assistant' || isAssistantToolCallOnlyMessage(lastVisible)) {
-    return null;
+    return null
   }
   const trailing = messages.slice(trailingStart)
   const toolNames = Array.from(
@@ -2040,17 +2040,15 @@ function ChatMessageListComponent({
                 streaming text starts arriving — the per-message TUI card
                 above the assistant bubble takes over from there to avoid
                 a duplicated activity surface. */}
-            {(showTypingIndicator ||
-              showResearchCard ||
+            {((showResearchCard ||
               isCompacting ||
               liveToolActivity.length > 0 ||
               (isStreaming && !streamingText) ||
               (isStreaming && activeToolCalls.length > 0)) &&
-            !(
-              isStreaming &&
-              streamingText &&
-              streamingText.trim().length > 0
-            ) ? (
+              !(
+                isStreaming &&
+                (streamingText?.trim().length ?? 0) > 0
+              )) ? (
               <div
                 className="flex flex-col gap-1 py-1.5 px-1 animate-in fade-in duration-300 md:gap-1.5 md:py-2"
                 role="status"

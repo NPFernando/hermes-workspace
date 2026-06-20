@@ -97,7 +97,7 @@ async function proxyRequest(request: Request, splat: string) {
 export const Route = createFileRoute('/api/claude-proxy/$')({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return new Response(
             JSON.stringify({ ok: false, error: 'Unauthorized' }),
@@ -106,7 +106,7 @@ export const Route = createFileRoute('/api/claude-proxy/$')({
         }
         return proxyRequest(request, params._splat || '')
       },
-      POST: async ({ request, params }) => {
+      POST: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return new Response(
             JSON.stringify({ ok: false, error: 'Unauthorized' }),
@@ -115,7 +115,7 @@ export const Route = createFileRoute('/api/claude-proxy/$')({
         }
         return proxyRequest(request, params._splat || '')
       },
-      PATCH: async ({ request, params }) => {
+      PATCH: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return new Response(
             JSON.stringify({ ok: false, error: 'Unauthorized' }),
@@ -124,7 +124,7 @@ export const Route = createFileRoute('/api/claude-proxy/$')({
         }
         return proxyRequest(request, params._splat || '')
       },
-      DELETE: async ({ request, params }) => {
+      DELETE: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return new Response(
             JSON.stringify({ ok: false, error: 'Unauthorized' }),

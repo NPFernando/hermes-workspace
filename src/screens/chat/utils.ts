@@ -223,7 +223,7 @@ export function normalizeSessions(
 
     const label =
       typeof session.label === 'string' && session.label.trim().length > 0
-        ? session.label.trim()
+        ? cleanUserText(session.label.trim()) || session.label.trim()
         : undefined
     const explicitTitle =
       typeof session.title === 'string' && session.title.trim().length > 0

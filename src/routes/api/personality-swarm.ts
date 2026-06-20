@@ -12,7 +12,7 @@ export const Route = createFileRoute('/api/personality-swarm')({
   server: {
     handlers: {
       /** GET — return preset catalogue + swarm recommendations */
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

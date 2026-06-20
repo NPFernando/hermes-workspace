@@ -6,7 +6,7 @@ import { readNaveenUpdateStatus } from '../../../server/naveen-update'
 export const Route = createFileRoute('/api/update/naveen-status')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

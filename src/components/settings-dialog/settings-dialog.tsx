@@ -1511,6 +1511,7 @@ const ENTERPRISE_THEME_FAMILIES: Array<ThemeId> = [
   'claude-official',
   'claude-classic',
   'claude-slate',
+  'odysseus',
 ]
 
 const ENTERPRISE_THEMES = THEMES.map((theme) => ({
@@ -1589,13 +1590,29 @@ const ENTERPRISE_THEMES = THEMES.map((theme) => ({
                       accent: '#7eb8f6',
                       text: '#c9d1d9',
                     }
-                  : {
-                      bg: '#F6F8FA',
-                      panel: '#FFFFFF',
-                      border: '#D0D7DE',
-                      accent: '#3b82f6',
-                      text: '#24292f',
-                    },
+                  : theme.id === 'odysseus'
+                    ? {
+                        bg: '#282c34',
+                        panel: '#1e2228',
+                        border: 'rgba(53, 90, 102, 0.5)',
+                        accent: '#f08090',
+                        text: '#9cdef2',
+                      }
+                    : theme.id === 'odysseus-light'
+                      ? {
+                          bg: '#f4f4f0',
+                          panel: '#ffffff',
+                          border: 'rgba(40, 44, 52, 0.14)',
+                          accent: '#c84050',
+                          text: '#282c34',
+                        }
+                      : {
+                          bg: '#F6F8FA',
+                          panel: '#FFFFFF',
+                          border: '#D0D7DE',
+                          accent: '#3b82f6',
+                          text: '#24292f',
+                        },
 }))
 
 function ThemeSwatch({

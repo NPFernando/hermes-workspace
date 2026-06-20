@@ -122,6 +122,7 @@ import { useSessionModelStore } from '@/stores/session-model-store'
 import { setActiveResearch, useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 import { useChatMode } from '@/hooks/use-chat-mode'
 import {  useChatActivityStore } from '@/stores/chat-activity-store'
 
@@ -563,6 +564,7 @@ export function ChatScreen({
   }, [activeFriendlyId])
   const { alertOpen, alertThreshold, alertPercent, dismissAlert } =
     useContextAlert()
+    useKeyboardShortcuts()
 
   const pendingStartRef = useRef(false)
   const composerHandleRef = useRef<ChatComposerHandle | null>(null)
@@ -2948,7 +2950,7 @@ export function ChatScreen({
 
         <main
           className={cn(
-            'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-bottom] duration-200',
+            'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-bottom] duration-200 mx-auto max-w-[1000px]',
             (activeIsRealtimeStreaming || hasPendingGeneration()) &&
               'chat-streaming-glow',
           )}

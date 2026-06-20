@@ -2885,6 +2885,19 @@ function MessageItemComponent({
                 ))}
               </div>
             ) : null}
+            {!isUser && effectiveIsStreaming && !hasText && (
+              <div className="flex items-start gap-2 text-[var(--theme-muted)] text-[11px]">
+                <span className="thinking-dot thinking-dot-1" />
+                <span className="thinking-dot thinking-dot-2" />
+                <span className="thinking-dot thinking-dot-3" />
+                <span className="ml-1">{thinkingStatusLabel}</span>
+                {thinkingElapsedSeconds > 0 && (
+                  <span className="ml-1 text-[10px] opacity-60">
+                    {thinkingElapsedSeconds}s
+                  </span>
+                )}
+              </div>
+            )}
             {hasText &&
               (isUser ? (
                 <span className="text-pretty">{displayText}</span>
