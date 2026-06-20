@@ -545,18 +545,20 @@ export function useRealtimeChatHistory({
   // caught up, causing the "message appears then disappears" bug.
   // TODO: Re-enable with smarter timing (e.g. only after history confirms the message)
   useEffect(() => {
-    return // disabled
     if (portableMode) return
     if (!effectiveSessionKey || effectiveSessionKey === 'new') return
     if (realtimeMessages.length === 0) return
-    if (mergedMessages.length !== historyMessages.length) return
+    // Only clear when streaming is idle and we have realtime messages
+    if (streamingStateRef.current !== null) return
+    // Additional condition: wait a bit after streaming ends to ensure history has caught up
+    if (Date.now() - lastStreamClearTimeRef.current < 1000) return
     clearRealtimeBuffer(effectiveSessionKey)
   }, [
     clearRealtimeBuffer,
     effectiveSessionKey,
-    historyMessages.length,
-    mergedMessages.length,
+    lastStreamClearTimeRef,
     realtimeMessages.length,
+    streamingStateRef.current,
   ])
 
   useEffect(() => {
