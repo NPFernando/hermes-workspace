@@ -79,12 +79,12 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
 
     const byAgent: Record<string, { tokens: number; cost: number }> = {}
     const byModel: Record<string, { tokens: number; cost: number }> = {}
-    const byDay: Record<string, { tokens: number; cost: number }> = {}
+    const byDay: Partial<Record<string, { tokens: number; cost: number }>> = {}
 
     for (const r of missionReports) {
-      const tokens = r.tokenCount ?? 0
-      const cost = r.costEstimate ?? estimateCost(tokens)
-      const ts = r.completedAt ?? 0
+      const tokens = r.tokenCount
+      const cost = r.costEstimate
+      const ts = r.completedAt
       const tsNum = typeof ts === 'string' ? new Date(ts).getTime() : ts
       const day = dayKey(ts)
 
@@ -95,7 +95,7 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
       if (tsNum > weekAgo) { weekTokens += tokens; weekCost += cost }
 
       // By agent
-      if (r.agents && r.agents.length > 0) {
+      if (r.agents.length > 0) {
         const perAgentTokens = tokens / r.agents.length
         const perAgentCost = cost / r.agents.length
         for (const m of r.agents) {
@@ -116,9 +116,10 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
       }
 
       // By day
-      byDay[day] = byDay[day] ?? { tokens: 0, cost: 0 }
-      byDay[day].tokens += tokens
-      byDay[day].cost += cost
+      const dayEntry = byDay[day] ?? { tokens: 0, cost: 0 }
+      dayEntry.tokens += tokens
+      dayEntry.cost += cost
+      byDay[day] = dayEntry
     }
 
     const avgCost = missionReports.length > 0 ? totalCost / missionReports.length : 0
@@ -134,7 +135,7 @@ export function CostAnalyticsDashboard({ missionReports, compact = false }: Cost
     const modelBars: Array<BarEntry> = Object.entries(byModel)
       .sort((a, b) => b[1].cost - a[1].cost)
       .slice(0, 10)
-      .map(([label, v]) => ({ label: label.split('/').pop() ?? label, value: v.cost, pct: (v.cost / maxModelCost) * 100 }))
+      .map(([label, v]) => ({ label: label.split('/').at(-1) ?? label, value: v.cost, pct: (v.cost / maxModelCost) * 100 }))
 
     // Last 7 days
     const days: Array<string> = []
