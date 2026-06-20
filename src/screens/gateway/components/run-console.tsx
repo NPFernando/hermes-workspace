@@ -143,8 +143,11 @@ function extractContent(msg: { content?: string | Array<{ type?: string; text?: 
 
 function sanitizeArgsPreview(args?: string): string {
   if (!args) return 'No arguments'
-  const cleaned = args
-    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+  const cleaned = Array.from(args, (char) => {
+    const code = char.charCodeAt(0)
+    return code <= 31 || code === 127 ? ' ' : char
+  })
+    .join('')
     .replace(/\s+/g, ' ')
     .trim()
   if (!cleaned) return 'No arguments'
@@ -243,7 +246,7 @@ export function RunConsole({
     for (const key of sessionKeys) {
       try {
         const res = await fetchSessionHistory(key)
-        const msgs = res?.messages ?? []
+        const msgs = res.messages ?? []
         const agentName = agentNameMap?.[key] ?? 'Agent'
         for (const msg of msgs) {
           const content = extractContent(msg)
@@ -356,12 +359,11 @@ export function RunConsole({
       }
     }
     return Array.from(grouped.entries()).map(([agentName, events]) => ({ agentName, events }))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayEvents])
 
   const copyArtifactContent = useCallback(async (artifact: RunArtifact) => {
     const textToCopy = artifact.content || artifact.path || artifact.name
-    if (!textToCopy || !navigator?.clipboard?.writeText) return
+    if (!textToCopy) return
     try {
       await navigator.clipboard.writeText(textToCopy)
       setCopiedArtifactId(artifact.id)
@@ -718,15 +720,8 @@ export function RunConsole({
               eventsByAgent.length >= 3 ? (
                 <div className="flex gap-3 overflow-x-auto pb-2">
                   {eventsByAgent.map((lane) => {
-                    const latestEvent = lane.events[lane.events.length - 1]
-                    const laneDotClass =
-                      latestEvent?.eventType === 'error'
-                        ? 'bg-red-400'
-                        : latestEvent?.eventType === 'tool'
-                          ? 'bg-amber-400'
-                          : latestEvent?.eventType === 'output'
-                            ? 'bg-sky-400'
-                            : 'bg-emerald-400'
+                    const latestEvent = lane.events.at(-1)
+                    const laneDotClass = latestEvent ? getEventDotClass(latestEvent.eventType) : 'bg-emerald-400'
                     return (
                       <section
                         key={lane.agentName}
@@ -769,15 +764,8 @@ export function RunConsole({
                   )}
                 >
                   {eventsByAgent.map((lane) => {
-                    const latestEvent = lane.events[lane.events.length - 1]
-                    const laneDotClass =
-                      latestEvent?.eventType === 'error'
-                        ? 'bg-red-400'
-                        : latestEvent?.eventType === 'tool'
-                          ? 'bg-amber-400'
-                          : latestEvent?.eventType === 'output'
-                            ? 'bg-sky-400'
-                            : 'bg-emerald-400'
+                    const latestEvent = lane.events.at(-1)
+                    const laneDotClass = latestEvent ? getEventDotClass(latestEvent.eventType) : 'bg-emerald-400'
                     return (
                       <section
                         key={lane.agentName}
