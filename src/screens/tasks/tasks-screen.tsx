@@ -30,11 +30,12 @@ import {
 } from '@/lib/tasks-api'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
+
 function isTypingTarget(target: EventTarget | null) {
   const el = target as HTMLElement | null
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
 }
-import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
 
 const QUERY_KEY = ['claude', 'tasks'] as const
 const ASSIGNEES_KEY = ['claude', 'tasks', 'assignees'] as const
@@ -396,6 +397,32 @@ export function TasksScreen() {
               setAskingAstra(true)
               try {
                 const { sessionId } = await askAstra()
+                // Pre-fill the chat composer with a board briefing so Astra has context
+                const COLS: Array<{ key: string; label: string }> = [
+                  { key: 'backlog', label: 'Backlog' },
+                  { key: 'todo', label: 'To Do' },
+                  { key: 'in_progress', label: 'In Progress' },
+                  { key: 'review', label: 'Review' },
+                  { key: 'blocked', label: 'Blocked' },
+                ]
+                const activeTasks = tasks.filter((t) => t.column !== 'done' && t.column !== 'deleted')
+                const doneCount = tasks.filter((t) => t.column === 'done').length
+                const sections = COLS.map((col) => {
+                  const colTasks = activeTasks.filter((t) => t.column === col.key)
+                  if (!colTasks.length) return null
+                  const lines = colTasks.map((t) => {
+                    const prio = t.priority !== 'medium' ? ` [${t.priority}]` : ''
+                    const who = t.assignee ? ` → ${t.assignee}` : ''
+                    return `• ${t.title.slice(0, 80)}${prio}${who}`
+                  }).join('\n')
+                  return `**${col.label}** (${colTasks.length})\n${lines}`
+                }).filter(Boolean).join('\n\n')
+                const briefing = [
+                  'Here is my current task board. Please review it and help me prioritize what to work on next.\n',
+                  sections || '(no active tasks)',
+                  doneCount > 0 ? `\n*${doneCount} task${doneCount === 1 ? '' : 's'} done*` : '',
+                ].join('\n')
+                window.sessionStorage.setItem(`claude-draft-${sessionId}`, briefing)
                 void navigate({ to: '/chat/$sessionKey', params: { sessionKey: sessionId } })
               } catch {
                 toast('Failed to start Astra session', { type: 'error' })

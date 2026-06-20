@@ -1523,20 +1523,20 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                 </div>
               ) : (
                 <Tabs value={detailTab} onValueChange={setDetailTab}>
-                  <TabsList className="mb-5 flex w-full flex-wrap gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1 text-[var(--theme-muted)] shadow-sm">
-                    <TabsTrigger value="overview" className="min-w-[110px] flex-1">
+                  <TabsList className="mb-5 flex w-full flex-nowrap overflow-x-auto scrollbar-none gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-1 text-[var(--theme-muted)] shadow-sm">
+                    <TabsTrigger value="overview" className="min-w-[110px] shrink-0">
                       Overview
                     </TabsTrigger>
-                    <TabsTrigger value="tools" className="min-w-[92px] flex-1">
+                    <TabsTrigger value="tools" className="min-w-[92px] shrink-0">
                       Tools
                     </TabsTrigger>
-                    <TabsTrigger value="skills" className="min-w-[92px] flex-1">
+                    <TabsTrigger value="skills" className="min-w-[92px] shrink-0">
                       Skills
                     </TabsTrigger>
-                    <TabsTrigger value="channels" className="min-w-[102px] flex-1">
+                    <TabsTrigger value="channels" className="min-w-[102px] shrink-0">
                       Channels
                     </TabsTrigger>
-                    <TabsTrigger value="cron" className="min-w-[102px] flex-1">
+                    <TabsTrigger value="cron" className="min-w-[102px] shrink-0">
                       Cron Jobs
                     </TabsTrigger>
                   </TabsList>

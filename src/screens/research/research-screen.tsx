@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowRight01Icon,
   BookOpen02Icon,
   Cancel01Icon,
+  Copy01Icon,
   FlowIcon,
   Loading03Icon,
   Search01Icon,
@@ -80,7 +81,8 @@ function phaseIcon(phase: string) {
 
 export function ResearchScreen() {
   const navigate = useNavigate()
-  const [query, setQuery] = useState('')
+  const { q: initialQuery } = useSearch({ from: '/research' })
+  const [query, setQuery] = useState(initialQuery || '')
   const [maxRounds, setMaxRounds] = useState(0)
   const [maxTime, setMaxTime] = useState(300)
   const [phase, setPhase] = useState<ResearchPhase>('idle')
@@ -89,6 +91,7 @@ export function ResearchScreen() {
   const [result, setResult] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'new' | 'library'>('new')
+  const [copied, setCopied] = useState(false)
   const stepCounterRef = useRef(0)
   const eventSourceRef = useRef<EventSource | null>(null)
   const stepsEndRef = useRef<HTMLDivElement>(null)
@@ -459,6 +462,22 @@ export function ResearchScreen() {
                   <HugeiconsIcon icon={Telescope02Icon} size={14} strokeWidth={1.5} />
                   View full report
                 </Button>
+                {result && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(result).then(() => {
+                        setCopied(true)
+                        setTimeout(() => setCopied(false), 2000)
+                      })
+                    }}
+                  >
+                    <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={14} strokeWidth={1.5} />
+                    {copied ? 'Copied!' : 'Copy report'}
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
