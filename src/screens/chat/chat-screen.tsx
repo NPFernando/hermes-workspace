@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import Skeleton from "../../components/Skeleton.tsx";
 import {
   deriveFriendlyIdFromKey,
   isMissingAuth,
@@ -37,6 +38,7 @@ import { ChatHeader } from './components/chat-header'
 import { ChatMessageList } from './components/chat-message-list'
 import { ChatEmptyState } from './components/chat-empty-state'
 import { ChatComposer } from './components/chat-composer'
+import { SisterPicker } from './components/sister-picker'
 import { ConnectionStatusMessage } from './components/connection-status-message'
 import {
   clearPendingSendForSession,
@@ -71,6 +73,7 @@ import {
   ArtifactPanelContext
   
 } from './contexts/artifact-panel-context'
+import type { SisterOption } from './components/sister-picker'
 import type {
   ChatRunCommandDetail,
   ChatSubmitSelectionDetail,
@@ -87,6 +90,8 @@ import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import type {AgentActivity} from '@/stores/chat-activity-store';
 import type {ArtifactPanelState} from './contexts/artifact-panel-context';
 import type { InlineArtifact } from './components/message-item'
+import { createTask } from '@/lib/tasks-api'
+import { classifyMultiple, classifyOne } from '@/lib/sister-routing'
 import KeyboardShortcuts from '@/components/KeyboardShortcuts'
 import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 import { playChatComplete } from '@/lib/sounds'
@@ -511,6 +516,33 @@ export function ChatScreen({
   >([])
   const [isCompacting, setIsCompacting] = useState(false)
   const [artifactPanelState, setArtifactPanelState] = useState<ArtifactPanelState | null>(null)
+  const [selectedSisterId, setSelectedSisterId] = useState<string | null>(null)
+  const [autoRoutedSisterId, setAutoRoutedSisterId] = useState<string | null>(null)
+  const [isOrchestrating, setIsOrchestrating] = useState(false)
+  const [orchestratingSisterIds, setOrchestratingSisterIds] = useState<Array<string>>([])
+  const selectedSisterSystemPromptRef = useRef<string | undefined>(undefined)
+  const selectedSisterIdRef = useRef<string | null>(null)
+  const sistersQuery = useQuery<{ sisters: Array<SisterOption> }>({
+    queryKey: ['sisters'],
+    queryFn: async () => {
+      const res = await fetch('/api/sisters')
+      if (!res.ok) return { sisters: [] }
+      const data = await res.json() as { ok: boolean; sisters: Array<SisterOption> }
+      return { sisters: data.sisters ?? [] }
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+  const sisters: Array<SisterOption> = sistersQuery.data?.sisters ?? []
+  const sistersRef = useRef<Array<SisterOption>>([])
+  // Keep refs in sync with selected sister state
+  useEffect(() => {
+    selectedSisterIdRef.current = selectedSisterId
+    const found = sisters.find((s) => s.id === selectedSisterId)
+    selectedSisterSystemPromptRef.current = found?.systemPrompt
+  }, [selectedSisterId, sisters])
+  useEffect(() => {
+    sistersRef.current = sisters
+  }, [sisters])
   const [researchResetKey, setResearchResetKey] = useState(0)
   // Per-session thinking level — stored in sessionStorage keyed by session
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(() => {
@@ -1930,6 +1962,8 @@ export function ChatScreen({
     ) {
       // Read from ref so we always get the latest value without capturing it in deps
       const currentThinkingLevel = thinkingLevelRef.current
+      setAutoRoutedSisterId(null)
+      setOrchestratingSisterIds([])
       setLocalActivity('reading')
       const normalizedAttachments = attachments.map((attachment) => ({
         ...attachment,
@@ -2043,24 +2077,100 @@ export function ChatScreen({
         }
       }
 
-      void startStreaming({
-        sessionKey,
-        friendlyId,
-        message: enrichedBody,
-        history,
-        attachments:
-          payloadAttachments.length > 0 ? payloadAttachments : undefined,
-        thinking:
-          currentThinkingLevel === 'off' ? undefined : currentThinkingLevel,
-        fastMode,
-        model: currentModel || undefined,
-        idempotencyKey: optimisticClientId || crypto.randomUUID(),
-      }).catch((err: unknown) => {
-        const messageText = err instanceof Error ? err.message : String(err)
-        if (import.meta.env.DEV) {
-          console.warn('[chat] send-stream failed', messageText)
+      // Capture for async closure (reads refs at call time)
+      const _body = body
+      const _sessionKey = sessionKey
+      const _selectedSisterIdAtSend = selectedSisterIdRef.current
+      const _manualSystemPrompt = selectedSisterSystemPromptRef.current
+
+      void (async () => {
+        let effectiveSisterPrompt = _manualSystemPrompt
+
+        if (!_selectedSisterIdAtSend) {
+          // Client-side classification runs instantly (zero network) so sisters
+          // are highlighted the moment the user hits send — before any API call.
+          const multiScores = classifyMultiple(_body)
+          if (multiScores.length >= 2) {
+            setOrchestratingSisterIds(multiScores.slice(0, 3).map((s) => s.id))
+          } else {
+            const { sister_id } = classifyOne(_body)
+            if (sister_id && sister_id !== 'astra') {
+              const routed = sistersRef.current.find((s) => s.id === sister_id)
+              if (routed?.systemPrompt) setAutoRoutedSisterId(sister_id)
+            }
+          }
+
+          // Single call to /api/orchestrate handles both cases:
+          //   orchestrated: true  → multi-sister response, inject and return early
+          //   orchestrated: false → sister_id included for single-sister routing
+          // Delay the ThinkingBubble so instant single-topic routes don't flash.
+          let orchTimer: ReturnType<typeof setTimeout> | null =
+            setTimeout(() => setIsOrchestrating(true), 300)
+          try {
+            const orchRes = await fetch('/api/orchestrate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: _body }),
+              signal: AbortSignal.timeout(90_000),
+            })
+            if (orchRes.ok) {
+              const orchData = await orchRes.json() as {
+                orchestrated: boolean
+                content?: string
+                sister_id?: string
+              }
+              if (orchData.orchestrated && orchData.content) {
+                // Multi-sister: inject combined response, skip gateway call
+                const syntheticMsg = {
+                  role: 'assistant' as const,
+                  content: [{ type: 'text', text: orchData.content }],
+                  __optimisticId: `orch-${Date.now()}`,
+                }
+                appendHistoryMessage(queryClient, friendlyId, sessionKey, syntheticMsg as any)
+                setIsOrchestrating(false)
+                setOrchestratingSisterIds([])
+                streamFinish()
+                setSending(false)
+                return
+              }
+              // Single-sister: use sister_id returned directly from the same call
+              const routedId = orchData.sister_id
+              if (routedId && routedId !== 'astra') {
+                const routed = sistersRef.current.find((s) => s.id === routedId)
+                if (routed?.systemPrompt) {
+                  effectiveSisterPrompt = routed.systemPrompt
+                  setAutoRoutedSisterId(routedId)
+                }
+              }
+            }
+          } catch {
+            // Orchestration timed out or failed — Astra handles it
+          } finally {
+            if (orchTimer) { clearTimeout(orchTimer); orchTimer = null }
+            setIsOrchestrating(false)
+            setOrchestratingSisterIds([])
+          }
         }
-      })
+
+        startStreaming({
+          sessionKey,
+          friendlyId,
+          message: enrichedBody,
+          history,
+          attachments:
+            payloadAttachments.length > 0 ? payloadAttachments : undefined,
+          thinking:
+            currentThinkingLevel === 'off' ? undefined : currentThinkingLevel,
+          fastMode,
+          model: currentModel || undefined,
+          idempotencyKey: optimisticClientId || crypto.randomUUID(),
+          systemMessage: effectiveSisterPrompt,
+        }).catch((err: unknown) => {
+          if (import.meta.env.DEV) {
+            console.warn('[chat] send-stream failed', err)
+          }
+        })
+      })()
     },
     [
       finalDisplayMessages,
@@ -2387,8 +2497,56 @@ export function ChatScreen({
         return true
       }
 
-      if (trimmedCommand === '/skills') {
+      if (trimmedCommand === '/skills' || trimmedCommand === '/plugins') {
         navigate({ to: '/skills' })
+        return true
+      }
+
+      if (trimmedCommand === '/mcp') {
+        navigate({ to: '/mcp' })
+        return true
+      }
+
+      if (trimmedCommand === '/tasks' || trimmedCommand === '/kanban') {
+        navigate({ to: '/tasks' })
+        return true
+      }
+
+      if (trimmedCommand.startsWith('/task ')) {
+        const title = trimmedCommand.slice('/task '.length).trim()
+        if (title) {
+          void createTask({ title })
+            .then(() => toast(`Task created: "${title}"`, { type: 'success' }))
+            .catch(() => toast('Failed to create task', { type: 'error' }))
+        } else {
+          navigate({ to: '/tasks' })
+        }
+        return true
+      }
+
+      if (trimmedCommand === '/jobs' || trimmedCommand === '/cron') {
+        navigate({ to: '/jobs' })
+        return true
+      }
+
+      if (trimmedCommand === '/files') {
+        navigate({ to: '/files' })
+        return true
+      }
+
+      if (trimmedCommand === '/terminal') {
+        navigate({ to: '/terminal' })
+        return true
+      }
+
+      if (trimmedCommand === '/agents') {
+        navigate({ to: '/command' })
+        return true
+      }
+
+      if (trimmedCommand.startsWith('/research')) {
+        const q = trimmedCommand.replace(/^\/research\s*/, '').trim()
+        navigate({ to: '/research', search: { q } })
         return true
       }
 
@@ -2754,6 +2912,11 @@ export function ChatScreen({
     open: (artifacts: Array<InlineArtifact>, index: number) =>
       setArtifactPanelState({ artifacts, activeIndex: index }),
   }
+    const [showSkeleton, setShowSkeleton] = useState(true);
+    useEffect(() => {
+      const timer = setTimeout(() => setShowSkeleton(false), 2000);
+      return () => clearTimeout(timer);
+    }, []);
 
   return (
     <ArtifactPanelContext.Provider value={artifactPanelContextValue}>
@@ -2763,6 +2926,7 @@ export function ChatScreen({
         compact ? 'h-full flex-1 min-h-0' : 'h-full',
       )}
     >
+    {showSkeleton && <Skeleton className="absolute inset-0" />}
     <KeyboardShortcuts />
       <div
         className={cn(
@@ -2908,7 +3072,7 @@ export function ChatScreen({
               }
               notice={null}
               noticePosition="end"
-              waitingForResponse={waitingForResponse}
+              waitingForResponse={waitingForResponse || isOrchestrating}
               sessionKey={activeCanonicalKey}
               pinToTop={false}
               pinGroupMinHeight={pinGroupMinHeight}
@@ -2937,6 +3101,19 @@ export function ChatScreen({
               isCompacting={isCompacting}
               sending={sending}
               onRegenerate={handleRegenerate}
+            />
+          )}
+          {showComposer && sisters.length > 0 && (
+            <SisterPicker
+              sisters={sisters}
+              selectedId={selectedSisterId}
+              autoSelectedId={autoRoutedSisterId}
+              orchestrating={isOrchestrating}
+              orchestratingSisterIds={orchestratingSisterIds}
+              onSelect={(id) => {
+                setSelectedSisterId(id)
+                setAutoRoutedSisterId(null)
+              }}
             />
           )}
           {showComposer ? (

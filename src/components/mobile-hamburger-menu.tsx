@@ -14,6 +14,7 @@ import {
   PuzzleIcon,
   Rocket01Icon,
   Settings01Icon,
+  Telescope02Icon,
   UserGroupIcon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
@@ -43,6 +44,20 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     match: (p: string) => p.startsWith('/dashboard'),
   },
   {
+    id: 'research',
+    label: 'Research',
+    icon: Telescope02Icon,
+    to: '/research',
+    match: (p: string) => p.startsWith('/research'),
+  },
+  {
+    id: 'files',
+    label: 'Files',
+    icon: File01Icon,
+    to: '/files',
+    match: (p: string) => p.startsWith('/files'),
+  },
+  {
     id: 'terminal',
     label: 'Terminal',
     icon: CommandLineIcon,
@@ -57,6 +72,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     match: (p: string) => p.startsWith('/jobs'),
   },
   {
+    id: 'command',
+    label: 'Command Center',
+    icon: UserMultipleIcon,
+    to: '/command',
+    match: (p: string) => p.startsWith('/command') || p.startsWith('/operations') || p.startsWith('/agents'),
+  },
+  {
     id: 'conductor',
     label: 'Conductor',
     icon: Rocket01Icon,
@@ -64,25 +86,11 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     match: (p: string) => p.startsWith('/conductor'),
   },
   {
-    id: 'operations',
-    label: 'Operations',
-    icon: UserMultipleIcon,
-    to: '/operations',
-    match: (p: string) => p.startsWith('/operations'),
-  },
-  {
-    id: 'agents',
-    label: 'Agent Team',
-    icon: UserGroupIcon,
-    to: '/agents',
-    match: (p: string) => p.startsWith('/agents'),
-  },
-  {
     id: 'swarm',
     label: 'Swarm',
     icon: UserGroupIcon,
     to: '/swarm',
-    match: (p: string) => p === '/swarm' || p.startsWith('/swarm2'),
+    match: (p: string) => p === '/swarm' || p.startsWith('/swarm/') || p.startsWith('/swarm2'),
   },
   {
     id: 'echo-studio',
@@ -91,7 +99,6 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     to: '/echo-studio',
     match: (p: string) => p.startsWith('/echo-studio'),
   },
-
   {
     id: 'memory',
     label: 'Memory',
@@ -119,6 +126,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     icon: UserGroupIcon,
     to: '/profiles',
     match: (p: string) => p.startsWith('/profiles'),
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: Settings01Icon,
+    to: '/settings',
+    match: (p: string) => p.startsWith('/settings'),
   },
 ]
 

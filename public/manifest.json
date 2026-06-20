@@ -41,10 +41,10 @@
       "icons": [{ "src": "/claude-icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Operations",
-      "short_name": "Ops",
-      "description": "Open agent operations dashboard",
-      "url": "/operations?source=pwa-shortcut",
+      "name": "Command Center",
+      "short_name": "Command",
+      "description": "Open Command Center: agent sisters, swarm, and operations",
+      "url": "/command?source=pwa-shortcut",
       "icons": [{ "src": "/claude-icon-192.png", "sizes": "192x192" }]
     },
     {

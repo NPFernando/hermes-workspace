@@ -308,6 +308,10 @@ export const Route = createFileRoute('/api/send-stream')({
         const message = String(body.message ?? '')
         const thinking =
           typeof body.thinking === 'string' ? body.thinking : undefined
+        const sisterSystemMessage =
+          typeof body.systemMessage === 'string' && body.systemMessage.trim()
+            ? body.systemMessage.trim()
+            : undefined
         const attachments = normalizeAttachments(body.attachments)
         const history = normalizePortableHistory(body.history)
         if (!message.trim() && (!attachments || attachments.length === 0)) {
@@ -1000,7 +1004,7 @@ export const Route = createFileRoute('/api/send-stream')({
                   message: scopedMessage,
                   model:
                     typeof body.model === 'string' ? body.model : undefined,
-                  system_message: thinking,
+                  system_message: sisterSystemMessage || thinking,
                   attachments: attachments || undefined,
                 },
                 {

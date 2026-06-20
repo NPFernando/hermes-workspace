@@ -408,8 +408,8 @@ const MAX_ATTACHMENT_FILE_SIZE = 50 * 1024 * 1024
 const MAX_IMAGE_DIMENSION = 1920
 /** Initial JPEG compression quality (0-1). */
 const IMAGE_QUALITY = 0.85
-/** Safe image attachment limit after processing (1MB). */
-const MAX_TRANSPORT_IMAGE_SIZE = 1 * 1024 * 1024
+/** Safe image attachment limit after processing (4MB — Claude API accepts up to 5MB base64). */
+const MAX_TRANSPORT_IMAGE_SIZE = 4 * 1024 * 1024
 
 const IMAGE_EXTENSION_TO_MIME: Record<string, string> = {
   png: 'image/png',
@@ -673,6 +673,23 @@ async function compressImageToDataUrl(file: File): Promise<string> {
           quality -= 0.08
           dataUrl = canvas.toDataURL('image/jpeg', quality)
           bytes = estimateDataUrlBytes(dataUrl)
+        }
+
+        // If still over limit after quality reduction, halve dimensions and retry
+        if (bytes > MAX_TRANSPORT_IMAGE_SIZE) {
+          width = Math.max(1, Math.round(width / 2))
+          height = Math.max(1, Math.round(height / 2))
+          canvas.width = width
+          canvas.height = height
+          context.drawImage(image, 0, 0, width, height)
+          quality = IMAGE_QUALITY
+          dataUrl = canvas.toDataURL('image/jpeg', quality)
+          bytes = estimateDataUrlBytes(dataUrl)
+          while (bytes > MAX_TRANSPORT_IMAGE_SIZE && quality > 0.4) {
+            quality -= 0.08
+            dataUrl = canvas.toDataURL('image/jpeg', quality)
+            bytes = estimateDataUrlBytes(dataUrl)
+          }
         }
 
         cleanup()
@@ -1499,6 +1516,21 @@ function ChatComposerComponent({
             const compressedDataUrl = await compressImageToDataUrl(file).catch(
               () => null,
             )
+
+            // HEIC/HEIF photos from Samsung / iOS fail canvas compression on Android.
+            // The raw file is too large to transport and won't render in the browser.
+            const isHeic =
+              file.type === 'image/heic' ||
+              file.type === 'image/heif' ||
+              /\.(heic|heif)$/i.test(file.name)
+            if (compressedDataUrl === null && isHeic) {
+              toast(
+                `HEIC photos can't be processed on this device. In your camera settings, switch the image format from "High Efficiency" to "Most Compatible" (JPEG) and try again.`,
+                { type: 'warning' },
+              )
+              return null
+            }
+
             const dataUrl = compressedDataUrl || (await readFileAsDataUrl(file))
             if (!dataUrl) return null
 
@@ -1510,7 +1542,7 @@ function ChatComposerComponent({
             const transportBytes = estimateDataUrlBytes(dataUrl)
             if (transportBytes > MAX_TRANSPORT_IMAGE_SIZE) {
               toast(
-                `Image compressed to ${(transportBytes / (1024 * 1024)).toFixed(2)}mb — still over the 1mb limit. Try a smaller screenshot.`,
+                `"${file.name || 'Image'}" is still ${(transportBytes / (1024 * 1024)).toFixed(1)}MB after compression (max 4MB). Try a lower-resolution or smaller image.`,
                 { type: 'warning' },
               )
               return null
@@ -2345,7 +2377,7 @@ function ChatComposerComponent({
                         voiceInput.stop()
                       } else if (voiceRecorder.isRecording) {
                         voiceRecorder.stop()
-                      } else {
+                      } else if (voiceInput.state !== 'processing') {
                         voiceInput.start()
                       }
                     }}
@@ -2355,18 +2387,22 @@ function ChatComposerComponent({
                     aria-label={
                       voiceRecorder.isRecording
                         ? 'Recording voice note'
-                        : voiceInput.isListening
-                          ? 'Stop listening'
-                          : 'Voice input'
+                        : voiceInput.state === 'processing'
+                          ? 'Transcribing…'
+                          : voiceInput.isListening
+                            ? 'Stop listening'
+                            : 'Voice input'
                     }
                     disabled={disabled}
                     className={cn(
                       'size-9 rounded-full flex items-center justify-center relative transition-all duration-150 select-none',
                       voiceRecorder.isRecording
                         ? 'text-red-600 bg-red-100 animate-pulse'
-                        : voiceInput.isListening
-                          ? 'text-red-500 bg-red-50 animate-pulse'
-                          : 'text-[var(--theme-muted)] bg-[var(--theme-card)]',
+                        : voiceInput.state === 'processing'
+                          ? 'text-amber-500 bg-amber-50 animate-pulse'
+                          : voiceInput.isListening
+                            ? 'text-red-500 bg-red-50 animate-pulse'
+                            : 'text-[var(--theme-muted)] bg-[var(--theme-card)]',
                     )}
                   >
                     <HugeiconsIcon
@@ -2378,6 +2414,11 @@ function ChatComposerComponent({
                       <span className="absolute -top-1 -right-1 flex size-3">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
                         <span className="relative inline-flex size-3 rounded-full bg-red-500" />
+                      </span>
+                    ) : voiceInput.state === 'processing' ? (
+                      <span className="absolute -top-1 -right-1 flex size-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                        <span className="relative inline-flex size-3 rounded-full bg-amber-500" />
                       </span>
                     ) : null}
                   </button>
@@ -2443,6 +2484,54 @@ function ChatComposerComponent({
                             Attach File
                           </span>
                         </button>
+
+                        {/* Voice/Dictate — only shown when mic is available */}
+                        {(voiceInput.isSupported || voiceRecorder.isSupported) ? (
+                          <button
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => {
+                              setIsMobileActionsMenuOpen(false)
+                              if (voiceInput.isListening) {
+                                voiceInput.stop()
+                              } else if (voiceRecorder.isRecording) {
+                                voiceRecorder.stop()
+                              } else if (voiceInput.state !== 'processing') {
+                                voiceInput.start()
+                              }
+                            }}
+                            className={cn(
+                              'rounded-xl border border-[var(--theme-border)] p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50',
+                              voiceInput.isListening || voiceRecorder.isRecording || voiceInput.state === 'processing'
+                                ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800'
+                                : 'bg-[var(--theme-card)]',
+                            )}
+                          >
+                            <span className={cn(
+                              'rounded-lg p-1.5',
+                              voiceInput.isListening || voiceRecorder.isRecording
+                                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                                : voiceInput.state === 'processing'
+                                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                                  : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
+                            )}>
+                              <HugeiconsIcon
+                                icon={Mic01Icon}
+                                size={24}
+                                strokeWidth={1.5}
+                              />
+                            </span>
+                            <span className="text-sm font-medium text-[var(--theme-text)]">
+                              {voiceInput.isListening
+                                ? 'Stop Listening'
+                                : voiceRecorder.isRecording
+                                  ? 'Stop Recording'
+                                  : voiceInput.state === 'processing'
+                                    ? 'Transcribing…'
+                                    : 'Dictate'}
+                            </span>
+                          </button>
+                        ) : null}
 
                         {/* Model selector — opens model picker sheet on top */}
                         <button
@@ -3141,9 +3230,11 @@ function ChatComposerComponent({
                     tooltip={
                       voiceRecorder.isRecording
                         ? `Recording… ${Math.round(voiceRecorder.durationMs / 1000)}s`
-                        : voiceInput.isListening
-                          ? 'Listening — tap to stop'
-                          : 'Tap: dictate · Hold: voice note'
+                        : voiceInput.state === 'processing'
+                          ? 'Transcribing…'
+                          : voiceInput.isListening
+                            ? 'Listening — tap to stop'
+                            : 'Tap: dictate · Hold: voice note'
                     }
                   >
                     <Button
@@ -3152,7 +3243,7 @@ function ChatComposerComponent({
                           voiceInput.stop()
                         } else if (voiceRecorder.isRecording) {
                           voiceRecorder.stop()
-                        } else {
+                        } else if (voiceInput.state !== 'processing') {
                           voiceInput.start()
                         }
                       }}
@@ -3165,16 +3256,20 @@ function ChatComposerComponent({
                         'rounded-lg transition-colors select-none',
                         voiceRecorder.isRecording
                           ? 'text-red-600 bg-red-100 hover:bg-red-200 animate-pulse'
-                          : voiceInput.isListening
-                            ? 'text-red-500 bg-red-50 hover:bg-red-100 animate-pulse'
-                            : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]',
+                          : voiceInput.state === 'processing'
+                            ? 'text-amber-500 bg-amber-50 hover:bg-amber-100 animate-pulse'
+                            : voiceInput.isListening
+                              ? 'text-red-500 bg-red-50 hover:bg-red-100 animate-pulse'
+                              : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]',
                       )}
                       aria-label={
                         voiceRecorder.isRecording
                           ? 'Recording voice note'
-                          : voiceInput.isListening
-                            ? 'Stop listening'
-                            : 'Voice input'
+                          : voiceInput.state === 'processing'
+                            ? 'Transcribing…'
+                            : voiceInput.isListening
+                              ? 'Stop listening'
+                              : 'Voice input'
                       }
                       disabled={disabled}
                     >
@@ -3187,6 +3282,11 @@ function ChatComposerComponent({
                         <span className="absolute -top-1 -right-1 flex size-3">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
                           <span className="relative inline-flex size-3 rounded-full bg-red-500" />
+                        </span>
+                      ) : voiceInput.state === 'processing' ? (
+                        <span className="absolute -top-1 -right-1 flex size-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                          <span className="relative inline-flex size-3 rounded-full bg-amber-500" />
                         </span>
                       ) : null}
                     </Button>
