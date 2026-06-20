@@ -2157,10 +2157,11 @@ function ChatComposerComponent({
             'outline-[var(--theme-accent)] ring-2 ring-[var(--theme-accent)]/50 bg-[var(--theme-panel)]',
           isLoading &&
             'ring-2 ring-accent-400/70 shadow-[0_0_20px_rgba(48,80,255,0.35)] animate-pulse-glow',
-          isFocused &&
-            'ring-2 ring-[var(--theme-accent)]',
         )}
-      style={composerWrapperStyle}
+      style={{
+        ...composerWrapperStyle,
+        ...(isFocused && { '--composer-border': 'var(--theme-accent)' }),
+      } as React.CSSProperties}
       ref={setWrapperRefs}
     >
       <input

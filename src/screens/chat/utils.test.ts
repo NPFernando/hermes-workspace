@@ -38,4 +38,18 @@ describe('chat utils workspace directive cleanup', () => {
     expect(sessions[0]?.derivedTitle).toBe('Review the open PRs')
     expect(sessions[1]?.derivedTitle).toBe('Fix Docker publish')
   })
+
+  it('hides serialized empty assistant payloads without hiding user text', () => {
+    const assistantMessage: ChatMessage = {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'null' }],
+    }
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: [{ type: 'text', text: 'null' }],
+    }
+
+    expect(textFromMessage(assistantMessage)).toBe('')
+    expect(textFromMessage(userMessage)).toBe('null')
+  })
 })

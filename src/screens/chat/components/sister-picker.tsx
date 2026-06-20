@@ -1,6 +1,6 @@
-import { HugeiconsIcon } from '@hugeicons/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { useAgentViewStore } from '@/hooks/use-agent-view'
 
 export type SisterOption = {
   id: string
@@ -27,28 +27,28 @@ export function SisterPicker({
   orchestratingSisterIds,
   onSelect,
 }: SisterPickerProps) {
-  const hasOverride = Boolean(selectedId || autoSelectedId)
+  const availableSisters = useMemo(
+    () => Array.from(new Map(sisters.map((sister) => [sister.id, sister])).values()),
+    [sisters],
+  )
 
   // Determine the current sister to display in the chip
   let currentSister: SisterOption | null = null
   if (selectedId) {
-    currentSister = sisters.find((s) => s.id === selectedId) ?? null
+    currentSister = availableSisters.find((s) => s.id === selectedId) ?? null
   } else if (autoSelectedId) {
-    currentSister = sisters.find((s) => s.id === autoSelectedId) ?? null
+    currentSister = availableSisters.find((s) => s.id === autoSelectedId) ?? null
   }
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
-  const triggerRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+
+  const agentCount = useAgentViewStore((s) => s.activeCount)
+  const openPanel = useAgentViewStore((s) => s.setOpen)
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget)
-  }
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      setAnchorEl(triggerRef.current)
-    }
   }
 
   const handleClose = () => {
@@ -58,7 +58,7 @@ export function SisterPicker({
   useEffect(() => {
     if (anchorEl) {
       const handleClickOutside = (event: MouseEvent) => {
-        if (!anchorEl.contains(event.target as Node)) {
+        if (!containerRef.current?.contains(event.target as Node)) {
           setAnchorEl(null)
         }
       }
@@ -77,22 +77,34 @@ export function SisterPicker({
     return () => document.removeEventListener('keydown', handleEscape)
   }, [])
 
-  if (sisters.length === 0) return null
+  if (availableSisters.length === 0) return null
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 flex-wrap">
+    <div className="flex items-center gap-1 px-2 py-1">
       <span className="text-xs text-muted-foreground mr-1 shrink-0">Agent:</span>
       {orchestrating && !orchestratingSisterIds?.length && (
         <span className="text-xs text-muted-foreground animate-pulse mr-1">🌟 Astra orchestrating…</span>
       )}
-      <div className="relative">
+      {agentCount > 0 && (
+        <button
+          type="button"
+          onClick={() => openPanel(true)}
+          className="flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 transition-colors hover:bg-emerald-500/20 shrink-0"
+          title="Open agent view"
+        >
+          <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          {agentCount}
+        </button>
+      )}
+      <div ref={containerRef} className="relative">
         {/* Anchor for the popover */}
-        <div
+        <button
+          type="button"
           ref={triggerRef}
           onClick={handleClick}
-          onKeyDown={handleKeyDown}
-          tabIndex={0}
-          role="button"
+          aria-haspopup="menu"
+          aria-expanded={Boolean(anchorEl)}
+          aria-label={`Choose agent, current: ${currentSister?.name ?? 'Auto'}`}
           className={cn(
             'flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-hover)]/50 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]/100 transition-colors',
             !currentSister && 'text-xs',
@@ -109,15 +121,15 @@ export function SisterPicker({
           ) : (
             <span className="text-xs">Auto</span>
           )}
-        </div>
+        </button>
 
-        {/* Popover menu */}
+        {/* Popover menu — opens upward since trigger sits above the composer at the bottom of the screen */}
         {anchorEl && (
           <div
-            className="absolute left-0 top-full mt-1 w-56 border border-[var(--theme-border)] bg-[var(--theme-card)] z-50 shadow-xl rounded-md p-1 space-y-1"
+            className="absolute left-0 bottom-full mb-1 max-h-[min(60dvh,24rem)] w-[min(18rem,calc(100vw-1rem))] overflow-y-auto border border-[var(--theme-border)] bg-[var(--theme-card)] z-50 shadow-xl rounded-xl p-1 space-y-1"
             role="menu"
           >
-            {sisters.map((sister) => {
+            {availableSisters.map((sister) => {
               const isManualSelected = selectedId === sister.id
               const isAutoSelected = !isManualSelected && autoSelectedId === sister.id
               const isOrchestrating = orchestrating && orchestratingSisterIds?.includes(sister.id)
@@ -125,6 +137,8 @@ export function SisterPicker({
                 <button
                   key={sister.id}
                   type="button"
+                  role="menuitemradio"
+                  aria-checked={isManualSelected}
                   onClick={() => {
                     onSelect(isManualSelected ? null : sister.id)
                     handleClose()
@@ -142,6 +156,7 @@ export function SisterPicker({
                 >
                   <span className="text-xs">{sister.emoji}</span>
                   <span className="ml-1 text-xs">{sister.name}</span>
+                  <span className="sr-only">{sister.description}</span>
                   {isAutoSelected && !isOrchestrating && (
                     <span className="text-[9px] opacity-60 ml-0.5">auto</span>
                   )}

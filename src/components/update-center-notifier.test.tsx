@@ -1,7 +1,10 @@
 /** @vitest-environment jsdom */
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { __updateReleaseNotesStorageForTests } from './update-center-notifier'
+import {
+  __updateReleaseNotesStorageForTests,
+  shouldShowUpdateCards,
+} from './update-center-notifier'
 
 const { NOTES_SEEN_KEY, storeNotes } = __updateReleaseNotesStorageForTests
 
@@ -59,5 +62,10 @@ describe('update center release notes storage', () => {
     localStorage.setItem(NOTES_SEEN_KEY, firstStored!.id)
 
     expect(storeNotes(agentReleaseNotes)).toBeNull()
+  })
+
+  it('does not cover the chat header with update cards', () => {
+    expect(shouldShowUpdateCards('/chat/main')).toBe(false)
+    expect(shouldShowUpdateCards('/settings')).toBe(true)
   })
 })

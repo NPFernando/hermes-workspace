@@ -2027,13 +2027,11 @@ function ChatMessageListComponent({
               </>
             ) : (
               <>
-                null
                 {visibleEntries
                   .slice(virtualRange.startIndex, virtualRange.endIndex)
                   .map((entry, index) =>
                     renderMessage(entry, virtualRange.startIndex + index),
                   )}
-                null
               </>
             )}
             {/* Bottom shimmer + branch TUI card. Hide as soon as the

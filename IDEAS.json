@@ -1,19 +1,19 @@
 [
   {
-    "title": "Repair mobile chat TypeScript regressions",
-    "description": "Fix syntax and type errors introduced in recent mobile chat UI work so the workspace compiles again and the chat activity/status components can be validated safely.",
+    "title": "Keep chat route overlays out of the composer lane",
+    "description": "Hide global update cards, whats-new modals, and the floating usage-meter pill on /chat routes so narrow mobile and desktop chat layouts keep the header and composer usable.",
     "category": "ui",
     "estimated_effort": "low"
   },
   {
-    "title": "Normalize chat event stream imports",
-    "description": "Keep the newer /api/chat-events SSE route aligned with existing auth and chat-event-bus modules so session-filtered activity streams type-check and remain authenticated.",
-    "category": "api",
+    "title": "Expose active agent count from the chat sister picker",
+    "description": "Surface the live active-agent count as a compact pill next to the chat agent selector, linking directly into the agent view without expanding the bottom controls.",
+    "category": "ui",
     "estimated_effort": "low"
   },
   {
-    "title": "Harden sister picker keyboard behavior",
-    "description": "Make the sister picker trigger use a real ref and keyboard handler instead of overloading click handlers, preserving accessibility without type errors.",
+    "title": "Filter serialized empty assistant payloads in chat history",
+    "description": "Treat literal assistant null/undefined sentinels from history adapters as absent text while preserving user messages that intentionally contain those words.",
     "category": "ui",
     "estimated_effort": "low"
   },

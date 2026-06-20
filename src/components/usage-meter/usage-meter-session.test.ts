@@ -3,6 +3,7 @@ import {
   resolveContextAlertThreshold,
   resolveUsageMeterSessionKey,
   shouldShowUsageMeterContextAlert,
+  shouldShowUsageMeterPill,
 } from './usage-meter-session'
 
 describe('usage meter session targeting', () => {
@@ -30,6 +31,18 @@ describe('usage meter session targeting', () => {
     ).toBe(false)
     expect(
       shouldShowUsageMeterContextAlert({ pathname: '/settings', visible: true }),
+    ).toBe(false)
+  })
+
+  it('keeps the global usage pill out of chat composer space', () => {
+    expect(
+      shouldShowUsageMeterPill({ pathname: '/chat/main', visible: true }),
+    ).toBe(false)
+    expect(
+      shouldShowUsageMeterPill({ pathname: '/settings', visible: true }),
+    ).toBe(true)
+    expect(
+      shouldShowUsageMeterPill({ pathname: '/settings', visible: false }),
     ).toBe(false)
   })
 

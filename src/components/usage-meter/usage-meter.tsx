@@ -8,6 +8,7 @@ import {
   resolveContextAlertThreshold,
   resolveUsageMeterSessionKey,
   shouldShowUsageMeterContextAlert,
+  shouldShowUsageMeterPill,
 } from './usage-meter-session'
 import { DialogContent, DialogRoot } from '@/components/ui/dialog'
 import {
@@ -450,6 +451,10 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
     () => shouldShowUsageMeterContextAlert({ pathname, visible }),
     [pathname, visible],
   )
+  const pillVisible = useMemo(
+    () => shouldShowUsageMeterPill({ pathname, visible }),
+    [pathname, visible],
+  )
   const [usage, setUsage] = useState<UsageSummary>(() =>
     parseSessionStatus(null),
   )
@@ -877,7 +882,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
 
   return (
     <>
-      {visible ? (
+      {pillVisible ? (
         <MenuRoot>
           <MenuTrigger
             className={cn(

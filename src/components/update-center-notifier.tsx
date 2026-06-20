@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouterState } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
@@ -156,8 +157,13 @@ function storeNotes(sections: Array<ReleaseNoteSection>): Notes | null {
   return notes
 }
 
+export function shouldShowUpdateCards(pathname: string): boolean {
+  return pathname !== '/chat' && !pathname.startsWith('/chat/')
+}
+
 export function UpdateCenterNotifier() {
   const queryClient = useQueryClient()
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set())
   const [phases, setPhases] = useState<Record<ProductId, Phase>>({
     workspace: 'idle',
@@ -375,7 +381,10 @@ export function UpdateCenterNotifier() {
 
   return (
     <>
-      <ReleaseNotes notes={notes} onClose={closeNotes} />
+      <ReleaseNotes
+        notes={shouldShowUpdateCards(pathname) ? notes : null}
+        onClose={closeNotes}
+      />
       {naveenModalOpen && naveenStatus && (
         <NaveenUpdateModal
           status={naveenStatus}
@@ -391,7 +400,12 @@ export function UpdateCenterNotifier() {
           onClose={() => setNaveenModalOpen(false)}
         />
       )}
-      <div className="pointer-events-none fixed left-1/2 top-[calc(var(--titlebar-h,0px)+1rem)] z-[9998] flex w-[92vw] max-w-md -translate-x-1/2 flex-col gap-3">
+      <div
+        className={cn(
+          'pointer-events-none fixed left-1/2 top-[calc(var(--titlebar-h,0px)+1rem)] z-[9998] w-[92vw] max-w-md -translate-x-1/2 flex-col gap-3',
+          shouldShowUpdateCards(pathname) ? 'flex' : 'hidden',
+        )}
+      >
         <AnimatePresence>
           {visibleProducts.map((product) => (
             <UpdateCard

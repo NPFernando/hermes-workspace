@@ -38,7 +38,7 @@ const KNOWN_CHANNELS = [
 function stripChannelPrefix(text: string): string {
   const match = text.match(CHANNEL_PREFIX_REGEX)
   if (!match) return text
-  const bracket = match[1] ?? ''
+  const bracket = match[1]
   // Strip if it contains a timestamp or known channel name
   const hasTimestamp =
     /\d{4}-\d{2}-\d{2}/.test(bracket) || /\d{2}:\d{2}/.test(bracket)
@@ -128,7 +128,13 @@ export function textFromMessage(msg: ChatMessage): string {
 
   // Clean assistant messages (strip reply tags and channel prefixes)
   const cleaned = raw.replace(/\[\[reply_to(?:_current|:\d+)\]\]/g, '').trim()
-  return stripChannelPrefix(cleaned)
+  const displayText = stripChannelPrefix(cleaned)
+
+  // Some gateway history adapters serialize an absent assistant payload as a
+  // literal sentinel. It is transport metadata, not a chat message.
+  if (/^(?:null|undefined)$/i.test(displayText)) return ''
+
+  return displayText
 }
 
 export function getToolCallsFromMessage(
@@ -265,7 +271,7 @@ export function normalizeSessions(
       preview:
         typeof session.preview === 'string'
           ? cleanUserText(session.preview) || session.preview.trim() || null
-          : session.preview ?? null,
+          : null,
     }
   })
 }

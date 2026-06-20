@@ -18,6 +18,18 @@ export function shouldShowUsageMeterContextAlert({
   return visible && pathname.startsWith('/chat/')
 }
 
+export function shouldShowUsageMeterPill({
+  pathname,
+  visible,
+}: {
+  pathname: string
+  visible: boolean
+}): boolean {
+  // Chat already exposes context usage in its header. Keeping the global pill
+  // there obscures composer controls, especially at phone and tablet widths.
+  return visible && pathname !== '/chat' && !pathname.startsWith('/chat/')
+}
+
 export function resolveContextAlertThreshold({
   previous,
   current,

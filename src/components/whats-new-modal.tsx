@@ -2,6 +2,7 @@
 
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useRouterState } from '@tanstack/react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 
@@ -11,6 +12,10 @@ import { CHANGELOG } from '@/lib/changelog'
 import { cn } from '@/lib/utils'
 
 const SEEN_KEY = 'hermes-workspace-seen-version'
+
+export function shouldShowWhatsNewModal(pathname: string): boolean {
+  return pathname !== '/chat' && !pathname.startsWith('/chat/')
+}
 
 const KIND_STYLE: Record<ChangeKind, { label: string; className: string }> = {
   added:    { label: 'New',      className: 'bg-emerald-500/10 text-emerald-500' },
@@ -39,6 +44,7 @@ function ChangeList({ entry }: { entry: VersionEntry }) {
 
 export function WhatsNewModal() {
   const [open, setOpen] = useState(false)
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
 
   useEffect(() => {
     const latest = CHANGELOG[0]
@@ -55,7 +61,7 @@ export function WhatsNewModal() {
 
   return (
     <AnimatePresence>
-      {open && (
+      {open && shouldShowWhatsNewModal(pathname) && (
         <div className="fixed inset-0 z-[9998] flex items-end justify-center sm:items-center p-4 bg-black/50 backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, y: 24, scale: 0.97 }}

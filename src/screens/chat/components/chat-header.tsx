@@ -182,6 +182,11 @@ function ChatHeaderComponent({
 
   const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
   const mobileTitle = formatMobileSessionTitle(activeTitle)
+  const formattedActiveTitle = safeText(formatSessionTitle(activeTitle)).trim()
+  const desktopTitle =
+    !formattedActiveTitle || formattedActiveTitle.toLowerCase() === 'new'
+      ? 'New Chat'
+      : formattedActiveTitle
   void _agentModel
   void agentConnected
   void statusMode
@@ -387,8 +392,9 @@ function ChatHeaderComponent({
                 onClick={() => setSessionPopoverOpen((p) => !p)}
                 className="min-w-0 truncate text-sm font-medium text-balance hover:text-accent-600 transition-colors rounded-sm text-left"
                 title="Click to switch session"
+                aria-label={`Switch session, current: ${desktopTitle}`}
               >
-                {safeText(formatSessionTitle(activeTitle))}
+                {desktopTitle}
               </button>
               {canRenameTitle && !renamingTitle && (
                 <button
@@ -396,6 +402,7 @@ function ChatHeaderComponent({
                   onClick={startTitleEdit}
                   className="text-xs text-[var(--theme-muted)] opacity-0 group-hover:opacity-100 hover:text-[var(--theme-muted)] transition-opacity shrink-0"
                   title="Rename session"
+                  aria-label="Rename session"
                 >
                   ✏️
                 </button>

@@ -1,18 +1,34 @@
-# Close Summary
+# Close Summary: Reduce chat overlay clutter and null sentinels
 
 ## What changed
-This auto-improvement iteration used the documented manual fallback because `hermes dispatch-mission` is not available in the installed Hermes CLI. The selected improvement was to repair the in-progress mobile chat UI/workspace changes so the project compiles again. I fixed malformed TSX in chat composer, chat header, chat message list, and message item; restored authenticated imports for `/api/chat-events`; added the missing Odysseus Light theme preview; repaired keyboard shortcut navigation calls; and made the sister picker popover trigger use a real DOM ref and keyboard handler.
+- Added route-aware hiding for update-center cards, release notes, the What's New modal, and the floating usage-meter pill on chat routes.
+- Kept usage-meter context alerts available for individual chat sessions while preventing the global pill from overlapping chat controls.
+- Improved the chat sister picker with deduplicated options, a real button trigger, ARIA menu attributes, upward-opening popover placement, and a compact active-agent count pill.
+- Cleaned chat rendering by removing literal `null` placeholders and filtering assistant `null`/`undefined` sentinels from history text without hiding user-authored text.
+
+## Files changed
+- `src/components/update-center-notifier.tsx` and test
+- `src/components/usage-meter/usage-meter-session.ts`, `usage-meter.tsx`, and test
+- `src/components/whats-new-modal.tsx` and test
+- `src/hooks/use-agent-view.ts`
+- `src/screens/chat/components/chat-composer.tsx`
+- `src/screens/chat/components/chat-header.tsx`
+- `src/screens/chat/components/chat-message-list.tsx`
+- `src/screens/chat/components/sister-picker.tsx`
+- `src/screens/chat/utils.ts` and test
+- `src/styles.css`
 
 ## Test results
-- `npx tsc --noEmit`: passed.
-- Focused ESLint on touched source files: passed with 0 errors and 11 existing warnings in `chat-composer.tsx`.
+- TypeScript: `npx tsc --noEmit` passed under Node 22.
 - Focused Vitest: 4 files / 14 tests passed.
-- Full `npm test`: attempted but still has unrelated baseline/environment failures, including missing `@playwright/test` for e2e files, two Odysseus `.mjs` files with no Vitest suite, slash-command description mismatch, and root runtime cache expectation.
+- Focused ESLint JSON: 0 errors, 15 warnings (ignored test-file warnings plus existing chat-composer no-shadow warnings).
+- Production build and service health were verified during deployment.
 
-## Side-effects observed
-`pnpm` is not installed in this cron environment, so npm/npx fallbacks were used. Several untracked scratch/backup files remain in the worktree and were deliberately not staged.
+## Side effects observed
+- System Node v18 cannot run the current Vitest/ESLint stack because dependencies expect newer Web APIs; `/home/ubuntu/.hermes/node/bin` Node v22 works.
+- Several stale untracked backup/scratch files remain in the worktree and should be cleaned in a separate safe cleanup cycle.
 
-## New improvement ideas
-1. Clean stale untracked backup files and one-off fix scripts from `~/hermes-workspace`.
-2. Split Vitest config so e2e Playwright specs and Node `.mjs` smoke files are not collected by unit test runs.
-3. Add a small CI command for “touched files only” lint/type/test checks to support safe cron-driven improvements.
+## New improvement ideas for next cycle
+1. Clean stale untracked backup and scratch files in `/home/ubuntu/hermes-workspace` after classifying each file.
+2. Add a repo-local Node version guard or `.nvmrc`/tooling note so cron verification always uses Node 22+.
+3. Convert ignored test-file lint warnings into a quieter lint command or config so focused reports are easier to read.
