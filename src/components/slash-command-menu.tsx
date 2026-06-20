@@ -57,15 +57,23 @@ export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   // Tools & skills
   { command: '/skills', description: 'Browse and manage skills' },
   { command: '/skill <name>', description: 'Load a skill into session' },
-  { command: '/plugins', description: 'List installed plugins and their status' },
-  { command: '/mcp', description: 'Manage MCP servers' },
-  { command: '/cron', description: 'Manage cron jobs' },
-  { command: '/kanban', description: 'Kanban collaboration board' },
+  { command: '/plugins', description: 'Open Skills screen' },
+  { command: '/mcp', description: 'Open MCP server manager' },
+  { command: '/cron', description: 'Open Jobs & scheduled cron runs' },
+  { command: '/agents', description: 'Open Command Center' },
+  { command: '/kanban', description: 'Open task board' },
+
+  // Navigate to tools
+  { command: '/tasks', description: 'Open task board' },
+  { command: '/task <title>', description: 'Quick-capture a task without leaving chat' },
+  { command: '/research <query>', description: 'Open Deep Research with query pre-filled' },
+  { command: '/files', description: 'Open file browser' },
+  { command: '/jobs', description: 'View scheduled jobs and cron runs' },
+  { command: '/terminal', description: 'Open terminal' },
 
   // Session management
   { command: '/save', description: 'Save the current conversation' },
   { command: '/history', description: 'Show conversation history' },
-  { command: '/agents', description: 'Show active agents and running tasks' },
   { command: '/resume', description: 'Resume a named session' },
   { command: '/branch', description: 'Branch the current session' },
   { command: '/fork', description: 'Fork the current session' },

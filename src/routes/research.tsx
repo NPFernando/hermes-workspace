@@ -4,6 +4,9 @@ import { usePageTitle } from '@/hooks/use-page-title'
 
 export const Route = createFileRoute('/research')({
   ssr: false,
+  validateSearch: (search) => ({
+    q: typeof search.q === 'string' ? search.q : undefined,
+  }),
   component: ResearchRoute,
 })
 

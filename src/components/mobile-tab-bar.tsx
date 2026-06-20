@@ -144,6 +144,7 @@ export function MobileTabBar() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const navRef = useRef<HTMLElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   // Drag-to-switch state
   const dragStartXRef = useRef<number | null>(null)
@@ -231,6 +232,16 @@ export function MobileTabBar() {
     }
   }, [])
 
+  // Scroll active tab into view when route changes
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container) return
+    const activeBtn = container.querySelector<HTMLElement>('[aria-current="page"]')
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ inline: 'center', behavior: 'smooth', block: 'nearest' })
+    }
+  }, [pathname])
+
   // Keep --tabbar-h fresh when tab bar hides/shows
   useEffect(() => {
     const root = document.documentElement
@@ -260,16 +271,17 @@ export function MobileTabBar() {
       <nav
         ref={navRef}
         className={cn(
-          // Pill: fixed bottom center, shrink to content width
-          'fixed bottom-0 left-0 right-0 mx-auto w-fit z-[80] md:hidden',
+          // Pill: fixed bottom center, capped to screen width so tabs don't overflow
+          'fixed bottom-0 left-0 right-0 mx-auto z-[80] md:hidden',
+          'max-w-[calc(100vw-24px)]',
           // Vertical position: above home indicator
           'mb-[max(env(safe-area-inset-bottom,8px),16px)]',
           // Keep the pill visually isolated from page and error-state backgrounds
           'bg-surface/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-surface/90',
-          'rounded-full',
+          'rounded-full overflow-hidden',
           'border border-[var(--theme-border)]',
-          // Inner padding
-          'px-3 py-2',
+          // Vertical padding only; horizontal padding lives on the scroll container
+          'py-2',
           // Hide/show animation
           'transition-all duration-300 ease-in-out',
           isChatRoute
@@ -282,7 +294,7 @@ export function MobileTabBar() {
         onTouchMove={handlePillTouchMove}
         onTouchEnd={handlePillTouchEnd}
       >
-        <div className="flex items-center gap-1">
+        <div ref={scrollRef} className="flex items-center gap-0.5 overflow-x-auto scrollbar-none px-2">
           {MOBILE_NAV_TABS.map((tab, idx) => {
             const isActive = tab.match(pathname)
             const isCenter = tab.id === 'chat'

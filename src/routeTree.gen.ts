@@ -86,12 +86,14 @@ import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
 import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
+import { Route as ApiRouteSisterRouteImport } from './routes/api/route-sister'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPersonalitySwarmRouteImport } from './routes/api/personality-swarm'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
+import { Route as ApiOrchestrateRouteImport } from './routes/api/orchestrate'
 import { Route as ApiOdysseusBootstrapRouteImport } from './routes/api/odysseus-bootstrap'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
@@ -597,6 +599,11 @@ const ApiSendRoute = ApiSendRouteImport.update({
   path: '/api/send',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRouteSisterRoute = ApiRouteSisterRouteImport.update({
+  id: '/api/route-sister',
+  path: '/api/route-sister',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
   id: '/api/provider-usage',
   path: '/api/provider-usage',
@@ -625,6 +632,11 @@ const ApiPersonalitySwarmRoute = ApiPersonalitySwarmRouteImport.update({
 const ApiPathsRoute = ApiPathsRouteImport.update({
   id: '/api/paths',
   path: '/api/paths',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrchestrateRoute = ApiOrchestrateRouteImport.update({
+  id: '/api/orchestrate',
+  path: '/api/orchestrate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOdysseusBootstrapRoute = ApiOdysseusBootstrapRouteImport.update({
@@ -1294,12 +1306,14 @@ export interface FileRoutesByFullPath {
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
+  '/api/orchestrate': typeof ApiOrchestrateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/personality-swarm': typeof ApiPersonalitySwarmRoute
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/route-sister': typeof ApiRouteSisterRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1496,12 +1510,14 @@ export interface FileRoutesByTo {
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
+  '/api/orchestrate': typeof ApiOrchestrateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/personality-swarm': typeof ApiPersonalitySwarmRoute
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/route-sister': typeof ApiRouteSisterRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1700,12 +1716,14 @@ export interface FileRoutesById {
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
+  '/api/orchestrate': typeof ApiOrchestrateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/personality-swarm': typeof ApiPersonalitySwarmRoute
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/route-sister': typeof ApiRouteSisterRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1905,12 +1923,14 @@ export interface FileRouteTypes {
     | '/api/model-switch'
     | '/api/models'
     | '/api/odysseus-bootstrap'
+    | '/api/orchestrate'
     | '/api/paths'
     | '/api/personality-swarm'
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/provider-usage'
+    | '/api/route-sister'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -2107,12 +2127,14 @@ export interface FileRouteTypes {
     | '/api/model-switch'
     | '/api/models'
     | '/api/odysseus-bootstrap'
+    | '/api/orchestrate'
     | '/api/paths'
     | '/api/personality-swarm'
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/provider-usage'
+    | '/api/route-sister'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -2310,12 +2332,14 @@ export interface FileRouteTypes {
     | '/api/model-switch'
     | '/api/models'
     | '/api/odysseus-bootstrap'
+    | '/api/orchestrate'
     | '/api/paths'
     | '/api/personality-swarm'
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/provider-usage'
+    | '/api/route-sister'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -2514,12 +2538,14 @@ export interface RootRouteChildren {
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
   ApiModelsRoute: typeof ApiModelsRoute
   ApiOdysseusBootstrapRoute: typeof ApiOdysseusBootstrapRoute
+  ApiOrchestrateRoute: typeof ApiOrchestrateRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPersonalitySwarmRoute: typeof ApiPersonalitySwarmRoute
   ApiPingRoute: typeof ApiPingRoute
   ApiPluginsRoute: typeof ApiPluginsRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
+  ApiRouteSisterRoute: typeof ApiRouteSisterRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
   ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
@@ -3155,6 +3181,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSendRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/route-sister': {
+      id: '/api/route-sister'
+      path: '/api/route-sister'
+      fullPath: '/api/route-sister'
+      preLoaderRoute: typeof ApiRouteSisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/provider-usage': {
       id: '/api/provider-usage'
       path: '/api/provider-usage'
@@ -3195,6 +3228,13 @@ declare module '@tanstack/react-router' {
       path: '/api/paths'
       fullPath: '/api/paths'
       preLoaderRoute: typeof ApiPathsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/orchestrate': {
+      id: '/api/orchestrate'
+      path: '/api/orchestrate'
+      fullPath: '/api/orchestrate'
+      preLoaderRoute: typeof ApiOrchestrateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/odysseus-bootstrap': {
@@ -4332,12 +4372,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApiModelSwitchRoute: ApiModelSwitchRoute,
   ApiModelsRoute: ApiModelsRoute,
   ApiOdysseusBootstrapRoute: ApiOdysseusBootstrapRoute,
+  ApiOrchestrateRoute: ApiOrchestrateRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPersonalitySwarmRoute: ApiPersonalitySwarmRoute,
   ApiPingRoute: ApiPingRoute,
   ApiPluginsRoute: ApiPluginsRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
+  ApiRouteSisterRoute: ApiRouteSisterRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
   ApiSessionHistoryRoute: ApiSessionHistoryRoute,
