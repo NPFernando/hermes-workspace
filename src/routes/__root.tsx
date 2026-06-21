@@ -184,8 +184,14 @@ export const Route = createRootRoute({
         content: 'yes',
       },
       {
+        // black-translucent lets the dark app background show through the iOS status bar
         name: 'apple-mobile-web-app-status-bar-style',
-        content: 'default',
+        content: 'black-translucent',
+      },
+      {
+        // Android Chrome standalone prompt
+        name: 'mobile-web-app-capable',
+        content: 'yes',
       },
     ],
     links: [

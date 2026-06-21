@@ -1,31 +1,29 @@
-# Close Summary: Polish responsive workspace surfaces
+# Close Summary — Auto-improvement cycle 2026-06-22
 
 ## What changed
-- Preserved and completed the active responsive UI work already present on `feature/chat-ui-improvements`.
-- Improved narrow-screen behavior across workspace shell chrome, Files, Tasks, Swarm, Agents, Chat, Crew, Dashboard, footer metrics, and shared prompt/sidebar components.
-- Added `src/routes/-files-responsive.test.ts` to lock in the mobile Files tree-to-editor flow and visible mobile close control.
-- Adjusted Vitest discovery to exclude `services/**` and `e2e/**`, which belong to native `node:test` and Playwright rather than Vitest.
-- Fixed the new `Array<string>` style lint issue in `src/routes/__root.tsx` before committing.
-
-## Files changed
-See `PLAN.md` for the full file list. The main implementation touched responsive UI source files under `src/`, one focused test file, `vite.config.ts`, and the standard mission artifacts (`IDEAS.json`, `PLAN.md`, `TEST_REPORT.json`, `CLOSE_SUMMARY.md`).
+- Improved responsive workspace shell behavior in `src/components/workspace-shell.tsx` by making standalone/PWA detection reactive, using standalone safe-area titlebar height, and auto-collapsing the sidebar to an icon rail on tablet widths.
+- Updated `src/components/prompt-kit/chat-container.tsx` so the chat column is an inline-size container for container-query styling.
+- Updated `src/styles.css` with tablet chat width, landscape-mobile tab bar breathing room, and narrow code-block container-query rules.
+- Updated `src/routes/__root.tsx` PWA metadata for translucent iOS status bar and Android standalone capability.
+- Recorded cycle ideas, plan, and test report in the tracked root artifacts.
 
 ## Test results
-- `git diff --check` passed.
-- `PATH=/home/ubuntu/.hermes/node/bin:$PATH npx tsc --noEmit` passed.
-- Focused Vitest passed: 3 files / 11 tests.
-- Full `pnpm test` passed: 111 files / 718 tests.
-- `pnpm build` passed for both client and SSR bundles.
-- Restarted `hermes-workspace.service`; `systemctl is-active` returned `active`.
-- External health validation passed: HTTP 200, `application/json`, body `{"status":"ok"}`.
-- `pnpm lint` still fails on the repository-wide baseline (202 errors / 37 warnings); the new `__root.tsx` lint regression was fixed. Existing strict-type lint debt remains a separate improvement item.
+- `git diff --check`: passed.
+- `npx tsc --noEmit`: passed.
+- Focused Vitest (`-files-responsive`, `workspace-shell`, `slash-command-menu`): 3 files / 11 tests passed.
+- `pnpm test`: 111 files / 718 tests passed.
+- Focused ESLint on changed source files: passed with 0 errors.
+- `pnpm lint`: still fails on the known repository baseline (201 errors / 37 warnings), outside this cycle's changed files.
+- `pnpm build`: passed.
+- Deployment restart: `hermes-workspace.service` active.
+- External health: HTTP 200, `application/json`, `{"status":"ok"}`.
 
-## Side effects observed
-- `hermes dispatch-mission` is not available in the installed Hermes CLI, so this cycle used the documented manual fallback.
-- The workspace branch is diverged from local `main` and `origin/main`; I did not merge it into `main` to avoid hiding upstream changes.
-- The build produces existing Vite chunk-size/dynamic-import warnings, but exits successfully.
+## Side effects / blockers
+- `hermes dispatch-mission` is still unavailable in Hermes v0.16.0, so the documented manual fallback was used.
+- `feature/chat-ui-improvements` is diverged from `main` (`main...HEAD` = 2 behind / 8 ahead locally; `origin/main...HEAD` = 1 behind / 6 ahead). I did not merge into `main`; deployment was from the verified current feature-branch worktree, matching the established branch-divergence safety rule.
+- Local screenshot QA artifacts remain untracked under `screenshots/` and `scripts/screenshot-viewports.cjs`; they were not committed.
 
-## New improvement ideas for next cycle
-1. Reconcile `feature/chat-ui-improvements` with `main`/`origin/main` so verified UI work can merge cleanly without an unsafe local merge.
-2. Reduce the strict-type lint baseline or add changed-line lint accounting for cron quality gates.
-3. Add browser/viewport smoke coverage for Files, Tasks, and Swarm mobile layouts after the responsive refactor lands.
+## New ideas for next cycle
+1. Reconcile `feature/chat-ui-improvements` with `main` so responsive work can be merged cleanly.
+2. Promote viewport screenshots into a repeatable visual smoke check with ignored generated output.
+3. Add a changed-file lint gate that distinguishes new regressions from the existing repository-wide lint baseline.

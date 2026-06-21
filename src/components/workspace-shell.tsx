@@ -76,13 +76,32 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   // On Android TWA, env(safe-area-inset-top) == status bar height.
   // We expose this as --titlebar-h so every consumer (sidebar, fixed panels)
   // clears the status bar without hardcoding pixel values.
-  const isStandalone = useMemo(() => {
+  const [isStandalone, setIsStandalone] = useState(() => {
     if (typeof window === 'undefined') return false
     return (
       window.matchMedia('(display-mode: standalone)').matches ||
       window.matchMedia('(display-mode: window-controls-overlay)').matches ||
       !!(navigator as Navigator & { standalone?: boolean }).standalone
     )
+  })
+
+  // Keep isStandalone reactive — user can install the PWA mid-session.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mqStandalone = window.matchMedia('(display-mode: standalone)')
+    const mqWco = window.matchMedia('(display-mode: window-controls-overlay)')
+    const update = () =>
+      setIsStandalone(
+        mqStandalone.matches ||
+          mqWco.matches ||
+          !!(navigator as Navigator & { standalone?: boolean }).standalone,
+      )
+    mqStandalone.addEventListener('change', update)
+    mqWco.addEventListener('change', update)
+    return () => {
+      mqStandalone.removeEventListener('change', update)
+      mqWco.removeEventListener('change', update)
+    }
   }, [])
 
   const { settings } = useSettings()
@@ -99,6 +118,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false
     return window.matchMedia('(max-width: 767px)').matches
+  })
+
+  // Tablet: 768–1023px. Sidebar auto-collapses to icon rail at this width.
+  const [isTablet, setIsTablet] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches
   })
 
   // Slide transition direction tracking (mobile only)
@@ -245,11 +270,8 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   }, [navigate])
 
   const handleSelectSession = useCallback(() => {
-    // On mobile, collapse sidebar after selecting
-    if (window.innerWidth < 768) {
-      setSidebarCollapsed(true)
-    }
-  }, [setSidebarCollapsed])
+    if (isMobile) setSidebarCollapsed(true)
+  }, [isMobile, setSidebarCollapsed])
 
   const handleActiveSessionDelete = useCallback(() => {
     navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })
@@ -262,6 +284,19 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
   }, [])
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px) and (max-width: 1023px)')
+    const update = () => setIsTablet(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  // Auto-collapse sidebar on tablet — it becomes an icon rail
+  useEffect(() => {
+    if (isTablet) setSidebarCollapsed(true)
+  }, [isTablet, setSidebarCollapsed])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -348,7 +383,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       : isStandalone
         ? 'env(safe-area-inset-top, 0px)'
         : 0,
-    '--titlebar-h': isElectron ? '40px' : '0px',
+    '--titlebar-h': isElectron ? '40px' : isStandalone ? 'env(safe-area-inset-top, 0px)' : '0px',
   }
 
   return (

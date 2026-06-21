@@ -1,26 +1,44 @@
 [
   {
-    "title": "Polish responsive workspace surfaces",
-    "description": "Harden mobile and narrow-width layout behavior across Files, Tasks, Swarm, Agents, Chat, Crew, Dashboard, and shell chrome so dense workspace screens remain usable on small viewports.",
-    "category": "ui",
-    "estimated_effort": "medium"
-  },
-  {
-    "title": "Split focused UI regression tests by surface",
-    "description": "Add lightweight source/behavior regression tests for responsive layout contracts so future UI changes catch mobile shell, files, and navigation regressions quickly.",
+    "title": "Polish responsive workspace shell behavior",
+    "description": "Use the current responsive shell changes to improve tablet icon-rail behavior, standalone safe-area handling, and narrow chat/code rendering without touching backend APIs.",
     "category": "ui",
     "estimated_effort": "low"
   },
   {
-    "title": "Separate Vitest from native-node and Playwright suites",
-    "description": "Keep Vitest discovery focused on frontend/unit tests by excluding services and e2e directories that are owned by other runners.",
-    "category": "config",
-    "estimated_effort": "low"
+    "title": "Add viewport screenshot smoke checks",
+    "description": "Formalize the existing screenshot helper into a documented visual smoke workflow for mobile, tablet, laptop, and desktop breakpoints.",
+    "category": "ui",
+    "estimated_effort": "medium"
   },
   {
-    "title": "Reduce lint baseline before enforcing repo-wide lint in cron",
-    "description": "Resolve the existing strict-type lint backlog or add changed-line lint accounting so auto-improvement cycles can fail only on newly introduced lint regressions.",
+    "title": "Add changed-line lint accounting",
+    "description": "Keep cron quality gates from failing on the existing lint baseline by reporting only lint regressions introduced by the current diff.",
     "category": "config",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Improve health-check diagnostics",
+    "description": "Expose clearer JSON diagnostics for workspace health endpoint checks when reverse proxy responses are HTML or transient 502s.",
+    "category": "backend",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Reconcile feature/chat-ui-improvements with main",
+    "description": "Resolve the branch divergence so the verified responsive UI work can be merged cleanly instead of remaining deployment-only from the feature worktree.",
+    "category": "config",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Promote viewport screenshots into a visual smoke check",
+    "description": "Turn the local screenshot helper and viewport captures into a repeatable QA script with ignored output artifacts and documented baselines.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add changed-file lint gate",
+    "description": "Add a script that reports focused lint results for the current diff alongside the existing repository-wide lint baseline.",
+    "category": "config",
+    "estimated_effort": "low"
   }
 ]

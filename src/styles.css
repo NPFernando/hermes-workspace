@@ -61,6 +61,24 @@
   --theme-warning-soft-strong: rgba(245, 158, 11, 0.18);
 }
 
+/* Tablet (768–1023px): sidebar auto-collapses to 48px icon rail (JS-driven).
+   Chat content cap raised to use the extra space freed by the collapsed rail. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --chat-content-max-width: 720px;
+  }
+}
+
+/* Landscape mobile (short viewports): hide tab bar so content breathes */
+@media (max-height: 500px) and (orientation: landscape) {
+  :root {
+    --tabbar-h: 0px;
+  }
+  nav[aria-label="Mobile navigation"] {
+    display: none !important;
+  }
+}
+
 /* Responsive content width for large desktop monitors.
    Placed before [data-chat-width] rules so user-selected wide/full always win via source order. */
 @media (min-width: 1280px) {
@@ -90,6 +108,24 @@
 
 [data-chat-width='full'] {
   --chat-content-max-width: 100%;
+}
+
+/* Container queries — message content adapts to its actual column width.
+   The ChatContainerContent div carries container-type: inline-size.
+   Code blocks shrink their font and reduce padding on narrow columns. */
+@container (max-width: 480px) {
+  pre, code {
+    font-size: 0.78rem;
+  }
+  pre {
+    padding: 0.625rem 0.75rem;
+    border-radius: 6px;
+  }
+}
+@container (max-width: 360px) {
+  pre, code {
+    font-size: 0.72rem;
+  }
 }
 
 /* Hide scrollbars until scroll — accent-colored on hover (Odysseus-style) */

@@ -158,7 +158,7 @@ function ChatContainerContent({
     >
       <div
         className="mx-auto w-full px-3 sm:px-5 flex flex-col"
-        style={{ maxWidth: 'min(var(--chat-content-max-width), 100%)' }}
+        style={{ maxWidth: 'min(var(--chat-content-max-width), 100%)', containerType: 'inline-size' }}
       >
         <div className="flex flex-col space-y-3">{children}</div>
       </div>
