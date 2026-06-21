@@ -2950,11 +2950,12 @@ export function ChatScreen({
 
         <main
           className={cn(
-            'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-bottom] duration-200 mx-auto max-w-[1000px]',
+            'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-bottom] duration-200 mx-auto w-full',
             (activeIsRealtimeStreaming || hasPendingGeneration()) &&
               'chat-streaming-glow',
           )}
           style={{
+            maxWidth: 'var(--chat-content-max-width)',
             marginBottom:
               terminalPanelInset > 0 ? `${terminalPanelInset}px` : undefined,
           }}

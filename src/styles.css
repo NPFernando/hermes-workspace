@@ -22,6 +22,7 @@
   --mobile-header-height: 48px;
   --composer-height: 48px;
   --tabbar-h: 80px;
+  --desktop-sidebar-width: clamp(280px, 18vw, 320px);
   /* Chat content max-width — controlled by Settings > Chat Display (see #89).
    * Keep 900px default to match prior layout; 'wide' = 1200px, 'full' = 100%. */
   --chat-content-max-width: 900px;
@@ -58,6 +59,29 @@
   --theme-warning-soft: rgba(245, 158, 11, 0.1);
   --theme-warning-border: rgba(245, 158, 11, 0.3);
   --theme-warning-soft-strong: rgba(245, 158, 11, 0.18);
+}
+
+/* Responsive content width for large desktop monitors.
+   Placed before [data-chat-width] rules so user-selected wide/full always win via source order. */
+@media (min-width: 1280px) {
+  :root {
+    --chat-content-max-width: 1000px;
+  }
+}
+@media (min-width: 1536px) {
+  :root {
+    --chat-content-max-width: 1100px;
+  }
+}
+@media (min-width: 1920px) {
+  :root {
+    --chat-content-max-width: 1300px;
+  }
+}
+@media (min-width: 2560px) {
+  :root {
+    --chat-content-max-width: 1600px;
+  }
 }
 
 [data-chat-width='wide'] {
@@ -1111,12 +1135,11 @@ code {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--theme-border);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--theme-card) 96%, transparent),
-      color-mix(in srgb, var(--theme-panel) 92%, transparent)
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--theme-card) 96%, transparent),
+    color-mix(in srgb, var(--theme-panel) 92%, transparent)
+  );
   box-shadow: var(--theme-shadow-1);
 }
 .surface-card::before {
@@ -1185,13 +1208,17 @@ code {
 [data-theme='odysseus'] .card-glow:focus-within,
 [data-theme='matrix'] .card-glow:focus-within,
 [data-theme='scifi'] .card-glow:focus-within {
-  border-color: color-mix(in srgb, var(--theme-accent) 58%, var(--theme-border));
+  border-color: color-mix(
+    in srgb,
+    var(--theme-accent) 58%,
+    var(--theme-border)
+  );
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--theme-accent) 16%, transparent),
     0 0 34px color-mix(in srgb, var(--theme-accent) 9%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
-[data-theme='odysseus'] .surface-card,
+  [data-theme='odysseus'] .surface-card,
   [data-theme='matrix'] .surface-card,
   [data-theme='scifi'] .surface-card,
   [data-theme='odysseus'] .card-glow,
@@ -1200,7 +1227,9 @@ code {
   [data-theme='odysseus'] .kpi-card,
   [data-theme='matrix'] .kpi-card,
   [data-theme='scifi'] .kpi-card {
-    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    transition:
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
   }
   [data-theme='odysseus'] .card-glow:hover,
   [data-theme='matrix'] .card-glow:hover,
@@ -1277,7 +1306,9 @@ code {
 }
 @media (prefers-reduced-motion: reduce) {
   .chat-message-bubble {
-    transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    transition:
+      border-color 0.16s ease,
+      box-shadow 0.16s ease;
   }
   [data-theme='odysseus'] .chat-message-bubble:hover,
   [data-theme='matrix'] .chat-message-bubble:hover,
@@ -2278,10 +2309,9 @@ kbd {
   color: #fff !important;
 }
 
-/* Composer focus ring for all themes */
+/* Composer focus ring for all themes — glow only, no border-color change */
 [data-theme] .composer-input:focus-within {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent) 65%, transparent);
-  border-color: var(--theme-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent) 35%, transparent), 0 0 18px color-mix(in srgb, var(--theme-accent) 18%, transparent);
 }
 
 /* ════════════════════════════════════════════════════════════════════

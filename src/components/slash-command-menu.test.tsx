@@ -9,7 +9,7 @@ describe('DEFAULT_SLASH_COMMANDS', () => {
     )
 
     expect(plugin).toBeTruthy()
-    expect(plugin?.description).toBe('List installed plugins and their status')
+    expect(plugin?.description).toBe('Open Skills screen')
   })
 
   it('exposes the core slash commands users expect', () => {

@@ -52,7 +52,7 @@ const TerminalWorkspace = lazy(() =>
 )
 
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
-  'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
+  'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[var(--desktop-sidebar-width)] z-10 bg-black/10 backdrop-blur-[1px]'
 
 type WorkspaceShellProps = {
   children?: React.ReactNode
@@ -192,7 +192,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (pathname.startsWith('/command')) return 'Command Center'
     if (pathname.startsWith('/operations')) return 'Operations'
     if (pathname.startsWith('/agents')) return 'Agent Team'
-    if (pathname.startsWith('/swarm2') || pathname === '/swarm' || pathname.startsWith('/swarm/')) return 'Swarm'
+    if (
+      pathname.startsWith('/swarm2') ||
+      pathname === '/swarm' ||
+      pathname.startsWith('/swarm/')
+    )
+      return 'Swarm'
     if (pathname.startsWith('/echo-studio')) return 'Echo Studio'
     if (pathname.startsWith('/memory')) return 'Memory'
     if (pathname.startsWith('/skills')) return 'Skills'
@@ -338,7 +343,11 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const shellStyle: React.CSSProperties & Record<'--titlebar-h', string> = {
     height: 'var(--vvh, 100dvh)',
     // Electron: native titlebar. TWA/standalone: status bar safe area. Web: none.
-    paddingTop: isElectron ? 40 : isStandalone ? 'env(safe-area-inset-top, 0px)' : 0,
+    paddingTop: isElectron
+      ? 40
+      : isStandalone
+        ? 'env(safe-area-inset-top, 0px)'
+        : 0,
     '--titlebar-h': isElectron ? '40px' : '0px',
   }
 
@@ -364,9 +373,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             <div className="w-[78px] shrink-0" />
             {/* Centered title */}
             <div className="flex-1 text-center">
-              <span
-                className="text-[13px] font-medium select-none text-[var(--theme-accent)]"
-              >
+              <span className="text-[13px] font-medium select-none text-[var(--theme-accent)]">
                 Hermes
               </span>
             </div>
@@ -411,7 +418,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
               isMobile && !isOnChatRoute
                 ? 'pb-[calc(var(--tabbar-h,80px)+0.5rem)]'
-                : !isMobile && !isOnChatRoute && settings.showSystemMetricsFooter
+                : !isMobile &&
+                    !isOnChatRoute &&
+                    settings.showSystemMetricsFooter
                   ? 'pb-7'
                   : '',
             ].join(' ')}
@@ -455,9 +464,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 .filter(Boolean)
                 .join(' ')}
             >
-              {isMobile && !isOnChatRoute && !isOnTerminalRoute && mobilePageTitle && (
-                <MobilePageHeader title={mobilePageTitle} />
-              )}
+              {isMobile &&
+                !isOnChatRoute &&
+                !isOnTerminalRoute &&
+                mobilePageTitle && <MobilePageHeader title={mobilePageTitle} />}
               {children}
             </div>
           </main>
@@ -486,7 +496,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       <MobileHamburgerMenu />
       <MobileTabBar />
       {!isMobile && !isOnChatRoute && settings.showSystemMetricsFooter ? (
-        <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
+        <SystemMetricsFooter
+          leftOffset={sidebarCollapsed ? 48 : 'var(--desktop-sidebar-width)'}
+        />
       ) : null}
       <CommandPalette pathname={pathname} sessions={sessions} />
     </>

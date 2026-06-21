@@ -2,13 +2,36 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, PlayIcon, RefreshIcon, Search01Icon  } from '@hugeicons/core-free-icons'
+import {
+  Add01Icon,
+  AiBrainIcon,
+  AiMagicIcon,
+  BulbIcon,
+  Cancel01Icon,
+  CheckListIcon,
+  PlayIcon,
+  RefreshIcon,
+  Search01Icon,
+} from '@hugeicons/core-free-icons'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
-import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority, UpdateTaskInput } from '@/lib/tasks-api'
+import type { CSSProperties } from 'react'
+import type {
+  ClaudeTask,
+  CreateTaskInput,
+  TaskAssignee,
+  TaskColumn,
+  TaskPriority,
+  UpdateTaskInput,
+} from '@/lib/tasks-api'
 import {
   COLUMN_COLORS,
   COLUMN_LABELS,
@@ -30,12 +53,22 @@ import {
 } from '@/lib/tasks-api'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
-import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  TooltipContent,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 
 function isTypingTarget(target: EventTarget | null) {
   const el = target as HTMLElement | null
-  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+  return (
+    !!el &&
+    (el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA' ||
+      el.isContentEditable)
+  )
 }
 
 const QUERY_KEY = ['claude', 'tasks'] as const
@@ -74,8 +107,11 @@ export function TasksScreen() {
 
   const search = useSearch({ from: '/tasks' })
   const navigate = useNavigate()
-  const initialAssignee = typeof search.assignee === 'string' ? search.assignee : null
-  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(initialAssignee)
+  const initialAssignee =
+    typeof search.assignee === 'string' ? search.assignee : null
+  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(
+    initialAssignee,
+  )
 
   const [launchingTaskId, setLaunchingTaskId] = useState<string | null>(null)
   const [executingTaskId, setExecutingTaskId] = useState<string | null>(null)
@@ -83,11 +119,17 @@ export function TasksScreen() {
   const [nlParsing, setNlParsing] = useState(false)
   const nlInputRef = useRef<HTMLInputElement>(null)
   const [createDefaults, setCreateDefaults] = useState<{
-    title?: string; description?: string; column?: TaskColumn
-    priority?: TaskPriority; assignee?: string; tags?: string
+    title?: string
+    description?: string
+    column?: TaskColumn
+    priority?: TaskPriority
+    assignee?: string
+    tags?: string
   } | null>(null)
   // Snapshot of column/priority taken when Deploy Agents fires; cleared when agents finish
-  const [deploySnapshot, setDeploySnapshot] = useState<Partial<Record<string, { column: TaskColumn; priority: TaskPriority }>> | null>(null)
+  const [deploySnapshot, setDeploySnapshot] = useState<Partial<
+    Record<string, { column: TaskColumn; priority: TaskPriority }>
+  > | null>(null)
 
   // — Search + filter state
   const [searchQuery, setSearchQuery] = useState('')
@@ -96,7 +138,9 @@ export function TasksScreen() {
   const [filterBlocked, setFilterBlocked] = useState(false)
   const [filterActiveAgent, setFilterActiveAgent] = useState(false)
   const [filterInReview, setFilterInReview] = useState(false)
-  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | null>(null)
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | null>(
+    null,
+  )
   const [tagFilter, setTagFilter] = useState<string | null>(null)
 
   const tasksQuery = useQuery({
@@ -129,7 +173,13 @@ export function TasksScreen() {
 
   const tasksByColumn = useMemo(() => {
     const columns: Record<TaskColumn, Array<ClaudeTask>> = {
-      backlog: [], todo: [], in_progress: [], review: [], blocked: [], done: [], deleted: [],
+      backlog: [],
+      todo: [],
+      in_progress: [],
+      review: [],
+      blocked: [],
+      done: [],
+      deleted: [],
     }
     const q = searchQuery.trim().toLowerCase()
     let matchCount = 0
@@ -137,9 +187,10 @@ export function TasksScreen() {
     for (const t of tasks) {
       if (assigneeFilter && t.assignee !== assigneeFilter) continue
       if (q) {
-        const hit = t.title.toLowerCase().includes(q)
-          || t.description.toLowerCase().includes(q)
-          || t.tags.some(tag => tag.toLowerCase().includes(q))
+        const hit =
+          t.title.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q) ||
+          t.tags.some((tag) => tag.toLowerCase().includes(q))
         if (!hit) continue
       }
       if (filterOverdue && !isOverdue(t)) continue
@@ -155,20 +206,41 @@ export function TasksScreen() {
     for (const col of COLUMN_ORDER) {
       columns[col].sort((a, b) => a.position - b.position)
     }
-    const hasAnyFilter = Boolean(assigneeFilter || q || filterOverdue || filterBlocked || filterActiveAgent || filterInReview || priorityFilter || tagFilter)
+    const hasAnyFilter = Boolean(
+      assigneeFilter ||
+      q ||
+      filterOverdue ||
+      filterBlocked ||
+      filterActiveAgent ||
+      filterInReview ||
+      priorityFilter ||
+      tagFilter,
+    )
     return { columns, matchCount, totalTasks: tasks.length, hasAnyFilter }
-  }, [tasks, assigneeFilter, searchQuery, filterOverdue, filterBlocked, filterActiveAgent, filterInReview, priorityFilter, tagFilter])
+  }, [
+    tasks,
+    assigneeFilter,
+    searchQuery,
+    filterOverdue,
+    filterBlocked,
+    filterActiveAgent,
+    filterInReview,
+    priorityFilter,
+    tagFilter,
+  ])
 
   const columnMap = tasksByColumn.columns
 
   const stats = useMemo(() => {
     const total = tasks.length
-    const running = tasks.filter(t => t.column === 'in_progress').length
-    const blocked = tasks.filter(t => t.column === 'blocked').length
-    const done = tasks.filter(t => t.column === 'done').length
-    const overdue = tasks.filter(t => isOverdue(t) && t.column !== 'done').length
+    const running = tasks.filter((t) => t.column === 'in_progress').length
+    const blocked = tasks.filter((t) => t.column === 'blocked').length
+    const done = tasks.filter((t) => t.column === 'done').length
+    const overdue = tasks.filter(
+      (t) => isOverdue(t) && t.column !== 'done',
+    ).length
     const completion = total > 0 ? Math.round((done / total) * 100) : 0
-    const agentActive = tasks.filter(t => t.agent_state).length
+    const agentActive = tasks.filter((t) => t.agent_state).length
     return { total, running, blocked, done, overdue, completion, agentActive }
   }, [tasks])
 
@@ -178,33 +250,62 @@ export function TasksScreen() {
 
   const createMutation = useMutation({
     mutationFn: createTask,
-    onSuccess: () => { invalidate(); toast('Task created'); setShowCreate(false) },
-    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to create task', { type: 'error' }),
+    onSuccess: () => {
+      invalidate()
+      toast('Task created')
+      setShowCreate(false)
+    },
+    onError: (e) =>
+      toast(e instanceof Error ? e.message : 'Failed to create task', {
+        type: 'error',
+      }),
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: CreateTaskInput }) => updateTask(id, input),
-    onSuccess: () => { invalidate(); toast('Task updated'); setEditingTask(null) },
-    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to update task', { type: 'error' }),
+    mutationFn: ({ id, input }: { id: string; input: CreateTaskInput }) =>
+      updateTask(id, input),
+    onSuccess: () => {
+      invalidate()
+      toast('Task updated')
+      setEditingTask(null)
+    },
+    onError: (e) =>
+      toast(e instanceof Error ? e.message : 'Failed to update task', {
+        type: 'error',
+      }),
   })
 
   const deleteMutation = useMutation({
     mutationFn: deleteTask,
-    onSuccess: () => { invalidate(); toast('Task deleted') },
-    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to delete task', { type: 'error' }),
+    onSuccess: () => {
+      invalidate()
+      toast('Task deleted')
+    },
+    onError: (e) =>
+      toast(e instanceof Error ? e.message : 'Failed to delete task', {
+        type: 'error',
+      }),
   })
 
   const moveMutation = useMutation({
-    mutationFn: ({ id, column }: { id: string; column: TaskColumn }) => moveTask(id, column, 'user'),
+    mutationFn: ({ id, column }: { id: string; column: TaskColumn }) =>
+      moveTask(id, column, 'user'),
     onSuccess: () => invalidate(),
-    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to move task', { type: 'error' }),
+    onError: (e) =>
+      toast(e instanceof Error ? e.message : 'Failed to move task', {
+        type: 'error',
+      }),
   })
 
   // Silent update mutation — for quick card actions (no dialog close side-effect)
   const quickUpdateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateTaskInput }) => updateTask(id, input),
+    mutationFn: ({ id, input }: { id: string; input: UpdateTaskInput }) =>
+      updateTask(id, input),
     onSuccess: () => invalidate(),
-    onError: (e) => toast(e instanceof Error ? e.message : 'Failed to update task', { type: 'error' }),
+    onError: (e) =>
+      toast(e instanceof Error ? e.message : 'Failed to update task', {
+        type: 'error',
+      }),
   })
 
   async function handleTaskComment(taskId: string, text: string) {
@@ -232,7 +333,12 @@ export function TasksScreen() {
       })
       setShowCreate(true)
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'AI could not parse the task — try rephrasing', { type: 'error' })
+      toast(
+        e instanceof Error
+          ? e.message
+          : 'AI could not parse the task — try rephrasing',
+        { type: 'error' },
+      )
     } finally {
       setNlParsing(false)
     }
@@ -257,7 +363,7 @@ export function TasksScreen() {
       }
       if (e.key === 'd') {
         e.preventDefault()
-        setShowDone(v => !v)
+        setShowDone((v) => !v)
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -267,7 +373,7 @@ export function TasksScreen() {
   // Agent deploy summary — fires when all agent_state clears after Deploy Agents was clicked
   useEffect(() => {
     if (!deploySnapshot) return
-    const anyActive = tasks.some(t => t.agent_state)
+    const anyActive = tasks.some((t) => t.agent_state)
     if (anyActive) return
     // All agents finished — compute diff vs snapshot
     let movedToReady = 0
@@ -285,7 +391,9 @@ export function TasksScreen() {
       if (before.priority !== task.priority) reprioritised++
     }
     if (total > 0) {
-      const parts: Array<string> = [`Reviewed ${total} task${total !== 1 ? 's' : ''}`]
+      const parts: Array<string> = [
+        `Reviewed ${total} task${total !== 1 ? 's' : ''}`,
+      ]
       if (movedToReady > 0) parts.push(`${movedToReady} → Ready`)
       if (movedToBlocked > 0) parts.push(`${movedToBlocked} Blocked`)
       if (reprioritised > 0) parts.push(`${reprioritised} reprioritised`)
@@ -307,7 +415,7 @@ export function TasksScreen() {
   function handleDrop(e: React.DragEvent, targetColumn: TaskColumn) {
     e.preventDefault()
     const taskId = e.dataTransfer.getData('text/plain')
-    const task = tasks.find(t => t.id === taskId)
+    const task = tasks.find((t) => t.id === taskId)
     if (!task || task.column === targetColumn) {
       setDraggingId(null)
       setDragOverColumn(null)
@@ -338,385 +446,517 @@ export function TasksScreen() {
     setTagFilter(null)
   }
 
-  const visibleColumns = showDone ? COLUMN_ORDER : COLUMN_ORDER.filter(c => c !== 'done')
+  const visibleColumns = showDone
+    ? COLUMN_ORDER
+    : COLUMN_ORDER.filter((c) => c !== 'done')
   const colMaxWidth = Math.floor(1200 / visibleColumns.length)
 
   return (
-    <div data-route-page className="h-full overflow-hidden flex flex-col bg-surface text-ink">
-      <div className="shrink-0 mx-auto w-full max-w-[1200px] flex flex-col gap-3 px-4 pt-5 pb-2 sm:px-6 lg:px-8">
-      {/* Header */}
-      <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 backdrop-blur-xl">
-        <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0">
-          <h1 className="text-2xl font-medium text-ink">Tasks</h1>
-          {assigneeFilter && (
-            <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
-              <span>Filtered by: <span className="capitalize text-amber-500">{assigneeFilter}</span></span>
+    <div
+      data-route-page
+      className="h-full overflow-hidden flex flex-col bg-surface text-ink"
+    >
+      <div className="shrink-0 mx-auto w-full max-w-[1200px] flex flex-col gap-3 px-3 pt-3 pb-2 sm:px-6 sm:pt-5 lg:px-8">
+        {/* Header */}
+        <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3 backdrop-blur-xl sm:p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-xl font-medium text-ink sm:text-2xl">
+                Tasks
+              </h1>
+              {assigneeFilter && (
+                <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
+                  <span>
+                    Filtered by:{' '}
+                    <span className="capitalize text-amber-500">
+                      {assigneeFilter}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAssigneeFilter(null)}
+                    className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] transition-colors"
+                  >
+                    ✕ Clear
+                  </button>
+                </div>
+              )}
+              {/* Stats */}
+              <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)] flex-wrap">
+                <span>{stats.total} total</span>
+                <span className="hidden sm:inline">·</span>
+                <span className="hidden sm:inline">
+                  {stats.running} running
+                </span>
+                {stats.blocked > 0 && (
+                  <>
+                    <span className="hidden sm:inline">·</span>
+                    <span className="text-red-400">
+                      {stats.blocked} blocked
+                    </span>
+                  </>
+                )}
+                {stats.overdue > 0 && (
+                  <>
+                    <span>·</span>
+                    <span className="text-red-400">
+                      {stats.overdue} overdue
+                    </span>
+                  </>
+                )}
+                <span className="hidden sm:inline">·</span>
+                <span className="hidden sm:inline">
+                  {stats.completion}% done
+                </span>
+                {stats.agentActive > 0 && (
+                  <>
+                    <span>·</span>
+                    <span className="flex items-center gap-1 text-violet-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse inline-block" />
+                      Astra reviewing {stats.agentActive}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="flex w-full items-center gap-2 overflow-x-auto pb-1 [&>button]:shrink-0 sm:w-auto sm:flex-wrap sm:justify-end sm:overflow-visible sm:pb-0">
+              {/* Ask Astra */}
+              <button
+                onClick={async () => {
+                  setAskingAstra(true)
+                  try {
+                    const { sessionId } = await askAstra()
+                    // Pre-fill the chat composer with a board briefing so Astra has context
+                    const COLS: Array<{ key: string; label: string }> = [
+                      { key: 'backlog', label: 'Backlog' },
+                      { key: 'todo', label: 'To Do' },
+                      { key: 'in_progress', label: 'In Progress' },
+                      { key: 'review', label: 'Review' },
+                      { key: 'blocked', label: 'Blocked' },
+                    ]
+                    const activeTasks = tasks.filter(
+                      (t) => t.column !== 'done' && t.column !== 'deleted',
+                    )
+                    const doneCount = tasks.filter(
+                      (t) => t.column === 'done',
+                    ).length
+                    const sections = COLS.map((col) => {
+                      const colTasks = activeTasks.filter(
+                        (t) => t.column === col.key,
+                      )
+                      if (!colTasks.length) return null
+                      const lines = colTasks
+                        .map((t) => {
+                          const prio =
+                            t.priority !== 'medium' ? ` [${t.priority}]` : ''
+                          const who = t.assignee ? ` → ${t.assignee}` : ''
+                          return `• ${t.title.slice(0, 80)}${prio}${who}`
+                        })
+                        .join('\n')
+                      return `**${col.label}** (${colTasks.length})\n${lines}`
+                    })
+                      .filter(Boolean)
+                      .join('\n\n')
+                    const briefing = [
+                      'Here is my current task board. Please review it and help me prioritize what to work on next.\n',
+                      sections || '(no active tasks)',
+                      doneCount > 0
+                        ? `\n*${doneCount} task${doneCount === 1 ? '' : 's'} done*`
+                        : '',
+                    ].join('\n')
+                    window.sessionStorage.setItem(
+                      `claude-draft-${sessionId}`,
+                      briefing,
+                    )
+                    void navigate({
+                      to: '/chat/$sessionKey',
+                      params: { sessionKey: sessionId },
+                    })
+                  } catch {
+                    toast('Failed to start Astra session', { type: 'error' })
+                  } finally {
+                    setAskingAstra(false)
+                  }
+                }}
+                disabled={askingAstra}
+                title="Open a chat with Astra pre-briefed on the current board state"
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                  askingAstra
+                    ? 'border-violet-500/50 bg-violet-500/10 text-violet-400 cursor-wait'
+                    : 'border-[var(--theme-border)] text-violet-400 hover:bg-violet-500/10 hover:border-violet-500/50',
+                )}
+              >
+                <span className={askingAstra ? 'animate-pulse' : ''}>✦</span>
+                {askingAstra ? 'Opening…' : 'Ask Astra'}
+              </button>
+
+              {/* Deploy Agents */}
+              <button
+                onClick={async () => {
+                  // Snapshot current states so we can compute diff when agents finish
+                  const snapshot: Record<
+                    string,
+                    { column: TaskColumn; priority: TaskPriority }
+                  > = {}
+                  for (const t of tasks)
+                    snapshot[t.id] = { column: t.column, priority: t.priority }
+                  setDeploySnapshot(snapshot)
+                  setAstraReviewing(true)
+                  try {
+                    await fetch('/api/tasks-deploy-agents', { method: 'POST' })
+                    await tasksQuery.refetch()
+                  } finally {
+                    setAstraReviewing(false)
+                  }
+                }}
+                disabled={astraReviewing}
+                title="Deploy agents: Astra reviews each task and delegates to specialist sisters as needed"
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                  astraReviewing
+                    ? 'border-violet-500/50 bg-violet-500/10 text-violet-400 cursor-wait'
+                    : 'border-[var(--theme-border)] text-violet-400 hover:bg-violet-500/10 hover:border-violet-500/50',
+                )}
+              >
+                <HugeiconsIcon
+                  icon={AiBrainIcon}
+                  size={13}
+                  strokeWidth={1.8}
+                  className={astraReviewing ? 'animate-pulse' : ''}
+                />
+                {astraReviewing ? 'Deploying…' : 'Deploy Agents'}
+              </button>
+
+              {/* AI idea generation */}
+              <button
+                onClick={async () => {
+                  setIdeasLoading(true)
+                  try {
+                    const res = await fetch('/api/tasks-generate-ideas', {
+                      method: 'POST',
+                    })
+                    const data = (await res.json()) as {
+                      ok: boolean
+                      injected: number
+                      ideas: Array<string>
+                      error?: string
+                    }
+                    if (data.injected > 0) {
+                      await tasksQuery.refetch()
+                      toast(
+                        `Added ${data.injected} idea${data.injected > 1 ? 's' : ''} to backlog`,
+                      )
+                    } else if (data.error) {
+                      toast(`Idea scan failed: ${data.error}`, {
+                        type: 'error',
+                      })
+                    } else {
+                      toast(
+                        'AI scanned workspace — no new ideas to add right now',
+                        { type: 'info' },
+                      )
+                    }
+                  } catch {
+                    toast('Failed to reach idea generator', { type: 'error' })
+                  } finally {
+                    setIdeasLoading(false)
+                  }
+                }}
+                disabled={ideasLoading}
+                title="Ask AI to scan the workspace and suggest feature ideas"
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                  ideasLoading
+                    ? 'border-amber-500/50 bg-amber-500/10 text-amber-400 cursor-wait'
+                    : 'border-[var(--theme-border)] text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50',
+                )}
+              >
+                <HugeiconsIcon
+                  icon={BulbIcon}
+                  size={13}
+                  strokeWidth={1.8}
+                  className={ideasLoading ? 'animate-pulse' : ''}
+                />
+                {ideasLoading ? 'Scanning…' : 'Add Idea'}
+              </button>
+
+              <button
+                onClick={() => setShowDone((v) => !v)}
+                className={cn(
+                  'text-xs px-2.5 py-1 rounded-lg border transition-colors',
+                  showDone
+                    ? 'border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-hover)]'
+                    : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:border-[var(--theme-accent)]',
+                )}
+              >
+                {showDone ? 'Hide Done' : 'Show Done'}
+              </button>
+
+              {/* Clear Done — only shown when Done column is visible and has tasks */}
+              {showDone && columnMap['done'].length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const doneTasks = columnMap['done']
+                    if (
+                      !window.confirm(
+                        `Delete all ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}? This cannot be undone.`,
+                      )
+                    )
+                      return
+                    void Promise.all(doneTasks.map((t) => deleteTask(t.id)))
+                      .then(() => {
+                        invalidate()
+                        toast(
+                          `Cleared ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}`,
+                        )
+                      })
+                      .catch(() =>
+                        toast('Failed to clear done tasks', { type: 'error' }),
+                      )
+                  }}
+                  className="text-xs px-2.5 py-1 rounded-lg border transition-colors border-red-500/40 text-red-400 hover:bg-red-500/10"
+                >
+                  Clear Done ({columnMap['done'].length})
+                </button>
+              )}
+
+              <button
+                onClick={invalidate}
+                className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
+                title="Refresh"
+              >
+                <HugeiconsIcon
+                  icon={RefreshIcon}
+                  size={16}
+                  className="text-[var(--theme-muted)]"
+                />
+              </button>
+
+              {/* Keyboard shortcuts hint */}
+              <TooltipProvider>
+                <TooltipRoot>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="rounded-lg px-2 py-1 text-xs font-mono transition-colors hover:bg-[var(--theme-hover)] text-[var(--theme-muted)]"
+                        aria-label="Keyboard shortcuts"
+                      >
+                        ?
+                      </button>
+                    }
+                  />
+                  <TooltipContent
+                    side="bottom"
+                    className="space-y-1 text-[11px] leading-relaxed"
+                  >
+                    <div>
+                      <kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">
+                        n
+                      </kbd>{' '}
+                      New task (Triage)
+                    </div>
+                    <div>
+                      <kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">
+                        /
+                      </kbd>{' '}
+                      Focus search
+                    </div>
+                    <div>
+                      <kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">
+                        d
+                      </kbd>{' '}
+                      Toggle Done column
+                    </div>
+                  </TooltipContent>
+                </TooltipRoot>
+              </TooltipProvider>
+
+              <button
+                onClick={() => {
+                  setCreateColumn('backlog')
+                  setShowCreate(true)
+                }}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 bg-[var(--theme-accent)]"
+              >
+                <HugeiconsIcon icon={Add01Icon} size={14} />
+                New Task
+              </button>
+            </div>
+          </div>
+          {/* Natural language task creation */}
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1">
+              <HugeiconsIcon
+                icon={AiMagicIcon}
+                size={14}
+                className={cn(
+                  'absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none',
+                  nlParsing
+                    ? 'text-[var(--theme-accent)]'
+                    : 'text-[var(--theme-muted)]',
+                )}
+              />
+              <input
+                ref={nlInputRef}
+                type="text"
+                value={nlInput}
+                onChange={(e) => setNlInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleNlCreate()
+                }}
+                placeholder="Describe a task in plain language and press Enter…"
+                disabled={nlParsing}
+                className="w-full rounded-lg border text-sm pl-8 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)] focus:border-[var(--theme-accent)] disabled:opacity-50 bg-[var(--theme-input)] border-[var(--theme-border)] text-[var(--theme-text)]"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleNlCreate()}
+              disabled={!nlInput.trim() || nlParsing}
+              className="px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 shrink-0 bg-[var(--theme-accent)] text-white"
+            >
+              {nlParsing ? '✦ Thinking…' : '✦ Create'}
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-[var(--theme-muted)]">
+            {TASKS_BOARD_HELP_TEXT}
+          </p>
+        </header>
+
+        {/* Search + Filter Bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Text search */}
+          <div className="relative flex-1 min-w-[180px]">
+            <HugeiconsIcon
+              icon={Search01Icon}
+              size={13}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--theme-muted)]"
+            />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search tasks… (/)"
+              className="w-full rounded-lg border pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-[var(--theme-accent)] bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]"
+            />
+            {searchQuery && (
               <button
                 type="button"
-                onClick={() => setAssigneeFilter(null)}
-                className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] transition-colors"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--theme-muted)]"
               >
-                ✕ Clear
+                <HugeiconsIcon icon={Cancel01Icon} size={12} />
+              </button>
+            )}
+          </div>
+
+          {/* Quick-filter chips */}
+          {(
+            [
+              ['Overdue', filterOverdue, () => setFilterOverdue((v) => !v)],
+              ['Blocked', filterBlocked, () => setFilterBlocked((v) => !v)],
+              [
+                'Active Agent',
+                filterActiveAgent,
+                () => setFilterActiveAgent((v) => !v),
+              ],
+              ['In Review', filterInReview, () => setFilterInReview((v) => !v)],
+            ] as Array<[string, boolean, () => void]>
+          ).map(([label, active, toggle]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={toggle}
+              className="text-[10px] px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
+              style={{
+                borderColor: active
+                  ? 'var(--theme-accent)'
+                  : 'var(--theme-border)',
+                color: active ? 'var(--theme-accent)' : 'var(--theme-muted)',
+                background: active
+                  ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)'
+                  : 'transparent',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+
+          {/* Priority filter chips */}
+          {(['high', 'medium', 'low'] as Array<TaskPriority>).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() =>
+                setPriorityFilter((prev) => (prev === p ? null : p))
+              }
+              className="text-[10px] px-2.5 py-1 rounded-full border transition-colors capitalize"
+              style={{
+                borderColor:
+                  priorityFilter === p
+                    ? PRIORITY_COLORS[p]
+                    : 'var(--theme-border)',
+                color:
+                  priorityFilter === p
+                    ? PRIORITY_COLORS[p]
+                    : 'var(--theme-muted)',
+                background:
+                  priorityFilter === p
+                    ? `${PRIORITY_COLORS[p]}1a`
+                    : 'transparent',
+              }}
+            >
+              {p}
+            </button>
+          ))}
+
+          {/* Active tag filter chip */}
+          {tagFilter && (
+            <div
+              className="flex items-center gap-1 text-[10px] rounded-full px-2.5 py-1 border"
+              style={{
+                borderColor: 'var(--theme-accent)',
+                color: 'var(--theme-accent)',
+                background:
+                  'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
+              }}
+            >
+              <span>#{tagFilter}</span>
+              <button
+                type="button"
+                onClick={() => setTagFilter(null)}
+                aria-label="Clear tag filter"
+                className="ml-0.5"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={10} />
               </button>
             </div>
           )}
-          {/* Stats */}
-          <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)] flex-wrap">
-            <span>{stats.total} total</span>
-            <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline">{stats.running} running</span>
-            {stats.blocked > 0 && (
-              <>
-                <span className="hidden sm:inline">·</span>
-                <span className="text-red-400">{stats.blocked} blocked</span>
-              </>
-            )}
-            {stats.overdue > 0 && (
-              <>
-                <span>·</span>
-                <span className="text-red-400">{stats.overdue} overdue</span>
-              </>
-            )}
-            <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline">{stats.completion}% done</span>
-            {stats.agentActive > 0 && (
-              <>
-                <span>·</span>
-                <span className="flex items-center gap-1 text-violet-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse inline-block" />
-                  Astra reviewing {stats.agentActive}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          {/* Ask Astra */}
-          <button
-            onClick={async () => {
-              setAskingAstra(true)
-              try {
-                const { sessionId } = await askAstra()
-                // Pre-fill the chat composer with a board briefing so Astra has context
-                const COLS: Array<{ key: string; label: string }> = [
-                  { key: 'backlog', label: 'Backlog' },
-                  { key: 'todo', label: 'To Do' },
-                  { key: 'in_progress', label: 'In Progress' },
-                  { key: 'review', label: 'Review' },
-                  { key: 'blocked', label: 'Blocked' },
-                ]
-                const activeTasks = tasks.filter((t) => t.column !== 'done' && t.column !== 'deleted')
-                const doneCount = tasks.filter((t) => t.column === 'done').length
-                const sections = COLS.map((col) => {
-                  const colTasks = activeTasks.filter((t) => t.column === col.key)
-                  if (!colTasks.length) return null
-                  const lines = colTasks.map((t) => {
-                    const prio = t.priority !== 'medium' ? ` [${t.priority}]` : ''
-                    const who = t.assignee ? ` → ${t.assignee}` : ''
-                    return `• ${t.title.slice(0, 80)}${prio}${who}`
-                  }).join('\n')
-                  return `**${col.label}** (${colTasks.length})\n${lines}`
-                }).filter(Boolean).join('\n\n')
-                const briefing = [
-                  'Here is my current task board. Please review it and help me prioritize what to work on next.\n',
-                  sections || '(no active tasks)',
-                  doneCount > 0 ? `\n*${doneCount} task${doneCount === 1 ? '' : 's'} done*` : '',
-                ].join('\n')
-                window.sessionStorage.setItem(`claude-draft-${sessionId}`, briefing)
-                void navigate({ to: '/chat/$sessionKey', params: { sessionKey: sessionId } })
-              } catch {
-                toast('Failed to start Astra session', { type: 'error' })
-              } finally {
-                setAskingAstra(false)
-              }
-            }}
-            disabled={askingAstra}
-            title="Open a chat with Astra pre-briefed on the current board state"
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-              askingAstra
-                ? 'border-violet-500/50 bg-violet-500/10 text-violet-400 cursor-wait'
-                : 'border-[var(--theme-border)] text-violet-400 hover:bg-violet-500/10 hover:border-violet-500/50',
-            )}
-          >
-            <span className={askingAstra ? 'animate-pulse' : ''}>✦</span>
-            {askingAstra ? 'Opening…' : 'Ask Astra'}
-          </button>
-
-          {/* Deploy Agents */}
-          <button
-            onClick={async () => {
-              // Snapshot current states so we can compute diff when agents finish
-              const snapshot: Record<string, { column: TaskColumn; priority: TaskPriority }> = {}
-              for (const t of tasks) snapshot[t.id] = { column: t.column, priority: t.priority }
-              setDeploySnapshot(snapshot)
-              setAstraReviewing(true)
-              try {
-                await fetch('/api/tasks-deploy-agents', { method: 'POST' })
-                await tasksQuery.refetch()
-              } finally {
-                setAstraReviewing(false)
-              }
-            }}
-            disabled={astraReviewing}
-            title="Deploy agents: Astra reviews each task and delegates to specialist sisters as needed"
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-              astraReviewing
-                ? 'border-violet-500/50 bg-violet-500/10 text-violet-400 cursor-wait'
-                : 'border-[var(--theme-border)] text-violet-400 hover:bg-violet-500/10 hover:border-violet-500/50',
-            )}
-          >
-            <HugeiconsIcon icon={AiBrainIcon} size={13} strokeWidth={1.8} className={astraReviewing ? 'animate-pulse' : ''} />
-            {astraReviewing ? 'Deploying…' : 'Deploy Agents'}
-          </button>
-
-          {/* AI idea generation */}
-          <button
-            onClick={async () => {
-              setIdeasLoading(true)
-              try {
-                const res = await fetch('/api/tasks-generate-ideas', { method: 'POST' })
-                const data = await res.json() as { ok: boolean; injected: number; ideas: Array<string>; error?: string }
-                if (data.injected > 0) {
-                  await tasksQuery.refetch()
-                  toast(`Added ${data.injected} idea${data.injected > 1 ? 's' : ''} to backlog`)
-                } else if (data.error) {
-                  toast(`Idea scan failed: ${data.error}`, { type: 'error' })
-                } else {
-                  toast('AI scanned workspace — no new ideas to add right now', { type: 'info' })
-                }
-              } catch {
-                toast('Failed to reach idea generator', { type: 'error' })
-              } finally {
-                setIdeasLoading(false)
-              }
-            }}
-            disabled={ideasLoading}
-            title="Ask AI to scan the workspace and suggest feature ideas"
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-              ideasLoading
-                ? 'border-amber-500/50 bg-amber-500/10 text-amber-400 cursor-wait'
-                : 'border-[var(--theme-border)] text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50',
-            )}
-          >
-            <HugeiconsIcon icon={BulbIcon} size={13} strokeWidth={1.8} className={ideasLoading ? 'animate-pulse' : ''} />
-            {ideasLoading ? 'Scanning…' : 'Add Idea'}
-          </button>
-
-          <button
-            onClick={() => setShowDone(v => !v)}
-            className={cn(
-              'text-xs px-2.5 py-1 rounded-lg border transition-colors',
-              showDone
-                ? 'border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-hover)]'
-                : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:border-[var(--theme-accent)]',
-            )}
-          >
-            {showDone ? 'Hide Done' : 'Show Done'}
-          </button>
-
-          {/* Clear Done — only shown when Done column is visible and has tasks */}
-          {showDone && columnMap['done'].length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                const doneTasks = columnMap['done']
-                if (!window.confirm(`Delete all ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}? This cannot be undone.`)) return
-                void Promise.all(doneTasks.map(t => deleteTask(t.id))).then(() => {
-                  invalidate()
-                  toast(`Cleared ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}`)
-                }).catch(() => toast('Failed to clear done tasks', { type: 'error' }))
-              }}
-              className="text-xs px-2.5 py-1 rounded-lg border transition-colors border-red-500/40 text-red-400 hover:bg-red-500/10"
-            >
-              Clear Done ({columnMap['done'].length})
-            </button>
-          )}
-
-          <button
-            onClick={invalidate}
-            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
-            title="Refresh"
-          >
-            <HugeiconsIcon icon={RefreshIcon} size={16} className="text-[var(--theme-muted)]" />
-          </button>
-
-          {/* Keyboard shortcuts hint */}
-          <TooltipProvider>
-            <TooltipRoot>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    className="rounded-lg px-2 py-1 text-xs font-mono transition-colors hover:bg-[var(--theme-hover)] text-[var(--theme-muted)]"
-                    aria-label="Keyboard shortcuts"
-                  >
-                    ?
-                  </button>
-                }
-              />
-              <TooltipContent side="bottom" className="space-y-1 text-[11px] leading-relaxed">
-                <div><kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">n</kbd> New task (Triage)</div>
-                <div><kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">/</kbd> Focus search</div>
-                <div><kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">d</kbd> Toggle Done column</div>
-              </TooltipContent>
-            </TooltipRoot>
-          </TooltipProvider>
-
-          <button
-            onClick={() => { setCreateColumn('backlog'); setShowCreate(true) }}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 bg-[var(--theme-accent)]"
-          >
-            <HugeiconsIcon icon={Add01Icon} size={14} />
-            New Task
-          </button>
-        </div>
-      </div>
-        {/* Natural language task creation */}
-        <div className="flex gap-2 mt-3">
-          <div className="relative flex-1">
-            <HugeiconsIcon
-              icon={AiMagicIcon}
-              size={14}
-              className={cn('absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none', nlParsing ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-muted)]')}
-            />
-            <input
-              ref={nlInputRef}
-              type="text"
-              value={nlInput}
-              onChange={e => setNlInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') void handleNlCreate() }}
-              placeholder="Describe a task in plain language and press Enter…"
-              disabled={nlParsing}
-              className="w-full rounded-lg border text-sm pl-8 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)] focus:border-[var(--theme-accent)] disabled:opacity-50 bg-[var(--theme-input)] border-[var(--theme-border)] text-[var(--theme-text)]"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => void handleNlCreate()}
-            disabled={!nlInput.trim() || nlParsing}
-            className="px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 shrink-0 bg-[var(--theme-accent)] text-white"
-          >
-            {nlParsing ? '✦ Thinking…' : '✦ Create'}
-          </button>
-        </div>
-        <p className="mt-3 text-xs text-[var(--theme-muted)]">
-          {TASKS_BOARD_HELP_TEXT}
-        </p>
-      </header>
-
-      {/* Search + Filter Bar */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Text search */}
-        <div className="relative flex-1 min-w-[180px]">
-          <HugeiconsIcon
-            icon={Search01Icon}
-            size={13}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--theme-muted)]"
-          />
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search tasks… (/)"
-            className="w-full rounded-lg border pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-[var(--theme-accent)] bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--theme-muted)]"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={12} />
-            </button>
+          {/* Match counter + clear all */}
+          {tasksByColumn.hasAnyFilter && (
+            <span className="ml-auto text-[10px] flex items-center gap-2 whitespace-nowrap text-[var(--theme-muted)]">
+              Showing {tasksByColumn.matchCount} of {tasksByColumn.totalTasks}
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="hover:underline text-[var(--theme-accent)]"
+              >
+                Clear all
+              </button>
+            </span>
           )}
         </div>
-
-        {/* Quick-filter chips */}
-        {([
-          ['Overdue', filterOverdue, () => setFilterOverdue(v => !v)],
-          ['Blocked', filterBlocked, () => setFilterBlocked(v => !v)],
-          ['Active Agent', filterActiveAgent, () => setFilterActiveAgent(v => !v)],
-          ['In Review', filterInReview, () => setFilterInReview(v => !v)],
-        ] as Array<[string, boolean, () => void]>).map(([label, active, toggle]) => (
-          <button
-            key={label}
-            type="button"
-            onClick={toggle}
-            className="text-[10px] px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
-            style={{
-              borderColor: active ? 'var(--theme-accent)' : 'var(--theme-border)',
-              color: active ? 'var(--theme-accent)' : 'var(--theme-muted)',
-              background: active ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' : 'transparent',
-            }}
-          >
-            {label}
-          </button>
-        ))}
-
-        {/* Priority filter chips */}
-        {(['high', 'medium', 'low'] as Array<TaskPriority>).map(p => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => setPriorityFilter(prev => prev === p ? null : p)}
-            className="text-[10px] px-2.5 py-1 rounded-full border transition-colors capitalize"
-            style={{
-              borderColor: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-border)',
-              color: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-muted)',
-              background: priorityFilter === p ? `${PRIORITY_COLORS[p]}1a` : 'transparent',
-            }}
-          >
-            {p}
-          </button>
-        ))}
-
-        {/* Active tag filter chip */}
-        {tagFilter && (
-          <div
-            className="flex items-center gap-1 text-[10px] rounded-full px-2.5 py-1 border"
-            style={{
-              borderColor: 'var(--theme-accent)',
-              color: 'var(--theme-accent)',
-              background: 'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
-            }}
-          >
-            <span>#{tagFilter}</span>
-            <button
-              type="button"
-              onClick={() => setTagFilter(null)}
-              aria-label="Clear tag filter"
-              className="ml-0.5"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={10} />
-            </button>
-          </div>
-        )}
-
-        {/* Match counter + clear all */}
-        {tasksByColumn.hasAnyFilter && (
-          <span className="ml-auto text-[10px] flex items-center gap-2 whitespace-nowrap text-[var(--theme-muted)]">
-            Showing {tasksByColumn.matchCount} of {tasksByColumn.totalTasks}
-            <button
-              type="button"
-              onClick={clearAllFilters}
-              className="hover:underline text-[var(--theme-accent)]"
-            >
-              Clear all
-            </button>
-          </span>
-        )}
-      </div>
       </div>
 
       {/* Board */}
       <div
-        className="flex-1 min-h-0 mx-auto w-full max-w-[1200px] flex gap-3 overflow-x-auto overflow-y-hidden px-4 pb-[calc(var(--tabbar-h,80px)+1rem)] pt-3 sm:px-6 lg:px-8"
+        className="flex-1 min-h-0 mx-auto w-full max-w-[1200px] flex gap-3 overflow-x-auto overflow-y-hidden px-3 pb-[calc(var(--tabbar-h,80px)+1rem)] pt-3 sm:px-6 lg:px-8"
         style={{ boxShadow: 'inset 0 8px 24px rgba(0,0,0,0.2)' }}
       >
         {visibleColumns.map((col) => {
@@ -728,36 +968,59 @@ export function TasksScreen() {
             <div
               key={col}
               className={cn(
-                'flex flex-col rounded-xl border min-w-[180px] w-full shrink-0 flex-1 min-h-0',
+                'flex min-h-0 w-[82vw] min-w-[min(82vw,280px)] max-w-[280px] shrink-0 flex-col rounded-xl border sm:w-[240px] sm:min-w-[240px] lg:w-full lg:min-w-[180px] lg:max-w-[var(--task-column-max-width)]',
                 'bg-[var(--theme-card)] border-[var(--theme-border)]',
                 'transition-colors shadow-[0_2px_12px_rgba(0,0,0,0.25)]',
-                isDragOver && 'border-[var(--theme-accent)] bg-[var(--theme-hover)]',
+                isDragOver &&
+                  'border-[var(--theme-accent)] bg-[var(--theme-hover)]',
               )}
-              style={{ maxWidth: colMaxWidth }}
-              onDragOver={e => handleDragOver(e, col)}
-              onDrop={e => handleDrop(e, col)}
+              style={
+                {
+                  '--task-column-max-width': colMaxWidth + 'px',
+                } as CSSProperties
+              }
+              onDragOver={(e) => handleDragOver(e, col)}
+              onDrop={(e) => handleDrop(e, col)}
               onDragLeave={() => setDragOverColumn(null)}
             >
               {/* Column header */}
               <div
                 className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--theme-border)] rounded-t-xl"
-                style={{ borderTopWidth: 2, borderTopColor: colColor, borderTopStyle: 'solid' }}
+                style={{
+                  borderTopWidth: 2,
+                  borderTopColor: colColor,
+                  borderTopStyle: 'solid',
+                }}
               >
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: colColor }} />
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ background: colColor }}
+                  />
                   <span className="text-xs font-semibold text-[var(--theme-text)]">
                     {COLUMN_LABELS[col]}
                   </span>
                   <span className="text-xs text-[var(--theme-muted)]">
-                    ({tasksQuery.isFetching && tasksQuery.data === undefined ? '…' : colTasks.length})
+                    (
+                    {tasksQuery.isFetching && tasksQuery.data === undefined
+                      ? '…'
+                      : colTasks.length}
+                    )
                   </span>
                 </div>
                 <button
-                  onClick={() => { setCreateColumn(col); setShowCreate(true) }}
+                  onClick={() => {
+                    setCreateColumn(col)
+                    setShowCreate(true)
+                  }}
                   className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
                   title={`Add to ${COLUMN_LABELS[col]}`}
                 >
-                  <HugeiconsIcon icon={Add01Icon} size={14} className="text-[var(--theme-muted)]" />
+                  <HugeiconsIcon
+                    icon={Add01Icon}
+                    size={14}
+                    className="text-[var(--theme-muted)]"
+                  />
                 </button>
               </div>
 
@@ -796,10 +1059,12 @@ export function TasksScreen() {
                       >
                         <HugeiconsIcon icon={CheckListIcon} size={22} />
                         <p className="text-xs font-medium">No tasks</p>
-                        <p className="text-[10px]">Drop here or click + to add</p>
+                        <p className="text-[10px]">
+                          Drop here or click + to add
+                        </p>
                       </motion.div>
                     ) : (
-                      colTasks.map(task => (
+                      colTasks.map((task) => (
                         <motion.div
                           key={task.id}
                           layout
@@ -812,13 +1077,24 @@ export function TasksScreen() {
                             task={task}
                             assigneeLabels={assigneeLabels}
                             isDragging={draggingId === task.id}
-                            onDragStart={e => handleDragStart(e, task.id)}
+                            onDragStart={(e) => handleDragStart(e, task.id)}
                             onClick={() => setEditingTask(task)}
                             activeTagFilter={tagFilter}
-                            onTagClick={(tag) => setTagFilter(prev => prev === tag ? null : tag)}
-                            onAssigneeClick={(assignee) => setAssigneeFilter(prev => prev === assignee ? null : assignee)}
+                            onTagClick={(tag) =>
+                              setTagFilter((prev) =>
+                                prev === tag ? null : tag,
+                              )
+                            }
+                            onAssigneeClick={(assignee) =>
+                              setAssigneeFilter((prev) =>
+                                prev === assignee ? null : assignee,
+                              )
+                            }
                             onChangePriority={(priority) =>
-                              quickUpdateMutation.mutate({ id: task.id, input: { priority } })
+                              quickUpdateMutation.mutate({
+                                id: task.id,
+                                input: { priority },
+                              })
                             }
                             onMoveToColumn={(column) =>
                               moveMutation.mutate({ id: task.id, column })
@@ -831,10 +1107,17 @@ export function TasksScreen() {
                             onLaunch={async () => {
                               setLaunchingTaskId(task.id)
                               try {
-                                const { sessionId } = await launchSession(task.id)
-                                void navigate({ to: '/chat/$sessionKey', params: { sessionKey: sessionId } })
+                                const { sessionId } = await launchSession(
+                                  task.id,
+                                )
+                                void navigate({
+                                  to: '/chat/$sessionKey',
+                                  params: { sessionKey: sessionId },
+                                })
                               } catch {
-                                toast('Failed to launch session', { type: 'error' })
+                                toast('Failed to launch session', {
+                                  type: 'error',
+                                })
                               } finally {
                                 setLaunchingTaskId(null)
                               }
@@ -847,7 +1130,9 @@ export function TasksScreen() {
                                 await tasksQuery.refetch()
                                 toast(`Agent is working on "${task.title}"…`)
                               } catch {
-                                toast('Failed to start agent execution', { type: 'error' })
+                                toast('Failed to start agent execution', {
+                                  type: 'error',
+                                })
                               } finally {
                                 setExecutingTaskId(null)
                               }
@@ -856,17 +1141,33 @@ export function TasksScreen() {
                             onBreakdown={async () => {
                               setBreakingDownId(task.id)
                               try {
-                                const { count, titles } = await breakdownTask(task.id)
+                                const { count, titles } = await breakdownTask(
+                                  task.id,
+                                )
                                 invalidate()
-                                toast(`Created ${count} subtask${count !== 1 ? 's' : ''}: ${titles.slice(0, 2).join(', ')}${count > 2 ? '…' : ''}`)
+                                toast(
+                                  `Created ${count} subtask${count !== 1 ? 's' : ''}: ${titles.slice(0, 2).join(', ')}${count > 2 ? '…' : ''}`,
+                                )
                               } catch (e) {
-                                toast(e instanceof Error ? e.message : 'Breakdown failed', { type: 'error' })
+                                toast(
+                                  e instanceof Error
+                                    ? e.message
+                                    : 'Breakdown failed',
+                                  { type: 'error' },
+                                )
                               } finally {
                                 setBreakingDownId(null)
                               }
                             }}
                             onResetAgent={() => {
-                              quickUpdateMutation.mutate({ id: task.id, input: { agent_state: null, agent_name: null, agent_action_at: null } })
+                              quickUpdateMutation.mutate({
+                                id: task.id,
+                                input: {
+                                  agent_state: null,
+                                  agent_name: null,
+                                  agent_action_at: null,
+                                },
+                              })
                             }}
                             onRequestRefresh={() => void tasksQuery.refetch()}
                             onComment={handleTaskComment}
@@ -885,7 +1186,10 @@ export function TasksScreen() {
       {/* Create dialog */}
       <TaskDialog
         open={showCreate}
-        onOpenChange={(open) => { setShowCreate(open); if (!open) setCreateDefaults(null) }}
+        onOpenChange={(open) => {
+          setShowCreate(open)
+          if (!open) setCreateDefaults(null)
+        }}
         defaultColumn={createDefaults?.column ?? createColumn}
         defaultTags={createDefaults?.tags}
         defaultTitle={createDefaults?.title}
@@ -894,14 +1198,22 @@ export function TasksScreen() {
         defaultAssignee={createDefaults?.assignee}
         assignees={assignees}
         isSubmitting={createMutation.isPending}
-        onSubmit={async (input) => { await createMutation.mutateAsync(input) }}
+        onSubmit={async (input) => {
+          await createMutation.mutateAsync(input)
+        }}
       />
 
       {/* Edit dialog — use live task data so agent_state reflects latest poll */}
       <TaskDialog
         open={editingTask !== null}
-        onOpenChange={(open) => { if (!open) setEditingTask(null) }}
-        task={editingTask ? (tasks.find(t => t.id === editingTask.id) ?? editingTask) : null}
+        onOpenChange={(open) => {
+          if (!open) setEditingTask(null)
+        }}
+        task={
+          editingTask
+            ? (tasks.find((t) => t.id === editingTask.id) ?? editingTask)
+            : null
+        }
         assignees={assignees}
         isSubmitting={updateMutation.isPending}
         onSubmit={async (input) => {
@@ -909,29 +1221,45 @@ export function TasksScreen() {
           await updateMutation.mutateAsync({ id: editingTask.id, input })
         }}
         onComment={handleTaskComment}
-        onExecute={editingTask ? async () => {
-          setExecutingTaskId(editingTask.id)
-          try {
-            await executeTask(editingTask.id)
-            await tasksQuery.refetch()
-            toast(`Agent is working on "${editingTask.title}"…`)
-          } finally {
-            setExecutingTaskId(null)
-          }
-        } : undefined}
+        onExecute={
+          editingTask
+            ? async () => {
+                setExecutingTaskId(editingTask.id)
+                try {
+                  await executeTask(editingTask.id)
+                  await tasksQuery.refetch()
+                  toast(`Agent is working on "${editingTask.title}"…`)
+                } finally {
+                  setExecutingTaskId(null)
+                }
+              }
+            : undefined
+        }
         isExecuting={editingTask ? executingTaskId === editingTask.id : false}
-        onOpenSession={(sid) => { setEditingTask(null); void navigate({ to: '/chat/$sessionKey', params: { sessionKey: sid } }) }}
+        onOpenSession={(sid) => {
+          setEditingTask(null)
+          void navigate({
+            to: '/chat/$sessionKey',
+            params: { sessionKey: sid },
+          })
+        }}
         isBreakingDown={editingTask ? breakingDownId === editingTask.id : false}
-        onBreakdown={editingTask ? async () => {
-          setBreakingDownId(editingTask.id)
-          try {
-            const { count, titles } = await breakdownTask(editingTask.id)
-            invalidate()
-            toast(`Created ${count} subtask${count !== 1 ? 's' : ''}: ${titles.slice(0, 2).join(', ')}${count > 2 ? '…' : ''}`)
-          } finally {
-            setBreakingDownId(null)
-          }
-        } : undefined}
+        onBreakdown={
+          editingTask
+            ? async () => {
+                setBreakingDownId(editingTask.id)
+                try {
+                  const { count, titles } = await breakdownTask(editingTask.id)
+                  invalidate()
+                  toast(
+                    `Created ${count} subtask${count !== 1 ? 's' : ''}: ${titles.slice(0, 2).join(', ')}${count > 2 ? '…' : ''}`,
+                  )
+                } finally {
+                  setBreakingDownId(null)
+                }
+              }
+            : undefined
+        }
       />
     </div>
   )

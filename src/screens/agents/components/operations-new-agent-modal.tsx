@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDown01Icon, Cancel01Icon, PlusSignIcon } from '@hugeicons/core-free-icons'
+import {
+  ArrowDown01Icon,
+  Cancel01Icon,
+  PlusSignIcon,
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { AGENT_PRESETS } from '../agent-presets'
-import type {GatewayModelCatalogEntry} from '@/lib/gateway-api';
+import type { GatewayModelCatalogEntry } from '@/lib/gateway-api'
 import { Button } from '@/components/ui/button'
-import {  fetchModels } from '@/lib/gateway-api'
+import { fetchModels } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
 
 type PresetOption = {
@@ -41,11 +45,15 @@ type AvailableModel = {
   name: string
 }
 
-function normalizeModel(model: GatewayModelCatalogEntry): AvailableModel | null {
+function normalizeModel(
+  model: GatewayModelCatalogEntry,
+): AvailableModel | null {
   if (typeof model === 'string') {
     return {
       id: model,
-      provider: model.includes('/') ? (model.split('/')[0] ?? 'model') : 'model',
+      provider: model.includes('/')
+        ? (model.split('/')[0] ?? 'model')
+        : 'model',
       name: model.split('/').pop() ?? model,
     }
   }
@@ -56,7 +64,12 @@ function normalizeModel(model: GatewayModelCatalogEntry): AvailableModel | null 
   return {
     id,
     provider: model.provider ?? id.split('/').at(0) ?? 'model',
-    name: model.label ?? model.displayName ?? model.name ?? id.split('/').at(-1) ?? id,
+    name:
+      model.label ??
+      model.displayName ??
+      model.name ??
+      id.split('/').at(-1) ??
+      id,
   }
 }
 
@@ -109,7 +122,10 @@ function ModelSelector({
           icon={ArrowDown01Icon}
           size={16}
           strokeWidth={1.8}
-          className={cn('text-[var(--theme-muted)] transition-transform', open && 'rotate-180')}
+          className={cn(
+            'text-[var(--theme-muted)] transition-transform',
+            open && 'rotate-180',
+          )}
         />
       </button>
 
@@ -224,7 +240,7 @@ export function OperationsNewAgentModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] p-6 shadow-[0_30px_100px_var(--theme-shadow)]"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] p-4 shadow-[0_30px_100px_var(--theme-shadow)] sm:p-6"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
@@ -273,14 +289,16 @@ export function OperationsNewAgentModal({
             ))}
           </div>
           <p className="text-xs text-[var(--theme-muted)]">
-            Templates fill in emoji, description, and system prompt. You can edit
-            everything before creating.
+            Templates fill in emoji, description, and system prompt. You can
+            edit everything before creating.
           </p>
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_0.6fr]">
           <label className="space-y-2">
-            <span className="text-sm font-medium text-[var(--theme-text)]">Name</span>
+            <span className="text-sm font-medium text-[var(--theme-text)]">
+              Name
+            </span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -290,7 +308,9 @@ export function OperationsNewAgentModal({
           </label>
 
           <label className="space-y-2">
-            <span className="text-sm font-medium text-[var(--theme-text)]">Emoji</span>
+            <span className="text-sm font-medium text-[var(--theme-text)]">
+              Emoji
+            </span>
             <input
               value={emoji}
               onChange={(event) => setEmoji(event.target.value)}
@@ -301,18 +321,26 @@ export function OperationsNewAgentModal({
         </div>
 
         <label className="mt-4 block space-y-2">
-          <span className="text-sm font-medium text-[var(--theme-text)]">Model</span>
+          <span className="text-sm font-medium text-[var(--theme-text)]">
+            Model
+          </span>
           <ModelSelector
             value={model}
             onChange={setModel}
             models={models}
             isLoading={modelsQuery.isPending}
-            error={modelsQuery.error instanceof Error ? modelsQuery.error.message : null}
+            error={
+              modelsQuery.error instanceof Error
+                ? modelsQuery.error.message
+                : null
+            }
           />
         </label>
 
         <label className="mt-4 block space-y-2">
-          <span className="text-sm font-medium text-[var(--theme-text)]">Description</span>
+          <span className="text-sm font-medium text-[var(--theme-text)]">
+            Description
+          </span>
           <input
             value={description}
             onChange={(event) => setDescription(event.target.value)}

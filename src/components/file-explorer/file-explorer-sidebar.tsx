@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowRight01Icon,
+  Cancel01Icon,
   Delete01Icon,
   Download01Icon,
   File01Icon,
@@ -398,6 +399,16 @@ export function FileExplorerSidebar({
           {ROOT_LABEL}
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={onToggle}
+            title="Close files"
+            aria-label="Close files"
+            className="md:hidden"
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={18} />
+          </Button>
           <Button
             size="icon-sm"
             variant="ghost"

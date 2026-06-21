@@ -140,9 +140,8 @@ function FilesRoute() {
   }, [])
 
   useEffect(() => {
-    if (!isMobile) return
-    setFileExplorerCollapsed(true)
-  }, [isMobile])
+    setFileExplorerCollapsed(isMobile ? Boolean(loaded?.path) : false)
+  }, [isMobile, loaded?.path])
 
   const handleInsertReference = useCallback(() => {
     // Reference insertion is only useful when there's a composer; on this
@@ -150,6 +149,7 @@ function FilesRoute() {
   }, [])
 
   const handleOpenFile = useCallback(async (entry: FileEntry) => {
+    if (isMobile) setFileExplorerCollapsed(true)
     const ext = getExt(entry.name)
     const isImage = IMAGE_EXTS.has(ext)
     setLoaded({
@@ -193,7 +193,7 @@ function FilesRoute() {
           : prev,
       )
     }
-  }, [])
+  }, [isMobile])
 
   const handleDownload = useCallback(() => {
     if (!loaded) return
@@ -258,8 +258,17 @@ function FilesRoute() {
           onInsertReference={handleInsertReference}
           onOpenFile={handleOpenFile}
           activePath={loaded?.path ?? null}
+          className={
+            isMobile && !fileExplorerCollapsed ? '!w-full' : undefined
+          }
         />
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <main
+          className={
+            isMobile && !fileExplorerCollapsed
+              ? 'hidden'
+              : 'flex min-w-0 flex-1 flex-col overflow-hidden'
+          }
+        >
           <header className="flex items-center gap-3 border-b border-[var(--theme-border)] px-3 py-2 md:px-4 md:py-3">
             <button
               type="button"

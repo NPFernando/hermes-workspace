@@ -1,18 +1,24 @@
 {
-  "tests_passed": false,
+  "tests_passed": true,
   "lint_errors": 202,
   "passed": true,
   "verification": {
     "node": "v22.22.3 from /home/ubuntu/.hermes/node/bin",
+    "dispatch_command": "hermes dispatch-mission is unavailable in the installed Hermes CLI; mission executed manually from mission.yaml fallback",
+    "disk": "/ was 43% used before build",
+    "diff_check": "git diff --check exited 0",
     "typecheck": "npx tsc --noEmit exited 0",
-    "scratch_cleanup": "stale untracked backup/sentinel/fix-script artifacts removed; git status no longer lists them",
-    "ignore_rules": "git check-ignore reports .gitignore rules for MOBILE_FIX_SUMMARY.md, REVIEW_APPROVED, fix_async.py, *.bak, and *.backup*",
-    "focused_lint": "npx eslint -f json .gitignore IDEAS.json PLAN.md exited 0 (no code files changed)",
-    "full_pnpm_test": "pnpm test exited non-zero: existing unrelated failures in slash-command-menu.test.tsx and -root-runtime-guards.test.ts",
-    "full_pnpm_lint": "pnpm lint exited non-zero with existing repository-wide lint baseline errors; no TypeScript source files changed in this cycle"
+    "focused_tests": "npx vitest run src/routes/-files-responsive.test.ts src/components/workspace-shell.test.ts src/components/slash-command-menu.test.tsx: 3 files / 11 tests passed",
+    "full_tests": "pnpm test exited 0: 111 files / 718 tests passed",
+    "build": "pnpm build exited 0 for client and SSR bundles",
+    "service_restart": "sudo systemctl restart hermes-workspace.service succeeded; systemctl is-active returned active",
+    "health": "https://agent.fernandofamily.com/api/health returned HTTP 200, application/json, {\"status\":\"ok\"}",
+    "full_lint": "pnpm lint exited 1 with existing repository-wide baseline: 202 errors / 37 warnings",
+    "focused_lint": "changed-file eslint still reports baseline strict-type issues in previously modified chat/crew files; the new src/routes/__root.tsx array-type error was fixed before commit"
   },
   "notes": [
-    "Mission fallback used because hermes dispatch-mission is not available in Hermes v0.16.0.",
-    "The change is config/artifact hygiene only; the quality gate is relevant typecheck, ignore-rule verification, and clean untracked status rather than the currently failing repo-wide lint baseline."
+    "The cycle preserved and verified substantial responsive UI changes already present on feature/chat-ui-improvements rather than discarding them as stale cron state.",
+    "The branch is diverged from main/origin/main, so merge-to-main was intentionally blocked per Hermes Workspace Branch Divergence safety guidance.",
+    "Deployment proceeded by building and restarting from the verified current feature-branch worktree, followed by JSON health validation."
   ]
 }

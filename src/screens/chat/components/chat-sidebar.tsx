@@ -226,7 +226,8 @@ function NavItem({
               style={
                 item.badge === 'NEW'
                   ? {
-                      background: 'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
+                      background:
+                        'linear-gradient(180deg, #fde68a 0%, #fbbf24 50%, #d4a017 100%)',
                       color: '#0b1320',
                       boxShadow: '0 0 8px rgba(250,204,21,0.4)',
                       letterSpacing: '0.08em',
@@ -548,7 +549,9 @@ function ChatSidebarComponent({
   useEffect(() => {
     function handleOpenSettingsEvent(event: Event) {
       const detail = (event as CustomEvent<ChatOpenSettingsDetail>).detail
-      handleOpenSettings(detail.section === 'appearance' ? 'appearance' : 'claude')
+      handleOpenSettings(
+        detail.section === 'appearance' ? 'appearance' : 'claude',
+      )
     }
 
     window.addEventListener(CHAT_OPEN_SETTINGS_EVENT, handleOpenSettingsEvent)
@@ -867,7 +870,6 @@ function ChatSidebarComponent({
           },
         ]
       : []),
-
   ]
 
   const knowledgeItems: Array<NavItemDef> = [
@@ -917,7 +919,7 @@ function ChatSidebarComponent({
             : 48
           : isMobile
             ? '85vw'
-            : 300,
+            : 'var(--desktop-sidebar-width)',
       }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className={cn(
@@ -963,9 +965,7 @@ function ChatSidebarComponent({
                   alt="Hermes Agent"
                   className="size-6 rounded-lg"
                 />
-                <span
-                  className="text-sm font-semibold tracking-tight text-[var(--theme-text)]"
-                >
+                <span className="text-sm font-semibold tracking-tight text-[var(--theme-text)]">
                   Hermes Workspace
                 </span>
               </Link>
@@ -1052,7 +1052,6 @@ function ChatSidebarComponent({
           </Link>
         </div>
       )}
-
 
       {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">

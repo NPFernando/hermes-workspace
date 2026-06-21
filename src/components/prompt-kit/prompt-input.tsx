@@ -160,14 +160,14 @@ function PromptInput({
           onClick={handleClick}
           onPointerDown={handlePointerDown}
           className={cn(
-            'cursor-text rounded-3xl py-3 gap-3 flex flex-col touch-manipulation mb-2',
+            'cursor-text rounded-3xl py-3 gap-3 flex flex-col touch-manipulation mb-2 transition-[box-shadow] duration-200',
             disabled && 'cursor-not-allowed opacity-60',
             className,
           )}
           style={{
             background: 'var(--composer-bg)',
             border: '1px solid var(--composer-border)',
-            boxShadow: 'var(--theme-shadow-1)',
+            boxShadow: 'var(--composer-focus-ring, var(--theme-shadow-1))',
           }}
           {...props}
         >
@@ -320,7 +320,7 @@ function PromptInputTextarea({
       onPaste={handlePaste}
       onPointerDown={handlePointerDown}
       className={cn(
-        'text-[var(--theme-text)] min-h-[28px] w-full resize-none border-none bg-transparent shadow-none outline-none focus-visible:ring-0 pl-4 pr-1 py-2 md:py-0 text-base placeholder:text-[var(--theme-muted)]',
+        'text-[var(--theme-text)] min-h-[28px] w-full resize-none border-none bg-transparent shadow-none outline-none focus-visible:outline-none focus-visible:ring-0 pl-4 pr-1 py-2 md:py-0 text-base placeholder:text-[var(--theme-muted)]',
         className,
       )}
       rows={1}

@@ -1,26 +1,26 @@
 [
   {
-    "title": "Ignore and purge local auto-improvement scratch artifacts",
-    "description": "Add focused ignore rules for one-off auto-improvement notes, approval sentinels, async-fix scripts, and editor backup suffixes; purge stale untracked copies so git status stays actionable for future cron cycles.",
-    "category": "config",
-    "estimated_effort": "low"
+    "title": "Polish responsive workspace surfaces",
+    "description": "Harden mobile and narrow-width layout behavior across Files, Tasks, Swarm, Agents, Chat, Crew, Dashboard, and shell chrome so dense workspace screens remain usable on small viewports.",
+    "category": "ui",
+    "estimated_effort": "medium"
   },
   {
-    "title": "Add Node 22 verification guard",
-    "description": "Add a repo-local check or script that refuses frontend verification under Node 18 and points cron jobs to /home/ubuntu/.hermes/node/bin so Vitest and ESLint use modern Web APIs.",
-    "category": "config",
-    "estimated_effort": "low"
-  },
-  {
-    "title": "Quiet focused lint warning reports",
-    "description": "Tune focused auto-improvement lint commands or config so ignored test files and baseline no-shadow warnings do not obscure new errors in TEST_REPORT.json.",
-    "category": "config",
-    "estimated_effort": "low"
-  },
-  {
-    "title": "Surface chat mobile smoke checklist in UI docs",
-    "description": "Capture the Android/WebView chat smoke scenarios as a short checked-in QA note so future mobile UI changes verify header spacing, composer insets, agent picker, and null text regressions consistently.",
+    "title": "Split focused UI regression tests by surface",
+    "description": "Add lightweight source/behavior regression tests for responsive layout contracts so future UI changes catch mobile shell, files, and navigation regressions quickly.",
     "category": "ui",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Separate Vitest from native-node and Playwright suites",
+    "description": "Keep Vitest discovery focused on frontend/unit tests by excluding services and e2e directories that are owned by other runners.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Reduce lint baseline before enforcing repo-wide lint in cron",
+    "description": "Resolve the existing strict-type lint backlog or add changed-line lint accounting so auto-improvement cycles can fail only on newly introduced lint regressions.",
+    "category": "config",
+    "estimated_effort": "medium"
   }
 ]

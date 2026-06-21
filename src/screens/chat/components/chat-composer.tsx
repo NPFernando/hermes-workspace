@@ -2160,7 +2160,10 @@ function ChatComposerComponent({
         )}
       style={{
         ...composerWrapperStyle,
-        ...(isFocused && { '--composer-border': 'var(--theme-accent)' }),
+        ...(isFocused && {
+          '--composer-focus-ring':
+            '0 0 0 2px color-mix(in srgb, var(--theme-accent) 35%, transparent), 0 0 18px color-mix(in srgb, var(--theme-accent) 18%, transparent)',
+        }),
       } as React.CSSProperties}
       ref={setWrapperRefs}
     >

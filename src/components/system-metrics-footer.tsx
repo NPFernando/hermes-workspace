@@ -93,7 +93,9 @@ function MetricItem({
 }
 
 function Separator() {
-  return <span className="h-3 w-px shrink-0 bg-[var(--theme-border)]" aria-hidden />
+  return (
+    <span className="h-3 w-px shrink-0 bg-[var(--theme-border)]" aria-hidden />
+  )
 }
 
 function StatusDot({ tone }: { tone: 'ok' | 'warn' | 'critical' | 'muted' }) {
@@ -111,7 +113,11 @@ function StatusDot({ tone }: { tone: 'ok' | 'warn' | 'critical' | 'muted' }) {
   )
 }
 
-export function SystemMetricsFooter({ leftOffsetPx = 0 }: { leftOffsetPx?: number }) {
+export function SystemMetricsFooter({
+  leftOffset = 0,
+}: {
+  leftOffset?: number | string
+}) {
   const { data, isError } = useQuery({
     queryKey: ['system-metrics-footer'],
     queryFn: fetchSystemMetrics,
@@ -119,16 +125,25 @@ export function SystemMetricsFooter({ leftOffsetPx = 0 }: { leftOffsetPx?: numbe
     staleTime: 14_000,
   })
 
-  const hermesHealthy = data?.hermes.status === 'connected' || data?.hermes.status === 'enhanced'
-  const hermesTone = hermesHealthy ? 'accent' : data?.hermes.status === 'disconnected' ? 'critical' : 'warn'
-  const hermesDotTone = hermesHealthy ? 'ok' : data?.hermes.status === 'disconnected' ? 'critical' : 'warn'
+  const hermesHealthy =
+    data?.hermes.status === 'connected' || data?.hermes.status === 'enhanced'
+  const hermesTone = hermesHealthy
+    ? 'accent'
+    : data?.hermes.status === 'disconnected'
+      ? 'critical'
+      : 'warn'
+  const hermesDotTone = hermesHealthy
+    ? 'ok'
+    : data?.hermes.status === 'disconnected'
+      ? 'critical'
+      : 'warn'
 
   return (
     <footer
       className="fixed bottom-0 right-0 z-40 hidden h-7 items-center border-t border-[var(--theme-border)] bg-[var(--theme-card)] px-4 text-[11px] leading-none text-[var(--theme-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] md:flex"
       data-testid="system-metrics-footer"
       aria-label="System metrics footer"
-      style={{ left: leftOffsetPx }}
+      style={{ left: leftOffset }}
     >
       <div className="flex max-w-full items-center justify-center gap-3 overflow-hidden opacity-85">
         {data ? (
@@ -153,7 +168,11 @@ export function SystemMetricsFooter({ leftOffsetPx = 0 }: { leftOffsetPx?: numbe
             <Separator />
             <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap">
               <StatusDot tone={hermesDotTone} />
-              <MetricItem label="Hermes" value={data.hermes.status} tone={hermesTone} />
+              <MetricItem
+                label="Hermes"
+                value={data.hermes.status}
+                tone={hermesTone}
+              />
             </span>
             <Separator />
             <MetricItem

@@ -293,7 +293,7 @@ export function CrewScreen() {
   }, [refetch])
 
   return (
-    <div data-route-page className="flex h-full flex-col gap-6 overflow-auto p-4 md:p-6">
+    <div data-route-page className="flex h-full flex-col gap-6 overflow-auto p-4 md:p-6 mx-auto w-full max-w-[1400px] xl:max-w-[1600px]">
       {/* ── Header ── */}
       <div className="space-y-4">
         <div className="h-px" style={{ background: 'linear-gradient(to right, #B87333, transparent)' }} />

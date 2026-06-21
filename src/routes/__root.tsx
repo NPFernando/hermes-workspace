@@ -259,10 +259,15 @@ type CachesLike = {
 
 export async function registerAppServiceWorker({
   serviceWorker,
+  cachesApi,
 }: {
   serviceWorker?: ServiceWorkerLike
   cachesApi?: CachesLike
 }): Promise<void> {
+  if (cachesApi) {
+    const keys = await cachesApi.keys().catch((): Array<string> => [])
+    await Promise.all(keys.map((k) => cachesApi.delete(k)))
+  }
   await serviceWorker
     ?.register('/sw.js', { scope: '/' })
     .catch((error: unknown) => {
