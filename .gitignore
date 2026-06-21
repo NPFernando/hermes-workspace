@@ -152,3 +152,10 @@ skills-bundle/
 .hermes/
 .env.bak-*
 pr-triage-20260505-*/
+
+# Auto-improvement scratch artifacts
+MOBILE_FIX_SUMMARY.md
+REVIEW_APPROVED
+fix_async*.py
+*.bak
+*.backup*

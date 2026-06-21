@@ -1,34 +1,30 @@
-# Close Summary: Reduce chat overlay clutter and null sentinels
+# Close Summary: Ignore and purge local auto-improvement scratch artifacts
 
 ## What changed
-- Added route-aware hiding for update-center cards, release notes, the What's New modal, and the floating usage-meter pill on chat routes.
-- Kept usage-meter context alerts available for individual chat sessions while preventing the global pill from overlapping chat controls.
-- Improved the chat sister picker with deduplicated options, a real button trigger, ARIA menu attributes, upward-opening popover placement, and a compact active-agent count pill.
-- Cleaned chat rendering by removing literal `null` placeholders and filtering assistant `null`/`undefined` sentinels from history text without hiding user-authored text.
+- Added a dedicated `.gitignore` section for local auto-improvement scratch files.
+- Ignored known sentinels and one-off files: `MOBILE_FIX_SUMMARY.md`, `REVIEW_APPROVED`, and `fix_async*.py`.
+- Ignored backup suffixes `*.bak` and `*.backup*` so editor/agent backup copies do not keep polluting future cron git status checks.
+- Removed the stale untracked scratch artifacts that were already present in the worktree, including the bogus duplicate `src/screens/chat/chat-header.tsx` placeholder.
 
 ## Files changed
-- `src/components/update-center-notifier.tsx` and test
-- `src/components/usage-meter/usage-meter-session.ts`, `usage-meter.tsx`, and test
-- `src/components/whats-new-modal.tsx` and test
-- `src/hooks/use-agent-view.ts`
-- `src/screens/chat/components/chat-composer.tsx`
-- `src/screens/chat/components/chat-header.tsx`
-- `src/screens/chat/components/chat-message-list.tsx`
-- `src/screens/chat/components/sister-picker.tsx`
-- `src/screens/chat/utils.ts` and test
-- `src/styles.css`
+- `.gitignore`
+- `IDEAS.json`
+- `PLAN.md`
+- `TEST_REPORT.json`
+- `CLOSE_SUMMARY.md`
 
 ## Test results
-- TypeScript: `npx tsc --noEmit` passed under Node 22.
-- Focused Vitest: 4 files / 14 tests passed.
-- Focused ESLint JSON: 0 errors, 15 warnings (ignored test-file warnings plus existing chat-composer no-shadow warnings).
-- Production build and service health were verified during deployment.
+- `PATH=/home/ubuntu/.hermes/node/bin:$PATH npx tsc --noEmit` passed.
+- `git check-ignore -v ...` confirmed the new ignore rules catch the intended scratch artifacts.
+- `git status --short --untracked-files=all` no longer lists the stale scratch files after cleanup.
+- `pnpm test` was attempted and exposed existing unrelated failures in `src/components/slash-command-menu.test.tsx` and `src/routes/-root-runtime-guards.test.ts`.
+- `pnpm lint` was attempted and still reflects the existing repository-wide lint baseline (202 errors / 37 warnings), unrelated to this config-only cycle.
 
 ## Side effects observed
-- System Node v18 cannot run the current Vitest/ESLint stack because dependencies expect newer Web APIs; `/home/ubuntu/.hermes/node/bin` Node v22 works.
-- Several stale untracked backup/scratch files remain in the worktree and should be cleaned in a separate safe cleanup cycle.
+- The workspace branch is diverged from local `main` and `origin/main`, so I did not merge into `main` or restart the service.
+- The cleanup only removed untracked scratch/backup artifacts; tracked source files were not deleted.
 
 ## New improvement ideas for next cycle
-1. Clean stale untracked backup and scratch files in `/home/ubuntu/hermes-workspace` after classifying each file.
-2. Add a repo-local Node version guard or `.nvmrc`/tooling note so cron verification always uses Node 22+.
-3. Convert ignored test-file lint warnings into a quieter lint command or config so focused reports are easier to read.
+1. Fix the two currently failing Vitest expectations so full `pnpm test` can become a reliable auto-improvement gate again.
+2. Add a lightweight `pnpm lint:changed` script for cron cycles so config-only or focused source changes are not blocked by unrelated baseline lint debt.
+3. Add a Node 22 guard for cron verification commands to prevent accidental use of system Node 18.

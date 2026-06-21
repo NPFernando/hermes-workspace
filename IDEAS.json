@@ -1,26 +1,26 @@
 [
   {
-    "title": "Keep chat route overlays out of the composer lane",
-    "description": "Hide global update cards, whats-new modals, and the floating usage-meter pill on /chat routes so narrow mobile and desktop chat layouts keep the header and composer usable.",
-    "category": "ui",
-    "estimated_effort": "low"
-  },
-  {
-    "title": "Expose active agent count from the chat sister picker",
-    "description": "Surface the live active-agent count as a compact pill next to the chat agent selector, linking directly into the agent view without expanding the bottom controls.",
-    "category": "ui",
-    "estimated_effort": "low"
-  },
-  {
-    "title": "Filter serialized empty assistant payloads in chat history",
-    "description": "Treat literal assistant null/undefined sentinels from history adapters as absent text while preserving user messages that intentionally contain those words.",
-    "category": "ui",
-    "estimated_effort": "low"
-  },
-  {
-    "title": "Clean stale untracked workspace scratch files",
-    "description": "Review backup files and one-off fix scripts left in the workspace root and chat directories, then either remove them or codify them as tracked utilities.",
+    "title": "Ignore and purge local auto-improvement scratch artifacts",
+    "description": "Add focused ignore rules for one-off auto-improvement notes, approval sentinels, async-fix scripts, and editor backup suffixes; purge stale untracked copies so git status stays actionable for future cron cycles.",
     "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add Node 22 verification guard",
+    "description": "Add a repo-local check or script that refuses frontend verification under Node 18 and points cron jobs to /home/ubuntu/.hermes/node/bin so Vitest and ESLint use modern Web APIs.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Quiet focused lint warning reports",
+    "description": "Tune focused auto-improvement lint commands or config so ignored test files and baseline no-shadow warnings do not obscure new errors in TEST_REPORT.json.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Surface chat mobile smoke checklist in UI docs",
+    "description": "Capture the Android/WebView chat smoke scenarios as a short checked-in QA note so future mobile UI changes verify header spacing, composer insets, agent picker, and null text regressions consistently.",
+    "category": "ui",
     "estimated_effort": "low"
   }
 ]
