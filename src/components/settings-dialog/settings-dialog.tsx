@@ -919,7 +919,7 @@ function HermesContent() {
                 aria-pressed={activeModel === model}
                 onClick={() => setActiveModel(model)}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-all',
+                  'rounded-lg px-3 py-2 sm:py-1.5 text-xs font-medium transition-all touch-manipulation',
                   activeModel === model
                     ? 'ring-2 ring-accent-500'
                     : 'hover:brightness-110',
@@ -1166,7 +1166,7 @@ function HermesContent() {
                           setEditingKey(null)
                           setKeyInput('')
                         }}
-                        className="rounded-lg px-2 py-1 text-[11px] font-medium bg-accent-500 text-white"
+                        className="rounded-lg px-2 py-1.5 sm:py-1 text-[11px] font-medium bg-accent-500 text-white touch-manipulation"
                       >
                         Save
                       </button>
@@ -1176,7 +1176,7 @@ function HermesContent() {
                           setEditingKey(null)
                           setKeyInput('')
                         }}
-                        className="rounded-lg px-2 py-1 text-[11px] font-medium text-[var(--theme-muted)]"
+                        className="rounded-lg px-2 py-1.5 sm:py-1 text-[11px] font-medium text-[var(--theme-muted)] touch-manipulation"
                       >
                         Cancel
                       </button>
@@ -1188,7 +1188,7 @@ function HermesContent() {
                         setEditingKey(key)
                         setKeyInput('')
                       }}
-                      className="rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors hover:bg-accent-500/10"
+                      className="rounded-lg px-2.5 py-1.5 sm:py-1 text-[11px] font-medium transition-colors hover:bg-accent-500/10 touch-manipulation"
                       style={{
                         color: 'var(--theme-accent, var(--theme-text))',
                       }}
@@ -1466,7 +1466,7 @@ function AppearanceContent() {
               type="button"
               onClick={() => handleThemeChange(option.value)}
               className={cn(
-                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
+                'flex items-center gap-1.5 rounded-md px-3 py-2 sm:py-1.5 text-sm transition-colors touch-manipulation',
                 settings.theme === option.value
                   ? 'bg-accent-500 text-white'
                   : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',

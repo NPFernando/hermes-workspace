@@ -291,7 +291,7 @@ export function OperationsScreen() {
                 type="button"
                 onClick={() => setView('overview')}
                 className={cn(
-                  'rounded-lg px-4 py-2 text-sm font-medium transition-all',
+                  'rounded-lg px-4 py-2.5 sm:py-2 text-sm font-medium transition-all touch-manipulation',
                   view === 'overview'
                     ? 'bg-[var(--theme-accent)] text-[var(--theme-text)]'
                     : 'text-[var(--theme-muted)] hover:bg-[var(--theme-card2)]',
@@ -303,7 +303,7 @@ export function OperationsScreen() {
                 type="button"
                 onClick={() => setView('outputs')}
                 className={cn(
-                  'rounded-lg px-4 py-2 text-sm font-medium transition-all',
+                  'rounded-lg px-4 py-2.5 sm:py-2 text-sm font-medium transition-all touch-manipulation',
                   view === 'outputs'
                     ? 'bg-[var(--theme-accent)] text-[var(--theme-text)]'
                     : 'text-[var(--theme-muted)] hover:bg-[var(--theme-card2)]',

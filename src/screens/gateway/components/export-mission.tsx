@@ -127,7 +127,7 @@ export function ExportMissionButton({ report }: { report: ExportableMissionRepor
         onClick={() => void handleCopy()}
         className={cn(
           'flex items-center gap-1.5 rounded-lg border border-[var(--theme-border)]',
-          'px-2.5 py-1.5 text-xs font-medium transition-colors',
+          'px-2.5 py-2 sm:py-1.5 text-xs font-medium transition-colors touch-manipulation',
           copied
             ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
             : 'text-[var(--theme-muted)] hover:bg-[var(--theme-card)] dark:hover:bg-neutral-800',

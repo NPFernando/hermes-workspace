@@ -649,7 +649,7 @@ export function Swarm2ReportsView({
           <button
             type="button"
             onClick={() => setExpandedId(null)}
-            className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-xs font-medium text-[var(--theme-muted)]"
+            className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 sm:py-1.5 text-xs font-medium text-[var(--theme-muted)] touch-manipulation"
           >
             Cancel
           </button>
@@ -657,7 +657,7 @@ export function Swarm2ReportsView({
             type="button"
             disabled={disabled}
             onClick={() => void sendGuidance(row)}
-            className="rounded-lg bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-primary-950 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg bg-[var(--theme-accent)] px-3 py-2 sm:py-1.5 text-xs font-semibold text-primary-950 disabled:cursor-not-allowed disabled:opacity-60 touch-manipulation"
           >
             {disabled ? 'Sending…' : 'Send guidance'}
           </button>
@@ -669,7 +669,7 @@ export function Swarm2ReportsView({
   function renderRowActions(row: Swarm2InboxItem, compact = false) {
     const prUrl = extractPullRequestUrl(row)
     const buttonClass = compact
-      ? 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[10px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]'
+      ? 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1.5 sm:py-1 text-[10px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)] touch-manipulation'
       : 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-2.5 sm:py-1.5 text-xs font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)] touch-manipulation'
     return (
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -758,7 +758,7 @@ export function Swarm2ReportsView({
             type="button"
             onClick={() => setStateFilter(filter.id)}
             className={cn(
-              'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+              'rounded-full border px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors touch-manipulation',
               stateFilter === filter.id
                 ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
                 : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
@@ -767,11 +767,11 @@ export function Swarm2ReportsView({
             {filter.label}
           </button>
         ))}
-        <select value={workerFilter} onChange={(event) => setWorkerFilter(event.target.value)} className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-xs text-[var(--theme-muted)] outline-none">
+        <select value={workerFilter} onChange={(event) => setWorkerFilter(event.target.value)} className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 sm:py-1.5 text-xs touch-manipulation text-[var(--theme-muted)] outline-none">
           <option value="all">All workers</option>
           {workers.map((worker) => <option key={worker} value={worker}>{worker}</option>)}
         </select>
-        <select value={missionFilter} onChange={(event) => setMissionFilter(event.target.value)} className="max-w-xs rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-1.5 text-xs text-[var(--theme-muted)] outline-none">
+        <select value={missionFilter} onChange={(event) => setMissionFilter(event.target.value)} className="max-w-xs rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 sm:py-1.5 text-xs touch-manipulation text-[var(--theme-muted)] outline-none">
           <option value="all">All missions</option>
           {missionOptions.map((mission) => <option key={mission.id} value={mission.id}>{mission.label}</option>)}
         </select>

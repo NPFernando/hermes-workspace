@@ -1,26 +1,32 @@
-# Plan: Harden mobile viewport sizing and touch ergonomics
+# Plan: Respect reduced motion and touch/mobile ergonomics
 
 ## Summary of the change
-Adopt dynamic viewport height units across workspace dialogs, drawers, image previews, chat panels, dashboards, jobs, gateway, memory, skills, swarm, and task surfaces so browser chrome on mobile no longer clips panel content. Add touch-only global CSS for minimum readable tiny labels, overscroll containment in nested scroll containers, and immediate press feedback for touch targets.
+Improve mobile and accessibility ergonomics in `~/hermes-workspace` by keeping the existing touch-accessibility implementation in the dirty worktree: global reduced-motion CSS, global `touch-action: manipulation` for coarse pointers, touch-friendly button classes, a mobile Files screen tree/detail toggle, and terminal viewport padding above the mobile tab bar.
 
 ## Files to modify
-- `src/**/*.tsx` components and routes that use `max-h-[...vh]`, `h-[...vh]`, or `min-h-[...vh]` for modal/drawer/panel sizing.
-- `src/styles.css` for touch-only ergonomic fallbacks.
+- `src/styles.css`
+- `src/components/workspace-shell.tsx`
+- `src/components/mobile-tab-bar.tsx`
+- `src/screens/files/files-screen.tsx`
+- Touch affordance class updates across `src/components/**` and `src/screens/**`
+- Mission artifacts: `IDEAS.json`, `PLAN.md`, `TEST_REPORT.json`, `CLOSE_SUMMARY.md`
 
 ## Steps
-1. Preserve the existing responsive worktree changes on `feature/chat-ui-improvements`; do not discard unrelated coherent UI changes.
-2. Convert fixed viewport-height Tailwind utilities in workspace source files from `vh` to `dvh` where dynamic mobile browser chrome matters.
-3. Add `@media (hover: none) and (pointer: coarse)` CSS rules for readable small arbitrary text utilities, nested scroller overscroll containment, and touch active feedback.
-4. Keep screenshot smoke artifacts untracked; do not stage them in this cycle.
-5. Run TypeScript, Vitest, lint/build gates, then commit only intended source files plus cycle artifacts.
+1. Preserve the current source changes that add reduced-motion behavior and touch ergonomics.
+2. Verify the Files screen mobile tree/detail toggle compiles and keeps desktop layout via `md:*` classes.
+3. Verify the terminal surface no longer extends behind the mobile tab bar when the tab bar is visible.
+4. Run TypeScript, tests, lint/build gates, and record exact outcomes in `TEST_REPORT.json`.
+5. Commit locally with an `auto-improve:` commit message and do not push.
+6. If source files changed, build and restart `hermes-workspace.service`, then validate `/api/health` returns JSON `{"status":"ok"}`.
 
 ## How to verify the change works
 - `git diff --check`
 - `npx tsc --noEmit`
 - `pnpm test`
-- `pnpm lint` and, if repository-wide baseline fails, focused ESLint on changed TypeScript/TSX files plus documentation of baseline failures.
+- `pnpm lint` (record baseline failures separately if strict repo-wide lint still fails outside the change intent)
 - `pnpm build`
-- JSON body health check after restart only if source changes are deployed.
+- Parse `TEST_REPORT.json` and confirm `passed: true`
+- External health check requires HTTP 200, `application/json`, and JSON body status `ok` after restart.
 
-## Rollback
-Revert the auto-improve commit on `feature/chat-ui-improvements` or restore the touched `src/` files from the previous commit. Restart `hermes-workspace.service` only if a deployed build was rolled back.
+## Rollback procedure
+Run `git revert <auto-improve-commit>` on the local feature branch and restart `hermes-workspace.service` after a successful `pnpm build` if the UI regression reaches the deployed workspace.

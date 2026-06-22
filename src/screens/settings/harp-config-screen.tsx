@@ -150,7 +150,7 @@ function TierModelRow({
           type="button"
           onClick={onMoveUp}
           disabled={index === 0}
-          className="rounded p-0.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] disabled:opacity-30"
+          className="rounded p-2.5 sm:p-0.5 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] disabled:opacity-30"
         >
           <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={2} />
         </button>
@@ -158,7 +158,7 @@ function TierModelRow({
           type="button"
           onClick={onMoveDown}
           disabled={index === total - 1}
-          className="rounded p-0.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] disabled:opacity-30"
+          className="rounded p-2.5 sm:p-0.5 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] disabled:opacity-30"
         >
           <HugeiconsIcon icon={ArrowDown01Icon} size={13} strokeWidth={2} />
         </button>
@@ -413,7 +413,7 @@ function BlocklistSection({
           type="button"
           onClick={submit}
           disabled={!modelId.trim()}
-          className="h-8 rounded-lg bg-red-500 px-3 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
+          className="h-10 sm:h-8 rounded-lg bg-red-500 px-3 text-xs font-medium touch-manipulation text-white hover:bg-red-600 disabled:opacity-50"
         >
           Block
         </button>
@@ -484,7 +484,7 @@ function CapWidget({
               type="button"
               onClick={() => onPeriodChange(p)}
               className={cn(
-                'h-8 px-2.5 text-xs transition-colors',
+                'h-10 sm:h-8 px-2.5 text-xs touch-manipulation transition-colors',
                 p === period
                   ? 'bg-accent-500 font-medium text-white'
                   : 'bg-surface text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',

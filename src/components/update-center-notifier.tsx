@@ -960,7 +960,7 @@ function NaveenUpdateModal({
                     type="button"
                     onClick={() => onStrategyChange(conflict.file, 'keep_ours')}
                     className={cn(
-                      'flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all border border-[var(--theme-border)]',
+                      'flex-1 rounded-lg px-3 py-2 sm:py-1.5 text-xs font-semibold transition-all border border-[var(--theme-border)] touch-manipulation',
                       currentStrategy === 'keep_ours'
                         ? 'text-white bg-green-500'
                         : 'opacity-50 hover:opacity-80 bg-[var(--theme-card)]',
@@ -972,7 +972,7 @@ function NaveenUpdateModal({
                     type="button"
                     onClick={() => onStrategyChange(conflict.file, 'take_theirs')}
                     className={cn(
-                      'flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all border border-[var(--theme-border)]',
+                      'flex-1 rounded-lg px-3 py-2 sm:py-1.5 text-xs font-semibold transition-all border border-[var(--theme-border)] touch-manipulation',
                       currentStrategy === 'take_theirs'
                         ? 'text-white bg-blue-500'
                         : 'opacity-50 hover:opacity-80 bg-[var(--theme-card)]',

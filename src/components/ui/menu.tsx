@@ -55,7 +55,7 @@ function MenuItem({ className, ...props }: MenuItemProps) {
   return (
     <Menu.Item
       className={cn(
-        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm select-none font-[450] text-[var(--theme-text)]',
+        'flex w-full items-center gap-2 rounded-md px-2 py-2.5 sm:py-1.5 text-sm select-none font-[450] text-[var(--theme-text)] touch-manipulation',
         className,
       )}
       onMouseEnter={(e) => {

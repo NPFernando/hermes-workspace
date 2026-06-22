@@ -332,7 +332,7 @@ function PeriodSwitch({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(p)}
-            className="px-2 py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors"
+            className="px-2 py-2 sm:py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors touch-manipulation"
             style={{
               background: active
                 ? 'color-mix(in srgb, var(--theme-accent) 18%, transparent)'

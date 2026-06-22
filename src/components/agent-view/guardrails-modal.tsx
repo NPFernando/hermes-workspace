@@ -114,7 +114,7 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
                   key={preset.label}
                   type="button"
                   onClick={() => setMaxTokens(preset.value)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${maxTokens === preset.value ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:bg-white/70 dark:hover:bg-neutral-700'}`}
+                  className={`rounded-md px-2.5 py-2 sm:py-1 text-xs font-medium transition-colors touch-manipulation ${maxTokens === preset.value ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:bg-white/70 dark:hover:bg-neutral-700'}`}
                 >
                   {preset.label}
                 </button>
@@ -143,7 +143,7 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
                     key={mode}
                     type="button"
                     onClick={() => setToolMode(mode)}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${toolMode === mode ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:bg-white/70 dark:hover:bg-neutral-700'}`}
+                    className={`rounded-md px-2.5 py-2 sm:py-1 text-xs font-medium transition-colors touch-manipulation ${toolMode === mode ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:bg-white/70 dark:hover:bg-neutral-700'}`}
                   >
                     {mode === 'allowlist' ? 'Allowlist' : 'Blocklist'}
                   </button>

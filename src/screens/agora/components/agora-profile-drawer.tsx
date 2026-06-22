@@ -109,7 +109,7 @@ export function AgoraProfileDrawer({
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     onBlur={() => onSaveProfile({ displayName: editName.slice(0, 32) || 'Builder' })}
-                    className="w-full rounded-md px-2 py-1 text-sm font-semibold outline-none bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)]"
+                    className="w-full rounded-md px-2 py-2 sm:py-1 text-sm font-semibold outline-none bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)]"
                   />
                 ) : (
                   <div className="text-sm font-semibold">{user.profile.displayName}</div>
@@ -161,7 +161,7 @@ export function AgoraProfileDrawer({
                   placeholder="Say something about yourself…"
                   rows={3}
                   maxLength={240}
-                  className="w-full rounded-md px-2 py-1.5 text-[12px] outline-none resize-none bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)]"
+                  className="w-full rounded-md px-2 py-2 sm:py-1.5 text-[12px] outline-none resize-none bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)]"
                 />
               ) : (
                 <div className="text-[12px] opacity-80 whitespace-pre-wrap">{user.profile.bio || 'No bio.'}</div>

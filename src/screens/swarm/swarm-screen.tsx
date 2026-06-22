@@ -449,7 +449,7 @@ function ViewModeToggle({ mode, setMode }: { mode: SwarmViewMode; setMode: (mode
       <button
         type="button"
         onClick={() => setMode('terminals')}
-        className={cn('rounded-full px-3 py-1 transition-colors', mode === 'terminals' ? 'bg-emerald-400 text-black' : 'hover:text-white')}
+        className={cn('rounded-full px-3 py-2 sm:py-1 transition-colors touch-manipulation', mode === 'terminals' ? 'bg-emerald-400 text-black' : 'hover:text-white')}
       >
         Terminals
       </button>

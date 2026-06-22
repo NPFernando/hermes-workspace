@@ -152,7 +152,7 @@ export function StandaloneRuntimePane({
                         type="button"
                         onClick={() => onSelect(member.id)}
                         className={cn(
-                          'rounded-full border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors',
+                          'rounded-full border px-3 py-2 sm:py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors touch-manipulation',
                           member.id === selectedId
                             ? 'border-amber-300/45 bg-amber-300/12 text-amber-100'
                             : 'border-emerald-300/16 bg-white/[0.025] text-emerald-100/65 hover:border-emerald-200/35 hover:text-white',

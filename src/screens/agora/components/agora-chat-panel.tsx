@@ -98,12 +98,12 @@ export function AgoraChatPanel({ self, others, messages, onSend }: AgoraChatPane
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Say something to the room…"
           maxLength={280}
-          className="flex-1 rounded-lg px-2 py-1.5 text-[12px] outline-none bg-[var(--theme-bg)] text-[var(--theme-text)] border border-[var(--theme-border)]"
+          className="flex-1 rounded-lg px-2 py-2 sm:py-1.5 text-[12px] outline-none bg-[var(--theme-bg)] text-[var(--theme-text)] border border-[var(--theme-border)]"
         />
         <button
           type="submit"
           disabled={!draft.trim()}
-          className="rounded-lg px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] disabled:opacity-40"
+          className="rounded-lg px-3 py-2 sm:py-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] disabled:opacity-40 touch-manipulation"
           style={{
             background: 'var(--theme-accent)',
             color: 'var(--theme-bg)',

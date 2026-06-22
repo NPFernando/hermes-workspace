@@ -198,7 +198,7 @@ export function SwarmHealthStrip({ targetWorkerId }: { targetWorkerId?: string |
           onClick={() => pingTarget && pingWorker(pingTarget)}
           disabled={!pingTarget || pinging}
           className={cn(
-            'inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors',
+            'inline-flex items-center gap-1 rounded-full px-3 py-2 sm:py-1.5 text-xs font-semibold transition-colors touch-manipulation',
             pinging ? 'bg-emerald-500/15 text-emerald-200' : 'bg-emerald-400 text-black hover:bg-emerald-300 disabled:opacity-50',
           )}
         >

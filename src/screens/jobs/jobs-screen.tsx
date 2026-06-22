@@ -419,7 +419,7 @@ export function JobsScreen() {
 
   return (
     <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
         <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/85 p-4 backdrop-blur-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -474,7 +474,7 @@ export function JobsScreen() {
               placeholder="Search jobs..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] py-1.5 pl-8 pr-3 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)]"
+              className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] py-2 sm:py-1.5 pl-8 pr-3 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)]"
             />
           </div>
           {profilesQuery.isError ? (

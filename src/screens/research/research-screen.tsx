@@ -281,7 +281,7 @@ export function ResearchScreen() {
             type="button"
             onClick={() => setActiveTab('new')}
             className={cn(
-              'rounded-lg px-3 py-1.5 text-sm transition-colors',
+              'rounded-lg px-3 py-2 sm:py-1.5 text-sm transition-colors touch-manipulation',
               activeTab === 'new'
                 ? 'bg-accent-500/10 text-accent-500'
                 : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] dark:hover:text-neutral-100',
@@ -293,7 +293,7 @@ export function ResearchScreen() {
             type="button"
             onClick={() => setActiveTab('library')}
             className={cn(
-              'rounded-lg px-3 py-1.5 text-sm transition-colors',
+              'rounded-lg px-3 py-2 sm:py-1.5 text-sm transition-colors touch-manipulation',
               activeTab === 'library'
                 ? 'bg-accent-500/10 text-accent-500'
                 : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] dark:hover:text-neutral-100',
@@ -534,7 +534,7 @@ function LibraryView({
             key={entry.session_id}
             type="button"
             onClick={() => onSelect(entry)}
-            className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3 text-left text-sm transition-colors hover:border-accent-400/50 hover:bg-accent-50/20 dark:hover:border-accent-500/30"
+            className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3 text-left text-sm transition-colors hover:border-accent-400/50 hover:bg-accent-50/20 dark:hover:border-accent-500/30 touch-manipulation"
           >
             <div className="flex items-start justify-between gap-2">
               <span className="font-medium text-[var(--theme-text)] line-clamp-2">

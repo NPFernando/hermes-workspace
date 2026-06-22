@@ -54,7 +54,7 @@ export function McpScreen() {
 
   return (
     <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
         <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/85 p-4 backdrop-blur-xl">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1.5">

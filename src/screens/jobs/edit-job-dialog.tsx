@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
-import { cn } from '@/lib/utils'
-import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { AnimatePresence, motion } from 'motion/react'
+import { useEffect, useState } from 'react'
 import type { ClaudeJob, JobProfileOption } from '@/lib/jobs-api'
+import { cn } from '@/lib/utils'
 
 const SCHEDULE_PRESETS = [
   { label: 'Every 15m', value: 'every 15m' },
@@ -363,7 +363,7 @@ export function EditJobDialog({
                               ? `Requires Hermes Agent gateway with ${option} configured`
                               : undefined
                           }
-                          className="rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition-colors"
+                          className="rounded-full border px-3 py-2 sm:py-1.5 text-xs font-medium capitalize transition-colors touch-manipulation"
                           style={{
                             background: isActive
                               ? 'var(--theme-accent)'

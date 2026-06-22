@@ -94,7 +94,7 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
         type="button"
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          'relative flex min-h-9 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all',
+          'relative flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all',
           count > 0
             ? open
               ? 'border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
@@ -174,7 +174,7 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
                         type="button"
                         onClick={() => void handleQuickAction(approval.id, 'approve')}
                         disabled={Boolean(busy)}
-                        className="flex-1 rounded-lg bg-emerald-500 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="flex-1 rounded-lg bg-emerald-500 py-2.5 sm:py-1.5 text-[11px] font-semibold text-white touch-manipulation transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {busy === 'approve' ? 'Approving...' : 'Approve'}
                       </button>
@@ -182,7 +182,7 @@ export function ApprovalsBell({ approvals, onApprove, onDeny }: ApprovalsBellPro
                         type="button"
                         onClick={() => void handleQuickAction(approval.id, 'deny')}
                         disabled={Boolean(busy)}
-                        className="flex-1 rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] py-1.5 text-[11px] font-medium text-red-400 transition-colors hover:bg-[var(--theme-danger-soft-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="flex-1 rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] py-2.5 sm:py-1.5 text-[11px] font-medium text-red-400 touch-manipulation transition-colors hover:bg-[var(--theme-danger-soft-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {busy === 'deny' ? 'Denying...' : 'Deny'}
                       </button>

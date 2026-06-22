@@ -1134,7 +1134,7 @@ export function Conductor() {
 
       return (
         <div className="flex min-h-dvh flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-          <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-4 md:pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
+          <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:pb-8 md:px-6 md:py-8">
             <div className="space-y-6">
               <button
                 type="button"
@@ -1295,7 +1295,7 @@ export function Conductor() {
 
     return (
       <div className="flex min-h-dvh flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-0 w-full max-w-[760px] flex-1 flex-col items-stretch justify-start px-4 py-4 pb-4 md:pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-6">
+        <main className="mx-auto flex min-h-0 w-full max-w-[760px] flex-1 flex-col items-stretch justify-start px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:pb-8 md:px-6 md:py-6">
           <div className="w-full space-y-6">
             <div className="space-y-2 md:text-center">
               <div className="flex items-center gap-2">
@@ -1835,7 +1835,7 @@ export function Conductor() {
   if (phase === 'preview') {
     return (
       <div className="flex min-h-dvh flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-4 md:pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
+        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:pb-8 md:px-6 md:py-8">
           <div className="space-y-6">
             <div className="text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-accent)]">Mission Decomposition</p>
@@ -1895,7 +1895,7 @@ export function Conductor() {
   if (phase === 'complete') {
     return (
       <div className="flex min-h-dvh flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-4 md:pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
+        <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:pb-8 md:px-6 md:py-8">
           <div className="space-y-6">
             <div className="text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
@@ -2229,7 +2229,7 @@ export function Conductor() {
 
   return (
     <div className="flex min-h-dvh flex-col overflow-y-auto bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-      <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-4 md:pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:py-8">
+      <main className="mx-auto flex min-h-0 w-full max-w-[720px] flex-1 flex-col px-4 py-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:pb-8 md:px-6 md:py-8">
         <div className="flex w-full flex-col gap-6">
           <div className="text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--theme-muted)]">
@@ -2280,7 +2280,7 @@ export function Conductor() {
                   }
                 }}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-2.5 sm:py-1.5 text-xs font-medium touch-manipulation transition-colors',
                   !conductor.orchestratorSessionKey || conductor.isPausing
                     ? 'cursor-not-allowed border-[var(--theme-border)] bg-[var(--theme-card2)] text-[var(--theme-muted)] opacity-50'
                     : conductor.isPaused

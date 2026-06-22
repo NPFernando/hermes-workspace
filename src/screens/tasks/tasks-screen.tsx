@@ -956,7 +956,7 @@ export function TasksScreen() {
 
       {/* Board */}
       <div
-        className="flex-1 min-h-0 mx-auto w-full max-w-[1200px] flex gap-3 overflow-x-auto overflow-y-hidden px-3 pb-[calc(var(--tabbar-h,80px)+1rem)] pt-3 sm:px-6 lg:px-8"
+        className="flex-1 min-h-0 mx-auto w-full max-w-[1200px] flex gap-3 overflow-x-auto overflow-y-hidden px-3 pt-3 pb-3 sm:px-6 lg:px-8"
         style={{ boxShadow: 'inset 0 8px 24px rgba(0,0,0,0.2)' }}
       >
         {visibleColumns.map((col) => {

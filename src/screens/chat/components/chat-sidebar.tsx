@@ -404,7 +404,7 @@ function SectionLabel({
         <button
           type="button"
           onClick={onToggle}
-          className="ml-auto p-0.5 rounded hover:bg-[var(--theme-hover)] transition-colors"
+          className="ml-auto p-2.5 sm:p-0.5 rounded touch-manipulation hover:bg-[var(--theme-hover)] transition-colors"
           aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
         >
           <HugeiconsIcon

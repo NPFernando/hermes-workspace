@@ -268,7 +268,7 @@ export function ClaudeReconnectBanner({
               type="button"
               onClick={() => void handleRetry()}
               disabled={isChecking || isStarting}
-              className="rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2.5 sm:py-1.5 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-60 touch-manipulation"
             >
               {isChecking ? 'Retrying…' : 'Retry'}
             </button>
@@ -276,7 +276,7 @@ export function ClaudeReconnectBanner({
               type="button"
               onClick={() => void handleStartAgent()}
               disabled={isStarting}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60 bg-[var(--theme-danger)]"
+              className="rounded-md px-3 py-2.5 sm:py-1.5 text-sm font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60 bg-[var(--theme-danger)] touch-manipulation"
             >
               {isStarting ? 'Starting…' : 'Start Agent'}
             </button>

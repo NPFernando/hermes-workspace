@@ -398,7 +398,7 @@ export function RouterChat({
                     (mode === 'manual' && !selectedId)
                   }
                   className={cn(
-                    'inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold',
+                    'inline-flex items-center gap-1 rounded-lg px-3 py-2 sm:py-1.5 text-xs font-semibold touch-manipulation',
                     dispatching || decomposing
                       ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-text)]'
                       : 'bg-[var(--theme-accent)] text-[var(--theme-text)] hover:bg-[var(--theme-accent-strong)] disabled:opacity-50',

@@ -213,7 +213,11 @@ export function MobileTabBar() {
       const el = navRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
-      if (rect.height <= 0) return
+      // When nav is hidden (landscape mode: display:none → height 0), report 0
+      if (rect.height <= 0) {
+        root.style.setProperty('--tabbar-h', '0px')
+        return
+      }
       // pill height + its bottom margin (safe-area + 8px) + 12px breathing room
       const safeArea =
         window.innerHeight - document.documentElement.clientHeight || 0

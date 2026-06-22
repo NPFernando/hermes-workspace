@@ -113,7 +113,7 @@ export function RunCompare({ runA, runB, onClose }: RunCompareProps) {
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg border border-primary-700 bg-primary-800 px-2 py-1 text-xs font-medium text-primary-200 transition-colors hover:border-accent-500 hover:text-accent-300"
+          className="rounded-lg border border-primary-700 bg-primary-800 px-2 py-1.5 sm:py-1 text-xs font-medium text-primary-200 transition-colors hover:border-accent-500 hover:text-accent-300 touch-manipulation"
           aria-label="Close compare view"
         >
           Close

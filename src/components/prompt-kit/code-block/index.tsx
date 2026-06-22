@@ -159,7 +159,7 @@ export function CodeBlock({
           {canShowLineNumbers ? (
             <Button
               variant="ghost"
-              className="h-auto px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
+              className="h-auto px-2 sm:px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
               onClick={() => {
                 setShowLineNumbers((current) => !current)
               }}
@@ -171,7 +171,7 @@ export function CodeBlock({
             variant="ghost"
             aria-label="Download file"
             title="Download file"
-            className="h-auto px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
+            className="h-auto px-2 sm:px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
             onClick={handleDownload}
           >
             <HugeiconsIcon icon={DownloadIcon} size={16} strokeWidth={1.5} />
@@ -179,7 +179,7 @@ export function CodeBlock({
           <Button
             variant="ghost"
             aria-label={ariaLabel ?? 'Copy code'}
-            className="h-auto px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
+            className="h-auto px-2 sm:px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
             onClick={() => {
               handleCopy().catch(() => {})
             }}
@@ -196,7 +196,7 @@ export function CodeBlock({
               variant="ghost"
               aria-label="Open in workspace"
               title="Open in workspace"
-              className="h-auto px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
+              className="h-auto px-2 sm:px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
               onClick={onExpand}
             >
               <HugeiconsIcon icon={ArrowExpandDiagonalIcon} size={16} strokeWidth={1.5} />

@@ -213,14 +213,14 @@ export function Swarm2TaskQueue({
             value={draftTitle}
             onChange={(event) => setDraftTitle(event.target.value)}
             placeholder="Add a task for this agent…"
-            className="w-full rounded-md border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[12px] text-[var(--theme-text)] outline-none"
+            className="w-full rounded-md border border-[var(--theme-border)] bg-transparent px-2 py-2 sm:py-1.5 text-[12px] text-[var(--theme-text)] outline-none"
           />
           <textarea
             value={draftDescription}
             onChange={(event) => setDraftDescription(event.target.value)}
             rows={2}
             placeholder="Optional notes"
-            className="w-full resize-none rounded-md border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[12px] text-[var(--theme-text)] outline-none"
+            className="w-full resize-none rounded-md border border-[var(--theme-border)] bg-transparent px-2 py-2 sm:py-1.5 text-[12px] text-[var(--theme-text)] outline-none"
           />
           <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--theme-muted)]">
             <span>Assigns directly to {workerId}</span>

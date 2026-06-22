@@ -1659,7 +1659,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
     >
       <main
         className={cn(
-          'min-h-full px-4 pb-[calc(var(--tabbar-h,80px)+1rem)] pt-5 text-[var(--theme-text)] md:px-6 md:pt-8 md:pb-8',
+          'min-h-full px-4 pb-4 pt-5 text-[var(--theme-text)] md:px-6 md:pt-8 md:pb-8',
           embedded && 'px-4 pb-6 pt-4 md:px-6 md:pb-6 md:pt-4',
         )}
       >

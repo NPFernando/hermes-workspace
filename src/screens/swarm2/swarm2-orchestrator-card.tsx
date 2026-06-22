@@ -177,7 +177,7 @@ export function Swarm2OrchestratorCard({
                 type="button"
                 onClick={() => onViewModeChange(mode)}
                 className={cn(
-                  'rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                  'rounded-lg px-2.5 py-2 sm:py-1.5 text-xs font-semibold transition-colors touch-manipulation',
                   viewMode === mode
                     ? 'bg-[var(--theme-accent)] text-primary-950'
                     : 'text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]',

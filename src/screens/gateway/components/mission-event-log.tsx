@@ -149,7 +149,7 @@ export function MissionEventLog({ events, agentNames, className }: MissionEventL
               type="button"
               onClick={() => setFilter(option.key)}
               className={cn(
-                'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                'rounded-full border px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors touch-manipulation',
                 filter === option.key
                   ? 'border-accent-500 bg-accent-500/15 text-accent-300'
                   : 'border-primary-700 bg-primary-800/80 text-primary-300 hover:border-primary-700 hover:bg-primary-800 hover:text-primary-100',

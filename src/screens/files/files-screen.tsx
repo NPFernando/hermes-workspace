@@ -676,9 +676,10 @@ function Breadcrumb({ path }: { path: string }) {
 
 type FilePanelProps = {
   selectedEntry: FileEntry | null
+  onBackToTree?: () => void
 }
 
-function FilePanel({ selectedEntry }: FilePanelProps) {
+function FilePanel({ selectedEntry, onBackToTree }: FilePanelProps) {
   const [loadingFile, setLoadingFile] = useState(false)
   const [fileError, setFileError] = useState<string | null>(null)
   const [content, setContent] = useState('')
@@ -824,6 +825,16 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
   const header = (
     <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--theme-border)] px-4 py-2.5">
       <div className="flex items-center gap-2 min-w-0">
+        {onBackToTree && (
+          <button
+            type="button"
+            onClick={onBackToTree}
+            className="md:hidden shrink-0 rounded-lg p-2 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors leading-none"
+            aria-label="Back to file tree"
+          >
+            ←
+          </button>
+        )}
         <span className="text-lg">{getFileIcon(selectedEntry)}</span>
         <span className="truncate text-sm font-semibold text-[var(--theme-text)]">
           {selectedEntry.name}
@@ -1047,6 +1058,7 @@ export function FilesScreen() {
   const [promptState, setPromptState] = useState<PromptState | null>(null)
   const [promptValue, setPromptValue] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<FileEntry | null>(null)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(true)
 
   const loadTree = useCallback(async () => {
     setTreeLoading(true)
@@ -1109,6 +1121,9 @@ export function FilesScreen() {
 
   const handleSelect = useCallback((entry: FileEntry) => {
     setSelectedEntry(entry)
+    if (entry.type === 'file' && window.matchMedia('(max-width: 767px)').matches) {
+      setMobileSidebarOpen(false)
+    }
   }, [])
 
   const handleContextMenu = useCallback(
@@ -1130,6 +1145,7 @@ export function FilesScreen() {
     })
     if (selectedEntry?.path === deleteConfirm.path) {
       setSelectedEntry(null)
+      setMobileSidebarOpen(true)
     }
     setDeleteConfirm(null)
     await loadTree()
@@ -1204,10 +1220,13 @@ export function FilesScreen() {
       {/* ── Left panel — directory tree ─────────────────────────────────── */}
       <aside
         className={cn(
-          'flex h-full w-[260px] shrink-0 flex-col overflow-hidden',
+          'h-full flex-col overflow-hidden',
           'rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 shadow-sm',
           'border-[var(--theme-border)]',
           'm-2 mr-0',
+          mobileSidebarOpen
+            ? 'flex w-full md:w-[260px] md:shrink-0'
+            : 'hidden md:flex md:w-[260px] md:shrink-0',
         )}
       >
         {/* Tree header */}
@@ -1284,13 +1303,14 @@ export function FilesScreen() {
       {/* ── Right panel — file viewer / editor ─────────────────────────── */}
       <main
         className={cn(
-          'flex h-full flex-1 min-w-0 flex-col overflow-hidden',
+          'h-full flex-1 min-w-0 flex-col overflow-hidden',
           'rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 shadow-sm',
           'border-[var(--theme-border)]',
           'm-2',
+          mobileSidebarOpen ? 'hidden md:flex' : 'flex',
         )}
       >
-        <FilePanel selectedEntry={selectedEntry} />
+        <FilePanel selectedEntry={selectedEntry} onBackToTree={() => setMobileSidebarOpen(true)} />
       </main>
 
       {/* ── Context menu ──────────────────────────────────────────────────── */}

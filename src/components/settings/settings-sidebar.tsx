@@ -116,7 +116,7 @@ export function SettingsMobilePills({ activeId }: { activeId: SettingsNavId }) {
       {SETTINGS_NAV_ITEMS.map((item) => {
         const isActive = activeId === item.id
         const className = cn(
-          'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+          'shrink-0 rounded-full px-3 py-2 sm:py-1.5 text-xs font-medium transition-colors touch-manipulation',
           isActive ? activeClass : inactiveClass,
         )
         return (

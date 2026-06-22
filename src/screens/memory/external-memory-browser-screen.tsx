@@ -343,7 +343,7 @@ export function ExternalMemoryBrowserScreen() {
                 onClick={() => setState(item)}
                 disabled={Boolean(searchTerm)}
                 className={cn(
-                  'rounded-lg border px-2 py-1.5 capitalize transition disabled:opacity-40',
+                  'rounded-lg border px-2 py-2 sm:py-1.5 capitalize transition disabled:opacity-40 touch-manipulation',
                   state === item
                     ? 'border-[var(--theme-accent)] bg-[var(--theme-hover)] text-[var(--theme-text)] dark:border-blue-500 dark:bg-blue-500/15 dark:text-blue-100'
                     : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]',

@@ -518,7 +518,7 @@ export function OperationalWorkerCard({
               event.stopPropagation()
               setSettingsOpen(true)
             }}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
+            className="inline-flex h-11 w-11 sm:h-8 sm:w-8 items-center justify-center rounded-lg touch-manipulation text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
           >
             <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.8} />
           </button>
@@ -582,7 +582,7 @@ export function OperationalWorkerCard({
               aria-label="Previous panel"
               title="Previous panel"
               onClick={() => cycleFocusPanel(-1)}
-              className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
+              className="inline-flex h-9 w-9 sm:h-6 sm:w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] touch-manipulation text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
             >
               <HugeiconsIcon icon={ArrowLeft01Icon} size={11} />
             </button>
@@ -599,7 +599,7 @@ export function OperationalWorkerCard({
                   aria-label={taskComposerOpen ? 'Close add task' : 'Add task'}
                   title={taskComposerOpen ? 'Close add task' : 'Add task'}
                   onClick={() => setTaskComposerOpen((value) => !value)}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
+                  className="inline-flex h-9 w-9 sm:h-6 sm:w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] touch-manipulation text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
                 >
                   <HugeiconsIcon icon={Add01Icon} size={11} />
                 </button>
@@ -609,7 +609,7 @@ export function OperationalWorkerCard({
                 aria-label="Next panel"
                 title="Next panel"
                 onClick={() => cycleFocusPanel(1)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
+                className="inline-flex h-9 w-9 sm:h-6 sm:w-6 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] touch-manipulation text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)]"
               >
                 <HugeiconsIcon icon={ArrowRight01Icon} size={11} />
               </button>

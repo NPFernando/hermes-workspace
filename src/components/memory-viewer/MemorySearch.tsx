@@ -57,7 +57,7 @@ function MemorySearch({
                       onSelectResult(result)
                     }}
                     className={cn(
-                      'w-full rounded-md border border-[var(--theme-border)] px-2 py-1.5 text-left',
+                      'w-full rounded-md border border-[var(--theme-border)] px-2 py-2 sm:py-1.5 text-left touch-manipulation',
                       'hover:bg-[var(--theme-hover)]',
                     )}
                   >

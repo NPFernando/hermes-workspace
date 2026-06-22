@@ -55,7 +55,7 @@ export function EditModePanel({ layout }: { layout: DashboardLayout }) {
           <button
             type="button"
             onClick={layout.reset}
-            className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors hover:bg-[var(--theme-card)] bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]"
+            className="rounded-full border px-3 py-2 sm:py-1 text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors hover:bg-[var(--theme-card)] bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)] touch-manipulation"
             title="Show every widget again"
           >
             Reset
@@ -63,7 +63,7 @@ export function EditModePanel({ layout }: { layout: DashboardLayout }) {
           <button
             type="button"
             onClick={() => layout.setEditMode(false)}
-            className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors"
+            className="rounded-full px-3 py-2 sm:py-1 text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors touch-manipulation"
             style={{
               background:
                 'linear-gradient(135deg, var(--theme-accent), color-mix(in srgb, var(--theme-accent) 60%, transparent))',
@@ -108,7 +108,7 @@ function Group({
               key={w.id}
               type="button"
               onClick={() => (visible ? layout.hide(w.id) : layout.show(w.id))}
-              className="group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all"
+              className="group inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 sm:py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all touch-manipulation"
               style={{
                 background: visible
                   ? 'color-mix(in srgb, var(--theme-success) 14%, transparent)'

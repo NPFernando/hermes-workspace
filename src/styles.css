@@ -18,6 +18,22 @@
 /* Tailwind v4 — enable dark: variant on .dark class (set by __root.tsx) */
 @variant dark (&:where(.dark, .dark *));
 
+/* ── Global prefers-reduced-motion ──────────────────────────────────────────
+   Users who enable "reduce motion" in OS accessibility settings should not
+   see spinning, sliding, or pulsing. Make all transitions/animations near-
+   instant so state changes still work (opacity, color) but motion stops.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 :root {
   --mobile-header-height: 48px;
   --composer-height: 48px;
@@ -2749,6 +2765,23 @@ kbd {
   select {
     min-height: 40px;
     cursor: pointer;
+  }
+}
+
+/* ── Global touch-action: manipulation ─────────────────────────────────────
+   Eliminates the 300ms tap delay on all interactive elements across the app.
+   Individual components also add the touch-manipulation Tailwind class, but
+   this catches any we missed and removes the need to add it everywhere.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  a,
+  [role="button"],
+  input,
+  select,
+  textarea,
+  label[for] {
+    touch-action: manipulation;
   }
 }
 

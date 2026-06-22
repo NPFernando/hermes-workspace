@@ -1,43 +1,43 @@
 [
   {
-    "title": "Harden mobile viewport sizing and touch ergonomics",
-    "description": "Use dynamic viewport units for modal, drawer, preview, and panel heights; add touch-only CSS for readable tiny labels, nested-scroll containment, and tactile active states.",
+    "title": "Respect reduced motion and touch tap ergonomics globally",
+    "description": "Add global prefers-reduced-motion handling, touch-action manipulation for mobile interactions, and touch-manipulation classes on primary controls so touch users see less motion and faster taps.",
     "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Make Files screen usable on narrow mobile viewports",
+    "description": "Collapse the file tree after selecting a file on small screens and provide a back-to-tree affordance so the editor panel can use the full viewport width.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add CSS-specific responsive smoke assertions",
+    "description": "Create a lightweight check that validates expected responsive CSS and accessibility media queries because ESLint ignores src/styles.css.",
+    "category": "config",
     "estimated_effort": "medium"
   },
   {
-    "title": "Add repeatable CSS validation for responsive utilities",
-    "description": "Introduce a stylelint or CSS smoke gate so responsive CSS changes are validated beyond TypeScript, ESLint, and production build.",
+    "title": "Move ad-hoc screenshot artifacts to an ignored report directory",
+    "description": "Introduce a dedicated ignored visual-smoke output path so viewport PNGs and helper scripts do not remain as root-level untracked noise after UI cycles.",
     "category": "config",
     "estimated_effort": "low"
   },
   {
-    "title": "Move viewport screenshot smoke artifacts into ignored cycle reports",
-    "description": "Create a dedicated ignored reports/screenshots location and update ad-hoc screenshot helpers to write there instead of leaving root-level untracked artifacts.",
+    "title": "Add focused accessibility smoke tests for reduced motion and touch CSS",
+    "description": "Create a small automated assertion that verifies prefers-reduced-motion and coarse-pointer touch-action rules remain present after CSS refactors.",
     "category": "config",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Convert visual-smoke screenshot leftovers into a first-class ignored report flow",
+    "description": "Move viewport screenshot scripts and PNG output under an ignored auto-improvement report directory so UI cycles can keep useful artifacts without dirtying the workspace root.",
+    "category": "config",
+    "estimated_effort": "medium"
   },
   {
     "title": "Reconcile feature/chat-ui-improvements with main",
-    "description": "Resolve the long-lived branch divergence so responsive UI commits can merge cleanly without local-only deployment workarounds.",
-    "category": "config",
-    "estimated_effort": "medium"
-  },
-  {
-    "title": "Add a viewport CSS smoke assertion for dvh utilities",
-    "description": "Add an automated check that scans responsive modal and drawer surfaces for accidental regressions back to vh-only sizing in touch-critical components.",
-    "category": "config",
-    "estimated_effort": "low"
-  },
-  {
-    "title": "Create an ignored visual-smoke artifact directory",
-    "description": "Move generated viewport screenshots and helper outputs under an ignored auto-improvement report directory so future UI cycles can capture evidence without dirtying the repo root.",
-    "category": "config",
-    "estimated_effort": "low"
-  },
-  {
-    "title": "Baseline and ratchet workspace ESLint debt",
-    "description": "Capture current strict lint failures into a baseline and add a changed-file ratchet so future cycles can distinguish new regressions from inherited debt automatically.",
+    "description": "Resolve the current divergence so verified auto-improvement commits can merge cleanly instead of remaining local-only deployment commits.",
     "category": "config",
     "estimated_effort": "medium"
   }

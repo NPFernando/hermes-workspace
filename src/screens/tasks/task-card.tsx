@@ -373,7 +373,7 @@ export function TaskCard({
               <div className="flex gap-1.5 pt-1 border-t border-[var(--theme-border)]">
                 <input
                   ref={replyInputRef}
-                  className="flex-1 rounded px-2 py-1 text-[10px] min-w-0 bg-[var(--theme-input)] border border-[var(--theme-border)] text-[var(--theme-text)] outline-none"
+                  className="flex-1 rounded px-2 py-1.5 sm:py-1 text-[10px] min-w-0 bg-[var(--theme-input)] border border-[var(--theme-border)] text-[var(--theme-text)] outline-none"
                   placeholder={task.agent_state === 'waiting_for_input' ? 'Reply to Astra…' : 'Continue…'}
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}

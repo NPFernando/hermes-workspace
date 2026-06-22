@@ -320,7 +320,7 @@ function ModelInventoryModal({
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="filter…"
-              className="rounded border border-[var(--theme-border)] bg-transparent px-2 py-1 font-mono text-[11px] text-[var(--theme-text)]"
+              className="rounded border border-[var(--theme-border)] bg-transparent px-2 py-2 sm:py-1 font-mono text-[11px] text-[var(--theme-text)]"
             />
             <button
               type="button"

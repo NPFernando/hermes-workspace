@@ -202,7 +202,7 @@ function MemoryRow({
         onSelectPath(file.path)
       }}
       className={cn(
-        'w-full rounded-md border px-2 py-1.5 text-left transition-colors',
+        'w-full rounded-md border px-2 py-2 sm:py-1.5 text-left transition-colors touch-manipulation',
         selected
           ? 'border-accent-500/40 bg-accent-500/10'
           : 'border-[var(--theme-border)] bg-[var(--theme-panel)] hover:bg-[var(--theme-hover)]',

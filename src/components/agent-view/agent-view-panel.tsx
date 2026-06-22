@@ -452,7 +452,7 @@ function OrchestratorCard({
               type="button"
               onClick={canCycleOc ? cycleOcProvider : undefined}
               className={cn(
-                'flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold tracking-wide transition-colors',
+                'flex items-center gap-1.5 rounded-md px-2 py-2 sm:py-1 text-[10px] font-semibold tracking-wide transition-colors touch-manipulation',
                 canCycleOc
                   ? 'cursor-pointer text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]'
                   : 'cursor-default text-[var(--theme-muted)]',

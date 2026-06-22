@@ -466,7 +466,11 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               className="flex flex-col"
               style={{
                 position: 'absolute',
-                inset: 0,
+                top: 0,
+                right: 0,
+                left: 0,
+                // On mobile the tab bar floats at the bottom; don't extend behind it
+                bottom: isMobile ? 'var(--tabbar-h, 80px)' : 0,
                 visibility: isOnTerminalRoute ? 'visible' : 'hidden',
                 pointerEvents: isOnTerminalRoute ? 'auto' : 'none',
                 zIndex: isOnTerminalRoute ? 1 : -1,

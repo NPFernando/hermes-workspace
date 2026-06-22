@@ -440,7 +440,7 @@ export function RunConsole({
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                'rounded-full px-3 py-2 sm:py-1 text-xs font-medium transition-colors touch-manipulation',
                 activeTab === tab.id
                   ? minimalChrome
                     ? 'bg-[var(--theme-card2)] text-[var(--theme-text)]'
@@ -569,7 +569,7 @@ export function RunConsole({
                   type="button"
                   onClick={() => setStreamView('combined')}
                   className={cn(
-                    'rounded px-2 py-1 text-xs transition-colors',
+                    'rounded px-2 py-1.5 sm:py-1 text-xs transition-colors touch-manipulation',
                     streamView === 'combined'
                       ? minimalChrome
                         ? 'bg-[var(--theme-card2)] text-[var(--theme-text)]'
@@ -585,7 +585,7 @@ export function RunConsole({
                   type="button"
                   onClick={() => setStreamView('lanes')}
                   className={cn(
-                    'rounded px-2 py-1 text-xs transition-colors',
+                    'rounded px-2 py-1.5 sm:py-1 text-xs transition-colors touch-manipulation',
                     streamView === 'lanes'
                       ? minimalChrome
                         ? 'bg-[var(--theme-card2)] text-[var(--theme-text)]'
@@ -626,7 +626,7 @@ export function RunConsole({
                             type="button"
                             onClick={() => onApprove?.(approval.id)}
                             disabled={!onApprove}
-                            className="rounded-md border border-amber-500/50 bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-500/30"
+                            className="rounded-md border border-amber-500/50 bg-amber-500/20 px-2.5 py-2 sm:py-1 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-500/30 touch-manipulation"
                           >
                             Approve
                           </button>
@@ -634,7 +634,7 @@ export function RunConsole({
                             type="button"
                             onClick={() => onDeny?.(approval.id)}
                             disabled={!onDeny}
-                            className="rounded-md border border-primary-700 bg-primary-900/80 px-2.5 py-1 text-xs font-medium text-primary-200 transition-colors hover:bg-primary-800"
+                            className="rounded-md border border-primary-700 bg-primary-900/80 px-2.5 py-2 sm:py-1 text-xs font-medium text-primary-200 transition-colors hover:bg-primary-800 touch-manipulation"
                           >
                             Deny
                           </button>

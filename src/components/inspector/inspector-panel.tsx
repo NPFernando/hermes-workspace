@@ -332,7 +332,7 @@ function SkillsTab() {
               onClick={() =>
                 setExpanded(expanded === skill.name ? null : skill.name)
               }
-              className="w-full text-left rounded px-2 py-1.5 text-xs mb-0.5 transition-colors"
+              className="w-full text-left rounded px-2 py-2 sm:py-1.5 text-xs mb-0.5 transition-colors touch-manipulation"
               style={{
                 background:
                   expanded === skill.name
