@@ -20,13 +20,14 @@ export function MobilePageHeader({
   return (
     <div
       className={cn(
-        'md:hidden flex items-center h-12 px-2 shrink-0',
+        'md:hidden flex items-end px-2 pb-1.5 shrink-0',
         'border-b bg-surface',
         className,
       )}
       style={{
         borderColor: 'var(--color-border, #e5e7eb)',
         paddingTop: 'env(safe-area-inset-top, 0px)',
+        minHeight: 'calc(48px + env(safe-area-inset-top, 0px))',
       }}
     >
       <button

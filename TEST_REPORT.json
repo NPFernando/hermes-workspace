@@ -1,22 +1,38 @@
 {
+  "cycle": "2026-06-22-cron-responsive-touch-surfaces",
+  "timestamp_utc": "2026-06-22T00:35:56Z",
   "tests_passed": true,
-  "focused_tests_passed": true,
-  "typescript_passed": true,
-  "repo_lint_exit_code": 1,
-  "repo_lint_errors": 201,
-  "repo_lint_warnings": 37,
   "lint_errors": 0,
-  "focused_lint_errors": 0,
   "passed": true,
-  "notes": "pnpm test passed 111 files / 718 tests. Repository-wide pnpm lint still has the known baseline (201 errors / 37 warnings) outside this cycle's changed files; focused ESLint on the changed source files passed with 0 errors.",
-  "build_passed": true,
-  "deployment_restarted": true,
-  "health_check_passed": true,
-  "health_check": {
-    "status_code": 200,
-    "content_type": "application/json",
-    "body": {
-      "status": "ok"
+  "commands": [
+    {
+      "command": "git diff --check",
+      "passed": true
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "passed": true
+    },
+    {
+      "command": "npx vitest run src/routes/-files-responsive.test.ts src/components/workspace-shell.test.ts src/components/slash-command-menu.test.tsx src/screens/chat/components/chat-message-list.test.tsx",
+      "passed": true,
+      "summary": "4 files / 14 tests passed"
+    },
+    {
+      "command": "pnpm test",
+      "passed": true,
+      "summary": "111 files / 718 tests passed"
+    },
+    {
+      "command": "npx eslint -f json <changed source files>",
+      "passed": true,
+      "summary": "0 errors; 1 warning for src/styles.css ignored because CSS has no matching ESLint config"
+    },
+    {
+      "command": "pnpm lint",
+      "passed": false,
+      "summary": "Known repository baseline: 201 errors / 37 warnings outside the changed source gate"
     }
-  }
+  ],
+  "notes": "Focused lint on changed source files had zero TypeScript/React errors. Repository-wide lint still fails on existing strict-type baseline and was not treated as a regression."
 }

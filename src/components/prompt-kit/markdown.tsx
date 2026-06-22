@@ -207,25 +207,25 @@ const INITIAL_COMPONENTS: Partial<Components> = {
   },
   p: function PComponent({ children }) {
     return (
-      <p className="text-[var(--theme-text)] text-pretty leading-relaxed">{children}</p>
+      <p className="mb-3 last:mb-0 text-[var(--theme-text)] text-pretty leading-relaxed">{children}</p>
     )
   },
   ul: function UlComponent({ children }) {
     return (
-      <ul className="ml-4 list-disc text-[var(--theme-text)] marker:text-[var(--theme-muted)]">
+      <ul className="my-2 ml-4 list-disc space-y-0.5 text-[var(--theme-text)] marker:text-[var(--theme-muted)]">
         {children}
       </ul>
     )
   },
   ol: function OlComponent({ children }) {
     return (
-      <ol className="ml-4 list-decimal text-[var(--theme-text)] marker:text-[var(--theme-muted)]">
+      <ol className="my-2 ml-4 list-decimal space-y-0.5 text-[var(--theme-text)] marker:text-[var(--theme-muted)]">
         {children}
       </ol>
     )
   },
   li: function LiComponent({ children }) {
-    return <li className="leading-relaxed">{children}</li>
+    return <li className="pl-1 leading-relaxed">{children}</li>
   },
   a: function AComponent({ children, href }) {
     if (!href) {
@@ -234,7 +234,7 @@ const INITIAL_COMPONENTS: Partial<Components> = {
     return (
       <a
         href={href}
-        className="text-[var(--theme-text)] underline decoration-[var(--theme-muted)] underline-offset-4 transition-colors hover:text-[var(--theme-text)] hover:decoration-[var(--theme-accent)]"
+        className="text-[var(--theme-accent)] underline decoration-[var(--theme-accent-border,var(--theme-muted))] underline-offset-4 transition-opacity hover:opacity-80"
         target="_blank"
         rel="noopener noreferrer"
       >
@@ -246,17 +246,25 @@ const INITIAL_COMPONENTS: Partial<Components> = {
     if (!src) {
       return null
     }
-    return <img src={src} alt={alt ?? ''} {...props} />
+    return (
+      <img
+        src={src}
+        alt={alt ?? ''}
+        loading="lazy"
+        className="my-3 h-auto max-w-full rounded-lg border border-[var(--theme-border)]"
+        {...props}
+      />
+    )
   },
   blockquote: function BlockquoteComponent({ children }) {
     return (
-      <blockquote className="border-l-2 border-[var(--theme-border)] pl-4 text-[var(--theme-text)] italic">
+      <blockquote className="my-3 border-l-2 border-[var(--theme-border)] pl-4 text-[var(--theme-text)] italic opacity-80">
         {children}
       </blockquote>
     )
   },
   strong: function StrongComponent({ children }) {
-    return <strong className="font-medium text-[var(--theme-text)]">{children}</strong>
+    return <strong className="font-semibold text-[var(--theme-text)]">{children}</strong>
   },
   em: function EmComponent({ children }) {
     return <em className="italic text-[var(--theme-text)]">{children}</em>
@@ -533,7 +541,7 @@ function MarkdownComponent({
   return (
     <div
       className={cn(
-        'flex flex-col gap-2 break-words overflow-hidden',
+        'flex flex-col gap-3 break-words overflow-hidden',
         className,
       )}
     >

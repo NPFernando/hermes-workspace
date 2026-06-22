@@ -66,23 +66,21 @@ export function ChatEmptyState({
       transition={{ duration: 0.3, ease: 'easeOut' }}
       className="flex h-full flex-col items-center justify-center px-4 py-8"
     >
-      <div className="flex max-w-xl flex-col items-center text-center">
-        {/* Avatar in editorial frame, no glow — architectural restraint */}
-        <div className="relative mb-6">
+      <div className="flex w-full max-w-lg flex-col items-center text-center">
+        {/* Avatar — scales with viewport */}
+        <div className="relative mb-5 sm:mb-6">
           <img
             src="/claude-avatar.webp"
             alt="Hermes Agent"
-            className="relative size-20 rounded-md border border-[var(--theme-border)] p-1 bg-[var(--theme-card)]"
+            className="relative size-16 sm:size-20 md:size-24 rounded-md border border-[var(--theme-border)] p-1 bg-[var(--theme-card)]"
           />
         </div>
 
         {/* Editorial micro-label */}
-        <p className="micro-label mb-2">
-          Hermes Workspace
-        </p>
+        <p className="micro-label mb-2">Hermes Workspace</p>
 
-        {/* Editorial display title */}
-        <h2 className="editorial-display text-3xl text-[var(--theme-text)]">
+        {/* Display title — fluid scale */}
+        <h2 className="editorial-display text-2xl sm:text-3xl md:text-4xl text-[var(--theme-text)] leading-tight">
           Begin a session
         </h2>
 
@@ -94,27 +92,25 @@ export function ChatEmptyState({
         )}
 
         {!compact && (
-          <>
-            <p className="mt-3 text-sm text-[var(--theme-muted)]">
-              Agent chat · live tools · memory · full observability
-            </p>
-          </>
+          <p className="mt-3 text-xs sm:text-sm text-[var(--theme-muted)] leading-relaxed">
+            Agent chat · live tools · memory · full observability
+          </p>
         )}
 
-        {/* Prompt chips */}
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+        {/* Prompt chips — stack on narrow mobile, wrap on wider */}
+        <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row sm:flex-wrap justify-center gap-2 w-full sm:w-auto">
           {SUGGESTIONS.map((suggestion) => (
             <button
               key={suggestion.label}
               type="button"
               onClick={() => onSuggestionClick?.(suggestion.prompt)}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-3.5 py-2 text-xs font-medium transition-all bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)] hover:border-[var(--theme-accent-border)]"
+              className="flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2.5 sm:px-3.5 sm:py-2 text-sm sm:text-xs font-medium transition-all bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)] hover:border-[var(--theme-accent-border)] active:scale-[0.98] touch-manipulation"
             >
               <HugeiconsIcon
                 icon={suggestion.icon as any}
-                size={14}
+                size={15}
                 strokeWidth={1.5}
-                className="text-[var(--theme-accent)]"
+                className="shrink-0 text-[var(--theme-accent)]"
               />
               {suggestion.label}
             </button>

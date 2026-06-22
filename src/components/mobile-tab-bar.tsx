@@ -294,7 +294,7 @@ export function MobileTabBar() {
         onTouchMove={handlePillTouchMove}
         onTouchEnd={handlePillTouchEnd}
       >
-        <div ref={scrollRef} className="flex items-center gap-0.5 overflow-x-auto scrollbar-none px-2">
+        <div ref={scrollRef} className="tab-scroll-container flex items-center gap-0.5 overflow-x-auto scrollbar-none px-2">
           {MOBILE_NAV_TABS.map((tab, idx) => {
             const isActive = tab.match(pathname)
             const isCenter = tab.id === 'chat'

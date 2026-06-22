@@ -79,6 +79,54 @@
   }
 }
 
+/* ── Safe area padding utilities ────────────────────────────────────────────
+   Tailwind v4 @utility — generates .pb-safe, .pt-safe, .px-safe etc.
+   Used by chat-composer bottom sheets and any fixed panels near notch/home bar.
+   ─────────────────────────────────────────────────────────────────────────── */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+@utility pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+@utility px-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+@utility py-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility mt-safe {
+  margin-top: env(safe-area-inset-top, 0px);
+}
+
+/* ── Touch target helper ────────────────────────────────────────────────────
+   .touch-target: ensures 44×44px minimum tap area (Apple/Google HIG guideline)
+   without visually changing element size — invisible ::before overlay expands hit area.
+   ─────────────────────────────────────────────────────────────────────────── */
+@utility touch-target {
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 50% 50%;
+    min-width: 44px;
+    min-height: 44px;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+  }
+}
+
 /* Responsive content width for large desktop monitors.
    Placed before [data-chat-width] rules so user-selected wide/full always win via source order. */
 @media (min-width: 1280px) {
@@ -855,6 +903,24 @@ code {
   animation: slide-in-from-right 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
+/* Mobile tab bar: fade edges indicate scrollable overflow */
+.tab-scroll-container {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0px,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0px,
+    black 12px,
+    black calc(100% - 12px),
+    transparent 100%
+  );
+}
+
 /* Chat panel: force all content to respect panel width */
 .chat-panel-content,
 .chat-panel-content [data-chat-scroll-viewport],
@@ -870,8 +936,37 @@ code {
 }
 
 @media (hover: none) and (pointer: coarse) {
-  :where(button, [data-slot='button'], a, [role='button']) {
+  /* Remove flash on tap for all interactive elements */
+  :where(button, [data-slot='button'], a, [role='button'], label, summary) {
     -webkit-tap-highlight-color: transparent;
+  }
+  /* Remove 300ms tap delay — manipulation disables double-tap zoom on elements */
+  :where(button, [data-slot='button'], a[href], [role='button'],
+         input[type='button'], input[type='submit'], input[type='reset'],
+         label[for], select, summary) {
+    touch-action: manipulation;
+  }
+  /* Prevent accidental text selection on UI chrome while typing/swiping */
+  :where(button, nav, header, [role='toolbar'], [role='menubar'], label) {
+    user-select: none;
+  }
+}
+
+/* Code blocks: show scrollbar on mobile so users discover horizontal content */
+@media (max-width: 767px) {
+  .code-block .shiki,
+  .code-block pre {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--theme-accent, #888) 35%, transparent) transparent;
+  }
+  .code-block .shiki::-webkit-scrollbar {
+    height: 4px;
+    display: block;
+  }
+  .code-block .shiki::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--theme-accent, #888) 35%, transparent);
+    border-radius: 2px;
   }
 }
 
@@ -2628,4 +2723,30 @@ kbd {
     padding-top: env(safe-area-inset-top, var(--mobile-header-height));
     padding-bottom: env(safe-area-inset-bottom, var(--composer-height));
   }
+}
+
+/* ── Non-chat page content: dynamic bottom clearance ─────────────────────────
+   Screens use hardcoded pb-24/pb-28 which double-counts with the shell wrapper.
+   [data-route-page] overrides to use --tabbar-h so clearance is always exact.
+   On desktop there's no tab bar, so 2rem breathing room is enough.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  [data-route-page] {
+    padding-bottom: calc(var(--tabbar-h, 80px) + 1rem) !important;
+  }
+}
+@media (min-width: 768px) {
+  [data-route-page] {
+    padding-bottom: 2rem !important;
+  }
+}
+
+/* ── Themed text selection ── */
+::selection {
+  background: color-mix(in srgb, var(--theme-accent) 28%, transparent);
+  color: var(--theme-text);
+}
+::-moz-selection {
+  background: color-mix(in srgb, var(--theme-accent) 28%, transparent);
+  color: var(--theme-text);
 }

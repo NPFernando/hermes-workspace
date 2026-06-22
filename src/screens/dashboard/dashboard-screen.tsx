@@ -777,7 +777,7 @@ export function DashboardScreen() {
           <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={20} strokeWidth={1.5} />
         </button>
       </div>
-      <div className="mx-auto w-full max-w-[1400px] xl:max-w-[1600px] px-4 pt-14 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
+      <div data-route-page className="mx-auto w-full max-w-[1400px] xl:max-w-[1600px] px-4 pt-4 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5">
       {/* ── Header: brand lockup left, action cluster right.
            Iteration 010: dropped redundant "Dashboard" eyebrow (the
            page IS the dashboard); promoted "Hermes Workspace" to
