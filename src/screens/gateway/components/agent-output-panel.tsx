@@ -484,7 +484,7 @@ export function AgentOutputPanel({
           <button
             type="button"
             onClick={handleReconnect}
-            className="rounded border border-amber-400 px-2 py-0.5 text-[10px] font-semibold text-amber-600 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/40"
+            className="rounded border border-amber-400 px-2 py-1.5 sm:py-0.5 text-[10px] font-semibold text-amber-600 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/40 touch-manipulation"
           >
             Reconnect
           </button>
@@ -658,7 +658,7 @@ export function AgentOutputPanel({
           <button
             type="submit"
             disabled={!messageInput.trim() || sendingMessage}
-            className="shrink-0 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-sky-700 disabled:opacity-40"
+            className="shrink-0 rounded-lg bg-sky-600 px-3 py-2.5 sm:py-1.5 text-xs font-semibold text-white transition-colors hover:bg-sky-700 disabled:opacity-40 touch-manipulation"
           >
             Send
           </button>

@@ -115,7 +115,7 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
       }}
     >
       <DialogContent className="w-[min(720px,95vw)] border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-sm">
-        <div className="flex max-h-[85vh] flex-col">
+        <div className="flex max-h-[85dvh] flex-col">
           <div className="border-b border-[var(--theme-border)] px-5 py-4">
             <DialogTitle className="text-balance">
               🔌 {draft.name || (initial ? 'Edit MCP Server' : 'Add MCP Server')}
@@ -140,7 +140,7 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
             </div>
           </div>
 
-          <ScrollAreaRoot className="h-[56vh]">
+          <ScrollAreaRoot className="h-[56dvh]">
             <ScrollAreaViewport className="px-5 py-4">
               <div className="space-y-3">
                 <label className={LABEL}>

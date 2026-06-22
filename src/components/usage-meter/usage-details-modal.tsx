@@ -316,7 +316,7 @@ export function UsageDetailsModal({
   }
 
   return (
-    <div className="flex max-h-[80vh] flex-col gap-4 overflow-hidden p-5">
+    <div className="flex max-h-[80dvh] flex-col gap-4 overflow-hidden p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <DialogTitle>Usage Overview</DialogTitle>
@@ -561,7 +561,7 @@ export function UsageDetailsModal({
                                 onClick={() =>
                                   handleSetDefault(provider.provider)
                                 }
-                                className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-1.5 text-xs font-medium text-[var(--theme-muted)] transition hover:bg-[var(--theme-hover)]"
+                                className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2.5 sm:py-1.5 text-xs font-medium text-[var(--theme-muted)] transition hover:bg-[var(--theme-hover)] touch-manipulation"
                               >
                                 Set as Default
                               </button>

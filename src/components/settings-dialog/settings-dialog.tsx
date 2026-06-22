@@ -854,7 +854,7 @@ function HermesContent() {
                             setActiveModel(model.id)
                           }}
                           className={cn(
-                            'rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:brightness-110',
+                            'rounded-lg px-3 py-2.5 sm:py-1.5 text-xs font-medium transition-all hover:brightness-110 touch-manipulation',
                             activeProvider === provider.id &&
                               activeModel === model.id
                               ? 'ring-2 ring-accent-500'
@@ -1699,7 +1699,7 @@ function EnterpriseThemePicker() {
         <button
           type="button"
           onClick={toggleEnterpriseThemeMode}
-          className="inline-flex items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-hover)]"
+          className="inline-flex items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2.5 sm:py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-hover)] touch-manipulation"
           aria-label={
             currentMode === 'dark'
               ? 'Switch enterprise theme to light mode'

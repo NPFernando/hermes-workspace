@@ -186,7 +186,7 @@ export function AchievementsCard({
           onClick={() => setShowAll(false)}
         >
           <div
-            className="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-lg border bg-[var(--theme-card)] border-[var(--theme-border)]"
+            className="max-h-[80dvh] w-full max-w-2xl overflow-hidden rounded-lg border bg-[var(--theme-card)] border-[var(--theme-border)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div
@@ -211,7 +211,7 @@ export function AchievementsCard({
                 />
               </button>
             </div>
-            <div className="max-h-[64vh] overflow-y-auto p-4">
+            <div className="max-h-[64dvh] overflow-y-auto p-4">
               {loadingAll ? (
                 <div
                   className="py-8 text-center text-[11px] text-[var(--theme-muted)]"

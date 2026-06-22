@@ -482,7 +482,7 @@ export function MemoryBrowserScreen() {
                     <button
                       type="button"
                       onClick={handleStartEditing}
-                      className="relative inline-flex items-center gap-1.5 rounded-md border border-[var(--theme-border)] px-3 py-1.5 text-xs font-semibold transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]"
+                      className="relative inline-flex items-center gap-1.5 rounded-md border border-[var(--theme-border)] px-3 py-2.5 sm:py-1.5 text-xs font-semibold transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)] touch-manipulation"
                     >
                       <HugeiconsIcon
                         icon={PencilEdit02Icon}

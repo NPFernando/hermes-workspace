@@ -917,7 +917,7 @@ export function TerminalWorkspace({
         >
           <button
             type="button"
-            className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
+            className="flex w-full items-center rounded px-2 py-2.5 sm:py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)] touch-manipulation"
             onClick={function renameTabFromMenu() {
               const menuTab = tabs.find((tab) => tab.id === contextMenu.tabId)
               setContextMenu(null)
@@ -934,7 +934,7 @@ export function TerminalWorkspace({
           </button>
           <button
             type="button"
-            className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
+            className="flex w-full items-center rounded px-2 py-2.5 sm:py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)] touch-manipulation"
             onClick={function closeTabFromMenu() {
               const menuTab = tabs.find((tab) => tab.id === contextMenu.tabId)
               setContextMenu(null)

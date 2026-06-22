@@ -670,7 +670,7 @@ export function OperationalWorkerCard({
           type="button"
           onClick={onOpenTasks}
           title={`Route work to ${member.displayName || member.id}`}
-          className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+          className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-2 sm:py-1 touch-manipulation text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
         >
           <HugeiconsIcon icon={CheckListIcon} size={11} />
           Route to agent
@@ -678,7 +678,7 @@ export function OperationalWorkerCard({
         <button
           type="button"
           onClick={onOpenTui}
-          className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+          className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-2 sm:py-1 touch-manipulation text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
         >
           <HugeiconsIcon icon={ComputerTerminal01Icon} size={11} />
           Open terminal
@@ -705,7 +705,7 @@ export function OperationalWorkerCard({
               </div>
               <button
                 type="button"
-                className="rounded-lg px-2 py-1 text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
+                className="rounded-lg px-2 py-2 sm:py-1 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
                 onClick={() => setSettingsOpen(false)}
               >
                 ✕

@@ -170,7 +170,7 @@ export function SwarmNodeChat({
           <button
             type="button"
             onClick={clear}
-            className="rounded-full border border-emerald-400/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-emerald-100/70 hover:text-white"
+            className="rounded-full border border-emerald-400/20 px-2 py-1.5 sm:py-0.5 text-[9px] uppercase tracking-[0.18em] text-emerald-100/70 hover:text-white touch-manipulation"
           >
             Clear
           </button>
@@ -178,7 +178,7 @@ export function SwarmNodeChat({
             <button
               type="button"
               onClick={() => onCollapsedChange(!collapsed)}
-              className="rounded-full border border-emerald-400/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-emerald-100/70 hover:text-white"
+              className="rounded-full border border-emerald-400/20 px-2 py-1.5 sm:py-0.5 text-[9px] uppercase tracking-[0.18em] text-emerald-100/70 hover:text-white touch-manipulation"
             >
               {collapsed ? 'Open' : 'Hide'}
             </button>

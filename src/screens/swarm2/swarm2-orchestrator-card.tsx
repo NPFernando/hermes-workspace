@@ -286,7 +286,7 @@ export function Swarm2OrchestratorCard({
                     type="button"
                     onClick={() => selectAgentLens(lens.id)}
                     className={cn(
-                      'rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] transition-colors',
+                      'rounded-full border px-1.5 py-1.5 sm:py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] transition-colors touch-manipulation',
                       agentLens === lens.id
                         ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
                         : 'border-transparent bg-transparent text-[var(--theme-muted)] hover:border-[var(--theme-border)] hover:bg-[var(--theme-card)] hover:text-[var(--theme-text)]',
@@ -411,7 +411,7 @@ export function Swarm2OrchestratorCard({
           onClick={() => setSettingsOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] p-6 shadow-[0_30px_100px_var(--theme-shadow)]"
+            className="max-h-[calc(100dvh-3rem)] w-full max-w-md overflow-y-auto rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] p-6 shadow-[0_30px_100px_var(--theme-shadow)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">

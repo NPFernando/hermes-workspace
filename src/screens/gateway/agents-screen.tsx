@@ -1895,7 +1895,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                 No recent sessions for this agent yet.
               </p>
             ) : (
-              <div className="max-h-[48vh] space-y-2 overflow-auto">
+              <div className="max-h-[48dvh] space-y-2 overflow-auto">
                 {selectedHistoryAgent.matchedSessions.slice(0, 8).map((session, index) => {
                   const friendlyId = getSessionFriendlyId(session)
                   const sessionModel = getSessionModelName(session)

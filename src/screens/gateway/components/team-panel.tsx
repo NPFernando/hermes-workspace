@@ -512,7 +512,7 @@ export function TeamPanel({
                     <button
                       type="button"
                       onClick={() => onKillSession?.(agent)}
-                      className="w-full rounded-md bg-red-500 px-2 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-red-600"
+                      className="w-full rounded-md bg-red-500 px-2 py-2.5 sm:py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-red-600 touch-manipulation"
                     >
                       Kill Session
                     </button>

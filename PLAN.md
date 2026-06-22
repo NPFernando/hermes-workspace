@@ -1,45 +1,26 @@
-# Plan: Make hover-only controls discoverable on touch devices
+# Plan: Harden mobile viewport sizing and touch ergonomics
 
 ## Summary of the change
-Complete the existing coherent dirty worktree on `feature/chat-ui-improvements` as a mobile/touch usability pass. The selected change makes controls that were previously hidden behind hover visible or partially visible on coarse-pointer devices, increases small touch targets where needed, and adds global mobile CSS guardrails for native selects, input zoom, and nested scroll containment.
+Adopt dynamic viewport height units across workspace dialogs, drawers, image previews, chat panels, dashboards, jobs, gateway, memory, skills, swarm, and task surfaces so browser chrome on mobile no longer clips panel content. Add touch-only global CSS for minimum readable tiny labels, overscroll containment in nested scroll containers, and immediate press feedback for touch targets.
 
 ## Files to modify
-- `src/components/agent-view/agent-card.tsx`
-- `src/components/agent-view/agent-view-panel.tsx`
-- `src/components/apply-mode-dialog.tsx`
-- `src/components/inspector/inspector-panel.tsx`
-- `src/components/keyboard-shortcuts-modal.tsx`
-- `src/components/manage-modes-modal.tsx`
-- `src/components/mobile-prompt/MobilePromptTrigger.tsx`
-- `src/components/mobile-prompt/MobileSetupModal.tsx`
-- `src/components/mobile-sessions-panel.tsx`
-- `src/components/model-suggestion-toast.tsx`
-- `src/components/orchestrator-avatar.tsx`
-- `src/components/prompt-kit/*.tsx`
-- `src/components/*mode-dialog.tsx`
-- `src/components/swarm/router-chat.tsx`
-- `src/components/update-center-notifier.tsx`
-- `src/components/usage-meter/usage-details-modal.tsx`
-- `src/components/whats-new-modal.tsx`
-- `src/routes/files.tsx`
-- `src/routes/settings/index.tsx`
-- `src/screens/**`
-- `src/styles.css`
+- `src/**/*.tsx` components and routes that use `max-h-[...vh]`, `h-[...vh]`, or `min-h-[...vh]` for modal/drawer/panel sizing.
+- `src/styles.css` for touch-only ergonomic fallbacks.
 
 ## Steps
-1. Treat the current pre-existing dirty `src/` diff as the implementation candidate; it consistently replaces mouse-hover-only visibility with coarse-pointer fallbacks and mobile-safe sizing.
-2. Do not stage generated screenshot files under `screenshots/` or ad-hoc screenshot scripts unless a future cycle explicitly turns them into supported tooling.
-3. Verify the diff has no whitespace errors with `git diff --check`.
-4. Verify TypeScript under the Hermes-managed Node 22 runtime using `npx tsc --noEmit`.
-5. Run focused Vitest coverage for responsive shell/chat surfaces, then full `pnpm test`.
-6. Run focused ESLint over changed TypeScript/React source files and separately record the repository-wide lint baseline if it still fails.
-7. Write `TEST_REPORT.json`, commit the intended source/artifact updates locally with `auto-improve: expose hover controls on touch devices`, and do not push.
+1. Preserve the existing responsive worktree changes on `feature/chat-ui-improvements`; do not discard unrelated coherent UI changes.
+2. Convert fixed viewport-height Tailwind utilities in workspace source files from `vh` to `dvh` where dynamic mobile browser chrome matters.
+3. Add `@media (hover: none) and (pointer: coarse)` CSS rules for readable small arbitrary text utilities, nested scroller overscroll containment, and touch active feedback.
+4. Keep screenshot smoke artifacts untracked; do not stage them in this cycle.
+5. Run TypeScript, Vitest, lint/build gates, then commit only intended source files plus cycle artifacts.
 
 ## How to verify the change works
-- `IDEAS.json` is valid JSON with at least three ideas.
-- `PLAN.md` contains `Files to modify` and `Steps` sections.
-- `git diff --check` exits 0.
-- `npx tsc --noEmit` exits 0.
-- Focused responsive/chat tests and full `pnpm test` pass.
-- Focused ESLint on changed TypeScript/React source files has 0 errors.
-- `TEST_REPORT.json` contains `passed: true`.
+- `git diff --check`
+- `npx tsc --noEmit`
+- `pnpm test`
+- `pnpm lint` and, if repository-wide baseline fails, focused ESLint on changed TypeScript/TSX files plus documentation of baseline failures.
+- `pnpm build`
+- JSON body health check after restart only if source changes are deployed.
+
+## Rollback
+Revert the auto-improve commit on `feature/chat-ui-improvements` or restore the touched `src/` files from the previous commit. Restart `hermes-workspace.service` only if a deployed build was rolled back.

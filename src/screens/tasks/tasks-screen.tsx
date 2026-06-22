@@ -742,7 +742,7 @@ export function TasksScreen() {
                     render={
                       <button
                         type="button"
-                        className="rounded-lg px-2 py-1 text-xs font-mono transition-colors hover:bg-[var(--theme-hover)] text-[var(--theme-muted)]"
+                        className="rounded-lg px-2 py-2.5 sm:py-1 text-xs font-mono transition-colors hover:bg-[var(--theme-hover)] text-[var(--theme-muted)] touch-manipulation"
                         aria-label="Keyboard shortcuts"
                       >
                         ?
@@ -780,7 +780,7 @@ export function TasksScreen() {
                   setCreateColumn('backlog')
                   setShowCreate(true)
                 }}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 bg-[var(--theme-accent)]"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 sm:py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 bg-[var(--theme-accent)] touch-manipulation"
               >
                 <HugeiconsIcon icon={Add01Icon} size={14} />
                 New Task

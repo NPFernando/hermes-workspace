@@ -258,7 +258,7 @@ export function LiveFeedPanel() {
             <button
               type="button"
               onClick={() => setEvents([])}
-              className="rounded px-1.5 py-0.5 text-[10px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)] dark:hover:bg-neutral-800 dark:hover:text-[var(--theme-muted)]"
+              className="rounded px-2 sm:px-1.5 py-1.5 sm:py-0.5 text-[10px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)] dark:hover:bg-neutral-800 dark:hover:text-[var(--theme-muted)] touch-manipulation"
             >
               Clear
             </button>
@@ -282,7 +282,7 @@ export function LiveFeedPanel() {
             type="button"
             onClick={() => setActiveFilter(tab)}
             className={cn(
-              'rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide transition-colors',
+              'rounded px-2 py-1.5 sm:py-0.5 text-[10px] font-medium uppercase tracking-wide transition-colors touch-manipulation',
               activeFilter === tab
                 ? 'bg-[var(--theme-card2)] text-[var(--theme-text)]'
                 : 'text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)] dark:hover:bg-neutral-900 dark:hover:text-[var(--theme-muted)]',

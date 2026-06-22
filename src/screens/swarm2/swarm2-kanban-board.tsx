@@ -385,7 +385,7 @@ export function Swarm2KanbanBoard({
               target="_blank"
               rel="noopener noreferrer"
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-2 py-1 font-medium transition-colors',
+                'inline-flex items-center gap-1.5 rounded-full border px-2 py-2.5 sm:py-1 font-medium transition-colors touch-manipulation',
                 'border-emerald-400/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20',
               )}
               title={`${backendPresentation.title ?? ''}\nOpen in Hermes Dashboard ↗`}
@@ -436,7 +436,7 @@ export function Swarm2KanbanBoard({
               setLinkLatestMission(Boolean(latestMission))
               setComposerOpen((open) => !open)
             }}
-            className="rounded-full bg-[var(--theme-accent)] px-3 py-1.5 font-semibold text-primary-950 hover:bg-[var(--theme-accent-strong)]"
+            className="rounded-full bg-[var(--theme-accent)] px-3 py-2.5 sm:py-1.5 font-semibold text-primary-950 hover:bg-[var(--theme-accent-strong)] touch-manipulation"
           >
             New card
           </button>
@@ -449,7 +449,7 @@ export function Swarm2KanbanBoard({
             type="button"
             onClick={() => setActiveLabelFilter(null)}
             className={cn(
-              'rounded-full border px-2.5 py-1 font-semibold transition-colors',
+              'rounded-full border px-2.5 py-2 sm:py-1 font-semibold transition-colors touch-manipulation',
               !activeLabelFilter
                 ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
                 : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
@@ -463,7 +463,7 @@ export function Swarm2KanbanBoard({
               type="button"
               onClick={() => setActiveLabelFilter(key)}
               className={cn(
-                'rounded-full border px-2.5 py-1 font-semibold transition-colors',
+                'rounded-full border px-2.5 py-2 sm:py-1 font-semibold transition-colors touch-manipulation',
                 label.color,
                 activeLabelFilter === key ? 'ring-2 ring-[var(--theme-accent)]' : '',
               )}
@@ -494,14 +494,14 @@ export function Swarm2KanbanBoard({
 
       {composerOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] p-5 shadow-[0_30px_100px_var(--theme-shadow)]">
+          <div className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-[var(--theme-border2)] bg-[var(--theme-card)] p-5 shadow-[0_30px_100px_var(--theme-shadow)]">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">Manual planning</div>
                 <h3 className="mt-1 text-lg font-semibold text-[var(--theme-text)]">New board card</h3>
                 <p className="mt-1 text-xs text-[var(--theme-muted-2)]">Spec work before routing it to an agent. Dispatch stays explicit through Router.</p>
               </div>
-              <button type="button" onClick={() => setComposerOpen(false)} className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-sm text-[var(--theme-muted)] hover:text-[var(--theme-text)]">Close</button>
+              <button type="button" onClick={() => setComposerOpen(false)} className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2.5 sm:py-1.5 text-sm text-[var(--theme-muted)] hover:text-[var(--theme-text)] touch-manipulation">Close</button>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="block text-xs md:col-span-2">

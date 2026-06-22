@@ -261,7 +261,7 @@ function ThinkingRow({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="group flex w-full items-baseline gap-2 px-3 py-1.5 text-left rounded-sm hover:bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)]"
+        className="group flex w-full items-baseline gap-2 px-3 py-2.5 sm:py-1.5 text-left rounded-sm hover:bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)] touch-manipulation"
       >
         <span className="shrink-0 leading-none">💭</span>
         <span

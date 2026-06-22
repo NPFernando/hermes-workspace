@@ -1,37 +1,43 @@
 [
   {
-    "title": "Make hover-only controls discoverable on touch devices",
-    "description": "Convert hover-revealed action buttons, metadata, and shortcut affordances into touch-visible states using coarse-pointer media variants so tablet and phone users can discover controls without a mouse.",
+    "title": "Harden mobile viewport sizing and touch ergonomics",
+    "description": "Use dynamic viewport units for modal, drawer, preview, and panel heights; add touch-only CSS for readable tiny labels, nested-scroll containment, and tactile active states.",
     "category": "ui",
-    "estimated_effort": "low"
+    "estimated_effort": "medium"
   },
   {
-    "title": "Prevent mobile input zoom and nested-scroll pull-to-refresh conflicts",
-    "description": "Add baseline mobile CSS for native selects, form controls, and route containers so text inputs do not trigger iOS zoom and inner scroll regions do not bubble overscroll to the browser shell.",
-    "category": "ui",
-    "estimated_effort": "low"
-  },
-  {
-    "title": "Move viewport screenshot smoke artifacts to ignored report storage",
-    "description": "Relocate ad-hoc viewport screenshot scripts and generated PNGs out of the tracked workspace tree, then add a documented ignored report path for future visual smoke checks.",
+    "title": "Add repeatable CSS validation for responsive utilities",
+    "description": "Introduce a stylelint or CSS smoke gate so responsive CSS changes are validated beyond TypeScript, ESLint, and production build.",
     "category": "config",
     "estimated_effort": "low"
   },
   {
-    "title": "Add CSS-specific validation for responsive utility changes",
-    "description": "Introduce a lightweight CSS/style validation command because ESLint does not validate src/styles.css, making responsive media-query regressions easy to miss.",
+    "title": "Move viewport screenshot smoke artifacts into ignored cycle reports",
+    "description": "Create a dedicated ignored reports/screenshots location and update ad-hoc screenshot helpers to write there instead of leaving root-level untracked artifacts.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Reconcile feature/chat-ui-improvements with main",
+    "description": "Resolve the long-lived branch divergence so responsive UI commits can merge cleanly without local-only deployment workarounds.",
     "category": "config",
     "estimated_effort": "medium"
   },
   {
-    "title": "Reconcile feature/chat-ui-improvements with origin/main",
-    "description": "Resolve branch divergence so verified responsive UI commits can merge cleanly instead of repeatedly deploying from a long-lived local feature branch.",
+    "title": "Add a viewport CSS smoke assertion for dvh utilities",
+    "description": "Add an automated check that scans responsive modal and drawer surfaces for accidental regressions back to vh-only sizing in touch-critical components.",
     "category": "config",
-    "estimated_effort": "medium"
+    "estimated_effort": "low"
   },
   {
-    "title": "Baseline and reduce strict conditional lint debt in responsive UI files",
-    "description": "Compare changed-file lint against a clean base and remove pre-existing @typescript-eslint/no-unnecessary-condition findings from high-traffic UI files so future visual polish can use stricter gates.",
+    "title": "Create an ignored visual-smoke artifact directory",
+    "description": "Move generated viewport screenshots and helper outputs under an ignored auto-improvement report directory so future UI cycles can capture evidence without dirtying the repo root.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Baseline and ratchet workspace ESLint debt",
+    "description": "Capture current strict lint failures into a baseline and add a changed-file ratchet so future cycles can distinguish new regressions from inherited debt automatically.",
     "category": "config",
     "estimated_effort": "medium"
   }

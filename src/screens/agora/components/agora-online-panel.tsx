@@ -34,7 +34,7 @@ export function AgoraOnlinePanel({ self, others, nearbyIds, onSelectUser }: Agor
               type="button"
               key={u.profile.id}
               onClick={() => onSelectUser?.(u)}
-              className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[var(--theme-bg)]"
+              className="w-full flex items-center gap-2 rounded-lg px-2 py-2.5 sm:py-1.5 text-left transition-colors hover:bg-[var(--theme-bg)] touch-manipulation"
             >
               <img
                 src={`/avatars/${u.profile.avatarId}.png`}

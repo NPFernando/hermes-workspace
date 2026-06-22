@@ -78,14 +78,14 @@ export function AgoraProfileDrawer({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="fixed right-0 top-0 z-[71] h-full w-full max-w-md overflow-y-auto p-5 bg-[var(--theme-bg)] border-l border-[var(--theme-border)]"
+            className="fixed right-0 top-0 z-[71] h-full w-full max-w-md overflow-y-auto p-5 pt-[calc(env(safe-area-inset-top,0px)+1.25rem)] bg-[var(--theme-bg)] border-l border-[var(--theme-border)]"
           >
             <div className="flex items-start justify-between mb-4">
               <h2 className="text-base font-semibold">{isSelf ? 'Your Profile' : user.profile.displayName}</h2>
               <button
                 type="button"
                 onClick={onClose}
-                className="opacity-60 hover:opacity-100 text-lg leading-none"
+                className="opacity-60 hover:opacity-100 touch-manipulation rounded-lg p-2.5 sm:p-1 text-lg leading-none"
                 aria-label="Close"
               >
                 ×
@@ -135,7 +135,7 @@ export function AgoraProfileDrawer({
                         onSaveProfile({ status: s })
                       }}
                       className={cn(
-                        'rounded-md px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.05em] border border-[var(--theme-border)]',
+                        'rounded-md px-3 py-2 sm:py-1 text-[11px] font-semibold uppercase tracking-[0.05em] border border-[var(--theme-border)] touch-manipulation',
                         editStatus === s
                           ? 'bg-[var(--theme-accent)] text-[var(--theme-bg)]'
                           : 'bg-[var(--theme-card)] text-[var(--theme-text)]',
@@ -212,7 +212,7 @@ export function AgoraProfileDrawer({
                 <button
                   type="button"
                   onClick={() => onWave?.(user)}
-                  className="rounded-lg px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.05em]"
+                  className="rounded-lg px-3 py-2.5 sm:py-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] touch-manipulation"
                   style={{
                     background: 'var(--theme-accent)',
                     color: 'var(--theme-bg)',

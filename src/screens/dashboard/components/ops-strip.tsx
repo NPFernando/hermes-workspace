@@ -183,7 +183,7 @@ export function OpsStrip({
           <button
             type="button"
             onClick={() => navigate({ to: '/settings', search: {} })}
-            className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
+            className="rounded px-2 sm:px-1.5 py-1.5 sm:py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80 touch-manipulation"
             style={{
               background:
                 'color-mix(in srgb, var(--theme-warning) 12%, transparent)',
@@ -226,7 +226,7 @@ export function OpsStrip({
           <button
             type="button"
             onClick={() => navigate({ to: '/swarm2' })}
-            className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
+            className="inline-flex items-center gap-2 rounded border px-2 py-1.5 sm:py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)] touch-manipulation"
             style={{
               borderColor:
                 kanban.blocked > 0
@@ -264,7 +264,7 @@ export function OpsStrip({
             <button
               type="button"
               onClick={() => navigate({ to: '/jobs' })}
-              className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
+              className="inline-flex items-center gap-2 rounded border px-2 py-1.5 sm:py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)] touch-manipulation"
               style={{
                 borderColor: isWarn
                   ? 'color-mix(in srgb, var(--theme-warning) 35%, transparent)'
@@ -303,7 +303,7 @@ export function OpsStrip({
           type="button"
           onClick={() => { setHasUnread(false); navigate({ to: '/settings', search: { section: 'whatsnew' } }) }}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80',
+            'inline-flex items-center gap-1.5 rounded border px-2 py-1.5 sm:py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80 touch-manipulation',
             hasUnread
               ? 'border-[var(--theme-accent)]/40 text-[var(--theme-accent)]'
               : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:text-[var(--theme-accent)]',

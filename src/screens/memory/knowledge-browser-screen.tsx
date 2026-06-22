@@ -818,7 +818,7 @@ export function KnowledgeBrowserScreen() {
             {page ? (
               <a
                 href={askUrl}
-                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--theme-border)] px-3 py-1.5 text-xs font-semibold transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]"
+                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--theme-border)] px-3 py-2.5 sm:py-1.5 text-xs font-semibold transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)] touch-manipulation"
               >
                 <HugeiconsIcon
                   icon={Message01Icon}
@@ -934,7 +934,7 @@ export function KnowledgeBrowserScreen() {
                                 key={backlink}
                                 type="button"
                                 onClick={() => handleSelectPath(backlinkPath)}
-                                className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-1 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]"
+                                className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 sm:py-1 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)] touch-manipulation"
                               >
                                 {backlink}
                               </button>
@@ -1003,7 +1003,7 @@ export function KnowledgeBrowserScreen() {
                                 key={link}
                                 type="button"
                                 onClick={() => handleSelectPath(linkPath)}
-                                className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-1 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]"
+                                className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 sm:py-1 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)] touch-manipulation"
                               >
                                 {link}
                               </button>
@@ -1147,7 +1147,7 @@ function TagPill({
       type="button"
       onClick={onClick}
       className={cn(
-        'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+        'rounded-full border px-2.5 py-2 sm:py-1 text-xs font-medium transition-colors touch-manipulation',
         active
           ? 'border-accent-500/70 bg-accent-500/10 text-[var(--theme-text)]'
           : 'border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)] hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]',

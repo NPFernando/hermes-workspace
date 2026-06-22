@@ -177,7 +177,7 @@ export function EditJobDialog({
             exit={{ opacity: 0, scale: 0.98, y: 10 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
             onSubmit={handleFormSubmit}
-            className="relative z-10 flex max-h-[85vh] w-[min(720px,96vw)] flex-col overflow-hidden rounded-2xl border shadow-2xl bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]"
+            className="relative z-10 flex max-h-[85dvh] w-[min(720px,96vw)] flex-col overflow-hidden rounded-2xl border shadow-2xl bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]"
           >
             <div
               className="flex items-start justify-between gap-4 border-b px-5 py-4 border-[var(--theme-border)]"

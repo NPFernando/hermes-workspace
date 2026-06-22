@@ -453,7 +453,7 @@ export function JobsScreen() {
               </button>
               <button
                 onClick={() => setShowCreate(true)}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 bg-[var(--theme-accent)]"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-2.5 sm:py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 bg-[var(--theme-accent)] touch-manipulation"
               >
                 <HugeiconsIcon icon={Add01Icon} size={14} />
                 New Job

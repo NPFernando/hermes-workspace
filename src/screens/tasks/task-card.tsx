@@ -305,7 +305,7 @@ export function TaskCard({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onResetAgent() }}
                 title="Agent appears stuck — click to reset"
-                className="text-[9px] px-1.5 py-0.5 rounded-md border transition-colors border-red-500/40 text-red-500 bg-red-500/7"
+                className="text-[10px] px-2 py-1.5 sm:px-1.5 sm:py-0.5 touch-manipulation rounded-md border transition-colors border-red-500/40 text-red-500 bg-red-500/7"
               >
                 ✕ reset
               </button>
@@ -326,7 +326,7 @@ export function TaskCard({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setActivityOpen(v => !v) }}
-            className="text-[9px] text-left hover:underline text-[var(--theme-muted)]"
+            className="text-[10px] sm:text-[9px] touch-manipulation text-left hover:underline text-[var(--theme-muted)]"
           >
             {activityOpen ? '▲ hide' : `💬 ${task.agent_history!.length} note${task.agent_history!.length !== 1 ? 's' : ''} — click to reply`}
           </button>
@@ -422,7 +422,7 @@ export function TaskCard({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onAssigneeClick(task.assignee!) }}
-                className="text-[10px] px-1.5 py-0.5 rounded-md transition-colors hover:outline hover:outline-1 hover:outline-[var(--theme-accent)] bg-[var(--theme-hover)] text-[var(--theme-muted)]"
+                className="text-[10px] px-2 sm:px-1.5 py-1.5 sm:py-0.5 rounded-md transition-colors hover:outline hover:outline-1 hover:outline-[var(--theme-accent)] bg-[var(--theme-hover)] text-[var(--theme-muted)] touch-manipulation"
                 title="Filter by this assignee"
               >
                 {assigneeLabel}

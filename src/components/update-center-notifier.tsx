@@ -558,7 +558,7 @@ function UpdateCard({
               type="button"
               onClick={onUpdate}
               disabled={updating}
-              className="rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60 bg-[var(--theme-accent)]"
+              className="rounded-lg px-4 py-2.5 sm:py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60 bg-[var(--theme-accent)] touch-manipulation"
             >
               {updating ? 'Updating' : 'Update'}
             </button>
@@ -639,7 +639,7 @@ function ReleaseNotes({
               <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={2} />
             </button>
           </div>
-          <div className="max-h-[60vh] space-y-4 overflow-auto px-5 pb-5">
+          <div className="max-h-[60dvh] space-y-4 overflow-auto px-5 pb-5">
             {notes.sections.map((section) => (
               <section key={`${section.product}:${section.to}`}>
                 <div className="mb-2 flex items-center justify-between gap-3">
@@ -754,7 +754,7 @@ function NaveenUpdateCard({
             type="button"
             onClick={onOpen}
             disabled={applying}
-            className={cn('rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60', hasConflicts ? 'bg-amber-500' : 'bg-purple-500')}
+            className={cn('rounded-lg px-4 py-2.5 sm:py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60 touch-manipulation', hasConflicts ? 'bg-amber-500' : 'bg-purple-500')}
           >
             {applying ? 'Updating' : hasConflicts ? 'Review' : 'Update'}
           </button>
@@ -847,7 +847,7 @@ function NaveenUpdateModal({
         </div>
 
         {/* Scrollable body */}
-        <div className="max-h-[60vh] space-y-4 overflow-auto px-5 pb-2">
+        <div className="max-h-[60dvh] space-y-4 overflow-auto px-5 pb-2">
           {/* Upstream commits */}
           <section>
             <h3 className="mb-2 text-sm font-semibold text-[var(--theme-text)]">

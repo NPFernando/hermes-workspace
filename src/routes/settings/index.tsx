@@ -1116,7 +1116,7 @@ function NetworkAccessSection() {
           href="https://tailscale.com/download"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-border)]"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 py-2.5 sm:py-1.5 text-xs font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-border)] touch-manipulation"
         >
           tailscale.com/download
           <svg viewBox="0 0 24 24" className="size-3 fill-none stroke-current" strokeWidth={2.5} aria-hidden>

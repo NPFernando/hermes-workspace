@@ -192,7 +192,7 @@ export function EchoStudioScreen() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
               <StatCard label="Screens Created" value={screensCreated} />
               <StatCard label="Widgets Active" value={widgetsActive} />
               <StatCard label="API Endpoints" value={apiEndpoints} />
@@ -226,7 +226,7 @@ export function EchoStudioScreen() {
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+    <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3 sm:p-4">
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]">
         {label}
       </p>

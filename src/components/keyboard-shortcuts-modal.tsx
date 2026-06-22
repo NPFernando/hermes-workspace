@@ -121,7 +121,7 @@ export function KeyboardShortcutsModal() {
             </div>
 
             {/* Content */}
-            <div className="max-h-[60vh] overflow-y-auto p-5">
+            <div className="max-h-[60dvh] overflow-y-auto p-5">
               {SHORTCUT_GROUPS.map((group) => (
                 <div key={group.title} className="mb-5 last:mb-0">
                   <h3 className="mb-2.5 text-xs font-medium uppercase tracking-wider text-[var(--theme-muted)]">

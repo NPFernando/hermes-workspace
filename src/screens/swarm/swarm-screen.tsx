@@ -266,7 +266,7 @@ export function SwarmScreen() {
             type="button"
             onClick={() => void refetch()}
             disabled={isFetching}
-            className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-emerald-200/70 hover:text-white"
+            className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 px-3 py-2.5 sm:py-1.5 text-[11px] uppercase tracking-[0.18em] text-emerald-200/70 hover:text-white touch-manipulation"
           >
             <HugeiconsIcon icon={RefreshIcon} size={11} className={isFetching ? 'animate-spin' : ''} />
             Refresh
@@ -275,7 +275,7 @@ export function SwarmScreen() {
             type="button"
             onClick={() => setMissionOpen(true)}
             disabled={!selectedId}
-            className="inline-flex items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-400/20 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-2.5 sm:py-1.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-400/20 disabled:opacity-50 touch-manipulation"
           >
             <HugeiconsIcon icon={ComputerTerminal01Icon} size={12} />
             Route to {selectedId ?? 'agent'}
@@ -284,7 +284,7 @@ export function SwarmScreen() {
             type="button"
             onClick={pingSelected}
             disabled={!selectedId || pinging}
-            className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-black hover:bg-emerald-300 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-3 py-2.5 sm:py-1.5 text-xs font-semibold text-black hover:bg-emerald-300 disabled:opacity-50 touch-manipulation"
           >
             <HugeiconsIcon icon={FlashIcon} size={12} />
             {pinging ? 'Pinging…' : `Ping ${selectedId ?? 'selected'}`}

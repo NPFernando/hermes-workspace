@@ -110,7 +110,7 @@ export function WhatsNewModal() {
               <button
                 type="button"
                 onClick={dismiss}
-                className="rounded-lg bg-accent-500 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-400"
+                className="rounded-lg bg-accent-500 px-4 py-2.5 sm:py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-400 touch-manipulation"
               >
                 Got it
               </button>

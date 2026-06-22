@@ -1,29 +1,23 @@
-# Close Summary: Expose hover controls on touch devices
+# Close Summary: Mobile viewport ergonomics hardening
 
 ## What changed
-- Completed a touch-usability pass across the Hermes workspace UI.
-- Hover-only action controls and metadata now gain coarse-pointer fallbacks so phone/tablet users can discover controls without a mouse.
-- Small close/remove/pin/menu affordances received safer touch sizing and `touch-manipulation` where appropriate.
-- `src/styles.css` now adds mobile guardrails for native select height, iOS input zoom prevention, and nested route overscroll containment.
-- Updated cycle artifacts: `IDEAS.json`, `PLAN.md`, and `TEST_REPORT.json`.
+- Converted responsive workspace surfaces from fixed `vh` sizing to dynamic `dvh` sizing across modals, drawers, panels, image previews, chat, dashboard, gateway, memory, skills, swarm, task, and file surfaces under `src/`.
+- Added touch-only CSS in `src/styles.css` for readable tiny arbitrary text utilities, nested scroller overscroll containment, and immediate active-state press feedback.
+- Preserved screenshot smoke leftovers as untracked artifacts; they were deliberately not staged.
 
 ## Test results
 - `git diff --check`: passed.
-- `npx tsc --noEmit`: passed.
-- Focused responsive/chat Vitest: 4 files / 14 tests passed.
-- Full `pnpm test`: 111 files / 718 tests passed.
-- `pnpm build`: passed for client and SSR bundles.
-- Focused ESLint excluding the known `@typescript-eslint/no-unnecessary-condition` baseline: 0 errors / 13 warnings.
-- Strict `pnpm lint` still fails on the known repository baseline: 201 errors / 37 warnings; 30 strict conditional errors are in touched files but were not introduced by this visual pass.
+- `npx tsc --noEmit` with Hermes Node v22.22.3: passed.
+- `pnpm test`: passed — 111 test files and 718 tests.
+- `pnpm build`: passed.
+- `pnpm lint`: failed on known repository baseline strict lint debt (201 errors, 37 warnings). Focused changed-file lint also reports inherited lint debt unrelated to this cycle's viewport-unit/className and CSS-only changes; details are in `TEST_REPORT.json`.
 
 ## Deployment and side effects
-- The requested `hermes dispatch-mission` command is still unavailable in Hermes v0.16.0, so the documented manual mission fallback was used.
-- Changes were committed locally on `feature/chat-ui-improvements`; no remote push was performed.
-- Branch merge remains blocked because `feature/chat-ui-improvements` is diverged from `main` and `origin/main`; I did not create a local merge commit.
-- Because source files changed, I built the workspace, restarted `hermes-workspace.service`, and validated the external JSON health endpoint. The first probe saw a transient nginx 502 during warm-up; the retry returned HTTP 200 `application/json` with `{ "status": "ok" }`.
-- Existing untracked screenshot smoke artifacts remain unmodified and unstaged under `screenshots/` plus `scripts/screenshot-viewports.cjs`.
+- The latest commit touches `src/`, so the verified current worktree was built, `hermes-workspace.service` was restarted, and external health was validated as HTTP 200 `application/json` with `{"status":"ok"}`.
+- The current branch remains diverged from `origin/main` (`HEAD...origin/main` reported 9 ahead / 1 behind), so I did not merge into `main` or push.
+- Remaining untracked files are viewport screenshot artifacts under `screenshots/` plus `scripts/screenshot-viewports.cjs`.
 
-## New ideas for next cycle
-1. Move screenshot smoke artifacts to an ignored auto-improvement report directory and document the capture command.
-2. Add a CSS-specific validation gate for `src/styles.css` because ESLint does not validate stylesheet semantics.
-3. Reconcile `feature/chat-ui-improvements` with `origin/main` so the accumulated responsive UI commits can merge cleanly.
+## New improvement ideas
+- Add a viewport CSS smoke assertion for `dvh` utilities.
+- Create an ignored visual-smoke artifact directory.
+- Baseline and ratchet workspace ESLint debt.

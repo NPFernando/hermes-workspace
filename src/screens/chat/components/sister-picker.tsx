@@ -89,7 +89,7 @@ export function SisterPicker({
         <button
           type="button"
           onClick={() => openPanel(true)}
-          className="flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 transition-colors hover:bg-emerald-500/20 shrink-0"
+          className="flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-1.5 sm:py-0.5 text-[11px] font-medium text-emerald-600 transition-colors hover:bg-emerald-500/20 shrink-0 touch-manipulation"
           title="Open agent view"
         >
           <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />

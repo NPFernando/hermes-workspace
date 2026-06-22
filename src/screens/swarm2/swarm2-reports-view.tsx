@@ -670,7 +670,7 @@ export function Swarm2ReportsView({
     const prUrl = extractPullRequestUrl(row)
     const buttonClass = compact
       ? 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[10px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]'
-      : 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]'
+      : 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-2.5 sm:py-1.5 text-xs font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)] touch-manipulation'
     return (
       <div className="mt-2 flex flex-wrap gap-1.5">
         <button type="button" aria-label={`Open ${row.workerId} worker`} onClick={() => openWorker(row)} className={buttonClass}>
@@ -980,7 +980,7 @@ export function Swarm2ReportsView({
                             </span>
                           ))}
                           {row.previews.map((preview) => (
-                            <a key={preview.id} href={preview.url} target="_blank" rel="noreferrer" className="rounded-full border border-[var(--theme-accent)]/40 bg-[var(--theme-accent-soft)] px-2 py-1 text-[10px] text-[var(--theme-accent-strong)]">
+                            <a key={preview.id} href={preview.url} target="_blank" rel="noreferrer" className="rounded-full border border-[var(--theme-accent)]/40 bg-[var(--theme-accent-soft)] px-2 py-2 sm:py-1 text-[10px] text-[var(--theme-accent-strong)] touch-manipulation">
                               preview: {preview.label}
                             </a>
                           ))}

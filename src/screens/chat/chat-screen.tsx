@@ -3027,7 +3027,7 @@ export function ChatScreen({
                         onClick={() => {
                           void resolvePendingApproval(approval, 'approved')
                         }}
-                        className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
+                        className="rounded-lg bg-emerald-500 px-3 py-2.5 sm:py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 touch-manipulation"
                       >
                         Approve
                       </button>
@@ -3036,7 +3036,7 @@ export function ChatScreen({
                         onClick={() => {
                           void resolvePendingApproval(approval, 'denied')
                         }}
-                        className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-[var(--theme-danger-soft-strong)]"
+                        className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-3 py-2.5 sm:py-1.5 text-xs font-medium text-red-400 hover:bg-[var(--theme-danger-soft-strong)] touch-manipulation"
                       >
                         Deny
                       </button>

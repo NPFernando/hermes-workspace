@@ -1059,7 +1059,7 @@ function ControlPlaneStage({
                 <button
                   type="button"
                   onClick={onClearFocusedRuntimeWorker}
-                  className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+                  className="rounded-full border border-[var(--theme-border)] px-2 py-1.5 sm:py-0.5 text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)] touch-manipulation"
                 >
                   Exit focus
                 </button>
@@ -1116,7 +1116,7 @@ function ControlPlaneStage({
                                     runtime.tmuxSession,
                                   )
                                 }
-                                className="rounded-full border border-transparent px-1.5 py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+                                className="rounded-full border border-transparent px-2.5 sm:px-1.5 py-1.5 sm:py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)] touch-manipulation"
                                 title={`Scroll up in ${runtime.tmuxSession ?? `swarm-${member.id}`}`}
                               >
                                 ↑
@@ -1130,7 +1130,7 @@ function ControlPlaneStage({
                                     runtime.tmuxSession,
                                   )
                                 }
-                                className="rounded-full border border-transparent px-1.5 py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+                                className="rounded-full border border-transparent px-2.5 sm:px-1.5 py-1.5 sm:py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)] touch-manipulation"
                                 title={`Scroll down in ${runtime.tmuxSession ?? `swarm-${member.id}`}`}
                               >
                                 ↓
@@ -1140,7 +1140,7 @@ function ControlPlaneStage({
                                 onClick={() =>
                                   onToggleFocusedRuntimeWorker(member.id)
                                 }
-                                className="rounded-full border border-transparent px-1.5 py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+                                className="rounded-full border border-transparent px-2.5 sm:px-1.5 py-1.5 sm:py-0.5 text-[12px] text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)] touch-manipulation"
                                 title={
                                   focusedRuntimeWorkerId === member.id
                                     ? `Exit focus for swarm-${member.id}`
@@ -1160,7 +1160,7 @@ function ControlPlaneStage({
                               }
                               onClick={() => onStartAgentSession(member.id)}
                               className={cn(
-                                'rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] transition-colors',
+                                'rounded-full border px-2 py-1.5 sm:py-0.5 text-[10px] uppercase tracking-[0.18em] transition-colors touch-manipulation',
                                 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)] hover:opacity-90',
                                 (pendingTmux.has(member.id) ||
                                   !tmuxAvailable) &&
@@ -2057,7 +2057,7 @@ export function Swarm2Screen() {
               <button
                 type="button"
                 onClick={() => setAddSwarmOpen(false)}
-                className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1.5 text-[var(--theme-muted)] hover:text-[var(--theme-text)]"
+                className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-2.5 sm:py-1.5 text-[var(--theme-muted)] hover:text-[var(--theme-text)] touch-manipulation"
               >
                 Close
               </button>

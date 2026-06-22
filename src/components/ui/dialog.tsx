@@ -32,7 +32,7 @@ function DialogContent({ className, children, style }: DialogContentProps) {
       <Dialog.Popup
         className={cn(
           'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
-          'w-[min(400px,92vw)] max-h-[90vh] rounded-[10px] p-0 overflow-hidden flex flex-col',
+          'w-[min(400px,92vw)] max-h-[90dvh] rounded-[10px] p-0 overflow-hidden flex flex-col',
           'transition-all duration-[250ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]',
           'data-[state=open]:opacity-100 data-[state=closed]:opacity-0',
           'data-[state=open]:scale-100 data-[state=open]:translate-y-[-50%] data-[state=closed]:scale-95 data-[state=closed]:translate-y-[-46%]',

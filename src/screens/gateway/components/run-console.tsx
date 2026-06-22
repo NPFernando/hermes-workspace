@@ -489,7 +489,7 @@ export function RunConsole({
                   <button
                     type="button"
                     onClick={() => setSteerTarget(steerTarget === agent.id ? null : agent.id)}
-                    className="rounded px-1.5 py-0.5 text-[10px] text-primary-400 transition-colors hover:bg-primary-800 hover:text-primary-200"
+                    className="rounded px-2 sm:px-1.5 py-1.5 sm:py-0.5 text-[10px] text-primary-400 transition-colors hover:bg-primary-800 hover:text-primary-200 touch-manipulation"
                   >
                     Steer
                   </button>
@@ -498,7 +498,7 @@ export function RunConsole({
                   <button
                     type="button"
                     onClick={() => onKillAgent(agent.id)}
-                    className="rounded px-1.5 py-0.5 text-[10px] text-red-400 transition-colors hover:bg-red-500/15 hover:text-red-300"
+                    className="rounded px-2 sm:px-1.5 py-1.5 sm:py-0.5 text-[10px] text-red-400 transition-colors hover:bg-red-500/15 hover:text-red-300 touch-manipulation"
                   >
                     Kill
                   </button>
@@ -810,7 +810,7 @@ export function RunConsole({
                   streamEndRef.current?.scrollIntoView({ behavior: 'smooth' })
                   setIsAutoScroll(true)
                 }}
-                className="sticky bottom-2 mx-auto flex items-center gap-1 rounded-full border border-primary-700 bg-primary-900/90 px-3 py-1.5 text-[11px] font-medium text-primary-200 shadow-lg backdrop-blur transition-colors hover:bg-primary-800"
+                className="sticky bottom-2 mx-auto flex items-center gap-1 rounded-full border border-primary-700 bg-primary-900/90 px-3 py-2.5 sm:py-1.5 text-[11px] font-medium text-primary-200 shadow-lg backdrop-blur transition-colors hover:bg-primary-800 touch-manipulation"
               >
                 ↓ Jump to latest
               </button>

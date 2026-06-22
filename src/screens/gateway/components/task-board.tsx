@@ -315,7 +315,7 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
               type="button"
               onClick={() => setShowAllTasks((p) => !p)}
               className={cn(
-                'shrink-0 rounded-lg border px-2 py-1 text-[10px] font-medium transition-colors',
+                'shrink-0 rounded-lg border px-2 py-2 sm:py-1 text-[10px] font-medium transition-colors touch-manipulation',
                 showAllTasks
                   ? 'border-[var(--theme-accent)]/40 bg-[var(--theme-card2)] text-[var(--theme-text)]'
                   : 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)] hover:border-[var(--theme-accent)]/40 hover:text-[var(--theme-text)]',
@@ -429,14 +429,14 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                         <button
                           type="button"
                           onClick={closeCreateForm}
-                          className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--theme-accent)] hover:bg-[var(--theme-accent-subtle)]"
+                          className="rounded-md px-2 py-2 sm:py-1 text-[11px] font-medium text-[var(--theme-accent)] hover:bg-[var(--theme-accent-subtle)] touch-manipulation"
                         >
                           Cancel
                         </button>
                         <button
                           type="submit"
                           disabled={!form.title.trim()}
-                          className="rounded-md bg-accent-500 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-md bg-accent-500 px-2 py-2 sm:py-1 text-[11px] font-medium text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation"
                         >
                           Create
                         </button>
@@ -582,14 +582,14 @@ export function TaskBoard({ agents, initialTasks, selectedAgentId, onRef, onTask
                               <button
                                 type="button"
                                 onClick={() => saveTaskDetail(task.id)}
-                                className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-500"
+                                className="rounded-md bg-emerald-600 px-2.5 py-2 sm:py-1 text-[11px] font-semibold text-white transition-colors hover:bg-emerald-500 touch-manipulation"
                               >
                                 Save
                               </button>
                               <button
                                 type="button"
                                 onClick={closeTaskDetail}
-                                className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card)]"
+                                className="rounded-md px-2 py-2 sm:py-1 text-[11px] font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card)] touch-manipulation"
                               >
                                 Cancel
                               </button>

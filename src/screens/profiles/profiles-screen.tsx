@@ -1138,7 +1138,7 @@ export function ProfilesScreen() {
         open={Boolean(detailsName)}
         onOpenChange={(open) => !open && setDetailsName(null)}
       >
-        <DialogContent className="w-[min(640px,94vw)] max-w-none p-0 max-h-[85vh] flex flex-col">
+        <DialogContent className="w-[min(640px,94vw)] max-w-none p-0 max-h-[85dvh] flex flex-col">
           {/* Header */}
           <div className="shrink-0 border-b border-[var(--theme-border)] px-6 pb-4 pt-5">
             <div className="flex items-center justify-between gap-3">

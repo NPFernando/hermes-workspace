@@ -268,7 +268,7 @@ function AddModelForm({
           type="button"
           onClick={submit}
           disabled={!modelId.trim()}
-          className="flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-2.5 sm:py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-600 disabled:opacity-50 touch-manipulation"
         >
           <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2.2} />
           Add
@@ -276,7 +276,7 @@ function AddModelForm({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="rounded-lg px-3 py-1.5 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
+          className="rounded-lg px-3 py-2.5 sm:py-1.5 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] touch-manipulation"
         >
           Cancel
         </button>

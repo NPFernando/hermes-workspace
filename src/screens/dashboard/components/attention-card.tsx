@@ -125,7 +125,7 @@ export function AttentionCard({
                     onClick={() =>
                       navigate({ to: href, search: {} } as never)
                     }
-                    className="w-full rounded border px-2 py-1.5 text-left transition-colors hover:bg-[var(--theme-card)]/80 border-[var(--theme-border)]"
+                    className="w-full rounded border px-2 py-2.5 sm:py-1.5 text-left transition-colors hover:bg-[var(--theme-card)]/80 border-[var(--theme-border)] touch-manipulation"
                   >
                     {content}
                   </button>

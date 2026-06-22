@@ -110,7 +110,7 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg border border-primary-700 px-2.5 py-1 text-xs font-medium text-primary-300 transition-colors hover:bg-primary-900 hover:text-primary-100"
+          className="rounded-lg border border-primary-700 px-2.5 py-2.5 sm:py-1 text-xs font-medium text-primary-300 transition-colors hover:bg-primary-900 hover:text-primary-100 touch-manipulation"
         >
           Close
         </button>
@@ -124,7 +124,7 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
               type="button"
               onClick={() => setActiveFilter(option.key)}
               className={cn(
-                'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                'rounded-full border px-3 py-2 sm:py-1 text-xs font-medium transition-colors touch-manipulation',
                 activeFilter === option.key
                   ? option.className ?? 'border-accent-500 bg-accent-500/15 text-accent-300'
                   : 'border-primary-700 bg-primary-900 text-primary-300 hover:border-primary-700 hover:bg-primary-800 hover:text-primary-100',
@@ -173,7 +173,7 @@ export function RunLearnings({ runId, runTitle, learnings, onAddLearning, onClos
                     <button
                       type="button"
                       onClick={() => void handleCopy(learning.id, learning.text)}
-                      className="shrink-0 rounded-lg border border-primary-700 px-2 py-1 text-[11px] font-medium text-primary-300 transition-colors hover:bg-primary-800 hover:text-primary-100"
+                      className="shrink-0 rounded-lg border border-primary-700 px-2 py-2 sm:py-1 text-[11px] font-medium text-primary-300 transition-colors hover:bg-primary-800 hover:text-primary-100 touch-manipulation"
                     >
                       {copiedId === learning.id ? 'Copied' : 'Copy'}
                     </button>

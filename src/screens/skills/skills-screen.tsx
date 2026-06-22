@@ -894,7 +894,7 @@ export function SkillsScreen() {
       >
         <DialogContent className="w-[min(960px,95vw)] border-[var(--theme-border)] bg-[var(--theme-panel)] backdrop-blur-sm">
           {selectedSkill ? (
-            <div className="flex max-h-[85vh] flex-col">
+            <div className="flex max-h-[85dvh] flex-col">
               <div className="border-b border-[var(--theme-border)] px-5 py-4">
                 <DialogTitle className="text-balance">
                   {selectedSkill.icon} {selectedSkill.name}
@@ -913,7 +913,7 @@ export function SkillsScreen() {
                 )}
               </div>
 
-              <ScrollAreaRoot className="h-[56vh]">
+              <ScrollAreaRoot className="h-[56dvh]">
                 <ScrollAreaViewport className="px-5 py-4">
                   <div className="space-y-3">
                     {selectedSkill.homepage ? (

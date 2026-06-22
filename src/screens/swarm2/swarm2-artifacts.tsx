@@ -196,7 +196,7 @@ export function Swarm2Artifacts({
                 onClick={(event) => event.stopPropagation()}
                 title={`${preview.label} · ${preview.url}${preview.source ? ` · ${preview.source}` : ''}`}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] transition-colors',
+                  'inline-flex items-center gap-1 rounded-full border px-1.5 py-1.5 sm:py-0.5 text-[10px] transition-colors touch-manipulation',
                   preview.status === 'down'
                     ? 'border-red-400/40 bg-red-500/10 text-red-200'
                     : 'border-[var(--theme-accent)]/40 bg-[var(--theme-accent-soft)] text-[var(--theme-text)] hover:border-[var(--theme-accent)]',

@@ -139,12 +139,12 @@ export default function FilePreviewDialog({
                 <img
                   src={dataUrl}
                   alt={path}
-                  className="max-h-[60vh] max-w-full rounded-lg border border-[var(--theme-border)]"
+                  className="max-h-[60dvh] max-w-full rounded-lg border border-[var(--theme-border)]"
                 />
               ) : null}
             </div>
           ) : (
-            <div className="h-[60vh]">
+            <div className="h-[60dvh]">
               <textarea
                 className="h-full w-full resize-none rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/30"
                 value={content}

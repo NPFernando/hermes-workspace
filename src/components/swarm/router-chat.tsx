@@ -314,7 +314,7 @@ export function RouterChat({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+                className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2.5 sm:py-1.5 text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)] touch-manipulation"
               >
                 Close
               </button>
@@ -383,7 +383,7 @@ export function RouterChat({
                   <button
                     type="button"
                     onClick={reset}
-                    className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+                    className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2.5 sm:py-1.5 text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)] touch-manipulation"
                   >
                     Reset
                   </button>

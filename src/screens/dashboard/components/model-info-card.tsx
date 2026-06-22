@@ -182,7 +182,7 @@ export function ModelInfoCard({
           <button
             type="button"
             onClick={() => setShowInventory(true)}
-            className="mt-1 self-start rounded border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
+            className="mt-1 self-start rounded border border-[var(--theme-border)] px-2 py-1.5 sm:py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80 touch-manipulation"
             style={{ color: palette.muted }}
           >
             Inventory →
@@ -296,7 +296,7 @@ function ModelInventoryModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
+        className="flex max-h-[85dvh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div

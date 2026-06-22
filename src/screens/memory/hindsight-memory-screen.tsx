@@ -448,7 +448,7 @@ export function HindsightMemoryScreen() {
                   type="button"
                   disabled={!addContent.trim() || addMutation.isPending}
                   onClick={() => addMutation.mutate({ content: addContent, context: addContext })}
-                  className="w-full rounded-lg border border-[var(--theme-accent)] bg-[var(--theme-accent)]/20 py-1.5 text-xs font-medium text-[var(--theme-text)] transition hover:bg-[var(--theme-accent)]/30 disabled:opacity-50"
+                  className="w-full rounded-lg border border-[var(--theme-accent)] bg-[var(--theme-accent)]/20 py-2.5 sm:py-1.5 text-xs font-medium text-[var(--theme-text)] transition hover:bg-[var(--theme-accent)]/30 disabled:opacity-50 touch-manipulation"
                 >
                   {addMutation.isPending ? 'Saving…' : 'Save to Hindsight'}
                 </button>

@@ -315,7 +315,7 @@ function FilesRoute() {
                   <button
                     type="button"
                     onClick={() => setRenderMarkdown((v) => !v)}
-                    className="rounded-md border border-[var(--theme-border)] px-2.5 py-1 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
+                    className="rounded-md border border-[var(--theme-border)] px-2.5 py-2.5 sm:py-1 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] touch-manipulation"
                   >
                     {renderMarkdown ? 'Edit' : 'Preview'}
                   </button>
@@ -325,7 +325,7 @@ function FilesRoute() {
                     type="button"
                     onClick={handleSave}
                     disabled={!loaded.dirty || saving}
-                    className="rounded-md bg-accent-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-accent-600 disabled:opacity-50"
+                    className="rounded-md bg-accent-500 px-2.5 py-2.5 sm:py-1 text-xs font-medium text-white hover:bg-accent-600 disabled:opacity-50 touch-manipulation"
                   >
                     {saving ? 'Saving…' : 'Save'}
                   </button>
@@ -333,7 +333,7 @@ function FilesRoute() {
                 <button
                   type="button"
                   onClick={handleOpenInTab}
-                  className="inline-flex items-center gap-1 rounded-md border border-[var(--theme-border)] px-2.5 py-1 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
+                  className="inline-flex items-center gap-1 rounded-md border border-[var(--theme-border)] px-2.5 py-2.5 sm:py-1 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] touch-manipulation"
                   title="Open this file in a new browser tab"
                 >
                   <HugeiconsIcon
@@ -346,7 +346,7 @@ function FilesRoute() {
                 <button
                   type="button"
                   onClick={handleDownload}
-                  className="inline-flex items-center gap-1 rounded-md border border-[var(--theme-border)] px-2.5 py-1 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
+                  className="inline-flex items-center gap-1 rounded-md border border-[var(--theme-border)] px-2.5 py-2.5 sm:py-1 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] touch-manipulation"
                   title="Download this file to your computer"
                 >
                   <HugeiconsIcon

@@ -141,7 +141,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
               type="button"
               onClick={() => onTabChange(i)}
               className={cn(
-                'shrink-0 rounded px-2.5 py-1 text-xs transition-colors',
+                'shrink-0 rounded px-2.5 py-2 sm:py-1 text-xs transition-colors touch-manipulation',
                 i === activeIndex
                   ? 'bg-accent-500/10 text-accent-600 font-medium'
                   : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
@@ -176,7 +176,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
           <button
             type="button"
             onClick={() => setShowSource((v) => !v)}
-            className="rounded px-2 py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
+            className="rounded px-2 py-2.5 sm:py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors touch-manipulation"
           >
             {showSource ? 'Preview' : 'Source'}
           </button>
@@ -185,7 +185,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
           type="button"
           onClick={() => setIsEditing((v) => !v)}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors',
+            'inline-flex items-center gap-1.5 rounded px-2 py-2.5 sm:py-1 text-xs transition-colors touch-manipulation',
             isEditing
               ? 'bg-accent-500/10 text-accent-600 font-medium'
               : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
@@ -199,7 +199,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
         <button
           type="button"
           onClick={() => { handleCopy().catch(() => {}) }}
-          className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
+          className="inline-flex items-center gap-1.5 rounded px-2 py-2.5 sm:py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors touch-manipulation"
         >
           <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={14} strokeWidth={1.6} />
           {copied ? 'Copied' : 'Copy'}
@@ -207,7 +207,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
         <button
           type="button"
           onClick={handleDownload}
-          className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
+          className="inline-flex items-center gap-1.5 rounded px-2 py-2.5 sm:py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors touch-manipulation"
           title="Download file"
         >
           <HugeiconsIcon icon={DownloadIcon} size={14} strokeWidth={1.6} />

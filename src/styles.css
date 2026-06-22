@@ -2772,6 +2772,52 @@ kbd {
   }
 }
 
+/* ── Minimum readable text size on touch devices ────────────────────────────
+   9px text is unreadable on mobile. Clamp anything smaller than 10px to 10px
+   on touch screens. Tailwind's text-[9px] compiles to font-size: 9px — this
+   catches those without touching every individual component.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (hover: none) and (pointer: coarse) {
+  *:not(input):not(select):not(textarea):not(code):not(pre) {
+    min-font-size: 10px; /* non-standard, ignored by browsers that don't support it */
+  }
+  /* Practical override: any element with explicit 8px or 9px via Tailwind arbitrary value */
+  [class*="text-[9px]"],
+  [class*="text-[8px]"] {
+    font-size: 10px !important;
+  }
+}
+
+/* ── Overscroll containment on touch ─────────────────────────────────────────
+   On mobile, scrolling to the end of a nested container bleeds through to the
+   page behind it (iOS rubber-band effect). Contain it so only the innermost
+   scroller bounces. Tailwind class selectors are stable and more targeted than
+   a universal rule that would suppress pull-to-refresh on the root scroll.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (hover: none) and (pointer: coarse) {
+  .overflow-y-auto,
+  .overflow-y-scroll,
+  .overflow-auto,
+  .overflow-scroll {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* ── Touch press feedback ────────────────────────────────────────────────────
+   Hover states never fire on touchscreens. Give every interactive element a
+   subtle opacity dip on :active so taps feel instantaneous.
+   Disabled buttons and elements with explicit Tailwind active:scale-* still
+   work fine — the opacity stacks with scale for more tactile feel.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (hover: none) and (pointer: coarse) {
+  button:active:not([disabled]),
+  a:active,
+  [role="button"]:active {
+    opacity: 0.72;
+    transition: opacity 0.06s ease;
+  }
+}
+
 /* ── Themed text selection ── */
 ::selection {
   background: color-mix(in srgb, var(--theme-accent) 28%, transparent);

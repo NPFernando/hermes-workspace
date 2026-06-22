@@ -241,7 +241,7 @@ export function AgentChatPanel({
               type="button"
               onClick={() => void loadHistory()}
               disabled={loading}
-              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] dark:hover:bg-neutral-800"
+              className="rounded-lg px-2.5 py-2.5 sm:py-1.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] dark:hover:bg-neutral-800 touch-manipulation"
             >
               {loading ? '↻' : '↻ Refresh'}
             </button>

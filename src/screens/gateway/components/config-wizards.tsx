@@ -297,7 +297,7 @@ export function WizardModal({
       <div
         className={cn(
           'relative w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-2xl',
-          'max-h-[90vh] overflow-y-auto',
+          'max-h-[90dvh] overflow-y-auto',
           width,
         )}
         role="dialog"
@@ -449,7 +449,7 @@ export function AgentWizardModal({
               </span>
               {member.backstory.trim() ? (
                 <button type="button" onClick={() => onUpdate({ backstory: '' })}
-                  className="rounded-md border border-[var(--theme-border)] px-1.5 py-0.5 text-[9px] text-[var(--theme-muted)] hover:text-red-500 transition-colors">
+                  className="rounded-md border border-[var(--theme-border)] px-2 sm:px-1.5 py-1.5 sm:py-0.5 text-[9px] text-[var(--theme-muted)] hover:text-red-500 transition-colors touch-manipulation">
                   ✕ Clear
                 </button>
               ) : null}
@@ -674,7 +674,7 @@ export function TeamWizardModal({
         </button>
       </div>
 
-      <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+      <div className="px-6 py-5 space-y-4 max-h-[70dvh] overflow-y-auto">
         {/* Team name */}
         <div>
           <FieldLabel>Team Name</FieldLabel>
@@ -952,7 +952,7 @@ export function AddTeamModal({ currentTeam, quickStartTemplates, existingIcons =
       {/* ── Step 3: Build your team ── */}
       {step === 3 ? (
         <>
-          <div className="px-6 py-5 max-h-[65vh] overflow-y-auto space-y-4">
+          <div className="px-6 py-5 max-h-[65dvh] overflow-y-auto space-y-4">
             {/* Templates section */}
             <div>
               <p className="mb-2 text-xs font-semibold text-[var(--theme-muted)] uppercase tracking-wide">Start from a template</p>

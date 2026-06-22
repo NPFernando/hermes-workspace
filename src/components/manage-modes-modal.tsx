@@ -73,7 +73,7 @@ export function ManageModesModal({
           role="dialog"
           aria-labelledby="manage-modes-title"
           aria-modal="true"
-          className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--theme-border)] bg-surface p-5 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto"
+          className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--theme-border)] bg-surface p-5 sm:p-6 shadow-xl max-h-[90dvh] overflow-y-auto"
         >
           <h2
             id="manage-modes-title"
@@ -111,7 +111,7 @@ export function ManageModesModal({
         role="dialog"
         aria-labelledby="manage-modes-title"
         aria-modal="true"
-        className="fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--theme-border)] bg-surface p-6 shadow-xl"
+        className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-[var(--theme-border)] bg-surface p-6 shadow-xl"
       >
         <h2
           id="manage-modes-title"
@@ -229,7 +229,7 @@ export function ManageModesModal({
             role="dialog"
             aria-labelledby="delete-mode-title"
             aria-modal="true"
-            className="fixed left-1/2 top-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--theme-border)] bg-surface p-5 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto"
+            className="fixed left-1/2 top-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-[var(--theme-border)] bg-surface p-5 sm:p-6 shadow-xl max-h-[90dvh] overflow-y-auto"
           >
             <h2
               id="delete-mode-title"

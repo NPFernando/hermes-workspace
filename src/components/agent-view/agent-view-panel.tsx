@@ -1274,7 +1274,7 @@ export function AgentViewPanel() {
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-                className="fixed inset-x-0 bottom-0 z-[81] max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-[var(--theme-border)] bg-[var(--theme-hover)]/95 backdrop-blur-xl"
+                className="fixed inset-x-0 bottom-0 z-[81] max-h-[85dvh] overflow-y-auto rounded-t-2xl border-t border-[var(--theme-border)] bg-[var(--theme-hover)]/95 backdrop-blur-xl"
               >
                 {/* Drag handle */}
                 <div className="sticky top-0 z-10 flex justify-center bg-[var(--theme-hover)]/95 pt-2 pb-1 backdrop-blur-xl">

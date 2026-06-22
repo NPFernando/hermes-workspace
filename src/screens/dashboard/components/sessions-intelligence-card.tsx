@@ -238,7 +238,7 @@ export function SessionsIntelligenceCard({
                       params: { sessionKey: s.key },
                     })
                   }
-                  className="group flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors hover:bg-[var(--theme-card)]/80"
+                  className="group flex w-full items-center gap-2 rounded-md border px-2 py-2.5 sm:py-1.5 text-left transition-colors hover:bg-[var(--theme-card)]/80 touch-manipulation"
                   style={{
                     borderColor: isHighlight
                       ? 'color-mix(in srgb, var(--theme-accent) 50%, transparent)'

@@ -122,7 +122,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
         {/* Accent top border */}
         <div className="h-[3px] w-full bg-[var(--theme-accent)]" />
 
-        <div className="p-5 overflow-y-auto max-h-[85vh]">
+        <div className="p-5 overflow-y-auto max-h-[85dvh]">
           <DialogTitle className="text-base font-semibold text-[var(--theme-text)] mb-1">
             {isEdit ? 'Edit Task' : 'New Task'}
           </DialogTitle>

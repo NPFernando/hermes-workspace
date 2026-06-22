@@ -3340,7 +3340,7 @@ function ChatComposerComponent({
             <img
               src={previewImage.url}
               alt={previewImage.name}
-              className="max-h-[85vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
+              className="max-h-[85dvh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             />
           </div>,

@@ -186,7 +186,7 @@ function AgentCard({
                     setMenuOpen(false)
                     onView()
                   }}
-                  className="block w-full px-3 py-1.5 text-left text-[11px] text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]"
+                  className="block w-full px-3 py-2.5 sm:py-1.5 text-left text-[11px] text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)] touch-manipulation"
                 >
                   View Output
                 </button>
@@ -197,7 +197,7 @@ function AgentCard({
                       setMenuOpen(false)
                       onRespawn()
                     }}
-                    className="block w-full px-3 py-1.5 text-left text-[11px] text-amber-600 transition-colors hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/20"
+                    className="block w-full px-3 py-2.5 sm:py-1.5 text-left text-[11px] text-amber-600 transition-colors hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/20 touch-manipulation"
                   >
                     Respawn
                   </button>
@@ -220,7 +220,7 @@ function AgentCard({
                         if (!directive || !directive.trim()) return
                         onSteer(directive.trim())
                       }}
-                      className="block w-full px-3 py-1.5 text-left text-[11px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)]"
+                      className="block w-full px-3 py-2.5 sm:py-1.5 text-left text-[11px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] touch-manipulation"
                     >
                       Steer
                     </button>
@@ -230,7 +230,7 @@ function AgentCard({
                         setMenuOpen(false)
                         onPause?.(agent.status !== 'paused')
                       }}
-                      className="block w-full px-3 py-1.5 text-left text-[11px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)]"
+                      className="block w-full px-3 py-2.5 sm:py-1.5 text-left text-[11px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] touch-manipulation"
                     >
                       {agent.status === 'paused' ? 'Resume' : 'Pause'}
                     </button>
@@ -243,7 +243,7 @@ function AgentCard({
                     setMenuOpen(false)
                     onKill()
                   }}
-                  className="block w-full px-3 py-1.5 text-left text-[11px] text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                  className="block w-full px-3 py-2.5 sm:py-1.5 text-left text-[11px] text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20 touch-manipulation"
                 >
                   Kill session
                 </button>

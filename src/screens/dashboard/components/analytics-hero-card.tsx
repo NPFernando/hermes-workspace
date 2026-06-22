@@ -348,7 +348,7 @@ function AnalyticsModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
+        className="flex max-h-[88dvh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div

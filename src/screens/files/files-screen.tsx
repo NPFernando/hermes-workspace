@@ -424,7 +424,7 @@ function DiffModal({
       }}
     >
       <DialogContent className="max-w-5xl w-full">
-        <div className="flex flex-col max-h-[85vh]">
+        <div className="flex flex-col max-h-[85dvh]">
           {/* Header */}
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--theme-border)] px-5 py-3">
             <div className="min-w-0">
@@ -1301,7 +1301,7 @@ export function FilesScreen() {
           onClick={(e) => e.stopPropagation()}
         >
           <button
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--theme-hover)]"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 sm:py-1.5 hover:bg-[var(--theme-hover)] touch-manipulation"
             onClick={() => {
               openRenamePrompt(contextMenu.entry)
               setContextMenu(null)
@@ -1311,7 +1311,7 @@ export function FilesScreen() {
           </button>
           {contextMenu.entry.type === 'folder' ? (
             <button
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--theme-hover)]"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 sm:py-1.5 hover:bg-[var(--theme-hover)] touch-manipulation"
               onClick={() => {
                 setPromptState({
                   mode: 'new-folder',
@@ -1325,7 +1325,7 @@ export function FilesScreen() {
             </button>
           ) : (
             <button
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--theme-hover)]"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 sm:py-1.5 hover:bg-[var(--theme-hover)] touch-manipulation"
               onClick={() => {
                 void handleDownload(contextMenu.entry)
                 setContextMenu(null)
@@ -1335,7 +1335,7 @@ export function FilesScreen() {
             </button>
           )}
           <button
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 sm:py-1.5 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 touch-manipulation"
             onClick={() => {
               setDeleteConfirm(contextMenu.entry)
               setContextMenu(null)

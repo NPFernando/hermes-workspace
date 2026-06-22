@@ -96,7 +96,7 @@ export function LogsTailCard({
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="rounded border border-[var(--theme-border)] px-2 py-0.5 font-mono uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
+              className="rounded border border-[var(--theme-border)] px-2 py-1.5 sm:py-0.5 font-mono uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)] touch-manipulation"
             >
               Tail →
             </button>
@@ -187,7 +187,7 @@ function LogsModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
+        className="flex max-h-[85dvh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div

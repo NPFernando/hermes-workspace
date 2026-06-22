@@ -57,12 +57,12 @@ export function AgoraChatPanel({ self, others, messages, onSend }: AgoraChatPane
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search messages…"
-          className="flex-1 rounded-lg px-2 py-1 text-[12px] outline-none bg-[var(--theme-bg)] text-[var(--theme-text)] border border-[var(--theme-border)]"
+          className="flex-1 rounded-lg px-2 py-2 sm:py-1 text-[12px] outline-none bg-[var(--theme-bg)] text-[var(--theme-text)] border border-[var(--theme-border)]"
         />
         {searchTerm && (
           <button
             onClick={() => setSearchTerm('')}
-            className="ml-2 rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.05em] disabled:opacity-40"
+            className="ml-2 rounded-lg px-2 py-2 sm:py-1 text-[10px] font-semibold uppercase tracking-[0.05em] disabled:opacity-40 touch-manipulation"
             style={{
               background: 'var(--theme-accent)',
               color: 'var(--theme-bg)',

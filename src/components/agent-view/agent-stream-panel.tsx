@@ -193,7 +193,7 @@ export function AgentStreamPanel({ sessionKey, agentName, agentColor, onClose }:
   return (
     <>
       <button type="button" aria-label="Close live stream panel" className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-      <aside className="fixed inset-x-0 bottom-0 z-50 h-[70vh] rounded-t-2xl border-t border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-2xl md:right-0 md:bottom-0 md:left-auto md:top-[var(--titlebar-h,0px)] md:h-auto md:w-[400px] md:rounded-none md:border-t-0 md:border-l">
+      <aside className="fixed inset-x-0 bottom-0 z-50 h-[70dvh] rounded-t-2xl border-t border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-2xl md:right-0 md:bottom-0 md:left-auto md:top-[var(--titlebar-h,0px)] md:h-auto md:w-[400px] md:rounded-none md:border-t-0 md:border-l">
         <div className="flex h-full min-h-0 flex-col">
           <div className="sticky top-0 z-10 border-b border-[var(--theme-border)] backdrop-blur glass-dropdown">
             <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-[var(--theme-border)] md:hidden" />
@@ -206,7 +206,7 @@ export function AgentStreamPanel({ sessionKey, agentName, agentColor, onClose }:
                 </div>
                 <p className="mt-1 truncate text-xs text-[var(--theme-muted)]">{model} · {sessionKey}</p>
               </div>
-              <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-sm text-[var(--theme-muted)] hover:bg-[var(--theme-card2)]" aria-label="Close panel">×</button>
+              <button type="button" onClick={onClose} className="rounded-lg px-2 py-2.5 sm:py-1 text-sm text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] touch-manipulation" aria-label="Close panel">×</button>
             </div>
             <div className="flex flex-wrap gap-2 px-4 pb-3">
               <span className="inline-flex items-center gap-1 rounded-lg bg-[var(--theme-card)] px-2 py-1 text-xs"><span className="text-[var(--theme-muted)]">Tokens</span><span className="font-medium text-[var(--theme-text)]">{inputTokens.toLocaleString()} / {outputTokens.toLocaleString()}</span></span>
@@ -222,11 +222,11 @@ export function AgentStreamPanel({ sessionKey, agentName, agentColor, onClose }:
               </div>
             ))}
           </div>
-          <div className="sticky bottom-0 border-t border-[var(--theme-border)] px-3 py-3 backdrop-blur glass-dropdown">
+          <div className="sticky bottom-0 border-t border-[var(--theme-border)] px-3 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] backdrop-blur glass-dropdown">
             <div className="grid grid-cols-3 gap-2">
               <button type="button" onClick={() => setSteerOpen(true)} className="rounded-lg border border-[var(--theme-border)] px-2 py-2 text-xs font-medium text-[var(--theme-text)] hover:bg-[var(--theme-card2)]">Steer</button>
               <div className="relative">
-                {menuOpen ? <div className="absolute bottom-full left-0 mb-2 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] p-1 shadow-lg"><button type="button" onClick={() => void onPauseToggle()} disabled={pausePending} className="flex w-full rounded-md px-2 py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-card2)] disabled:opacity-60">{pausePending ? 'Updating...' : isPaused ? 'Resume' : 'Pause'}</button><button type="button" onClick={() => void onKill()} disabled={killPending} className="flex w-full rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-60 dark:text-red-300 dark:hover:bg-red-950/40">{killPending ? 'Terminating...' : 'Kill'}</button></div> : null}
+                {menuOpen ? <div className="absolute bottom-full left-0 mb-2 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] p-1 shadow-lg"><button type="button" onClick={() => void onPauseToggle()} disabled={pausePending} className="flex w-full rounded-md px-2 py-2.5 sm:py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-card2)] disabled:opacity-60 touch-manipulation">{pausePending ? 'Updating...' : isPaused ? 'Resume' : 'Pause'}</button><button type="button" onClick={() => void onKill()} disabled={killPending} className="flex w-full rounded-md px-2 py-2.5 sm:py-1.5 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-60 dark:text-red-300 dark:hover:bg-red-950/40 touch-manipulation">{killPending ? 'Terminating...' : 'Kill'}</button></div> : null}
                 <button type="button" onClick={() => setMenuOpen((open) => !open)} className="w-full rounded-lg border border-[var(--theme-border)] px-2 py-2 text-xs font-medium text-[var(--theme-text)] hover:bg-[var(--theme-card2)]">Pause/Kill</button>
               </div>
               <button type="button" onClick={() => { onClose(); void navigate({ to: '/chat/$sessionKey', params: { sessionKey } }) }} className="rounded-lg bg-accent-500 px-2 py-2 text-xs font-medium text-white hover:bg-accent-600">Open Chat</button>

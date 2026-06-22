@@ -545,7 +545,7 @@ export function FileExplorerSidebar({
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
           <button
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--theme-hover)]"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 sm:py-1.5 hover:bg-[var(--theme-hover)] touch-manipulation"
             onClick={() => {
               handleRename(contextMenu.entry)
               setContextMenu(null)
@@ -556,7 +556,7 @@ export function FileExplorerSidebar({
           {contextMenu.entry.type === 'folder' ? (
             <>
               <button
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--theme-hover)]"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 sm:py-1.5 hover:bg-[var(--theme-hover)] touch-manipulation"
                 onClick={() => {
                   handleNewFile(contextMenu.entry)
                   setContextMenu(null)
@@ -565,7 +565,7 @@ export function FileExplorerSidebar({
                 <HugeiconsIcon icon={PlusSignIcon} size={16} /> New file
               </button>
               <button
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--theme-hover)]"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 sm:py-1.5 hover:bg-[var(--theme-hover)] touch-manipulation"
                 onClick={() => {
                   handleNewFolder(contextMenu.entry)
                   setContextMenu(null)
@@ -574,7 +574,7 @@ export function FileExplorerSidebar({
                 <HugeiconsIcon icon={Folder01Icon} size={16} /> New folder
               </button>
               <button
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--theme-hover)]"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 sm:py-1.5 hover:bg-[var(--theme-hover)] touch-manipulation"
                 onClick={() => {
                   handleUploadClick(contextMenu.entry.path)
                   setContextMenu(null)
@@ -585,7 +585,7 @@ export function FileExplorerSidebar({
             </>
           ) : (
             <button
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--theme-hover)]"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 sm:py-1.5 hover:bg-[var(--theme-hover)] touch-manipulation"
               onClick={() => {
                 void handleDownload(contextMenu.entry)
                 setContextMenu(null)
@@ -595,7 +595,7 @@ export function FileExplorerSidebar({
             </button>
           )}
           <button
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-red-700 hover:bg-red-50/80"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 sm:py-1.5 text-red-700 hover:bg-red-50/80 touch-manipulation"
             onClick={() => {
               void handleDelete(contextMenu.entry)
               setContextMenu(null)

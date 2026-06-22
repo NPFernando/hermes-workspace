@@ -59,7 +59,7 @@ export function WorkflowHelpModal({
               </button>
             </div>
 
-            <div className="max-h-[70vh] space-y-5 overflow-y-auto px-5 py-5">
+            <div className="max-h-[70dvh] space-y-5 overflow-y-auto px-5 py-5">
               {sections.map((section) => (
                 <section key={section.title} className="space-y-2">
                   <h3 className="text-sm font-semibold text-[var(--theme-text)]">

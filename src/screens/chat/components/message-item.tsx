@@ -1123,7 +1123,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
       {/* Header row — always clickable */}
       <button
         type="button"
-        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 hover:opacity-80 text-left"
+        className="w-full flex items-center gap-1.5 px-2.5 py-2.5 sm:py-1.5 hover:opacity-80 text-left touch-manipulation"
         onClick={() => setExpanded((v) => !v)}
       >
         <span className="shrink-0 text-[10px] opacity-50">
@@ -1242,7 +1242,7 @@ function AgentWorkSummary({ toolSections }: { toolSections: Array<InlineToolSect
 
   return (
     <details className="group/agentwork w-full max-w-[var(--chat-content-max-width)]">
-      <summary className="flex cursor-pointer select-none list-none items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-1.5 text-[11px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/20 [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer select-none list-none items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2.5 sm:py-1.5 text-[11px] text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/20 [&::-webkit-details-marker]:hidden touch-manipulation">
         <span className="shrink-0 opacity-70">⚙</span>
         <span className="flex-1 font-medium">
           Agent Work
@@ -1567,7 +1567,7 @@ function ArtifactPreviewBody({ artifact, onExpand }: { artifact: InlineArtifact;
         title={artifact.title}
         sandbox="allow-scripts"
         srcDoc={artifact.content}
-        className="h-[60vh] w-full rounded-lg border"
+        className="h-[60dvh] w-full rounded-lg border"
         style={{
           borderColor: 'var(--theme-border)',
           background: 'white',
@@ -1579,7 +1579,7 @@ function ArtifactPreviewBody({ artifact, onExpand }: { artifact: InlineArtifact;
   if (artifact.type === 'markdown' || artifact.type === 'md') {
     return (
       <div
-        className="max-h-[60vh] overflow-auto rounded-lg border p-4 border-[var(--theme-border)]"
+        className="max-h-[60dvh] overflow-auto rounded-lg border p-4 border-[var(--theme-border)]"
       >
         <Markdown className="text-sm">{artifact.content}</Markdown>
       </div>
@@ -1590,7 +1590,7 @@ function ArtifactPreviewBody({ artifact, onExpand }: { artifact: InlineArtifact;
     <CodeBlock
       content={artifact.content}
       language={artifactLanguage(artifact.type)}
-      className="my-0 max-h-[60vh] overflow-auto"
+      className="my-0 max-h-[60dvh] overflow-auto"
       onExpand={onExpand}
     />
   )
@@ -1651,7 +1651,7 @@ function InlineArtifactCard({
         </div>
       </div>
       <DialogRoot open={open} onOpenChange={setOpen}>
-        <DialogContent className="w-[min(1100px,96vw)] max-h-[92vh]">
+        <DialogContent className="w-[min(1100px,96vw)] max-h-[92dvh]">
           <div className="flex items-center justify-between gap-3 border-b px-4 py-3 border-[var(--theme-border)]">
             <div className="min-w-0">
               <DialogTitle className="truncate text-base">{artifact.title}</DialogTitle>
@@ -1890,7 +1890,7 @@ function InlineToolSectionItem({
                     href={artifactPath}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium"
+                    className="shrink-0 rounded-lg px-2 py-2.5 sm:py-1 text-xs font-medium touch-manipulation"
                     style={{
                       background: 'var(--theme-card2)',
                       color: 'var(--theme-text)',

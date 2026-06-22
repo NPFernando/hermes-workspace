@@ -296,7 +296,7 @@ export function OperatorTipCard({
               <button
                 type="button"
                 onClick={handleCta}
-                className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] transition-all hover:scale-[1.03] hover:bg-[var(--theme-card)]/70 text-[var(--theme-text)]"
+                className="rounded-full border border-[var(--theme-border)] px-2 py-1.5 sm:py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] transition-all hover:scale-[1.03] hover:bg-[var(--theme-card)]/70 text-[var(--theme-text)] touch-manipulation"
               >
                 {tip.cta ?? 'Open'} →
               </button>
