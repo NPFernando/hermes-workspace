@@ -2683,7 +2683,7 @@ function MessageItemComponent({
       }
       className={cn(
         'group relative flex flex-col',
-        hasText || hasAttachments || hasSelectionCards ? 'gap-0.5 md:gap-1' : 'gap-0',
+        hasText || hasAttachments || hasSelectionCards ? 'gap-1 md:gap-1.5' : 'gap-0',
         wrapperClassName,
         isUser ? 'items-end' : 'items-start',
         !isUser && isNew && 'animate-[message-fade-in_0.4s_ease-out]',

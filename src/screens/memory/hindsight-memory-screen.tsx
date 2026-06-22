@@ -409,7 +409,7 @@ export function HindsightMemoryScreen() {
                   type="button"
                   title="Add memory"
                   onClick={() => setAddOpen(true)}
-                  className="rounded-lg border border-[var(--theme-border)] p-1.5 text-[var(--theme-muted)] transition hover:bg-[var(--theme-hover)]"
+                  className="rounded-lg border border-[var(--theme-border)] p-2.5 sm:p-1.5 touch-manipulation text-[var(--theme-muted)] transition hover:bg-[var(--theme-hover)]"
                 >
                   <HugeiconsIcon icon={Add01Icon} className="size-3.5" />
                 </button>
@@ -669,7 +669,7 @@ function MemoryDetail({
             title="Delete memory"
             disabled={isDeleting}
             onClick={onDelete}
-            className="rounded-lg border border-rose-300 p-1.5 text-rose-500 transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-900/20"
+            className="rounded-lg border border-rose-300 p-2.5 sm:p-1.5 touch-manipulation text-rose-500 transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-900/20"
           >
             <HugeiconsIcon icon={Delete01Icon} className="size-3.5" />
           </button>

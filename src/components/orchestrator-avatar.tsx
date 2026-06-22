@@ -1770,7 +1770,7 @@ function OrchestratorAvatarComponent({ size = 48, compact = false }: Orchestrato
       <button
         type="button"
         onClick={() => setShowPicker((v) => !v)}
-        className="absolute -right-1 -top-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-hover)]/90 p-1 text-[var(--theme-muted)] shadow-sm transition-all hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)] hover:scale-110"
+        className="absolute -right-1 -top-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-hover)]/90 p-2 sm:p-1 touch-manipulation text-[var(--theme-muted)] shadow-sm transition-all hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)] hover:scale-110"
         aria-label="Change avatar"
       >
         <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">

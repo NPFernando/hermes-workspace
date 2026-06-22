@@ -1827,7 +1827,7 @@ function ChatMessageListComponent({
                   type="button"
                   onClick={jumpToPreviousMatch}
                   disabled={messageSearchMatches.length === 0}
-                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] disabled:opacity-30"
+                  className="rounded p-2.5 sm:p-1 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] disabled:opacity-30"
                   aria-label="Previous match"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1844,7 +1844,7 @@ function ChatMessageListComponent({
                   type="button"
                   onClick={jumpToNextMatch}
                   disabled={messageSearchMatches.length === 0}
-                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] disabled:opacity-30"
+                  className="rounded p-2.5 sm:p-1 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] disabled:opacity-30"
                   aria-label="Next match"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1860,7 +1860,7 @@ function ChatMessageListComponent({
                 <button
                   type="button"
                   onClick={closeMessageSearch}
-                  className="rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]"
+                  className="rounded p-2.5 sm:p-1 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]"
                   aria-label="Close search"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">

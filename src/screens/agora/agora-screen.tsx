@@ -66,7 +66,7 @@ export function AgoraScreen() {
           <button
             type="button"
             onClick={openSelfProfile}
-            className="flex items-center gap-2 rounded-full px-2 py-1 text-[11px] hover:opacity-80 bg-[var(--theme-card)] border border-[var(--theme-border)]"
+            className="flex items-center gap-2 rounded-full px-3 sm:px-2 py-2 sm:py-1 touch-manipulation text-xs sm:text-[11px] hover:opacity-80 bg-[var(--theme-card)] border border-[var(--theme-border)]"
             title="Your profile"
           >
             <img

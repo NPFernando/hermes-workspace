@@ -1404,7 +1404,7 @@ export function Conductor() {
                         setActivityPage(0)
                       }}
                       className={cn(
-                        'rounded-full border px-3 py-1 text-[11px] font-medium capitalize transition-colors',
+                        'rounded-full border px-3 py-2 sm:py-1 touch-manipulation text-xs sm:text-[11px] font-medium capitalize transition-colors',
                         activityFilter === filter
                           ? 'border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
                           : 'border-[var(--theme-border)] text-[var(--theme-muted-2)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-text)]',

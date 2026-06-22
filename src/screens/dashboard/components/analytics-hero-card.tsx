@@ -132,7 +132,7 @@ export function AnalyticsHeroCard({
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="rounded border border-[var(--theme-border)] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
+              className="rounded border border-[var(--theme-border)] px-2 py-2 sm:py-1 touch-manipulation font-mono text-[10px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
             >
               Expand →
             </button>
@@ -373,7 +373,7 @@ function AnalyticsModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1 hover:bg-[var(--theme-card)]/80"
+            className="rounded p-2.5 sm:p-1 touch-manipulation hover:bg-[var(--theme-card)]/80"
           >
             <HugeiconsIcon
               icon={CancelIcon}

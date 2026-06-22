@@ -458,7 +458,7 @@ export function LiveActivityPanel({
               <button
                 type="button"
                 onClick={handleCloseOutput}
-                className="rounded p-1 text-[11px] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)] dark:hover:text-[var(--theme-muted)]"
+                className="rounded p-2.5 sm:p-1 touch-manipulation text-[11px] text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)] dark:hover:text-[var(--theme-muted)]"
                 aria-label="Close output"
               >
                 ✕

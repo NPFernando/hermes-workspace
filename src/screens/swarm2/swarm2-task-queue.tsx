@@ -228,7 +228,7 @@ export function Swarm2TaskQueue({
               <button
                 type="button"
                 onClick={() => setComposerOpen(false)}
-                className="rounded-md border border-[var(--theme-border)] px-2 py-1 hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
+                className="rounded-md border border-[var(--theme-border)] px-2 py-2 sm:py-1 touch-manipulation hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
               >
                 Cancel
               </button>
@@ -236,7 +236,7 @@ export function Swarm2TaskQueue({
                 type="button"
                 disabled={!draftTitle.trim() || createMutation.isPending}
                 onClick={() => void createMutation.mutateAsync()}
-                className="rounded-md bg-[var(--theme-accent)] px-2 py-1 font-semibold text-primary-950 disabled:opacity-40"
+                className="rounded-md bg-[var(--theme-accent)] px-2 py-2 sm:py-1 touch-manipulation font-semibold text-primary-950 disabled:opacity-40"
               >
                 {createMutation.isPending ? 'Adding…' : 'Add task'}
               </button>
@@ -320,7 +320,7 @@ export function Swarm2TaskQueue({
             <button
               type="button"
               onClick={() => setDetailsOpen((value) => !value)}
-              className="w-full rounded-md border border-dashed border-[var(--theme-border)]/70 bg-transparent px-2 py-1 text-center text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:bg-[color:rgba(255,255,255,0.03)] hover:text-[var(--theme-text)]"
+              className="w-full rounded-md border border-dashed border-[var(--theme-border)]/70 bg-transparent px-2 py-2 sm:py-1 touch-manipulation text-center text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)] hover:bg-[color:rgba(255,255,255,0.03)] hover:text-[var(--theme-text)]"
             >
               {detailsOpen ? 'Less' : 'More'}
             </button>

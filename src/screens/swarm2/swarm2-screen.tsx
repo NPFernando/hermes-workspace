@@ -1839,7 +1839,7 @@ export function Swarm2Screen() {
       <div
         className={cn(
           'mx-auto flex min-h-full max-w-[1680px] flex-col gap-3 px-3 pt-3 sm:px-4 lg:px-5',
-          routerOpen ? 'pb-[30rem]' : 'pb-24',
+          routerOpen ? 'pb-[30rem]' : 'pb-[calc(var(--tabbar-h,80px)+1rem)] md:pb-8',
         )}
       >
         <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-5 py-3 shadow-sm">

@@ -80,7 +80,7 @@ export function WhatsNewModal() {
               <button
                 type="button"
                 onClick={dismiss}
-                className="shrink-0 rounded-lg p-1.5 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]"
+                className="shrink-0 rounded-lg p-2.5 sm:p-1.5 touch-manipulation text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]"
                 aria-label="Close"
               >
                 <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={2} />

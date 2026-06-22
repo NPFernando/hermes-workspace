@@ -154,7 +154,7 @@ const INITIAL_COMPONENTS: Partial<Components> = {
           <span>{children}</span>
           <span
             aria-hidden="true"
-            className="text-[var(--theme-muted)] opacity-0 transition-opacity group-hover/heading:opacity-100"
+            className="text-[var(--theme-muted)] opacity-0 transition-opacity group-hover/heading:opacity-100 [@media(hover:none)]:opacity-50"
           >
             #
           </span>
@@ -176,7 +176,7 @@ const INITIAL_COMPONENTS: Partial<Components> = {
           <span>{children}</span>
           <span
             aria-hidden="true"
-            className="text-[var(--theme-muted)] opacity-0 transition-opacity group-hover/heading:opacity-100"
+            className="text-[var(--theme-muted)] opacity-0 transition-opacity group-hover/heading:opacity-100 [@media(hover:none)]:opacity-50"
           >
             #
           </span>

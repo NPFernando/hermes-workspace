@@ -231,7 +231,7 @@ function AgentCard({ member }: { member: CrewMember }) {
           <button
             type="button"
             onClick={handleViewTasks}
-            className="flex items-center gap-1 text-[11px] text-[var(--theme-muted)] hover:text-[#B87333] hover:bg-[var(--theme-hover)] px-2 py-1 rounded transition-colors -ml-2"
+            className="flex items-center gap-1 text-xs sm:text-[11px] text-[var(--theme-muted)] hover:text-[#B87333] hover:bg-[var(--theme-hover)] px-2 py-2 sm:py-1 rounded transition-colors touch-manipulation -ml-2"
           >
             <HugeiconsIcon icon={CheckListIcon} size={12} />
             Tasks
@@ -239,7 +239,7 @@ function AgentCard({ member }: { member: CrewMember }) {
           <button
             type="button"
             onClick={handleViewJobs}
-            className="flex items-center gap-1 text-[11px] text-[var(--theme-muted)] hover:text-[#B87333] hover:bg-[var(--theme-hover)] px-2 py-1 rounded transition-colors -mr-2"
+            className="flex items-center gap-1 text-xs sm:text-[11px] text-[var(--theme-muted)] hover:text-[#B87333] hover:bg-[var(--theme-hover)] px-2 py-2 sm:py-1 rounded transition-colors touch-manipulation -mr-2"
           >
             <HugeiconsIcon icon={Clock01Icon} size={12} />
             Cron Jobs

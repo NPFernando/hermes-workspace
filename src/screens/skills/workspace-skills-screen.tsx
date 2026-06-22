@@ -249,7 +249,7 @@ export function WorkspaceSkillsScreen() {
         </header>
 
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] shadow-sm lg:grid-cols-2">
-          <section className="min-h-0 border-b border-[var(--theme-border)] lg:border-b-0">
+          <section className="min-h-0 max-h-[50vh] lg:max-h-none border-b border-[var(--theme-border)] lg:border-b-0">
             <div className="flex h-full min-h-0 flex-col p-4 sm:p-5">
               <div className="flex flex-col gap-3 border-b border-[var(--theme-border)] pb-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>

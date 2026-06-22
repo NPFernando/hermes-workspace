@@ -106,7 +106,7 @@ export function KeyboardShortcutsModal() {
               </h2>
               <button
                 onClick={() => setIsOpen(false)}
-                className="rounded-lg p-1.5 text-[var(--theme-muted)] transition hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]"
+                className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation text-[var(--theme-muted)] transition hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]"
                 aria-label="Close"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

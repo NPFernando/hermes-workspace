@@ -206,7 +206,7 @@ function TemplateCard({
               e.stopPropagation()
               onDelete()
             }}
-            className="shrink-0 rounded p-1 text-xs text-[var(--theme-muted)] opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+            className="shrink-0 rounded p-2.5 sm:p-1 text-xs touch-manipulation text-[var(--theme-muted)] opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100 [@media(hover:none)]:opacity-80"
           >
             🗑
           </button>

@@ -408,7 +408,7 @@ export function Swarm2LiveChat({
                 onClick={() => void handleSend()}
                 disabled={isSending || !draft.trim()}
                 className={cn(
-                  'inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold transition-colors',
+                  'inline-flex h-9 sm:h-7 touch-manipulation items-center gap-1 rounded-lg px-3 sm:px-2.5 text-xs sm:text-[11px] font-semibold transition-colors',
                   isSending
                     ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-text)]'
                     : 'bg-[var(--theme-accent)] text-primary-950 hover:bg-[var(--theme-accent-strong)] disabled:opacity-40',

@@ -286,7 +286,7 @@ export function OperationsAgentCard({
             }
             onClick={() => setShowCronPanel((value) => !value)}
             className={cn(
-              'inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-1.5 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]',
+              'inline-flex h-10 sm:h-8 shrink-0 items-center gap-1 rounded-lg px-2.5 sm:px-1.5 touch-manipulation text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]',
               showCronPanel && 'bg-[var(--theme-bg)] text-[var(--theme-text)]',
             )}
           >
@@ -338,7 +338,7 @@ export function OperationsAgentCard({
                 : undefined
             }
             className={cn(
-              'inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--theme-bg)] disabled:cursor-not-allowed disabled:opacity-60',
+              'inline-flex h-10 w-10 sm:h-8 sm:w-8 items-center justify-center rounded-lg touch-manipulation transition-colors hover:bg-[var(--theme-bg)] disabled:cursor-not-allowed disabled:opacity-60',
               agent.needsSetup
                 ? 'text-amber-300 hover:text-amber-200'
                 : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
@@ -355,7 +355,7 @@ export function OperationsAgentCard({
             type="button"
             aria-label={`Open settings for ${displayName}`}
             onClick={() => onOpenSettings(agent.id)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
+            className="inline-flex h-10 w-10 sm:h-8 sm:w-8 items-center justify-center rounded-lg touch-manipulation text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]"
           >
             <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.8} />
           </button>
@@ -398,7 +398,7 @@ export function OperationsAgentCard({
           <button
             type="button"
             onClick={() => onOpenSettings(agent.id)}
-            className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-400 transition-colors hover:bg-[var(--theme-warning-soft-strong)]"
+            className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2 py-2 sm:py-1 touch-manipulation text-[10px] font-bold uppercase tracking-[0.14em] text-amber-400 transition-colors hover:bg-[var(--theme-warning-soft-strong)]"
             title="This agent has no model configured. Click to set one up."
           >
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-300" />

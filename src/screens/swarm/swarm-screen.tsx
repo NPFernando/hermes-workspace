@@ -384,7 +384,7 @@ export function SwarmScreen() {
                           <button
                             type="button"
                             onClick={() => setSelectedId(member.id)}
-                            className="inline-flex items-center gap-1 rounded-full border border-emerald-400/15 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-200/70 hover:text-white"
+                            className="inline-flex items-center gap-1 rounded-full border border-emerald-400/15 px-3 py-2 sm:py-1 touch-manipulation text-[11px] uppercase tracking-[0.18em] text-emerald-200/70 hover:text-white"
                           >
                             <HugeiconsIcon icon={ComputerTerminal01Icon} size={11} />
                             Focus
@@ -442,7 +442,7 @@ function ViewModeToggle({ mode, setMode }: { mode: SwarmViewMode; setMode: (mode
       <button
         type="button"
         onClick={() => setMode('cards')}
-        className={cn('rounded-full px-3 py-1 transition-colors', mode === 'cards' ? 'bg-emerald-400 text-black' : 'hover:text-white')}
+        className={cn('rounded-full px-3 py-2 sm:py-1 touch-manipulation transition-colors', mode === 'cards' ? 'bg-emerald-400 text-black' : 'hover:text-white')}
       >
         Cards
       </button>

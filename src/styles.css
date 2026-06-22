@@ -2741,6 +2741,37 @@ kbd {
   }
 }
 
+/* ── Native <select> mobile polish ──────────────────────────────────────────
+   Native selects on Android/iOS need min-height and a pointer for clarity.
+   The app themes each select individually; this adds the baseline touch polish.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (hover: none) and (pointer: coarse) {
+  select {
+    min-height: 40px;
+    cursor: pointer;
+  }
+}
+
+/* ── Contain overscroll on inner scrollable areas ─────────────────────────
+   Prevent scroll events from bubbling up and triggering pull-to-refresh
+   when the user scrolls within route page containers.
+   ─────────────────────────────────────────────────────────────────────────── */
+[data-route-page] {
+  overscroll-behavior-y: contain;
+}
+
+/* ── iOS / Android input zoom prevention ────────────────────────────────────
+   Any input < 16px triggers auto-zoom on iOS. Force a minimum of 16px on
+   touch devices; max(16px, 1em) preserves larger sizes where set explicitly.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']),
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
 /* ── Themed text selection ── */
 ::selection {
   background: color-mix(in srgb, var(--theme-accent) 28%, transparent);

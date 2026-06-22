@@ -108,7 +108,7 @@ function ThemeToggleMini() {
         applyTheme(nextMode)
         updateSettings({ theme: nextMode })
       }}
-      className="shrink-0 rounded-lg p-1.5 transition-colors hover:opacity-80 text-[var(--theme-muted)]"
+      className="shrink-0 rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-colors hover:opacity-80 text-[var(--theme-muted)]"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       <HugeiconsIcon
@@ -1198,7 +1198,7 @@ function ChatSidebarComponent({
               <button
                 type="button"
                 onClick={() => handleOpenSettings('claude')}
-                className="shrink-0 rounded-lg p-1.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors"
+                className="shrink-0 rounded-lg p-2.5 sm:p-1.5 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors"
                 aria-label="Settings"
               >
                 <HugeiconsIcon

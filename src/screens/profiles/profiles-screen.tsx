@@ -921,7 +921,7 @@ export function ProfilesScreen() {
                                 onChange={(e) =>
                                   setWorkerPresets((prev) => ({ ...prev, [rec.workerId]: e.target.value }))
                                 }
-                                className="h-7 flex-1 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-[11px] outline-none focus:border-accent-400"
+                                className="h-9 sm:h-7 flex-1 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs sm:text-[11px] outline-none focus:border-accent-400"
                               >
                                 {(swarmData.presets ?? []).map((p) => (
                                   <option key={p.key} value={p.key}>{p.label}</option>

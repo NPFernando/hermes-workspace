@@ -644,7 +644,7 @@ function ModeToggle({
           type="button"
           onClick={() => setMode(m)}
           className={cn(
-            'rounded-lg px-3 py-1 transition-colors',
+            'rounded-lg px-3 py-2 sm:py-1 touch-manipulation transition-colors',
             mode === m ? 'bg-[var(--theme-accent)] text-[var(--theme-text)]' : 'hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]',
           )}
         >

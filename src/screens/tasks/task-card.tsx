@@ -172,7 +172,7 @@ export function TaskCard({
 
       {/* Hover action buttons (▶ launch + ⋮ menu) */}
       <div
-        className="absolute top-1.5 right-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-1.5 right-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
         onClick={e => e.stopPropagation()}
       >
         {/* ▶ Launch Session */}
@@ -182,7 +182,7 @@ export function TaskCard({
             onClick={(e) => { e.stopPropagation(); onLaunch() }}
             disabled={isLaunching}
             title="Launch chat session for this task"
-            className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
+            className="rounded p-2 sm:p-0.5 touch-manipulation hover:bg-[var(--theme-hover)] transition-colors"
           >
             <HugeiconsIcon
               icon={PlayIcon}
@@ -198,7 +198,7 @@ export function TaskCard({
             onClick={(e) => { e.stopPropagation(); onExecute() }}
             disabled={isExecuting}
             title="Execute task with AI agent"
-            className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
+            className="rounded p-2 sm:p-0.5 touch-manipulation hover:bg-[var(--theme-hover)] transition-colors"
           >
             <HugeiconsIcon
               icon={Rocket01Icon}
@@ -210,7 +210,7 @@ export function TaskCard({
         <MenuRoot>
           <MenuTrigger
             type="button"
-            className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
+            className="rounded p-2 sm:p-0.5 touch-manipulation hover:bg-[var(--theme-hover)] transition-colors"
             aria-label="Task options"
           >
             <HugeiconsIcon icon={MoreVerticalIcon} size={13} className="text-[var(--theme-muted)]" />

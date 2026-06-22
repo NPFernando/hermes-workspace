@@ -153,10 +153,10 @@ function JobCard({
           <p className="mb-2 line-clamp-2 text-xs text-[var(--theme-muted)]">
             {job.prompt}
           </p>
-          <div className="mb-2 flex flex-wrap items-center gap-3 text-[10px] text-[var(--theme-muted)]">
+          <div className="mb-2 flex flex-wrap items-center gap-3 text-xs sm:text-[10px] text-[var(--theme-muted)]">
             {job.profile && (
               <>
-                <span className="rounded-md border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-[var(--theme-text)]">
+                <span className="rounded-md border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[10px] sm:text-[9px] uppercase tracking-wide text-[var(--theme-text)]">
                   {job.profile}
                 </span>
                 <span>·</span>
@@ -187,7 +187,7 @@ function JobCard({
         <div className="flex shrink-0 items-center gap-1">
           <button
             onClick={() => onTrigger(job.id)}
-            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
+            className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-colors hover:bg-[var(--theme-hover)]"
             title="Run now"
           >
             <HugeiconsIcon
@@ -198,7 +198,7 @@ function JobCard({
           </button>
           <button
             onClick={() => (isPaused ? onResume(job.id) : onPause(job.id))}
-            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
+            className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-colors hover:bg-[var(--theme-hover)]"
             title={isPaused ? 'Resume' : 'Pause'}
           >
             <HugeiconsIcon
@@ -209,7 +209,7 @@ function JobCard({
           </button>
           <button
             onClick={() => onEdit(job)}
-            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
+            className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-colors hover:bg-[var(--theme-hover)]"
             title="Edit"
           >
             <HugeiconsIcon
@@ -220,7 +220,7 @@ function JobCard({
           </button>
           <button
             onClick={() => setExpanded((current) => !current)}
-            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
+            className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-colors hover:bg-[var(--theme-hover)]"
             title={expanded ? 'Hide run history' : 'Show run history'}
           >
             <HugeiconsIcon
@@ -231,7 +231,7 @@ function JobCard({
           </button>
           <button
             onClick={() => onDelete(job.id)}
-            className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
+            className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-colors hover:bg-[var(--theme-hover)]"
             title="Delete"
           >
             <HugeiconsIcon
@@ -442,7 +442,7 @@ export function JobsScreen() {
                 onClick={() =>
                   void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
                 }
-                className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
+                className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-colors hover:bg-[var(--theme-hover)]"
                 title="Refresh"
               >
                 <HugeiconsIcon

@@ -1,37 +1,37 @@
 [
   {
-    "title": "Polish mobile and responsive workspace surfaces",
-    "description": "Finish the existing responsive UI refinement by adding safe-area header spacing, mobile-friendly empty-state buttons, discoverable tab overflow, better markdown spacing, and dynamic bottom clearance on non-chat route pages.",
+    "title": "Make hover-only controls discoverable on touch devices",
+    "description": "Convert hover-revealed action buttons, metadata, and shortcut affordances into touch-visible states using coarse-pointer media variants so tablet and phone users can discover controls without a mouse.",
     "category": "ui",
     "estimated_effort": "low"
   },
   {
-    "title": "Promote viewport screenshots into repeatable smoke coverage",
-    "description": "Convert the local screenshot capture helper into a documented smoke script that stores transient artifacts outside tracked source and validates key routes across common breakpoints.",
+    "title": "Prevent mobile input zoom and nested-scroll pull-to-refresh conflicts",
+    "description": "Add baseline mobile CSS for native selects, form controls, and route containers so text inputs do not trigger iOS zoom and inner scroll regions do not bubble overscroll to the browser shell.",
     "category": "ui",
-    "estimated_effort": "medium"
+    "estimated_effort": "low"
   },
   {
-    "title": "Separate baseline lint debt from changed-file lint regressions",
-    "description": "Add a focused lint/reporting gate for cron cycles so known repository-wide strict-type lint debt does not mask new regressions in modified files.",
-    "category": "config",
-    "estimated_effort": "medium"
-  },
-  {
-    "title": "Move screenshot smoke artifacts out of the tracked workspace tree",
-    "description": "Relocate viewport screenshots to an ignored temp/report directory and document a stable command so visual smoke checks do not leave repo-root noise after cron cycles.",
+    "title": "Move viewport screenshot smoke artifacts to ignored report storage",
+    "description": "Relocate ad-hoc viewport screenshot scripts and generated PNGs out of the tracked workspace tree, then add a documented ignored report path for future visual smoke checks.",
     "category": "config",
     "estimated_effort": "low"
   },
   {
-    "title": "Add CSS-specific lint or style validation for responsive utilities",
-    "description": "ESLint ignores src/styles.css, so add a lightweight CSS validation/stylelint path for Tailwind utility and media-query regressions.",
+    "title": "Add CSS-specific validation for responsive utility changes",
+    "description": "Introduce a lightweight CSS/style validation command because ESLint does not validate src/styles.css, making responsive media-query regressions easy to miss.",
     "category": "config",
     "estimated_effort": "medium"
   },
   {
     "title": "Reconcile feature/chat-ui-improvements with origin/main",
-    "description": "Resolve branch divergence so verified responsive UI commits can be merged cleanly rather than repeatedly deploying from a long-lived feature branch.",
+    "description": "Resolve branch divergence so verified responsive UI commits can merge cleanly instead of repeatedly deploying from a long-lived local feature branch.",
+    "category": "config",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Baseline and reduce strict conditional lint debt in responsive UI files",
+    "description": "Compare changed-file lint against a clean base and remove pre-existing @typescript-eslint/no-unnecessary-condition findings from high-traffic UI files so future visual polish can use stricter gates.",
     "category": "config",
     "estimated_effort": "medium"
   }

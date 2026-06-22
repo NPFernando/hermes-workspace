@@ -130,7 +130,7 @@ export function McpLogsDrawer({ server, open, onClose }: Props) {
             </label>
             <button
               type="button"
-              className="rounded border border-[var(--theme-border)] px-2 py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]"
+              className="rounded border border-[var(--theme-border)] px-2 py-2 sm:py-1 touch-manipulation text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]"
               onClick={onClose}
             >
               Close

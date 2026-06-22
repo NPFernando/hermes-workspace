@@ -842,7 +842,7 @@ export function Swarm2ReportsView({
                     <button
                       type="button"
                       onClick={() => setExpandedId(expanded ? null : `worker:${card.workerId}`)}
-                      className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]"
+                      className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-2 sm:py-1.5 touch-manipulation text-xs sm:text-[11px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]"
                     >
                       {expanded ? 'Hide reports' : `Open reports (${card.rows.length})`}
                     </button>
@@ -851,7 +851,7 @@ export function Swarm2ReportsView({
                         href={card.prUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
+                        className="inline-flex items-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-2 sm:py-1.5 touch-manipulation text-xs sm:text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
                       >
                         ↗
                       </a>
@@ -860,7 +860,7 @@ export function Swarm2ReportsView({
                       <button
                         type="button"
                         onClick={() => onRouteToReviewer?.(latestInboxItem)}
-                        className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
+                        className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-2 sm:py-1.5 touch-manipulation text-xs sm:text-[11px] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
                       >
                         Steer
                       </button>
@@ -946,11 +946,11 @@ export function Swarm2ReportsView({
                     </div>
                     <div className="shrink-0 text-right text-xs text-[var(--theme-muted)]">
                       <div className="flex flex-wrap justify-end gap-1.5">
-                        <button type="button" onClick={(event) => { event.stopPropagation(); onSelectWorker?.(row.workerId) }} className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1 font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]">
+                        <button type="button" onClick={(event) => { event.stopPropagation(); onSelectWorker?.(row.workerId) }} className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-2 sm:py-1 touch-manipulation font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]">
                           {row.workerName}
                         </button>
                         {row.state === 'needs_review' ? (
-                          <button type="button" onClick={(event) => { event.stopPropagation(); onRouteToReviewer?.({ ...row, lane: 'needs_review' }) }} className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1 font-medium text-amber-700 hover:bg-amber-500/15">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); onRouteToReviewer?.({ ...row, lane: 'needs_review' }) }} className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-2 sm:py-1 touch-manipulation font-medium text-amber-700 hover:bg-amber-500/15">
                             Route swarm6
                           </button>
                         ) : null}

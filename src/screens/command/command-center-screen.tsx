@@ -152,7 +152,7 @@ function SisterCard({ sister, onChat, className }: { sister: Sister; onChat: () 
         <button
           type="button"
           onClick={onChat}
-          className="mt-auto flex items-center gap-1.5 self-start rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--theme-muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:border-accent-500/40 hover:bg-accent-500/5 hover:text-accent-600"
+          className="mt-auto flex items-center gap-1.5 self-start rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--theme-muted)] opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100 touch-manipulation hover:border-accent-500/40 hover:bg-accent-500/5 hover:text-accent-600"
         >
           <HugeiconsIcon icon={Chat01Icon} size={12} strokeWidth={2} />
           Chat

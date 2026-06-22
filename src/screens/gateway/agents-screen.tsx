@@ -1284,7 +1284,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
   }
 
   return (
-    <div className="min-h-full bg-surface px-4 pb-24 pt-5 text-[var(--theme-text)] md:px-6 md:pb-4 md:pt-8">
+    <div data-route-page className="min-h-full bg-surface px-4 pt-5 text-[var(--theme-text)] md:px-6 md:pt-8">
       <div className="mx-auto w-full max-w-[1200px]">
         <header className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-3 shadow-sm">
           <div>

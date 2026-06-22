@@ -2262,7 +2262,7 @@ function ChatComposerComponent({
                         event.stopPropagation()
                         handleRemoveAttachment(attachment.id)
                       }}
-                      className="absolute right-1 top-1 z-10 inline-flex size-6 items-center justify-center rounded-full bg-[var(--theme-bg)]/80 text-[var(--theme-text)] opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100 focus-visible:opacity-100"
+                      className="absolute right-1 top-1 z-10 inline-flex size-8 sm:size-6 items-center justify-center rounded-full bg-[var(--theme-bg)]/80 text-[var(--theme-text)] touch-manipulation opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100 focus-visible:opacity-100"
                     >
                       <HugeiconsIcon
                         icon={Cancel01Icon}
@@ -2725,7 +2725,7 @@ function ChatComposerComponent({
                                   className={`absolute right-3 rounded p-1 transition-opacity ${
                                     isPinned(entry.id)
                                       ? 'text-accent-500 opacity-80 hover:opacity-100'
-                                      : 'text-[var(--theme-muted)] opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-[var(--theme-accent)]'
+                                      : 'text-[var(--theme-muted)] opacity-0 group-hover:opacity-60 [@media(hover:none)]:opacity-50 hover:!opacity-100 hover:text-[var(--theme-accent)]'
                                   }`}
                                   aria-label={
                                     isPinned(entry.id)
@@ -3162,7 +3162,7 @@ function ChatComposerComponent({
                                               className={`absolute right-2 rounded p-1 transition-opacity ${
                                                 isPinned(entry.id)
                                                   ? 'text-accent-500 opacity-80 hover:opacity-100'
-                                                  : 'text-[var(--theme-muted)] opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-[var(--theme-accent)]'
+                                                  : 'text-[var(--theme-muted)] opacity-0 group-hover:opacity-60 [@media(hover:none)]:opacity-50 hover:!opacity-100 hover:text-[var(--theme-accent)]'
                                               }`}
                                               aria-label={isPinned(entry.id) ? `Unpin ${entry.name}` : `Pin ${entry.name}`}
                                             >

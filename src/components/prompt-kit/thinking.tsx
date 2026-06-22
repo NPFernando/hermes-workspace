@@ -24,7 +24,7 @@ function Thinking({ content }: ThinkingProps) {
           render={
             <Button
               variant="ghost"
-              className="h-auto gap-1.5 px-1.5 py-0.5 -mx-2"
+              className="h-auto gap-1.5 px-2 py-2 sm:px-1.5 sm:py-0.5 -mx-2 touch-manipulation"
             />
           }
         >

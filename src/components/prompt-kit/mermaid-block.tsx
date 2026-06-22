@@ -81,7 +81,7 @@ export function MermaidBlock({ code }: { code: string }) {
           type="button"
           onClick={() => { handleCopy().catch(() => {}) }}
           className={cn(
-            'inline-flex items-center gap-1 text-xs text-[var(--theme-muted)] hover:text-[var(--theme-text)] transition-colors',
+            'inline-flex items-center gap-1 text-xs text-[var(--theme-muted)] hover:text-[var(--theme-text)] transition-colors rounded p-2 sm:p-0.5 touch-manipulation',
           )}
         >
           <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={14} strokeWidth={1.5} />

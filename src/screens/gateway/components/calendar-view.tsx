@@ -345,7 +345,7 @@ export function CalendarView({ cronJobs, missionRuns, onSelectEvent }: CalendarV
               type="button"
               onClick={() => setMode(view)}
               className={cn(
-                'rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors',
+                'rounded px-2.5 py-2 sm:py-1 touch-manipulation text-xs font-medium capitalize transition-colors',
                 mode === view ? 'bg-accent-500 text-primary-950' : 'text-primary-300 hover:bg-primary-800 hover:text-primary-100',
               )}
             >

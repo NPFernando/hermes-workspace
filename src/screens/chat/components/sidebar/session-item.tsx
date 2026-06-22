@@ -173,8 +173,8 @@ function SessionItemComponent({
             event.stopPropagation()
           }}
           className={cn(
-            'ml-2 inline-flex size-7 items-center justify-center rounded-md text-[var(--theme-muted)]',
-            'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--theme-hover)]',
+            'ml-2 inline-flex size-9 sm:size-7 touch-manipulation items-center justify-center rounded-md text-[var(--theme-muted)]',
+            'opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-[var(--theme-hover)]',
             'aria-expanded:opacity-100 aria-expanded:bg-[var(--theme-hover)]',
           )}
           aria-label="Session options"

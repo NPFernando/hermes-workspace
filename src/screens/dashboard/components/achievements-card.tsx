@@ -201,7 +201,7 @@ export function AchievementsCard({
                 type="button"
                 onClick={() => setShowAll(false)}
                 aria-label="Close"
-                className="rounded p-1 hover:bg-[var(--theme-card)]/80"
+                className="rounded p-2.5 sm:p-1 touch-manipulation hover:bg-[var(--theme-card)]/80"
               >
                 <HugeiconsIcon
                   icon={CancelIcon}

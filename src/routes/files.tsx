@@ -273,7 +273,7 @@ function FilesRoute() {
             <button
               type="button"
               onClick={() => setFileExplorerCollapsed((prev) => !prev)}
-              className="rounded-lg p-1.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
+              className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
               aria-label={fileExplorerCollapsed ? 'Show files' : 'Hide files'}
               title={fileExplorerCollapsed ? 'Show files' : 'Hide files'}
             >
@@ -359,7 +359,7 @@ function FilesRoute() {
               </div>
             ) : null}
           </header>
-          <div className="min-h-0 flex-1 pb-24 md:pb-0">
+          <div className="min-h-0 flex-1 pb-[calc(var(--tabbar-h,80px)+1rem)] md:pb-0">
             {loaded?.loading ? (
               <div className="flex h-full items-center justify-center text-sm text-[var(--theme-muted)]">
                 Loading…

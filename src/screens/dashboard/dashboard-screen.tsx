@@ -737,9 +737,12 @@ export function DashboardScreen() {
   })
 
   return (
-    <div data-route-page className="min-h-full">
+    <div className="min-h-full">
       {/* Floating mobile nav: hamburger left, theme toggle right */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-2 h-12" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <div
+        className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-end justify-between px-2 pb-1 bg-[var(--theme-bg)]/80 backdrop-blur-md border-b border-[var(--theme-border)]/40"
+        style={{ paddingTop: 'env(safe-area-inset-top, 12px)', minHeight: 'calc(48px + env(safe-area-inset-top, 0px))' }}
+      >
         <button
           type="button"
           aria-label="Open navigation menu"
@@ -777,7 +780,13 @@ export function DashboardScreen() {
           <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={20} strokeWidth={1.5} />
         </button>
       </div>
-      <div data-route-page className="mx-auto w-full max-w-[1400px] xl:max-w-[1600px] px-4 pt-4 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5">
+      {/* Mobile spacer: pushes content below the fixed floating header */}
+      <div
+        className="md:hidden shrink-0"
+        aria-hidden="true"
+        style={{ height: 'calc(48px + env(safe-area-inset-top, 0px))' }}
+      />
+      <div data-route-page className="mx-auto w-full max-w-[1400px] xl:max-w-[1600px] px-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5">
       {/* ── Header: brand lockup left, action cluster right.
            Iteration 010: dropped redundant "Dashboard" eyebrow (the
            page IS the dashboard); promoted "Hermes Workspace" to

@@ -339,7 +339,7 @@ export function ResearchScreen() {
                   <select
                     value={maxRounds}
                     onChange={(e) => setMaxRounds(Number(e.target.value))}
-                    className="rounded-lg border border-[var(--theme-border)] bg-transparent px-2 py-1 text-xs"
+                    className="rounded-lg border border-[var(--theme-border)] bg-transparent px-2 py-2 sm:py-1 text-xs touch-manipulation"
                   >
                     <option value={0}>Auto</option>
                     {[3, 5, 8, 10, 15, 20].map((n) => (
@@ -352,7 +352,7 @@ export function ResearchScreen() {
                   <select
                     value={maxTime}
                     onChange={(e) => setMaxTime(Number(e.target.value))}
-                    className="rounded-lg border border-[var(--theme-border)] bg-transparent px-2 py-1 text-xs"
+                    className="rounded-lg border border-[var(--theme-border)] bg-transparent px-2 py-2 sm:py-1 text-xs touch-manipulation"
                   >
                     {[60, 120, 180, 300, 600, 900, 1200].map((s) => (
                       <option key={s} value={s}>{s < 60 ? `${s}s` : `${s / 60}m`}</option>

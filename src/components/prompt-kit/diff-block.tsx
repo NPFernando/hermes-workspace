@@ -57,7 +57,7 @@ export function DiffBlock({ code }: { code: string }) {
         <button
           type="button"
           onClick={() => { handleCopy().catch(() => {}) }}
-          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
+          className="inline-flex items-center gap-1 rounded px-2 py-1.5 sm:px-1.5 sm:py-0.5 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
         >
           <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={12} strokeWidth={1.6} />
           <span className="text-[10px]">{copied ? 'Copied' : 'Copy'}</span>

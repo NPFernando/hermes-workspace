@@ -381,7 +381,7 @@ export function KanbanBoard({
                   updateTask(menuTaskId, (task) => ({ ...task, priority, updatedAt: Date.now() }))
                   setMenuTaskId(null)
                 }}
-                className={cn('rounded-md border px-2 py-1 text-left text-[11px] font-medium transition-colors', PRIORITY_BADGES[priority], 'hover:brightness-110')}
+                className={cn('rounded-md border px-2 py-2 sm:py-1 touch-manipulation text-left text-xs sm:text-[11px] font-medium transition-colors', PRIORITY_BADGES[priority], 'hover:brightness-110')}
               >
                 {PRIORITY_LABELS[priority]}
               </button>
@@ -423,7 +423,7 @@ export function KanbanBoard({
                 onDeleteTask(menuTaskId)
                 setMenuTaskId(null)
               }}
-              className="rounded-md border border-red-400/40 bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-300 hover:bg-red-500/20"
+              className="rounded-md border border-red-400/40 bg-red-500/10 px-2 py-2 sm:py-1 touch-manipulation text-xs sm:text-[11px] font-medium text-red-300 hover:bg-red-500/20"
             >
               Delete
             </button>
@@ -439,7 +439,7 @@ export function KanbanBoard({
                 setMenuTaskId(null)
                 setNoteDraft('')
               }}
-              className="rounded-md bg-accent-500 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md bg-accent-500 px-2 py-2 sm:py-1 touch-manipulation text-xs sm:text-[11px] font-medium text-white transition-colors hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Save note
             </button>

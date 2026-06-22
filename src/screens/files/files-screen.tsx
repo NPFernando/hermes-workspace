@@ -1218,7 +1218,7 @@ export function FilesScreen() {
               type="button"
               onClick={openNewFolderPrompt}
               title="New folder"
-              className="rounded p-1 text-sm text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors leading-none"
+              className="rounded p-2.5 sm:p-1 text-sm touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors leading-none"
             >
               📁+
             </button>
@@ -1226,7 +1226,7 @@ export function FilesScreen() {
               type="button"
               onClick={() => void loadTree()}
               title="Refresh"
-              className="rounded p-1 text-lg text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors leading-none"
+              className="rounded p-2.5 sm:p-1 text-lg touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors leading-none"
             >
               ↺
             </button>

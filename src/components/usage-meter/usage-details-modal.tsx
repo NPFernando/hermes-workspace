@@ -333,7 +333,7 @@ export function UsageDetailsModal({
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={`rounded-full px-3 py-1 font-medium transition ${
+            className={`rounded-full px-3 py-2 sm:py-1 touch-manipulation font-medium transition ${
               activeTab === tab
                 ? 'bg-[var(--theme-hover)] text-[var(--theme-text)] shadow-sm'
                 : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]'

@@ -685,7 +685,7 @@ export function TasksScreen() {
               <button
                 onClick={() => setShowDone((v) => !v)}
                 className={cn(
-                  'text-xs px-2.5 py-1 rounded-lg border transition-colors',
+                  'text-xs px-2.5 py-2 sm:py-1 rounded-lg border touch-manipulation transition-colors',
                   showDone
                     ? 'border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-hover)]'
                     : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:border-[var(--theme-accent)]',
@@ -717,7 +717,7 @@ export function TasksScreen() {
                         toast('Failed to clear done tasks', { type: 'error' }),
                       )
                   }}
-                  className="text-xs px-2.5 py-1 rounded-lg border transition-colors border-red-500/40 text-red-400 hover:bg-red-500/10"
+                  className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border touch-manipulation transition-colors border-red-500/40 text-red-400 hover:bg-red-500/10"
                 >
                   Clear Done ({columnMap['done'].length})
                 </button>
@@ -725,7 +725,7 @@ export function TasksScreen() {
 
               <button
                 onClick={invalidate}
-                className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
+                className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-colors hover:bg-[var(--theme-hover)]"
                 title="Refresh"
               >
                 <HugeiconsIcon
@@ -872,7 +872,7 @@ export function TasksScreen() {
               key={label}
               type="button"
               onClick={toggle}
-              className="text-[10px] px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
+              className="text-xs sm:text-[10px] px-2.5 py-1.5 sm:py-1 rounded-full border touch-manipulation transition-colors whitespace-nowrap"
               style={{
                 borderColor: active
                   ? 'var(--theme-accent)'
@@ -895,7 +895,7 @@ export function TasksScreen() {
               onClick={() =>
                 setPriorityFilter((prev) => (prev === p ? null : p))
               }
-              className="text-[10px] px-2.5 py-1 rounded-full border transition-colors capitalize"
+              className="text-xs sm:text-[10px] px-2.5 py-1.5 sm:py-1 rounded-full border touch-manipulation transition-colors capitalize"
               style={{
                 borderColor:
                   priorityFilter === p
@@ -918,7 +918,7 @@ export function TasksScreen() {
           {/* Active tag filter chip */}
           {tagFilter && (
             <div
-              className="flex items-center gap-1 text-[10px] rounded-full px-2.5 py-1 border"
+              className="flex items-center gap-1 text-xs sm:text-[10px] rounded-full px-2.5 py-1.5 sm:py-1 border"
               style={{
                 borderColor: 'var(--theme-accent)',
                 color: 'var(--theme-accent)',

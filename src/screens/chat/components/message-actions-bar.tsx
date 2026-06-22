@@ -94,7 +94,7 @@ export function MessageActionsBar({
             <TooltipTrigger
               type="button"
               onClick={onRetry}
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+              className="inline-flex items-center gap-1 rounded px-2 py-1.5 sm:px-1.5 sm:py-0.5 touch-manipulation text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
             >
               <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.6} />
               <span className="text-[11px] font-medium">Retry</span>
@@ -110,7 +110,7 @@ export function MessageActionsBar({
             <TooltipTrigger
               type="button"
               onClick={onRegenerate}
-              className="inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)] transition-colors"
+              className="inline-flex items-center justify-center rounded border border-transparent bg-transparent p-2 sm:p-1 touch-manipulation text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)] transition-colors"
             >
               <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.6} />
             </TooltipTrigger>
@@ -127,7 +127,7 @@ export function MessageActionsBar({
                 type="button"
                 onClick={() => setThumbs(thumbs === 'up' ? null : 'up')}
                 className={cn(
-                  'inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 transition-colors',
+                  'inline-flex items-center justify-center rounded border border-transparent bg-transparent p-2 sm:p-1 touch-manipulation transition-colors',
                   thumbs === 'up'
                     ? 'text-green-600 bg-green-50 dark:bg-green-900/30'
                     : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
@@ -144,7 +144,7 @@ export function MessageActionsBar({
                 type="button"
                 onClick={() => setThumbs(thumbs === 'down' ? null : 'down')}
                 className={cn(
-                  'inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 transition-colors',
+                  'inline-flex items-center justify-center rounded border border-transparent bg-transparent p-2 sm:p-1 touch-manipulation transition-colors',
                   thumbs === 'down'
                     ? 'text-red-600 bg-red-50 dark:bg-red-900/30'
                     : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
@@ -165,7 +165,7 @@ export function MessageActionsBar({
             onClick={() => {
               handleCopy().catch(() => {})
             }}
-            className="inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
+            className="inline-flex items-center justify-center rounded border border-transparent bg-transparent p-2 sm:p-1 touch-manipulation text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
           >
             <HugeiconsIcon
               icon={copied ? Tick02Icon : Copy01Icon}

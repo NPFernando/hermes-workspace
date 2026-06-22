@@ -289,7 +289,7 @@ export function MemoryBrowserScreen() {
         <aside className="flex min-h-0 flex-col rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] md:col-span-1">
           <button
             type="button"
-            className="flex items-center justify-between px-3 py-2 text-left md:cursor-default"
+            className="flex items-center justify-between px-3 py-3 md:py-2 text-left md:cursor-default touch-manipulation"
             onClick={() => setMobileFilesOpen((value) => !value)}
           >
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
@@ -447,7 +447,7 @@ export function MemoryBrowserScreen() {
                 type="button"
                 title="Refresh files"
                 onClick={() => queryClient.invalidateQueries({ queryKey: ['memory'] })}
-                className="inline-flex items-center justify-center rounded-md border border-[var(--theme-border)] p-1.5 text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]"
+                className="inline-flex items-center justify-center rounded-md border border-[var(--theme-border)] p-2.5 sm:p-1.5 touch-manipulation text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]"
               >
                 <HugeiconsIcon icon={CircleArrowReload01Icon} size={14} strokeWidth={1.7} />
               </button>

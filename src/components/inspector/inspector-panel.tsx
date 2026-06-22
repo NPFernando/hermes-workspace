@@ -533,7 +533,7 @@ export function InspectorPanel({ embedded = false }: { embedded?: boolean } = {}
             <button
               type="button"
               onClick={() => useInspectorStore.getState().setOpen(false)}
-              className="rounded p-1 text-xs hover:opacity-70 transition-opacity text-[var(--theme-muted)]"
+              className="rounded p-2.5 sm:p-1 touch-manipulation text-xs hover:opacity-70 transition-opacity text-[var(--theme-muted)]"
               aria-label="Close inspector"
             >
               ✕

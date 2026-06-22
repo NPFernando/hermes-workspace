@@ -186,7 +186,7 @@ function TierModelRow({
       <button
         type="button"
         onClick={onRemove}
-        className="ml-1 rounded p-1 text-[var(--theme-muted)] hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30"
+        className="ml-1 rounded p-2 sm:p-1 touch-manipulation text-[var(--theme-muted)] hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30"
       >
         <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} />
       </button>
@@ -383,7 +383,7 @@ function BlocklistSection({
           <button
             type="button"
             onClick={() => onRemove(entry.model)}
-            className="rounded p-1 text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40"
+            className="rounded p-2 sm:p-1 touch-manipulation text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} />
           </button>

@@ -53,7 +53,7 @@ export function ModelSuggestionToast({
           <button
             type="button"
             onClick={onDismiss}
-            className="shrink-0 rounded-md p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]"
+            className="shrink-0 rounded-md p-2.5 sm:p-1 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]"
             aria-label="Dismiss"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.5} />

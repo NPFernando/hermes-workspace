@@ -28,7 +28,7 @@ function ScrollToBottomButton({
           size="icon-sm"
           aria-label="Scroll to bottom"
           className={cn(
-            'pointer-events-auto relative rounded-full text-white shadow-lg transition-colors hover:opacity-90',
+            'pointer-events-auto relative rounded-full text-white shadow-lg transition-colors hover:opacity-90 touch-manipulation',
             className,
           )}
           style={{

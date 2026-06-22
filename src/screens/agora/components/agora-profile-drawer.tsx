@@ -179,7 +179,7 @@ export function AgoraProfileDrawer({
                       type="button"
                       onClick={() => onSaveProfile({ avatarId: a.id })}
                       title={a.label}
-                      className="rounded-lg p-1 transition-transform hover:scale-105"
+                      className="rounded-lg p-2 sm:p-1 touch-manipulation transition-transform hover:scale-105"
                       style={{
                         background:
                           user.profile.avatarId === a.id

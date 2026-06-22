@@ -570,7 +570,7 @@ function UpdateCard({
           <button
             type="button"
             onClick={onDismiss}
-            className="rounded-lg p-1.5 transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
+            className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
             aria-label={`Dismiss ${product.label} update`}
           >
             <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
@@ -634,7 +634,7 @@ function ReleaseNotes({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-1.5 transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
+              className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={2} />
             </button>
@@ -761,7 +761,7 @@ function NaveenUpdateCard({
           <button
             type="button"
             onClick={onDismiss}
-            className="rounded-lg p-1.5 transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
+            className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
             aria-label="Dismiss upstream update"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
@@ -840,7 +840,7 @@ function NaveenUpdateModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
+            className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-opacity hover:opacity-80 text-[var(--theme-muted)]"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={2} />
           </button>

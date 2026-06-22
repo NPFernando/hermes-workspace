@@ -100,7 +100,7 @@ export function MobileSessionsPanel({
             <button
               type="button"
               onClick={onNewChat}
-              className="inline-flex items-center gap-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2.5 py-1.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:border-accent-200 hover:text-accent-600"
+              className="inline-flex items-center gap-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 touch-manipulation text-xs font-medium text-[var(--theme-muted)] transition-colors hover:border-accent-200 hover:text-accent-600"
             >
               <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.8} />
               New Chat

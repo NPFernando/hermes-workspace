@@ -400,7 +400,7 @@ function ChatHeaderComponent({
                 <button
                   type="button"
                   onClick={startTitleEdit}
-                  className="text-xs text-[var(--theme-muted)] opacity-0 group-hover:opacity-100 hover:text-[var(--theme-muted)] transition-opacity shrink-0"
+                  className="text-xs text-[var(--theme-muted)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-70 hover:text-[var(--theme-muted)] touch-manipulation transition-opacity shrink-0"
                   title="Rename session"
                   aria-label="Rename session"
                 >

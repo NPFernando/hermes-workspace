@@ -110,7 +110,7 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
           type="button"
           onClick={() => void refresh()}
           disabled={loading}
-          className="rounded-lg px-2.5 py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] transition-colors"
+          className="rounded-lg px-2.5 py-2 sm:py-1 touch-manipulation text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-card2)] transition-colors"
         >
           {loading ? 'Refreshing...' : 'Refresh'}
         </button>
@@ -166,7 +166,7 @@ export function RemoteAgentsPanel({ localSessionKeys }: RemoteAgentsPanelProps) 
                     window.location.href = `/chat?session=${encodeURIComponent(s.key)}`
                   }}
                   className={cn(
-                    'inline-flex items-center rounded-lg border px-2 py-1 text-[10px] font-medium transition-colors',
+                    'inline-flex items-center rounded-lg border px-2 py-2 sm:py-1 touch-manipulation text-xs sm:text-[10px] font-medium transition-colors',
                     'border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]',
                     'border-[var(--theme-border)]',
                   )}

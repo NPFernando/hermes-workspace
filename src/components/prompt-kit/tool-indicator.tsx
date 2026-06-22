@@ -38,7 +38,7 @@ function ToolIndicator({ tools, defaultOpen = false }: ToolIndicatorProps) {
           render={
             <Button
               variant="ghost"
-              className="h-auto gap-1.5 px-2 py-1 -mx-2 text-[var(--theme-muted)] hover:text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]"
+              className="h-auto gap-1.5 px-2 py-2 sm:py-1 -mx-2 touch-manipulation text-[var(--theme-muted)] hover:text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]"
             />
           }
         >

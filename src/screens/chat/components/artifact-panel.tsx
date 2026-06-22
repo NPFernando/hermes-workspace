@@ -123,7 +123,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
         <button
           type="button"
           onClick={onClose}
-          className="ml-1 shrink-0 rounded p-1 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors"
+          className="ml-1 shrink-0 rounded p-2.5 sm:p-1 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors"
           aria-label="Close artifact panel"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.6} />

@@ -1304,7 +1304,7 @@ export function AgentViewPanel() {
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
-                    className="rounded-lg p-1.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
+                    className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
                     aria-label="Close"
                   >
                     <svg width="18" height="18" viewBox="0 0 16 16" fill="none">

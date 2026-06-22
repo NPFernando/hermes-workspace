@@ -357,7 +357,7 @@ function SettingsRoute() {
       <div className="pointer-events-none fixed inset-0 bg-radial from-[var(--theme-accent)]/10 via-transparent to-transparent" />
       <div className="pointer-events-none fixed inset-0 bg-gradient-to-br from-[var(--theme-hover)]/60 via-transparent to-[var(--theme-hover)]/30" />
 
-      <main className="relative mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 pt-6 pb-24 sm:px-6 md:flex-row md:gap-6 md:pb-8 lg:pt-8">
+      <main className="relative mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 pt-6 pb-[calc(var(--tabbar-h,80px)+1rem)] sm:px-6 md:flex-row md:gap-6 md:pb-8 lg:pt-8">
         <SettingsSidebar activeId={activeSection} />
 
         <SettingsMobilePills activeId={activeSection} />

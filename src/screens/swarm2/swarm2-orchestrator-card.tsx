@@ -300,14 +300,14 @@ export function Swarm2OrchestratorCard({
                 <button
                   type="button"
                   onClick={() => setSwarmCardMode('cards')}
-                  className={cn('rounded-lg px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em]', swarmCardMode === 'cards' ? 'bg-[var(--theme-accent)] text-primary-950' : 'text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]')}
+                  className={cn('rounded-lg px-3 py-2 sm:px-2 sm:py-1 text-xs sm:text-[9px] font-semibold uppercase tracking-[0.14em] touch-manipulation', swarmCardMode === 'cards' ? 'bg-[var(--theme-accent)] text-primary-950' : 'text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]')}
                 >
                   Active Swarm
                 </button>
                 <button
                   type="button"
                   onClick={() => setSwarmCardMode('office')}
-                  className={cn('rounded-lg px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em]', swarmCardMode === 'office' ? 'bg-[var(--theme-accent)] text-primary-950' : 'text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]')}
+                  className={cn('rounded-lg px-3 py-2 sm:px-2 sm:py-1 text-xs sm:text-[9px] font-semibold uppercase tracking-[0.14em] touch-manipulation', swarmCardMode === 'office' ? 'bg-[var(--theme-accent)] text-primary-950' : 'text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)]')}
                 >
                   Office
                 </button>
@@ -317,7 +317,7 @@ export function Swarm2OrchestratorCard({
                   type="button"
                   onClick={() => cycleAgentPage(-1)}
                   disabled={filteredAgents.length <= AGENT_PAGE_SIZE}
-                  className="inline-flex size-7 items-center justify-center rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)] disabled:cursor-not-allowed disabled:opacity-35"
+                  className="inline-flex size-9 sm:size-7 touch-manipulation items-center justify-center rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)] disabled:cursor-not-allowed disabled:opacity-35"
                   aria-label="Previous agent page"
                 >
                   ←
@@ -337,7 +337,7 @@ export function Swarm2OrchestratorCard({
                   type="button"
                   onClick={() => cycleAgentPage(1)}
                   disabled={filteredAgents.length <= AGENT_PAGE_SIZE}
-                  className="inline-flex size-7 items-center justify-center rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)] disabled:cursor-not-allowed disabled:opacity-35"
+                  className="inline-flex size-9 sm:size-7 touch-manipulation items-center justify-center rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-bg)] hover:text-[var(--theme-text)] disabled:cursor-not-allowed disabled:opacity-35"
                   aria-label="Next agent page"
                 >
                   →

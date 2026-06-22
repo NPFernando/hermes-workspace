@@ -116,7 +116,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]" style={THEME_STYLE}>
-      <main className="mx-auto flex w-full max-w-[960px] flex-1 flex-col items-stretch justify-center gap-6 px-4 pb-24 md:px-6">
+      <main className="mx-auto flex w-full max-w-[960px] flex-1 flex-col items-stretch justify-center gap-6 px-4 pb-[calc(var(--tabbar-h,80px)+1rem)] md:px-6 md:pb-8">
         <section className="overflow-hidden rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] shadow-sm" style={{ height: 520 }}>
           <OfficeView
             agentRows={agentRows}

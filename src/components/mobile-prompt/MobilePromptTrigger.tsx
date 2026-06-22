@@ -191,7 +191,7 @@ export function MobilePromptTrigger() {
                   <button
                     type="button"
                     onClick={dismiss}
-                    className="rounded-lg p-1.5 transition-colors hover:opacity-80 text-[var(--theme-muted)]"
+                    className="rounded-lg p-2.5 sm:p-1.5 touch-manipulation transition-colors hover:opacity-80 text-[var(--theme-muted)]"
                     aria-label="Dismiss"
                   >
                     <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={2} />
