@@ -18,23 +18,48 @@ import { CLAUDE_API } from './gateway-capabilities'
  * 2. `CLAUDE_API_TOKEN` env var (back-compat)
  * 3. Codex OAuth access token from `~/.codex/auth.json`
  */
+function readDotEnvValue(filePath: string, key: string): string {
+  try {
+    if (!existsSync(filePath)) return ''
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = readFileSync(filePath, 'utf-8').match(
+      new RegExp(`^${escapedKey}=(.*)$`, 'm'),
+    )
+    if (!match?.[1]) return ''
+    return match[1].trim().replace(/^['"]|['"]$/g, '')
+  } catch {
+    return ''
+  }
+}
+
 export function getBearerToken(): string {
   const fromEnv = process.env.HERMES_API_TOKEN || process.env.CLAUDE_API_TOKEN
   if (fromEnv) return fromEnv
 
-  // Fall back to Codex OAuth token when no env var is set.
-  // This bridges the gap for users who authenticated via `codex login`
-  // but don't have HERMES_API_TOKEN configured.
-  try {
-    const codexAuthPath = join(homedir(), '.codex', 'auth.json')
-    if (existsSync(codexAuthPath)) {
-      const auth = JSON.parse(readFileSync(codexAuthPath, 'utf-8')) as {
-        tokens?: { access_token?: string }
+  // Production `node server-entry.js` can be started manually outside systemd,
+  // which means the workspace .env is not injected into process.env.  The Hermes
+  // gateway rejects the Codex OAuth token fallback, so prefer the workspace token
+  // from disk before considering Codex auth.
+  const workspaceEnvToken =
+    readDotEnvValue(join(process.cwd(), '.env'), 'HERMES_API_TOKEN') ||
+    readDotEnvValue(join(process.cwd(), '.env'), 'CLAUDE_API_TOKEN')
+  if (workspaceEnvToken) return workspaceEnvToken
+
+  // Fall back to Codex OAuth token only for non-Hermes/OpenAI-compatible
+  // endpoints. Local Hermes Agent gateways use HERMES_API_TOKEN/API_SERVER_KEY.
+  const apiUrl = process.env.HERMES_API_URL || process.env.CLAUDE_API_URL || ''
+  if (!/127\.0\.0\.1:8642|localhost:8642|hermes/i.test(apiUrl)) {
+    try {
+      const codexAuthPath = join(homedir(), '.codex', 'auth.json')
+      if (existsSync(codexAuthPath)) {
+        const auth = JSON.parse(readFileSync(codexAuthPath, 'utf-8')) as {
+          tokens?: { access_token?: string }
+        }
+        if (auth.tokens?.access_token) return auth.tokens.access_token
       }
-      if (auth.tokens?.access_token) return auth.tokens.access_token
+    } catch {
+      // Silently ignore — no Codex auth available
     }
-  } catch {
-    // Silently ignore — no Codex auth available
   }
 
   return ''

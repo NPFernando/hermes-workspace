@@ -551,7 +551,11 @@ export function executeTaskBackground(taskId: string): void {
       )
 
     try {
-      output = await doChat(AbortSignal.timeout(45_000))
+      // The Hermes gateway can take 60-90s on free/large models once the full
+      // Astra system prompt is included. A 45s cap caused successful requests to
+      // be aborted and surfaced as the useless “AI analysis unavailable” task
+      // note. Keep the background job bounded, but give the model enough room.
+      output = await doChat(AbortSignal.timeout(150_000))
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       const cause = err instanceof Error && 'cause' in err
@@ -559,7 +563,7 @@ export function executeTaskBackground(taskId: string): void {
         : ''
       console.error(`[executeTaskBackground] openaiChat failed: ${msg}${cause ? ` (cause: ${cause})` : ''} — retrying`)
       try {
-        output = await doChat(AbortSignal.timeout(30_000))
+        output = await doChat(AbortSignal.timeout(90_000))
       } catch (err2) {
         console.error('[executeTaskBackground] retry failed:', err2 instanceof Error ? err2.message : String(err2))
       }
