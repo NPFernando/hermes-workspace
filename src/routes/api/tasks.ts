@@ -31,9 +31,16 @@ function toTaskShape(record: ClaudeTaskRecord) {
     title: record.title,
     description: record.description,
     status: toStatus(record.column),
+    // Include canonical Hermes task fields as well as the legacy task-store
+    // shape. Consumers like /api/crew-status need assignee/column, while older
+    // task-store callers still read status/P0-style priority.
+    column: record.column,
+    assignee: record.assignee,
     priority: record.priority === 'high' ? 'P0' : record.priority === 'medium' ? 'P1' : 'P2',
+    priorityRaw: record.priority,
     tags: record.tags,
     dueDate: record.due_date ?? undefined,
+    due_date: record.due_date,
     createdAt: record.created_at,
     updatedAt: record.updated_at,
   }
@@ -47,7 +54,13 @@ export const Route = createFileRoute('/api/tasks')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         try {
-          const records = await listClaudeTasks()
+          const url = new URL(request.url)
+          const records = await listClaudeTasks({
+            column: url.searchParams.get('column'),
+            assignee: url.searchParams.get('assignee'),
+            priority: url.searchParams.get('priority'),
+            includeDone: url.searchParams.get('include_done') === 'true',
+          })
           return json({ tasks: records.map(toTaskShape) })
         } catch (err) {
           return json(
