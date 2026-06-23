@@ -622,7 +622,7 @@ export function InspectorToggleButton({ className }: { className?: string }) {
       onClick={toggle}
       title={isOpen ? 'Close inspector' : 'Open inspector'}
       className={cn(
-        'flex items-center justify-center rounded-lg px-2 py-1.5 text-xs transition-colors',
+        'flex items-center justify-center rounded-lg px-2 py-2.5 sm:py-1.5 text-xs touch-manipulation transition-colors',
         isOpen ? 'opacity-100' : 'opacity-60 hover:opacity-90',
         className,
       )}

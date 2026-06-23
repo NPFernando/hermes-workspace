@@ -1912,7 +1912,7 @@ function ChatMessageListComponent({
                     onClick={() => setExpandAllToolSections(true)}
                     disabled={expandAllToolSections}
                     className={cn(
-                      'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                      'shrink-0 rounded-md border px-3 py-2 sm:py-1.5 text-xs font-medium touch-manipulation transition-colors',
                       expandAllToolSections
                         ? 'border-amber-300 bg-amber-100 text-amber-700 cursor-default'
                         : 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 dark:hover:bg-amber-900/30 hover:border-amber-400',

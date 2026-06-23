@@ -477,7 +477,7 @@ function OrchestratorCard({
               <button
                 type="button"
                 onClick={() => setUsageExpanded((v) => !v)}
-                className="rounded p-0.5 text-[9px] text-[var(--theme-muted)] hover:text-[var(--theme-muted)] transition-colors cursor-pointer"
+                className="rounded p-2.5 sm:p-0.5 touch-manipulation text-[9px] text-[var(--theme-muted)] hover:text-[var(--theme-muted)] transition-colors cursor-pointer"
                 aria-expanded={usageExpanded}
               >
                 {usageExpanded ? '▲' : '▼'}

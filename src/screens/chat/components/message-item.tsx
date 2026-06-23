@@ -231,7 +231,7 @@ function InteractiveSelectionCard({ card }: { card: SelectionCardContent }) {
             type="button"
             onClick={() => submit()}
             disabled={selected.size === 0}
-            className="rounded-full bg-[var(--theme-accent)] px-3 py-1.5 font-semibold text-[var(--theme-text)] disabled:opacity-50"
+            className="rounded-full bg-[var(--theme-accent)] px-3 py-2.5 sm:py-1.5 touch-manipulation font-semibold text-[var(--theme-text)] disabled:opacity-50"
           >
             {card.submitLabel || 'Send choice'}
           </button>

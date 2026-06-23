@@ -276,7 +276,7 @@ export function EditJobDialog({
                           }))
                         }
                         className={cn(
-                          'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                          'rounded-full border px-3 py-2 sm:py-1.5 text-xs font-medium touch-manipulation transition-colors',
                           isActive
                             ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-white'
                             : 'bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]',
@@ -397,7 +397,7 @@ export function EditJobDialog({
                         }))
                       }
                       className={cn(
-                      'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                      'rounded-full border px-3 py-2 sm:py-1.5 text-xs font-medium touch-manipulation transition-colors',
                       form.repeatMode === 'unlimited'
                         ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-white'
                         : 'bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]',

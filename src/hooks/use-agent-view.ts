@@ -51,6 +51,7 @@ type AgentViewState = {
   queueOpen: boolean
   historyOpen: boolean
   activeCount: number
+  activeAgentSummaries: Array<{ id: string; name: string; status: string }>
   setOpen: (isOpen: boolean) => void
   toggleOpen: () => void
   setQueueOpen: (isOpen: boolean) => void
@@ -457,6 +458,7 @@ export const useAgentViewStore = create<AgentViewState>()(
       queueOpen: true,
       historyOpen: false,
       activeCount: 0,
+      activeAgentSummaries: [],
       setOpen: function setOpen(isOpen) {
         set({ isOpen })
       },
@@ -608,7 +610,10 @@ export function useAgentView(): AgentViewResult {
         setActiveAgents(dedupeById(nextActiveAgents))
         setQueuedAgents(dedupeById(nextQueuedAgents))
         setHistoryAgents(dedupeById(nextHistoryAgents).slice(0, 10))
-        useAgentViewStore.setState({ activeCount: nextActiveAgents.length })
+        useAgentViewStore.setState({
+          activeCount: nextActiveAgents.length,
+          activeAgentSummaries: nextActiveAgents.map((a) => ({ id: a.id, name: a.name, status: a.status })),
+        })
         setIsDemoMode(false)
         setIsLiveConnected(true)
         setErrorMessage(null)
@@ -620,7 +625,7 @@ export function useAgentView(): AgentViewResult {
         setActiveAgents([])
         setQueuedAgents([])
         setHistoryAgents([])
-        useAgentViewStore.setState({ activeCount: 0 })
+        useAgentViewStore.setState({ activeCount: 0, activeAgentSummaries: [] })
         setIsDemoMode(false)
         setIsLiveConnected(false)
         setErrorMessage(

@@ -1,44 +1,26 @@
 [
   {
-    "title": "Respect reduced motion and touch tap ergonomics globally",
-    "description": "Add global prefers-reduced-motion handling, touch-action manipulation for mobile interactions, and touch-manipulation classes on primary controls so touch users see less motion and faster taps.",
+    "title": "Surface running agents near the chat composer",
+    "description": "Move the active-agent signal from the compact sister picker into a full-width composer-adjacent tray so users can see which agents are running and tap directly into Agent View on mobile.",
     "category": "ui",
     "estimated_effort": "low"
   },
   {
-    "title": "Make Files screen usable on narrow mobile viewports",
-    "description": "Collapse the file tree after selecting a file on small screens and provide a back-to-tree affordance so the editor panel can use the full viewport width.",
+    "title": "Increase mobile tap targets for secondary workspace controls",
+    "description": "Raise small buttons, pills, and toggles to mobile-friendly heights while preserving compact desktop sizing with responsive classes.",
     "category": "ui",
     "estimated_effort": "low"
   },
   {
-    "title": "Add CSS-specific responsive smoke assertions",
-    "description": "Create a lightweight check that validates expected responsive CSS and accessibility media queries because ESLint ignores src/styles.css.",
+    "title": "Add CSS or DOM smoke coverage for composer mobile controls",
+    "description": "Create a focused test that asserts chat composer controls expose touch-friendly class names and the running-agent tray renders when active agents exist.",
     "category": "config",
     "estimated_effort": "medium"
   },
   {
-    "title": "Move ad-hoc screenshot artifacts to an ignored report directory",
-    "description": "Introduce a dedicated ignored visual-smoke output path so viewport PNGs and helper scripts do not remain as root-level untracked noise after UI cycles.",
+    "title": "Normalize visual-smoke artifacts into an ignored report directory",
+    "description": "Move the existing viewport screenshot helper and PNG outputs out of the workspace root into an ignored auto-improvement report path.",
     "category": "config",
     "estimated_effort": "low"
-  },
-  {
-    "title": "Add focused accessibility smoke tests for reduced motion and touch CSS",
-    "description": "Create a small automated assertion that verifies prefers-reduced-motion and coarse-pointer touch-action rules remain present after CSS refactors.",
-    "category": "config",
-    "estimated_effort": "low"
-  },
-  {
-    "title": "Convert visual-smoke screenshot leftovers into a first-class ignored report flow",
-    "description": "Move viewport screenshot scripts and PNG output under an ignored auto-improvement report directory so UI cycles can keep useful artifacts without dirtying the workspace root.",
-    "category": "config",
-    "estimated_effort": "medium"
-  },
-  {
-    "title": "Reconcile feature/chat-ui-improvements with main",
-    "description": "Resolve the current divergence so verified auto-improvement commits can merge cleanly instead of remaining local-only deployment commits.",
-    "category": "config",
-    "estimated_effort": "medium"
   }
 ]

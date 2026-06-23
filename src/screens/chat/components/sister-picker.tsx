@@ -40,12 +40,12 @@ export function SisterPicker({
     currentSister = availableSisters.find((s) => s.id === autoSelectedId) ?? null
   }
 
+  const agentCount = useAgentViewStore((s) => s.activeCount)
+  const openPanel = useAgentViewStore((s) => s.setOpen)
+
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
-
-  const agentCount = useAgentViewStore((s) => s.activeCount)
-  const openPanel = useAgentViewStore((s) => s.setOpen)
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget)
@@ -81,21 +81,26 @@ export function SisterPicker({
 
   return (
     <div className="flex items-center gap-1 px-2 py-1">
-      <span className="text-xs text-muted-foreground mr-1 shrink-0">Agent:</span>
+      <button
+        type="button"
+        onClick={() => openPanel(true)}
+        title="Open agent view"
+        className={cn(
+          'inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium touch-manipulation transition-colors shrink-0 mr-0.5',
+          agentCount > 0
+            ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+            : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+        )}
+      >
+        {agentCount > 0 && (
+          <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        )}
+        <span>Agents{agentCount > 0 ? ` (${agentCount})` : ''}</span>
+      </button>
       {orchestrating && !orchestratingSisterIds?.length && (
         <span className="text-xs text-muted-foreground animate-pulse mr-1">🌟 Astra orchestrating…</span>
       )}
-      {agentCount > 0 && (
-        <button
-          type="button"
-          onClick={() => openPanel(true)}
-          className="flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-1.5 sm:py-0.5 text-[11px] font-medium text-emerald-600 transition-colors hover:bg-emerald-500/20 shrink-0 touch-manipulation"
-          title="Open agent view"
-        >
-          <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          {agentCount}
-        </button>
-      )}
+
       <div ref={containerRef} className="relative">
         {/* Anchor for the popover */}
         <button

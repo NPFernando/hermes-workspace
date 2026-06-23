@@ -1,31 +1,24 @@
-# Close Summary — Auto-improvement cycle 2026-06-23
+# Close Summary: running-agent visibility and mobile tap ergonomics
 
 ## What changed
-- Improved workspace touch/accessibility ergonomics across `src/components/**` and `src/screens/**` by adding `touch-manipulation` to interactive surfaces.
-- Added global `prefers-reduced-motion: reduce` handling and coarse-pointer `touch-action: manipulation` rules in `src/styles.css`.
-- Updated `src/components/workspace-shell.tsx` and `src/components/mobile-tab-bar.tsx` so the terminal surface respects the mobile tab bar height.
-- Updated `src/screens/files/files-screen.tsx` so narrow mobile screens can switch between the file tree and file detail panel with a back-to-tree button.
-- Cleaned focused import-order lint issues in touched files while preserving existing source behavior.
+- Added `activeAgentSummaries` to the agent-view store and reset it with the live connection state.
+- Rendered running-agent chips directly above the chat composer; tapping any chip opens Agent View.
+- Removed the duplicated compact running-agent count from `SisterPicker`.
+- Increased mobile tap targets across composer controls, agent input, inspector/settings buttons, message action controls, TUI activity rows, and job repeat pills while preserving compact desktop sizing.
+- Removed a stale `react-hooks/exhaustive-deps` inline disable in `chat-screen.tsx` so the focused fallback lint gate has zero errors.
 
 ## Test results
-- `git diff --check`: passed.
-- `npx tsc --noEmit`: passed before commit and again after close-artifact amend.
-- `pnpm test`: passed, 111 test files / 718 tests.
-- `pnpm build`: passed and was used for deployment build validation.
-- `pnpm lint`: repo-wide strict lint still reports the known baseline debt (201 errors / 37 warnings), so the cycle used the documented focused fallback.
-- Focused changed-file ESLint with the known `@typescript-eslint/no-unnecessary-condition` baseline rule disabled: passed with 0 errors and 3 warnings.
-- `TEST_REPORT.json`: `passed: true`.
+- TypeScript: `npx tsc --noEmit` passed.
+- Tests: `pnpm test` passed, 111 files / 718 tests.
+- Build: `pnpm build` passed.
+- Repo lint: `pnpm lint` still fails with 198 known baseline errors and 37 warnings.
+- Focused fallback lint: changed TS/TSX files passed with 0 errors and 20 documented baseline warnings after disabling only the known `@typescript-eslint/no-unnecessary-condition` baseline rule.
 
-## Deployment and health
-The latest commit changed `src/`, so I rebuilt the workspace, restarted `hermes-workspace.service`, and validated `https://agent.fernandofamily.com/api/health` as HTTP 200, `application/json`, body `{"status":"ok"}`. One transient 502 occurred immediately after restart, then the bounded retry succeeded.
+## Side effects / leftovers
+- Existing untracked screenshot artifacts remain under `screenshots/` plus `scripts/screenshot-viewports.cjs`; this cycle did not stage them.
+- Because source files changed, deployment requires rebuild/restart plus JSON health validation.
 
-## Side effects / blockers
-- No push was performed, matching the mission instruction.
-- The branch `feature/chat-ui-improvements` is still diverged from `main` / `origin/main`, so I did not merge it into `main` automatically.
-- Existing screenshot smoke leftovers remain untracked: `screenshots/*.png`, `screenshots/take-screenshots.mjs`, and `scripts/screenshot-viewports.cjs`.
-- CSS is still not fully covered by ESLint; build is the available CSS gate for this cycle.
-
-## New ideas for next cycle
-- Add focused CSS/accessibility smoke assertions for reduced-motion and touch-action rules.
-- Move viewport screenshot scripts/output into a first-class ignored report directory.
-- Reconcile `feature/chat-ui-improvements` with `main` so local auto-improvement commits can merge cleanly.
+## New improvement ideas
+1. Add a focused DOM test for the running-agent tray using mocked `useAgentViewStore` state.
+2. Normalize screenshot scripts and PNG output into an ignored report directory.
+3. Reconcile the long-lived `feature/chat-ui-improvements` branch with `main` so auto-improvement commits can merge cleanly instead of remaining local-only.

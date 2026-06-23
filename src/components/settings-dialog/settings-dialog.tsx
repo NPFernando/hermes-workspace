@@ -2575,7 +2575,7 @@ export function SettingsDialog({
                       type="button"
                       onClick={() => handleSectionSelect(s.id)}
                       className={cn(
-                        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]',
+                        'flex w-full items-center gap-2.5 rounded-lg px-3 py-3 md:py-2 text-left text-sm text-[var(--theme-muted)] touch-manipulation transition-colors hover:bg-[var(--theme-hover)]',
                         active === s.id &&
                           'bg-accent-50 font-medium text-accent-700',
                       )}
@@ -2602,7 +2602,7 @@ export function SettingsDialog({
                     variant="ghost"
                     size="sm"
                     onClick={() => setMobileView('nav')}
-                    className="h-8 gap-1.5 rounded-lg px-2 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
+                    className="h-11 md:h-8 gap-1.5 rounded-lg px-2 touch-manipulation text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
                   >
                     <HugeiconsIcon
                       icon={ArrowLeft01Icon}

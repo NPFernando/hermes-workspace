@@ -57,7 +57,7 @@ export function AgentChatInput({
           }}
           onKeyDown={handleTextareaKeyDown}
           className={cn(
-            'max-h-36 min-h-8 flex-1 resize-y bg-transparent px-2 py-1 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)]',
+            'max-h-36 min-h-9 sm:min-h-8 flex-1 resize-y bg-transparent px-2 py-2 sm:py-1 text-sm text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)]',
             disabled ? 'cursor-not-allowed opacity-60' : '',
           )}
         />

@@ -110,6 +110,7 @@ import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
+import { useAgentViewStore } from '@/hooks/use-agent-view'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
@@ -594,6 +595,8 @@ export function ChatScreen({
   const terminalPanelHeight = useTerminalPanelStore(
     (state) => state.panelHeight,
   )
+  const activeAgentSummaries = useAgentViewStore((s) => s.activeAgentSummaries)
+  const openAgentPanel = useAgentViewStore((s) => s.setOpen)
   const { renameSession, renaming: renamingSessionTitle } = useRenameSession()
   const sseConnectionState = useChatStore((s) => s.connectionState)
 
@@ -1753,7 +1756,7 @@ export function ChatScreen({
       void historyQuery.refetch()
     }, 2000)
     return () => window.clearTimeout(timer)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only
+  }, []) // mount-only
 
   useEffect(() => {
     function handleSSEDrop() {
@@ -3118,6 +3121,22 @@ export function ChatScreen({
                 setAutoRoutedSisterId(null)
               }}
             />
+          )}
+          {showComposer && activeAgentSummaries.length > 0 && (
+            <div className="mx-auto flex w-full max-w-[var(--chat-content-max-width,100%)] items-center gap-1.5 overflow-x-auto px-3 py-1 no-scrollbar">
+              <span className="shrink-0 text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">Running</span>
+              {activeAgentSummaries.map((agent) => (
+                <button
+                  key={agent.id}
+                  type="button"
+                  onClick={() => openAgentPanel(true)}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-600 touch-manipulation hover:bg-emerald-500/20 transition-colors"
+                >
+                  <span className={cn('size-1.5 rounded-full', ['running', 'active', 'streaming', 'thinking', 'in_progress'].includes(agent.status) ? 'bg-emerald-400 animate-pulse' : 'bg-[var(--theme-muted)]')} />
+                  <span className="max-w-[7rem] truncate">{agent.name.split('—')[0]?.trim() ?? agent.name}</span>
+                </button>
+              ))}
+            </div>
           )}
           {showComposer ? (
             <ChatComposer

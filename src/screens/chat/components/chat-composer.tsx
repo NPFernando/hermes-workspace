@@ -2896,7 +2896,7 @@ function ChatComposerComponent({
                         setIsThinkingMenuOpen(false)
                         setIsModelMenuOpen(false)
                       }}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60"
+                      className="inline-flex h-11 sm:h-8 touch-manipulation items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60"
                       title={`Chat controls · ${modelButtonLabel}`}
                       aria-label={`Chat controls, current model: ${modelButtonLabel}`}
                     >
@@ -2939,7 +2939,7 @@ function ChatComposerComponent({
                                 setIsModelMenuOpen(false)
                               }}
                               disabled={disabled || profileActivateMutation.isPending}
-                              className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80 disabled:cursor-not-allowed disabled:opacity-50/60"
+                              className="inline-flex h-11 sm:h-8 touch-manipulation max-w-[8rem] items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80 disabled:cursor-not-allowed disabled:opacity-50/60"
                               title={
                                 activeProfile
                                   ? `${activeProfile.name}${profileMeta(activeProfile) ? ` · ${profileMeta(activeProfile)}` : ''}`
@@ -3003,7 +3003,7 @@ function ChatComposerComponent({
                                 setIsModelMenuOpen(false)
                               }}
                               className={cn(
-                                'inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60',
+                                'inline-flex h-11 sm:h-8 touch-manipulation items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60',
                                 thinkingLevel === 'off' && 'opacity-70',
                               )}
                               title={`Reasoning effort: ${thinkingLabel(thinkingLevel)}`}
@@ -3049,7 +3049,7 @@ function ChatComposerComponent({
                             <button
                               type="button"
                               onClick={() => setIsWorkspaceMenuOpen((open) => !open)}
-                              className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60"
+                              className="inline-flex h-11 sm:h-8 touch-manipulation max-w-[8rem] items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60"
                               title={workspaceButtonLabel}
                             >
                               <span className="truncate">{workspaceButtonLabel}</span>
@@ -3098,7 +3098,7 @@ function ChatComposerComponent({
                                 setIsThinkingMenuOpen(false)
                               }}
                               disabled={isModelSwitcherDisabled}
-                              className="inline-flex h-8 max-w-[9rem] items-center rounded-full bg-[var(--theme-hover)]/70 px-2 md:max-w-none md:px-3 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]/80/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex h-11 sm:h-8 touch-manipulation max-w-[9rem] items-center rounded-full bg-[var(--theme-hover)]/70 px-2 md:max-w-none md:px-3 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]/80/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                               title={modelButtonLabel}
                             >
                               <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">{modelButtonLabel}</span>

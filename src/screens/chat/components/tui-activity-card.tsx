@@ -142,7 +142,7 @@ function ToolRow({
         type="button"
         onClick={() => canExpand && setOpen((v) => !v)}
         className={cn(
-          'group flex w-full items-baseline gap-2 px-3 py-1.5 text-left rounded-sm',
+          'group flex w-full items-baseline gap-2 px-3 py-2.5 sm:py-1.5 text-left rounded-sm touch-manipulation',
           canExpand && 'hover:bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)]',
           !canExpand && 'cursor-default',
         )}
