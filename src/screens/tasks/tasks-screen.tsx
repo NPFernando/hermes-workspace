@@ -438,10 +438,12 @@ export function TasksScreen() {
   }
 
   function clearAllFilters() {
+    setAssigneeFilter(null)
     setSearchQuery('')
     setFilterOverdue(false)
     setFilterBlocked(false)
     setFilterActiveAgent(false)
+    setFilterInReview(false)
     setPriorityFilter(null)
     setTagFilter(null)
   }
@@ -513,7 +515,7 @@ export function TasksScreen() {
                     <span>·</span>
                     <span className="flex items-center gap-1 text-violet-400">
                       <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse inline-block" />
-                      Astra reviewing {stats.agentActive}
+                      {stats.agentActive} active agent task{stats.agentActive !== 1 ? 's' : ''}
                     </span>
                   </>
                 )}
@@ -605,8 +607,21 @@ export function TasksScreen() {
                   setDeploySnapshot(snapshot)
                   setAstraReviewing(true)
                   try {
-                    await fetch('/api/tasks-deploy-agents', { method: 'POST' })
+                    const res = await fetch('/api/tasks-deploy-agents', { method: 'POST' })
+                    if (!res.ok) {
+                      const data = (await res.json().catch(() => ({}))) as { error?: string }
+                      throw new Error(data.error || `Deploy agents failed: ${res.status}`)
+                    }
+                    const data = (await res.json()) as { ok?: boolean; taskCount?: number; error?: string }
+                    if (!data.ok) throw new Error(data.error || 'Deploy agents failed')
                     await tasksQuery.refetch()
+                    toast(
+                      data.taskCount && data.taskCount > 0
+                        ? `Deploying agents for ${data.taskCount} task${data.taskCount !== 1 ? 's' : ''}…`
+                        : 'No ready tasks for agents right now',
+                    )
+                  } catch (e) {
+                    toast(e instanceof Error ? e.message : 'Failed to deploy agents', { type: 'error' })
                   } finally {
                     setAstraReviewing(false)
                   }

@@ -540,6 +540,7 @@ export function executeTaskBackground(taskId: string): void {
 
   void (async () => {
     let output = ''
+    let failureReason = ''
 
     const doChat = (signal: AbortSignal) =>
       openaiChat(
@@ -561,11 +562,14 @@ export function executeTaskBackground(taskId: string): void {
       const cause = err instanceof Error && 'cause' in err
         ? String((err as { cause?: unknown }).cause)
         : ''
+      failureReason = cause ? `${msg} (${cause})` : msg
       console.error(`[executeTaskBackground] openaiChat failed: ${msg}${cause ? ` (cause: ${cause})` : ''} — retrying`)
       try {
         output = await doChat(AbortSignal.timeout(90_000))
+        failureReason = ''
       } catch (err2) {
-        console.error('[executeTaskBackground] retry failed:', err2 instanceof Error ? err2.message : String(err2))
+        failureReason = err2 instanceof Error ? err2.message : String(err2)
+        console.error('[executeTaskBackground] retry failed:', failureReason)
       }
     }
 
@@ -617,7 +621,9 @@ export function executeTaskBackground(taskId: string): void {
           by: displayName.toLowerCase(),
           byEmoji: emoji,
           action: 'blocked',
-          note: 'AI analysis unavailable — please try again or use Launch Session.',
+          note: failureReason
+            ? `AI analysis unavailable (${failureReason.slice(0, 220)}) — retry execution or use Launch Session.`
+            : 'AI analysis unavailable — retry execution or use Launch Session.',
           at: new Date().toISOString(),
         }],
         agent_state: null,

@@ -264,8 +264,13 @@ export async function executeTask(taskId: string): Promise<{ ok: boolean; alread
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   })
-  if (!res.ok) throw new Error(`Failed to execute task: ${res.status}`)
-  return res.json()
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error((body as { error?: string }).error || `Failed to execute task: ${res.status}`)
+  }
+  const data = (await res.json()) as { ok?: boolean; alreadyRunning?: boolean; error?: string }
+  if (data.ok === false) throw new Error(data.error || 'Failed to execute task')
+  return { ok: data.ok ?? true, alreadyRunning: data.alreadyRunning }
 }
 
 export async function postTaskComment(taskId: string, text: string): Promise<{ resumed: boolean }> {
@@ -275,8 +280,12 @@ export async function postTaskComment(taskId: string, text: string): Promise<{ r
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
   })
-  if (!res.ok) throw new Error(`Failed to post comment: ${res.status}`)
-  const data = (await res.json()) as { resumed?: boolean }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error((body as { error?: string }).error || `Failed to post comment: ${res.status}`)
+  }
+  const data = (await res.json()) as { ok?: boolean; resumed?: boolean; error?: string }
+  if (data.ok === false) throw new Error(data.error || 'Failed to post comment')
   return { resumed: data.resumed ?? false }
 }
 
