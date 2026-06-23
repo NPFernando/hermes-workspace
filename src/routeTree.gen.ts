@@ -147,6 +147,7 @@ import { Route as ApiUpdateNaveenStatusRouteImport } from './routes/api/update/n
 import { Route as ApiUpdateNaveenApplyRouteImport } from './routes/api/update/naveen-apply'
 import { Route as ApiUpdateNaveenAiAnalysisRouteImport } from './routes/api/update/naveen-ai-analysis'
 import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
+import { Route as ApiTasksTaskIdRouteImport } from './routes/api/tasks.$taskId'
 import { Route as ApiSwarmRuntimeResetRouteImport } from './routes/api/swarm-runtime.reset'
 import { Route as ApiSwarmMemorySearchRouteImport } from './routes/api/swarm-memory/search'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
@@ -905,6 +906,11 @@ const ApiUpdateAgentRoute = ApiUpdateAgentRouteImport.update({
   path: '/api/update/agent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTasksTaskIdRoute = ApiTasksTaskIdRouteImport.update({
+  id: '/$taskId',
+  path: '/$taskId',
+  getParentRoute: () => ApiTasksRoute,
+} as any)
 const ApiSwarmRuntimeResetRoute = ApiSwarmRuntimeResetRouteImport.update({
   id: '/reset',
   path: '/reset',
@@ -1347,7 +1353,7 @@ export interface FileRoutesByFullPath {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
-  '/api/tasks': typeof ApiTasksRoute
+  '/api/tasks': typeof ApiTasksRouteWithChildren
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
@@ -1426,6 +1432,7 @@ export interface FileRoutesByFullPath {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
   '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
+  '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/naveen-ai-analysis': typeof ApiUpdateNaveenAiAnalysisRoute
   '/api/update/naveen-apply': typeof ApiUpdateNaveenApplyRoute
@@ -1551,7 +1558,7 @@ export interface FileRoutesByTo {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
-  '/api/tasks': typeof ApiTasksRoute
+  '/api/tasks': typeof ApiTasksRouteWithChildren
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
@@ -1630,6 +1637,7 @@ export interface FileRoutesByTo {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
   '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
+  '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/naveen-ai-analysis': typeof ApiUpdateNaveenAiAnalysisRoute
   '/api/update/naveen-apply': typeof ApiUpdateNaveenApplyRoute
@@ -1757,7 +1765,7 @@ export interface FileRoutesById {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
-  '/api/tasks': typeof ApiTasksRoute
+  '/api/tasks': typeof ApiTasksRouteWithChildren
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
@@ -1836,6 +1844,7 @@ export interface FileRoutesById {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
   '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
+  '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/naveen-ai-analysis': typeof ApiUpdateNaveenAiAnalysisRoute
   '/api/update/naveen-apply': typeof ApiUpdateNaveenApplyRoute
@@ -2043,6 +2052,7 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
     | '/api/swarm-runtime/reset'
+    | '/api/tasks/$taskId'
     | '/api/update/agent'
     | '/api/update/naveen-ai-analysis'
     | '/api/update/naveen-apply'
@@ -2247,6 +2257,7 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
     | '/api/swarm-runtime/reset'
+    | '/api/tasks/$taskId'
     | '/api/update/agent'
     | '/api/update/naveen-ai-analysis'
     | '/api/update/naveen-apply'
@@ -2452,6 +2463,7 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
     | '/api/swarm-runtime/reset'
+    | '/api/tasks/$taskId'
     | '/api/update/agent'
     | '/api/update/naveen-ai-analysis'
     | '/api/update/naveen-apply'
@@ -2579,7 +2591,7 @@ export interface RootRouteChildren {
   ApiSwarmTmuxStartRoute: typeof ApiSwarmTmuxStartRoute
   ApiSwarmTmuxStopRoute: typeof ApiSwarmTmuxStopRoute
   ApiSystemMetricsRoute: typeof ApiSystemMetricsRoute
-  ApiTasksRoute: typeof ApiTasksRoute
+  ApiTasksRoute: typeof ApiTasksRouteWithChildren
   ApiTasksAskAstraRoute: typeof ApiTasksAskAstraRoute
   ApiTasksAstraReviewRoute: typeof ApiTasksAstraReviewRoute
   ApiTasksDeployAgentsRoute: typeof ApiTasksDeployAgentsRoute
@@ -3608,6 +3620,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUpdateAgentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/tasks/$taskId': {
+      id: '/api/tasks/$taskId'
+      path: '/$taskId'
+      fullPath: '/api/tasks/$taskId'
+      preLoaderRoute: typeof ApiTasksTaskIdRouteImport
+      parentRoute: typeof ApiTasksRoute
+    }
     '/api/swarm-runtime/reset': {
       id: '/api/swarm-runtime/reset'
       path: '/reset'
@@ -4277,6 +4296,18 @@ const ApiSwarmRuntimeRouteWithChildren = ApiSwarmRuntimeRoute._addFileChildren(
   ApiSwarmRuntimeRouteChildren,
 )
 
+interface ApiTasksRouteChildren {
+  ApiTasksTaskIdRoute: typeof ApiTasksTaskIdRoute
+}
+
+const ApiTasksRouteChildren: ApiTasksRouteChildren = {
+  ApiTasksTaskIdRoute: ApiTasksTaskIdRoute,
+}
+
+const ApiTasksRouteWithChildren = ApiTasksRoute._addFileChildren(
+  ApiTasksRouteChildren,
+)
+
 interface ApiWorkspaceSkillsRouteChildren {
   ApiWorkspaceSkillsSkillIdContentRoute: typeof ApiWorkspaceSkillsSkillIdContentRoute
 }
@@ -4413,7 +4444,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmTmuxStartRoute: ApiSwarmTmuxStartRoute,
   ApiSwarmTmuxStopRoute: ApiSwarmTmuxStopRoute,
   ApiSystemMetricsRoute: ApiSystemMetricsRoute,
-  ApiTasksRoute: ApiTasksRoute,
+  ApiTasksRoute: ApiTasksRouteWithChildren,
   ApiTasksAskAstraRoute: ApiTasksAskAstraRoute,
   ApiTasksAstraReviewRoute: ApiTasksAstraReviewRoute,
   ApiTasksDeployAgentsRoute: ApiTasksDeployAgentsRoute,
