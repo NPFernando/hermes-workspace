@@ -1,6 +1,38 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+
 export const GOOGLE_ALLOWED_EMAIL = 'fernandonaveen2000@gmail.com'
 
 const GOOGLE_REDIRECT_URI = 'https://agent.fernandofamily.com/api/auth/google/callback'
+
+const HERMES_HOME =
+  process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? join(homedir(), '.hermes')
+const PROFILE_FILE = join(HERMES_HOME, 'workspace-user-profile.json')
+
+export type GoogleUserProfile = {
+  email: string
+  name: string
+  picture: string
+}
+
+export function storeUserProfile(profile: GoogleUserProfile): void {
+  try {
+    writeFileSync(PROFILE_FILE, JSON.stringify(profile, null, 2), { encoding: 'utf8', mode: 0o600 })
+  } catch {
+    console.warn('[google-oauth] Failed to persist user profile')
+  }
+}
+
+export function getUserProfile(): GoogleUserProfile | null {
+  try {
+    if (!existsSync(PROFILE_FILE)) return null
+    const raw = readFileSync(PROFILE_FILE, 'utf8')
+    return JSON.parse(raw) as GoogleUserProfile
+  } catch {
+    return null
+  }
+}
 
 export function isGoogleOAuthEnabled(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
@@ -11,7 +43,7 @@ export function buildGoogleAuthUrl(state: string): string {
     response_type: 'code',
     client_id: process.env.GOOGLE_CLIENT_ID!,
     redirect_uri: GOOGLE_REDIRECT_URI,
-    scope: 'openid email',
+    scope: 'openid email profile',
     state,
     access_type: 'online',
     prompt: 'select_account',
@@ -19,7 +51,9 @@ export function buildGoogleAuthUrl(state: string): string {
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
 }
 
-export async function exchangeCodeForEmail(code: string): Promise<string> {
+export async function exchangeCodeForEmail(
+  code: string,
+): Promise<{ email: string; name: string; picture: string }> {
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -47,9 +81,17 @@ export async function exchangeCodeForEmail(code: string): Promise<string> {
     throw new Error(`Google userinfo failed: ${userRes.status}`)
   }
 
-  const { email } = (await userRes.json()) as { email: string }
-  if (!email) throw new Error('No email in Google userinfo response')
-  return email
+  const info = (await userRes.json()) as {
+    email?: string
+    name?: string
+    picture?: string
+  }
+  if (!info.email) throw new Error('No email in Google userinfo response')
+  return {
+    email: info.email,
+    name: info.name ?? '',
+    picture: info.picture ?? '',
+  }
 }
 
 // ---------------------------------------------------------------------------

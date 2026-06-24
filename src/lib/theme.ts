@@ -100,7 +100,7 @@ export const THEMES: Array<{
 ]
 
 const STORAGE_KEY = 'claude-theme'
-const DEFAULT_THEME: ThemeId = 'claude-nous'
+const DEFAULT_THEME: ThemeId = 'odysseus'
 const THEME_SET = new Set<ThemeId>(THEMES.map((theme) => theme.id))
 const LIGHT_THEME_MAP: Partial<Record<
   Exclude<ThemeId, `${string}-light`>,

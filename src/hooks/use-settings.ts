@@ -52,7 +52,7 @@ export const defaultStudioSettings: StudioSettings = {
   preferredBudgetModel: '',
   preferredPremiumModel: '',
   onlySuggestCheaper: false,
-  showSystemMetricsFooter: false,
+  showSystemMetricsFooter: true,
   interfaceFont: 'system',
   interfaceDensity: 'comfortable',
   mobileChatNavMode: 'dock',

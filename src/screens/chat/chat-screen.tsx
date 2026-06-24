@@ -2954,7 +2954,9 @@ export function ChatScreen({
           )}
           style={{
             marginBottom:
-              terminalPanelInset > 0 ? `${terminalPanelInset}px` : undefined,
+              terminalPanelInset > 0
+                ? `calc(${terminalPanelInset}px + var(--metrics-footer-h, 0px))`
+                : 'var(--metrics-footer-h, 0px)',
           }}
           ref={mainRef}
         >

@@ -260,6 +260,15 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   useEffect(() => {
     if (typeof document === 'undefined') return
+    const h = !isMobile && settings.showSystemMetricsFooter ? '28px' : '0px'
+    document.documentElement.style.setProperty('--metrics-footer-h', h)
+    return () => {
+      document.documentElement.style.removeProperty('--metrics-footer-h')
+    }
+  }, [isMobile, settings.showSystemMetricsFooter])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
     if (isElectron) {
       document.documentElement.style.setProperty('--titlebar-h', '40px')
     } else if (isStandalone) {
@@ -485,7 +494,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
       <MobileHamburgerMenu />
       <MobileTabBar />
-      {!isMobile && !isOnChatRoute && settings.showSystemMetricsFooter ? (
+      {!isMobile && settings.showSystemMetricsFooter ? (
         <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
       ) : null}
       <CommandPalette pathname={pathname} sessions={sessions} />

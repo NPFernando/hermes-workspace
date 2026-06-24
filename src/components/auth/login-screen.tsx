@@ -15,26 +15,29 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
 const CSS = `
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   .lp-root{
+    --theme-bg:#282c34;--theme-card:#1e2228;--theme-panel:#111111;--theme-card2:#23272f;
+    --theme-text:#9cdef2;--theme-muted:rgba(156,222,242,0.65);--theme-border:rgba(53,90,102,0.5);
+    --theme-accent:#f08090;--theme-accent-secondary:#f59aaa;
     --bg:var(--theme-bg,#282c34);--card:color-mix(in srgb,var(--theme-card,#1e2228) 88%,transparent);
     --card-strong:var(--theme-card,#1e2228);--panel:color-mix(in srgb,var(--theme-panel,#111) 88%,transparent);
     --input:color-mix(in srgb,var(--theme-input,var(--theme-card,#1e2228)) 90%,#000 10%);
     --border:var(--theme-border,rgba(156,222,242,.14));--border-f:var(--theme-accent,#e06c75);
     --text:var(--theme-text,#9cdef2);--sub:var(--theme-muted,rgba(156,222,242,.68));--muted:var(--theme-muted,rgba(156,222,242,.56));
     --accent:var(--theme-accent,#e06c75);--accent2:var(--theme-accent-secondary,#f0989e);
-    --cyan:#9cdef2;--deep:#111111;--slate:#282c34;
+    --cyan:var(--theme-text,#9cdef2);--deep:var(--theme-panel,#111111);--slate:var(--theme-bg,#282c34);
     --grad:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 46%,var(--cyan) 120%);
     --err:var(--theme-danger,#ef4444);--ok:var(--theme-success,#22c55e);
     min-height:100dvh;display:flex;align-items:center;justify-content:center;
     font-family:'Inter Variable',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     background:var(--bg);color:var(--text);position:relative;overflow:hidden;padding:24px;
   }
-  .lp-root::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(1100px 520px at 82% -10%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 60%),radial-gradient(900px 520px at 0% 0%,rgba(53,90,102,.32),transparent 55%),linear-gradient(180deg,rgba(17,17,17,.08),rgba(17,17,17,.28));z-index:0}
-  .lp-grid{position:fixed;inset:-80px;pointer-events:none;z-index:1;background-image:radial-gradient(circle,rgba(156,222,242,.075) 1px,transparent 1.4px);background-size:24px 24px;mask-image:radial-gradient(circle at 50% 45%,#000 0 58%,transparent 82%);animation:lpGridDrift 42s linear infinite}
+  .lp-root::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(1100px 520px at 82% -10%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 60%),radial-gradient(900px 520px at 0% 0%,color-mix(in srgb,var(--theme-border,rgba(53,90,102,.5)) 60%,transparent),transparent 55%),linear-gradient(180deg,color-mix(in srgb,var(--theme-panel,#111) 8%,transparent),color-mix(in srgb,var(--theme-panel,#111) 28%,transparent));z-index:0}
+  .lp-grid{position:fixed;inset:-80px;pointer-events:none;z-index:1;background-image:radial-gradient(circle,color-mix(in srgb,var(--theme-text,#9cdef2) 8%,transparent) 1px,transparent 1.4px);background-size:24px 24px;mask-image:radial-gradient(circle at 50% 45%,#000 0 58%,transparent 82%);animation:lpGridDrift 42s linear infinite}
   .lp-flow{position:fixed;inset:0;pointer-events:none;z-index:2;overflow:hidden;opacity:.7}
-  .lp-flow span{position:absolute;height:1px;width:38vw;min-width:260px;background:linear-gradient(90deg,transparent,var(--accent),rgba(156,222,242,.55),transparent);filter:drop-shadow(0 0 12px color-mix(in srgb,var(--accent) 50%,transparent));animation:lpFlow 9s linear infinite}
+  .lp-flow span{position:absolute;height:1px;width:38vw;min-width:260px;background:linear-gradient(90deg,transparent,var(--accent),color-mix(in srgb,var(--theme-text,#9cdef2) 55%,transparent),transparent);filter:drop-shadow(0 0 12px color-mix(in srgb,var(--accent) 50%,transparent));animation:lpFlow 9s linear infinite}
   .lp-flow span:nth-child(1){top:18%;left:-42%;animation-delay:-1s}.lp-flow span:nth-child(2){top:35%;right:-42%;animation-delay:-4s;animation-direction:reverse}.lp-flow span:nth-child(3){bottom:22%;left:-42%;animation-delay:-7s}.lp-flow span:nth-child(4){bottom:38%;right:-42%;animation-delay:-2.5s;animation-direction:reverse}
   .lp-orb{position:fixed;border-radius:50%;filter:blur(64px);opacity:.48;animation:lpOrb 14s ease-in-out infinite alternate;pointer-events:none;z-index:1;will-change:transform}
-  .lp-orb-1{width:420px;height:420px;background:radial-gradient(circle,color-mix(in srgb,var(--accent) 30%,transparent),transparent 70%);top:-120px;left:-120px}.lp-orb-2{width:340px;height:340px;background:radial-gradient(circle,rgba(53,90,102,.42),transparent 70%);bottom:-80px;right:-80px;animation-delay:-5s}.lp-orb-3{width:240px;height:240px;background:radial-gradient(circle,rgba(156,222,242,.18),transparent 70%);top:42%;left:56%;animation-delay:-9s}
+  .lp-orb-1{width:420px;height:420px;background:radial-gradient(circle,color-mix(in srgb,var(--accent) 30%,transparent),transparent 70%);top:-120px;left:-120px}.lp-orb-2{width:340px;height:340px;background:radial-gradient(circle,color-mix(in srgb,var(--theme-border,rgba(53,90,102,.5)) 80%,transparent),transparent 70%);bottom:-80px;right:-80px;animation-delay:-5s}.lp-orb-3{width:240px;height:240px;background:radial-gradient(circle,color-mix(in srgb,var(--theme-text,#9cdef2) 18%,transparent),transparent 70%);top:42%;left:56%;animation-delay:-9s}
   .lp-card{position:relative;z-index:10;width:100%;max-width:440px;background:linear-gradient(180deg,color-mix(in srgb,var(--card-strong) 92%,transparent),color-mix(in srgb,var(--panel) 96%,transparent));border:1px solid color-mix(in srgb,var(--border) 80%,var(--accent) 20%);border-radius:22px;padding:44px 38px;box-shadow:0 28px 70px rgba(0,0,0,.52),0 0 0 1px rgba(255,255,255,.025),0 0 46px color-mix(in srgb,var(--accent) 12%,transparent);backdrop-filter:blur(22px) saturate(130%);-webkit-backdrop-filter:blur(22px) saturate(130%);animation:lpCardIn .62s cubic-bezier(.2,.8,.2,1) both;overflow:hidden}
   .lp-card::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 50%,transparent),rgba(156,222,242,.22),transparent 58%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}.lp-card::after{content:'';position:absolute;inset:-1px;background:linear-gradient(110deg,transparent 0 34%,rgba(255,255,255,.08) 45%,transparent 56%);transform:translateX(-120%);animation:lpCardSheen 7s ease-in-out infinite;pointer-events:none}
   .lp-logo{text-align:center;margin-bottom:32px;position:relative}.lp-logo-icon{width:68px;height:68px;margin:0 auto 16px;background:linear-gradient(135deg,#111,var(--slate));border:1px solid color-mix(in srgb,var(--accent) 44%,var(--border));border-radius:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 32px color-mix(in srgb,var(--accent) 26%,transparent),inset 0 0 24px rgba(156,222,242,.06);animation:lpLogoPulse 3.4s ease-in-out infinite}.lp-logo-icon svg{width:33px;height:33px;fill:none;stroke:var(--cyan);stroke-width:1.8;filter:drop-shadow(0 0 8px rgba(156,222,242,.5))}.lp-logo-title{font-size:25px;font-weight:760;letter-spacing:-.03em;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}.lp-logo-sub{font-family:'JetBrains Mono Variable',ui-monospace,monospace;font-size:11px;color:var(--muted);margin-top:6px;font-weight:500;letter-spacing:.16em;text-transform:uppercase}
@@ -63,6 +66,14 @@ export function LoginScreen() {
   const [shakeKey, setShakeKey] = useState(0)
   const [gatewayStatus, setGatewayStatus] = useState<'checking' | 'online' | 'offline'>('checking')
   const [googleEnabled, setGoogleEnabled] = useState(false)
+
+  // Set clean /login URL in the address bar
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (window.location.pathname !== '/login') {
+      window.history.replaceState({}, '', '/login')
+    }
+  }, [])
 
   // Read OAuth error from URL
   useEffect(() => {

@@ -7,6 +7,66 @@ import { createTask, getTask, listTasks, updateTask } from './tasks-store'
 import { openaiChat } from './openai-compat-api'
 import type { ActivityEntry, TaskColumn, TaskPriority, TaskRecord } from './tasks-store'
 
+// ---------------------------------------------------------------------------
+// directChat — calls OpenRouter directly, bypassing the Hermes gateway.
+//
+// The Hermes gateway injects ~88k tokens of internal memory into every
+// request, causing the free model to time out on task analysis (which only
+// needs ~1-2k tokens). Going direct drops latency from >45s to <10s.
+// Falls back to gateway openaiChat if OpenRouter is unavailable.
+// ---------------------------------------------------------------------------
+
+function loadOpenRouterKey(): string {
+  if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY
+  try {
+    const envPath = path.join(os.homedir(), '.hermes', '.env')
+    const content = fs.readFileSync(envPath, 'utf-8')
+    const match = content.match(/^OPENROUTER_API_KEY=(.+)$/m)
+    return match?.[1]?.trim() ?? ''
+  } catch { return '' }
+}
+
+const OR_MODELS = [
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'meta-llama/llama-4-maverick:free',
+  'google/gemma-3-27b-it:free',
+]
+
+async function directChat(
+  messages: Array<{ role: string; content: string }>,
+  options: { max_tokens?: number; temperature?: number; signal?: AbortSignal },
+): Promise<string> {
+  const apiKey = loadOpenRouterKey()
+  if (!apiKey) throw new Error('No OpenRouter API key')
+
+  for (const model of OR_MODELS) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          messages,
+          max_tokens: options.max_tokens ?? 900,
+          temperature: options.temperature ?? 0.4,
+        }),
+        signal: options.signal,
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        if (res.status === 429 || res.status === 503) continue
+        throw new Error(`OpenRouter ${res.status}: ${text.slice(0, 200)}`)
+      }
+      const data = await res.json() as { choices?: Array<{ message?: { content?: string | null } }> }
+      const content = data.choices?.[0]?.message?.content ?? ''
+      if (content.trim()) return content
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') throw err
+    }
+  }
+  throw new Error('All OpenRouter models failed')
+}
+
 // Resolve hermes binary path — the systemd service PATH doesn't include ~/.local/bin
 function resolveHermesBin(): string {
   const candidates = [
@@ -479,9 +539,9 @@ export function executeTaskBackground(taskId: string): void {
   const hasConversation = conversationEntries.length > 0
   const conversationContext = conversationEntries
     .map(e => {
-      if (e.action === 'replied') return `[Naveen] ${e.note}`
-      if (e.action === 'question') return `[You asked] ${e.note}`
-      return `[You said] ${e.note}`
+      if (e.by === 'user') return `[Naveen] ${e.note}`
+      if (e.action === 'question') return `[Astra asked] ${e.note}`
+      return `[Astra] ${e.note}`
     })
     .join('\n')
 
@@ -540,28 +600,37 @@ export function executeTaskBackground(taskId: string): void {
 
   void (async () => {
     let output = ''
+    let lastError = ''
 
-    const doChat = (signal: AbortSignal) =>
-      openaiChat(
-        [
-          { role: 'system', content: systemMsg },
-          { role: 'user', content: userMsg },
-        ],
-        { max_tokens: 900, temperature: 0.4, signal },
-      )
+    const msgs = [
+      { role: 'system', content: systemMsg },
+      { role: 'user', content: userMsg },
+    ]
+
+    // Primary: call OpenRouter directly (~1-2k tokens, fast).
+    // Fallback: gateway openaiChat (88k token context, may timeout).
+    const doDirectChat = (signal: AbortSignal) =>
+      directChat(msgs, { max_tokens: 900, temperature: 0.4, signal })
+
+    const doGatewayChat = (signal: AbortSignal) =>
+      openaiChat(msgs, { max_tokens: 900, temperature: 0.4, signal })
 
     try {
-      output = await doChat(AbortSignal.timeout(45_000))
+      output = await doDirectChat(AbortSignal.timeout(30_000))
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      const cause = err instanceof Error && 'cause' in err
-        ? String((err as { cause?: unknown }).cause)
-        : ''
-      console.error(`[executeTaskBackground] openaiChat failed: ${msg}${cause ? ` (cause: ${cause})` : ''} — retrying`)
+      lastError = msg
+      console.warn(`[executeTaskBackground] OpenRouter direct failed: ${msg} — falling back to gateway`)
       try {
-        output = await doChat(AbortSignal.timeout(30_000))
-      } catch (err2) {
-        console.error('[executeTaskBackground] retry failed:', err2 instanceof Error ? err2.message : String(err2))
+        output = await doDirectChat(AbortSignal.timeout(25_000))
+      } catch {
+        // Both direct attempts failed — try gateway as last resort
+        try {
+          output = await doGatewayChat(AbortSignal.timeout(60_000))
+        } catch (err3) {
+          lastError = err3 instanceof Error ? err3.message : String(err3)
+          console.error('[executeTaskBackground] all attempts failed:', lastError)
+        }
       }
     }
 
@@ -604,16 +673,18 @@ export function executeTaskBackground(taskId: string): void {
       (rawOutputIsUsable ? output.trim().slice(0, 400).replace(/\n{3,}/g, '\n\n') : '')
 
     if (!primaryNote) {
-      // Parsing completely failed
       const current = getTask(taskId)
       const existing = current?.agent_history ?? []
+      const errorNote = lastError
+        ? `AI unavailable: ${lastError.slice(0, 150)}. Try again or use Launch Session.`
+        : 'AI analysis unavailable — please try again or use Launch Session.'
       updateTask(taskId, {
         agent_history: [...existing, {
           id: randomUUID(),
           by: displayName.toLowerCase(),
           byEmoji: emoji,
           action: 'blocked',
-          note: 'AI analysis unavailable — please try again or use Launch Session.',
+          note: errorNote,
           at: new Date().toISOString(),
         }],
         agent_state: null,

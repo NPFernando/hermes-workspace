@@ -1,20 +1,20 @@
 [
   {
-    "title": "Refactor hub-utils.tsx into focused utility modules",
-    "description": "The hub-utils.tsx file exports many helper functions extracted from various places, making it a dumping ground. Split it into domain-specific utility files (e.g., math-utils.tsx, string-utils.tsx, array-utils.tsx) to improve maintainability.",
-    "category": "ui",
-    "estimated_effort": "medium"
-  },
-  {
-    "title": "Implement smarter timing for re-enabling real-time chat history updates",
-    "description": "The TODO in use-realtime-chat-history.ts suggests re-enabling a feature with smarter timing (e.g., only after history confirms the message). Implement a mechanism that waits for message confirmation before re-enabling real-time updates to reduce unnecessary fetches.",
+    "title": "Fix chat history loading TODO",
+    "description": "Re-enable and improve the chat history loading logic in use-realtime-chat-history.ts by implementing smarter timing for clearing the realtime buffer. The current code has a TODO to re-enable the cleanup of the realtime buffer with smarter timing (only after history confirms the message). This change modifies the cleanup effect to wait for stream to end, then wait 2 seconds, and ensure the last realtime message is not a streaming message.",
     "category": "ui",
     "estimated_effort": "low"
   },
   {
-    "title": "Add proper error handling for missing assistant reply in session-send",
-    "description": "The route /api/session-send has a XXX comment indicating a missing error handling case where the sender never sees their assistant reply. Add proper error handling and user feedback for this scenario.",
-    "category": "backend",
+    "title": "Enhance error handling in gateway components",
+    "description": "Add proper error boundaries and fallback UI for gateway components to prevent crashes and improve user experience when API calls fail.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add keyboard shortcuts for common actions",
+    "description": "Implement keyboard shortcuts (e.g., Ctrl+K for search, Ctrl+N for new chat) across the workspace to improve accessibility and power user experience.",
+    "category": "ui",
     "estimated_effort": "low"
   }
 ]

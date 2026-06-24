@@ -41,6 +41,7 @@ import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiVtCapitalRouteImport } from './routes/api/vt-capital'
 import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
 import { Route as ApiUserSettingsRouteImport } from './routes/api/user-settings'
+import { Route as ApiUserProfileRouteImport } from './routes/api/user-profile'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
@@ -371,6 +372,11 @@ const ApiValidateProviderRoute = ApiValidateProviderRouteImport.update({
 const ApiUserSettingsRoute = ApiUserSettingsRouteImport.update({
   id: '/api/user-settings',
   path: '/api/user-settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUserProfileRoute = ApiUserProfileRouteImport.update({
+  id: '/api/user-profile',
+  path: '/api/user-profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
@@ -1359,6 +1365,7 @@ export interface FileRoutesByFullPath {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/user-profile': typeof ApiUserProfileRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
@@ -1563,6 +1570,7 @@ export interface FileRoutesByTo {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/user-profile': typeof ApiUserProfileRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
@@ -1769,6 +1777,7 @@ export interface FileRoutesById {
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/user-profile': typeof ApiUserProfileRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
@@ -1976,6 +1985,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/transcribe'
+    | '/api/user-profile'
     | '/api/user-settings'
     | '/api/validate-provider'
     | '/api/vt-capital'
@@ -2180,6 +2190,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/transcribe'
+    | '/api/user-profile'
     | '/api/user-settings'
     | '/api/validate-provider'
     | '/api/vt-capital'
@@ -2385,6 +2396,7 @@ export interface FileRouteTypes {
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/transcribe'
+    | '/api/user-profile'
     | '/api/user-settings'
     | '/api/validate-provider'
     | '/api/vt-capital'
@@ -2591,6 +2603,7 @@ export interface RootRouteChildren {
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
+  ApiUserProfileRoute: typeof ApiUserProfileRoute
   ApiUserSettingsRoute: typeof ApiUserSettingsRoute
   ApiValidateProviderRoute: typeof ApiValidateProviderRoute
   ApiVtCapitalRoute: typeof ApiVtCapitalRoute
@@ -2864,6 +2877,13 @@ declare module '@tanstack/react-router' {
       path: '/api/user-settings'
       fullPath: '/api/user-settings'
       preLoaderRoute: typeof ApiUserSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/user-profile': {
+      id: '/api/user-profile'
+      path: '/api/user-profile'
+      fullPath: '/api/user-profile'
+      preLoaderRoute: typeof ApiUserProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/transcribe': {
@@ -4425,6 +4445,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
+  ApiUserProfileRoute: ApiUserProfileRoute,
   ApiUserSettingsRoute: ApiUserSettingsRoute,
   ApiValidateProviderRoute: ApiValidateProviderRoute,
   ApiVtCapitalRoute: ApiVtCapitalRoute,

@@ -141,13 +141,13 @@ export function SystemMetricsFooter({ leftOffsetPx = 0 }: { leftOffsetPx?: numbe
             <Separator />
             <MetricItem
               label="RAM"
-              value={`${formatBytes(data.memory.usedBytes)} / ${formatBytes(data.memory.totalBytes)}`}
+              value={`${formatBytes(data.memory.usedBytes)} / ${formatBytes(data.memory.totalBytes)} · ${data.memory.usedPercent}%`}
               tone={metricTone(data.memory.usedPercent)}
             />
             <Separator />
             <MetricItem
               label="Disk"
-              value={`${data.disk.usedPercent}%`}
+              value={`${formatBytes(data.disk.usedBytes)} / ${formatBytes(data.disk.totalBytes)} · ${data.disk.usedPercent}%`}
               tone={metricTone(data.disk.usedPercent)}
             />
             <Separator />

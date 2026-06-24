@@ -37,7 +37,20 @@ function ChangeList({ entry }: { entry: VersionEntry }) {
   )
 }
 
-export function WhatsNewModal() {
+/** Returns true if the current version hasn't been marked as seen */
+export function hasUnseenUpdates(): boolean {
+  try {
+    return localStorage.getItem(SEEN_KEY) !== CHANGELOG[0]?.version
+  } catch {
+    return false
+  }
+}
+
+type WhatsNewModalProps = {
+  onDismissed?: () => void
+}
+
+export function WhatsNewModal({ onDismissed }: WhatsNewModalProps = {}) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -51,6 +64,8 @@ export function WhatsNewModal() {
   const dismiss = () => {
     localStorage.setItem(SEEN_KEY, CHANGELOG[0].version)
     setOpen(false)
+    // Delay callback until after exit animation (~250ms)
+    if (onDismissed) setTimeout(onDismissed, 350)
   }
 
   return (

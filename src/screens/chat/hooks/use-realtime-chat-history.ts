@@ -344,14 +344,14 @@ export function useRealtimeChatHistory({
             const store = useChatStore.getState()
             const realtimeMessages =
               store.realtimeMessages.get(effectiveSessionKey) ?? []
-            const historyMessages = prevData?.messages as
+            const cachedHistoryMessages = prevData?.messages as
               | Array<unknown>
               | undefined
 
-            if (realtimeMessages.length > 0 && Array.isArray(historyMessages)) {
+            if (realtimeMessages.length > 0 && Array.isArray(cachedHistoryMessages)) {
               // Deduplicate: remove any realtime messages already in history
               const historyTexts = new Set(
-                historyMessages.map((m: unknown) => {
+                cachedHistoryMessages.map((m: unknown) => {
                   const raw = m as Record<string, unknown>
                   const content = raw.content ?? raw.text ?? ''
                   return `${raw.role ?? ''}:${JSON.stringify(content)}`
@@ -409,7 +409,7 @@ export function useRealtimeChatHistory({
                 const refetchData =
                   queryClient.getQueryData<Record<string, unknown>>(key)
                 const refetchedMessages =
-                  (refetchData?.messages as Array<Record<string, unknown>>) ?? []
+                  (refetchData?.messages ?? []) as Array<Record<string, unknown>>
                 const assistantTail = (completedAssistant.content ?? completedAssistant.text ?? '')
                   .toString()
                   .slice(-64)
@@ -423,7 +423,7 @@ export function useRealtimeChatHistory({
                     queryClient,
                     effectiveFriendlyId,
                     effectiveSessionKey,
-                    completedAssistant as unknown as import('@/screens/chat/types').ChatMessage,
+                    completedAssistant as unknown as ChatMessage,
                   )
                 }
               }
@@ -541,17 +541,20 @@ export function useRealtimeChatHistory({
   }, [mergedMessages, portableMode])
 
   // History has caught up — cleanup realtime buffer outside render
-  // DISABLED: This was aggressively clearing realtime messages before history
-  // caught up, causing the "message appears then disappears" bug.
-  // TODO: Re-enable with smarter timing (e.g. only after history confirms the message)
+  // Previously disabled due to "message appears then disappears" bug.
+  // Re-enabled with smarter timing: wait for stream to end, then wait 2 seconds,
+  // and ensure the last realtime message is not a streaming message.
   useEffect(() => {
     if (portableMode) return
     if (!effectiveSessionKey || effectiveSessionKey === 'new') return
     if (realtimeMessages.length === 0) return
-    // Only clear when streaming is idle and we have realtime messages
+    // Only clear when streaming is idle (no active stream)
     if (streamingStateRef.current !== null) return
-    // Additional condition: wait a bit after streaming ends to ensure history has caught up
-    if (Date.now() - lastStreamClearTimeRef.current < 1000) return
+    // Wait 2 seconds after stream ends to allow history to catch up
+    if (Date.now() - lastStreamClearTimeRef.current < 2000) return
+    // Additionally, ensure the last realtime message is not a streaming message
+    const lastRealtime = realtimeMessages[realtimeMessages.length - 1]
+    if (lastRealtime.__streamingStatus === 'streaming') return
     clearRealtimeBuffer(effectiveSessionKey)
   }, [
     clearRealtimeBuffer,

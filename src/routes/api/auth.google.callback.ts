@@ -4,6 +4,7 @@ import {
   consumeOAuthState,
   exchangeCodeForEmail,
   isGoogleOAuthEnabled,
+  storeUserProfile,
 } from '../../server/google-oauth'
 import {
   createSessionCookie,
@@ -42,7 +43,7 @@ export const Route = createFileRoute('/api/auth/google/callback')({
         }
 
         try {
-          const email = await exchangeCodeForEmail(code)
+          const { email, name, picture } = await exchangeCodeForEmail(code)
 
           if (email.toLowerCase() !== GOOGLE_ALLOWED_EMAIL.toLowerCase()) {
             return new Response(null, {
@@ -50,6 +51,8 @@ export const Route = createFileRoute('/api/auth/google/callback')({
               headers: { Location: '/?error=unauthorized_email' },
             })
           }
+
+          storeUserProfile({ email, name, picture })
 
           const token = generateSessionToken()
           storeSessionToken(token, true) // 1-year for Google login

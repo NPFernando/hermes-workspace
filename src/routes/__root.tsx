@@ -16,12 +16,10 @@ import { TerminalShortcutListener } from '@/components/terminal-shortcut-listene
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import KeyboardShortcuts from '@/components/KeyboardShortcuts'
 import { WorkspaceShell } from '@/components/workspace-shell'
-import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrigger'
 import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
-import { UpdateCenterNotifier } from '@/components/update-center-notifier'
-import { WhatsNewModal } from '@/components/whats-new-modal'
+import { NotificationHub } from '@/components/notification-hub'
 import {
   applyInterfacePreferences,
   initializeSettingsAppearance,
@@ -427,13 +425,9 @@ function RootLayout() {
               {/* Keep UsageMeter mounted so search-modal OPEN_USAGE still works even when the pill is hidden by default. */}
               <UsageMeter visible={settings.showUsageMeter} />
               <KeyboardShortcutsModal />
-              <UpdateCenterNotifier />
-              <WhatsNewModal />
+              <NotificationHub />
               {rootSurfaceState.showPostOnboardingOverlays ? (
-                <>
-                  <MobilePromptTrigger />
-                  <OnboardingTour />
-                </>
+                <OnboardingTour />
               ) : null}
             </>
           ) : null}
@@ -489,87 +483,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           (function(){
             var d = document.getElementById('splash-screen');
             if (!d) return;
-            var bg = '#282c34', txt = '#9cdef2', muted = 'rgba(156,222,242,0.55)', accent = '#e06c75', dotGrid = false, monoFont = true;
-            try {
-              var theme = localStorage.getItem('${THEME_STORAGE_KEY}') || '${DEFAULT_THEME}';
-              if (theme === 'odysseus') {
-                bg = '#282c34';
-                txt = '#9cdef2';
-                muted = 'rgba(156,222,242,0.65)';
-                accent = '#f08090';
-                dotGrid = true;
-                monoFont = true;
-              } else if (theme === 'claude-nous') {
-                bg = '#031A1A';
-                txt = '#F8F1E3';
-                muted = '#9CB2AE';
-                accent = '#FFAC02';
-                dotGrid = false;
-                monoFont = false;
-              } else if (theme === 'claude-nous-light') {
-                bg = '#F8FAF8';
-                txt = '#16315F';
-                muted = '#6F7D96';
-                accent = '#2557B7';
-              } else if (theme === 'claude-classic') {
-                bg = '#0d0f12';
-                txt = '#eceff4';
-                muted = '#7f8a96';
-                accent = '#b98a44';
-              } else if (theme === 'claude-official') {
-                bg = '#0a0e1a';
-                txt = '#e6eaf2';
-                muted = '#9aa5bd';
-                accent = '#6366f1';
-              } else if (theme === 'claude-official-light') {
-                bg = '#F7F7F1';
-                txt = '#16315F';
-                muted = '#6F7D96';
-                accent = '#2557B7';
-              } else if (theme === 'claude-classic-light') {
-                bg = '#F5F2ED';
-                txt = '#1a1f26';
-                muted = '#6F675E';
-                accent = '#b98a44';
-              } else if (theme === 'claude-slate') {
-                bg = '#0d1117';
-                txt = '#c9d1d9';
-                muted = '#8b949e';
-                accent = '#7eb8f6';
-              } else if (theme === 'claude-slate-light') {
-                bg = '#F6F8FA';
-                txt = '#24292f';
-                muted = '#57606A';
-                accent = '#3b82f6';
-              } else if (theme === 'matrix') {
-                bg = '#020804';
-                txt = '#d8ffe3';
-                muted = 'rgba(216,255,227,0.58)';
-                accent = '#00ff41';
-              } else if (theme === 'matrix-light') {
-                bg = '#F4FFF6';
-                txt = '#062a12';
-                muted = 'rgba(6,42,18,0.55)';
-                accent = '#008f2d';
-              } else if (theme === 'scifi') {
-                bg = '#060b18';
-                txt = '#e0f7fa';
-                muted = '#5d9bb8';
-                accent = '#00f0ff';
-              } else if (theme === 'scifi-light') {
-                bg = '#eef1f5';
-                txt = '#0a1628';
-                muted = '#5a6a7e';
-                accent = '#0097a7';
-              }
-            } catch(e){}
-
-            var isDark = !['claude-nous-light','claude-official-light','claude-classic-light','claude-slate-light','matrix-light','scifi-light'].includes(theme);
-            var fontStack = monoFont ? "'JetBrains Mono Variable',ui-monospace,monospace" : "system-ui,-apple-system,sans-serif";
-            var letterSpacing = monoFont ? '0.06em' : '0.04em';
-            var gridStyle = dotGrid ? ';background-image:radial-gradient(rgba(53,90,102,0.45) 1px,transparent 1px);background-size:20px 20px' : '';
+            var bg = '#282c34', txt = '#9cdef2', muted = 'rgba(156,222,242,0.65)', accent = '#f08090';
+            var isDark = true;
+            var fontStack = "'JetBrains Mono Variable',ui-monospace,monospace";
+            var letterSpacing = '0.06em';
+            var gridStyle = ';background-image:radial-gradient(rgba(53,90,102,0.45) 1px,transparent 1px);background-size:20px 20px';
             var terminalQuips = ['> initializing agent runtime...','> loading ancient knowledge...','> calibrating tool chain...','> summoning your agent...','> bridging realms...','> connecting to Hermes...'];
-            var quip = (dotGrid || theme === 'matrix' || theme === 'scifi') ? terminalQuips[Math.floor(Math.random() * terminalQuips.length)] : '';
+            var quip = terminalQuips[Math.floor(Math.random() * terminalQuips.length)];
 
             d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.5s ease'+gridStyle+';';
             d.innerHTML = '<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
