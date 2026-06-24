@@ -151,7 +151,7 @@ function saveClaudeCredentials(creds: ClaudeCredentials): void {
     } catch {
       /* best effort */
     }
-  } else if (creds.source === 'keychain' && process.platform === 'darwin') {
+  } else if (process.platform === 'darwin') {
     try {
       execSync(
         `security add-generic-password -U -s "${CLAUDE_KEYCHAIN_SERVICE}" -w "${text.replace(/"/g, '\\"')}" 2>/dev/null`,
@@ -481,10 +481,11 @@ async function refreshCodexToken(auth: CodexAuth): Promise<string | null> {
       string,
       unknown
     > | null
+    const errorValue = body?.error
     const code =
-      (body?.error as Record<string, unknown>)?.code ??
-      body?.error ??
-      body?.code
+      typeof errorValue === 'object' && errorValue !== null
+        ? (errorValue as Record<string, unknown>).code
+        : errorValue ?? body?.code
     if (
       code === 'refresh_token_expired' ||
       code === 'refresh_token_reused' ||
@@ -719,7 +720,11 @@ export async function fetchCodexUsage(): Promise<ProviderUsageResult> {
 
   // Credits
   const creditsHeader = readNumber(res.headers.get('x-codex-credits-balance'))
-  const creditsData = (data.credits as Record<string, unknown>)?.balance
+  const credits = data.credits
+  const creditsData =
+    typeof credits === 'object' && credits !== null
+      ? (credits as Record<string, unknown>).balance
+      : undefined
   const creditsRemaining = creditsHeader ?? readNumber(creditsData)
   if (creditsRemaining !== undefined) {
     const limit = 1000
@@ -922,12 +927,12 @@ export async function fetchOpenRouterUsage(): Promise<ProviderUsageResult> {
       string,
       unknown
     >
-    const data = (payload?.data ?? payload) as Record<string, unknown>
-    const usage = (data?.usage ?? {}) as Record<string, unknown>
+    const data = (payload.data ?? payload) as Record<string, unknown>
+    const usage = (data.usage ?? {}) as Record<string, unknown>
 
     const costUsd =
-      readNumber(usage?.cost ?? data?.cost ?? data?.usage_cost) ?? 0
-    const limitUsd = readNumber(data?.limit ?? data?.spend_limit)
+      readNumber(usage.cost ?? data.cost ?? data.usage_cost) ?? 0
+    const limitUsd = readNumber(data.limit ?? data.spend_limit)
 
     const lines: Array<UsageLine> = []
 
@@ -948,9 +953,9 @@ export async function fetchOpenRouterUsage(): Promise<ProviderUsageResult> {
     }
 
     const inputTokens =
-      readNumber(usage?.prompt_tokens ?? usage?.input_tokens) ?? 0
+      readNumber(usage.prompt_tokens ?? usage.input_tokens) ?? 0
     const outputTokens =
-      readNumber(usage?.completion_tokens ?? usage?.output_tokens) ?? 0
+      readNumber(usage.completion_tokens ?? usage.output_tokens) ?? 0
     if (inputTokens > 0 || outputTokens > 0) {
       lines.push({
         type: 'text',
