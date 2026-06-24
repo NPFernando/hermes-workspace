@@ -290,13 +290,17 @@ export async function fetchDashboardToken(options?: {
     const res = await fetch(`${CLAUDE_DASHBOARD_URL}/`, {
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
+    // If the dashboard returns a non-200 status (e.g., 302 redirect to login,
+    // 401, 500, etc.), we treat it as unavailable and return an empty string.
+    // The caller may retry with force:true after a 401 from dashboardFetch.
     if (!res.ok) {
-      throw new Error(`Dashboard index failed: ${res.status}`)
+      return ''
     }
     const html = await res.text()
     const token = html.match(DASHBOARD_TOKEN_REGEX)?.[1]?.trim() || ''
     if (!token) {
-      throw new Error('Dashboard session token not found in root HTML')
+      // Token not found in HTML; treat as unavailable.
+      return ''
     }
     dashboardTokenCache = token
     return token
