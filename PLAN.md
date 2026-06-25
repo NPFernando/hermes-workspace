@@ -1,33 +1,32 @@
-# Fix chat history loading TODO
+# Auto-improvement Plan: Implement automatic dependency updates via Dependabot
 
-## Summary
-Re-enable and improve the chat history loading logic in `use-realtime-chat-history.ts` by implementing smarter timing for clearing the realtime buffer. The current code has a TODO to re-enable the cleanup of the realtime buffer with smarter timing (only after history confirms the message). This change modifies the cleanup effect to wait for stream to end, then wait 2 seconds, and ensure the last realtime message is not a streaming message.
+## Summary of the change
+Add Dependabot configuration to automatically create pull requests for outdated dependencies, keeping the project secure and up-to-date.
 
 ## Files to modify
-- `src/screens/chat/hooks/use-realtime-chat-history.ts`
+- `.github/dependabot.yml` (new file)
 
-## Step-by-step implementation
-1. Open `src/screens/chat/hooks/use-realtime-chat-history.ts`.
-2. Locate the `useEffect` block that clears the realtime buffer (lines 547-562 in the current version).
-3. Replace the current condition with a more sophisticated check that ensures the message has been persisted to history before clearing the buffer.
-4. Implement the check by verifying that the last message in the realtime buffer (if any) is present in the history messages (mergedMessages) by comparing a unique identifier (e.g., timestamp + content hash) or by checking that the realtime buffer is empty or only contains messages that have been acknowledged by history.
-5. For simplicity and safety, we will implement a hybrid approach: keep the existing timeout but add a condition that the last realtime message is not a streaming message (i.e., does not have `__streamingStatus === 'streaming'`) and that at least 2 seconds have passed since the stream ended.
-6. After making the change, save the file.
-7. Run `cd /home/ubuntu/hermes-workspace && npx tsc --noEmit` to verify TypeScript compiles without errors.
-8. If there are any errors, adjust the implementation accordingly.
+## Steps
+1. Create the file `.github/dependabot.yml` in the repository root.
+2. Add the following configuration to the file:
+   ```yaml
+   version: 2
+   updates:
+     - package-ecosystem: "npm"
+       directory: "/"
+       schedule:
+         interval: "daily"
+       open-pull-requests-limit: 10
+       reviewers:
+         - "naveen"
+       labels:
+         - "dependencies"
+         - "automated"
+   ```
+3. Commit the file to the feature branch.
+4. Push the branch and open a pull request (if applicable).
 
 ## How to verify the change works
-- TypeScript compilation succeeds (`tsc --noEmit` exits with code 0).
-- Manual verification: 
-  - Open the workspace UI in a browser.
-  - Send a message and observe that the message appears and stays (does not disappear after a brief flash).
-  - Send multiple messages in quick succession and ensure they all remain visible.
-  - Check that the realtime buffer is cleared appropriately (no memory leak).
-- Since we cannot run the full test suite in this environment, we rely on the TypeScript check and manual inspection.
-
-## Rollback procedure
-- If the change causes issues, revert the file to its previous state using Git:
-  ```bash
-  cd /home/ubuntu/hermes-workspace
-  git checkout HEAD -- src/screens/chat/hooks/use-realtime-chat-history.ts
-  ```
+- After merging the configuration to the default branch, Dependabot will start scanning the repository.
+- Within 24 hours, check the Dependabot tab in the repository's security tab or look for pull requests labeled "dependencies".
+- Verify that the pull requests are created for outdated npm packages.

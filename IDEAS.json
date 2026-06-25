@@ -1,20 +1,20 @@
 [
   {
-    "title": "Fix chat history loading TODO",
-    "description": "Re-enable and improve the chat history loading logic in use-realtime-chat-history.ts by implementing smarter timing for clearing the realtime buffer. The current code has a TODO to re-enable the cleanup of the realtime buffer with smarter timing (only after history confirms the message). This change modifies the cleanup effect to wait for stream to end, then wait 2 seconds, and ensure the last realtime message is not a streaming message.",
+    "title": "Enable strict TypeScript mode and fix type errors",
+    "description": "Update tsconfig.json to enable strict: true, noImplicitAny, strictNullChecks, etc. Then fix all resulting type errors across the codebase to improve type safety and reduce runtime bugs.",
+    "category": "backend",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add keyboard navigation support for modal dialogs",
+    "description": "Ensure all modal dialogs can be opened, navigated, and closed using only keyboard (Tab, Shift+Tab, Enter, Escape). This improves accessibility and power user experience.",
     "category": "ui",
     "estimated_effort": "low"
   },
   {
-    "title": "Enhance error handling in gateway components",
-    "description": "Add proper error boundaries and fallback UI for gateway components to prevent crashes and improve user experience when API calls fail.",
-    "category": "ui",
-    "estimated_effort": "medium"
-  },
-  {
-    "title": "Add keyboard shortcuts for common actions",
-    "description": "Implement keyboard shortcuts (e.g., Ctrl+K for search, Ctrl+N for new chat) across the workspace to improve accessibility and power user experience.",
-    "category": "ui",
+    "title": "Implement automatic dependency updates via Renovate or Dependabot",
+    "description": "Configure a dependency update bot (like Renovate) to automatically create pull requests for outdated dependencies, keeping the project secure and up-to-date.",
+    "category": "backend",
     "estimated_effort": "low"
   }
 ]
