@@ -1,8 +1,11 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { deleteTask, getTask, moveTask, updateTask } from '../../server/tasks-store'
-import { breakdownTaskWithAI, executeTaskBackground } from '../../server/astra-tasks'
+import { breakdownTaskWithAI, executeTaskBackground, executeTaskWithHermesBackground } from '../../server/astra-tasks'
 import { appendLocalMessage, ensureLocalSession, getLocalMessages } from '../../server/local-session-store'
 import { getSessionMessages } from '../../server/claude-dashboard-api'
 import type { ActivityEntry, TaskAgentState, TaskColumn, TaskPriority } from '../../server/tasks-store'
@@ -36,6 +39,31 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
       GET: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
+        }
+
+        // ?action=log → return latest execution log for the task
+        const url = new URL(request.url)
+        if (url.searchParams.get('action') === 'log') {
+          const hermesHome =
+            process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+          const logsDir = path.join(hermesHome, 'logs')
+          const prefix = `exec-${params.taskId.slice(0, 8)}-`
+          try {
+            const files = fs
+              .readdirSync(logsDir)
+              .filter((f) => f.startsWith(prefix) && f.endsWith('.log'))
+              .map((f) => {
+                try { return { name: f, mtime: fs.statSync(path.join(logsDir, f)).mtimeMs } }
+                catch { return { name: f, mtime: 0 } }
+              })
+              .sort((a, b) => b.mtime - a.mtime)
+            if (files.length === 0) return jsonResponse({ found: false, log: '' })
+            const raw = fs.readFileSync(path.join(logsDir, files[0].name), 'utf-8')
+            const log = raw.length > 51_200 ? '…(truncated)\n' + raw.slice(-51_200) : raw
+            return jsonResponse({ found: true, log, file: files[0].name })
+          } catch {
+            return jsonResponse({ found: false, log: '' })
+          }
         }
 
         const task = getTask(params.taskId)
@@ -174,6 +202,16 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
             // Re-trigger agent when: waiting for input, OR agent has previously worked on this task
             const hasAgentHistory = existing.some(e => e.by !== 'user' && e.action !== 'executed')
             const shouldResume = task.agent_state === 'waiting_for_input' || (hasAgentHistory && task.agent_state !== 'working')
+            // Use the full hermes execution engine when a prior hermes run exists (i.e. the
+            // task was previously executed, not just analysed). Conversational-only tasks that
+            // have never been executed still get the lighter directChat path.
+            const hadExecution = existing.some(e =>
+              e.by !== 'user' && ['attempted', 'completed', 'blocked'].includes(e.action)
+            )
+            // Re-open: if user replies on a completed (review) or blocked task, move it back
+            // to in_progress so the board reflects that work is resuming.
+            const reopenColumn =
+              task.column === 'blocked' || task.column === 'review' ? 'in_progress' : task.column
             updateTask(params.taskId, {
               agent_history: [...existing, entry],
               ...(shouldResume ? {
@@ -181,11 +219,15 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
                 agent_name: task.agent_name ?? 'astra',
                 agent_action_at: now,
                 waiting_for_user: false,
-                column: task.column === 'blocked' ? 'in_progress' : task.column,
+                column: reopenColumn,
               } : {}),
             })
             if (shouldResume) {
-              executeTaskBackground(params.taskId)
+              if (hadExecution) {
+                executeTaskWithHermesBackground(params.taskId)
+              } else {
+                executeTaskBackground(params.taskId)
+              }
             }
             return jsonResponse({ ok: true, resumed: shouldResume })
           } catch {
@@ -230,7 +272,7 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
               at: now,
             }],
           })
-          executeTaskBackground(params.taskId)
+          executeTaskWithHermesBackground(params.taskId)
           return jsonResponse({ ok: true })
         }
 

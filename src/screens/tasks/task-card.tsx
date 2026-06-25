@@ -3,18 +3,9 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Delete01Icon, MoreVerticalIcon, PlayIcon, Rocket01Icon, SplitIcon } from '@hugeicons/core-free-icons'
 import type { ClaudeTask, TaskAgentState, TaskColumn, TaskPriority } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
-import { COLUMN_LABELS, COLUMN_ORDER, PRIORITY_COLORS, isOverdue } from '@/lib/tasks-api'
+import { COLUMN_LABELS, COLUMN_ORDER, PRIORITY_COLORS, isOverdue, relativeTime } from '@/lib/tasks-api'
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from '@/components/ui/menu'
 
-function relativeTime(isoStr: string): string {
-  const diff = Date.now() - new Date(isoStr).getTime()
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
-}
 
 function isStuckAgent(task: ClaudeTask): boolean {
   if (!task.agent_state || !task.agent_action_at) return false
@@ -42,6 +33,7 @@ type Props = {
   onResetAgent?: () => void
   onRequestRefresh?: () => void
   onComment?: (taskId: string, text: string) => Promise<void>
+  queuePosition?: number | null
 }
 
 export function formatTaskAssigneeLabel(
@@ -119,11 +111,14 @@ export function TaskCard({
   onResetAgent,
   onRequestRefresh,
   onComment,
+  queuePosition,
 }: Props) {
   const [activityOpen, setActivityOpen] = useState(false)
   const [replyText, setReplyText] = useState('')
   const [replySending, setReplySending] = useState(false)
   const replyInputRef = useRef<HTMLInputElement>(null)
+  const [logContent, setLogContent] = useState<string | null>(null)
+  const [logLoading, setLogLoading] = useState(false)
   const overdue = isOverdue(task)
   const priorityColor = PRIORITY_COLORS[task.priority]
   const visibleTags = task.tags.slice(0, 2)
@@ -276,9 +271,24 @@ export function TaskCard({
         </MenuRoot>
       </div>{/* end hover actions */}
 
-      <p className="text-sm font-medium text-[var(--theme-text)] leading-snug mb-1 line-clamp-2 pr-12">
-        {task.title}
-      </p>
+      <div className="flex items-start gap-1.5 mb-1 pr-12">
+        {queuePosition != null && !task.agent_state && (task.column === 'todo' || task.column === 'backlog') && (
+          <span
+            title={`Queue position ${queuePosition} — processed in priority order (high → medium → low, oldest first)`}
+            className={cn(
+              'shrink-0 mt-0.5 inline-flex items-center rounded px-1 py-0 text-[9px] font-bold tabular-nums border',
+              queuePosition === 1
+                ? 'bg-violet-500/15 text-violet-400 border-violet-500/30'
+                : 'bg-[var(--theme-hover)] text-[var(--theme-muted)] border-[var(--theme-border)]',
+            )}
+          >
+            #{queuePosition}
+          </span>
+        )}
+        <p className="text-sm font-medium text-[var(--theme-text)] leading-snug line-clamp-2">
+          {task.title}
+        </p>
+      </div>
 
       {task.description && (
         <p className="text-xs text-[var(--theme-muted)] line-clamp-2 mb-2">
@@ -315,11 +325,47 @@ export function TaskCard({
         )}
 
         {/* Agent comment — latest reasoning shown at a glance (when panel is closed) */}
-        {task.agent_comment && !isAgentActive && !activityOpen && (
+        {task.agent_comment && !isAgentActive && !activityOpen && task.column !== 'review' && (
           <p className="text-[10px] leading-relaxed line-clamp-2 text-[var(--theme-muted)]">
             <span className="text-purple-500">✦</span> {task.agent_comment}
           </p>
         )}
+
+        {/* Plan-ready banner — shown when task is in review with a sister's plan.
+            Replaces the buried "expand history → find planned entry" workflow. */}
+        {task.column === 'review' && !isAgentActive && (() => {
+          const planEntry = [...(task.agent_history ?? [])].reverse().find(e => e.action === 'planned')
+          if (!planEntry) return null
+          return (
+            <div
+              className="rounded-md p-2 space-y-1.5 bg-violet-500/5 border border-violet-500/20"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-violet-400">
+                <span>{planEntry.byEmoji}</span>
+                <span>{planEntry.by} · plan ready</span>
+              </div>
+              <p className="text-[10px] text-[var(--theme-muted)] leading-relaxed line-clamp-5 whitespace-pre-line">
+                {planEntry.note}
+              </p>
+              {onExecute && (
+                <button
+                  type="button"
+                  onClick={() => onExecute()}
+                  disabled={isExecuting}
+                  className={cn(
+                    'w-full rounded py-1 text-[10px] font-medium border transition-colors',
+                    isExecuting
+                      ? 'border-amber-500/20 bg-amber-500/5 text-amber-400/50 cursor-wait'
+                      : 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20',
+                  )}
+                >
+                  {isExecuting ? '🚀 Executing…' : '🚀 Execute this plan'}
+                </button>
+              )}
+            </div>
+          )
+        })()}
 
         {/* History note count — clickable to expand panel */}
         {hasHistory && !isAgentActive && (
@@ -367,6 +413,37 @@ export function TaskCard({
                 </div>
               </div>
             ))}
+
+            {/* View log — shown when there are execution entries */}
+            {task.agent_history?.some(e => ['completed', 'attempted', 'blocked'].includes(e.action) && e.by !== 'user') && (
+              <div className="pt-1 border-t border-[var(--theme-border)]">
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    if (logContent !== null) { setLogContent(null); return }
+                    setLogLoading(true)
+                    try {
+                      const res = await fetch(`/api/hermes-tasks/${task.id}?action=log`)
+                      const data = await res.json() as { found: boolean; log: string }
+                      setLogContent(data.found ? data.log : '(no log file found for this task)')
+                    } catch {
+                      setLogContent('(failed to fetch log)')
+                    } finally {
+                      setLogLoading(false)
+                    }
+                  }}
+                  className="text-[9px] text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:underline transition-colors"
+                >
+                  {logLoading ? 'loading…' : logContent !== null ? '▲ hide log' : '📋 view execution log'}
+                </button>
+                {logContent !== null && (
+                  <pre className="mt-1.5 text-[9px] leading-relaxed text-[var(--theme-muted)] bg-black/20 rounded p-2 overflow-auto max-h-48 whitespace-pre-wrap break-all">
+                    {logContent}
+                  </pre>
+                )}
+              </div>
+            )}
 
             {/* Inline reply input */}
             {onComment && (

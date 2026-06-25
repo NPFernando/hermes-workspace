@@ -86,6 +86,108 @@ function resolveHermesBin(): string {
 const HERMES_BIN = resolveHermesBin()
 
 // ---------------------------------------------------------------------------
+// clearStuckTasks — recover tasks whose agent process died without cleanup
+//
+// Background scripts are killed by OOM, SIGKILL, or server restart before
+// they can clear agent_state. This function finds tasks that have been in
+// a non-null agent_state longer than the expected timeout and resets them,
+// leaving a 'timed_out' history entry so Naveen can see what happened.
+// Called on every runAgentDeployBackground() and periodically via setInterval.
+// ---------------------------------------------------------------------------
+
+const REVIEWING_TIMEOUT_MS = 4 * 60 * 1000    //  4 min  (each review call is ≤ 90s × 2)
+const WORKING_TIMEOUT_MS   = 25 * 60 * 1000   // 25 min  (hermes -z timeout is 20 min)
+
+export function clearStuckTasks(): number {
+  const now = Date.now()
+  const all = listTasks({ includeDone: true })
+  let cleared = 0
+
+  // ── Part 1: recover stuck agent_state ──────────────────────────────────────
+  for (const task of all) {
+    if (!task.agent_state || !task.agent_action_at) continue
+    const ageMs   = now - new Date(task.agent_action_at).getTime()
+    const timeout = task.agent_state === 'working' ? WORKING_TIMEOUT_MS : REVIEWING_TIMEOUT_MS
+    if (ageMs <= timeout) continue
+
+    const existing = task.agent_history ?? []
+    const ageMin   = Math.round(ageMs / 60_000)
+    updateTask(task.id, {
+      agent_state:     null,
+      agent_name:      null,
+      agent_action_at: null,
+      agent_history:   [...existing, {
+        id:      randomUUID(),
+        by:      'astra',
+        byEmoji: '🌟',
+        action:  'timed_out',
+        note:    `Agent state "${task.agent_state}" was stuck for ${ageMin} min — auto-cleared. Press Execute to retry.`,
+        at:      new Date().toISOString(),
+      }],
+    })
+    cleared++
+  }
+
+  // ── Part 2: escalate tasks stuck in 'blocked' without user reply ───────────
+  const ESCALATE_AFTER_MS  = 2 * 60 * 60 * 1000  // alert after 2 h blocked
+  const ESCALATE_REPEAT_MS = 6 * 60 * 60 * 1000  // repeat at most every 6 h
+
+  for (const task of all) {
+    if (task.column !== 'blocked' || task.agent_state) continue
+    const history = task.agent_history ?? []
+
+    const lastUserReply   = [...history].reverse().find(e => e.by === 'user' && e.action === 'replied')
+    const lastEscalation  = [...history].reverse().find(e => e.action === 'escalated')
+    const lastEscalationMs = lastEscalation ? new Date(lastEscalation.at).getTime() : 0
+
+    // Use last user reply, updated_at, or agent_action_at as "last activity" baseline
+    const lastActivityMs = Math.max(
+      lastUserReply  ? new Date(lastUserReply.at).getTime()  : 0,
+      task.updated_at     ? new Date(task.updated_at).getTime()     : 0,
+      task.agent_action_at ? new Date(task.agent_action_at).getTime() : 0,
+    )
+    if (!lastActivityMs || now - lastActivityMs < ESCALATE_AFTER_MS) continue
+    if (now - lastEscalationMs < ESCALATE_REPEAT_MS) continue
+
+    const blockedH = Math.round((now - lastActivityMs) / (60 * 60 * 1000))
+    const lastNote = [...history].reverse().find(e => e.by !== 'user' && e.note)?.note ?? '(no details)'
+    const nowIso   = new Date().toISOString()
+
+    updateTask(task.id, {
+      agent_history: [...history, {
+        id:      randomUUID(),
+        by:      'astra',
+        byEmoji: '🌟',
+        action:  'escalated',
+        note:    `Blocked ${blockedH}h — escalation sent. Reply to unblock or reassign.`,
+        at:      nowIso,
+      }],
+    })
+
+    const tgMsg = `🚫 Still blocked ${blockedH}h: ${task.title}\n${lastNote.slice(0, 220)}\n→ Reply in workspace to unblock or reassign`
+    try {
+      spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q', tgMsg], {
+        encoding: 'utf-8',
+        timeout:  15_000,
+      })
+    } catch { /* non-fatal */ }
+  }
+
+  return cleared
+}
+
+// Periodic stuck-task sweep: every 10 minutes while the server is running.
+setInterval(clearStuckTasks, 10 * 60 * 1000)
+
+// Periodic deploy sweep: every 15 minutes, pick up any unreviewed tasks that
+// slipped through (server restart broke a self-chain, tasks moved back to
+// backlog manually, etc.). Only touches tasks no agent has reviewed yet —
+// tasks already in the pipeline are left alone.
+setInterval(() => {
+  try { runAgentDeployBackground('auto') } catch { /* non-fatal */ }
+}, 15 * 60 * 1000)
+
+// ---------------------------------------------------------------------------
 // markTasksAsReviewing
 // ---------------------------------------------------------------------------
 
@@ -265,13 +367,36 @@ process.exit(0);
 // runAgentDeployBackground — sequential per-task review with sister delegation
 // ---------------------------------------------------------------------------
 
-export function runAgentDeployBackground(): { taskCount: number } {
-  const candidates = listTasks({ column: 'backlog' }).concat(listTasks({ column: 'todo' }))
+// mode 'auto'  → periodic sweep: only picks tasks no agent has touched yet
+// mode 'manual' (default) → user-triggered: picks any eligible task, re-review OK
+export function runAgentDeployBackground(mode: 'manual' | 'auto' = 'manual'): { taskCount: number } {
+  clearStuckTasks()
 
-  if (candidates.length === 0) return { taskCount: 0 }
+  const PRIORITY_SCORE: Record<string, number> = { high: 3, medium: 2, low: 1 }
+  const allEligible = listTasks({ column: 'backlog' }).concat(listTasks({ column: 'todo' }))
+    .sort((a, b) => {
+      const pa = PRIORITY_SCORE[a.priority] ?? 2
+      const pb = PRIORITY_SCORE[b.priority] ?? 2
+      if (pb !== pa) return pb - pa                       // high priority first
+      const da = new Date(a.created_at ?? 0).getTime()
+      const db = new Date(b.created_at ?? 0).getTime()
+      return da - db                                      // older tasks first within same priority
+    })
+  const candidate = allEligible.find((t) => {
+    if (t.agent_state) return false
+    if (mode === 'auto') {
+      // Skip tasks an agent has already reviewed — they're waiting for Execute
+      return !(t.agent_history ?? []).some((e) => e.by !== 'user')
+    }
+    return true
+  })
 
-  // Mark all as reviewing immediately (synchronous, before fork)
-  markTasksAsReviewing(candidates.map((t) => t.id))
+  if (!candidate) return { taskCount: 0 }
+
+  const candidates = [candidate]
+
+  // Mark it as reviewing synchronously, before the fork
+  markTasksAsReviewing([candidate.id])
 
   const hermesHome =
     process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
@@ -292,14 +417,46 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const TASKS_FILE = ${JSON.stringify(tasksFilePath)};
-const HERMES_BIN = ${JSON.stringify(HERMES_BIN)};
+const TASKS_FILE  = ${JSON.stringify(tasksFilePath)};
+const HERMES_BIN  = ${JSON.stringify(HERMES_BIN)};
 const HERMES_HOME = ${JSON.stringify(hermesHome)};
-const TASKS = ${JSON.stringify(taskPayload)};
+const TASKS       = ${JSON.stringify(taskPayload)};
+const TG_TARGET   = 'telegram:2130622225';
 
-const SISTER_EMOJIS = { astra: '🌟', luna: '🌙', ada: '💻', maya: '🔨', nova: '🔬', novus: '⚙️', user: '👤' };
-const VALID_SISTERS = ['luna', 'ada', 'maya', 'nova', 'novus'];
-const VALID_COLUMNS = ['backlog', 'todo', 'in_progress', 'review', 'blocked'];
+const SISTER_EMOJIS   = { astra: '🌟', luna: '🌙', ada: '💻', maya: '🔨', nova: '🔬', novus: '⚙️', user: '👤' };
+const VALID_SISTERS   = ['luna', 'ada', 'maya', 'nova', 'novus'];
+const VALID_COLUMNS   = ['backlog', 'todo', 'in_progress', 'review', 'blocked'];
+// Maps assignee names → hermes profile dirs for execution routing
+const SISTER_PROFILES = {
+  ada: 'coder', coder: 'coder', qa: 'coder', reviewer: 'coder',
+  maya: 'builder', builder: 'builder', maintainer: 'builder', 'ops-watch': 'builder',
+  luna: 'researcher', researcher: 'researcher',
+  nova: 'nova', novus: 'novus', local: 'novus',
+};
+
+const LOCK_FILE = TASKS_FILE + '.lock';
+
+function sleep(ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {}
+}
+
+// Cross-process advisory lock — same semantics as tasks-store.ts withTasksLock.
+function withTasksLock(fn) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    try {
+      const fd = fs.openSync(LOCK_FILE, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL);
+      fs.closeSync(fd);
+      try { return fn(); } finally { try { fs.unlinkSync(LOCK_FILE); } catch {} }
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      try { const s = fs.statSync(LOCK_FILE); if (Date.now() - s.mtimeMs > 30_000) { fs.unlinkSync(LOCK_FILE); continue; } } catch {}
+      sleep(50);
+    }
+  }
+  return fn(); // timeout: proceed rather than deadlock
+}
 
 function readTasks() {
   try {
@@ -321,24 +478,30 @@ function getTaskDirect(taskId) {
   return readTasks().tasks.find(t => t.id === taskId) || null;
 }
 
+// Lock covers the full read-modify-write so no concurrent process can interleave.
 function updateTaskDirect(taskId, updates) {
-  const file = readTasks();
-  const idx = file.tasks.findIndex(t => t.id === taskId);
-  if (idx === -1) return;
-  file.tasks[idx] = { ...file.tasks[idx], ...updates, updated_at: new Date().toISOString() };
-  writeTasks(file);
+  withTasksLock(() => {
+    const file = readTasks();
+    const idx = file.tasks.findIndex(t => t.id === taskId);
+    if (idx === -1) return;
+    file.tasks[idx] = { ...file.tasks[idx], ...updates, updated_at: new Date().toISOString() };
+    writeTasks(file);
+  });
 }
 
-function callHermes(prompt) {
-  const r = spawnSync(HERMES_BIN, ['-z', prompt], { encoding: 'utf-8', timeout: 90000, maxBuffer: 4 * 1024 * 1024 });
+function callHermes(prompt, profileDir) {
+  const profileArgs = profileDir ? ['--profile', profileDir] : [];
+  const r = spawnSync(HERMES_BIN, [...profileArgs, '-z', prompt], { encoding: 'utf-8', timeout: 90000, maxBuffer: 4 * 1024 * 1024 });
   return r.stdout || '';
 }
 
 function parseJSON(text) {
   const t = (text || '').trim();
   try { return JSON.parse(t); } catch {}
-  const match = t.match(/\\{[\\s\\S]*\\}/);
-  if (match) { try { return JSON.parse(match[0]); } catch {} }
+  const m1 = t.match(/\\{[\\s\\S]*\\}/);
+  if (m1) { try { return JSON.parse(m1[0]); } catch {} }
+  const m2 = t.match(/\\[[\\s\\S]*\\]/);
+  if (m2) { try { return JSON.parse(m2[0]); } catch {} }
   return null;
 }
 
@@ -348,6 +511,102 @@ function getSoulMd(sister) {
     return fs.readFileSync(p, 'utf-8').slice(0, 600);
   } catch { return ''; }
 }
+
+function sendTelegram(msg) {
+  try { spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q', msg], { encoding: 'utf-8', timeout: 15_000 }); } catch {}
+}
+
+// Shared WORK_SUMMARY parser used for auto-execution results
+function parseWorkSummary(output, stderr, exitCode) {
+  let status = 'partial', summary = '', next = '', question = '';
+  const block = output.match(/<WORK_SUMMARY>([\\s\\S]*?)<\\/WORK_SUMMARY>/)?.[1] ?? '';
+  const src   = block || (output.match(/^STATUS:/im) ? output : '');
+  if (src) {
+    const sm = src.match(/STATUS:\\s*(\\w+)/i);
+    const su = src.match(/SUMMARY:\\s*(.+)/i);
+    const nx = src.match(/NEXT:\\s*(.+)/i);
+    const q  = src.match(/QUESTION:\\s*(.+)/i);
+    if (sm) status   = sm[1].toLowerCase();
+    if (su) summary  = su[1].trim().replace(/^\\[|\\]$/g, '');
+    if (nx) next     = nx[1].trim().replace(/^\\[|\\]$/g, '');
+    if (q)  question = q[1].trim().replace(/^\\[|\\]$/g, '');
+  }
+  if (exitCode !== 0 && status === 'partial') {
+    status  = 'blocked';
+    summary = summary || ('hermes exited with code ' + exitCode + (stderr ? ': ' + stderr.slice(0, 200) : ''));
+  }
+  const freeText = output.replace(/<WORK_SUMMARY>[\\s\\S]*?<\\/WORK_SUMMARY>/g, '').trim();
+  const note = summary || freeText.slice(0, 800) ||
+    (exitCode !== 0 ? 'Execution failed (exit ' + exitCode + '): ' + stderr.slice(0, 200) : 'Task executed — no summary returned.');
+  const parts = [note];
+  if (next && next !== '...') parts.push('→ ' + next);
+  if (question) parts.push('Needs input: ' + question);
+  return {
+    status,
+    note: parts.join('\\n\\n'),
+    actionLabel: status === 'done' ? 'completed' : (status === 'blocked' || status === 'needs_input') ? 'blocked' : 'attempted',
+    newColumn:   status === 'done' ? 'review'    : (status === 'blocked' || status === 'needs_input') ? 'blocked' : null,
+  };
+}
+
+// Break a task into subtasks and write them to tasks.json
+function doBreakdown(task, assignee) {
+  updateTaskDirect(task.id, { agent_state: 'reviewing', agent_name: 'astra', agent_action_at: new Date().toISOString() });
+  const breakdownPrompt =
+    'Break this task into 3-6 concrete, independently completable subtasks.\\n\\n' +
+    'Task: ' + task.title + '\\n' +
+    'Description: ' + (task.description || '(none)') + '\\n' +
+    'Assignee: ' + (assignee || 'unassigned') + '\\n\\n' +
+    'Return ONLY a valid JSON array, no other text:\\n' +
+    '[{"title":"...","description":"what to do and definition of done","priority":"high|medium|low","assignee":"' + (assignee || 'null') + '"}]';
+
+  const raw = callHermes(breakdownPrompt);
+  let subtasks = null;
+  try {
+    const t = (raw || '').trim();
+    try { subtasks = JSON.parse(t); } catch {}
+    if (!Array.isArray(subtasks)) { const m = t.match(/\\[[\\s\\S]*\\]/); if (m) subtasks = JSON.parse(m[0]); }
+  } catch {}
+  if (!Array.isArray(subtasks) || subtasks.length === 0) {
+    updateTaskDirect(task.id, { agent_state: null, agent_name: null, agent_action_at: null });
+    return 0;
+  }
+
+  const titles = [];
+  withTasksLock(() => {
+    const file = readTasks();
+    const now  = new Date().toISOString();
+    for (const sub of subtasks) {
+      if (!sub.title) continue;
+      file.tasks.push({
+        id: randomUUID(), title: sub.title.trim(), description: sub.description || '',
+        column: 'todo', priority: sub.priority || task.priority,
+        assignee: sub.assignee && sub.assignee !== 'null' ? sub.assignee : (assignee || null),
+        tags: ['subtask'], due_date: null, position: 0,
+        created_by: 'astra', created_at: now, updated_at: now,
+        session_id: null, agent_state: null, agent_name: null, agent_action_at: null,
+        source: 'astra', agent_comment: null, agent_history: [], waiting_for_user: false,
+      });
+      titles.push(sub.title.trim());
+    }
+    writeTasks(file);
+  });
+
+  const count = titles.length;
+  const note  = 'Auto-broke down into ' + count + ' subtask' + (count !== 1 ? 's' : '') + ': ' + titles.slice(0, 3).join(', ') + (count > 3 ? '…' : '');
+  const cur   = getTaskDirect(task.id);
+  const exH   = (cur && Array.isArray(cur.agent_history)) ? cur.agent_history : [];
+  updateTaskDirect(task.id, {
+    agent_comment: note,
+    agent_history: [...exH, { id: randomUUID(), by: 'astra', byEmoji: '🌟', action: 'broke down', note, at: now }],
+    agent_state: null, agent_name: null, agent_action_at: null,
+  });
+  return count;
+}
+
+// ── Phase 1: Review all tasks ────────────────────────────────────────────────
+
+const sisterReviewQueue = [];
 
 for (const task of TASKS) {
   updateTaskDirect(task.id, { agent_state: 'reviewing', agent_name: 'astra', agent_action_at: new Date().toISOString() });
@@ -360,14 +619,20 @@ for (const task of TASKS) {
     'Current column: ' + task.column + ' | Priority: ' + task.priority + '\\n\\n' +
     'Decide:\\n' +
     '1. priority: high/medium/low\\n' +
-    '2. column: "todo" (ready), "blocked" (needs more info), "backlog" (not yet)\\n' +
-    '3. assignee: orchestrator | builder | researcher | reviewer | qa | ops-watch | maintainer | null\\n' +
-    '4. sister_needed: null, "luna" (research/docs), "ada" (code review), "maya" (build/infra), "nova" (web research)\\n' +
-    '5. astra_note: 1-2 sentence explanation of your decision\\n\\n' +
+    '2. column: "todo" (ready to work), "blocked" (needs more info), "backlog" (not yet ready)\\n' +
+    '3. assignee: luna | ada | maya | nova | novus | qa | ops-watch | maintainer | orchestrator | null\\n' +
+    '4. sister_needed: null | "luna" (research/docs) | "ada" (code review) | "maya" (build/infra) | "nova" (web research)\\n' +
+    '5. dispatch — how to proceed after this review:\\n' +
+    '   "auto_execute"   → task is clear; sister will write a plan first (cheap), then wait for Naveen to press Execute (cost gate)\\n' +
+    '   "auto_breakdown" → task is too large or has distinct independent parts — split into subtasks first\\n' +
+    '   "needs_input"    → cannot start without a specific answer from Naveen (missing credentials, ambiguous scope, policy call)\\n' +
+    '   "manual"         → leave entirely for Naveen — no agent action (use when unsure or task is sensitive)\\n' +
+    '6. question: (required when dispatch is needs_input) the exact question to ask Naveen\\n' +
+    '7. astra_note: 1-2 sentence summary of your reasoning\\n\\n' +
     'Return ONLY valid JSON, no other text:\\n' +
-    '{"id":"...","priority":"medium","column":"todo","assignee":"builder","sister_needed":null,"astra_note":"..."}';
+    '{"id":"...","priority":"medium","column":"todo","assignee":"ada","sister_needed":null,"dispatch":"manual","question":"","astra_note":"..."}';
 
-  const astraText = callHermes(astraPrompt);
+  const astraText   = callHermes(astraPrompt);
   const astraResult = parseJSON(astraText);
 
   if (!astraResult) {
@@ -375,22 +640,18 @@ for (const task of TASKS) {
     continue;
   }
 
-  const { priority, column, assignee, sister_needed, astra_note } = astraResult;
+  const { priority, column, assignee, sister_needed, dispatch, question, astra_note } = astraResult;
   const historyToAdd = [];
-  const astraEntry = {
-    id: randomUUID(),
-    by: 'astra',
-    byEmoji: '🌟',
-    action: 'reviewed',
-    note: astra_note || 'Reviewed by Astra.',
-    at: new Date().toISOString()
+  const astraEntry   = {
+    id: randomUUID(), by: 'astra', byEmoji: '🌟', action: 'reviewed',
+    note: astra_note || 'Reviewed by Astra.', at: new Date().toISOString()
   };
   historyToAdd.push(astraEntry);
   let finalNote = astraEntry.note;
 
   if (sister_needed && VALID_SISTERS.includes(sister_needed)) {
     updateTaskDirect(task.id, { agent_state: 'delegating', agent_name: sister_needed, agent_action_at: new Date().toISOString() });
-    const soulMd = getSoulMd(sister_needed);
+    const soulMd      = getSoulMd(sister_needed);
     const sisterPrompt =
       (soulMd ? soulMd + '\\n\\n' : '') +
       'You are reviewing a task that Astra delegated to you because it needs your specialty.\\n\\n' +
@@ -400,35 +661,176 @@ for (const task of TASKS) {
       'Give your specialist assessment in 2-3 sentences. Return ONLY valid JSON:\\n' +
       '{"note":"...","action":"reviewed"}';
 
-    const sisterText = callHermes(sisterPrompt);
-    const sisterResult = parseJSON(sisterText);
-    if (sisterResult && sisterResult.note) {
-      const sisterEntry = {
-        id: randomUUID(),
-        by: sister_needed,
-        byEmoji: SISTER_EMOJIS[sister_needed] || '🤖',
-        action: sisterResult.action || 'reviewed',
-        note: sisterResult.note,
-        at: new Date().toISOString()
-      };
-      historyToAdd.push(sisterEntry);
+    const sisterResult = parseJSON(callHermes(sisterPrompt));
+    if (sisterResult?.note) {
+      historyToAdd.push({
+        id: randomUUID(), by: sister_needed, byEmoji: SISTER_EMOJIS[sister_needed] || '🤖',
+        action: sisterResult.action || 'reviewed', note: sisterResult.note, at: new Date().toISOString()
+      });
       finalNote = sisterResult.note;
     }
   }
 
-  const current = getTaskDirect(task.id);
+  const current         = getTaskDirect(task.id);
   const existingHistory = (current && Array.isArray(current.agent_history)) ? current.agent_history : [];
+  const resolvedAssignee =
+    (sister_needed && VALID_SISTERS.includes(sister_needed))
+      ? sister_needed
+      : (assignee !== undefined ? assignee : task.assignee);
+  const resolvedColumn = VALID_COLUMNS.includes(column) ? column : task.column;
 
   updateTaskDirect(task.id, {
     priority: priority || task.priority,
-    column: VALID_COLUMNS.includes(column) ? column : task.column,
-    assignee: assignee !== undefined ? assignee : task.assignee,
+    column: resolvedColumn,
+    assignee: resolvedAssignee,
     agent_comment: finalNote,
     agent_history: [...existingHistory, ...historyToAdd],
-    agent_state: null,
-    agent_name: null,
-    agent_action_at: null
+    agent_state: null, agent_name: null, agent_action_at: null,
   });
+
+  // ── Act on dispatch decision ─────────────────────────────────────────────
+  const safeDispatch = (dispatch || 'manual').toLowerCase();
+
+  if (safeDispatch === 'needs_input' && question) {
+    // Block and ping Naveen immediately
+    const qEntry = { id: randomUUID(), by: 'astra', byEmoji: '🌟', action: 'question', note: question, at: new Date().toISOString() };
+    updateTaskDirect(task.id, {
+      column: 'blocked', waiting_for_user: true,
+      agent_history: [...existingHistory, ...historyToAdd, qEntry],
+    });
+    sendTelegram('❓ 🌟 Astra needs your input\\nTask: ' + task.title + '\\n' + question.slice(0, 300));
+
+  } else if (safeDispatch === 'auto_breakdown') {
+    const count = doBreakdown(task, resolvedAssignee);
+    if (count > 0) sendTelegram('🔀 🌟 Astra broke down: ' + task.title + ' → ' + count + ' subtasks ready in todo');
+
+  } else if (safeDispatch === 'auto_execute' && resolvedColumn === 'todo') {
+    sisterReviewQueue.push({ id: task.id, title: task.title, description: task.description, assignee: resolvedAssignee });
+    const dispatchEntry = { id: randomUUID(), by: 'astra', byEmoji: '🌟', action: 'dispatching', note: 'Queued for sister review — she will plan, then wait for Execute.', at: new Date().toISOString() };
+    updateTaskDirect(task.id, { agent_history: [...existingHistory, ...historyToAdd, dispatchEntry] });
+  }
+  // 'manual' → no further action; user presses Execute when ready
+}
+
+// ── Phase 2: Sister review + plan (cheap ~90s gate; execution stays manual) ──
+// Each assigned sister reads the task and writes a concrete implementation plan.
+// After planning the task moves to "review" column — a cost gate where Naveen
+// can read the plan and press Execute only when satisfied.
+// If the sister says re_assign, we redirect once to the right specialist.
+// If the sister needs input, we block and ping Naveen via Telegram.
+
+for (const reviewTask of sisterReviewQueue) {
+  let assignee = reviewTask.assignee || 'astra';
+  let redirectDone = false;
+
+  // Allow one re-assignment redirect
+  for (let hop = 0; hop <= 1; hop++) {
+    const profileDir  = SISTER_PROFILES[assignee] || '';
+    const sisterEmoji = SISTER_EMOJIS[assignee] || '🌟';
+    const soulMd      = getSoulMd(profileDir || assignee);
+
+    updateTaskDirect(reviewTask.id, {
+      agent_state: 'reviewing', agent_name: assignee, agent_action_at: new Date().toISOString(),
+    });
+
+    const planPrompt =
+      (soulMd ? soulMd + '\\n\\n' : '') +
+      'You have been assigned this task. Write a concrete step-by-step implementation plan.\\n' +
+      'Do NOT execute anything yet — just plan.\\n\\n' +
+      'Task: ' + reviewTask.title + '\\n' +
+      (reviewTask.description ? 'Description: ' + reviewTask.description + '\\n' : '') +
+      '\\nDecide:\\n' +
+      '  action: "ready"      → you can handle this; include a numbered plan\\n' +
+      '  action: "re_assign"  → wrong specialist; name the right one in reassign_to\\n' +
+      '  action: "needs_input"→ missing info; write your question in question field\\n\\n' +
+      'Return ONLY valid JSON:\\n' +
+      '{"action":"ready","plan":"1. ...\\\\n2. ...\\\\n3. ...","reassign_to":null,"question":""}';
+
+    const planResult = parseJSON(callHermes(planPrompt, profileDir));
+    const cur = getTaskDirect(reviewTask.id);
+    const exH = Array.isArray(cur?.agent_history) ? cur.agent_history : [];
+    const now = new Date().toISOString();
+
+    if (!planResult || planResult.action === 'ready' || hop === 1 || !planResult.action) {
+      // Gate stop: move to review column with sister's plan
+      const planNote = (planResult?.plan) || '(Plan unavailable — press Execute to proceed.)';
+      updateTaskDirect(reviewTask.id, {
+        column: 'review',
+        assignee,
+        agent_comment: planNote,
+        agent_state: null, agent_name: null, agent_action_at: null,
+        agent_history: [...exH, {
+          id: randomUUID(), by: assignee, byEmoji: sisterEmoji,
+          action: 'planned', note: planNote, at: now,
+        }],
+      });
+      sendTelegram('📋 ' + sisterEmoji + ' ' + assignee + ' has a plan\\nTask: ' + reviewTask.title + '\\n' + planNote.slice(0, 250) + '\\n\\n→ Check review column, press Execute when ready.');
+      break;
+    }
+
+    if (planResult.action === 're_assign' && !redirectDone && planResult.reassign_to && VALID_SISTERS.includes(planResult.reassign_to)) {
+      // Redirect to the correct sister
+      const redirectNote = (planResult.plan || 'Re-assigning to ' + planResult.reassign_to + '.');
+      updateTaskDirect(reviewTask.id, {
+        assignee: planResult.reassign_to,
+        agent_history: [...exH, {
+          id: randomUUID(), by: assignee, byEmoji: sisterEmoji,
+          action: 're-assigned', note: redirectNote, at: now,
+        }],
+      });
+      assignee = planResult.reassign_to;
+      redirectDone = true;
+      continue;
+    }
+
+    if (planResult.action === 'needs_input' && planResult.question) {
+      updateTaskDirect(reviewTask.id, {
+        column: 'blocked', waiting_for_user: true, assignee,
+        agent_state: null, agent_name: null, agent_action_at: null,
+        agent_history: [...exH, {
+          id: randomUUID(), by: assignee, byEmoji: sisterEmoji,
+          action: 'question', note: planResult.question, at: now,
+        }],
+      });
+      sendTelegram('❓ ' + sisterEmoji + ' ' + assignee + ' needs your input\\nTask: ' + reviewTask.title + '\\n' + planResult.question.slice(0, 300));
+      break;
+    }
+
+    // Fallback: treat as ready
+    const planNote = planResult.plan || '(No plan — press Execute to proceed.)';
+    updateTaskDirect(reviewTask.id, {
+      column: 'review', assignee,
+      agent_comment: planNote,
+      agent_state: null, agent_name: null, agent_action_at: null,
+      agent_history: [...exH, {
+        id: randomUUID(), by: assignee, byEmoji: sisterEmoji,
+        action: 'planned', note: planNote, at: now,
+      }],
+    });
+    sendTelegram('📋 ' + sisterEmoji + ' ' + assignee + ' has a plan\\nTask: ' + reviewTask.title + '\\n' + planNote.slice(0, 250) + '\\n\\n→ Press Execute when ready.');
+    break;
+  }
+}
+
+// ── Self-chain: trigger next eligible task ───────────────────────────────────
+// Each script handles ONE task; this spawns the next deployment cycle.
+{
+  const remaining = readTasks().tasks.filter(t =>
+    (t.column === 'backlog' || t.column === 'todo') && !t.agent_state
+  );
+  if (remaining.length > 0) {
+    const curlArgs = ['-s', '-X', 'POST', '-m', '10'];
+    try {
+      const sessionsFile = path.join(HERMES_HOME, 'workspace-sessions.json');
+      const sessions = JSON.parse(fs.readFileSync(sessionsFile, 'utf-8'));
+      const nowMs = Date.now();
+      const valid = Object.entries(sessions.tokens || {}).find(([, exp]) => Number(exp) > nowMs);
+      if (valid) curlArgs.push('-H', 'Cookie: claude-auth=' + valid[0]);
+    } catch {}
+    spawnSync('curl', [...curlArgs, 'http://localhost:3000/api/tasks-deploy-agents'], {
+      encoding: 'utf-8', timeout: 15_000
+    });
+  }
 }
 `
 
@@ -463,17 +865,23 @@ function resolveSisterAndCwd(task: Pick<TaskRecord, 'assignee' | 'tags' | 'colum
   let displayName = 'Astra'
   let emoji = '🌟'
 
-  if (['ada', 'coder', 'reviewer'].includes(assignee)) {
+  if (['ada', 'coder', 'qa', 'reviewer'].includes(assignee)) {
+    // Ada: code generation, review, quality assurance
     profileDir = 'coder'; displayName = 'Ada'; emoji = '💻'
-  } else if (['maya', 'builder'].includes(assignee)) {
+  } else if (['maya', 'builder', 'maintainer', 'ops-watch'].includes(assignee)) {
+    // Maya: building, infra, maintenance, ops
     profileDir = 'builder'; displayName = 'Maya'; emoji = '🔨'
   } else if (['luna', 'researcher'].includes(assignee)) {
+    // Luna: research, docs, deep synthesis
     profileDir = 'researcher'; displayName = 'Luna'; emoji = '🌙'
   } else if (assignee === 'nova') {
+    // Nova: web research, browser, vision
     profileDir = 'nova'; displayName = 'Nova'; emoji = '🔬'
   } else if (['novus', 'local'].includes(assignee)) {
+    // Novus: local/private tasks via Ollama (zero cost)
     profileDir = 'novus'; displayName = 'Novus'; emoji = '⚙️'
   }
+  // orchestrator, strategist, inbox-triage, km-agent → Astra default (no profile change)
 
   const tags = task.tags
   const hermesTags = ['ui', 'dashboard', 'hermes', 'self-improvement']
@@ -757,6 +1165,326 @@ export function executeTaskBackground(taskId: string): void {
       column: newColumn,
     })
   })()
+}
+
+// ---------------------------------------------------------------------------
+// executeTaskWithHermesBackground — full autonomous execution via hermes -z
+//
+// Unlike executeTaskBackground (which calls OpenRouter directly with no tools),
+// this spawns hermes -z in a detached subprocess. hermes -z loads the full
+// toolset (file, terminal, memory) and runs its own agent loop (up to
+// max_turns) — so Astra can actually write files, run commands, and iterate
+// until the task is done or blocked, with no TypeScript loop needed.
+//
+// Fixes applied over the initial version:
+//   #1 log file  — redirects all output to ~/.hermes/logs/exec-<id>-<ts>.log
+//   #2 try/finally — agent_state is always cleared, even on crash or timeout
+//   #3 non-zero exit — maps to blocked instead of silent partial
+//   #4 timeout  — raised to 20 min; --accept-hooks added to bypass prompts
+//   #5 cleanup  — temp .mjs script deleted after the run
+//   #6 persona  — SOUL.md prepended so hermes knows it's Astra
+//   #7 label    — partial-with-no-summary → 'attempted', not 'replied'
+//
+// Called by the Execute button; executeTaskBackground is kept for the lighter
+// "user replied" conversational-continuation path.
+// ---------------------------------------------------------------------------
+
+export function executeTaskWithHermesBackground(taskId: string): void {
+  const task = getTask(taskId)
+  if (!task) return
+
+  const { workCwd, profileDir, displayName, emoji } = resolveSisterAndCwd(task)
+  const hermesHome =
+    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+  const tasksFilePath = path.join(hermesHome, 'tasks.json')
+
+  // #6: prepend SOUL.md personality; use sister's profile if one is assigned
+  const personality = loadAstraPersonality()
+
+  // Build history context (last 6 entries) so Astra sees what was already tried
+  const history = task.agent_history ?? []
+  const priorContext = history
+    .filter(e => e.action !== 'executed')
+    .slice(-6)
+    .map(e => {
+      const who = e.by === 'user' ? 'Naveen' : `Astra (${e.action})`
+      return `[${who}] ${e.note?.slice(0, 300) ?? ''}`
+    })
+    .join('\n')
+
+  const isReopen = (task.agent_history ?? []).some(
+    e => e.by === 'user' && e.action === 'replied'
+  ) && (task.agent_history ?? []).some(
+    e => e.by !== 'user' && e.action === 'completed'
+  )
+
+  const prompt = [
+    personality,
+    '',
+    'You are Astra, an autonomous AI agent. Implement this task completely using your file and terminal tools.',
+    'Do NOT just describe a plan — actually write the files, run the commands, verify the result.',
+    '',
+    isReopen
+      ? 'IMPORTANT: Naveen has reviewed prior work and flagged an issue. Read the prior context carefully, understand what went wrong or was not found, then fix or redo it.'
+      : '',
+    'IMPORTANT: If you check and find the work is already complete and working, report STATUS: done with SUMMARY describing exactly what you found (file path, function name, URL, etc.). Do not re-implement something that already exists.',
+    '',
+    `Task: ${task.title}`,
+    task.description ? `Description: ${task.description}` : '',
+    task.tags.length ? `Tags: ${task.tags.join(', ')}` : '',
+    priorContext ? `\nPrior work on this task:\n${priorContext}` : '',
+    '',
+    "When you finish (or hit a genuine blocker requiring Naveen's input), end your final message with:",
+    '',
+    '<WORK_SUMMARY>',
+    'STATUS: done|blocked|needs_input',
+    'SUMMARY: [what was built / changed, or what already existed and where]',
+    'NEXT: [leave blank if done, or what remains]',
+    'QUESTION: [only fill if STATUS is needs_input]',
+    '</WORK_SUMMARY>',
+  ].filter(Boolean).join('\n')
+
+  // Generate paths before building script content so they can be embedded as constants
+  const timestamp = Date.now()
+  const scriptPath = path.join(os.tmpdir(), `hermes-exec-${timestamp}.mjs`)
+  const logsDir = path.join(hermesHome, 'logs')
+  const logPath = path.join(logsDir, `exec-${taskId.slice(0, 8)}-${timestamp}.log`)
+
+  // #1: ensure logs dir exists before the child tries to write to it
+  fs.mkdirSync(logsDir, { recursive: true })
+
+  const scriptContent = `
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
+
+const TASKS_FILE  = ${JSON.stringify(tasksFilePath)};
+const HERMES_BIN   = ${JSON.stringify(HERMES_BIN)};
+const TASK_ID      = ${JSON.stringify(taskId)};
+const TASK_TITLE   = ${JSON.stringify(task.title)};
+const DISPLAY_NAME = ${JSON.stringify(displayName || 'Astra')};
+const BY_EMOJI     = ${JSON.stringify(emoji || '🌟')};
+const PROFILE_DIR  = ${JSON.stringify(profileDir || '')};
+const WORK_CWD     = ${JSON.stringify(workCwd)};
+const PROMPT       = ${JSON.stringify(prompt)};
+const LOG_PATH     = ${JSON.stringify(logPath)};
+const SCRIPT_PATH  = ${JSON.stringify(scriptPath)};
+const TG_TARGET    = 'telegram:2130622225';
+
+const LOCK_FILE = TASKS_FILE + '.lock';
+
+// #1: append-only log helper — all hermes output lands here
+function log(msg) {
+  try { fs.appendFileSync(LOG_PATH, '[' + new Date().toISOString() + '] ' + msg + '\\n', 'utf-8'); } catch {}
+}
+
+function sleep(ms) { const end = Date.now() + ms; while (Date.now() < end) {} }
+
+// Cross-process advisory lock — prevents concurrent writes from this script
+// and the SSR server clobbering each other's updates to tasks.json.
+function withTasksLock(fn) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    try {
+      const fd = fs.openSync(LOCK_FILE, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL);
+      fs.closeSync(fd);
+      try { return fn(); } finally { try { fs.unlinkSync(LOCK_FILE); } catch {} }
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      try { const s = fs.statSync(LOCK_FILE); if (Date.now() - s.mtimeMs > 30_000) { fs.unlinkSync(LOCK_FILE); continue; } } catch {}
+      sleep(50);
+    }
+  }
+  return fn();
+}
+
+function readTasks() {
+  try {
+    const raw = fs.readFileSync(TASKS_FILE, 'utf-8').trim();
+    if (!raw) return { tasks: [] };
+    const parsed = JSON.parse(raw);
+    return { tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [] };
+  } catch (e) { log('readTasks error: ' + e); return { tasks: [] }; }
+}
+
+function writeTasks(data) {
+  const content = JSON.stringify(data, null, 2) + '\\n';
+  const tmp = TASKS_FILE + '.tmp';
+  fs.writeFileSync(tmp, content, 'utf-8');
+  fs.renameSync(tmp, TASKS_FILE);
+}
+
+function updateTaskDirect(id, updates) {
+  withTasksLock(() => {
+    const file = readTasks();
+    const idx = file.tasks.findIndex(t => t.id === id);
+    if (idx === -1) { log('updateTaskDirect: task not found: ' + id); return; }
+    file.tasks[idx] = { ...file.tasks[idx], ...updates, updated_at: new Date().toISOString() };
+    writeTasks(file);
+  });
+}
+
+// Clean up orphaned hermes-exec-*.mjs scripts from previous killed runs.
+try {
+  const tmpDir = require('node:os').tmpdir();
+  const staleMs = 30 * 60 * 1000; // 30 min
+  for (const f of fs.readdirSync(tmpDir)) {
+    if (!f.startsWith('hermes-exec-') || !f.endsWith('.mjs')) continue;
+    const full = tmpDir + '/' + f;
+    try {
+      const stat = fs.statSync(full);
+      if (Date.now() - stat.mtimeMs > staleMs) fs.unlinkSync(full);
+    } catch {}
+  }
+} catch {}
+
+// #2: always clear the spinner, even if we crash or time out
+function clearAgentState() {
+  try {
+    updateTaskDirect(TASK_ID, { agent_state: null, agent_name: null, agent_action_at: null });
+    log('agent state cleared');
+  } catch (e) { log('clearAgentState error: ' + e); }
+}
+
+// #5: delete the temp script file after the run
+function cleanup() {
+  try { fs.unlinkSync(SCRIPT_PATH); } catch {}
+}
+
+log('starting hermes execution — cwd=' + WORK_CWD);
+
+let result;
+try {
+  // #1 sister routing: pass --profile when a specific sister is assigned
+  const profileArgs = PROFILE_DIR ? ['--profile', PROFILE_DIR] : [];
+  log('profile=' + (PROFILE_DIR || 'default') + ' sister=' + DISPLAY_NAME);
+
+  // #4: 20-min timeout; --accept-hooks bypasses hook confirmation prompts
+  result = spawnSync(HERMES_BIN, [...profileArgs, '-z', PROMPT, '--accept-hooks'], {
+    encoding: 'utf-8',
+    timeout: 1_200_000,
+    maxBuffer: 8 * 1024 * 1024,
+    cwd: WORK_CWD,
+  });
+  log('hermes finished — exit=' + result.status + ' stdout_len=' + (result.stdout || '').length);
+} catch (e) {
+  // spawnSync throws on timeout (ETIMEDOUT) or spawn failure
+  log('spawnSync threw: ' + e);
+  clearAgentState();
+  cleanup();
+  process.exit(1);
+}
+
+const output = (result.stdout || '').trim();
+const stderr  = (result.stderr  || '').trim();
+if (stderr)  log('stderr tail: ' + stderr.slice(-400));
+if (output)  log('stdout tail: ' + output.slice(-400));
+
+// Parse WORK_SUMMARY block
+let status   = 'partial';
+let summary  = '';
+let next     = '';
+let question = '';
+
+const block = output.match(/<WORK_SUMMARY>([\\s\\S]*?)<\\/WORK_SUMMARY>/)?.[1] ?? '';
+const parseSource = block || (output.match(/^STATUS:/im) ? output : '');
+if (parseSource) {
+  const smMatch = parseSource.match(/STATUS:\\s*(\\w+)/i);
+  const suMatch = parseSource.match(/SUMMARY:\\s*(.+)/i);
+  const nxMatch = parseSource.match(/NEXT:\\s*(.+)/i);
+  const qMatch  = parseSource.match(/QUESTION:\\s*(.+)/i);
+  if (smMatch) status   = smMatch[1].toLowerCase();
+  if (suMatch) summary  = suMatch[1].trim().replace(/^\\[|\\]$/g, '');
+  if (nxMatch) next     = nxMatch[1].trim().replace(/^\\[|\\]$/g, '');
+  if (qMatch)  question = qMatch[1].trim().replace(/^\\[|\\]$/g, '');
+}
+
+// #3: non-zero exit → blocked, not a silent partial
+if (result.status !== 0 && status === 'partial') {
+  status  = 'blocked';
+  summary = summary || ('hermes exited with code ' + result.status + (stderr ? ': ' + stderr.slice(0, 200) : ''));
+}
+
+const freeText = output.replace(/<WORK_SUMMARY>[\\s\\S]*?<\\/WORK_SUMMARY>/g, '').trim();
+const note = summary || freeText.slice(0, 800) ||
+  (result.status !== 0
+    ? 'Execution failed (exit ' + result.status + '): ' + stderr.slice(0, 200)
+    : 'Task executed — no summary returned.');
+
+const parts = [note];
+if (next && next !== '...') parts.push('→ ' + next);
+if (question) parts.push('Needs input: ' + question);
+const fullNote = parts.join('\\n\\n');
+
+// #7: partial-with-no-WORK_SUMMARY → 'attempted', not 'replied'
+const actionLabel =
+  status === 'done'        ? 'completed' :
+  status === 'blocked'     ? 'blocked'   :
+  status === 'needs_input' ? 'blocked'   : 'attempted';
+
+const newColumn =
+  status === 'done'        ? 'review'  :
+  status === 'blocked'     ? 'blocked' :
+  status === 'needs_input' ? 'blocked' : null;
+
+log('resolved — status=' + status + ' action=' + actionLabel + ' column=' + (newColumn || 'unchanged'));
+
+const file    = readTasks();
+const taskRec = file.tasks.find(t => t.id === TASK_ID);
+if (!taskRec) {
+  log('task not found in tasks.json at update time');
+  cleanup();
+  process.exit(0);
+}
+
+const existing = Array.isArray(taskRec.agent_history) ? taskRec.agent_history : [];
+const entry = {
+  id:      randomUUID(),
+  by:      DISPLAY_NAME.toLowerCase(),
+  byEmoji: BY_EMOJI,
+  action:  actionLabel,
+  note:    fullNote,
+  at:      new Date().toISOString(),
+};
+
+updateTaskDirect(TASK_ID, {
+  agent_comment:    note,
+  agent_history:    [...existing, entry],
+  agent_state:      null,
+  agent_name:       null,
+  agent_action_at:  null,
+  waiting_for_user: status === 'needs_input',
+  ...(newColumn ? { column: newColumn } : {}),
+});
+
+log('task updated successfully');
+
+// #2 Telegram notification — send push so Naveen doesn't have to watch the UI
+try {
+  const statusEmoji = status === 'done' ? '✅' : status === 'blocked' ? '🚫' : status === 'needs_input' ? '❓' : '⏳';
+  const tgMsg = statusEmoji + ' ' + BY_EMOJI + ' ' + DISPLAY_NAME + ' — ' + actionLabel + '\\n' +
+    'Task: ' + TASK_TITLE + '\\n' +
+    note.slice(0, 300);
+  spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q', tgMsg], {
+    encoding: 'utf-8',
+    timeout: 15_000,
+  });
+  log('telegram notification sent');
+} catch (e) {
+  log('telegram notification failed (non-fatal): ' + e);
+}
+
+cleanup();
+`
+
+  fs.writeFileSync(scriptPath, scriptContent, 'utf-8')
+
+  const child = spawn(process.execPath, [scriptPath], {
+    detached: true,
+    stdio: 'ignore',
+    cwd: workCwd,
+  })
+  child.unref()
 }
 
 // ---------------------------------------------------------------------------

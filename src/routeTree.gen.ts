@@ -95,6 +95,7 @@ import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPersonalitySwarmRouteImport } from './routes/api/personality-swarm'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiOrchestrateRouteImport } from './routes/api/orchestrate'
+import { Route as ApiOpenrouterCreditsRouteImport } from './routes/api/openrouter-credits'
 import { Route as ApiOdysseusBootstrapRouteImport } from './routes/api/odysseus-bootstrap'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
@@ -643,6 +644,11 @@ const ApiPathsRoute = ApiPathsRouteImport.update({
 const ApiOrchestrateRoute = ApiOrchestrateRouteImport.update({
   id: '/api/orchestrate',
   path: '/api/orchestrate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOpenrouterCreditsRoute = ApiOpenrouterCreditsRouteImport.update({
+  id: '/api/openrouter-credits',
+  path: '/api/openrouter-credits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOdysseusBootstrapRoute = ApiOdysseusBootstrapRouteImport.update({
@@ -1312,6 +1318,7 @@ export interface FileRoutesByFullPath {
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
+  '/api/openrouter-credits': typeof ApiOpenrouterCreditsRoute
   '/api/orchestrate': typeof ApiOrchestrateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/personality-swarm': typeof ApiPersonalitySwarmRoute
@@ -1517,6 +1524,7 @@ export interface FileRoutesByTo {
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
+  '/api/openrouter-credits': typeof ApiOpenrouterCreditsRoute
   '/api/orchestrate': typeof ApiOrchestrateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/personality-swarm': typeof ApiPersonalitySwarmRoute
@@ -1724,6 +1732,7 @@ export interface FileRoutesById {
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
+  '/api/openrouter-credits': typeof ApiOpenrouterCreditsRoute
   '/api/orchestrate': typeof ApiOrchestrateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/personality-swarm': typeof ApiPersonalitySwarmRoute
@@ -1932,6 +1941,7 @@ export interface FileRouteTypes {
     | '/api/model-switch'
     | '/api/models'
     | '/api/odysseus-bootstrap'
+    | '/api/openrouter-credits'
     | '/api/orchestrate'
     | '/api/paths'
     | '/api/personality-swarm'
@@ -2137,6 +2147,7 @@ export interface FileRouteTypes {
     | '/api/model-switch'
     | '/api/models'
     | '/api/odysseus-bootstrap'
+    | '/api/openrouter-credits'
     | '/api/orchestrate'
     | '/api/paths'
     | '/api/personality-swarm'
@@ -2343,6 +2354,7 @@ export interface FileRouteTypes {
     | '/api/model-switch'
     | '/api/models'
     | '/api/odysseus-bootstrap'
+    | '/api/openrouter-credits'
     | '/api/orchestrate'
     | '/api/paths'
     | '/api/personality-swarm'
@@ -2550,6 +2562,7 @@ export interface RootRouteChildren {
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
   ApiModelsRoute: typeof ApiModelsRoute
   ApiOdysseusBootstrapRoute: typeof ApiOdysseusBootstrapRoute
+  ApiOpenrouterCreditsRoute: typeof ApiOpenrouterCreditsRoute
   ApiOrchestrateRoute: typeof ApiOrchestrateRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPersonalitySwarmRoute: typeof ApiPersonalitySwarmRoute
@@ -3255,6 +3268,13 @@ declare module '@tanstack/react-router' {
       path: '/api/orchestrate'
       fullPath: '/api/orchestrate'
       preLoaderRoute: typeof ApiOrchestrateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/openrouter-credits': {
+      id: '/api/openrouter-credits'
+      path: '/api/openrouter-credits'
+      fullPath: '/api/openrouter-credits'
+      preLoaderRoute: typeof ApiOpenrouterCreditsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/odysseus-bootstrap': {
@@ -4392,6 +4412,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiModelSwitchRoute: ApiModelSwitchRoute,
   ApiModelsRoute: ApiModelsRoute,
   ApiOdysseusBootstrapRoute: ApiOdysseusBootstrapRoute,
+  ApiOpenrouterCreditsRoute: ApiOpenrouterCreditsRoute,
   ApiOrchestrateRoute: ApiOrchestrateRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPersonalitySwarmRoute: ApiPersonalitySwarmRoute,

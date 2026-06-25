@@ -55,6 +55,37 @@ export type UpdateTaskInput = Partial<Omit<TaskRecord, 'id' | 'created_at' | 'cr
 
 const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
 const TASKS_FILE = path.join(CLAUDE_HOME, 'tasks.json')
+const LOCK_FILE  = TASKS_FILE + '.lock'
+
+// Cross-process advisory lock so background .mjs scripts and the SSR server
+// never write tasks.json at the same time. Lock is a plain exclusive file;
+// stale locks (> 30 s) are removed so a killed process can't block forever.
+// Uses a sync busy-wait — acceptable because the lock is held for < 10 ms.
+function withTasksLock<T>(fn: () => T): T {
+  const deadline = Date.now() + 5_000
+  while (Date.now() < deadline) {
+    try {
+      const fd = fs.openSync(LOCK_FILE, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL)
+      fs.closeSync(fd)
+      try {
+        return fn()
+      } finally {
+        try { fs.unlinkSync(LOCK_FILE) } catch { /* non-fatal */ }
+      }
+    } catch (e: unknown) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
+      // Remove stale locks left by killed processes
+      try {
+        const stat = fs.statSync(LOCK_FILE)
+        if (Date.now() - stat.mtimeMs > 30_000) { fs.unlinkSync(LOCK_FILE); continue }
+      } catch { /* ok */ }
+      const end = Date.now() + 50
+      while (Date.now() < end) { /* busy-wait 50 ms */ }
+    }
+  }
+  // Timeout — proceed without lock rather than deadlock
+  return fn()
+}
 
 function ensureTasksFile(): void {
   fs.mkdirSync(CLAUDE_HOME, { recursive: true })
@@ -130,50 +161,54 @@ export function getTask(taskId: string): TaskRecord | null {
 }
 
 export function createTask(input: CreateTaskInput): TaskRecord {
-  const file = readTaskFile()
-  const now = new Date().toISOString()
-  const task = normalizeTask({
-    id: typeof input.id === 'string' && input.id ? input.id : randomUUID(),
-    title: input.title,
-    description: input.description,
-    column: input.column,
-    priority: input.priority,
-    assignee: input.assignee,
-    tags: input.tags,
-    due_date: input.due_date,
-    position: typeof input.position === 'number' ? input.position : 0,
-    created_by: typeof input.created_by === 'string' && input.created_by ? input.created_by : 'user',
-    created_at: now,
-    updated_at: now,
-    source: input.source,
-    agent_state: input.agent_state,
-    agent_name: input.agent_name,
-    agent_action_at: input.agent_action_at,
+  return withTasksLock(() => {
+    const file = readTaskFile()
+    const now = new Date().toISOString()
+    const task = normalizeTask({
+      id: typeof input.id === 'string' && input.id ? input.id : randomUUID(),
+      title: input.title,
+      description: input.description,
+      column: input.column,
+      priority: input.priority,
+      assignee: input.assignee,
+      tags: input.tags,
+      due_date: input.due_date,
+      position: typeof input.position === 'number' ? input.position : 0,
+      created_by: typeof input.created_by === 'string' && input.created_by ? input.created_by : 'user',
+      created_at: now,
+      updated_at: now,
+      source: input.source,
+      agent_state: input.agent_state,
+      agent_name: input.agent_name,
+      agent_action_at: input.agent_action_at,
+    })
+    file.tasks.push(task)
+    writeTaskFile({ tasks: file.tasks.map(normalizeTask) })
+    return task
   })
-  file.tasks.push(task)
-  writeTaskFile({ tasks: file.tasks.map(normalizeTask) })
-  return task
 }
 
 export function updateTask(taskId: string, updates: UpdateTaskInput): TaskRecord | null {
-  const file = readTaskFile()
-  const index = file.tasks.findIndex((task) => task.id === taskId)
-  if (index === -1) return null
+  return withTasksLock(() => {
+    const file = readTaskFile()
+    const index = file.tasks.findIndex((task) => task.id === taskId)
+    if (index === -1) return null
 
-  const current = normalizeTask(file.tasks[index])
-  const next = normalizeTask({
-    ...current,
-    ...updates,
-    id: current.id,
-    created_by: current.created_by,
-    created_at: current.created_at,
-    updated_at: new Date().toISOString(),
-    title: typeof updates.title === 'string' ? updates.title : current.title,
+    const current = normalizeTask(file.tasks[index])
+    const next = normalizeTask({
+      ...current,
+      ...updates,
+      id: current.id,
+      created_by: current.created_by,
+      created_at: current.created_at,
+      updated_at: new Date().toISOString(),
+      title: typeof updates.title === 'string' ? updates.title : current.title,
+    })
+
+    file.tasks[index] = next
+    writeTaskFile({ tasks: file.tasks.map(normalizeTask) })
+    return next
   })
-
-  file.tasks[index] = next
-  writeTaskFile({ tasks: file.tasks.map(normalizeTask) })
-  return next
 }
 
 export function moveTask(taskId: string, column: TaskColumn): TaskRecord | null {
@@ -181,11 +216,13 @@ export function moveTask(taskId: string, column: TaskColumn): TaskRecord | null 
 }
 
 export function deleteTask(taskId: string): boolean {
-  const file = readTaskFile()
-  const nextTasks = file.tasks.filter((task) => task.id !== taskId)
-  if (nextTasks.length === file.tasks.length) return false
-  writeTaskFile({ tasks: nextTasks.map((task) => normalizeTask(task)) })
-  return true
+  return withTasksLock(() => {
+    const file = readTaskFile()
+    const nextTasks = file.tasks.filter((task) => task.id !== taskId)
+    if (nextTasks.length === file.tasks.length) return false
+    writeTaskFile({ tasks: nextTasks.map((task) => normalizeTask(task)) })
+    return true
+  })
 }
 
 export function linkTaskSession(taskId: string, sessionId: string | null): TaskRecord | null {

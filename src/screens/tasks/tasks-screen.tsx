@@ -5,7 +5,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, PlayIcon, RefreshIcon, Search01Icon  } from '@hugeicons/core-free-icons'
+import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, Loading03Icon, PlayIcon, RefreshIcon, Search01Icon  } from '@hugeicons/core-free-icons'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
 import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority, UpdateTaskInput } from '@/lib/tasks-api'
@@ -68,6 +68,7 @@ export function TasksScreen() {
   const [astraReviewing, setAstraReviewing] = useState(false)
   const [askingAstra, setAskingAstra] = useState(false)
   const [ideasLoading, setIdeasLoading] = useState(false)
+  const [clearingStuck, setClearingStuck] = useState(false)
   const [breakingDownId, setBreakingDownId] = useState<string | null>(null)
 
   const search = useSearch({ from: '/tasks' })
@@ -114,6 +115,17 @@ export function TasksScreen() {
     staleTime: 5 * 60_000,
   })
 
+  const creditsQuery = useQuery({
+    queryKey: ['openrouter', 'credits'],
+    queryFn: async () => {
+      const res = await fetch('/api/openrouter-credits')
+      if (!res.ok) return null
+      return res.json() as Promise<{ remaining: number; level: 'ok' | 'warning' | 'critical' | 'exhausted' }>
+    },
+    staleTime: 30 * 60_000,
+    refetchInterval: 60 * 60_000,
+  })
+
   const assignees: Array<TaskAssignee> = assigneesQuery.data?.assignees ?? []
   const humanReviewer = assigneesQuery.data?.humanReviewer ?? null
 
@@ -158,6 +170,24 @@ export function TasksScreen() {
   }, [tasks, assigneeFilter, searchQuery, filterOverdue, filterBlocked, filterActiveAgent, filterInReview, priorityFilter, tagFilter])
 
   const columnMap = tasksByColumn.columns
+
+  // Queue position map — mirrors server-side priority sort in runAgentDeployBackground
+  const queuePositions = useMemo(() => {
+    const PRIORITY_SCORE: Record<string, number> = { high: 3, medium: 2, low: 1 }
+    const sorted = tasks
+      .filter(t => (t.column === 'todo' || t.column === 'backlog') && !t.agent_state)
+      .sort((a, b) => {
+        const pa = PRIORITY_SCORE[a.priority] ?? 2
+        const pb = PRIORITY_SCORE[b.priority] ?? 2
+        if (pb !== pa) return pb - pa
+        const da = new Date((a as unknown as { created_at?: string }).created_at ?? 0).getTime()
+        const db = new Date((b as unknown as { created_at?: string }).created_at ?? 0).getTime()
+        return da - db
+      })
+    const map: Record<string, number> = {}
+    sorted.forEach((t, i) => { map[t.id] = i + 1 })
+    return map
+  }, [tasks])
 
   const stats = useMemo(() => {
     const total = tasks.length
@@ -262,9 +292,10 @@ export function TasksScreen() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  // Agent deploy summary — fires when all agent_state clears after Deploy Agents was clicked
+  // Agent deploy summary — fires when all agent_state clears after Deploy Agents was clicked.
+  // Guard on !astraReviewing so we don't fire before agents have even started.
   useEffect(() => {
-    if (!deploySnapshot) return
+    if (!deploySnapshot || astraReviewing) return
     const anyActive = tasks.some(t => t.agent_state)
     if (anyActive) return
     // All agents finished — compute diff vs snapshot
@@ -290,7 +321,7 @@ export function TasksScreen() {
       toast(parts.join(' · '))
     }
     setDeploySnapshot(null)
-  }, [tasks, deploySnapshot])
+  }, [tasks, deploySnapshot, astraReviewing])
 
   function handleDragStart(e: React.DragEvent, taskId: string) {
     e.dataTransfer.setData('text/plain', taskId)
@@ -332,6 +363,7 @@ export function TasksScreen() {
     setFilterOverdue(false)
     setFilterBlocked(false)
     setFilterActiveAgent(false)
+    setFilterInReview(false)
     setPriorityFilter(null)
     setTagFilter(null)
   }
@@ -384,6 +416,23 @@ export function TasksScreen() {
                 <span className="flex items-center gap-1 text-violet-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse inline-block" />
                   Astra reviewing {stats.agentActive}
+                </span>
+              </>
+            )}
+            {creditsQuery.data && creditsQuery.data.level !== 'ok' && (
+              <>
+                <span>·</span>
+                <span
+                  title={`OpenRouter paid credits: $${creditsQuery.data.remaining} remaining`}
+                  className={cn(
+                    'flex items-center gap-1 font-medium',
+                    creditsQuery.data.level === 'exhausted' ? 'text-red-400' :
+                    creditsQuery.data.level === 'critical'  ? 'text-red-400' :
+                                                              'text-amber-400',
+                  )}
+                >
+                  {creditsQuery.data.level === 'exhausted' ? '🚫' : creditsQuery.data.level === 'critical' ? '🔴' : '🟡'}
+                  OR ${creditsQuery.data.remaining}
                 </span>
               </>
             )}
@@ -470,6 +519,27 @@ export function TasksScreen() {
             <HugeiconsIcon icon={AiBrainIcon} size={13} strokeWidth={1.8} className={astraReviewing ? 'animate-pulse' : ''} />
             {astraReviewing ? 'Deploying…' : 'Deploy Agents'}
           </button>
+
+          {/* Clear Stuck — only shown when tasks are visibly stuck (spinner > 10 min) */}
+          {tasks.some(t => t.agent_state && t.agent_action_at && Date.now() - new Date(t.agent_action_at).getTime() > 10 * 60_000) && (
+            <button
+              onClick={async () => {
+                setClearingStuck(true)
+                try {
+                  await fetch('/api/tasks-deploy-agents', { method: 'DELETE' })
+                  await tasksQuery.refetch()
+                } finally {
+                  setClearingStuck(false)
+                }
+              }}
+              disabled={clearingStuck}
+              title="Clear stuck agent spinners — auto-recovers tasks whose background process died"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors"
+            >
+              <HugeiconsIcon icon={Loading03Icon} size={13} strokeWidth={1.8} className={clearingStuck ? 'animate-spin' : ''} />
+              {clearingStuck ? 'Clearing…' : 'Clear Stuck'}
+            </button>
+          )}
 
           {/* AI idea generation */}
           <button
@@ -868,6 +938,7 @@ export function TasksScreen() {
                             }}
                             onRequestRefresh={() => void tasksQuery.refetch()}
                             onComment={handleTaskComment}
+                            queuePosition={queuePositions[task.id] ?? null}
                           />
                         </motion.div>
                       ))

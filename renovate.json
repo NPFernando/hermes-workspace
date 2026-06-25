@@ -1,0 +1,23 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base"
+  ],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "branch"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "automerge": true
+    }
+  ],
+  "prCreation": "not-pending",
+  "schedule": ["before 5am on monday"],
+  "timezone": "UTC",
+  "commitMessagePrefix": "renovate",
+  "resetBranches": true
+}

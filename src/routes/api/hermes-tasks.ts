@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { runAgentDeployBackground } from '../../server/astra-tasks'
 import { createTask, listTasks } from '../../server/tasks-store'
 import type { TaskColumn, TaskPriority } from '../../server/tasks-store'
 
@@ -68,6 +69,13 @@ export const Route = createFileRoute('/api/hermes-tasks')({
             position: typeof body.position === 'number' ? body.position : 0,
             created_by: typeof body.created_by === 'string' ? body.created_by : 'user',
           })
+
+          // Auto-start Phase 1 review for actionable tasks — no manual Deploy needed.
+          // Skip if the task was created directly into in_progress/review/blocked/done
+          // (that means the caller already knows what to do with it).
+          if (task.column === 'backlog' || task.column === 'todo') {
+            runAgentDeployBackground()
+          }
 
           return jsonResponse({ task }, 201)
         } catch {

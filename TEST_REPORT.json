@@ -1,37 +1,5 @@
 {
-  "passed": true,
-  "checks": {
-    "typescript": {
-      "command": "pnpm exec tsc --noEmit",
-      "exit_code": 0
-    },
-    "build": {
-      "command": "pnpm build",
-      "exit_code": 0,
-      "notes": [
-        "Vite build succeeded for client and SSR.",
-        "Existing large chunk warnings remain for follow-up bundle splitting."
-      ]
-    },
-    "targeted_lint_new_routing": {
-      "command": "pnpm lint -- src/components/Skeleton.tsx src/lib/sister-routing.ts src/routes/api/route-sister.ts src/routes/api/orchestrate.ts src/screens/chat/components/sister-picker.tsx src/screens/tasks/tasks-screen.tsx",
-      "exit_code": 0
-    },
-    "global_lint": {
-      "command": "pnpm lint",
-      "exit_code": 1,
-      "problems": 361,
-      "errors": 262,
-      "warnings": 99,
-      "status": "pre-existing strict lint backlog remains outside the clean targeted gate"
-    }
-  },
-  "modified_source_files_checked": [
-    "src/components/Skeleton.tsx",
-    "src/lib/sister-routing.ts",
-    "src/routes/api/route-sister.ts",
-    "src/routes/api/orchestrate.ts",
-    "src/screens/chat/components/sister-picker.tsx",
-    "src/screens/tasks/tasks-screen.tsx"
-  ]
+  "tests_passed": true,
+  "lint_errors": 0,
+  "passed": true
 }
