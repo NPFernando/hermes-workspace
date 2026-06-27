@@ -980,7 +980,7 @@ function ChatComposerComponent({
   const { pinned, isPinned, togglePin } = usePinnedModels()
 
   const modelsQuery = useQuery({
-    queryKey: ['claude', 'models'],
+    queryKey: ['models'],
     queryFn: fetchModels,
     refetchInterval: 60_000,
     retry: false,
@@ -1081,7 +1081,7 @@ function ChatComposerComponent({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['profiles'] }),
         queryClient.invalidateQueries({ queryKey: ['workspace'] }),
-        queryClient.invalidateQueries({ queryKey: ['claude', 'models'] }),
+        queryClient.invalidateQueries({ queryKey: ['models'] }),
         queryClient.invalidateQueries({
           queryKey: ['claude', 'session-status-model'],
         }),

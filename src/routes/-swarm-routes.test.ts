@@ -9,10 +9,9 @@ describe('swarm routes stay client-only to avoid hydration/loading loops', () =>
     expect(source).toContain('Loading swarm...')
   })
 
-  it('disables SSR for the /swarm2 route alias', () => {
+  it('redirects /swarm2 to /swarm (duplicate route removed)', () => {
     const source = readFileSync('src/routes/swarm2.tsx', 'utf8')
     expect(source).toContain("createFileRoute('/swarm2')")
-    expect(source).toContain('ssr: false')
-    expect(source).toContain('Loading Swarm...')
+    expect(source).toContain("to: '/swarm'")
   })
 })

@@ -257,10 +257,18 @@ type CachesLike = {
 
 export async function registerAppServiceWorker({
   serviceWorker,
+  cachesApi,
 }: {
   serviceWorker?: ServiceWorkerLike
   cachesApi?: CachesLike
 }): Promise<void> {
+  try {
+    const cacheNames = (await cachesApi?.keys()) ?? []
+    await Promise.all(cacheNames.map((name) => cachesApi?.delete(name)))
+  } catch (error) {
+    console.warn('PWA cache cleanup failed', error)
+  }
+
   await serviceWorker
     ?.register('/sw.js', { scope: '/' })
     .catch((error: unknown) => {

@@ -32,6 +32,9 @@ let _resolving: Promise<BackendResolution> | null = null
 async function probeBackend(base: string): Promise<number> {
   try {
     const res = await fetch(base, { signal: AbortSignal.timeout(3000) })
+    // Distinguish auth failure (-1) from "route exists but empty" (0).
+    // Callers use -1 to skip caching and re-probe once the user is logged in.
+    if (res.status === 401 || res.status === 403) return -1
     if (!res.ok) return 0
     // Guard against HTML catch-all responses (route not found returns 200 HTML)
     const contentType = res.headers.get('content-type') ?? ''
@@ -53,11 +56,22 @@ async function resolveBackend(): Promise<BackendResolution> {
       probeBackend(CLAUDE_BASE),
     ])
 
-    // Prefer hermes if it has real data (> 0); fall back to claude if hermes is
-    // missing (returns -1 for non-JSON / route-not-found) or empty.
-    // Default to claude when both are empty — it is the active backend after the
-    // hermes-tasks → claude-tasks route rename (commit efcb7d14).
-    const useHermes = hermesCount > 0 && hermesCount >= claudeCount
+    // Both probes returned -1: likely unauthenticated. Don't cache — let the
+    // next fetchTasks() call re-probe once the session cookie is available.
+    // Default to hermes in the meantime (canonical agent task store).
+    if (hermesCount < 0 && claudeCount < 0) {
+      _resolving = null
+      return {
+        base: HERMES_BASE,
+        assigneesBase: '/api/hermes-tasks-assignees',
+        backend: 'hermes',
+      }
+    }
+
+    // Prefer hermes if it has real data (> 0). Fall back to claude only when
+    // hermes is empty/unavailable and claude has tasks.
+    // Default to hermes when both are empty — it is the canonical agent task store.
+    const useHermes = hermesCount >= 0 && (claudeCount < 0 || hermesCount >= claudeCount)
     _resolved = {
       base: useHermes ? HERMES_BASE : CLAUDE_BASE,
       assigneesBase: useHermes ? '/api/hermes-tasks-assignees' : '/api/claude-tasks-assignees',

@@ -173,6 +173,48 @@ export function clearStuckTasks(): number {
     } catch { /* non-fatal */ }
   }
 
+  // ── Part 3: alert on review-loop tasks (>40 history entries stuck >48 h) ───
+  const LOOP_HISTORY_THRESHOLD = 40
+  const LOOP_AGE_MS    = 48 * 60 * 60 * 1000
+  const LOOP_REPEAT_MS = 24 * 60 * 60 * 1000
+
+  for (const task of all) {
+    if (task.column !== 'review' && task.column !== 'blocked') continue
+    if (task.agent_state) continue
+    const history = task.agent_history ?? []
+    if (history.length < LOOP_HISTORY_THRESHOLD) continue
+
+    const lastLoopAlert   = [...history].reverse().find(e => e.action === 'loop_alert')
+    const lastLoopAlertMs = lastLoopAlert ? new Date(lastLoopAlert.at).getTime() : 0
+    if (now - lastLoopAlertMs < LOOP_REPEAT_MS) continue
+
+    const lastActivityMs = Math.max(
+      task.updated_at      ? new Date(task.updated_at).getTime()      : 0,
+      task.agent_action_at ? new Date(task.agent_action_at).getTime() : 0,
+    )
+    if (!lastActivityMs || now - lastActivityMs < LOOP_AGE_MS) continue
+
+    const nowIso = new Date().toISOString()
+    updateTask(task.id, {
+      agent_history: [...history, {
+        id:      randomUUID(),
+        by:      'astra',
+        byEmoji: '🌟',
+        action:  'loop_alert',
+        note:    `Task has ${history.length} history entries and has been in '${task.column}' >48 h without progress. Consider resolving or pruning.`,
+        at:      nowIso,
+      }],
+    })
+
+    const tgMsg = `⚠️ Review loop: ${task.title}\n${history.length} history entries stuck in ${task.column} >48h — prune or resolve manually.`
+    try {
+      spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q', tgMsg], {
+        encoding: 'utf-8',
+        timeout:  15_000,
+      })
+    } catch { /* non-fatal */ }
+  }
+
   return cleared
 }
 
@@ -382,21 +424,21 @@ export function runAgentDeployBackground(mode: 'manual' | 'auto' = 'manual'): { 
       const db = new Date(b.created_at ?? 0).getTime()
       return da - db                                      // older tasks first within same priority
     })
-  const candidate = allEligible.find((t) => {
+  const MAX_PER_CYCLE = 3
+
+  const candidates = allEligible.filter((t) => {
     if (t.agent_state) return false
     if (mode === 'auto') {
       // Skip tasks an agent has already reviewed — they're waiting for Execute
       return !(t.agent_history ?? []).some((e) => e.by !== 'user')
     }
     return true
-  })
+  }).slice(0, MAX_PER_CYCLE)
 
-  if (!candidate) return { taskCount: 0 }
+  if (candidates.length === 0) return { taskCount: 0 }
 
-  const candidates = [candidate]
-
-  // Mark it as reviewing synchronously, before the fork
-  markTasksAsReviewing([candidate.id])
+  // Mark all as reviewing synchronously, before the fork
+  markTasksAsReviewing(candidates.map((c) => c.id))
 
   const hermesHome =
     process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
@@ -572,12 +614,17 @@ function doBreakdown(task, assignee) {
     return 0;
   }
 
+  const MAX_SUBTASKS = 6;
   const titles = [];
   withTasksLock(() => {
     const file = readTasks();
     const now  = new Date().toISOString();
+    const existingTitles = new Set(file.tasks.map(function(t) { return t.title.toLowerCase().trim(); }));
+    let pushed = 0;
     for (const sub of subtasks) {
-      if (!sub.title) continue;
+      if (!sub.title || pushed >= MAX_SUBTASKS) continue;
+      const normalized = sub.title.trim().toLowerCase();
+      if (existingTitles.has(normalized)) continue;
       file.tasks.push({
         id: randomUUID(), title: sub.title.trim(), description: sub.description || '',
         column: 'todo', priority: sub.priority || task.priority,
@@ -588,6 +635,8 @@ function doBreakdown(task, assignee) {
         source: 'astra', agent_comment: null, agent_history: [], waiting_for_user: false,
       });
       titles.push(sub.title.trim());
+      existingTitles.add(normalized);
+      pushed++;
     }
     writeTasks(file);
   });
@@ -812,26 +861,8 @@ for (const reviewTask of sisterReviewQueue) {
   }
 }
 
-// ── Self-chain: trigger next eligible task ───────────────────────────────────
-// Each script handles ONE task; this spawns the next deployment cycle.
-{
-  const remaining = readTasks().tasks.filter(t =>
-    (t.column === 'backlog' || t.column === 'todo') && !t.agent_state
-  );
-  if (remaining.length > 0) {
-    const curlArgs = ['-s', '-X', 'POST', '-m', '10'];
-    try {
-      const sessionsFile = path.join(HERMES_HOME, 'workspace-sessions.json');
-      const sessions = JSON.parse(fs.readFileSync(sessionsFile, 'utf-8'));
-      const nowMs = Date.now();
-      const valid = Object.entries(sessions.tokens || {}).find(([, exp]) => Number(exp) > nowMs);
-      if (valid) curlArgs.push('-H', 'Cookie: claude-auth=' + valid[0]);
-    } catch {}
-    spawnSync('curl', [...curlArgs, 'http://localhost:3000/api/tasks-deploy-agents'], {
-      encoding: 'utf-8', timeout: 15_000
-    });
-  }
-}
+// Continuation is handled by the TS-side periodic sweep (15 min) and the
+// MAX_PER_CYCLE batch — no HTTP self-chain needed.
 `
 
   const timestamp = Date.now()
@@ -1613,9 +1644,17 @@ export async function breakdownTaskWithAI(taskId: string): Promise<{ count: numb
 
   if (subtasks.length === 0) return null
 
+  const MAX_SUBTASKS_TS = 6
+  const allExisting = listTasks({ includeDone: false })
+  const existingTitlesSet = new Set(allExisting.map((t) => t.title.toLowerCase().trim()))
+
   const titles: Array<string> = []
 
   for (const sub of subtasks) {
+    if (titles.length >= MAX_SUBTASKS_TS) break
+    const normalized = (sub.title as string).trim().toLowerCase()
+    if (existingTitlesSet.has(normalized)) continue
+
     const subTags = Array.isArray(sub.tags)
       ? (sub.tags as Array<string>).filter(t => typeof t === 'string').slice(0, 4)
       : ['subtask', ...task.tags.slice(0, 2)]
@@ -1633,6 +1672,7 @@ export async function breakdownTaskWithAI(taskId: string): Promise<{ count: numb
     })
 
     titles.push((sub.title as string).trim())
+    existingTitlesSet.add(normalized)
   }
 
   const count = titles.length
@@ -1911,4 +1951,257 @@ Return ONLY a valid JSON array, no explanation before or after:
 
   // ── 6. Inject into backlog (deduplication vs existing tasks handled inside) ──
   return injectIdeasAsBacklog()
+}
+
+// ---------------------------------------------------------------------------
+// runCompletionCheckBackground — Astra verifies review/in_progress tasks and
+// moves confirmed-done ones to 'done'.
+//
+// For each candidate task, the script:
+//   1. Gathers recent git commits and service status as evidence
+//   2. Asks Astra (via OpenRouter direct): "Is this task done and deployed?"
+//   3. If confident YES → moves to 'done' + Telegram notification
+//   4. If uncertain / NO → leaves the column unchanged
+// ---------------------------------------------------------------------------
+
+export function runCompletionCheckBackground(): { taskCount: number } {
+  const nowMs = Date.now()
+  const THREE_HOURS_MS = 3 * 60 * 60 * 1000
+
+  const candidates = [
+    ...listTasks({ column: 'review' }),
+    ...listTasks({ column: 'in_progress' }),
+  ].filter((t) => {
+    if (t.agent_state) return false
+    // Skip tasks checked recently to avoid spam — one check per 3 hours per task
+    const lastChecked = (t.agent_history ?? []).slice().reverse().find((e) => e.action === 'checked')
+    if (lastChecked && nowMs - new Date(lastChecked.at).getTime() < THREE_HOURS_MS) return false
+    return true
+  })
+
+  if (candidates.length === 0) return { taskCount: 0 }
+
+  // Mark all as reviewing so the UI shows spinners immediately
+  markTasksAsReviewing(candidates.map((t) => t.id))
+
+  const hermesHome =
+    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+  const tasksFilePath = path.join(hermesHome, 'tasks.json')
+
+  let serviceStatus = ''
+  try {
+    const r = spawnSync('systemctl', ['is-active', 'hermes-workspace.service'], {
+      encoding: 'utf-8',
+      timeout: 3_000,
+    })
+    serviceStatus = r.stdout.trim()
+  } catch { /* ok */ }
+
+  // Compute per-task workCwd so the script can run git log in the right repo
+  const taskPayload = candidates.map((t) => {
+    const { workCwd } = resolveSisterAndCwd(t)
+    return {
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      column: t.column,
+      agent_comment: t.agent_comment ?? '',
+      last_history: (t.agent_history ?? []).slice(-3).map((e) => `[${e.by}] ${e.action}: ${e.note?.slice(0, 120)}`).join('\n'),
+      workCwd,
+    }
+  })
+
+  const scriptContent = `
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
+
+const TASKS_FILE     = ${JSON.stringify(tasksFilePath)};
+const HERMES_HOME    = ${JSON.stringify(hermesHome)};
+const HERMES_BIN     = ${JSON.stringify(HERMES_BIN)};
+const TASKS          = ${JSON.stringify(taskPayload)};
+const SERVICE_STATUS = ${JSON.stringify(serviceStatus)};
+const TG_TARGET      = 'telegram:2130622225';
+const OR_MODELS      = ['nvidia/nemotron-3-super-120b-a12b:free','meta-llama/llama-4-maverick:free','google/gemma-3-27b-it:free'];
+const LOCK_FILE      = TASKS_FILE + '.lock';
+
+function sleep(ms) { const end = Date.now() + ms; while (Date.now() < end) {} }
+
+function withTasksLock(fn) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    try {
+      const fd = fs.openSync(LOCK_FILE, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL);
+      fs.closeSync(fd);
+      try { return fn(); } finally { try { fs.unlinkSync(LOCK_FILE); } catch {} }
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      try { const s = fs.statSync(LOCK_FILE); if (Date.now() - s.mtimeMs > 30_000) { fs.unlinkSync(LOCK_FILE); continue; } } catch {}
+      sleep(50);
+    }
+  }
+  return fn();
+}
+
+function readTasks() {
+  try {
+    const raw = fs.readFileSync(TASKS_FILE, 'utf-8').trim();
+    if (!raw) return { tasks: [] };
+    const p = JSON.parse(raw);
+    return { tasks: Array.isArray(p.tasks) ? p.tasks : [] };
+  } catch { return { tasks: [] }; }
+}
+
+function writeTasks(data) {
+  const content = JSON.stringify(data, null, 2) + '\\n';
+  const tmp = TASKS_FILE + '.tmp';
+  fs.writeFileSync(tmp, content, 'utf-8');
+  fs.renameSync(tmp, TASKS_FILE);
+}
+
+function updateTaskDirect(id, updates) {
+  withTasksLock(() => {
+    const file = readTasks();
+    const idx = file.tasks.findIndex(t => t.id === id);
+    if (idx === -1) return;
+    file.tasks[idx] = { ...file.tasks[idx], ...updates, updated_at: new Date().toISOString() };
+    writeTasks(file);
+  });
+}
+
+function clearAgentState(id) {
+  updateTaskDirect(id, { agent_state: null, agent_name: null, agent_action_at: null });
+}
+
+function loadOpenRouterKey() {
+  if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY;
+  try {
+    const content = fs.readFileSync(path.join(HERMES_HOME, '.env'), 'utf-8');
+    const m = content.match(/^OPENROUTER_API_KEY=(.+)$/m);
+    return m?.[1]?.trim() ?? '';
+  } catch { return ''; }
+}
+
+async function callAI(prompt) {
+  const apiKey = loadOpenRouterKey();
+  if (!apiKey) {
+    // Fallback: use hermes CLI
+    const r = spawnSync(HERMES_BIN, ['-z', prompt], { encoding: 'utf-8', timeout: 60_000, maxBuffer: 2 * 1024 * 1024 });
+    return r.stdout || '';
+  }
+  for (const model of OR_MODELS) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+        body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 400, temperature: 0.2 }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const text = data.choices?.[0]?.message?.content ?? '';
+      if (text.trim()) return text;
+    } catch {}
+  }
+  return '';
+}
+
+function parseJSON(text) {
+  const t = (text || '').trim();
+  try { return JSON.parse(t); } catch {}
+  const m = t.match(/\\{[\\s\\S]*\\}/);
+  if (m) { try { return JSON.parse(m[0]); } catch {} }
+  return null;
+}
+
+function sendTelegram(msg) {
+  try { spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q', msg], { encoding: 'utf-8', timeout: 15_000 }); } catch {}
+}
+
+// ── Main: check each task ────────────────────────────────────────────────────
+
+for (const task of TASKS) {
+  updateTaskDirect(task.id, { agent_state: 'reviewing', agent_name: 'astra', agent_action_at: new Date().toISOString() });
+
+  // Per-task git log — use the task's own project directory
+  let recentCommits = '';
+  try {
+    const gl = spawnSync('git', ['log', '--oneline', '-20'], {
+      encoding: 'utf-8',
+      cwd: task.workCwd || '.',
+      timeout: 5_000,
+    });
+    recentCommits = gl.stdout.trim();
+  } catch {}
+
+  const evidence = [
+    SERVICE_STATUS  ? 'Service status: hermes-workspace.service is ' + SERVICE_STATUS : '',
+    recentCommits   ? 'Recent git commits for this project (newest first):\\n' + recentCommits : 'No git history found for this project.',
+  ].filter(Boolean).join('\\n');
+
+  const prompt =
+    'You are Astra. Determine whether this task has been fully implemented and deployed.\\n\\n' +
+    'Task: ' + task.title + '\\n' +
+    'Description: ' + (task.description || '(none)') + '\\n' +
+    (task.agent_comment ? 'Last agent note: ' + task.agent_comment + '\\n' : '') +
+    (task.last_history ? 'Recent activity:\\n' + task.last_history + '\\n' : '') +
+    '\\nDeployment evidence:\\n' + evidence + '\\n\\n' +
+    'Decide:\\n' +
+    '  done: true  → the task is clearly implemented, committed, and the service is running with the fix\\n' +
+    '  done: false → the task is still in progress, no matching commits found, or deployment is uncertain\\n\\n' +
+    'Return ONLY valid JSON (no other text):\\n' +
+    '{"done": true|false, "confidence": "high|medium|low", "reason": "1 sentence explaining your decision"}';
+
+  const raw    = await callAI(prompt);
+  const result = parseJSON(raw);
+
+  const now = new Date().toISOString();
+  const file = readTasks();
+  const taskRec = file.tasks.find(t => t.id === task.id);
+  const existing = Array.isArray(taskRec?.agent_history) ? taskRec.agent_history : [];
+
+  if (result && result.done === true && result.confidence !== 'low') {
+    // Confirmed done — move to done column
+    const note = result.reason || 'Astra verified: task is implemented and deployed.';
+    updateTaskDirect(task.id, {
+      column: 'done',
+      agent_state:  null,
+      agent_name:   null,
+      agent_action_at: null,
+      agent_comment: note,
+      agent_history: [...existing, {
+        id: randomUUID(), by: 'astra', byEmoji: '🌟',
+        action: 'verified done', note, at: now,
+      }],
+    });
+    sendTelegram('✅ 🌟 Astra verified done\\nTask: ' + task.title + '\\n' + note.slice(0, 280));
+  } else {
+    // Not done or uncertain — clear spinner, leave column unchanged
+    const note = result?.reason || 'Could not confirm completion — task remains in current column.';
+    updateTaskDirect(task.id, {
+      agent_state:  null,
+      agent_name:   null,
+      agent_action_at: null,
+      agent_history: [...existing, {
+        id: randomUUID(), by: 'astra', byEmoji: '🌟',
+        action: 'checked', note, at: now,
+      }],
+    });
+  }
+}
+`
+
+  const timestamp = Date.now()
+  const scriptPath = `/tmp/completion-check-${timestamp}.mjs`
+  fs.writeFileSync(scriptPath, scriptContent, 'utf-8')
+
+  const child = spawn(process.execPath, [scriptPath], {
+    detached: true,
+    stdio: 'ignore',
+  })
+  child.unref()
+
+  return { taskCount: candidates.length }
 }

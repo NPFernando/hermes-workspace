@@ -203,7 +203,7 @@ export function OperationsNewAgentModal({
   }
 
   const modelsQuery = useQuery({
-    queryKey: ['operations', 'models'],
+    queryKey: ['models'],
     queryFn: fetchModels,
     enabled: open,
   })

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import type { ActivityEntry, ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority } from '@/lib/tasks-api'
 import {
   DialogContent,
-  DialogDescription,
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -43,7 +42,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
   const [dueDate, setDueDate] = useState('')
   const [commentText, setCommentText] = useState('')
   const [commentSending, setCommentSending] = useState(false)
-  const historyEndRef = useRef<HTMLDivElement>(null)
+  const activityScrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (task) {
@@ -103,7 +102,8 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
   const history: Array<ActivityEntry> = task?.agent_history ?? []
 
   useEffect(() => {
-    historyEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = activityScrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [history.length])
 
   return (
@@ -113,12 +113,9 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
         <div className="h-[3px] w-full bg-[var(--theme-accent)]" />
 
         <div className="p-5 overflow-y-auto max-h-[85vh]">
-          <DialogTitle className="text-base font-semibold text-[var(--theme-text)] mb-1">
+          <DialogTitle className="text-base font-semibold text-[var(--theme-text)] mb-4">
             {isEdit ? 'Edit Task' : 'New Task'}
           </DialogTitle>
-          <DialogDescription className="text-xs text-[var(--theme-muted)] mb-4">
-            {isEdit ? 'Update the task details below.' : 'Fill in the details for your new task.'}
-          </DialogDescription>
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
@@ -213,8 +210,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
               />
             </div>
 
-            <div className="flex items-center justify-between pt-2">
-              <p className="text-[10px] text-[var(--theme-muted)]">Press Esc to cancel</p>
+            <div className="flex items-center justify-end pt-2">
               <div className="flex gap-2">
                 <Button
                   type="button"
@@ -299,7 +295,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                 </div>
               )}
 
-              <div className="max-h-52 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+              <div ref={activityScrollRef} className="max-h-52 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
                 {history.length === 0 ? (
                   <p className="text-xs italic text-[var(--theme-muted)]">
                     {isExecuting || task?.agent_state
@@ -340,7 +336,6 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                     })}
                   </div>
                 )}
-                <div ref={historyEndRef} />
               </div>
 
               {/* User reply input */}

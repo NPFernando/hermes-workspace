@@ -1,6 +1,7 @@
 'use client'
 
 import { Dialog } from '@base-ui/react/dialog'
+
 import { Button } from './button'
 import { cn } from '@/lib/utils'
 
@@ -16,13 +17,18 @@ function DialogTrigger({ className, ...props }: DialogTriggerProps) {
   return <Dialog.Trigger className={cn(className)} {...props} />
 }
 
-type DialogContentProps = {
+type DialogContentProps = React.ComponentProps<typeof Dialog.Popup> & {
   className?: string
   children: React.ReactNode
   style?: React.CSSProperties
 }
 
-function DialogContent({ className, children, style }: DialogContentProps) {
+function DialogContent({
+  className,
+  children,
+  style,
+  ...popupProps
+}: DialogContentProps) {
   return (
     <Dialog.Portal>
       <Dialog.Backdrop
@@ -45,6 +51,7 @@ function DialogContent({ className, children, style }: DialogContentProps) {
           color: 'var(--theme-text)',
           ...style,
         }}
+        {...popupProps}
       >
         {children}
       </Dialog.Popup>

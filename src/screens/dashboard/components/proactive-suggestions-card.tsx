@@ -106,7 +106,7 @@ function buildSuggestions(overview: DashboardOverview | null, cycleIdx: number):
         title: 'No active sessions detected',
         body: 'Gateway shows no running sessions. Check that agent profiles (Astra, Novus, etc.) have been started, or trigger a cron job to wake one up.',
         impact: 'medium',
-        href: '/operations',
+        href: '/command',
       })
     }
   }

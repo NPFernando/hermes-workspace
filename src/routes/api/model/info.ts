@@ -41,7 +41,7 @@ export const Route = createFileRoute('/api/model/info')({
           ? deriveFallbackModelInfoFromGateway(gatewayMode, getCapabilities())
           : normalized
 
-        if (shouldUseFallback) {
+        if (shouldUseFallback && import.meta.env.DEV) {
           console.log(
             `[model-info] falling back to gateway capabilities (source=gateway-capabilities mode=${gatewayMode})`,
           )

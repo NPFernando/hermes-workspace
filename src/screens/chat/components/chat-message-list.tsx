@@ -678,12 +678,12 @@ export function getTrailingToolOnlyTurnSummary(
   }
 
 
-  if (trailingStart === 0) {
-    return null;
+  if (trailingStart === messages.length || trailingStart === 0) {
+    return null
   }
-  const lastVisible = messages[trailingStart - 1];
+  const lastVisible = messages[trailingStart - 1]
   if (lastVisible.role !== 'assistant' || isAssistantToolCallOnlyMessage(lastVisible)) {
-    return null;
+    return null
   }
   const trailing = messages.slice(trailingStart)
   const toolNames = Array.from(

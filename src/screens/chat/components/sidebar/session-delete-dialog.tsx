@@ -26,7 +26,7 @@ export function SessionDeleteDialog({
 }: SessionDeleteDialogProps) {
   return (
     <AlertDialogRoot open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent initialFocus>
         <div className="p-4">
           <AlertDialogTitle className="mb-1">Delete Session</AlertDialogTitle>
           <AlertDialogDescription className="mb-4">

@@ -47,10 +47,12 @@ import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-str
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
+import { Route as ApiTasksPruneRouteImport } from './routes/api/tasks-prune'
 import { Route as ApiTasksInjectIdeasRouteImport } from './routes/api/tasks-inject-ideas'
 import { Route as ApiTasksGenerateIdeasRouteImport } from './routes/api/tasks-generate-ideas'
 import { Route as ApiTasksFromTextRouteImport } from './routes/api/tasks-from-text'
 import { Route as ApiTasksDeployAgentsRouteImport } from './routes/api/tasks-deploy-agents'
+import { Route as ApiTasksCompletionCheckRouteImport } from './routes/api/tasks-completion-check'
 import { Route as ApiTasksAstraReviewRouteImport } from './routes/api/tasks-astra-review'
 import { Route as ApiTasksAskAstraRouteImport } from './routes/api/tasks-ask-astra'
 import { Route as ApiTasksRouteImport } from './routes/api/tasks'
@@ -405,6 +407,11 @@ const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
   path: '/api/terminal-close',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTasksPruneRoute = ApiTasksPruneRouteImport.update({
+  id: '/api/tasks-prune',
+  path: '/api/tasks-prune',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTasksInjectIdeasRoute = ApiTasksInjectIdeasRouteImport.update({
   id: '/api/tasks-inject-ideas',
   path: '/api/tasks-inject-ideas',
@@ -423,6 +430,11 @@ const ApiTasksFromTextRoute = ApiTasksFromTextRouteImport.update({
 const ApiTasksDeployAgentsRoute = ApiTasksDeployAgentsRouteImport.update({
   id: '/api/tasks-deploy-agents',
   path: '/api/tasks-deploy-agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksCompletionCheckRoute = ApiTasksCompletionCheckRouteImport.update({
+  id: '/api/tasks-completion-check',
+  path: '/api/tasks-completion-check',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTasksAstraReviewRoute = ApiTasksAstraReviewRouteImport.update({
@@ -1363,10 +1375,12 @@ export interface FileRoutesByFullPath {
   '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
+  '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
+  '/api/tasks-prune': typeof ApiTasksPruneRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -1569,10 +1583,12 @@ export interface FileRoutesByTo {
   '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
+  '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
+  '/api/tasks-prune': typeof ApiTasksPruneRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -1777,10 +1793,12 @@ export interface FileRoutesById {
   '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
+  '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
+  '/api/tasks-prune': typeof ApiTasksPruneRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -1986,10 +2004,12 @@ export interface FileRouteTypes {
     | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
+    | '/api/tasks-completion-check'
     | '/api/tasks-deploy-agents'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
+    | '/api/tasks-prune'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -2192,10 +2212,12 @@ export interface FileRouteTypes {
     | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
+    | '/api/tasks-completion-check'
     | '/api/tasks-deploy-agents'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
+    | '/api/tasks-prune'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -2399,10 +2421,12 @@ export interface FileRouteTypes {
     | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
+    | '/api/tasks-completion-check'
     | '/api/tasks-deploy-agents'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
+    | '/api/tasks-prune'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -2607,10 +2631,12 @@ export interface RootRouteChildren {
   ApiTasksRoute: typeof ApiTasksRoute
   ApiTasksAskAstraRoute: typeof ApiTasksAskAstraRoute
   ApiTasksAstraReviewRoute: typeof ApiTasksAstraReviewRoute
+  ApiTasksCompletionCheckRoute: typeof ApiTasksCompletionCheckRoute
   ApiTasksDeployAgentsRoute: typeof ApiTasksDeployAgentsRoute
   ApiTasksFromTextRoute: typeof ApiTasksFromTextRoute
   ApiTasksGenerateIdeasRoute: typeof ApiTasksGenerateIdeasRoute
   ApiTasksInjectIdeasRoute: typeof ApiTasksInjectIdeasRoute
+  ApiTasksPruneRoute: typeof ApiTasksPruneRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
@@ -2934,6 +2960,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTerminalCloseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/tasks-prune': {
+      id: '/api/tasks-prune'
+      path: '/api/tasks-prune'
+      fullPath: '/api/tasks-prune'
+      preLoaderRoute: typeof ApiTasksPruneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tasks-inject-ideas': {
       id: '/api/tasks-inject-ideas'
       path: '/api/tasks-inject-ideas'
@@ -2960,6 +2993,13 @@ declare module '@tanstack/react-router' {
       path: '/api/tasks-deploy-agents'
       fullPath: '/api/tasks-deploy-agents'
       preLoaderRoute: typeof ApiTasksDeployAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-completion-check': {
+      id: '/api/tasks-completion-check'
+      path: '/api/tasks-completion-check'
+      fullPath: '/api/tasks-completion-check'
+      preLoaderRoute: typeof ApiTasksCompletionCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tasks-astra-review': {
@@ -4457,10 +4497,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTasksRoute: ApiTasksRoute,
   ApiTasksAskAstraRoute: ApiTasksAskAstraRoute,
   ApiTasksAstraReviewRoute: ApiTasksAstraReviewRoute,
+  ApiTasksCompletionCheckRoute: ApiTasksCompletionCheckRoute,
   ApiTasksDeployAgentsRoute: ApiTasksDeployAgentsRoute,
   ApiTasksFromTextRoute: ApiTasksFromTextRoute,
   ApiTasksGenerateIdeasRoute: ApiTasksGenerateIdeasRoute,
   ApiTasksInjectIdeasRoute: ApiTasksInjectIdeasRoute,
+  ApiTasksPruneRoute: ApiTasksPruneRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,

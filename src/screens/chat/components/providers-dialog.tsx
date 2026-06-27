@@ -1,5 +1,7 @@
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useRef } from 'react'
+
 import { Button } from '@/components/ui/button'
 import {
   DialogClose,
@@ -16,9 +18,14 @@ type ProvidersDialogProps = {
 }
 
 export function ProvidersDialog({ open, onOpenChange }: ProvidersDialogProps) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(85dvh,680px)] w-[min(640px,92vw)] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden p-0">
+      <DialogContent
+        className="flex h-[min(85dvh,680px)] w-[min(640px,92vw)] max-h-[calc(100dvh-3rem)] flex-col overflow-hidden p-0"
+        initialFocus={closeButtonRef}
+      >
         <div className="flex items-start justify-between border-b border-[var(--theme-border)] p-4 pb-3">
           <div>
             <DialogTitle className="mb-1 text-balance">Providers</DialogTitle>
@@ -29,6 +36,7 @@ export function ProvidersDialog({ open, onOpenChange }: ProvidersDialogProps) {
           <DialogClose
             render={
               <Button
+                ref={closeButtonRef}
                 size="icon-sm"
                 variant="ghost"
                 className="text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]"

@@ -1004,7 +1004,7 @@ export function Swarm2Screen() {
   const [addSwarmSaving, setAddSwarmSaving] = useState(false)
   const [addSwarmError, setAddSwarmError] = useState<string | null>(null)
   const modelsQuery = useQuery({
-    queryKey: ['swarm2', 'available-models'],
+    queryKey: ['models'],
     queryFn: fetchAvailableModels,
     staleTime: 60_000,
     refetchOnWindowFocus: false,

@@ -1,6 +1,7 @@
 'use client'
 
 import { AlertDialog } from '@base-ui/react/alert-dialog'
+
 import { Button } from './button'
 import { cn } from '@/lib/utils'
 
@@ -16,12 +17,16 @@ function AlertDialogTrigger({ className, ...props }: AlertDialogTriggerProps) {
   return <AlertDialog.Trigger className={cn(className)} {...props} />
 }
 
-type AlertDialogContentProps = {
+type AlertDialogContentProps = React.ComponentProps<typeof AlertDialog.Popup> & {
   className?: string
   children: React.ReactNode
 }
 
-function AlertDialogContent({ className, children }: AlertDialogContentProps) {
+function AlertDialogContent({
+  className,
+  children,
+  ...popupProps
+}: AlertDialogContentProps) {
   return (
     <AlertDialog.Portal>
       <AlertDialog.Backdrop
@@ -41,6 +46,7 @@ function AlertDialogContent({ className, children }: AlertDialogContentProps) {
           background: 'var(--theme-panel)',
           borderColor: 'var(--theme-border)',
         }}
+        {...popupProps}
       >
         {children}
       </AlertDialog.Popup>

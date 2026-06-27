@@ -38,6 +38,7 @@ import {
 import { cn } from '@/lib/utils'
 import { CHAT_SUBMIT_SELECTION_EVENT } from '@/screens/chat/chat-events'
 import { useArtifactPanel } from '@/screens/chat/contexts/artifact-panel-context'
+import { readStringArg } from './tool-arg-utils'
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
@@ -545,20 +546,6 @@ function readExecNotification(message: ChatMessage): ExecNotification | null {
     exitCode,
     ok,
   }
-}
-
-function readStringArg(
-  args: Record<string, unknown> | undefined,
-  ...keys: Array<string>
-): string | null {
-  if (!args) return null
-  for (const key of keys) {
-    const value = args[key]
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim()
-    }
-  }
-  return null
 }
 
 function fileNameFromPath(value: string): string {

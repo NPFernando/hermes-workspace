@@ -732,7 +732,7 @@ export function Conductor() {
   const [directoryBrowserLoading, setDirectoryBrowserLoading] = useState(false)
   const [directoryBrowserError, setDirectoryBrowserError] = useState<string | null>(null)
   const modelsQuery = useQuery({
-    queryKey: ['conductor', 'models'],
+    queryKey: ['models'],
     queryFn: async () => {
       const res = await fetch('/api/models')
       const data = (await res.json()) as {

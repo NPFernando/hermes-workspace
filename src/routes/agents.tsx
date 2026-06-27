@@ -1,11 +1,5 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { usePageTitle } from '@/hooks/use-page-title'
-import { AgentsScreen } from '@/screens/agents/agents-screen'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/agents')({
-  ssr: false,
-  component: function AgentsRoute() {
-    usePageTitle('Agent Team')
-    return <AgentsScreen />
-  },
+  beforeLoad: () => { throw redirect({ to: '/command' }) },
 })

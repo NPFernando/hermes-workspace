@@ -5,7 +5,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, Loading03Icon, PlayIcon, RefreshIcon, Search01Icon  } from '@hugeicons/core-free-icons'
+import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, Delete01Icon, Loading03Icon, RefreshIcon, Search01Icon } from '@hugeicons/core-free-icons'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
 import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority, UpdateTaskInput } from '@/lib/tasks-api'
@@ -69,7 +69,9 @@ export function TasksScreen() {
   const [askingAstra, setAskingAstra] = useState(false)
   const [ideasLoading, setIdeasLoading] = useState(false)
   const [clearingStuck, setClearingStuck] = useState(false)
+  const [checkingCompletion, setCheckingCompletion] = useState(false)
   const [breakingDownId, setBreakingDownId] = useState<string | null>(null)
+  const [pruningStale, setPruningStale] = useState(false)
 
   const search = useSearch({ from: '/tasks' })
   const navigate = useNavigate()
@@ -87,6 +89,8 @@ export function TasksScreen() {
   } | null>(null)
   // Snapshot of column/priority taken when Deploy Agents fires; cleared when agents finish
   const [deploySnapshot, setDeploySnapshot] = useState<Partial<Record<string, { column: TaskColumn; priority: TaskPriority }>> | null>(null)
+  // Becomes true when we observe at least one agent_state → ensures we don't fire summary before agents start
+  const [agentsEverActive, setAgentsEverActive] = useState(false)
 
   // — Search + filter state
   const [searchQuery, setSearchQuery] = useState('')
@@ -113,17 +117,6 @@ export function TasksScreen() {
     queryKey: ASSIGNEES_KEY,
     queryFn: fetchAssignees,
     staleTime: 5 * 60_000,
-  })
-
-  const creditsQuery = useQuery({
-    queryKey: ['openrouter', 'credits'],
-    queryFn: async () => {
-      const res = await fetch('/api/openrouter-credits')
-      if (!res.ok) return null
-      return res.json() as Promise<{ remaining: number; level: 'ok' | 'warning' | 'critical' | 'exhausted' }>
-    },
-    staleTime: 30 * 60_000,
-    refetchInterval: 60 * 60_000,
   })
 
   const assignees: Array<TaskAssignee> = assigneesQuery.data?.assignees ?? []
@@ -292,11 +285,16 @@ export function TasksScreen() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  // Agent deploy summary — fires when all agent_state clears after Deploy Agents was clicked.
-  // Guard on !astraReviewing so we don't fire before agents have even started.
+  // Agent deploy summary — waits for agents to start (agentsEverActive) then fires when all clear.
   useEffect(() => {
-    if (!deploySnapshot || astraReviewing) return
+    if (!deploySnapshot) return
     const anyActive = tasks.some(t => t.agent_state)
+    // Phase 1: agents not yet started — wait until we see at least one spinner
+    if (!agentsEverActive) {
+      if (anyActive) setAgentsEverActive(true)
+      return
+    }
+    // Phase 2: agents have started — wait until all clear
     if (anyActive) return
     // All agents finished — compute diff vs snapshot
     let movedToReady = 0
@@ -321,7 +319,8 @@ export function TasksScreen() {
       toast(parts.join(' · '))
     }
     setDeploySnapshot(null)
-  }, [tasks, deploySnapshot, astraReviewing])
+    setAgentsEverActive(false)
+  }, [tasks, deploySnapshot, agentsEverActive])
 
   function handleDragStart(e: React.DragEvent, taskId: string) {
     e.dataTransfer.setData('text/plain', taskId)
@@ -419,23 +418,6 @@ export function TasksScreen() {
                 </span>
               </>
             )}
-            {creditsQuery.data && creditsQuery.data.level !== 'ok' && (
-              <>
-                <span>·</span>
-                <span
-                  title={`OpenRouter paid credits: $${creditsQuery.data.remaining} remaining`}
-                  className={cn(
-                    'flex items-center gap-1 font-medium',
-                    creditsQuery.data.level === 'exhausted' ? 'text-red-400' :
-                    creditsQuery.data.level === 'critical'  ? 'text-red-400' :
-                                                              'text-amber-400',
-                  )}
-                >
-                  {creditsQuery.data.level === 'exhausted' ? '🚫' : creditsQuery.data.level === 'critical' ? '🔴' : '🟡'}
-                  OR ${creditsQuery.data.remaining}
-                </span>
-              </>
-            )}
           </div>
         </div>
 
@@ -499,6 +481,7 @@ export function TasksScreen() {
               const snapshot: Record<string, { column: TaskColumn; priority: TaskPriority }> = {}
               for (const t of tasks) snapshot[t.id] = { column: t.column, priority: t.priority }
               setDeploySnapshot(snapshot)
+              setAgentsEverActive(false)
               setAstraReviewing(true)
               try {
                 await fetch('/api/tasks-deploy-agents', { method: 'POST' })
@@ -541,6 +524,32 @@ export function TasksScreen() {
             </button>
           )}
 
+          {/* Check Completion — only shown when there are tasks to check */}
+          {tasks.some(t => t.column === 'review' || t.column === 'in_progress') && (
+            <button
+              onClick={async () => {
+                setCheckingCompletion(true)
+                try {
+                  await fetch('/api/tasks-completion-check', { method: 'POST' })
+                  await tasksQuery.refetch()
+                } finally {
+                  setCheckingCompletion(false)
+                }
+              }}
+              disabled={checkingCompletion}
+              title="Astra reviews tasks in Review/In Progress and marks them Done if implementation is confirmed deployed"
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                checkingCompletion
+                  ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400 cursor-wait'
+                  : 'border-[var(--theme-border)] text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50',
+              )}
+            >
+              <HugeiconsIcon icon={CheckListIcon} size={13} strokeWidth={1.8} className={checkingCompletion ? 'animate-pulse' : ''} />
+              {checkingCompletion ? 'Checking…' : 'Check Done'}
+            </button>
+          )}
+
           {/* AI idea generation */}
           <button
             onClick={async () => {
@@ -574,6 +583,41 @@ export function TasksScreen() {
             <HugeiconsIcon icon={BulbIcon} size={13} strokeWidth={1.8} className={ideasLoading ? 'animate-pulse' : ''} />
             {ideasLoading ? 'Scanning…' : 'Add Idea'}
           </button>
+
+          {/* Prune Stale — only shown when there are backlog/todo tasks that could be pruned */}
+          {tasks.some(t => (t.column === 'backlog' || t.column === 'todo') && !(t.agent_history?.length)) && <button
+            onClick={async () => {
+              if (!window.confirm('Delete todo/backlog tasks with no agent history older than 2 hours? Duplicates and stale AI-generated tasks will be removed.')) return
+              setPruningStale(true)
+              try {
+                const res = await fetch('/api/tasks-prune', { method: 'POST' })
+                const data = await res.json() as { ok: boolean; pruned: number; error?: string }
+                if (data.pruned > 0) {
+                  await tasksQuery.refetch()
+                  toast(`Pruned ${data.pruned} stale task${data.pruned !== 1 ? 's' : ''}`)
+                } else if (data.error) {
+                  toast(`Prune failed: ${data.error}`, { type: 'error' })
+                } else {
+                  toast('No stale tasks to prune', { type: 'info' })
+                }
+              } catch {
+                toast('Failed to reach prune endpoint', { type: 'error' })
+              } finally {
+                setPruningStale(false)
+              }
+            }}
+            disabled={pruningStale}
+            title="Remove unprocessed auto-generated todo/backlog tasks older than 2 hours"
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+              pruningStale
+                ? 'border-red-500/50 bg-red-500/10 text-red-400 cursor-wait'
+                : 'border-[var(--theme-border)] text-red-400/70 hover:bg-red-500/10 hover:border-red-500/40',
+            )}
+          >
+            <HugeiconsIcon icon={Delete01Icon} size={13} strokeWidth={1.8} className={pruningStale ? 'animate-pulse' : ''} />
+            {pruningStale ? 'Pruning…' : 'Prune Stale'}
+          </button>}
 
           <button
             onClick={() => setShowDone(v => !v)}
@@ -672,9 +716,6 @@ export function TasksScreen() {
             {nlParsing ? '✦ Thinking…' : '✦ Create'}
           </button>
         </div>
-        <p className="mt-3 text-xs text-[var(--theme-muted)]">
-          {TASKS_BOARD_HELP_TEXT}
-        </p>
       </header>
 
       {/* Search + Filter Bar */}

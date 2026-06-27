@@ -16,5 +16,23 @@
     "description": "Configure a dependency update bot (like Renovate) to automatically create pull requests for outdated dependencies, keeping the project secure and up-to-date.",
     "category": "backend",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Exclude E2E and Node TAP fixtures from default Vitest glob",
+    "description": "Adjust the default unit-test command or Vitest include/exclude rules so Playwright specs and services/odysseus Node TAP .mjs files do not make pnpm test fail when their dedicated runners/dependencies are not installed.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Ratchet repo-wide ESLint baseline with focused clusters",
+    "description": "Reduce the current repo-wide ESLint backlog by fixing one small cluster per cycle, starting with import ordering in touched task/notification files and stale react-hooks disable comments.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add dialog keyboard interaction tests",
+    "description": "Add focused tests for ContextAlertModal, ProvidersDialog, and SessionDeleteDialog to verify initial focus, Escape close behavior, and Enter primary-action handling.",
+    "category": "ui",
+    "estimated_effort": "medium"
   }
 ]

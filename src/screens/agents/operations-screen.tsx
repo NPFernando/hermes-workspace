@@ -1,4 +1,5 @@
-import {  useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import {
   AiBrain03Icon,
@@ -180,10 +181,15 @@ export function OperationsScreen() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsAgentId, setSettingsAgentId] = useState<string | null>(null)
   const [view, setView] = useState<'overview' | 'outputs'>('overview')
-  const [agentBusHealth, setAgentBusHealth] = useState<AgentBusHealth | null>(null)
-  const [agentBusError, setAgentBusError] = useState<string | null>(null)
-  const [agentBusPending, setAgentBusPending] = useState(true)
-  const [healthLastChecked, setHealthLastChecked] = useState<number | null>(null)
+  const agentBusQuery = useQuery({
+    queryKey: ['agent-bus'],
+    queryFn: async () => {
+      const res = await fetch('/api/agent-bus', { headers: { Accept: 'application/json' } })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json() as Promise<AgentBusHealth>
+    },
+    refetchInterval: 30_000,
+  })
   const {
     agents,
     recentActivity,
@@ -200,39 +206,6 @@ export function OperationsScreen() {
     deleteAgent,
     isDeletingAgent,
   } = useOperations()
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadAgentBusHealth() {
-      setAgentBusPending(true)
-      try {
-        const response = await fetch('/api/agent-bus', {
-          headers: { Accept: 'application/json' },
-        })
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        const payload = (await response.json()) as AgentBusHealth
-        if (cancelled) return
-        setAgentBusHealth(payload)
-        setAgentBusError(null)
-      } catch (err) {
-        if (cancelled) return
-        setAgentBusError(err instanceof Error ? err.message : 'Agent Bus failed')
-      } finally {
-        if (!cancelled) {
-          setAgentBusPending(false)
-          setHealthLastChecked(Date.now())
-        }
-      }
-    }
-
-    void loadAgentBusHealth()
-    const timer = window.setInterval(() => void loadAgentBusHealth(), 30_000)
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-    }
-  }, [])
 
   // Split: AI sisters + delegation profiles first (sorted by priority), then others
   const { sisterAgents } = useMemo(() => {
@@ -364,10 +337,10 @@ export function OperationsScreen() {
                 sistersPending={sistersQuery.isPending}
                 sistersError={sistersQuery.error}
                 sistersCount={sistersQuery.data?.length ?? 0}
-                agentBus={agentBusHealth}
-                agentBusPending={agentBusPending}
-                agentBusError={agentBusError}
-                lastChecked={healthLastChecked}
+                agentBus={agentBusQuery.data ?? null}
+                agentBusPending={agentBusQuery.isPending}
+                agentBusError={agentBusQuery.error instanceof Error ? agentBusQuery.error.message : null}
+                lastChecked={agentBusQuery.dataUpdatedAt || null}
               />
             </motion.div>
 

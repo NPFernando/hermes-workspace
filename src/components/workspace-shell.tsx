@@ -39,6 +39,7 @@ import { MobilePageHeader } from '@/components/mobile-page-header'
 
 import { MobileTerminalInput } from '@/components/terminal/mobile-terminal-input'
 import { ClaudeReconnectBanner } from '@/components/claude-reconnect-banner'
+import { OpenRouterCreditsBanner } from '@/components/openrouter-credits-banner'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { CommandPalette } from '@/components/command-palette'
@@ -188,6 +189,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (pathname.startsWith('/files')) return 'Files'
     if (pathname.startsWith('/jobs')) return 'Jobs'
     if (pathname.startsWith('/tasks')) return 'Tasks'
+    if (pathname.startsWith('/vt-capital')) return 'VT Capital'
     if (pathname.startsWith('/conductor')) return 'Conductor'
     if (pathname.startsWith('/command')) return 'Command Center'
     if (pathname.startsWith('/operations')) return 'Operations'
@@ -358,6 +360,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         style={shellStyle}
       >
         <ClaudeReconnectBanner enabled={authState.checked} />
+        <OpenRouterCreditsBanner />
         {/* Electron: native-style title bar (absolute over the padding) */}
         {isElectron && (
           <div

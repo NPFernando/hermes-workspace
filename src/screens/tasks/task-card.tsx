@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Delete01Icon, MoreVerticalIcon, PlayIcon, Rocket01Icon, SplitIcon } from '@hugeicons/core-free-icons'
 import type { ClaudeTask, TaskAgentState, TaskColumn, TaskPriority } from '@/lib/tasks-api'
@@ -40,8 +40,7 @@ export function formatTaskAssigneeLabel(
   assignee: string | null,
   assigneeLabels: Record<string, string>,
 ): string {
-  const resolvedLabel = assignee ? (assigneeLabels[assignee] ?? assignee) : 'Unassigned'
-  return `Assignee: ${resolvedLabel}`
+  return assignee ? (assigneeLabels[assignee] ?? assignee) : ''
 }
 
 const AGENT_STATE_CONFIG: Record<
@@ -90,7 +89,7 @@ function SourceBadge({ source }: { source: ClaudeTask['source'] }) {
   )
 }
 
-export function TaskCard({
+export const TaskCard = memo(function TaskCard({
   task,
   assigneeLabels = {},
   onClick,
@@ -146,22 +145,11 @@ export function TaskCard({
       )}
       style={{ borderLeftWidth: 3, borderLeftColor: priorityColor }}
     >
-      {/* Priority dot */}
-      <span
-        className="absolute top-2.5 right-10 w-2 h-2 rounded-full shrink-0"
-        style={{ background: priorityColor }}
-        title={`Priority: ${task.priority}`}
-      />
-
-      {/* Agent state gradient banner — click to toggle activity panel */}
+      {/* Agent state gradient banner — decorative only; badge below is the click target */}
       {isAgentActive && (
-        <button
-          type="button"
-          aria-label="Toggle agent activity"
-          onClick={(e) => { e.stopPropagation(); setActivityOpen(v => { if (!v) onRequestRefresh?.(); return !v }) }}
-          className="absolute inset-x-0 top-0 h-1 rounded-t-lg w-full cursor-pointer"
+        <div
+          className="absolute inset-x-0 top-0 h-1 rounded-t-lg w-full pointer-events-none"
           style={{ background: stuck ? 'linear-gradient(90deg, #ef4444, #f97316)' : 'linear-gradient(90deg, #a855f7, #3b82f6, #a855f7)', backgroundSize: '200%' }}
-          title={activityOpen ? 'Hide agent activity' : 'Show agent activity'}
         />
       )}
 
@@ -495,19 +483,21 @@ export function TaskCard({
 
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
-            {task.assignee && onAssigneeClick ? (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onAssigneeClick(task.assignee!) }}
-                className="text-[10px] px-1.5 py-0.5 rounded-md transition-colors hover:outline hover:outline-1 hover:outline-[var(--theme-accent)] bg-[var(--theme-hover)] text-[var(--theme-muted)]"
-                title="Filter by this assignee"
-              >
-                {assigneeLabel}
-              </button>
-            ) : (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]">
-                {assigneeLabel}
-              </span>
+            {task.assignee && assigneeLabel && (
+              onAssigneeClick ? (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onAssigneeClick(task.assignee!) }}
+                  className="text-[10px] px-1.5 py-0.5 rounded-md transition-colors hover:outline hover:outline-1 hover:outline-[var(--theme-accent)] bg-[var(--theme-hover)] text-[var(--theme-muted)]"
+                  title="Filter by this assignee"
+                >
+                  {assigneeLabel}
+                </button>
+              ) : (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]">
+                  {assigneeLabel}
+                </span>
+              )
             )}
             {visibleTags.map((tag) => (
               <button
@@ -552,4 +542,4 @@ export function TaskCard({
       </div>
     </div>
   )
-}
+})

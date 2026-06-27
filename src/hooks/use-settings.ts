@@ -30,6 +30,8 @@ export type StudioSettings = {
   mobileChatNavMode: 'dock' | 'integrated' | 'scroll-hide'
   /** Hidden experimental: show Echo Studio (dashboard builder scaffold) in nav. Off by default. */
   experimentalEchoStudio: boolean
+  /** Hidden experimental: enable Agora spatial collaboration screen. Off by default. */
+  experimentalAgora: boolean
 }
 
 type SettingsState = {
@@ -57,6 +59,7 @@ export const defaultStudioSettings: StudioSettings = {
   interfaceDensity: 'comfortable',
   mobileChatNavMode: 'dock',
   experimentalEchoStudio: false,
+  experimentalAgora: false,
 }
 
 export const useSettingsStore = create<SettingsState>()(

@@ -2,8 +2,8 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   BrainIcon,
-  Building01Icon,
   Cancel01Icon,
+  ChartCandleIcon,
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
@@ -70,6 +70,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     icon: Clock01Icon,
     to: '/jobs',
     match: (p: string) => p.startsWith('/jobs'),
+  },
+  {
+    id: 'vt-capital',
+    label: 'VT Capital',
+    icon: ChartCandleIcon,
+    to: '/vt-capital',
+    match: (p: string) => p.startsWith('/vt-capital'),
   },
   {
     id: 'command',

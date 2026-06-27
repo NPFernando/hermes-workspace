@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Chat01Icon, Rocket01Icon, Settings01Icon } from '@hugeicons/core-free-icons'
@@ -239,29 +239,18 @@ export function CommandCenterScreen() {
   } = useOperations()
 
   // Agent bus health (polled)
-  const [agentBus, setAgentBus] = useState<AgentBusHealth | null>(null)
-  const [agentBusPending, setAgentBusPending] = useState(true)
-  const [agentBusError, setAgentBusError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    async function poll() {
-      setAgentBusPending(true)
-      try {
-        const res = await fetch('/api/agent-bus', { headers: { Accept: 'application/json' } })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const payload = (await res.json()) as AgentBusHealth
-        if (!cancelled) { setAgentBus(payload); setAgentBusError(null) }
-      } catch (err) {
-        if (!cancelled) setAgentBusError(err instanceof Error ? err.message : 'Agent Bus error')
-      } finally {
-        if (!cancelled) setAgentBusPending(false)
-      }
-    }
-    void poll()
-    const timer = window.setInterval(() => void poll(), 30_000)
-    return () => { cancelled = true; window.clearInterval(timer) }
-  }, [])
+  const agentBusQuery = useQuery({
+    queryKey: ['agent-bus'],
+    queryFn: async () => {
+      const res = await fetch('/api/agent-bus', { headers: { Accept: 'application/json' } })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json() as Promise<AgentBusHealth>
+    },
+    refetchInterval: 30_000,
+  })
+  const agentBus = agentBusQuery.data ?? null
+  const agentBusPending = agentBusQuery.isPending
+  const agentBusError = agentBusQuery.error instanceof Error ? agentBusQuery.error.message : null
 
   // Derived data
   const sisters = sistersQuery.data ?? []

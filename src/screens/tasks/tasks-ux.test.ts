@@ -10,10 +10,8 @@ describe('tasks UX copy', () => {
     )
   })
 
-  it('formats assignee labels explicitly for assigned and unassigned tasks', () => {
-    expect(formatTaskAssigneeLabel('jarvis', { jarvis: 'Jarvis' })).toBe(
-      'Assignee: Jarvis',
-    )
-    expect(formatTaskAssigneeLabel(null, {})).toBe('Assignee: Unassigned')
+  it('formats assignee labels for assigned tasks and returns empty string for unassigned', () => {
+    expect(formatTaskAssigneeLabel('jarvis', { jarvis: 'Jarvis' })).toBe('Jarvis')
+    expect(formatTaskAssigneeLabel(null, {})).toBe('')
   })
 })

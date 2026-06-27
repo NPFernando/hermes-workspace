@@ -1,6 +1,7 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useRef } from 'react'
+
 import { DialogContent, DialogRoot } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
@@ -37,6 +38,18 @@ function ContextAlertModalComponent({
       ? 'text-amber-600'
       : 'text-amber-600'
 
+  const gotItButtonRef = useRef<HTMLButtonElement | null>(null)
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter') {
+      gotItButtonRef.current?.click()
+      event.preventDefault()
+    } else if (event.key === 'Escape') {
+      onClose()
+      event.preventDefault()
+    }
+  }
+
   return (
     <DialogRoot
       open={open}
@@ -44,7 +57,11 @@ function ContextAlertModalComponent({
         if (!o) onClose()
       }}
     >
-      <DialogContent className="w-[min(440px,92vw)] p-0 overflow-hidden">
+      <DialogContent
+        className="w-[min(440px,92vw)] p-0 overflow-hidden"
+        initialFocus={gotItButtonRef}
+        onKeyDown={handleKeyDown}
+      >
         {/* Colored top bar */}
         <div className={cn('h-1.5 w-full', barColor)} />
 
@@ -135,6 +152,7 @@ function ContextAlertModalComponent({
           {/* Actions */}
           <div className="flex justify-end gap-2">
             <button
+              ref={gotItButtonRef}
               onClick={onClose}
               className="rounded-lg border border-[var(--theme-border)] bg-surface px-4 py-2 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-panel)] transition-colors"
             >

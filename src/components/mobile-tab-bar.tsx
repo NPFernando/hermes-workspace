@@ -2,7 +2,7 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   BrainIcon,
-  Building01Icon,
+  ChartCandleIcon,
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
@@ -88,6 +88,13 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     icon: Clock01Icon,
     to: '/jobs',
     match: (p) => p.startsWith('/jobs'),
+  },
+  {
+    id: 'vt-capital',
+    label: 'Capital',
+    icon: ChartCandleIcon,
+    to: '/vt-capital',
+    match: (p) => p.startsWith('/vt-capital'),
   },
   {
     id: 'swarm',

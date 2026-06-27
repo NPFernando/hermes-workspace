@@ -4,7 +4,7 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   BrainIcon,
-  Building01Icon,
+  ChartCandleIcon,
   Chat01Icon,
   CheckListIcon,
   Clock01Icon,
@@ -579,7 +579,6 @@ function ChatSidebarComponent({
   const isSkillsActive = pathname === '/skills'
   const isMcpActive = pathname === '/mcp'
   const isFilesActive = pathname === '/files'
-  const isAgoraActive = pathname === '/agora'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
   const isMemoryActive = pathname === '/memory'
@@ -588,6 +587,7 @@ function ChatSidebarComponent({
   const isCommandActive = pathname.startsWith('/command')
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
   const isResearchActive = pathname.startsWith('/research')
+  const isVtCapitalActive = pathname.startsWith('/vt-capital')
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
   )
@@ -603,7 +603,6 @@ function ChatSidebarComponent({
 
   const mainNav = getLastRoute('main') || '/chat'
   const knowledgeNav = getLastRoute('knowledge') || '/memory'
-  const _systemNav = getLastRoute('system') || '/settings'
 
   const transition = {
     duration: 0.15,
@@ -618,10 +617,6 @@ function ChatSidebarComponent({
   const [knowledgeExpanded, toggleKnowledge] = usePersistedBool(
     'claude-sidebar-knowledge-expanded',
     true,
-  )
-  const [_systemExpanded, _toggleSystem] = usePersistedBool(
-    'claude-sidebar-system-expanded',
-    false,
   )
 
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
@@ -834,6 +829,13 @@ function ChatSidebarComponent({
       icon: CheckListIcon,
       label: 'Tasks',
       active: isTasksActive,
+    },
+    {
+      kind: 'link',
+      to: '/vt-capital',
+      icon: ChartCandleIcon,
+      label: 'VT Capital',
+      active: isVtCapitalActive,
     },
     {
       kind: 'link',
