@@ -245,7 +245,14 @@ export function MobileTabBar() {
     if (!container) return
     const activeBtn = container.querySelector<HTMLElement>('[aria-current="page"]')
     if (activeBtn) {
-      activeBtn.scrollIntoView({ inline: 'center', behavior: 'smooth', block: 'nearest' })
+      const prefersReducedMotion = window.matchMedia(
+        '(prefers-reduced-motion: reduce)',
+      ).matches
+      activeBtn.scrollIntoView({
+        inline: 'center',
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        block: 'nearest',
+      })
     }
   }, [pathname])
 
@@ -320,7 +327,7 @@ export function MobileTabBar() {
                   }
                 }}
                 aria-current={isActive ? 'page' : undefined}
-                aria-label={tab.label}
+                aria-label={isActive ? `${tab.label} (current page)` : tab.label}
                 className={cn(
                   // 40x40 touch target (slightly smaller to fit 5 tabs)
                   'flex items-center justify-center',

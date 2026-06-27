@@ -2,51 +2,67 @@
   "tests_passed": false,
   "lint_errors": 209,
   "passed": true,
-  "timestamp_utc": "2026-06-27T06:42:42.646921+00:00",
+  "timestamp_utc": "2026-06-27T12:37:09.008032+00:00",
+  "selected_idea": "Respect reduced motion in mobile tab navigation",
+  "changed_files": [
+    "src/components/mobile-tab-bar.tsx",
+    "IDEAS.json",
+    "PLAN.md"
+  ],
   "verification": {
+    "node_version": "v22.22.3",
+    "diff_check": {
+      "command": "git diff --check",
+      "passed": true
+    },
     "typescript": {
       "command": "npx tsc --noEmit --pretty false",
       "passed": true
     },
-    "focused_tests": {
-      "command": "npx vitest run src/components/slash-command-menu.test.tsx src/screens/chat/components/chat-message-list.test.tsx src/routes/-root-runtime-guards.test.ts",
-      "passed": true,
-      "tests": "11 passed"
-    },
-    "full_tests": {
-      "command": "pnpm test",
-      "passed": false,
-      "summary": "109 files passed; 712 tests passed; 5 suite-level failures from missing @playwright/test in e2e specs and Node TAP .mjs files collected by Vitest"
-    },
-    "focused_eslint": {
-      "command": "npx eslint -f json <touched dialog/root/slash/chat-list files>",
+    "focused_lint": {
+      "command": "npx eslint -f json src/components/mobile-tab-bar.tsx",
       "passed": true,
       "errors": 0,
       "warnings": 0
-    },
-    "repo_lint": {
-      "command": "pnpm lint",
-      "passed": false,
-      "errors": 209,
-      "warnings": 102,
-      "summary": "repo-wide baseline debt remains outside focused dialog/root/slash/chat-list gate"
-    },
-    "class_token_smoke": {
-      "command": "pnpm -s lint:class-tokens",
-      "passed": true
     },
     "build": {
       "command": "pnpm build",
       "passed": true
     },
-    "diff_check": {
-      "command": "git diff --check",
-      "passed": true
+    "full_test_suite": {
+      "command": "pnpm test",
+      "passed": false,
+      "exit_code": 1,
+      "baseline_issue": true,
+      "summary": "712 assertions passed across 109 Vitest files; suite exits non-zero because Vitest collects Playwright e2e specs without @playwright/test and Odysseus TAP .mjs files with no Vitest suite."
+    },
+    "repo_lint": {
+      "command": "pnpm lint",
+      "passed": false,
+      "exit_code": 1,
+      "baseline_issue": true,
+      "errors": 209,
+      "warnings": 102,
+      "summary": "Repo-wide baseline lint debt is outside this mobile-tab-bar change; focused lint on the touched source file has zero errors."
     }
   },
   "notes": [
-    "Focused gates for the implemented keyboard-navigation and small test-stabilization files are clean.",
-    "Full pnpm test has no failing assertions after fixes; remaining failures are suite collection/environment issues documented for a follow-up config cycle.",
-    "Full pnpm lint still reports existing baseline debt; focused touched-file ESLint is clean."
-  ]
+    "hermes dispatch-mission is not available in this Hermes CLI, so the cron cycle was executed manually against the mission phases.",
+    "Pre-existing dirty gitlink/submodule state remains in services/odysseus and was not staged."
+  ],
+  "deployment": {
+    "service_restarted": true,
+    "service": "hermes-workspace.service",
+    "service_active": true,
+    "health_check": {
+      "url": "https://agent.fernandofamily.com/api/health",
+      "status": 200,
+      "content_type": "application/json",
+      "body": {
+        "status": "ok"
+      },
+      "passed": true
+    },
+    "timestamp_utc": "2026-06-27T12:38:06.628422+00:00"
+  }
 }
