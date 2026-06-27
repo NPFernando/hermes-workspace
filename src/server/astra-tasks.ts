@@ -5,6 +5,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { createTask, getTask, listTasks, updateTask } from './tasks-store'
 import { openaiChat } from './openai-compat-api'
+import { sendTelegramClarification, sendTelegramTaskDone } from './telegram-clarify'
 import type { ActivityEntry, TaskColumn, TaskPriority, TaskRecord } from './tasks-store'
 
 // ---------------------------------------------------------------------------
@@ -558,6 +559,55 @@ function sendTelegram(msg) {
   try { spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q', msg], { encoding: 'utf-8', timeout: 15_000 }); } catch {}
 }
 
+async function sendTelegramClarificationKeyboard(taskId, taskTitle, questions) {
+  let token = '';
+  try {
+    const envPath = path.join(os.homedir(), '.hermes', '.env');
+    const envContent = fs.readFileSync(envPath, 'utf-8');
+    const match = envContent.match(/^TELEGRAM_BOT_TOKEN=(.+)$/m);
+    token = match ? match[1].trim() : '';
+  } catch {}
+  if (!token) { sendTelegram('❓ Clarification needed\\nTask: ' + taskTitle); return; }
+  const relayBase = 'https://tg-api.fernandofamily.com/8c778d763c97aa414644fc5bd95da90a';
+  const chatId = 2130622225;
+  const taskPrefix = taskId.replace(/-/g, '').slice(0, 12);
+  function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  let text = '❓ <b>Clarification needed</b>\\n<b>Task:</b> ' + escHtml(taskTitle) + '\\n\\n';
+  const keyboard = [];
+  const pendingApp = [];
+  questions.forEach(function(q, qi) {
+    text += '<b>Q' + (qi + 1) + '.</b> ' + escHtml(q.question) + '\\n';
+    if (q.options && q.options.length > 0) {
+      const row = q.options.map(function(opt, oi) {
+        return { text: opt, callback_data: 'task:' + taskPrefix + ':' + qi + ':' + oi };
+      });
+      row.push({ text: '✏️ Custom', url: 'https://agent.fernandofamily.com/tasks?task=' + taskId });
+      keyboard.push(row);
+    } else {
+      pendingApp.push('Q' + (qi + 1));
+    }
+  });
+  if (pendingApp.length > 0) {
+    text += '\\n<i>' + pendingApp.join(', ') + ': reply to this message with your answer.</i>\\n';
+    keyboard.push([{ text: '🔗 Open task', url: 'https://agent.fernandofamily.com/tasks?task=' + taskId }]);
+  }
+  try {
+    const res = await fetch(relayBase + '/bot' + token + '/sendMessage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } }),
+    });
+    const data = await res.json();
+    if (data.ok && data.result && data.result.message_id) {
+      updateTaskDirect(taskId, { clarify_tg: { chat_id: chatId, message_id: data.result.message_id } });
+    } else {
+      sendTelegram('\\u2753 Clarification needed\\nTask: ' + taskTitle);
+    }
+  } catch (e) {
+    sendTelegram('\\u2753 Clarification needed\\nTask: ' + taskTitle);
+  }
+}
+
 // Shared WORK_SUMMARY parser used for auto-execution results
 function parseWorkSummary(output, stderr, exitCode) {
   let status = 'partial', summary = '', next = '', question = '';
@@ -1016,9 +1066,11 @@ export function executeTaskBackground(taskId: string): void {
       'STATUS: partial\n' +
       'SUMMARY: [updated 1-2 sentence status]\n' +
       'NEXT: [next concrete action]\n' +
-      'QUESTION: [only if you need input from Naveen]\n' +
+      'QUESTIONS: [{"id":"q1","q":"Which approach?","options":["Option A","Option B","Option C"]},{"id":"q2","q":"Free-form question?"}]\n' +
+      '  — only if STATUS is needs_input; omit otherwise. Include "options" array (2-4 short choices) when answers are enumerable; omit "options" for open-ended questions.\n' +
       '</WORK_SUMMARY>\n\n' +
-      'STATUS options: partial, done, blocked, needs_input'
+      'STATUS options: partial, done, blocked, needs_input\n' +
+      'When needs_input: emit QUESTIONS (1-4). On resume, if answers satisfy all gaps, proceed.'
   } else {
     // Initial analysis mode
     systemMsg =
@@ -1032,9 +1084,11 @@ export function executeTaskBackground(taskId: string): void {
       'SUMMARY: [1-2 sentences on what this involves and the approach]\n' +
       'CHANGES: [step 1; step 2; step 3]\n' +
       'NEXT: [single most important first action]\n' +
-      'QUESTION: [only if STATUS is needs_input]\n' +
+      'QUESTIONS: [{"id":"q1","q":"Which approach?","options":["Option A","Option B"]},{"id":"q2","q":"Open-ended question?"}]\n' +
+      '  — only if STATUS is needs_input; omit otherwise. Include "options" (2-4 short choices) when enumerable; omit for open-ended.\n' +
       '</WORK_SUMMARY>\n\n' +
-      'STATUS: partial | done | blocked | needs_input'
+      'STATUS: partial | done | blocked | needs_input\n' +
+      'When needs_input: emit QUESTIONS (1-4). On resume with answers, proceed.'
   }
 
   void (async () => {
@@ -1078,6 +1132,7 @@ export function executeTaskBackground(taskId: string): void {
     let changes = ''
     let next = ''
     let question = ''
+    let clarificationQs: Array<{ id: string; q: string; options?: Array<string> }> = []
 
     // Parse WORK_SUMMARY block — accepts both wrapped (<WORK_SUMMARY>…</WORK_SUMMARY>)
     // and unwrapped (bare STATUS:/SUMMARY: lines) since some models drop the XML tags.
@@ -1091,12 +1146,22 @@ export function executeTaskBackground(taskId: string): void {
       const suMatch = parseSource.match(/SUMMARY:\s*(.+)/i)
       const chMatch = parseSource.match(/CHANGES:\s*(.+)/i)
       const nxMatch = parseSource.match(/NEXT:\s*(.+)/i)
-      const qMatch = parseSource.match(/QUESTION:\s*(.+)/i)
       if (smMatch) status = smMatch[1].toLowerCase()
       if (suMatch) summary = suMatch[1].trim().replace(/^\[|\]$/g, '')
       if (chMatch) changes = chMatch[1].trim().replace(/^\[|\]$/g, '')
       if (nxMatch) next = nxMatch[1].trim().replace(/^\[|\]$/g, '')
-      if (qMatch) question = qMatch[1].trim().replace(/^\[|\]$/g, '')
+      // Parse structured QUESTIONS array first; fall back to legacy QUESTION: line
+      const qsMatch = parseSource.match(/QUESTIONS:\s*(\[[\s\S]*?\])/i)
+      if (qsMatch) {
+        try { clarificationQs = JSON.parse(qsMatch[1]) as Array<{ id: string; q: string }> } catch { /* ignore */ }
+      }
+      if (clarificationQs.length === 0) {
+        const qMatch = parseSource.match(/QUESTION:\s*(.+)/i)
+        if (qMatch) {
+          question = qMatch[1].trim().replace(/^\[|\]$/g, '')
+          if (question) clarificationQs = [{ id: randomUUID(), q: question }]
+        }
+      }
     }
 
     // In continuation mode, the free text is Astra's conversational reply — use it as the note.
@@ -1144,24 +1209,44 @@ export function executeTaskBackground(taskId: string): void {
       status === 'needs_input' ? 'blocked' :
       freshColumn
 
-    if (status === 'needs_input' && (question || conversationalReply)) {
-      const questionNote = question || conversationalReply
+    if (status === 'needs_input' && (clarificationQs.length > 0 || conversationalReply)) {
+      const now = new Date().toISOString()
+      // Build a combined note from all questions for the activity feed
+      const questionNote = clarificationQs.length > 0
+        ? clarificationQs.map((q, i) => `Q${i + 1}: ${q.q}`).join('\n')
+        : (conversationalReply || question)
+      const questionsToSave = clarificationQs.map(q => ({
+        id: q.id || randomUUID(),
+        question: q.q,
+        options: Array.isArray(q.options) && q.options.length > 0 ? q.options : undefined,
+        asked_at: now,
+      }))
       updateTask(taskId, {
         agent_comment: questionNote,
+        clarification_questions: questionsToSave.length > 0 ? questionsToSave : undefined,
         agent_history: [...existing, {
           id: randomUUID(),
           by: displayName.toLowerCase(),
           byEmoji: emoji,
           action: 'question',
           note: questionNote,
-          at: new Date().toISOString(),
+          at: now,
         }],
         agent_state: 'waiting_for_input',
         agent_name: displayName.toLowerCase(),
-        agent_action_at: new Date().toISOString(),
+        agent_action_at: now,
         waiting_for_user: true,
         column: newColumn,
       })
+      if (questionsToSave.length > 0) {
+        const tgPointer = await sendTelegramClarification(
+          { id: taskId, title: task.title },
+          questionsToSave,
+        )
+        if (tgPointer) {
+          updateTask(taskId, { clarify_tg: tgPointer })
+        }
+      }
       return
     }
 
@@ -1195,6 +1280,11 @@ export function executeTaskBackground(taskId: string): void {
       waiting_for_user: false,
       column: newColumn,
     })
+
+    // Send Telegram notification for terminal outcomes (done / blocked)
+    if (status === 'done' || status === 'blocked') {
+      void sendTelegramTaskDone({ id: taskId, title: task.title }, status, note)
+    }
   })()
 }
 
@@ -1271,8 +1361,10 @@ export function executeTaskWithHermesBackground(taskId: string): void {
     'STATUS: done|blocked|needs_input',
     'SUMMARY: [what was built / changed, or what already existed and where]',
     'NEXT: [leave blank if done, or what remains]',
-    'QUESTION: [only fill if STATUS is needs_input]',
+    'QUESTIONS: [{"id":"q1","q":"Which approach?","options":["Option A","Option B","Option C"]},{"id":"q2","q":"Open question?"}]',
+    '  — only if STATUS is needs_input; omit otherwise. Add "options" array (2-4 short choices) when answers are enumerable.',
     '</WORK_SUMMARY>',
+    'When needs_input: emit QUESTIONS (1-4). On resume with answers, satisfy gaps and proceed.',
   ].filter(Boolean).join('\n')
 
   // Generate paths before building script content so they can be embedded as constants
@@ -1287,6 +1379,8 @@ export function executeTaskWithHermesBackground(taskId: string): void {
   const scriptContent = `
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 const TASKS_FILE  = ${JSON.stringify(tasksFilePath)};
@@ -1355,6 +1449,81 @@ function updateTaskDirect(id, updates) {
   });
 }
 
+// Load Telegram bot token from ~/.hermes/.env
+function loadTgToken() {
+  try {
+    const envPath = path.join(os.homedir(), '.hermes', '.env');
+    const envContent = fs.readFileSync(envPath, 'utf-8');
+    const match = envContent.match(/^TELEGRAM_BOT_TOKEN=(.+)$/m);
+    return match ? match[1].trim() : '';
+  } catch { return ''; }
+}
+
+const TG_RELAY_BASE = 'https://tg-api.fernandofamily.com/8c778d763c97aa414644fc5bd95da90a';
+const TG_CHAT_ID = 2130622225;
+
+function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// Send clarification keyboard (inline buttons for structured Q&A)
+async function sendTelegramClarificationKeyboard(taskId, taskTitle, questions) {
+  const token = loadTgToken();
+  if (!token) { spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q', '\\u2753 Clarification needed\\nTask: ' + taskTitle], { encoding: 'utf-8', timeout: 15_000 }); return; }
+  const taskPrefix = taskId.replace(/-/g, '').slice(0, 12);
+  let text = '\\u2753 <b>Clarification needed</b>\\n<b>Task:</b> ' + escHtml(taskTitle) + '\\n\\n';
+  const keyboard = [];
+  const pendingApp = [];
+  questions.forEach(function(q, qi) {
+    text += '<b>Q' + (qi + 1) + '.</b> ' + escHtml(q.question) + '\\n';
+    if (q.options && q.options.length > 0) {
+      const row = q.options.map(function(opt, oi) {
+        return { text: opt, callback_data: 'task:' + taskPrefix + ':' + qi + ':' + oi };
+      });
+      row.push({ text: '\\u270f\\ufe0f Custom', url: 'https://agent.fernandofamily.com/tasks?task=' + taskId });
+      keyboard.push(row);
+    } else {
+      pendingApp.push('Q' + (qi + 1));
+    }
+  });
+  if (pendingApp.length > 0) {
+    text += '\\n<i>' + pendingApp.join(', ') + ': reply to this message with your answer.</i>\\n';
+    keyboard.push([{ text: '\\U0001f517 Open task', url: 'https://agent.fernandofamily.com/tasks?task=' + taskId }]);
+  }
+  try {
+    const res = await fetch(TG_RELAY_BASE + '/bot' + token + '/sendMessage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TG_CHAT_ID, text, parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } }),
+    });
+    const data = await res.json();
+    if (data.ok && data.result && data.result.message_id) {
+      updateTaskDirect(taskId, { clarify_tg: { chat_id: TG_CHAT_ID, message_id: data.result.message_id } });
+    }
+  } catch (e) {
+    log('sendTelegramClarificationKeyboard failed: ' + e);
+  }
+}
+
+// Send task-done / task-blocked notification with a deep-link button
+async function sendTelegramDoneNotification(taskId, taskTitle, status, note) {
+  const token = loadTgToken();
+  const header = status === 'done' ? '\\u2705 <b>Task completed</b>' : status === 'blocked' ? '\\U0001f6ab <b>Task blocked</b>' : '\\u23f3 <b>Task update</b>';
+  const text = header + '\\n<b>Task:</b> ' + escHtml(taskTitle) + '\\n\\n' + escHtml(String(note).slice(0, 400));
+  const keyboard = [[{ text: '\\U0001f517 Open task', url: 'https://agent.fernandofamily.com/tasks?task=' + taskId }]];
+  if (token) {
+    try {
+      await fetch(TG_RELAY_BASE + '/bot' + token + '/sendMessage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: TG_CHAT_ID, text, parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } }),
+      });
+      return;
+    } catch (e) { log('sendTelegramDoneNotification fetch failed: ' + e); }
+  }
+  // Fallback: plain text via hermes send
+  const statusEmoji = status === 'done' ? '\\u2705' : status === 'blocked' ? '\\U0001f6ab' : '\\u23f3';
+  spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q', statusEmoji + ' ' + BY_EMOJI + ' ' + DISPLAY_NAME + ' \\u2014 ' + status + '\\nTask: ' + taskTitle + '\\n' + String(note).slice(0, 300)], { encoding: 'utf-8', timeout: 15_000 });
+}
+
 // Clean up orphaned hermes-exec-*.mjs scripts from previous killed runs.
 try {
   const tmpDir = require('node:os').tmpdir();
@@ -1412,10 +1581,11 @@ if (stderr)  log('stderr tail: ' + stderr.slice(-400));
 if (output)  log('stdout tail: ' + output.slice(-400));
 
 // Parse WORK_SUMMARY block
-let status   = 'partial';
-let summary  = '';
-let next     = '';
-let question = '';
+let status           = 'partial';
+let summary          = '';
+let next             = '';
+let question         = '';
+let clarificationQs  = [];
 
 const block = output.match(/<WORK_SUMMARY>([\\s\\S]*?)<\\/WORK_SUMMARY>/)?.[1] ?? '';
 const parseSource = block || (output.match(/^STATUS:/im) ? output : '');
@@ -1423,11 +1593,21 @@ if (parseSource) {
   const smMatch = parseSource.match(/STATUS:\\s*(\\w+)/i);
   const suMatch = parseSource.match(/SUMMARY:\\s*(.+)/i);
   const nxMatch = parseSource.match(/NEXT:\\s*(.+)/i);
-  const qMatch  = parseSource.match(/QUESTION:\\s*(.+)/i);
-  if (smMatch) status   = smMatch[1].toLowerCase();
-  if (suMatch) summary  = suMatch[1].trim().replace(/^\\[|\\]$/g, '');
-  if (nxMatch) next     = nxMatch[1].trim().replace(/^\\[|\\]$/g, '');
-  if (qMatch)  question = qMatch[1].trim().replace(/^\\[|\\]$/g, '');
+  if (smMatch) status  = smMatch[1].toLowerCase();
+  if (suMatch) summary = suMatch[1].trim().replace(/^\\[|\\]$/g, '');
+  if (nxMatch) next    = nxMatch[1].trim().replace(/^\\[|\\]$/g, '');
+  // Parse structured QUESTIONS array (new format); fall back to legacy QUESTION: line
+  const qsMatch = parseSource.match(/QUESTIONS:\\s*(\\[[\\s\\S]*?\\])/i);
+  if (qsMatch) {
+    try { clarificationQs = JSON.parse(qsMatch[1]); } catch(e) { log('QUESTIONS parse error: ' + e); }
+  }
+  if (clarificationQs.length === 0) {
+    const qMatch = parseSource.match(/QUESTION:\\s*(.+)/i);
+    if (qMatch) {
+      question = qMatch[1].trim().replace(/^\\[|\\]$/g, '');
+      if (question) clarificationQs = [{id: 'q' + Math.random().toString(36).slice(2,6), q: question}];
+    }
+  }
 }
 
 // #3: non-zero exit → blocked, not a silent partial
@@ -1444,14 +1624,13 @@ const note = summary || freeText.slice(0, 800) ||
 
 const parts = [note];
 if (next && next !== '...') parts.push('→ ' + next);
-if (question) parts.push('Needs input: ' + question);
 const fullNote = parts.join('\\n\\n');
 
 // #7: partial-with-no-WORK_SUMMARY → 'attempted', not 'replied'
 const actionLabel =
   status === 'done'        ? 'completed' :
   status === 'blocked'     ? 'blocked'   :
-  status === 'needs_input' ? 'blocked'   : 'attempted';
+  status === 'needs_input' ? 'question'  : 'attempted';
 
 const newColumn =
   status === 'done'        ? 'review'  :
@@ -1468,39 +1647,55 @@ if (!taskRec) {
   process.exit(0);
 }
 
+// Build the history entry note — for needs_input, list questions so history is readable
+const questionNote = clarificationQs.length > 0
+  ? clarificationQs.map((q, i) => 'Q' + (i+1) + ': ' + (q.q || q.question || '')).join('\\n')
+  : (question || note);
+const entryNote = status === 'needs_input' ? questionNote : fullNote;
+
+// Build clarification_questions for the task record
+const questionsToSave = clarificationQs
+  .map(q => ({
+    id: q.id || ('q' + Math.random().toString(36).slice(2,6)),
+    question: q.q || q.question || '',
+    options: Array.isArray(q.options) && q.options.length > 0 ? q.options : undefined,
+    asked_at: new Date().toISOString(),
+  }))
+  .filter(q => q.question);
+
 const existing = Array.isArray(taskRec.agent_history) ? taskRec.agent_history : [];
 const entry = {
   id:      randomUUID(),
   by:      DISPLAY_NAME.toLowerCase(),
   byEmoji: BY_EMOJI,
   action:  actionLabel,
-  note:    fullNote,
+  note:    entryNote,
   at:      new Date().toISOString(),
 };
 
 updateTaskDirect(TASK_ID, {
   agent_comment:    note,
   agent_history:    [...existing, entry],
-  agent_state:      null,
-  agent_name:       null,
-  agent_action_at:  null,
+  agent_state:      status === 'needs_input' ? 'waiting_for_input' : null,
+  agent_name:       status === 'needs_input' ? DISPLAY_NAME.toLowerCase() : null,
+  agent_action_at:  status === 'needs_input' ? new Date().toISOString() : null,
   waiting_for_user: status === 'needs_input',
+  ...(questionsToSave.length > 0 && status === 'needs_input' ? { clarification_questions: questionsToSave } : {}),
   ...(newColumn ? { column: newColumn } : {}),
 });
 
 log('task updated successfully');
 
-// #2 Telegram notification — send push so Naveen doesn't have to watch the UI
+// Telegram notification — rich card for terminal outcomes; keyboard for clarifications
 try {
-  const statusEmoji = status === 'done' ? '✅' : status === 'blocked' ? '🚫' : status === 'needs_input' ? '❓' : '⏳';
-  const tgMsg = statusEmoji + ' ' + BY_EMOJI + ' ' + DISPLAY_NAME + ' — ' + actionLabel + '\\n' +
-    'Task: ' + TASK_TITLE + '\\n' +
-    note.slice(0, 300);
-  spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q', tgMsg], {
-    encoding: 'utf-8',
-    timeout: 15_000,
-  });
-  log('telegram notification sent');
+  if (status === 'needs_input' && questionsToSave.length > 0) {
+    await sendTelegramClarificationKeyboard(TASK_ID, TASK_TITLE, questionsToSave);
+    log('telegram clarification keyboard sent');
+  } else if (status === 'done' || status === 'blocked') {
+    await sendTelegramDoneNotification(TASK_ID, TASK_TITLE, status, note);
+    log('telegram done notification sent');
+  }
+  // partial/attempted: no notification (intermediate state, not worth pinging)
 } catch (e) {
   log('telegram notification failed (non-fatal): ' + e);
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ActivityEntry, ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority } from '@/lib/tasks-api'
+import type { ActivityEntry, ClarificationQuestion, ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority } from '@/lib/tasks-api'
 import {
   DialogContent,
   DialogRoot,
@@ -23,6 +23,7 @@ type Props = {
   defaultPriority?: TaskPriority
   defaultAssignee?: string
   onComment?: (taskId: string, text: string) => Promise<void>
+  onClarify?: (taskId: string, answers: Record<string, string>) => Promise<void>
   onExecute?: () => Promise<void>
   isExecuting?: boolean
   onBreakdown?: () => Promise<void>
@@ -30,7 +31,248 @@ type Props = {
   onOpenSession?: (sessionId: string) => void
 }
 
-export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTags, defaultTitle, defaultDescription, defaultPriority, defaultAssignee, assignees, onSubmit, isSubmitting, onComment, onExecute, isExecuting, onBreakdown, isBreakingDown, onOpenSession }: Props) {
+// Sentinel value used when the user clicks "Custom…" but hasn't typed yet
+const CUSTOM_SENTINEL = '__custom__'
+
+function ClarificationPanel({
+  questions,
+  onSubmit,
+  inputClass,
+}: {
+  questions: Array<ClarificationQuestion>
+  onSubmit: (answers: Record<string, string>) => Promise<void>
+  inputClass: string
+}) {
+  // answers keyed by question id; for "Custom…" selections, stores the typed text
+  const [localAnswers, setLocalAnswers] = useState<Record<string, string>>({})
+  // separate storage for the custom text box so we can distinguish "option selected"
+  // from "custom box is open but empty"
+  const [customTexts, setCustomTexts] = useState<Record<string, string>>({})
+  // which pending question is shown right now
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const serverAnswered = questions.filter(q => q.answer)
+  const pending = questions.filter(q => !q.answer)
+  const currentQ = pending.at(currentIdx) ?? null
+  const isLast = currentIdx === pending.length - 1
+
+  const currentValue = currentQ ? (localAnswers[currentQ.id] ?? '') : ''
+  const currentIsValid = currentValue.trim() !== '' && currentValue !== CUSTOM_SENTINEL
+
+  // Focus textarea whenever the current question changes (if it has no options)
+  useEffect(() => {
+    if (textareaRef.current) textareaRef.current.focus()
+  }, [currentIdx])
+
+  function advance() {
+    setCurrentIdx(i => Math.min(i + 1, pending.length - 1))
+  }
+
+  // Go back to pendingIdx, clearing that question's answer and all after it
+  function goBackTo(pendingIdx: number) {
+    setCurrentIdx(pendingIdx)
+    setLocalAnswers(prev => {
+      const next = { ...prev }
+      for (let i = pendingIdx; i < pending.length; i++) delete next[pending[i].id]
+      return next
+    })
+    setCustomTexts(prev => {
+      const next = { ...prev }
+      for (let i = pendingIdx; i < pending.length; i++) delete next[pending[i].id]
+      return next
+    })
+  }
+
+  function pickOption(qId: string, opt: string) {
+    if (opt === CUSTOM_SENTINEL) {
+      // Switch to custom mode — keep whatever the user typed before
+      setLocalAnswers(prev => ({ ...prev, [qId]: customTexts[qId] || CUSTOM_SENTINEL }))
+    } else {
+      setLocalAnswers(prev => ({ ...prev, [qId]: opt }))
+      // Auto-advance after a brief visual flash (not on last question)
+      if (!isLast) setTimeout(advance, 180)
+    }
+  }
+
+  function setCustomText(qId: string, text: string) {
+    setCustomTexts(prev => ({ ...prev, [qId]: text }))
+    setLocalAnswers(prev => ({ ...prev, [qId]: text || CUSTOM_SENTINEL }))
+  }
+
+  async function handleSubmit() {
+    if (!currentIsValid || submitting) return
+    setSubmitting(true)
+    try {
+      const merged: Record<string, string> = {}
+      for (const q of serverAnswered) merged[q.id] = q.answer!
+      for (const q of pending) {
+        const v = localAnswers[q.id] ?? ''
+        if (v && v !== CUSTOM_SENTINEL) merged[q.id] = v
+      }
+      await onSubmit(merged)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (!currentQ) return null
+
+  const currentOptions = currentQ.options ?? []
+  const hasOptions = currentOptions.length > 0
+  const selectedOpt = hasOptions
+    ? (currentOptions.includes(currentValue) ? currentValue : currentValue ? CUSTOM_SENTINEL : '')
+    : ''
+  const isCustomMode = selectedOpt === CUSTOM_SENTINEL
+
+  // Questions already answered in this session (before currentIdx)
+  const locallyAnswered = pending.slice(0, currentIdx)
+  const hasThread = serverAnswered.length > 0 || locallyAnswered.length > 0
+
+  return (
+    <div className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3 space-y-3 mt-3">
+
+      {/* Answered thread — compact read-only */}
+      {hasThread && (
+        <div className="space-y-1 pb-2 border-b border-amber-400/15">
+          {serverAnswered.map((q, i) => (
+            <div key={q.id} className="flex gap-1.5 text-[11px]">
+              <span className="text-amber-400/40 shrink-0 w-4">{i + 1}.</span>
+              <span className="text-amber-400/50 truncate">{q.question}</span>
+              <span className="text-[var(--theme-muted)] ml-auto shrink-0 max-w-[45%] truncate">→ {q.answer}</span>
+            </div>
+          ))}
+          {locallyAnswered.map((q, i) => (
+            <div key={q.id} className="flex gap-1.5 text-[11px] items-center">
+              <span className="text-amber-400/50 shrink-0 w-4">{serverAnswered.length + i + 1}.</span>
+              <span className="text-amber-400/60 truncate">{q.question}</span>
+              <span className="text-[var(--theme-muted)] ml-auto shrink-0 max-w-[40%] truncate">→ {localAnswers[q.id]}</span>
+              <button
+                type="button"
+                onClick={() => goBackTo(i)}
+                className="shrink-0 opacity-40 hover:opacity-100 transition-opacity leading-none"
+                title="Edit this answer"
+              >
+                ✏️
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Progress */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wide">
+          Question {serverAnswered.length + currentIdx + 1} of {questions.length}
+        </span>
+        {pending.length > 1 && (
+          <div className="ml-auto flex items-center gap-1">
+            {pending.map((_, i) => (
+              <span
+                key={i}
+                className={cn(
+                  'inline-block w-1.5 h-1.5 rounded-full transition-colors duration-200',
+                  i < currentIdx ? 'bg-amber-500' : i === currentIdx ? 'bg-amber-400' : 'bg-amber-400/20',
+                )}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Current question text */}
+      <p className="text-sm font-medium text-[var(--theme-text)]">{currentQ.question}</p>
+
+      {/* Option buttons */}
+      {hasOptions && (
+        <div className="flex flex-wrap gap-1.5">
+          {currentOptions.map(opt => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => pickOption(currentQ.id, opt)}
+              className={cn(
+                'rounded-md px-3 py-1.5 text-xs border transition-all duration-150',
+                selectedOpt === opt
+                  ? 'bg-amber-500 text-white border-amber-500 scale-[1.03]'
+                  : 'bg-transparent text-amber-400 border-amber-400/40 hover:border-amber-400 hover:bg-amber-400/5',
+              )}
+            >
+              {opt}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => pickOption(currentQ.id, CUSTOM_SENTINEL)}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-xs border transition-all duration-150',
+              isCustomMode
+                ? 'bg-amber-400/15 text-amber-400 border-amber-400'
+                : 'bg-transparent text-amber-400/50 border-amber-400/20 hover:border-amber-400/50 hover:text-amber-400/80',
+            )}
+          >
+            Custom…
+          </button>
+        </div>
+      )}
+
+      {/* Free-form textarea — shown when no options, or Custom is active */}
+      {(!hasOptions || isCustomMode) && (
+        <textarea
+          ref={textareaRef}
+          rows={2}
+          className={cn(inputClass, 'resize-none border-amber-400/20 focus:ring-amber-400/40 text-xs py-1.5')}
+          placeholder={hasOptions ? 'Enter your custom answer…' : isLast ? 'Your answer… (Enter to submit)' : 'Your answer… (Enter to continue)'}
+          value={hasOptions ? (customTexts[currentQ.id] ?? '') : currentValue}
+          onChange={e => {
+            if (hasOptions) setCustomText(currentQ.id, e.target.value)
+            else setLocalAnswers(prev => ({ ...prev, [currentQ.id]: e.target.value }))
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey && currentIsValid) {
+              e.preventDefault()
+              if (isLast) void handleSubmit()
+              else advance()
+            }
+          }}
+        />
+      )}
+
+      {/* Footer: hint or next/submit button */}
+      {isLast ? (
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => void handleSubmit()}
+          disabled={!currentIsValid || submitting}
+          className="w-full bg-amber-500 text-white disabled:opacity-40"
+        >
+          {submitting ? 'Sending…' : 'Submit & resume agent'}
+        </Button>
+      ) : (
+        <div className="flex items-center justify-between">
+          {hasOptions && !isCustomMode
+            ? <span className="text-[10px] text-amber-400/40">Select an option to continue</span>
+            : <span className="text-[10px] text-amber-400/40">Enter to continue</span>
+          }
+          {(!hasOptions || isCustomMode) && (
+            <button
+              type="button"
+              onClick={() => { if (currentIsValid) advance() }}
+              disabled={!currentIsValid}
+              className="text-[10px] text-amber-400/60 hover:text-amber-400 disabled:opacity-30 transition-colors"
+            >
+              Next →
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTags, defaultTitle, defaultDescription, defaultPriority, defaultAssignee, assignees, onSubmit, isSubmitting, onComment, onClarify, onExecute, isExecuting, onBreakdown, isBreakingDown, onOpenSession }: Props) {
   const isEdit = Boolean(task)
 
   const [title, setTitle] = useState('')
@@ -275,8 +517,8 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                 )}
               </div>
 
-              {/* Waiting for user input banner */}
-              {task?.agent_state === 'waiting_for_input' && (
+              {/* Waiting for user input banner — only shown when no structured questions */}
+              {task?.agent_state === 'waiting_for_input' && !task?.clarification_questions?.length && (
                 <div className="flex items-center gap-2 mb-3 rounded-md border border-amber-300/25 bg-amber-400/8 px-2.5 py-2">
                   <span className="text-base shrink-0">💬</span>
                   <span className="text-xs font-medium text-amber-500">
@@ -338,8 +580,17 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                 )}
               </div>
 
-              {/* User reply input */}
-              {onComment && (
+              {/* Structured clarification Q&A — shown when agent asks targeted questions */}
+              {task?.waiting_for_user && task.clarification_questions && task.clarification_questions.length > 0 && onClarify && (
+                <ClarificationPanel
+                  questions={task.clarification_questions}
+                  inputClass={inputClass}
+                  onSubmit={(answers) => onClarify(task.id, answers)}
+                />
+              )}
+
+              {/* Freeform comment / reply input — hidden during structured clarification */}
+              {onComment && !(task?.waiting_for_user && task?.clarification_questions?.length) && (
                 <div className="flex gap-2 mt-3">
                   <input
                     className={cn(inputClass, 'text-xs py-1.5')}

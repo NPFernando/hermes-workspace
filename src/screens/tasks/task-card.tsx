@@ -433,8 +433,16 @@ export const TaskCard = memo(function TaskCard({
               </div>
             )}
 
-            {/* Inline reply input */}
-            {onComment && (
+            {/* Inline reply input — hidden when structured clarification questions are pending */}
+            {onComment && task.waiting_for_user && task.clarification_questions?.length && (
+              <div className="flex items-center gap-1.5 pt-1 border-t border-[var(--theme-border)]">
+                <span className="text-[10px] text-amber-400">❓</span>
+                <span className="text-[10px] text-amber-400/80">
+                  {task.clarification_questions.length} question{task.clarification_questions.length !== 1 ? 's' : ''} — open task to answer
+                </span>
+              </div>
+            )}
+            {onComment && !(task.waiting_for_user && task.clarification_questions?.length) && (
               <div className="flex gap-1.5 pt-1 border-t border-[var(--theme-border)]">
                 <input
                   ref={replyInputRef}

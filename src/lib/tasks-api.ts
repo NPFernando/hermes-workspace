@@ -111,6 +111,15 @@ export type ActivityEntry = {
   at: string
 }
 
+export type ClarificationQuestion = {
+  id: string
+  question: string
+  options?: Array<string>
+  answer?: string
+  asked_at: string
+  answered_at?: string
+}
+
 export type ClaudeTask = {
   id: string
   title: string
@@ -132,6 +141,7 @@ export type ClaudeTask = {
   agent_comment?: string | null
   agent_history?: Array<ActivityEntry>
   waiting_for_user?: boolean
+  clarification_questions?: Array<ClarificationQuestion>
 }
 
 export type CreateTaskInput = {
@@ -302,6 +312,20 @@ export async function postTaskComment(taskId: string, text: string): Promise<{ r
   if (!res.ok) throw new Error(`Failed to post comment: ${res.status}`)
   const data = (await res.json()) as { resumed?: boolean }
   return { resumed: data.resumed ?? false }
+}
+
+export async function submitClarificationAnswers(
+  taskId: string,
+  answers: Record<string, string>,
+): Promise<{ ok: boolean; resumed: boolean }> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}?action=clarify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers }),
+  })
+  if (!res.ok) throw new Error(`Failed to submit clarification: ${res.status}`)
+  return res.json()
 }
 
 export async function moveTask(taskId: string, column: TaskColumn, movedBy = 'user'): Promise<ClaudeTask> {

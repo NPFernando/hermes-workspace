@@ -5,6 +5,7 @@ import { TasksScreen } from '@/screens/tasks/tasks-screen'
 
 const searchSchema = z.object({
   assignee: z.string().optional(),
+  task: z.string().optional(),
 })
 
 export const Route = createFileRoute('/tasks')({

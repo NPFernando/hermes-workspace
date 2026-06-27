@@ -47,12 +47,15 @@ import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-str
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
+import { Route as ApiTelegramTaskClarifyRouteImport } from './routes/api/telegram-task-clarify'
 import { Route as ApiTasksPruneRouteImport } from './routes/api/tasks-prune'
+import { Route as ApiTasksProgressPingRouteImport } from './routes/api/tasks-progress-ping'
 import { Route as ApiTasksInjectIdeasRouteImport } from './routes/api/tasks-inject-ideas'
 import { Route as ApiTasksGenerateIdeasRouteImport } from './routes/api/tasks-generate-ideas'
 import { Route as ApiTasksFromTextRouteImport } from './routes/api/tasks-from-text'
 import { Route as ApiTasksDeployAgentsRouteImport } from './routes/api/tasks-deploy-agents'
 import { Route as ApiTasksCompletionCheckRouteImport } from './routes/api/tasks-completion-check'
+import { Route as ApiTasksClarifyNudgeRouteImport } from './routes/api/tasks-clarify-nudge'
 import { Route as ApiTasksAstraReviewRouteImport } from './routes/api/tasks-astra-review'
 import { Route as ApiTasksAskAstraRouteImport } from './routes/api/tasks-ask-astra'
 import { Route as ApiTasksRouteImport } from './routes/api/tasks'
@@ -407,9 +410,19 @@ const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
   path: '/api/terminal-close',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTelegramTaskClarifyRoute = ApiTelegramTaskClarifyRouteImport.update({
+  id: '/api/telegram-task-clarify',
+  path: '/api/telegram-task-clarify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTasksPruneRoute = ApiTasksPruneRouteImport.update({
   id: '/api/tasks-prune',
   path: '/api/tasks-prune',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksProgressPingRoute = ApiTasksProgressPingRouteImport.update({
+  id: '/api/tasks-progress-ping',
+  path: '/api/tasks-progress-ping',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTasksInjectIdeasRoute = ApiTasksInjectIdeasRouteImport.update({
@@ -435,6 +448,11 @@ const ApiTasksDeployAgentsRoute = ApiTasksDeployAgentsRouteImport.update({
 const ApiTasksCompletionCheckRoute = ApiTasksCompletionCheckRouteImport.update({
   id: '/api/tasks-completion-check',
   path: '/api/tasks-completion-check',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksClarifyNudgeRoute = ApiTasksClarifyNudgeRouteImport.update({
+  id: '/api/tasks-clarify-nudge',
+  path: '/api/tasks-clarify-nudge',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTasksAstraReviewRoute = ApiTasksAstraReviewRouteImport.update({
@@ -1375,12 +1393,15 @@ export interface FileRoutesByFullPath {
   '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
+  '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
+  '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -1583,12 +1604,15 @@ export interface FileRoutesByTo {
   '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
+  '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
+  '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -1793,12 +1817,15 @@ export interface FileRoutesById {
   '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
+  '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
+  '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
@@ -2004,12 +2031,15 @@ export interface FileRouteTypes {
     | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
+    | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
     | '/api/tasks-deploy-agents'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
+    | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/telegram-task-clarify'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -2212,12 +2242,15 @@ export interface FileRouteTypes {
     | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
+    | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
     | '/api/tasks-deploy-agents'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
+    | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/telegram-task-clarify'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -2421,12 +2454,15 @@ export interface FileRouteTypes {
     | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
+    | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
     | '/api/tasks-deploy-agents'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
+    | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/telegram-task-clarify'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
@@ -2631,12 +2667,15 @@ export interface RootRouteChildren {
   ApiTasksRoute: typeof ApiTasksRoute
   ApiTasksAskAstraRoute: typeof ApiTasksAskAstraRoute
   ApiTasksAstraReviewRoute: typeof ApiTasksAstraReviewRoute
+  ApiTasksClarifyNudgeRoute: typeof ApiTasksClarifyNudgeRoute
   ApiTasksCompletionCheckRoute: typeof ApiTasksCompletionCheckRoute
   ApiTasksDeployAgentsRoute: typeof ApiTasksDeployAgentsRoute
   ApiTasksFromTextRoute: typeof ApiTasksFromTextRoute
   ApiTasksGenerateIdeasRoute: typeof ApiTasksGenerateIdeasRoute
   ApiTasksInjectIdeasRoute: typeof ApiTasksInjectIdeasRoute
+  ApiTasksProgressPingRoute: typeof ApiTasksProgressPingRoute
   ApiTasksPruneRoute: typeof ApiTasksPruneRoute
+  ApiTelegramTaskClarifyRoute: typeof ApiTelegramTaskClarifyRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
@@ -2960,11 +2999,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTerminalCloseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/telegram-task-clarify': {
+      id: '/api/telegram-task-clarify'
+      path: '/api/telegram-task-clarify'
+      fullPath: '/api/telegram-task-clarify'
+      preLoaderRoute: typeof ApiTelegramTaskClarifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tasks-prune': {
       id: '/api/tasks-prune'
       path: '/api/tasks-prune'
       fullPath: '/api/tasks-prune'
       preLoaderRoute: typeof ApiTasksPruneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-progress-ping': {
+      id: '/api/tasks-progress-ping'
+      path: '/api/tasks-progress-ping'
+      fullPath: '/api/tasks-progress-ping'
+      preLoaderRoute: typeof ApiTasksProgressPingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tasks-inject-ideas': {
@@ -3000,6 +3053,13 @@ declare module '@tanstack/react-router' {
       path: '/api/tasks-completion-check'
       fullPath: '/api/tasks-completion-check'
       preLoaderRoute: typeof ApiTasksCompletionCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-clarify-nudge': {
+      id: '/api/tasks-clarify-nudge'
+      path: '/api/tasks-clarify-nudge'
+      fullPath: '/api/tasks-clarify-nudge'
+      preLoaderRoute: typeof ApiTasksClarifyNudgeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tasks-astra-review': {
@@ -4497,12 +4557,15 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTasksRoute: ApiTasksRoute,
   ApiTasksAskAstraRoute: ApiTasksAskAstraRoute,
   ApiTasksAstraReviewRoute: ApiTasksAstraReviewRoute,
+  ApiTasksClarifyNudgeRoute: ApiTasksClarifyNudgeRoute,
   ApiTasksCompletionCheckRoute: ApiTasksCompletionCheckRoute,
   ApiTasksDeployAgentsRoute: ApiTasksDeployAgentsRoute,
   ApiTasksFromTextRoute: ApiTasksFromTextRoute,
   ApiTasksGenerateIdeasRoute: ApiTasksGenerateIdeasRoute,
   ApiTasksInjectIdeasRoute: ApiTasksInjectIdeasRoute,
+  ApiTasksProgressPingRoute: ApiTasksProgressPingRoute,
   ApiTasksPruneRoute: ApiTasksPruneRoute,
+  ApiTelegramTaskClarifyRoute: ApiTelegramTaskClarifyRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,

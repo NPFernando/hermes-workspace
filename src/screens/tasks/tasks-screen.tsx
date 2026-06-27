@@ -26,6 +26,7 @@ import {
   launchSession,
   moveTask,
   postTaskComment,
+  submitClarificationAnswers,
   updateTask,
 } from '@/lib/tasks-api'
 import { toast } from '@/components/ui/toast'
@@ -77,6 +78,9 @@ export function TasksScreen() {
   const navigate = useNavigate()
   const initialAssignee = typeof search.assignee === 'string' ? search.assignee : null
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(initialAssignee)
+  const taskIdFromUrl = typeof search.task === 'string' ? search.task : null
+  // Track which task ID was auto-opened from the URL to avoid re-opening after close
+  const autoOpenedTaskIdRef = useRef<string | null>(null)
 
   const [launchingTaskId, setLaunchingTaskId] = useState<string | null>(null)
   const [executingTaskId, setExecutingTaskId] = useState<string | null>(null)
@@ -129,6 +133,17 @@ export function TasksScreen() {
   }, [assignees])
 
   const tasks = tasksQuery.data ?? []
+
+  // Auto-open the task dialog when a ?task=<id> deep-link is present
+  useEffect(() => {
+    if (!taskIdFromUrl) { autoOpenedTaskIdRef.current = null; return }
+    if (autoOpenedTaskIdRef.current === taskIdFromUrl) return
+    const target = tasks.find(t => t.id === taskIdFromUrl)
+    if (target) {
+      autoOpenedTaskIdRef.current = taskIdFromUrl
+      setEditingTask(target)
+    }
+  }, [taskIdFromUrl, tasks])
 
   const tasksByColumn = useMemo(() => {
     const columns: Record<TaskColumn, Array<ClaudeTask>> = {
@@ -230,6 +245,14 @@ export function TasksScreen() {
 
   async function handleTaskComment(taskId: string, text: string) {
     const result = await postTaskComment(taskId, text)
+    invalidate()
+    if (result.resumed) {
+      toast('Astra is on it…')
+    }
+  }
+
+  async function handleTaskClarify(taskId: string, answers: Record<string, string>) {
+    const result = await submitClarificationAnswers(taskId, answers)
     invalidate()
     if (result.resumed) {
       toast('Astra is on it…')
@@ -1010,7 +1033,12 @@ export function TasksScreen() {
       {/* Edit dialog — use live task data so agent_state reflects latest poll */}
       <TaskDialog
         open={editingTask !== null}
-        onOpenChange={(open) => { if (!open) setEditingTask(null) }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingTask(null)
+            if (taskIdFromUrl) void navigate({ to: '/tasks', search: (prev) => ({ ...prev, task: undefined }) })
+          }
+        }}
         task={editingTask ? (tasks.find(t => t.id === editingTask.id) ?? editingTask) : null}
         assignees={assignees}
         isSubmitting={updateMutation.isPending}
@@ -1019,6 +1047,7 @@ export function TasksScreen() {
           await updateMutation.mutateAsync({ id: editingTask.id, input })
         }}
         onComment={handleTaskComment}
+        onClarify={handleTaskClarify}
         onExecute={editingTask ? async () => {
           setExecutingTaskId(editingTask.id)
           try {

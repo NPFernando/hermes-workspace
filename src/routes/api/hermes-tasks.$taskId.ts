@@ -8,7 +8,7 @@ import { deleteTask, getTask, moveTask, updateTask } from '../../server/tasks-st
 import { breakdownTaskWithAI, executeTaskBackground, executeTaskWithHermesBackground } from '../../server/astra-tasks'
 import { appendLocalMessage, ensureLocalSession, getLocalMessages } from '../../server/local-session-store'
 import { getSessionMessages } from '../../server/claude-dashboard-api'
-import type { ActivityEntry, TaskAgentState, TaskColumn, TaskPriority } from '../../server/tasks-store'
+import type { ActivityEntry, ClarificationQuestion, TaskAgentState, TaskColumn, TaskPriority } from '../../server/tasks-store'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -230,6 +230,66 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
               }
             }
             return jsonResponse({ ok: true, resumed: shouldResume })
+          } catch {
+            return jsonResponse({ error: 'Invalid request body' }, 400)
+          }
+        }
+
+        if (action === 'clarify') {
+          try {
+            const body = (await request.json()) as Record<string, unknown>
+            const answers = (body.answers ?? {}) as Record<string, string>
+            const task = getTask(params.taskId)
+            if (!task) return jsonResponse({ error: 'Task not found' }, 404)
+
+            const questions: Array<ClarificationQuestion> = task.clarification_questions ?? []
+            const now = new Date().toISOString()
+
+            // Save answers back into the questions array
+            const updatedQuestions = questions.map(q => ({
+              ...q,
+              answer: answers[q.id] != null ? String(answers[q.id]) : q.answer,
+              answered_at: answers[q.id] != null ? now : q.answered_at,
+            }))
+
+            // Build one combined Q&A history entry so the resumed agent sees context
+            const qaNote = updatedQuestions
+              .map((q, i) => `Q${i + 1}: ${q.question}\nA${i + 1}: ${answers[q.id] ?? q.answer ?? '(no answer)'}`)
+              .join('\n\n')
+
+            const replyEntry: ActivityEntry = {
+              id: randomUUID(),
+              by: 'user',
+              byEmoji: '👤',
+              action: 'replied',
+              note: qaNote,
+              at: now,
+            }
+
+            const existing = task.agent_history ?? []
+            const hadExecution = existing.some(e =>
+              e.by !== 'user' && ['attempted', 'completed', 'blocked'].includes(e.action),
+            )
+            const reopenColumn =
+              task.column === 'blocked' || task.column === 'review' ? 'in_progress' : task.column
+
+            updateTask(params.taskId, {
+              clarification_questions: updatedQuestions,
+              agent_history: [...existing, replyEntry],
+              agent_state: 'working',
+              agent_name: task.agent_name ?? 'astra',
+              agent_action_at: now,
+              waiting_for_user: false,
+              column: reopenColumn,
+            })
+
+            if (hadExecution) {
+              executeTaskWithHermesBackground(params.taskId)
+            } else {
+              executeTaskBackground(params.taskId)
+            }
+
+            return jsonResponse({ ok: true, resumed: true })
           } catch {
             return jsonResponse({ error: 'Invalid request body' }, 400)
           }

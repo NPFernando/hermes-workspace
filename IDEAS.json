@@ -1,26 +1,44 @@
 [
   {
-    "title": "Respect reduced motion in mobile tab navigation",
-    "description": "Avoid forced smooth scrolling for the mobile tab bar when the user has prefers-reduced-motion enabled, and make current-page labels explicit for screen readers.",
+    "title": "Structured task clarification flow with Telegram deep links",
+    "description": "Let running workspace agents ask multiple structured clarification questions, collect answers in the task dialog or Telegram inline keyboard, then resume the original execution with the full Q&A context.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Stale clarification reminder sweep",
+    "description": "Add a lightweight API endpoint for scheduled reminder nudges when tasks wait too long for user clarification, capped to avoid notification spam.",
+    "category": "backend",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Working-task progress pings",
+    "description": "Send low-frequency Telegram progress pings for long-running task executions so the operator knows an agent is still active before timeout.",
+    "category": "backend",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Task dialog deep-link support",
+    "description": "Allow /tasks?task=<id> links to open a specific task dialog directly from external notifications and clear the link when the dialog closes.",
     "category": "ui",
     "estimated_effort": "low"
   },
   {
-    "title": "Add stale health response diagnostics to workspace status cards",
-    "description": "When backend health payloads are malformed or stale, show content-type/body-shape diagnostics instead of a generic unavailable state.",
-    "category": "api",
+    "title": "Wire scheduled clarification and progress ping endpoints into cron",
+    "description": "Add authenticated scheduled invocations for /api/tasks-clarify-nudge and /api/tasks-progress-ping so the new endpoints run automatically instead of remaining manual hooks.",
+    "category": "backend",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add focused tests for Telegram clarification callbacks",
+    "description": "Cover option-click, freeform reply, edit-answer, and confirm-resume paths with route-level tests using mocked task store and Telegram edit helpers.",
+    "category": "backend",
     "estimated_effort": "medium"
   },
   {
-    "title": "Create focused test include rules for Vitest",
-    "description": "Exclude Playwright e2e specs and TAP-style Odysseus tests from unit-test collection so pnpm test reflects actual unit failures rather than environment collection gaps.",
+    "title": "Clean Vitest include/exclude baseline for E2E and TAP suites",
+    "description": "Adjust test configuration so Playwright e2e specs and Node TAP service tests are not collected by the unit-test Vitest run.",
     "category": "config",
-    "estimated_effort": "medium"
-  },
-  {
-    "title": "Add command palette empty-state recovery actions",
-    "description": "When command search has no matches, offer quick links to common workspace areas and a clear reset button.",
-    "category": "ui",
     "estimated_effort": "low"
   }
 ]

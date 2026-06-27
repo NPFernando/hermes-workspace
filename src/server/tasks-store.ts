@@ -18,6 +18,15 @@ export type ActivityEntry = {
   at: string
 }
 
+export type ClarificationQuestion = {
+  id: string
+  question: string
+  options?: Array<string>
+  answer?: string
+  asked_at: string
+  answered_at?: string
+}
+
 export type TaskRecord = {
   id: string
   title: string
@@ -39,6 +48,11 @@ export type TaskRecord = {
   agent_comment?: string | null
   agent_history?: Array<ActivityEntry>
   waiting_for_user?: boolean
+  clarification_questions?: Array<ClarificationQuestion>
+  clarify_tg?: { chat_id: number; message_id: number }
+  clarify_nudged_at?: string
+  clarify_nudge_count?: number
+  agent_progress_pinged_at?: string
 }
 
 type TaskFile = { tasks: Array<TaskRecord> }
@@ -136,6 +150,12 @@ function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'titl
     agent_comment: task.agent_comment ?? null,
     agent_history: Array.isArray(task.agent_history) ? task.agent_history : [],
     waiting_for_user: task.waiting_for_user ?? false,
+    // Optional clarification fields — preserved as-is (undefined omitted from JSON)
+    ...(Array.isArray(task.clarification_questions) ? { clarification_questions: task.clarification_questions } : {}),
+    ...(task.clarify_tg != null ? { clarify_tg: task.clarify_tg } : {}),
+    ...(task.clarify_nudged_at != null ? { clarify_nudged_at: task.clarify_nudged_at } : {}),
+    ...(task.clarify_nudge_count != null ? { clarify_nudge_count: task.clarify_nudge_count } : {}),
+    ...(task.agent_progress_pinged_at != null ? { agent_progress_pinged_at: task.agent_progress_pinged_at } : {}),
   }
 }
 
