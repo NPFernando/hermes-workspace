@@ -1,44 +1,38 @@
 [
   {
-    "title": "Add guarded Finance workspace for personal records, tax tracking, and trading plans",
-    "description": "Create a Finance screen plus authenticated API and local secure store for income, expenses, accounts, savings goals, tax records, market/risk data, and blocked-by-default trading plans for Binance/IBKR workflows.",
-    "category": "backend",
-    "estimated_effort": "medium"
-  },
-  {
-    "title": "Add finance record entry forms",
-    "description": "Layer guided web forms on top of the Finance API for accounts, income, expenses, savings goals, tax records, and trading-plan drafts with client-side validation.",
+    "title": "Improve task filter accessibility semantics",
+    "description": "Add ARIA state and descriptive labels to Workspace Tasks filter chips and clear-search controls so keyboard and screen-reader users can understand which filters are active and how to clear them.",
     "category": "ui",
-    "estimated_effort": "medium"
+    "estimated_effort": "low"
   },
   {
-    "title": "Wire read-only market connectors behind finance guardrails",
-    "description": "Add read-only Binance and IBKR/paper endpoints that fetch market data without storing API secrets in the JSON store and without enabling order execution.",
-    "category": "api",
-    "estimated_effort": "high"
-  },
-  {
-    "title": "Add finance import/export tools",
-    "description": "Provide CSV/JSON import and export utilities for finance records, tax summaries, and audit trails with explicit masking of sensitive identifiers.",
-    "category": "backend",
-    "estimated_effort": "medium"
-  },
-  {
-    "title": "Add guided Finance record entry forms",
-    "description": "Build accessible forms on /finance for accounts, income, expenses, savings goals, tax records, and trading-plan drafts so users do not need to POST raw JSON.",
+    "title": "Add tasks empty-column action copy",
+    "description": "Make empty task columns explain their next action more clearly, especially on compact mobile layouts where the add button can be ambiguous.",
     "category": "ui",
-    "estimated_effort": "medium"
+    "estimated_effort": "low"
   },
   {
-    "title": "Add read-only market data connector smoke tests",
-    "description": "Introduce mocked Binance and IBKR/paper connector tests that verify no secret values are persisted and no order execution endpoint exists in observe-only mode.",
-    "category": "api",
+    "title": "Expose task board refresh status text",
+    "description": "Add a small non-intrusive refresh status indicator for the task board so users know when background polling or manual refresh is happening.",
+    "category": "ui",
     "estimated_effort": "medium"
   },
   {
     "title": "Fix Vitest unit-test include/exclude baseline",
-    "description": "Adjust unit-test configuration so Playwright E2E specs and Odysseus TAP .mjs tests are excluded from pnpm test, leaving those suites to their dedicated runners.",
+    "description": "Adjust Vitest configuration so Playwright E2E specs and Odysseus TAP .mjs suites are excluded from pnpm test and run only under their dedicated runners.",
     "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add task board refresh status text",
+    "description": "Show a subtle status line when Workspace Tasks is polling or manually refreshing so users know the board is updating in the background.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Improve compact task column labels",
+    "description": "Add clearer empty-column and compact-column action labels for mobile and keyboard users, including accessible names for add buttons.",
+    "category": "ui",
     "estimated_effort": "low"
   }
 ]

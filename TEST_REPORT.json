@@ -2,48 +2,40 @@
   "tests_passed": true,
   "lint_errors": 0,
   "passed": true,
+  "summary": "Changed-code gates passed. Repository-wide pnpm test and pnpm lint still expose known baseline/config debt unrelated to this task-filter accessibility change.",
   "commands": [
     {
       "command": "npx tsc --noEmit",
-      "exit_code": 0,
-      "summary": "TypeScript compiled successfully under Hermes-managed Node v22.22.3."
+      "exit_code": 0
     },
     {
-      "command": "npx vitest run src/server/finance-store.test.ts",
+      "command": "npx vitest run src/screens/tasks/tasks-ux.test.ts",
       "exit_code": 0,
-      "summary": "Focused finance store tests passed: 4 tests in 1 file."
+      "result": "4 tests passed"
+    },
+    {
+      "command": "npx eslint --no-warn-ignored -f json src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts",
+      "exit_code": 0,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "command": "pnpm build",
+      "exit_code": 0
     },
     {
       "command": "pnpm test",
       "exit_code": 1,
-      "summary": "All 717 collected assertions passed and finance tests passed, but the repo-wide Vitest command exited non-zero because of pre-existing collection/config debt: three e2e specs require missing @playwright/test and two services/odysseus TAP .mjs files expose no Vitest suite."
+      "baseline_issue": "All collected assertions passed (718 passed), but Vitest collected E2E specs requiring @playwright/test plus Odysseus TAP .mjs files with no Vitest suite. This is pre-existing test configuration debt."
     },
     {
       "command": "pnpm lint",
       "exit_code": 1,
-      "summary": "Repo-wide lint has existing baseline debt: 213 errors and 102 warnings, including unrelated import-order, strict no-unnecessary-condition, missing react-hooks plugin, and regex warnings outside this finance change."
-    },
-    {
-      "command": "npx eslint --no-warn-ignored -f json --rule '@typescript-eslint/no-unnecessary-condition: off' <changed finance/navigation files>",
-      "exit_code": 0,
-      "summary": "Focused changed-file lint passed with 0 errors and 1 pre-existing warning in chat-sidebar require-await."
-    },
-    {
-      "command": "pnpm build",
-      "exit_code": 0,
-      "summary": "Production client and SSR build completed successfully."
+      "baseline_issue": "Repository-wide ESLint reports 213 errors and 102 warnings in unrelated files. Focused changed-file ESLint passed with 0 errors and 0 warnings."
     }
-  ],
-  "baseline_failures": [
-    "Vitest collects e2e/*.spec.ts files without @playwright/test installed in the unit-test environment.",
-    "Vitest collects services/odysseus/tests/streaming/*.test.mjs TAP files that do not expose Vitest suites.",
-    "Repo-wide ESLint baseline currently reports 213 errors and 102 warnings outside the focused finance implementation."
-  ],
-  "focused_changed_file_lint": {
-    "errors": 0,
-    "warnings": 1,
-    "warning_details": [
-      "src/screens/chat/components/chat-sidebar.tsx: existing @typescript-eslint/require-await warning on fetchWorkspaceProjectShortcuts"
-    ]
-  }
+  ]
 }

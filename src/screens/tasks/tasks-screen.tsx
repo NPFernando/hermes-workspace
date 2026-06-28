@@ -56,6 +56,10 @@ export function formatTaskFilterSummary(matchCount: number, totalTasks: number) 
   return `Showing ${matchCount} of ${totalTasks} ${pluralizeTask(totalTasks)}`
 }
 
+export function formatTaskFilterAriaLabel(label: string, active: boolean) {
+  return `${active ? 'Disable' : 'Enable'} ${label.toLowerCase()} task filter`
+}
+
 function SkeletonCard() {
   return (
     <div className="skeleton-shimmer rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
@@ -769,6 +773,7 @@ export function TasksScreen() {
             <button
               type="button"
               onClick={() => setSearchQuery('')}
+              aria-label="Clear task search"
               className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--theme-muted)]"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={12} />
@@ -787,6 +792,8 @@ export function TasksScreen() {
             key={label}
             type="button"
             onClick={toggle}
+            aria-pressed={active}
+            aria-label={formatTaskFilterAriaLabel(label, active)}
             className="text-[10px] px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
             style={{
               borderColor: active ? 'var(--theme-accent)' : 'var(--theme-border)',
@@ -804,6 +811,8 @@ export function TasksScreen() {
             key={p}
             type="button"
             onClick={() => setPriorityFilter(prev => prev === p ? null : p)}
+            aria-pressed={priorityFilter === p}
+            aria-label={formatTaskFilterAriaLabel(`${p} priority`, priorityFilter === p)}
             className="text-[10px] px-2.5 py-1 rounded-full border transition-colors capitalize"
             style={{
               borderColor: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-border)',

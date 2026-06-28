@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { formatTaskAssigneeLabel } from './task-card'
-import { TASKS_BOARD_HELP_TEXT, formatTaskFilterSummary } from './tasks-screen'
+import { TASKS_BOARD_HELP_TEXT, formatTaskFilterAriaLabel, formatTaskFilterSummary } from './tasks-screen'
 
 describe('tasks UX copy', () => {
   it('exposes helper copy that explains drag and assignment behavior', () => {
@@ -20,5 +20,11 @@ describe('tasks UX copy', () => {
     expect(formatTaskFilterSummary(0, 5)).toBe('No matches across 5 tasks')
     expect(formatTaskFilterSummary(1, 1)).toBe('Showing all 1 task')
     expect(formatTaskFilterSummary(2, 5)).toBe('Showing 2 of 5 tasks')
+  })
+
+  it('formats filter toggle aria labels from active state', () => {
+    expect(formatTaskFilterAriaLabel('Overdue', false)).toBe('Enable overdue task filter')
+    expect(formatTaskFilterAriaLabel('Active Agent', true)).toBe('Disable active agent task filter')
+    expect(formatTaskFilterAriaLabel('high priority', false)).toBe('Enable high priority task filter')
   })
 })
