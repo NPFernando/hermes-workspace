@@ -310,6 +310,82 @@ export function ResearchScreen() {
           entries={library ?? []}
           onSelect={loadSavedResult}
         />
+      ) : phase === 'done' && result ? (
+        /* ── Two-panel done layout ── */
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* Left sidebar: query + controls + steps log */}
+          <div className="w-72 shrink-0 flex flex-col border-r border-[var(--theme-border)] overflow-y-auto">
+            <div className="p-4 space-y-3">
+              <p className="text-sm font-medium text-[var(--theme-text)] leading-snug">{query}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={reset} className="text-xs">
+                  New research
+                </Button>
+                {sessionId && (
+                  <Button
+                    size="sm" variant="outline" className="gap-1.5 text-xs"
+                    onClick={() => window.open(`/api/odysseus/research/report/${sessionId}`, '_blank')}
+                  >
+                    <HugeiconsIcon icon={Telescope02Icon} size={13} strokeWidth={1.5} />
+                    Full report
+                  </Button>
+                )}
+                <Button
+                  size="sm" variant="outline" className="gap-1.5 text-xs"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(result).then(() => {
+                      setCopied(true)
+                      setTimeout(() => setCopied(false), 2000)
+                    })
+                  }}
+                >
+                  <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={13} strokeWidth={1.5} />
+                  {copied ? 'Copied!' : 'Copy'}
+                </Button>
+                {sessionId && (
+                  <Button
+                    size="sm" variant="outline" className="text-xs"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/odysseus/research/spinoff/${sessionId}`, { method: 'POST' })
+                        if (res.ok) {
+                          const data = (await res.json()) as { session_id?: string }
+                          if (data.session_id) void navigate({ to: '/chat/$sessionKey', params: { sessionKey: data.session_id } })
+                        }
+                      } catch { /* ignore */ }
+                    }}
+                  >
+                    Continue in chat
+                  </Button>
+                )}
+              </div>
+            </div>
+            {steps.length > 0 && (
+              <div className="border-t border-[var(--theme-border)] px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] mb-2">
+                  Research log
+                </p>
+                <div className="space-y-1.5">
+                  {steps.map((step) => (
+                    <div key={step.id} className="flex items-start gap-2 text-xs">
+                      <span className="mt-0.5 shrink-0">{phaseIcon(step.phase)}</span>
+                      <span className="text-[var(--theme-muted)]">{step.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Right panel: research report at full available width */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-6">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+              Research Report
+            </div>
+            <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 md:p-6 text-sm text-[var(--theme-text)] [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:font-semibold [&_h3]:mt-3 [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-2 [&_a]:text-accent-400 [&_a]:underline">
+              <Markdown>{result}</Markdown>
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-4 md:p-6">
 

@@ -1,13 +1,13 @@
 [
   {
-    "title": "Clear task filter result summary copy",
-    "description": "Improve the Tasks filter bar result summary so empty and partial matches are easier to understand, with a tested helper for pluralization and zero-match states.",
+    "title": "Full-width workspace surfaces and task board quick actions",
+    "description": "Remove unnecessary width caps from dense workspace screens and refine the Tasks board with always-visible Done, overflow secondary actions, and quick-add controls so large displays are used more effectively.",
     "category": "ui",
-    "estimated_effort": "low"
+    "estimated_effort": "medium"
   },
   {
-    "title": "Task filter controls accessibility labels",
-    "description": "Add explicit aria labels and button types to compact Tasks toolbar controls that currently rely on icon/title-only affordances.",
+    "title": "Task board keyboard shortcut discoverability",
+    "description": "Add a compact shortcut/help affordance to the Tasks screen so power users can discover search, quick-add, and board navigation shortcuts without guessing.",
     "category": "ui",
     "estimated_effort": "low"
   },
@@ -18,9 +18,9 @@
     "estimated_effort": "low"
   },
   {
-    "title": "Task filter empty-state action hint",
-    "description": "When filters hide every task, show a small inline hint near the board with a one-click clear-filters action rather than only the compact toolbar summary.",
-    "category": "ui",
+    "title": "Health check regression smoke script",
+    "description": "Package the JSON/status/body validation health check into a reusable workspace script so cron cycles and manual deploys do not accidentally accept HTML fallback pages as healthy API responses.",
+    "category": "backend",
     "estimated_effort": "low"
   }
 ]

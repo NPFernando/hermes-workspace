@@ -404,7 +404,7 @@ export function KnowledgeBrowserScreen() {
   return (
     <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
     <div
-      className="mx-auto flex w-full max-w-[1200px] min-h-0 flex-col px-4 py-6 sm:px-6 lg:px-8"
+      className="flex w-full min-h-0 flex-col px-4 py-6 sm:px-6 lg:px-8"
     >
       <div
         className="px-3 py-3 md:px-4 border-b border-[var(--theme-border)] bg-[var(--theme-bg)]"

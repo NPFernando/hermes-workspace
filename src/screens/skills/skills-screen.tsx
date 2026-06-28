@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
@@ -644,7 +644,7 @@ export function SkillsScreen() {
 
   return (
     <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
+      <div className="flex w-full flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
         <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 backdrop-blur-xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1.5">
@@ -1228,7 +1228,7 @@ function SkillsGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       <AnimatePresence initial={false}>
         {skills.map((skill) => {
           const isActing = actionSkillId === skill.id
@@ -1477,7 +1477,7 @@ function SkillsSkeleton({
         'grid gap-3',
         large
           ? 'grid-cols-1 lg:grid-cols-2'
-          : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3',
+          : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4',
       )}
     >
       {Array.from({ length: count }).map((_, index) => (

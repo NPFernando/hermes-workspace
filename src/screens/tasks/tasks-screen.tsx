@@ -5,10 +5,11 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, Delete01Icon, Loading03Icon, RefreshIcon, Search01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, Delete01Icon, Loading03Icon, MoreVerticalIcon, RefreshIcon, Search01Icon } from '@hugeicons/core-free-icons'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
 import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority, UpdateTaskInput } from '@/lib/tasks-api'
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from '@/components/ui/menu'
 import {
   COLUMN_COLORS,
   COLUMN_LABELS,
@@ -76,7 +77,7 @@ export function TasksScreen() {
   const [editingTask, setEditingTask] = useState<ClaudeTask | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<TaskColumn | null>(null)
-  const [showDone, setShowDone] = useState(false)
+  const [showDone] = useState(true)
   const [astraReviewing, setAstraReviewing] = useState(false)
   const [askingAstra, setAskingAstra] = useState(false)
   const [ideasLoading, setIdeasLoading] = useState(false)
@@ -116,6 +117,9 @@ export function TasksScreen() {
   const [filterInReview, setFilterInReview] = useState(false)
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | null>(null)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+
+  const [quickAddCol, setQuickAddCol] = useState<TaskColumn | null>(null)
+  const [quickAddTitle, setQuickAddTitle] = useState('')
 
   const tasksQuery = useQuery({
     queryKey: [...QUERY_KEY, showDone],
@@ -310,10 +314,6 @@ export function TasksScreen() {
         searchInputRef.current?.focus()
         return
       }
-      if (e.key === 'd') {
-        e.preventDefault()
-        setShowDone(v => !v)
-      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -401,37 +401,39 @@ export function TasksScreen() {
     setTagFilter(null)
   }
 
-  const visibleColumns = showDone ? COLUMN_ORDER : COLUMN_ORDER.filter(c => c !== 'done')
-  const colMaxWidth = Math.floor(1200 / visibleColumns.length)
+  const visibleColumns = COLUMN_ORDER
 
   return (
     <div data-route-page className="h-full overflow-hidden flex flex-col bg-surface text-ink">
-      <div className="shrink-0 mx-auto w-full max-w-[1200px] flex flex-col gap-3 px-4 pt-5 pb-2 sm:px-6 lg:px-8">
+      <div className="shrink-0 w-full flex flex-col gap-3 px-4 pt-5 pb-2 sm:px-6 lg:px-8">
       {/* Header */}
       <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 backdrop-blur-xl">
-        <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0">
-          <h1 className="text-2xl font-medium text-ink">Tasks</h1>
-          {assigneeFilter && (
-            <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
-              <span>Filtered by: <span className="capitalize text-amber-500">{assigneeFilter}</span></span>
-              <button
-                type="button"
-                onClick={() => setAssigneeFilter(null)}
-                className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] transition-colors"
-              >
-                ✕ Clear
-              </button>
-            </div>
-          )}
-          {/* Stats */}
-          <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)] flex-wrap">
-            <span>{stats.total} total</span>
-            <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline">{stats.running} running</span>
+        <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-medium text-ink shrink-0">Tasks</h1>
+            {assigneeFilter && (
+              <div className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
+                <span>·</span>
+                <span>Filtered by: <span className="capitalize text-amber-500">{assigneeFilter}</span></span>
+                <button
+                  type="button"
+                  onClick={() => setAssigneeFilter(null)}
+                  className="text-[var(--theme-muted)] hover:text-ink transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+          {/* Stats — single subtitle line, full left-column width so it never wraps */}
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
+            <span>{stats.total} tasks</span>
+            <span>·</span>
+            <span>{stats.running} running</span>
             {stats.blocked > 0 && (
               <>
-                <span className="hidden sm:inline">·</span>
+                <span>·</span>
                 <span className="text-red-400">{stats.blocked} blocked</span>
               </>
             )}
@@ -441,8 +443,8 @@ export function TasksScreen() {
                 <span className="text-red-400">{stats.overdue} overdue</span>
               </>
             )}
-            <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline">{stats.completion}% done</span>
+            <span>·</span>
+            <span>{stats.completion}% done</span>
             {stats.agentActive > 0 && (
               <>
                 <span>·</span>
@@ -455,7 +457,7 @@ export function TasksScreen() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
           {/* Ask Astra */}
           <button
             onClick={async () => {
@@ -537,151 +539,146 @@ export function TasksScreen() {
             {astraReviewing ? 'Deploying…' : 'Deploy Agents'}
           </button>
 
-          {/* Clear Stuck — only shown when tasks are visibly stuck (spinner > 10 min) */}
-          {tasks.some(t => t.agent_state && t.agent_action_at && Date.now() - new Date(t.agent_action_at).getTime() > 10 * 60_000) && (
-            <button
-              onClick={async () => {
-                setClearingStuck(true)
-                try {
-                  await fetch('/api/tasks-deploy-agents', { method: 'DELETE' })
-                  await tasksQuery.refetch()
-                } finally {
-                  setClearingStuck(false)
-                }
-              }}
-              disabled={clearingStuck}
-              title="Clear stuck agent spinners — auto-recovers tasks whose background process died"
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors"
-            >
-              <HugeiconsIcon icon={Loading03Icon} size={13} strokeWidth={1.8} className={clearingStuck ? 'animate-spin' : ''} />
-              {clearingStuck ? 'Clearing…' : 'Clear Stuck'}
-            </button>
-          )}
-
-          {/* Check Completion — only shown when there are tasks to check */}
-          {tasks.some(t => t.column === 'review' || t.column === 'in_progress') && (
-            <button
-              onClick={async () => {
-                setCheckingCompletion(true)
-                try {
-                  await fetch('/api/tasks-completion-check', { method: 'POST' })
-                  await tasksQuery.refetch()
-                } finally {
-                  setCheckingCompletion(false)
-                }
-              }}
-              disabled={checkingCompletion}
-              title="Astra reviews tasks in Review/In Progress and marks them Done if implementation is confirmed deployed"
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-                checkingCompletion
-                  ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400 cursor-wait'
-                  : 'border-[var(--theme-border)] text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50',
+          {/* Secondary actions — overflow menu */}
+          <MenuRoot>
+            <MenuTrigger
+              render={
+                <button
+                  type="button"
+                  title="More actions"
+                  className="relative flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium border border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-ink transition-colors"
+                >
+                  <HugeiconsIcon icon={MoreVerticalIcon} size={14} />
+                  {/* Dot badge when any conditional action is available */}
+                  {(tasks.some(t => t.column === 'review' || t.column === 'in_progress') ||
+                    tasks.some(t => (t.column === 'backlog' || t.column === 'todo') && !(t.agent_history?.length)) ||
+                    columnMap['done'].length > 0 ||
+                    tasks.some(t => t.agent_state && t.agent_action_at && Date.now() - new Date(t.agent_action_at).getTime() > 10 * 60_000)
+                  ) && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 border-2 border-[var(--theme-panel)]" />
+                  )}
+                </button>
+              }
+            />
+            <MenuContent side="bottom" align="end">
+              {/* Clear Stuck */}
+              {tasks.some(t => t.agent_state && t.agent_action_at && Date.now() - new Date(t.agent_action_at).getTime() > 10 * 60_000) && (
+                <MenuItem
+                  onClick={async () => {
+                    setClearingStuck(true)
+                    try {
+                      await fetch('/api/tasks-deploy-agents', { method: 'DELETE' })
+                      await tasksQuery.refetch()
+                    } finally {
+                      setClearingStuck(false)
+                    }
+                  }}
+                  disabled={clearingStuck}
+                  className="text-amber-400"
+                >
+                  <HugeiconsIcon icon={Loading03Icon} size={13} className={clearingStuck ? 'animate-spin' : ''} />
+                  {clearingStuck ? 'Clearing…' : 'Clear Stuck'}
+                </MenuItem>
               )}
-            >
-              <HugeiconsIcon icon={CheckListIcon} size={13} strokeWidth={1.8} className={checkingCompletion ? 'animate-pulse' : ''} />
-              {checkingCompletion ? 'Checking…' : 'Check Done'}
-            </button>
-          )}
 
-          {/* AI idea generation */}
-          <button
-            onClick={async () => {
-              setIdeasLoading(true)
-              try {
-                const res = await fetch('/api/tasks-generate-ideas', { method: 'POST' })
-                const data = await res.json() as { ok: boolean; injected: number; ideas: Array<string>; error?: string }
-                if (data.injected > 0) {
-                  await tasksQuery.refetch()
-                  toast(`Added ${data.injected} idea${data.injected > 1 ? 's' : ''} to backlog`)
-                } else if (data.error) {
-                  toast(`Idea scan failed: ${data.error}`, { type: 'error' })
-                } else {
-                  toast('AI scanned workspace — no new ideas to add right now', { type: 'info' })
-                }
-              } catch {
-                toast('Failed to reach idea generator', { type: 'error' })
-              } finally {
-                setIdeasLoading(false)
-              }
-            }}
-            disabled={ideasLoading}
-            title="Ask AI to scan the workspace and suggest feature ideas"
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-              ideasLoading
-                ? 'border-amber-500/50 bg-amber-500/10 text-amber-400 cursor-wait'
-                : 'border-[var(--theme-border)] text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50',
-            )}
-          >
-            <HugeiconsIcon icon={BulbIcon} size={13} strokeWidth={1.8} className={ideasLoading ? 'animate-pulse' : ''} />
-            {ideasLoading ? 'Scanning…' : 'Add Idea'}
-          </button>
+              {/* Check Completion */}
+              {tasks.some(t => t.column === 'review' || t.column === 'in_progress') && (
+                <MenuItem
+                  onClick={async () => {
+                    setCheckingCompletion(true)
+                    try {
+                      await fetch('/api/tasks-completion-check', { method: 'POST' })
+                      await tasksQuery.refetch()
+                    } finally {
+                      setCheckingCompletion(false)
+                    }
+                  }}
+                  disabled={checkingCompletion}
+                  className="text-emerald-400"
+                >
+                  <HugeiconsIcon icon={CheckListIcon} size={13} className={checkingCompletion ? 'animate-pulse' : ''} />
+                  {checkingCompletion ? 'Checking…' : 'Check Done'}
+                </MenuItem>
+              )}
 
-          {/* Prune Stale — only shown when there are backlog/todo tasks that could be pruned */}
-          {tasks.some(t => (t.column === 'backlog' || t.column === 'todo') && !(t.agent_history?.length)) && <button
-            onClick={async () => {
-              if (!window.confirm('Delete todo/backlog tasks with no agent history older than 2 hours? Duplicates and stale AI-generated tasks will be removed.')) return
-              setPruningStale(true)
-              try {
-                const res = await fetch('/api/tasks-prune', { method: 'POST' })
-                const data = await res.json() as { ok: boolean; pruned: number; error?: string }
-                if (data.pruned > 0) {
-                  await tasksQuery.refetch()
-                  toast(`Pruned ${data.pruned} stale task${data.pruned !== 1 ? 's' : ''}`)
-                } else if (data.error) {
-                  toast(`Prune failed: ${data.error}`, { type: 'error' })
-                } else {
-                  toast('No stale tasks to prune', { type: 'info' })
-                }
-              } catch {
-                toast('Failed to reach prune endpoint', { type: 'error' })
-              } finally {
-                setPruningStale(false)
-              }
-            }}
-            disabled={pruningStale}
-            title="Remove unprocessed auto-generated todo/backlog tasks older than 2 hours"
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-              pruningStale
-                ? 'border-red-500/50 bg-red-500/10 text-red-400 cursor-wait'
-                : 'border-[var(--theme-border)] text-red-400/70 hover:bg-red-500/10 hover:border-red-500/40',
-            )}
-          >
-            <HugeiconsIcon icon={Delete01Icon} size={13} strokeWidth={1.8} className={pruningStale ? 'animate-pulse' : ''} />
-            {pruningStale ? 'Pruning…' : 'Prune Stale'}
-          </button>}
+              {/* Add Idea */}
+              <MenuItem
+                onClick={async () => {
+                  setIdeasLoading(true)
+                  try {
+                    const res = await fetch('/api/tasks-generate-ideas', { method: 'POST' })
+                    const data = await res.json() as { ok: boolean; injected: number; ideas: Array<string>; error?: string }
+                    if (data.injected > 0) {
+                      await tasksQuery.refetch()
+                      toast(`Added ${data.injected} idea${data.injected > 1 ? 's' : ''} to backlog`)
+                    } else if (data.error) {
+                      toast(`Idea scan failed: ${data.error}`, { type: 'error' })
+                    } else {
+                      toast('AI scanned workspace — no new ideas to add right now', { type: 'info' })
+                    }
+                  } catch {
+                    toast('Failed to reach idea generator', { type: 'error' })
+                  } finally {
+                    setIdeasLoading(false)
+                  }
+                }}
+                disabled={ideasLoading}
+                className="text-amber-400"
+              >
+                <HugeiconsIcon icon={BulbIcon} size={13} className={ideasLoading ? 'animate-pulse' : ''} />
+                {ideasLoading ? 'Scanning…' : 'Add Idea'}
+              </MenuItem>
 
-          <button
-            onClick={() => setShowDone(v => !v)}
-            className={cn(
-              'text-xs px-2.5 py-1 rounded-lg border transition-colors',
-              showDone
-                ? 'border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-hover)]'
-                : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:border-[var(--theme-accent)]',
-            )}
-          >
-            {showDone ? 'Hide Done' : 'Show Done'}
-          </button>
+              {/* Prune Stale */}
+              {tasks.some(t => (t.column === 'backlog' || t.column === 'todo') && !(t.agent_history?.length)) && (
+                <MenuItem
+                  onClick={async () => {
+                    if (!window.confirm('Delete todo/backlog tasks with no agent history older than 2 hours? Duplicates and stale AI-generated tasks will be removed.')) return
+                    setPruningStale(true)
+                    try {
+                      const res = await fetch('/api/tasks-prune', { method: 'POST' })
+                      const data = await res.json() as { ok: boolean; pruned: number; error?: string }
+                      if (data.pruned > 0) {
+                        await tasksQuery.refetch()
+                        toast(`Pruned ${data.pruned} stale task${data.pruned !== 1 ? 's' : ''}`)
+                      } else if (data.error) {
+                        toast(`Prune failed: ${data.error}`, { type: 'error' })
+                      } else {
+                        toast('No stale tasks to prune', { type: 'info' })
+                      }
+                    } catch {
+                      toast('Failed to reach prune endpoint', { type: 'error' })
+                    } finally {
+                      setPruningStale(false)
+                    }
+                  }}
+                  disabled={pruningStale}
+                  className="text-red-400"
+                >
+                  <HugeiconsIcon icon={Delete01Icon} size={13} className={pruningStale ? 'animate-pulse' : ''} />
+                  {pruningStale ? 'Pruning…' : 'Prune Stale'}
+                </MenuItem>
+              )}
 
-          {/* Clear Done — only shown when Done column is visible and has tasks */}
-          {showDone && columnMap['done'].length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                const doneTasks = columnMap['done']
-                if (!window.confirm(`Delete all ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}? This cannot be undone.`)) return
-                void Promise.all(doneTasks.map(t => deleteTask(t.id))).then(() => {
-                  invalidate()
-                  toast(`Cleared ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}`)
-                }).catch(() => toast('Failed to clear done tasks', { type: 'error' }))
-              }}
-              className="text-xs px-2.5 py-1 rounded-lg border transition-colors border-red-500/40 text-red-400 hover:bg-red-500/10"
-            >
-              Clear Done ({columnMap['done'].length})
-            </button>
-          )}
+              {/* Clear Done */}
+              {columnMap['done'].length > 0 && (
+                <MenuItem
+                  onClick={() => {
+                    const doneTasks = columnMap['done']
+                    if (!window.confirm(`Delete all ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}? This cannot be undone.`)) return
+                    void Promise.all(doneTasks.map(t => deleteTask(t.id))).then(() => {
+                      invalidate()
+                      toast(`Cleared ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}`)
+                    }).catch(() => toast('Failed to clear done tasks', { type: 'error' }))
+                  }}
+                  className="text-red-400"
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={13} />
+                  Clear Done ({columnMap['done'].length})
+                </MenuItem>
+              )}
+            </MenuContent>
+          </MenuRoot>
 
           <button
             onClick={invalidate}
@@ -708,7 +705,6 @@ export function TasksScreen() {
               <TooltipContent side="bottom" className="space-y-1 text-[11px] leading-relaxed">
                 <div><kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">n</kbd> New task (Triage)</div>
                 <div><kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">/</kbd> Focus search</div>
-                <div><kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">d</kbd> Toggle Done column</div>
               </TooltipContent>
             </TooltipRoot>
           </TooltipProvider>
@@ -859,89 +855,120 @@ export function TasksScreen() {
 
       {/* Board */}
       <div
-        className="flex-1 min-h-0 mx-auto w-full max-w-[1200px] flex gap-3 overflow-x-auto overflow-y-hidden px-4 pb-[calc(var(--tabbar-h,80px)+1rem)] pt-3 sm:px-6 lg:px-8"
+        className="flex-1 min-h-0 w-full flex gap-3 overflow-x-auto overflow-y-hidden px-4 pb-[calc(var(--tabbar-h,80px)+1rem)] pt-3 sm:px-6 lg:px-8"
         style={{ boxShadow: 'inset 0 8px 24px rgba(0,0,0,0.2)' }}
       >
         {visibleColumns.map((col) => {
           const colTasks = columnMap[col]
           const colColor = COLUMN_COLORS[col]
           const isDragOver = dragOverColumn === col
+          // Compact when empty and not being dragged over
+          const isCompact = colTasks.length === 0 && !isDragOver && !tasksQuery.isLoading
 
           return (
             <div
               key={col}
               className={cn(
-                'flex flex-col rounded-xl border min-w-[180px] w-full shrink-0 flex-1 min-h-0',
+                'flex flex-col rounded-xl border min-h-0 transition-all duration-200',
+                isCompact ? 'w-10 shrink-0' : 'min-w-[280px] flex-1',
                 'bg-[var(--theme-card)] border-[var(--theme-border)]',
-                'transition-colors shadow-[0_2px_12px_rgba(0,0,0,0.25)]',
+                'shadow-[0_2px_12px_rgba(0,0,0,0.25)]',
                 isDragOver && 'border-[var(--theme-accent)] bg-[var(--theme-hover)]',
               )}
-              style={{ maxWidth: colMaxWidth }}
               onDragOver={e => handleDragOver(e, col)}
               onDrop={e => handleDrop(e, col)}
               onDragLeave={() => setDragOverColumn(null)}
             >
-              {/* Column header */}
-              <div
-                className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--theme-border)] rounded-t-xl"
-                style={{ borderTopWidth: 2, borderTopColor: colColor, borderTopStyle: 'solid' }}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: colColor }} />
-                  <span className="text-xs font-semibold text-[var(--theme-text)]">
-                    {COLUMN_LABELS[col]}
-                  </span>
-                  <span className="text-xs text-[var(--theme-muted)]">
-                    ({tasksQuery.isFetching && tasksQuery.data === undefined ? '…' : colTasks.length})
-                  </span>
-                </div>
-                <button
-                  onClick={() => { setCreateColumn(col); setShowCreate(true) }}
-                  className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
-                  title={`Add to ${COLUMN_LABELS[col]}`}
+              {isCompact ? (
+                /* Compact column: rotated label + add button */
+                <div
+                  className="flex flex-col items-center h-full py-2 gap-2"
+                  style={{ borderTopWidth: 2, borderTopColor: colColor, borderTopStyle: 'solid', borderRadius: '0.75rem 0.75rem 0 0' }}
                 >
-                  <HugeiconsIcon icon={Add01Icon} size={14} className="text-[var(--theme-muted)]" />
-                </button>
-              </div>
-
-              {/* Cards */}
-              <div className="flex flex-col gap-2 p-2 flex-1 min-h-0 overflow-y-auto scrollbar-thin">
-                {tasksQuery.isError ? (
-                  <motion.div
-                    key="error"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex flex-col items-center justify-center py-8 gap-2 text-red-400"
+                  <button
+                    onClick={() => { setCreateColumn(col); setShowCreate(true) }}
+                    className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
+                    title={`Add to ${COLUMN_LABELS[col]}`}
                   >
-                    <p className="text-xs font-medium">Failed to load tasks</p>
-                    <button
-                      onClick={() => tasksQuery.refetch()}
-                      className="text-xs text-[var(--theme-accent)] hover:underline"
+                    <HugeiconsIcon icon={Add01Icon} size={13} className="text-[var(--theme-muted)]" />
+                  </button>
+                  <div className="flex-1 flex items-center justify-center">
+                    <span
+                      className="text-[10px] font-semibold tracking-wide select-none"
+                      style={{
+                        color: colColor,
+                        writingMode: 'vertical-lr',
+                        transform: 'rotate(180deg)',
+                      }}
                     >
-                      Retry
+                      {COLUMN_LABELS[col]}
+                    </span>
+                  </div>
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: colColor }} />
+                </div>
+              ) : (
+                <>
+                  {/* Column header */}
+                  <div
+                    className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--theme-border)] rounded-t-xl"
+                    style={{ borderTopWidth: 2, borderTopColor: colColor, borderTopStyle: 'solid' }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: colColor }} />
+                      <span className="text-xs font-semibold text-[var(--theme-text)]">
+                        {COLUMN_LABELS[col]}
+                      </span>
+                      <span className="text-xs text-[var(--theme-muted)]">
+                        ({tasksQuery.isFetching && tasksQuery.data === undefined ? '…' : colTasks.length})
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => { setCreateColumn(col); setShowCreate(true) }}
+                      className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
+                      title={`Add to ${COLUMN_LABELS[col]}`}
+                    >
+                      <HugeiconsIcon icon={Add01Icon} size={14} className="text-[var(--theme-muted)]" />
                     </button>
-                  </motion.div>
-                ) : tasksQuery.isLoading ? (
-                  <>
-                    <SkeletonCard />
-                    <SkeletonCard />
-                    <SkeletonCard />
-                  </>
-                ) : (
-                  <AnimatePresence initial={false}>
-                    {colTasks.length === 0 ? (
+                  </div>
+
+                  {/* Cards */}
+                  <div className="flex flex-col gap-2 p-2 flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+                    {tasksQuery.isError ? (
                       <motion.div
-                        key="empty"
+                        key="error"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="flex flex-col items-center justify-center py-8 gap-2 text-[var(--theme-muted)] opacity-60"
+                        className="flex flex-col items-center justify-center py-8 gap-2 text-red-400"
                       >
-                        <HugeiconsIcon icon={CheckListIcon} size={22} />
-                        <p className="text-xs font-medium">No tasks</p>
-                        <p className="text-[10px]">Drop here or click + to add</p>
+                        <p className="text-xs font-medium">Failed to load tasks</p>
+                        <button
+                          onClick={() => tasksQuery.refetch()}
+                          className="text-xs text-[var(--theme-accent)] hover:underline"
+                        >
+                          Retry
+                        </button>
                       </motion.div>
+                    ) : tasksQuery.isLoading ? (
+                      <>
+                        <SkeletonCard />
+                        <SkeletonCard />
+                        <SkeletonCard />
+                      </>
                     ) : (
+                      <AnimatePresence initial={false}>
+                        {colTasks.length === 0 ? (
+                          <motion.div
+                            key="empty"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex flex-col items-center justify-center py-8 gap-2 text-[var(--theme-muted)] opacity-60"
+                          >
+                            <HugeiconsIcon icon={CheckListIcon} size={22} />
+                            <p className="text-xs font-medium">No tasks</p>
+                            <p className="text-[10px]">Drop here or click + to add</p>
+                          </motion.div>
+                        ) : (
                       colTasks.map(task => (
                         <motion.div
                           key={task.id}
@@ -1017,10 +1044,44 @@ export function TasksScreen() {
                           />
                         </motion.div>
                       ))
-                    )}
-                  </AnimatePresence>
+                      )}
+                    </AnimatePresence>
+                  )}
+                </div>
+
+                {/* Inline quick-add footer */}
+                {quickAddCol === col ? (
+                  <div className="shrink-0 p-2 border-t border-[var(--theme-border)]">
+                    <input
+                      autoFocus
+                      value={quickAddTitle}
+                      onChange={e => setQuickAddTitle(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && quickAddTitle.trim()) {
+                          createMutation.mutate({ title: quickAddTitle.trim(), column: col })
+                          setQuickAddTitle('')
+                          setQuickAddCol(null)
+                        } else if (e.key === 'Escape') {
+                          setQuickAddTitle('')
+                          setQuickAddCol(null)
+                        }
+                      }}
+                      onBlur={() => { setQuickAddTitle(''); setQuickAddCol(null) }}
+                      placeholder="Task title… Enter to save, Esc to cancel"
+                      className="w-full text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2.5 py-2 text-ink outline-none focus:border-[var(--theme-accent)] placeholder:text-[var(--theme-muted)]"
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setQuickAddCol(col)}
+                    className="shrink-0 w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-[var(--theme-muted)]/40 hover:text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-all duration-150 border-t border-[var(--theme-border)]/40 hover:border-[var(--theme-border)] rounded-b-xl"
+                  >
+                    <HugeiconsIcon icon={Add01Icon} size={11} />
+                    Add task
+                  </button>
                 )}
-              </div>
+                </>
+              )}
             </div>
           )
         })}

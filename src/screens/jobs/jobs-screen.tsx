@@ -419,90 +419,77 @@ export function JobsScreen() {
 
   return (
     <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
+      <div className="flex w-full flex-col gap-4 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
         <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/85 p-4 backdrop-blur-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <HugeiconsIcon
+              icon={Clock01Icon}
+              size={18}
+              className="text-[var(--theme-accent)] shrink-0"
+            />
+            <h1 className="text-base font-semibold text-[var(--theme-text)] shrink-0">
+              Jobs
+            </h1>
+            {jobsQuery.data && (
+              <span className="text-xs text-[var(--theme-muted)] shrink-0">
+                ({jobsQuery.data.length})
+              </span>
+            )}
+            {/* Search — inline in header */}
+            <div className="relative flex-1 min-w-0">
               <HugeiconsIcon
-                icon={Clock01Icon}
-                size={18}
-                className="text-[var(--theme-accent)]"
+                icon={Search01Icon}
+                size={13}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-muted)] pointer-events-none"
               />
-              <h1 className="text-base font-semibold text-[var(--theme-text)]">
-                Jobs
-              </h1>
-              {jobsQuery.data && (
-                <span className="ml-1 text-xs text-[var(--theme-muted)]">
-                  ({jobsQuery.data.length})
-                </span>
-              )}
+              <input
+                type="text"
+                placeholder="Search jobs…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] py-1.5 pl-8 pr-3 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)]"
+              />
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() =>
-                  void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
-                }
-                className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
-                title="Refresh"
-              >
-                <HugeiconsIcon
-                  icon={RefreshIcon}
-                  size={16}
-                  className="text-[var(--theme-muted)]"
-                />
-              </button>
-              <button
-                onClick={() => setShowCreate(true)}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 bg-[var(--theme-accent)]"
-              >
-                <HugeiconsIcon icon={Add01Icon} size={14} />
-                New Job
-              </button>
-            </div>
+            {profilesQuery.isError && (
+              <span className="text-xs text-amber-400 shrink-0">Profiles failed to load</span>
+            )}
+            <button
+              onClick={() =>
+                void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+              }
+              className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)] shrink-0"
+              title="Refresh"
+            >
+              <HugeiconsIcon
+                icon={RefreshIcon}
+                size={16}
+                className="text-[var(--theme-muted)]"
+              />
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 bg-[var(--theme-accent)] shrink-0"
+            >
+              <HugeiconsIcon icon={Add01Icon} size={14} />
+              New Job
+            </button>
           </div>
         </header>
 
-        <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/85 p-4 backdrop-blur-xl">
-          <div className="relative">
-            <HugeiconsIcon
-              icon={Search01Icon}
-              size={14}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-muted)]"
-            />
-            <input
-              type="text"
-              placeholder="Search jobs..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] py-1.5 pl-8 pr-3 text-xs text-[var(--theme-text)] placeholder:text-[var(--theme-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)]"
-            />
-          </div>
-          {profilesQuery.isError ? (
-            <p
-              className="mt-2 text-xs text-amber-400"
-            >
-              Profile list failed to load. New jobs will default to the default
-              profile until profiles refresh.
-            </p>
-          ) : null}
-        </div>
-
-        <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {jobsQuery.isLoading ? (
-            <div className="flex items-center justify-center py-12 text-sm text-[var(--theme-muted)]">
+            <div className="col-span-full flex items-center justify-center py-12 text-sm text-[var(--theme-muted)]">
               Loading jobs...
             </div>
           ) : jobsQuery.isError ? (
-            <div
-              className="flex items-center justify-center py-12 text-sm text-[var(--theme-danger,#ef4444)]"
-            >
+            <div className="col-span-full flex items-center justify-center py-12 text-sm text-[var(--theme-danger,#ef4444)]">
               Failed to load jobs:{' '}
               {jobsQuery.error instanceof Error
                 ? jobsQuery.error.message
                 : 'Unknown error'}
             </div>
           ) : filteredJobs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-[var(--theme-muted)]">
+            <div className="col-span-full flex flex-col items-center justify-center py-12 text-[var(--theme-muted)]">
               <HugeiconsIcon
                 icon={Clock01Icon}
                 size={32}

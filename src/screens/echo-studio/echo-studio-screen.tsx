@@ -67,7 +67,7 @@ export function EchoStudioScreen() {
 
   return (
     <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight">Echo Studio</h1>
@@ -94,10 +94,10 @@ export function EchoStudioScreen() {
           ))}
         </div>
 
-        {/* Create Tab */}
+        {/* Create Tab — 2-column on lg+ */}
         {tab === 'create' && (
-          <div className="space-y-6">
-            {/* Form */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
+            {/* Left: form */}
             <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-6">
               <div className="space-y-5">
                 {/* Page ID */}
@@ -137,7 +137,7 @@ export function EchoStudioScreen() {
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder={DEFAULT_PROMPT}
-                    rows={5}
+                    rows={8}
                     className="w-full resize-y rounded-xl border border-[var(--theme-border)] bg-[var(--theme-input)] px-4 py-2.5 text-sm text-[var(--theme-text)] outline-none transition-colors placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)]"
                   />
                 </div>
@@ -171,31 +171,34 @@ export function EchoStudioScreen() {
               </div>
             </div>
 
-            {/* Quick Templates */}
-            <div>
-              <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]">
-                Quick Templates
-              </h2>
-              <div className="flex flex-wrap gap-3">
-                {QUICK_TEMPLATES.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => handleTemplate(t.id)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-accent-500 hover:bg-accent-50/50 dark:hover:bg-accent-900/20"
-                  >
-                    <span className="text-base">{t.icon}</span>
-                    {t.label}
-                  </button>
-                ))}
+            {/* Right sidebar: templates + stats */}
+            <div className="flex flex-col gap-5">
+              {/* Quick Templates */}
+              <div>
+                <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+                  Quick Templates
+                </h2>
+                <div className="flex flex-col gap-2">
+                  {QUICK_TEMPLATES.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => handleTemplate(t.id)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-accent-500 hover:bg-accent-50/50 dark:hover:bg-accent-900/20"
+                    >
+                      <span className="text-base">{t.icon}</span>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <StatCard label="Screens Created" value={screensCreated} />
-              <StatCard label="Widgets Active" value={widgetsActive} />
-              <StatCard label="API Endpoints" value={apiEndpoints} />
+              {/* Stats */}
+              <div className="flex flex-col gap-3">
+                <StatCard label="Screens Created" value={screensCreated} />
+                <StatCard label="Widgets Active" value={widgetsActive} />
+                <StatCard label="API Endpoints" value={apiEndpoints} />
+              </div>
             </div>
           </div>
         )}

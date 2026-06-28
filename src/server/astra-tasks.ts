@@ -96,8 +96,11 @@ const HERMES_BIN = resolveHermesBin()
 // Called on every runAgentDeployBackground() and periodically via setInterval.
 // ---------------------------------------------------------------------------
 
-const REVIEWING_TIMEOUT_MS = 4 * 60 * 1000    //  4 min  (each review call is ≤ 90s × 2)
-const WORKING_TIMEOUT_MS   = 25 * 60 * 1000   // 25 min  (hermes -z timeout is 20 min)
+const REVIEWING_TIMEOUT_MS     =  4 * 60 * 1000   //  4 min  (each review call is ≤ 90s × 2)
+const WORKING_TIMEOUT_MS       = 25 * 60 * 1000   // 25 min  (hermes -z timeout is 20 min)
+const WAITING_INPUT_TIMEOUT_MS = 60 * 60 * 1000   // 60 min  (user needs time to read & answer via Telegram)
+const AUTO_RETRY_AFTER_MS      =  4 * 60 * 60 * 1000  // 4h before first auto-retry of a blocked task
+const MAX_AUTO_RETRIES         = 2                     // hard cap on auto-retries per task
 
 export function clearStuckTasks(): number {
   const now = Date.now()
@@ -105,24 +108,37 @@ export function clearStuckTasks(): number {
   let cleared = 0
 
   // ── Part 1: recover stuck agent_state ──────────────────────────────────────
+  // waiting_for_input gets 60 min — the user may be asleep; working gets 25 min;
+  // reviewing/delegating get 4 min (each hermes review call is ≤ 90s).
   for (const task of all) {
     if (!task.agent_state || !task.agent_action_at) continue
-    const ageMs   = now - new Date(task.agent_action_at).getTime()
-    const timeout = task.agent_state === 'working' ? WORKING_TIMEOUT_MS : REVIEWING_TIMEOUT_MS
+    const ageMs = now - new Date(task.agent_action_at).getTime()
+    const timeout =
+      task.agent_state === 'working'           ? WORKING_TIMEOUT_MS :
+      task.agent_state === 'waiting_for_input' ? WAITING_INPUT_TIMEOUT_MS :
+      REVIEWING_TIMEOUT_MS
     if (ageMs <= timeout) continue
 
     const existing = task.agent_history ?? []
     const ageMin   = Math.round(ageMs / 60_000)
+    // waiting_for_input: spinner clears but task stays blocked+waiting — the
+    // Telegram keyboard and workspace reply path remain valid.
+    const note = task.agent_state === 'waiting_for_input'
+      ? `No reply received in ${ageMin} min — spinner cleared. Question still open; answer via Telegram or workspace, or press Execute to restart with prior context.`
+      : `Agent state "${task.agent_state}" was stuck for ${ageMin} min — auto-cleared. Press Execute to retry.`
+
     updateTask(task.id, {
       agent_state:     null,
       agent_name:      null,
       agent_action_at: null,
+      // For waiting_for_input: keep waiting_for_user=true so the question UI remains visible
+      ...(task.agent_state !== 'waiting_for_input' ? { waiting_for_user: false } : {}),
       agent_history:   [...existing, {
         id:      randomUUID(),
         by:      'astra',
         byEmoji: '🌟',
         action:  'timed_out',
-        note:    `Agent state "${task.agent_state}" was stuck for ${ageMin} min — auto-cleared. Press Execute to retry.`,
+        note,
         at:      new Date().toISOString(),
       }],
     })
@@ -214,6 +230,56 @@ export function clearStuckTasks(): number {
         timeout:  15_000,
       })
     } catch { /* non-fatal */ }
+  }
+
+  // ── Part 4: auto-retry execution-blocked tasks (not waiting_for_user) ──────
+  // When a task is blocked because the agent hit a runtime error (not a user
+  // question), we retry up to MAX_AUTO_RETRIES times after AUTO_RETRY_AFTER_MS.
+  // The prior failure context is already in agent_history so the agent can see
+  // what was tried. Retries are capped to avoid burning credits in a loop.
+  for (const task of all) {
+    if (task.column !== 'blocked') continue
+    if (task.agent_state) continue                               // active agent — skip
+    if (task.waiting_for_user) continue                          // question open — don't interrupt
+    if ((task.auto_retry_count ?? 0) >= MAX_AUTO_RETRIES) continue
+
+    // Must have at least one prior agent execution (blocked entry) to retry
+    const history = task.agent_history ?? []
+    const lastBlockedEntry = [...history].reverse().find(e => e.by !== 'user' && e.action === 'blocked')
+    if (!lastBlockedEntry) continue
+
+    // Don't retry if blocked by a user action or if the block was from escalation/loop_alert
+    const lastUserActivity = [...history].reverse().find(e => e.by === 'user')
+    const lastBlockedMs    = new Date(lastBlockedEntry.at).getTime()
+    const lastActivityMs   = Math.max(
+      lastUserActivity ? new Date(lastUserActivity.at).getTime() : 0,
+      lastBlockedMs,
+    )
+    if (!lastActivityMs || now - lastActivityMs < AUTO_RETRY_AFTER_MS) continue
+
+    const retryCount = (task.auto_retry_count ?? 0) + 1
+    const ageH       = Math.round((now - lastActivityMs) / (60 * 60 * 1000))
+    const nowIso     = new Date().toISOString()
+
+    updateTask(task.id, {
+      column:           'in_progress',
+      auto_retry_count: retryCount,
+      auto_retry_at:    nowIso,
+      agent_state:      'working',
+      agent_name:       task.assignee ?? 'astra',
+      agent_action_at:  nowIso,
+      agent_history:    [...history, {
+        id:      randomUUID(),
+        by:      'astra',
+        byEmoji: '🌟',
+        action:  'auto_retry',
+        note:    `Auto-retrying (attempt ${retryCount}/${MAX_AUTO_RETRIES}) after ${ageH}h blocked — prior context included in prompt. No more retries if this fails.`,
+        at:      nowIso,
+      }],
+    })
+
+    // Fire execution in a background subprocess — fully detached, non-blocking
+    executeTaskWithHermesBackground(task.id)
   }
 
   return cleared
@@ -666,9 +732,9 @@ function doBreakdown(task, assignee) {
 
   const MAX_SUBTASKS = 6;
   const titles = [];
+  const now = new Date().toISOString();
   withTasksLock(() => {
     const file = readTasks();
-    const now  = new Date().toISOString();
     const existingTitles = new Set(file.tasks.map(function(t) { return t.title.toLowerCase().trim(); }));
     let pushed = 0;
     for (const sub of subtasks) {
@@ -1113,13 +1179,13 @@ export function executeTaskBackground(taskId: string): void {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       lastError = msg
-      console.warn(`[executeTaskBackground] OpenRouter direct failed: ${msg} — falling back to gateway`)
+      console.warn(`[executeTaskBackground] OpenRouter direct failed: ${msg} — trying gateway`)
       try {
-        output = await doDirectChat(AbortSignal.timeout(25_000))
+        output = await doGatewayChat(AbortSignal.timeout(60_000))
       } catch {
-        // Both direct attempts failed — try gateway as last resort
+        // Gateway also failed — retry direct as last resort
         try {
-          output = await doGatewayChat(AbortSignal.timeout(60_000))
+          output = await doDirectChat(AbortSignal.timeout(25_000))
         } catch (err3) {
           lastError = err3 instanceof Error ? err3.message : String(err3)
           console.error('[executeTaskBackground] all attempts failed:', lastError)
@@ -1526,7 +1592,7 @@ async function sendTelegramDoneNotification(taskId, taskTitle, status, note) {
 
 // Clean up orphaned hermes-exec-*.mjs scripts from previous killed runs.
 try {
-  const tmpDir = require('node:os').tmpdir();
+  const tmpDir = os.tmpdir();
   const staleMs = 30 * 60 * 1000; // 30 min
   for (const f of fs.readdirSync(tmpDir)) {
     if (!f.startsWith('hermes-exec-') || !f.endsWith('.mjs')) continue;

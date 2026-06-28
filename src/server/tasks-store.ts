@@ -53,6 +53,8 @@ export type TaskRecord = {
   clarify_nudged_at?: string
   clarify_nudge_count?: number
   agent_progress_pinged_at?: string
+  auto_retry_count?: number       // # of times the lifecycle auto-retried a blocked task
+  auto_retry_at?: string          // ISO timestamp of last auto-retry
 }
 
 type TaskFile = { tasks: Array<TaskRecord> }
@@ -156,6 +158,8 @@ function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'titl
     ...(task.clarify_nudged_at != null ? { clarify_nudged_at: task.clarify_nudged_at } : {}),
     ...(task.clarify_nudge_count != null ? { clarify_nudge_count: task.clarify_nudge_count } : {}),
     ...(task.agent_progress_pinged_at != null ? { agent_progress_pinged_at: task.agent_progress_pinged_at } : {}),
+    ...(task.auto_retry_count != null ? { auto_retry_count: task.auto_retry_count } : {}),
+    ...(task.auto_retry_at != null ? { auto_retry_at: task.auto_retry_at } : {}),
   }
 }
 

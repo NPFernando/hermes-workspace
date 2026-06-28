@@ -15,7 +15,7 @@ function ProfilesRoute() {
 
   return (
     <div className="min-h-full overflow-y-auto bg-surface text-ink">
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-5 flex gap-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] p-1 backdrop-blur-xl">
           <button
             onClick={() => setTab('profiles')}
