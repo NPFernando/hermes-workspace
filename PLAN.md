@@ -1,42 +1,40 @@
-# Plan: Full-width workspace surfaces and task board quick actions
+# Plan: Add guarded Finance workspace
 
 ## Summary of the change
-
-Use the existing local implementation candidate to make dense workspace screens use the available viewport width and make the Tasks board faster to operate. The change removes unnecessary 1200px max-width wrappers on several screens, promotes Jobs and Research results into roomier layouts, and refines the Tasks board header/actions/quick-add behavior so the Done column remains visible while secondary controls move into an overflow menu.
+Add a Finance section to `~/hermes-workspace` that gives Naveen a safe foundation for personal finance tracking, tax estimates, investment monitoring, and future Binance/IBKR workflows. The implementation keeps live trading disabled by default, stores data in a private local JSON store under `~/.hermes/finance`, masks sensitive keys/tokens in API payloads, and requires an explicit approval phrase before live trading modes can be selected.
 
 ## Files to modify
-
-- `src/routes/profiles.tsx`
-- `src/screens/echo-studio/echo-studio-screen.tsx`
-- `src/screens/gateway/agents-screen.tsx`
-- `src/screens/jobs/jobs-screen.tsx`
-- `src/screens/mcp/mcp-screen.tsx`
-- `src/screens/memory/knowledge-browser-screen.tsx`
-- `src/screens/research/research-screen.tsx`
-- `src/screens/skills/skills-screen.tsx`
-- `src/screens/tasks/tasks-screen.tsx`
-- `src/server/astra-tasks.ts`
-- `src/server/tasks-store.ts`
+- `src/routes/finance.tsx`
+- `src/routes/api/finance.ts`
+- `src/screens/finance/finance-screen.tsx`
+- `src/server/finance-store.ts`
+- `src/server/finance-store.test.ts`
+- `src/server/finance-schema.sql`
+- `src/components/mobile-hamburger-menu.tsx`
+- `src/components/mobile-tab-bar.tsx`
+- `src/components/workspace-shell.tsx`
+- `src/screens/chat/components/chat-sidebar.tsx`
+- `src/routeTree.gen.ts`
 
 ## Steps
-
-1. Treat the pre-existing dirty workspace changes as the implementation candidate for this cycle rather than inventing a duplicate UI idea.
-2. Verify the diff is limited to Hermes workspace UI/task backend files and the pre-existing `services/odysseus` gitlink remains unstaged.
-3. Keep Done tasks visible in the Tasks board, consolidate secondary board actions into the menu, and add quick-add controls for columns.
-4. Expand dense screens by removing max-width wrappers and tightening screen-specific layouts where useful.
-5. Write this plan, run TypeScript/build/test/lint gates, and record baseline failures separately from changed-file regressions.
-6. Commit the intended source files plus cycle artifacts locally. Do not push.
-7. If source files changed, build, restart `hermes-workspace.service`, and validate `/api/health` returns JSON with `status: ok`.
+1. Add a server-side finance store with typed records for accounts, income, expenses, budgets, savings goals, tax records, assets, market prices, news, risk scores, and trading plans.
+2. Persist the finance database and append-only audit log under `~/.hermes/finance` with restrictive file modes.
+3. Add authenticated `/api/finance` GET/POST handlers for payload retrieval, adding records, changing trading mode, and emergency stop.
+4. Enforce trading safety guardrails: withdrawals/leverage/futures disabled, live trading off by default, emergency kill switch active, and executable plans blocked unless stop-loss/exit/position controls exist.
+5. Add a `/finance` route and Finance screen showing summary cards, alerts, rollout coverage, data tables, storage/security notes, and connector guardrails.
+6. Wire Finance into desktop sidebar, mobile hamburger menu, mobile tab bar, route tree, and workspace shell page title.
+7. Add focused Vitest coverage for summary calculations, blocked trading plans, masking, and alerts.
+8. Validate with TypeScript, focused tests, full tests/lint where possible, build, diff checks, and JSON health after restart.
 
 ## How to verify the change works
-
-- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx tsc --noEmit --pretty false`
-- `pnpm test` with any known collection/config baseline failures documented in `TEST_REPORT.json`
-- `pnpm lint` or a focused ESLint fallback on changed files, documenting known baseline strict-type debt separately
+- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH`
+- `npx tsc --noEmit`
+- `npx vitest run src/server/finance-store.test.ts`
+- `pnpm test` and record any repository baseline collection failures separately from changed-file regressions.
+- `pnpm lint` and run focused changed-file ESLint if repository-wide lint has known baseline debt.
 - `pnpm build`
 - `git diff --check`
-- Bounded JSON health check against `https://agent.fernandofamily.com/api/health` after restart
+- Restart `hermes-workspace.service` only because source files changed, then validate `https://agent.fernandofamily.com/api/health` returns HTTP 200, JSON content type, and `{ "status": "ok" }`.
 
 ## Rollback procedure
-
-Use `git revert <auto-improve-commit>` from `/home/ubuntu/hermes-workspace`, rebuild with `pnpm build`, restart `hermes-workspace.service`, and re-run the JSON health check.
+Revert the auto-improve commit. If desired, archive or remove `~/.hermes/finance/finance.json` and `~/.hermes/finance/audit.jsonl`; those runtime data files are outside the repository and are not required for rollback.

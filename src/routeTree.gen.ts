@@ -22,6 +22,7 @@ import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as JobsRouteImport } from './routes/jobs'
+import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as EchoStudioRouteImport } from './routes/echo-studio'
 import { Route as DownloadApkRouteImport } from './routes/download-apk'
@@ -117,6 +118,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiHarpConfigRouteImport } from './routes/api/harp-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
+import { Route as ApiFinanceRouteImport } from './routes/api/finance'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
@@ -283,6 +285,11 @@ const McpRoute = McpRouteImport.update({
 const JobsRoute = JobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceRoute = FinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FilesRoute = FilesRouteImport.update({
@@ -759,6 +766,11 @@ const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
 const ApiGatewayReprobeRoute = ApiGatewayReprobeRouteImport.update({
   id: '/api/gateway-reprobe',
   path: '/api/gateway-reprobe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFinanceRoute = ApiFinanceRouteImport.update({
+  id: '/api/finance',
+  path: '/api/finance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFilesRoute = ApiFilesRouteImport.update({
@@ -1291,6 +1303,7 @@ export interface FileRoutesByFullPath {
   '/download-apk': typeof DownloadApkRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
+  '/finance': typeof FinanceRoute
   '/jobs': typeof JobsRoute
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
@@ -1332,6 +1345,7 @@ export interface FileRoutesByFullPath {
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/finance': typeof ApiFinanceRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
@@ -1503,6 +1517,7 @@ export interface FileRoutesByTo {
   '/download-apk': typeof DownloadApkRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
+  '/finance': typeof FinanceRoute
   '/jobs': typeof JobsRoute
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
@@ -1543,6 +1558,7 @@ export interface FileRoutesByTo {
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/finance': typeof ApiFinanceRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
@@ -1715,6 +1731,7 @@ export interface FileRoutesById {
   '/download-apk': typeof DownloadApkRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
+  '/finance': typeof FinanceRoute
   '/jobs': typeof JobsRoute
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
@@ -1756,6 +1773,7 @@ export interface FileRoutesById {
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/finance': typeof ApiFinanceRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
@@ -1929,6 +1947,7 @@ export interface FileRouteTypes {
     | '/download-apk'
     | '/echo-studio'
     | '/files'
+    | '/finance'
     | '/jobs'
     | '/mcp'
     | '/memory'
@@ -1970,6 +1989,7 @@ export interface FileRouteTypes {
     | '/api/env-reset'
     | '/api/events'
     | '/api/files'
+    | '/api/finance'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/harp-config'
@@ -2141,6 +2161,7 @@ export interface FileRouteTypes {
     | '/download-apk'
     | '/echo-studio'
     | '/files'
+    | '/finance'
     | '/jobs'
     | '/mcp'
     | '/memory'
@@ -2181,6 +2202,7 @@ export interface FileRouteTypes {
     | '/api/env-reset'
     | '/api/events'
     | '/api/files'
+    | '/api/finance'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/harp-config'
@@ -2352,6 +2374,7 @@ export interface FileRouteTypes {
     | '/download-apk'
     | '/echo-studio'
     | '/files'
+    | '/finance'
     | '/jobs'
     | '/mcp'
     | '/memory'
@@ -2393,6 +2416,7 @@ export interface FileRouteTypes {
     | '/api/env-reset'
     | '/api/events'
     | '/api/files'
+    | '/api/finance'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/harp-config'
@@ -2565,6 +2589,7 @@ export interface RootRouteChildren {
   DownloadApkRoute: typeof DownloadApkRoute
   EchoStudioRoute: typeof EchoStudioRoute
   FilesRoute: typeof FilesRoute
+  FinanceRoute: typeof FinanceRoute
   JobsRoute: typeof JobsRoute
   McpRoute: typeof McpRoute
   MemoryRoute: typeof MemoryRoute
@@ -2606,6 +2631,7 @@ export interface RootRouteChildren {
   ApiEnvResetRoute: typeof ApiEnvResetRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
+  ApiFinanceRoute: typeof ApiFinanceRoute
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHarpConfigRoute: typeof ApiHarpConfigRoute
@@ -2822,6 +2848,13 @@ declare module '@tanstack/react-router' {
       path: '/jobs'
       fullPath: '/jobs'
       preLoaderRoute: typeof JobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance': {
+      id: '/finance'
+      path: '/finance'
+      fullPath: '/finance'
+      preLoaderRoute: typeof FinanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/files': {
@@ -3487,6 +3520,13 @@ declare module '@tanstack/react-router' {
       path: '/api/gateway-reprobe'
       fullPath: '/api/gateway-reprobe'
       preLoaderRoute: typeof ApiGatewayReprobeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/finance': {
+      id: '/api/finance'
+      path: '/api/finance'
+      fullPath: '/api/finance'
+      preLoaderRoute: typeof ApiFinanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/files': {
@@ -4455,6 +4495,7 @@ const rootRouteChildren: RootRouteChildren = {
   DownloadApkRoute: DownloadApkRoute,
   EchoStudioRoute: EchoStudioRoute,
   FilesRoute: FilesRoute,
+  FinanceRoute: FinanceRoute,
   JobsRoute: JobsRoute,
   McpRoute: McpRoute,
   MemoryRoute: MemoryRoute,
@@ -4496,6 +4537,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEnvResetRoute: ApiEnvResetRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
+  ApiFinanceRoute: ApiFinanceRoute,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHarpConfigRoute: ApiHarpConfigRoute,

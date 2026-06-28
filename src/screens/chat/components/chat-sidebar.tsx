@@ -587,6 +587,7 @@ function ChatSidebarComponent({
   const isCommandActive = pathname.startsWith('/command')
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
   const isResearchActive = pathname.startsWith('/research')
+  const isFinanceActive = pathname.startsWith('/finance')
   const isVtCapitalActive = pathname.startsWith('/vt-capital')
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
@@ -836,6 +837,13 @@ function ChatSidebarComponent({
       icon: ChartCandleIcon,
       label: 'VT Capital',
       active: isVtCapitalActive,
+    },
+    {
+      kind: 'link',
+      to: '/finance',
+      icon: ChartCandleIcon,
+      label: 'Finance',
+      active: isFinanceActive,
     },
     {
       kind: 'link',

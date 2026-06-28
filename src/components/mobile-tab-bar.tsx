@@ -97,6 +97,13 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     match: (p) => p.startsWith('/vt-capital'),
   },
   {
+    id: 'finance',
+    label: 'Finance',
+    icon: ChartCandleIcon,
+    to: '/finance',
+    match: (p) => p.startsWith('/finance'),
+  },
+  {
     id: 'swarm',
     label: 'Swarm',
     icon: UserGroupIcon,
