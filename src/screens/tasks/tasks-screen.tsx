@@ -44,6 +44,17 @@ const ASSIGNEES_KEY = ['claude', 'tasks', 'assignees'] as const
 export const TASKS_BOARD_HELP_TEXT =
   'Workspace Tasks is a lightweight task board. Drag cards to change status. Use Dashboard Kanban for native multi-board controls.'
 
+function pluralizeTask(count: number) {
+  return count === 1 ? 'task' : 'tasks'
+}
+
+export function formatTaskFilterSummary(matchCount: number, totalTasks: number) {
+  if (totalTasks === 0) return 'No tasks yet'
+  if (matchCount === 0) return `No matches across ${totalTasks} ${pluralizeTask(totalTasks)}`
+  if (matchCount === totalTasks) return `Showing all ${totalTasks} ${pluralizeTask(totalTasks)}`
+  return `Showing ${matchCount} of ${totalTasks} ${pluralizeTask(totalTasks)}`
+}
+
 function SkeletonCard() {
   return (
     <div className="skeleton-shimmer rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
@@ -833,7 +844,7 @@ export function TasksScreen() {
         {/* Match counter + clear all */}
         {tasksByColumn.hasAnyFilter && (
           <span className="ml-auto text-[10px] flex items-center gap-2 whitespace-nowrap text-[var(--theme-muted)]">
-            Showing {tasksByColumn.matchCount} of {tasksByColumn.totalTasks}
+            {formatTaskFilterSummary(tasksByColumn.matchCount, tasksByColumn.totalTasks)}
             <button
               type="button"
               onClick={clearAllFilters}

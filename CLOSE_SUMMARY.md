@@ -1,30 +1,35 @@
-# Close Summary: Structured Task Clarification Flow
+# Close Summary: Clear Task Filter Result Summary Copy
 
 ## What changed
 
-Implemented structured clarification handling for Hermes Workspace tasks. Agents can now store multiple clarification questions, expose them in the task dialog, notify Telegram with option buttons/deep links, accept web or Telegram answers, and resume the original task execution with a consolidated Q&A history entry.
+Improved the Workspace Tasks filter status copy. The active-filter toolbar now uses a tested `formatTaskFilterSummary` helper so partial matches, all-task matches, empty boards, and zero-match filter states are described clearly instead of always saying only `Showing X of Y`.
 
-Changed files include the task API/types, task store, Astra task execution parser/notifications, Telegram clarification helper, web and Telegram clarification routes, reminder/progress-ping API routes, Tasks route search schema, Tasks screen deep-link handling, Task dialog Q&A UI, Task card affordances, and the generated route tree.
+Changed files:
+
+- `src/screens/tasks/tasks-screen.tsx` — added the summary formatter and used it in the filter counter.
+- `src/screens/tasks/tasks-ux.test.ts` — added focused coverage for pluralization and zero-match copy.
+- `IDEAS.json`, `PLAN.md`, and `TEST_REPORT.json` — updated the auto-improvement cycle artifacts.
 
 ## Test results
 
-- `npx tsc --noEmit`: passed.
-- `pnpm build`: passed.
+- `npx tsc --noEmit`: passed under Hermes-managed Node v22.22.3.
+- `npx vitest run src/screens/tasks/tasks-ux.test.ts`: passed, 3 tests.
+- Focused changed-file ESLint with `--no-warn-ignored`: passed with 0 errors and 0 warnings.
+- `pnpm build`: passed before and during deployment.
 - `git diff --check`: passed.
-- `pnpm test`: exited 1 due to known test-collection/config baseline; 109 files passed and 712/712 assertions passed, while 3 Playwright E2E specs lacked `@playwright/test` and 2 Odysseus TAP files exposed no Vitest suite.
-- `pnpm lint`: exited 1 with repository baseline debt: 316 problems (214 errors, 102 warnings).
-- Focused changed-file ESLint with `@typescript-eslint/no-unnecessary-condition` disabled: passed with 0 errors and 3 existing warnings.
+- `pnpm test`: still exits 1 due to known baseline collection issues: 3 Playwright E2E specs need `@playwright/test`, and 2 Odysseus TAP `.mjs` files expose no Vitest suite. All collected assertions passed: 713/713.
+- `pnpm lint`: still exits 1 due to repository baseline debt: 316 problems, 214 errors and 102 warnings.
 
 ## Deployment / health
 
-Because workspace source files changed, I rebuilt the workspace, restarted `hermes-workspace.service`, and validated the external health endpoint by status, content type, and JSON body. Final health check returned HTTP 200, `application/json`, and `{ "status": "ok" }`.
+The commit touched `src/`, so I rebuilt the workspace and restarted `hermes-workspace.service`. The first external health request returned a transient nginx 502 while Node warmed up; the bounded retry then succeeded with HTTP 200, `application/json`, and `{ "status": "ok" }`.
 
 ## Side effects observed
 
-The local `services/odysseus` gitlink was already dirty and was intentionally left unstaged. No remote push or PR was created. Local `main` remains ahead of `origin/main`, matching the cron mission's no-push constraint.
+The repo is on local `main`, now ahead of `origin/main`, and no remote push or PR was created. The pre-existing dirty `services/odysseus` gitlink remains unstaged and untouched.
 
 ## New improvement ideas
 
-1. Wire scheduled clarification reminder and progress-ping endpoints into cron or a safe internal scheduler.
-2. Add focused route-level tests for Telegram clarification callbacks and web clarification submission.
-3. Clean Vitest include/exclude configuration so E2E and TAP suites do not poison the unit-test run.
+1. Add explicit aria labels and button types to compact Tasks toolbar controls.
+2. Clean the Vitest include/exclude baseline so E2E and TAP files are not collected by unit tests.
+3. Add a richer empty-state action hint when active filters hide every task.

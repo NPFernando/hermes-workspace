@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { formatTaskAssigneeLabel } from './task-card'
-import { TASKS_BOARD_HELP_TEXT } from './tasks-screen'
+import { TASKS_BOARD_HELP_TEXT, formatTaskFilterSummary } from './tasks-screen'
 
 describe('tasks UX copy', () => {
   it('exposes helper copy that explains drag and assignment behavior', () => {
@@ -13,5 +13,12 @@ describe('tasks UX copy', () => {
   it('formats assignee labels for assigned tasks and returns empty string for unassigned', () => {
     expect(formatTaskAssigneeLabel('jarvis', { jarvis: 'Jarvis' })).toBe('Jarvis')
     expect(formatTaskAssigneeLabel(null, {})).toBe('')
+  })
+
+  it('formats filter result summaries with clear zero-match and plural copy', () => {
+    expect(formatTaskFilterSummary(0, 0)).toBe('No tasks yet')
+    expect(formatTaskFilterSummary(0, 5)).toBe('No matches across 5 tasks')
+    expect(formatTaskFilterSummary(1, 1)).toBe('Showing all 1 task')
+    expect(formatTaskFilterSummary(2, 5)).toBe('Showing 2 of 5 tasks')
   })
 })

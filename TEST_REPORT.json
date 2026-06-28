@@ -4,18 +4,20 @@
   "passed": true,
   "notes": [
     "npx tsc --noEmit passed under Hermes-managed Node v22.22.3.",
+    "npx vitest run src/screens/tasks/tasks-ux.test.ts passed: 1 file, 3 tests.",
     "pnpm build passed.",
-    "pnpm test exited 1 due to known collection/config baseline: 3 e2e suites require missing @playwright/test and 2 services/odysseus TAP .mjs files expose no Vitest suite; 109 files passed and 712/712 assertions passed.",
+    "git diff --check passed.",
+    "pnpm test exited 1 due to known collection/config baseline: 3 e2e suites require missing @playwright/test and 2 services/odysseus TAP .mjs files expose no Vitest suite; 109 files passed and 713/713 assertions passed.",
     "pnpm lint exited 1 with repository baseline debt: 316 problems (214 errors, 102 warnings).",
-    "Focused changed-file lint with @typescript-eslint/no-unnecessary-condition disabled passed with 0 errors and 3 warnings (existing require-await/no-shadow warnings).",
-    "git diff --check passed."
+    "Focused changed-file ESLint passed with --no-warn-ignored: 0 errors, 0 warnings."
   ],
   "commands": {
-    "typescript": "npx tsc --noEmit",
-    "test": "pnpm test",
-    "lint": "pnpm lint",
-    "focused_lint_relaxed": "npx eslint -f json --rule '@typescript-eslint/no-unnecessary-condition: off' <changed files>",
-    "build": "pnpm build",
+    "typescript": "export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx tsc --noEmit",
+    "focused_test": "export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx vitest run src/screens/tasks/tasks-ux.test.ts",
+    "focused_lint": "export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx eslint --no-warn-ignored -f json src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts",
+    "test": "export PATH=/home/ubuntu/.hermes/node/bin:$PATH && pnpm test",
+    "lint": "export PATH=/home/ubuntu/.hermes/node/bin:$PATH && pnpm lint",
+    "build": "export PATH=/home/ubuntu/.hermes/node/bin:$PATH && pnpm build",
     "whitespace": "git diff --check"
   }
 }
