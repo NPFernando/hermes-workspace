@@ -75,6 +75,20 @@ export function formatCompactTaskColumnActionLabel(label: string) {
   return `Add a task to the ${label} column`
 }
 
+export function formatBlockedTaskBreakdownLabel(waitingForInput: number, executionFailures: number) {
+  if (waitingForInput > 0 && executionFailures > 0) return `${waitingForInput} input · ${executionFailures} err`
+  if (waitingForInput > 0) return 'needs input'
+  if (executionFailures > 0) return 'exec error'
+  return null
+}
+
+export function formatBlockedTaskBreakdownTitle(waitingForInput: number, executionFailures: number) {
+  return [
+    waitingForInput > 0 ? `${waitingForInput} waiting for input` : '',
+    executionFailures > 0 ? `${executionFailures} execution failure${executionFailures === 1 ? '' : 's'}` : '',
+  ].filter(Boolean).join(', ')
+}
+
 function SkeletonCard() {
   return (
     <div className="skeleton-shimmer rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
@@ -235,12 +249,15 @@ export function TasksScreen() {
   const stats = useMemo(() => {
     const total = tasks.length
     const running = tasks.filter(t => t.column === 'in_progress').length
-    const blocked = tasks.filter(t => t.column === 'blocked').length
+    const blockedTasks = tasks.filter(t => t.column === 'blocked')
+    const blocked = blockedTasks.length
+    const blockedWaiting = blockedTasks.filter(t => t.waiting_for_user).length
+    const blockedExecFail = blockedTasks.filter(t => !t.waiting_for_user).length
     const done = tasks.filter(t => t.column === 'done').length
     const overdue = tasks.filter(t => isOverdue(t) && t.column !== 'done').length
     const completion = total > 0 ? Math.round((done / total) * 100) : 0
     const agentActive = tasks.filter(t => t.agent_state).length
-    return { total, running, blocked, done, overdue, completion, agentActive }
+    return { total, running, blocked, blockedWaiting, blockedExecFail, done, overdue, completion, agentActive }
   }, [tasks])
 
   const invalidate = useCallback(() => {
@@ -454,7 +471,17 @@ export function TasksScreen() {
             {stats.blocked > 0 && (
               <>
                 <span>·</span>
-                <span className="text-red-400">{stats.blocked} blocked</span>
+                <span
+                  className="text-red-400"
+                  title={formatBlockedTaskBreakdownTitle(stats.blockedWaiting, stats.blockedExecFail)}
+                >
+                  {stats.blocked} blocked
+                  {formatBlockedTaskBreakdownLabel(stats.blockedWaiting, stats.blockedExecFail) && (
+                    <span className="ml-1 opacity-60">
+                      ({formatBlockedTaskBreakdownLabel(stats.blockedWaiting, stats.blockedExecFail)})
+                    </span>
+                  )}
+                </span>
               </>
             )}
             {stats.overdue > 0 && (

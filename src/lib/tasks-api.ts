@@ -142,6 +142,7 @@ export type ClaudeTask = {
   agent_history?: Array<ActivityEntry>
   waiting_for_user?: boolean
   clarification_questions?: Array<ClarificationQuestion>
+  depends_on?: Array<string>
 }
 
 export type CreateTaskInput = {

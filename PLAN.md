@@ -1,26 +1,32 @@
-# Plan: Improve compact task column labels
+# Plan: Show task dependencies and blocked-state causes
 
 ## Summary of the change
-Improve Workspace Tasks compact/empty column affordances so mobile, keyboard, and screen-reader users get clearer action copy. Compact empty columns should expose a descriptive accessible region label and add-button label instead of relying on a rotated visual column name alone.
+Make the Workspace Tasks board more actionable by surfacing why work is blocked and when tasks are waiting for prerequisites. The cycle uses the existing dirty worktree candidate and hardens it with typed helpers, focused UX tests, and a cost-safe retry fallback.
 
 ## Files to modify
-- `src/screens/tasks/tasks-screen.tsx`
-- `src/screens/tasks/tasks-ux.test.ts`
+- `src/lib/tasks-api.ts` — include optional `depends_on` in the client task type.
+- `src/server/tasks-store.ts` — persist task dependencies in normalized records.
+- `src/server/astra-tasks.ts` — skip dependency-blocked tasks during Deploy, auto-archive stale inactive tasks, clarify `needs_input` routing, and use a configurable free default retry model.
+- `src/screens/tasks/task-card.tsx` — show a typed prerequisite chip for tasks with dependencies.
+- `src/screens/tasks/tasks-screen.tsx` — split blocked stats into input-needed and execution-error labels.
+- `src/screens/tasks/tasks-ux.test.ts` — cover the new helper copy.
+- `IDEAS.json`, `TEST_REPORT.json`, `CLOSE_SUMMARY.md` — tracked cycle artifacts.
 
 ## Steps
-1. Add exported helper copy functions for compact task column aria/summary text.
-2. Use those helpers in the compact empty-column rendering path for `aria-label`, `title`, and add-button `aria-label`.
-3. Preserve the visual compact column layout while adding a screen-reader-only hint.
-4. Add focused Vitest coverage for the helper copy.
-5. Verify TypeScript, focused Vitest, focused ESLint, build, full test/lint baseline, and JSON health after restart.
+1. Preserve existing idea backlog and append de-duplicated candidates for this cycle.
+2. Add `depends_on` to task data types and persistence normalization.
+3. Render dependency chips without `any` casts and add helper-tested copy.
+4. Split blocked task counts into waiting-for-input versus execution-failure causes.
+5. Keep retry escalation configurable and free-by-default to respect cost controls.
+6. Run TypeScript, focused Vitest, focused ESLint, full test/lint baselines, build, and JSON health validation.
+7. Commit only intended files on the current branch and do not push.
 
 ## How to verify the change works
-- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH`
-- `npx tsc --noEmit`
-- `npx vitest run src/screens/tasks/tasks-ux.test.ts`
-- `npx eslint --no-warn-ignored -f json src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts`
-- `pnpm build`
-- `pnpm test` and `pnpm lint` results recorded in `TEST_REPORT.json` with known baseline issues separated from focused regressions.
+- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx tsc --noEmit`
+- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx vitest run src/screens/tasks/tasks-ux.test.ts`
+- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx eslint --no-warn-ignored -f json src/screens/tasks/task-card.tsx src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts src/lib/tasks-api.ts src/server/astra-tasks.ts src/server/tasks-store.ts`
+- `git diff --check`
+- `pnpm build`, service restart, and `/api/health` JSON body validation because `src/` changed.
 
 ## Rollback procedure
-Run `git -C /home/ubuntu/hermes-workspace revert HEAD` before deployment, or restore the two modified source/test files from the previous commit and rerun the focused verification commands.
+Revert the local `auto-improve: task dependency blocked status clarity` commit, rebuild, restart `hermes-workspace.service`, and rerun the JSON health check.

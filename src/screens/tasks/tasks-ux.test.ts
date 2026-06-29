@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatTaskAssigneeLabel } from './task-card'
+import { formatTaskAssigneeLabel, formatTaskDependencyLabel } from './task-card'
 import {
   TASKS_BOARD_HELP_TEXT,
   formatCompactTaskColumnActionLabel,
+  formatBlockedTaskBreakdownLabel,
+  formatBlockedTaskBreakdownTitle,
   formatCompactTaskColumnAriaLabel,
   formatTaskFilterAriaLabel,
   formatTaskFilterSummary,
@@ -20,6 +22,12 @@ describe('tasks UX copy', () => {
   it('formats assignee labels for assigned tasks and returns empty string for unassigned', () => {
     expect(formatTaskAssigneeLabel('jarvis', { jarvis: 'Jarvis' })).toBe('Jarvis')
     expect(formatTaskAssigneeLabel(null, {})).toBe('')
+  })
+
+  it('formats task dependency chips with singular and plural copy', () => {
+    expect(formatTaskDependencyLabel(0)).toBeNull()
+    expect(formatTaskDependencyLabel(1)).toBe('waiting on 1 prerequisite')
+    expect(formatTaskDependencyLabel(3)).toBe('waiting on 3 prerequisites')
   })
 
   it('formats filter result summaries with clear zero-match and plural copy', () => {
@@ -39,6 +47,14 @@ describe('tasks UX copy', () => {
     expect(formatTaskRefreshStatus(true, true)).toBe('Loading task board…')
     expect(formatTaskRefreshStatus(true, false)).toBe('Updating task board…')
     expect(formatTaskRefreshStatus(false, false)).toBeNull()
+  })
+
+  it('formats blocked task breakdown copy and titles', () => {
+    expect(formatBlockedTaskBreakdownLabel(2, 1)).toBe('2 input · 1 err')
+    expect(formatBlockedTaskBreakdownLabel(1, 0)).toBe('needs input')
+    expect(formatBlockedTaskBreakdownLabel(0, 3)).toBe('exec error')
+    expect(formatBlockedTaskBreakdownLabel(0, 0)).toBeNull()
+    expect(formatBlockedTaskBreakdownTitle(1, 2)).toBe('1 waiting for input, 2 execution failures')
   })
 
   it('formats compact column labels for empty and populated columns', () => {

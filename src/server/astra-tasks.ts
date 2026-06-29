@@ -282,6 +282,42 @@ export function clearStuckTasks(): number {
     executeTaskWithHermesBackground(task.id)
   }
 
+  // ── Part 5: auto-archive stale todo/backlog tasks (> 60 days, no activity) ──
+  // Prevents the Deploy sweep from being diluted by hundreds of ancient tasks.
+  const STALE_TODO_MS = 60 * 24 * 60 * 60 * 1000  // 60 days
+  let archived = 0
+
+  for (const task of all) {
+    if (task.column !== 'todo' && task.column !== 'backlog') continue
+    if (task.agent_state) continue
+    const history = task.agent_history ?? []
+    const lastActivity = Math.max(
+      task.updated_at ? new Date(task.updated_at).getTime() : 0,
+      task.created_at ? new Date(task.created_at).getTime() : 0,
+      history.length ? new Date(history[history.length - 1].at).getTime() : 0,
+    )
+    if (!lastActivity || now - lastActivity < STALE_TODO_MS) continue
+
+    const ageD = Math.round((now - lastActivity) / (24 * 60 * 60 * 1000))
+    const nowIso = new Date().toISOString()
+    updateTask(task.id, {
+      column: 'done',
+      agent_history: [...history, {
+        id:      randomUUID(),
+        by:      'astra',
+        byEmoji: '🌟',
+        action:  'archived',
+        note:    `Auto-archived after ${ageD} days of inactivity in ${task.column}. Move back to todo to restart.`,
+        at:      nowIso,
+      }],
+    })
+    archived++
+  }
+
+  if (archived > 0) {
+    console.log(`[clearStuckTasks] Auto-archived ${archived} stale tasks (>60 days inactive)`)
+  }
+
   return cleared
 }
 
@@ -487,14 +523,23 @@ export function runAgentDeployBackground(mode: 'manual' | 'auto' = 'manual'): { 
       const pa = PRIORITY_SCORE[a.priority] ?? 2
       const pb = PRIORITY_SCORE[b.priority] ?? 2
       if (pb !== pa) return pb - pa                       // high priority first
-      const da = new Date(a.created_at ?? 0).getTime()
-      const db = new Date(b.created_at ?? 0).getTime()
+      const da = new Date(a.created_at).getTime()
+      const db = new Date(b.created_at).getTime()
       return da - db                                      // older tasks first within same priority
     })
   const MAX_PER_CYCLE = 3
 
+  // Build a set of done task IDs to resolve depends_on checks
+  const doneTasks = new Set(listTasks({ includeDone: true })
+    .filter(t => t.column === 'done')
+    .map(t => t.id))
+
   const candidates = allEligible.filter((t) => {
     if (t.agent_state) return false
+    // Skip tasks whose dependencies are not yet done — they should wait silently in todo
+    if (Array.isArray(t.depends_on) && t.depends_on.length > 0) {
+      if (!t.depends_on.every(depId => doneTasks.has(depId))) return false
+    }
     if (mode === 'auto') {
       // Skip tasks an agent has already reviewed — they're waiting for Execute
       return !(t.agent_history ?? []).some((e) => e.by !== 'user')
@@ -790,8 +835,8 @@ for (const task of TASKS) {
     '5. dispatch — how to proceed after this review:\\n' +
     '   "auto_execute"   → task is clear; sister will write a plan first (cheap), then wait for Naveen to press Execute (cost gate)\\n' +
     '   "auto_breakdown" → task is too large or has distinct independent parts — split into subtasks first\\n' +
-    '   "needs_input"    → cannot start without a specific answer from Naveen (missing credentials, ambiguous scope, policy call)\\n' +
-    '   "manual"         → leave entirely for Naveen — no agent action (use when unsure or task is sensitive)\\n' +
+    '   "needs_input"    → ONLY when you literally cannot begin step 1 without a secret/credential not available in env (e.g. API key, account number). Do NOT use for general ambiguity, uncertain scope, or missing details — use "manual" instead. NEVER block multiple tasks for the same missing prerequisite; mention the shared gap in astra_note and set column="todo" so tasks wait silently.\\n' +
+    '   "manual"         → unclear scope, policy call, general uncertainty, or anything sensitive — DEFAULT choice when in doubt\\n' +
     '6. question: (required when dispatch is needs_input) the exact question to ask Naveen\\n' +
     '7. astra_note: 1-2 sentence summary of your reasoning\\n\\n' +
     'Return ONLY valid JSON, no other text:\\n' +
@@ -1395,7 +1440,7 @@ export function executeTaskWithHermesBackground(taskId: string): void {
     .slice(-6)
     .map(e => {
       const who = e.by === 'user' ? 'Naveen' : `Astra (${e.action})`
-      return `[${who}] ${e.note?.slice(0, 300) ?? ''}`
+      return `[${who}] ${e.note.slice(0, 300)}`
     })
     .join('\n')
 
@@ -1449,18 +1494,26 @@ import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const TASKS_FILE  = ${JSON.stringify(tasksFilePath)};
-const HERMES_BIN   = ${JSON.stringify(HERMES_BIN)};
-const TASK_ID      = ${JSON.stringify(taskId)};
-const TASK_TITLE   = ${JSON.stringify(task.title)};
-const DISPLAY_NAME = ${JSON.stringify(displayName || 'Astra')};
-const BY_EMOJI     = ${JSON.stringify(emoji || '🌟')};
-const PROFILE_DIR  = ${JSON.stringify(profileDir || '')};
-const WORK_CWD     = ${JSON.stringify(workCwd)};
-const PROMPT       = ${JSON.stringify(prompt)};
-const LOG_PATH     = ${JSON.stringify(logPath)};
-const SCRIPT_PATH  = ${JSON.stringify(scriptPath)};
-const TG_TARGET    = 'telegram:2130622225';
+const TASKS_FILE       = ${JSON.stringify(tasksFilePath)};
+const HERMES_BIN       = ${JSON.stringify(HERMES_BIN)};
+const TASK_ID          = ${JSON.stringify(taskId)};
+const TASK_TITLE       = ${JSON.stringify(task.title)};
+const DISPLAY_NAME     = ${JSON.stringify(displayName || 'Astra')};
+const BY_EMOJI         = ${JSON.stringify(emoji || '🌟')};
+const PROFILE_DIR      = ${JSON.stringify(profileDir || '')};
+const WORK_CWD         = ${JSON.stringify(workCwd)};
+const PROMPT           = ${JSON.stringify(prompt)};
+const LOG_PATH         = ${JSON.stringify(logPath)};
+const SCRIPT_PATH      = ${JSON.stringify(scriptPath)};
+const TG_TARGET        = 'telegram:2130622225';
+const AUTO_RETRY_COUNT = ${task.auto_retry_count ?? 0};
+// On retry ≥1, switch to a configurable fallback model. Default stays on a free
+// OpenRouter tier; operators can opt into a paid model via environment when needed.
+const RETRY_MODEL = process.env.HERMES_TASK_RETRY_MODEL || 'openrouter/owl-alpha';
+const RETRY_PROVIDER = process.env.HERMES_TASK_RETRY_PROVIDER || 'openrouter';
+const RETRY_MODEL_ARGS = AUTO_RETRY_COUNT >= 1
+  ? ['-m', RETRY_MODEL, '--provider', RETRY_PROVIDER]
+  : [];
 
 const LOCK_FILE = TASKS_FILE + '.lock';
 
@@ -1626,13 +1679,14 @@ try {
   log('profile=' + (PROFILE_DIR || 'default') + ' sister=' + DISPLAY_NAME);
 
   // #4: 20-min timeout; --accept-hooks bypasses hook confirmation prompts
-  result = spawnSync(HERMES_BIN, [...profileArgs, '-z', PROMPT, '--accept-hooks'], {
+  // RETRY_MODEL_ARGS overrides the default model on retries (more reliable provider)
+  result = spawnSync(HERMES_BIN, [...profileArgs, ...RETRY_MODEL_ARGS, '-z', PROMPT, '--accept-hooks'], {
     encoding: 'utf-8',
     timeout: 1_200_000,
     maxBuffer: 8 * 1024 * 1024,
     cwd: WORK_CWD,
   });
-  log('hermes finished — exit=' + result.status + ' stdout_len=' + (result.stdout || '').length);
+  log('hermes finished — exit=' + result.status + ' stdout_len=' + (result.stdout || '').length + (RETRY_MODEL_ARGS.length ? ' [retry-model]' : ''));
 } catch (e) {
   // spawnSync throws on timeout (ETIMEDOUT) or spawn failure
   log('spawnSync threw: ' + e);
@@ -1676,10 +1730,13 @@ if (parseSource) {
   }
 }
 
-// #3: non-zero exit → blocked, not a silent partial
-if (result.status !== 0 && status === 'partial') {
+// #3: non-zero exit → blocked only for genuine agent failures; transient model errors stay partial
+const isTransientFailure = stderr.includes('no final response') || stderr.includes('timed out') || stderr.includes('connection refused') || stderr.includes('rate limit');
+if (result.status !== 0 && status === 'partial' && !isTransientFailure) {
   status  = 'blocked';
   summary = summary || ('hermes exited with code ' + result.status + (stderr ? ': ' + stderr.slice(0, 200) : ''));
+} else if (result.status !== 0 && status === 'partial' && isTransientFailure) {
+  summary = summary || ('Transient execution failure (model unavailable) — will retry automatically. ' + stderr.slice(0, 150));
 }
 
 const freeText = output.replace(/<WORK_SUMMARY>[\\s\\S]*?<\\/WORK_SUMMARY>/g, '').trim();
@@ -2267,7 +2324,7 @@ export function runCompletionCheckBackground(): { taskCount: number } {
       description: t.description,
       column: t.column,
       agent_comment: t.agent_comment ?? '',
-      last_history: (t.agent_history ?? []).slice(-3).map((e) => `[${e.by}] ${e.action}: ${e.note?.slice(0, 120)}`).join('\n'),
+      last_history: (t.agent_history ?? []).slice(-3).map((e) => `[${e.by}] ${e.action}: ${e.note.slice(0, 120)}`).join('\n'),
       workCwd,
     }
   })

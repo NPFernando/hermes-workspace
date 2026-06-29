@@ -1,49 +1,18 @@
 {
-  "passed": true,
+  "timestamp": "2026-06-29T18:08:00Z",
   "tests_passed": true,
   "lint_errors": 0,
-  "summary": "Focused changed-file gates passed; repo-wide pnpm test/lint still expose documented baseline failures unrelated to the compact task-column label change.",
+  "passed": true,
   "focused_gates": {
-    "typescript": {
-      "command": "npx tsc --noEmit",
-      "passed": true
-    },
-    "vitest": {
-      "command": "npx vitest run src/screens/tasks/tasks-ux.test.ts",
-      "passed": true,
-      "tests": "6 passed"
-    },
-    "eslint": {
-      "command": "npx eslint --no-warn-ignored -f json src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts",
-      "passed": true,
-      "errors": 0,
-      "warnings": 0
-    },
-    "build": {
-      "command": "pnpm build",
-      "passed": true
-    }
+    "typescript": "passed: npx tsc --noEmit",
+    "vitest": "passed: npx vitest run src/screens/tasks/tasks-ux.test.ts (8 tests)",
+    "eslint_changed_files": "passed: 0 errors, 0 warnings on changed source/test files",
+    "diff_check": "passed: git diff --check",
+    "build": "passed: pnpm build"
   },
-  "repo_baseline": {
-    "pnpm_test": {
-      "passed": false,
-      "exit_code": 1,
-      "failure_summary": "All 720 collected unit-test assertions passed, but Vitest collection still fails on 3 e2e Playwright specs missing @playwright/test and 2 Odysseus TAP .mjs files with no Vitest suite."
-    },
-    "pnpm_lint": {
-      "passed": false,
-      "exit_code": 1,
-      "errors": 213,
-      "warnings": 102,
-      "failure_summary": "Repository-wide baseline lint debt outside touched files."
-    }
+  "baseline_gates": {
+    "pnpm_test": "non-zero baseline: 722 assertions passed; 5 suite collection failures from missing @playwright/test in e2e specs and Odysseus TAP .mjs files with no Vitest suite",
+    "pnpm_lint": "non-zero baseline: repository-wide eslint reported 208 errors and 101 warnings; focused changed-file eslint reported 0 errors and 0 warnings"
   },
-  "changed_files": [
-    "src/screens/tasks/tasks-screen.tsx",
-    "src/screens/tasks/tasks-ux.test.ts",
-    "PLAN.md",
-    "TEST_REPORT.json",
-    "CLOSE_SUMMARY.md",
-    "IDEAS.json"
-  ]
+  "notes": "Marked passed because all changed-file gates, TypeScript, focused UX tests, diff check, and production build passed. Full-suite failures match documented baseline collection/lint debt outside this cycle."
 }

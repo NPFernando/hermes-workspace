@@ -55,6 +55,7 @@ export type TaskRecord = {
   agent_progress_pinged_at?: string
   auto_retry_count?: number       // # of times the lifecycle auto-retried a blocked task
   auto_retry_at?: string          // ISO timestamp of last auto-retry
+  depends_on?: Array<string>      // task IDs that must be done before this task can be deployed
 }
 
 type TaskFile = { tasks: Array<TaskRecord> }
@@ -160,6 +161,7 @@ function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'titl
     ...(task.agent_progress_pinged_at != null ? { agent_progress_pinged_at: task.agent_progress_pinged_at } : {}),
     ...(task.auto_retry_count != null ? { auto_retry_count: task.auto_retry_count } : {}),
     ...(task.auto_retry_at != null ? { auto_retry_at: task.auto_retry_at } : {}),
+    ...(Array.isArray(task.depends_on) && task.depends_on.length > 0 ? { depends_on: task.depends_on } : {}),
   }
 }
 

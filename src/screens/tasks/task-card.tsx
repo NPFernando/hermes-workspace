@@ -43,6 +43,11 @@ export function formatTaskAssigneeLabel(
   return assignee ? (assigneeLabels[assignee] ?? assignee) : ''
 }
 
+export function formatTaskDependencyLabel(dependencyCount: number): string | null {
+  if (dependencyCount <= 0) return null
+  return `waiting on ${dependencyCount} prerequisite${dependencyCount === 1 ? '' : 's'}`
+}
+
 const AGENT_STATE_CONFIG: Record<
   NonNullable<TaskAgentState>,
   { label: string; color: string; pulse: boolean }
@@ -89,7 +94,7 @@ function SourceBadge({ source }: { source: ClaudeTask['source'] }) {
   )
 }
 
-export const TaskCard = memo(function TaskCard({
+export const TaskCard = memo(function TaskCardComponent({
   task,
   assigneeLabels = {},
   onClick,
@@ -124,6 +129,7 @@ export const TaskCard = memo(function TaskCard({
   const extraTagCount = task.tags.length - 2
   const assigneeLabel = formatTaskAssigneeLabel(task.assignee, assigneeLabels)
   const isAgentActive = Boolean(task.agent_state)
+  const dependencyLabel = formatTaskDependencyLabel(task.depends_on?.length ?? 0)
   const hasHistory = (task.agent_history?.length ?? 0) > 0
   const stuck = isStuckAgent(task)
   const isDimmed = Boolean(activeTagFilter && !task.tags.includes(activeTagFilter))
@@ -309,6 +315,17 @@ export const TaskCard = memo(function TaskCard({
               </button>
             )}
             <SourceBadge source={task.source} />
+          </div>
+        )}
+
+        {/* Dependency chip — shown when task is waiting on a prerequisite */}
+        {dependencyLabel && task.column !== 'done' && (
+          <div
+            className="flex items-center gap-1 text-[9px] text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5 w-fit"
+            title={dependencyLabel}
+          >
+            <span aria-hidden="true">⏳</span>
+            <span>{dependencyLabel}</span>
           </div>
         )}
 

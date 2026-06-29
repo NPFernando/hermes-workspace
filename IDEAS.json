@@ -52,5 +52,23 @@
     "description": "Exclude Playwright e2e specs and Odysseus TAP .mjs tests from the default Vitest unit-test glob and document their dedicated runners.",
     "category": "config",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Show task dependencies and blocked-state causes",
+    "description": "Expose task prerequisite counts on cards and split blocked task stats into input-needed versus execution-error causes so operators know what to act on first.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add configurable free retry model for task agents",
+    "description": "When a task retry is needed, use a configurable fallback model with a free default instead of hardcoding a paid provider/model, preserving cost controls while improving reliability.",
+    "category": "backend",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Archive stale untouched backlog tasks automatically",
+    "description": "Move very old inactive backlog/todo tasks to done with an audit history entry so the deploy sweep stays focused on actionable work.",
+    "category": "backend",
+    "estimated_effort": "medium"
   }
 ]
