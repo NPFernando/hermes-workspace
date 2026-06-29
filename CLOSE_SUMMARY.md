@@ -1,50 +1,23 @@
-# Close Summary: task filter accessibility semantics
+# Auto-Improvement Close Summary: Task Board Refresh Status Text
 
 ## What changed
-
-Improved Workspace Tasks filter accessibility semantics in:
-
-- `src/screens/tasks/tasks-screen.tsx`
-  - Added `formatTaskFilterAriaLabel(label, active)` for stable toggle copy.
-  - Added `aria-pressed` to quick-filter chips and priority chips.
-  - Added descriptive `aria-label` values for filter toggles.
-  - Added `aria-label="Clear task search"` to the search clear button.
-- `src/screens/tasks/tasks-ux.test.ts`
-  - Added focused coverage for active/inactive filter ARIA-label copy.
-- `IDEAS.json`, `PLAN.md`, and `TEST_REPORT.json`
-  - Updated the standard auto-improvement artifacts for this cycle.
+- Added `formatTaskRefreshStatus` in `src/screens/tasks/tasks-screen.tsx` to centralize stable copy for initial task loading and background refreshes.
+- Added a polite `role="status"` live region near the Tasks search/filter controls so users get non-intrusive feedback when the board is loading or updating.
+- Updated the refresh button to call `tasksQuery.refetch()` directly, expose a state-aware accessible label, and visually spin the refresh icon while the task query is fetching.
+- Extended `src/screens/tasks/tasks-ux.test.ts` with focused copy tests for the new refresh-status helper.
 
 ## Test results
+Focused validation passed: TypeScript compile, focused Tasks UX Vitest, focused changed-file ESLint with zero errors/warnings, `git diff --check`, and `pnpm build`.
 
-Changed-code verification passed:
-
-- `npx tsc --noEmit` — passed.
-- `npx vitest run src/screens/tasks/tasks-ux.test.ts` — passed, 4 tests.
-- `npx eslint --no-warn-ignored -f json src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts` — passed, 0 errors and 0 warnings.
-- `git diff --check` — passed.
-- `pnpm build` — passed before and after commit.
-
-Repository-wide baseline visibility:
-
-- `pnpm test` still exits non-zero because Vitest collects Playwright E2E specs without `@playwright/test` and Odysseus TAP `.mjs` files with no Vitest suite. All collected assertions passed: 718 passed.
-- `pnpm lint` still exits non-zero from unrelated repository-wide baseline lint debt: 213 errors and 102 warnings. Focused changed-file lint passed cleanly.
-
-## Deployment and health
-
-Because `src/` changed, deployment validation was performed:
-
-- `pnpm build` after commit — passed.
-- `sudo systemctl restart hermes-workspace.service` — exit 0, service active.
-- `https://agent.fernandofamily.com/api/health` — HTTP 200, `application/json`, body `{ "status": "ok" }`.
+Full `pnpm test` and `pnpm lint` still fail on documented repository baseline issues unrelated to these changed files: Vitest collects Playwright E2E specs without `@playwright/test` plus Odysseus TAP `.mjs` files, and repository-wide lint reports existing strict-type debt outside the Tasks screen.
 
 ## Side effects observed
+No backend schema or API behavior changed. The UI now announces loading/updating status politely and the manual refresh affordance gives clearer screen-reader and visual feedback.
 
-- No remote push was performed, per mission rules.
-- Local `main` remains ahead of `origin/main`; this cycle added one local auto-improvement commit on top of the existing local-ahead history.
-- The pre-existing dirty `services/odysseus` gitlink remains unstaged and untouched.
+## Deployment status
+Deployment completed from the verified local `main` worktree. Because the commit touched `src/`, `pnpm build` was rerun, `hermes-workspace.service` was restarted successfully, and `https://agent.fernandofamily.com/api/health` returned HTTP 200 with `application/json` and `{ "status": "ok" }`.
 
-## Follow-up ideas for next cycle
-
-- Fix the Vitest include/exclude baseline so unit tests do not collect Playwright E2E specs or Odysseus TAP `.mjs` suites.
-- Add visible task-board refresh status text for background polling and manual refresh.
-- Improve empty-column task board copy and touch target labeling for compact/mobile columns.
+## New improvement ideas for the next cycle
+- Fix the Vitest include/exclude baseline so E2E and TAP tests do not poison unit-test runs.
+- Add clearer compact task-column add-button accessible names and empty-column prompts.
+- Add a lightweight visual smoke for Tasks screen loading/refetch states.

@@ -60,6 +60,12 @@ export function formatTaskFilterAriaLabel(label: string, active: boolean) {
   return `${active ? 'Disable' : 'Enable'} ${label.toLowerCase()} task filter`
 }
 
+export function formatTaskRefreshStatus(isFetching: boolean, isInitialLoading: boolean) {
+  if (isInitialLoading) return 'Loading task board…'
+  if (isFetching) return 'Updating task board…'
+  return null
+}
+
 function SkeletonCard() {
   return (
     <div className="skeleton-shimmer rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
@@ -197,6 +203,7 @@ export function TasksScreen() {
   }, [tasks, assigneeFilter, searchQuery, filterOverdue, filterBlocked, filterActiveAgent, filterInReview, priorityFilter, tagFilter])
 
   const columnMap = tasksByColumn.columns
+  const taskRefreshStatus = formatTaskRefreshStatus(tasksQuery.isFetching, tasksQuery.isLoading)
 
   // Queue position map — mirrors server-side priority sort in runAgentDeployBackground
   const queuePositions = useMemo(() => {
@@ -685,11 +692,17 @@ export function TasksScreen() {
           </MenuRoot>
 
           <button
-            onClick={invalidate}
+            type="button"
+            onClick={() => void tasksQuery.refetch()}
+            aria-label={tasksQuery.isFetching ? 'Refreshing task board' : 'Refresh task board'}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
-            title="Refresh"
+            title={tasksQuery.isFetching ? 'Refreshing…' : 'Refresh'}
           >
-            <HugeiconsIcon icon={RefreshIcon} size={16} className="text-[var(--theme-muted)]" />
+            <HugeiconsIcon
+              icon={RefreshIcon}
+              size={16}
+              className={cn('text-[var(--theme-muted)]', tasksQuery.isFetching && 'animate-spin text-[var(--theme-accent)]')}
+            />
           </button>
 
           {/* Keyboard shortcuts hint */}
@@ -859,6 +872,17 @@ export function TasksScreen() {
             </button>
           </span>
         )}
+        <span
+          role="status"
+          aria-live="polite"
+          className={cn(
+            'ml-auto text-[10px] whitespace-nowrap text-[var(--theme-muted)] transition-opacity',
+            taskRefreshStatus ? 'opacity-100' : 'opacity-0',
+            tasksByColumn.hasAnyFilter && 'ml-0',
+          )}
+        >
+          {taskRefreshStatus ?? 'Task board is up to date'}
+        </span>
       </div>
       </div>
 

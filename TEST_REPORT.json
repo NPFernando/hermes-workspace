@@ -2,40 +2,47 @@
   "tests_passed": true,
   "lint_errors": 0,
   "passed": true,
-  "summary": "Changed-code gates passed. Repository-wide pnpm test and pnpm lint still expose known baseline/config debt unrelated to this task-filter accessibility change.",
-  "commands": [
-    {
+  "environment": {
+    "node": "v22.22.3",
+    "package_manager": "pnpm 11.6.0"
+  },
+  "focused_gates": {
+    "typescript": {
       "command": "npx tsc --noEmit",
-      "exit_code": 0
+      "passed": true
     },
-    {
+    "vitest": {
       "command": "npx vitest run src/screens/tasks/tasks-ux.test.ts",
-      "exit_code": 0,
-      "result": "4 tests passed"
+      "passed": true,
+      "tests": 5
     },
-    {
+    "eslint_changed_files": {
       "command": "npx eslint --no-warn-ignored -f json src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts",
-      "exit_code": 0,
+      "passed": true,
       "errors": 0,
       "warnings": 0
     },
-    {
+    "diff_check": {
       "command": "git diff --check",
-      "exit_code": 0
+      "passed": true
     },
-    {
+    "build": {
       "command": "pnpm build",
-      "exit_code": 0
-    },
-    {
-      "command": "pnpm test",
-      "exit_code": 1,
-      "baseline_issue": "All collected assertions passed (718 passed), but Vitest collected E2E specs requiring @playwright/test plus Odysseus TAP .mjs files with no Vitest suite. This is pre-existing test configuration debt."
-    },
-    {
-      "command": "pnpm lint",
-      "exit_code": 1,
-      "baseline_issue": "Repository-wide ESLint reports 213 errors and 102 warnings in unrelated files. Focused changed-file ESLint passed with 0 errors and 0 warnings."
+      "passed": true
     }
-  ]
+  },
+  "full_suite_baseline": {
+    "pnpm_test": {
+      "passed": false,
+      "exit_code": 1,
+      "reason": "Known baseline Vitest collection failures: e2e Playwright specs missing @playwright/test and Odysseus TAP .mjs suites expose no Vitest suite. All collected unit assertions passed (719 passed)."
+    },
+    "pnpm_lint": {
+      "passed": false,
+      "exit_code": 1,
+      "errors": 213,
+      "warnings": 102,
+      "reason": "Known repository-wide strict lint baseline outside changed files."
+    }
+  }
 }

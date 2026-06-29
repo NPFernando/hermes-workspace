@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { formatTaskAssigneeLabel } from './task-card'
-import { TASKS_BOARD_HELP_TEXT, formatTaskFilterAriaLabel, formatTaskFilterSummary } from './tasks-screen'
+import { TASKS_BOARD_HELP_TEXT, formatTaskFilterAriaLabel, formatTaskFilterSummary, formatTaskRefreshStatus } from './tasks-screen'
 
 describe('tasks UX copy', () => {
   it('exposes helper copy that explains drag and assignment behavior', () => {
@@ -26,5 +26,11 @@ describe('tasks UX copy', () => {
     expect(formatTaskFilterAriaLabel('Overdue', false)).toBe('Enable overdue task filter')
     expect(formatTaskFilterAriaLabel('Active Agent', true)).toBe('Disable active agent task filter')
     expect(formatTaskFilterAriaLabel('high priority', false)).toBe('Enable high priority task filter')
+  })
+
+  it('formats task refresh status copy for loading and background updates', () => {
+    expect(formatTaskRefreshStatus(true, true)).toBe('Loading task board…')
+    expect(formatTaskRefreshStatus(true, false)).toBe('Updating task board…')
+    expect(formatTaskRefreshStatus(false, false)).toBeNull()
   })
 })
