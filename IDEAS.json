@@ -34,5 +34,23 @@
     "description": "Add clearer empty-column and compact-column action labels for mobile and keyboard users, including accessible names for add buttons.",
     "category": "ui",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Clarify compact column drop targets",
+    "description": "When a task is dragged over a compact empty column, expand the target with concise drop copy so users can tell exactly where the card will land.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add focused test coverage for task column actions",
+    "description": "Add component-level tests around compact and expanded task column add buttons so accessible labels and actions stay stable.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Fix Vitest collection baseline for E2E and TAP suites",
+    "description": "Exclude Playwright e2e specs and Odysseus TAP .mjs tests from the default Vitest unit-test glob and document their dedicated runners.",
+    "category": "config",
+    "estimated_effort": "low"
   }
 ]

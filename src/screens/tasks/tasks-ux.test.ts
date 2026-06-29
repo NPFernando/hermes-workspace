@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import { formatTaskAssigneeLabel } from './task-card'
-import { TASKS_BOARD_HELP_TEXT, formatTaskFilterAriaLabel, formatTaskFilterSummary, formatTaskRefreshStatus } from './tasks-screen'
+import {
+  TASKS_BOARD_HELP_TEXT,
+  formatCompactTaskColumnActionLabel,
+  formatCompactTaskColumnAriaLabel,
+  formatTaskFilterAriaLabel,
+  formatTaskFilterSummary,
+  formatTaskRefreshStatus,
+} from './tasks-screen'
 
 describe('tasks UX copy', () => {
   it('exposes helper copy that explains drag and assignment behavior', () => {
@@ -32,5 +39,11 @@ describe('tasks UX copy', () => {
     expect(formatTaskRefreshStatus(true, true)).toBe('Loading task board…')
     expect(formatTaskRefreshStatus(true, false)).toBe('Updating task board…')
     expect(formatTaskRefreshStatus(false, false)).toBeNull()
+  })
+
+  it('formats compact column labels for empty and populated columns', () => {
+    expect(formatCompactTaskColumnAriaLabel('Backlog', 0)).toBe('Backlog column is empty. Add a task or drop one here.')
+    expect(formatCompactTaskColumnAriaLabel('In Progress', 2)).toBe('In Progress column with 2 tasks')
+    expect(formatCompactTaskColumnActionLabel('Review')).toBe('Add a task to the Review column')
   })
 })

@@ -66,6 +66,15 @@ export function formatTaskRefreshStatus(isFetching: boolean, isInitialLoading: b
   return null
 }
 
+export function formatCompactTaskColumnAriaLabel(label: string, taskCount: number) {
+  if (taskCount === 0) return `${label} column is empty. Add a task or drop one here.`
+  return `${label} column with ${taskCount} ${pluralizeTask(taskCount)}`
+}
+
+export function formatCompactTaskColumnActionLabel(label: string) {
+  return `Add a task to the ${label} column`
+}
+
 function SkeletonCard() {
   return (
     <div className="skeleton-shimmer rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
@@ -894,6 +903,9 @@ export function TasksScreen() {
         {visibleColumns.map((col) => {
           const colTasks = columnMap[col]
           const colColor = COLUMN_COLORS[col]
+          const columnLabel = COLUMN_LABELS[col]
+          const compactAriaLabel = formatCompactTaskColumnAriaLabel(columnLabel, colTasks.length)
+          const compactActionLabel = formatCompactTaskColumnActionLabel(columnLabel)
           const isDragOver = dragOverColumn === col
           // Compact when empty and not being dragged over
           const isCompact = colTasks.length === 0 && !isDragOver && !tasksQuery.isLoading
@@ -915,16 +927,22 @@ export function TasksScreen() {
               {isCompact ? (
                 /* Compact column: rotated label + add button */
                 <div
+                  role="group"
+                  aria-label={compactAriaLabel}
+                  title={compactAriaLabel}
                   className="flex flex-col items-center h-full py-2 gap-2"
                   style={{ borderTopWidth: 2, borderTopColor: colColor, borderTopStyle: 'solid', borderRadius: '0.75rem 0.75rem 0 0' }}
                 >
                   <button
+                    type="button"
                     onClick={() => { setCreateColumn(col); setShowCreate(true) }}
+                    aria-label={compactActionLabel}
                     className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
-                    title={`Add to ${COLUMN_LABELS[col]}`}
+                    title={compactActionLabel}
                   >
                     <HugeiconsIcon icon={Add01Icon} size={13} className="text-[var(--theme-muted)]" />
                   </button>
+                  <span className="sr-only">{compactAriaLabel}</span>
                   <div className="flex-1 flex items-center justify-center">
                     <span
                       className="text-[10px] font-semibold tracking-wide select-none"
@@ -934,7 +952,7 @@ export function TasksScreen() {
                         transform: 'rotate(180deg)',
                       }}
                     >
-                      {COLUMN_LABELS[col]}
+                      {columnLabel}
                     </span>
                   </div>
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: colColor }} />

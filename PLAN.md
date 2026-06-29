@@ -1,27 +1,26 @@
-# Auto-Improvement Plan: Task Board Refresh Status Text
+# Plan: Improve compact task column labels
 
 ## Summary of the change
-Add a subtle live refresh status message to the Workspace Tasks screen so users can tell when the board is initially loading or refetching in the background. This improves feedback for manual refreshes and automatic polling without changing backend behavior.
+Improve Workspace Tasks compact/empty column affordances so mobile, keyboard, and screen-reader users get clearer action copy. Compact empty columns should expose a descriptive accessible region label and add-button label instead of relying on a rotated visual column name alone.
 
 ## Files to modify
 - `src/screens/tasks/tasks-screen.tsx`
 - `src/screens/tasks/tasks-ux.test.ts`
 
 ## Steps
-1. Add an exported `formatTaskRefreshStatus` helper that returns stable user-facing copy for initial load and background refresh states.
-2. Compute the refresh status from the TanStack Query task query state in `TasksScreen`.
-3. Render the status in a small `role="status"` / `aria-live="polite"` region near the search/filter controls.
-4. Make the refresh button call `tasksQuery.refetch()` directly, expose a stateful accessible label, and show a spinning icon while refreshing.
-5. Extend the existing tasks UX copy tests to cover the new helper.
+1. Add exported helper copy functions for compact task column aria/summary text.
+2. Use those helpers in the compact empty-column rendering path for `aria-label`, `title`, and add-button `aria-label`.
+3. Preserve the visual compact column layout while adding a screen-reader-only hint.
+4. Add focused Vitest coverage for the helper copy.
+5. Verify TypeScript, focused Vitest, focused ESLint, build, full test/lint baseline, and JSON health after restart.
 
 ## How to verify the change works
 - `export PATH=/home/ubuntu/.hermes/node/bin:$PATH`
 - `npx tsc --noEmit`
 - `npx vitest run src/screens/tasks/tasks-ux.test.ts`
 - `npx eslint --no-warn-ignored -f json src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts`
-- `git diff --check`
 - `pnpm build`
-- If source changed, restart `hermes-workspace.service` and validate `/api/health` returns JSON `{ "status": "ok" }`.
+- `pnpm test` and `pnpm lint` results recorded in `TEST_REPORT.json` with known baseline issues separated from focused regressions.
 
 ## Rollback procedure
-Revert the auto-improvement commit or remove the helper, status region, refresh-button state changes, and matching tests from the two modified source files.
+Run `git -C /home/ubuntu/hermes-workspace revert HEAD` before deployment, or restore the two modified source/test files from the previous commit and rerun the focused verification commands.

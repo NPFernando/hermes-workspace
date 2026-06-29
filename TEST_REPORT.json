@@ -1,11 +1,8 @@
 {
+  "passed": true,
   "tests_passed": true,
   "lint_errors": 0,
-  "passed": true,
-  "environment": {
-    "node": "v22.22.3",
-    "package_manager": "pnpm 11.6.0"
-  },
+  "summary": "Focused changed-file gates passed; repo-wide pnpm test/lint still expose documented baseline failures unrelated to the compact task-column label change.",
   "focused_gates": {
     "typescript": {
       "command": "npx tsc --noEmit",
@@ -14,35 +11,39 @@
     "vitest": {
       "command": "npx vitest run src/screens/tasks/tasks-ux.test.ts",
       "passed": true,
-      "tests": 5
+      "tests": "6 passed"
     },
-    "eslint_changed_files": {
+    "eslint": {
       "command": "npx eslint --no-warn-ignored -f json src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts",
       "passed": true,
       "errors": 0,
       "warnings": 0
-    },
-    "diff_check": {
-      "command": "git diff --check",
-      "passed": true
     },
     "build": {
       "command": "pnpm build",
       "passed": true
     }
   },
-  "full_suite_baseline": {
+  "repo_baseline": {
     "pnpm_test": {
       "passed": false,
       "exit_code": 1,
-      "reason": "Known baseline Vitest collection failures: e2e Playwright specs missing @playwright/test and Odysseus TAP .mjs suites expose no Vitest suite. All collected unit assertions passed (719 passed)."
+      "failure_summary": "All 720 collected unit-test assertions passed, but Vitest collection still fails on 3 e2e Playwright specs missing @playwright/test and 2 Odysseus TAP .mjs files with no Vitest suite."
     },
     "pnpm_lint": {
       "passed": false,
       "exit_code": 1,
       "errors": 213,
       "warnings": 102,
-      "reason": "Known repository-wide strict lint baseline outside changed files."
+      "failure_summary": "Repository-wide baseline lint debt outside touched files."
     }
-  }
+  },
+  "changed_files": [
+    "src/screens/tasks/tasks-screen.tsx",
+    "src/screens/tasks/tasks-ux.test.ts",
+    "PLAN.md",
+    "TEST_REPORT.json",
+    "CLOSE_SUMMARY.md",
+    "IDEAS.json"
+  ]
 }
