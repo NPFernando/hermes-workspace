@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { formatTaskAssigneeLabel, formatTaskDependencyLabel } from './task-card'
 import {
   TASKS_BOARD_HELP_TEXT,
+  countExecutableReviewTasks,
   formatCompactTaskColumnActionLabel,
   formatBlockedTaskBreakdownLabel,
   formatBlockedTaskBreakdownTitle,
@@ -61,5 +62,18 @@ describe('tasks UX copy', () => {
     expect(formatCompactTaskColumnAriaLabel('Backlog', 0)).toBe('Backlog column is empty. Add a task or drop one here.')
     expect(formatCompactTaskColumnAriaLabel('In Progress', 2)).toBe('In Progress column with 2 tasks')
     expect(formatCompactTaskColumnActionLabel('Review')).toBe('Add a task to the Review column')
+  })
+
+  it('counts only review tasks with usable execution plans', () => {
+    const plannedHistory = [{ id: 'h1', action: 'planned', note: '1. Do the work', by: 'astra', at: '2026-01-01T00:00:00Z' }]
+    const unavailableHistory = [{ id: 'h2', action: 'planned', note: 'Plan unavailable — press Execute to proceed.', by: 'astra', at: '2026-01-01T00:00:00Z' }]
+
+    expect(countExecutableReviewTasks([
+      { column: 'review', agent_state: null, agent_history: plannedHistory },
+      { column: 'review', agent_state: 'working', agent_history: plannedHistory },
+      { column: 'review', agent_state: null, agent_history: unavailableHistory },
+      { column: 'todo', agent_state: null, agent_history: plannedHistory },
+      { column: 'review', agent_state: null, agent_history: [] },
+    ])).toBe(1)
   })
 })

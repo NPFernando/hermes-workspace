@@ -303,6 +303,16 @@ export async function executeTask(taskId: string): Promise<{ ok: boolean; alread
   return res.json()
 }
 
+export async function batchExecuteTasks(limit = 5, taskIds?: Array<string>): Promise<{ ok: boolean; started: number; remaining: number }> {
+  const res = await fetch('/api/tasks-batch-execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ limit, taskIds }),
+  })
+  if (!res.ok) throw new Error(`Failed to batch execute: ${res.status}`)
+  return res.json()
+}
+
 export async function postTaskComment(taskId: string, text: string): Promise<{ resumed: boolean }> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}?action=comment`, {

@@ -16,6 +16,7 @@ import {
   COLUMN_ORDER,
   PRIORITY_COLORS,
   askAstra,
+  batchExecuteTasks,
   breakdownTask,
   createTask,
   deleteTask,
@@ -82,6 +83,17 @@ export function formatBlockedTaskBreakdownLabel(waitingForInput: number, executi
   return null
 }
 
+type ExecutableReviewCandidate = Pick<ClaudeTask, 'column' | 'agent_history'> & { agent_state?: ClaudeTask['agent_state'] }
+
+export function countExecutableReviewTasks(tasks: Array<ExecutableReviewCandidate>) {
+  return tasks.filter((task) => {
+    if (task.column !== 'review' || task.agent_state) return false
+    const plannedHistory = (task.agent_history ?? []).filter((entry) => entry.action === 'planned')
+    if (plannedHistory.length === 0) return false
+    return !plannedHistory[plannedHistory.length - 1].note.includes('Plan unavailable')
+  }).length
+}
+
 export function formatBlockedTaskBreakdownTitle(waitingForInput: number, executionFailures: number) {
   return [
     waitingForInput > 0 ? `${waitingForInput} waiting for input` : '',
@@ -115,6 +127,7 @@ export function TasksScreen() {
   const [askingAstra, setAskingAstra] = useState(false)
   const [ideasLoading, setIdeasLoading] = useState(false)
   const [clearingStuck, setClearingStuck] = useState(false)
+  const [batchExecuting, setBatchExecuting] = useState(false)
   const [checkingCompletion, setCheckingCompletion] = useState(false)
   const [breakingDownId, setBreakingDownId] = useState<string | null>(null)
   const [pruningStale, setPruningStale] = useState(false)
@@ -257,7 +270,8 @@ export function TasksScreen() {
     const overdue = tasks.filter(t => isOverdue(t) && t.column !== 'done').length
     const completion = total > 0 ? Math.round((done / total) * 100) : 0
     const agentActive = tasks.filter(t => t.agent_state).length
-    return { total, running, blocked, blockedWaiting, blockedExecFail, done, overdue, completion, agentActive }
+    const readyToExecute = countExecutableReviewTasks(tasks)
+    return { total, running, blocked, blockedWaiting, blockedExecFail, done, overdue, completion, agentActive, readyToExecute }
   }, [tasks])
 
   const invalidate = useCallback(() => {
@@ -585,6 +599,39 @@ export function TasksScreen() {
             <HugeiconsIcon icon={AiBrainIcon} size={13} strokeWidth={1.8} className={astraReviewing ? 'animate-pulse' : ''} />
             {astraReviewing ? 'Deploying…' : 'Deploy Agents'}
           </button>
+
+          {/* Execute Ready — batch-fire all review tasks with real plans */}
+          {stats.readyToExecute > 0 && (
+            <button
+              onClick={async () => {
+                setBatchExecuting(true)
+                try {
+                  const res = await batchExecuteTasks(5)
+                  await tasksQuery.refetch()
+                  if (res.remaining > 0) {
+                    toast(`Started ${res.started} tasks · ${res.remaining} more in review`)
+                  } else {
+                    toast(`Started ${res.started} task${res.started !== 1 ? 's' : ''}`)
+                  }
+                } catch {
+                  toast('Batch execute failed', { type: 'error' })
+                } finally {
+                  setBatchExecuting(false)
+                }
+              }}
+              disabled={batchExecuting}
+              title={`Execute next 5 of ${stats.readyToExecute} review tasks with real plans`}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                batchExecuting
+                  ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400 cursor-wait'
+                  : 'border-[var(--theme-border)] text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50',
+              )}
+            >
+              <HugeiconsIcon icon={AiMagicIcon} size={13} strokeWidth={1.8} className={batchExecuting ? 'animate-pulse' : ''} />
+              {batchExecuting ? 'Starting…' : `Execute Ready (${stats.readyToExecute})`}
+            </button>
+          )}
 
           {/* Secondary actions — overflow menu */}
           <MenuRoot>

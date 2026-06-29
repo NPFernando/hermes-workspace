@@ -1,32 +1,32 @@
-# Plan: Show task dependencies and blocked-state causes
+# Plan: Execute Ready batch action for planned review tasks
 
 ## Summary of the change
-Make the Workspace Tasks board more actionable by surfacing why work is blocked and when tasks are waiting for prerequisites. The cycle uses the existing dirty worktree candidate and hardens it with typed helpers, focused UX tests, and a cost-safe retry fallback.
+Add a small Tasks board action that lets the operator execute up to five review-column tasks that already have real plans. The backend exposes an authenticated batch endpoint that starts existing Hermes task execution with a concurrency cap and returns how many tasks started and how many remain.
 
 ## Files to modify
-- `src/lib/tasks-api.ts` — include optional `depends_on` in the client task type.
-- `src/server/tasks-store.ts` — persist task dependencies in normalized records.
-- `src/server/astra-tasks.ts` — skip dependency-blocked tasks during Deploy, auto-archive stale inactive tasks, clarify `needs_input` routing, and use a configurable free default retry model.
-- `src/screens/tasks/task-card.tsx` — show a typed prerequisite chip for tasks with dependencies.
-- `src/screens/tasks/tasks-screen.tsx` — split blocked stats into input-needed and execution-error labels.
-- `src/screens/tasks/tasks-ux.test.ts` — cover the new helper copy.
-- `IDEAS.json`, `TEST_REPORT.json`, `CLOSE_SUMMARY.md` — tracked cycle artifacts.
+- `src/lib/tasks-api.ts`
+- `src/routes/api/tasks-batch-execute.ts`
+- `src/server/astra-tasks.ts`
+- `src/screens/tasks/tasks-screen.tsx`
+- `src/screens/tasks/tasks-ux.test.ts`
+- `src/routeTree.gen.ts`
 
 ## Steps
-1. Preserve existing idea backlog and append de-duplicated candidates for this cycle.
-2. Add `depends_on` to task data types and persistence normalization.
-3. Render dependency chips without `any` casts and add helper-tested copy.
-4. Split blocked task counts into waiting-for-input versus execution-failure causes.
-5. Keep retry escalation configurable and free-by-default to respect cost controls.
-6. Run TypeScript, focused Vitest, focused ESLint, full test/lint baselines, build, and JSON health validation.
-7. Commit only intended files on the current branch and do not push.
+1. Preserve the existing idea backlog and append the batch-execution idea without deleting prior entries.
+2. Add `batchExecuteTasks()` to the client task API.
+3. Add `/api/tasks-batch-execute` with authentication, a bounded `limit`, and optional explicit task IDs.
+4. Add `batchExecuteBackground()` on the server to select review tasks with usable plans, stagger starts, and return `{ started, remaining }`.
+5. Extract shared UI readiness logic into `countExecutableReviewTasks()` and cover it with focused Vitest tests.
+6. Render an `Execute Ready` button only when at least one review task is executable; show loading and toast feedback.
 
 ## How to verify the change works
-- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx tsc --noEmit`
-- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx vitest run src/screens/tasks/tasks-ux.test.ts`
-- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx eslint --no-warn-ignored -f json src/screens/tasks/task-card.tsx src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts src/lib/tasks-api.ts src/server/astra-tasks.ts src/server/tasks-store.ts`
+- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH`
+- `npx tsc --noEmit`
+- `npx vitest run src/screens/tasks/tasks-ux.test.ts`
+- `npx eslint --no-warn-ignored -f json src/lib/tasks-api.ts src/routes/api/tasks-batch-execute.ts src/server/astra-tasks.ts src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts`
 - `git diff --check`
-- `pnpm build`, service restart, and `/api/health` JSON body validation because `src/` changed.
+- `pnpm build`
+- Restart `hermes-workspace.service` because source files changed, then validate `/api/health` returns JSON `{ "status": "ok" }`.
 
 ## Rollback procedure
-Revert the local `auto-improve: task dependency blocked status clarity` commit, rebuild, restart `hermes-workspace.service`, and rerun the JSON health check.
+Revert the auto-improvement commit, rebuild the workspace, restart `hermes-workspace.service`, and re-run the JSON health check.

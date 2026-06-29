@@ -1,40 +1,46 @@
-# Close Summary: Task dependency and blocked-state clarity
+# Close Summary: Execute Ready batch action
 
 ## What changed
-- Added typed `depends_on` support to task API/client records and store normalization so dependency metadata survives round-trips.
-- Updated the task deploy sweep to skip tasks whose prerequisites are not done yet, keeping dependent work silent in todo/backlog instead of wasting agent cycles.
-- Added task card prerequisite chips such as “waiting on 2 prerequisites” and focused helper tests for the singular/plural copy.
-- Split blocked board stats into input-needed versus execution-error causes, with helper-tested labels and title text.
-- Hardened task-agent retry behavior so retry model escalation is configurable and free-by-default instead of hardcoding a paid model.
-- Preserved the existing idea backlog and appended this cycle's follow-up candidates.
+- Added an authenticated `/api/tasks-batch-execute` route that starts up to a bounded number of review-column tasks with usable plans.
+- Added `batchExecuteTasks()` on the client and `batchExecuteBackground()` on the server, with staggered task starts to avoid a process thundering herd.
+- Added a Tasks board `Execute Ready` button that appears only when planned review tasks are ready, shows loading feedback, and reports started/remaining counts via toast.
+- Extracted `countExecutableReviewTasks()` and added focused UX-copy test coverage for ready-task eligibility.
+- Preserved `IDEAS.json` and appended follow-up ideas instead of replacing the backlog.
 
 ## Files changed
+- `IDEAS.json`
+- `PLAN.md`
+- `TEST_REPORT.json`
 - `src/lib/tasks-api.ts`
-- `src/server/tasks-store.ts`
+- `src/routes/api/tasks-batch-execute.ts`
 - `src/server/astra-tasks.ts`
-- `src/screens/tasks/task-card.tsx`
 - `src/screens/tasks/tasks-screen.tsx`
 - `src/screens/tasks/tasks-ux.test.ts`
-- `IDEAS.json`, `PLAN.md`, `TEST_REPORT.json`, `CLOSE_SUMMARY.md`
+- `src/routeTree.gen.ts`
 
 ## Test results
-- PASS: `npx tsc --noEmit`
-- PASS: `npx vitest run src/screens/tasks/tasks-ux.test.ts` (8 tests)
-- PASS: focused changed-file ESLint, 0 errors / 0 warnings
-- PASS: `git diff --check`
-- PASS: `pnpm build`
-- Baseline only: full `pnpm test` still exits non-zero due Vitest collecting Playwright E2E specs without `@playwright/test` and Odysseus TAP `.mjs` files with no Vitest suite.
-- Baseline only: full `pnpm lint` still reports repo-wide lint debt outside the touched files.
+Passing focused gates:
+- `npx tsc --noEmit`
+- `npx vitest run src/screens/tasks/tasks-ux.test.ts` — 9 tests passed.
+- `npx eslint --no-warn-ignored -f json ...changed files...` — 0 errors, 0 warnings.
+- `git diff --check`
+- `pnpm build`
 
-## Deployment / health
-- PASS: `pnpm build` completed before restart.
-- PASS: `sudo systemctl restart hermes-workspace.service` completed and `systemctl is-active hermes-workspace.service` returned `active`.
-- PASS: bounded `/api/health` validation returned HTTP 200, `application/json`, and body `{"status":"ok"}`.
+Baseline limitations recorded in `TEST_REPORT.json`:
+- Full `pnpm test` still exits non-zero because default Vitest collection includes Playwright E2E specs without `@playwright/test` and Odysseus TAP `.mjs` files with no Vitest suite.
+- Full `pnpm lint` still reports repo-wide baseline lint debt outside the changed-file gate.
 
-## Side effects observed
-No external repositories were touched and no remote push was performed. The pre-existing dirty `services/odysseus` gitlink was left unstaged.
+## Deployment and health
+- Rebuilt production assets with `pnpm build`.
+- Restarted `hermes-workspace.service`; `systemctl is-active` returned `active`.
+- Health check used bounded retry and validated status, content type, and JSON body. First attempt returned transient nginx 502 during warm-up; final result: `200 application/json` with body `{"status":"ok"}`.
 
-## Follow-up ideas
-- Fix the default Vitest include/exclude baseline so E2E and TAP suites do not fail unit-test collection.
-- Add UI controls to manage task dependencies directly from the task dialog.
-- Add a small operator tooltip explaining why dependency-waiting tasks are skipped by Deploy.
+## Side effects / notes
+- No push or PR was created; the mission explicitly says not to push.
+- Existing dirty gitlink `services/odysseus` remains unstaged and untouched.
+- Pre-existing unrelated work-in-progress snippets were not included in this commit; a pre-cleanup diff backup was saved at `/tmp/hermes-workspace-pre-autoimprove.diff` for audit during this cron run.
+
+## New ideas for next cycle
+- Show live progress after Execute Ready starts tasks.
+- Add focused API tests for tasks batch execution.
+- Fix the default Vitest collection baseline so E2E/TAP suites do not fail unit-test runs.

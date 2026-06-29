@@ -57,6 +57,7 @@ import { Route as ApiTasksFromTextRouteImport } from './routes/api/tasks-from-te
 import { Route as ApiTasksDeployAgentsRouteImport } from './routes/api/tasks-deploy-agents'
 import { Route as ApiTasksCompletionCheckRouteImport } from './routes/api/tasks-completion-check'
 import { Route as ApiTasksClarifyNudgeRouteImport } from './routes/api/tasks-clarify-nudge'
+import { Route as ApiTasksBatchExecuteRouteImport } from './routes/api/tasks-batch-execute'
 import { Route as ApiTasksAstraReviewRouteImport } from './routes/api/tasks-astra-review'
 import { Route as ApiTasksAskAstraRouteImport } from './routes/api/tasks-ask-astra'
 import { Route as ApiTasksRouteImport } from './routes/api/tasks'
@@ -460,6 +461,11 @@ const ApiTasksCompletionCheckRoute = ApiTasksCompletionCheckRouteImport.update({
 const ApiTasksClarifyNudgeRoute = ApiTasksClarifyNudgeRouteImport.update({
   id: '/api/tasks-clarify-nudge',
   path: '/api/tasks-clarify-nudge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksBatchExecuteRoute = ApiTasksBatchExecuteRouteImport.update({
+  id: '/api/tasks-batch-execute',
+  path: '/api/tasks-batch-execute',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTasksAstraReviewRoute = ApiTasksAstraReviewRouteImport.update({
@@ -1407,6 +1413,7 @@ export interface FileRoutesByFullPath {
   '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
+  '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
@@ -1620,6 +1627,7 @@ export interface FileRoutesByTo {
   '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
+  '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
@@ -1835,6 +1843,7 @@ export interface FileRoutesById {
   '/api/tasks': typeof ApiTasksRoute
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
+  '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
@@ -2051,6 +2060,7 @@ export interface FileRouteTypes {
     | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
+    | '/api/tasks-batch-execute'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
     | '/api/tasks-deploy-agents'
@@ -2264,6 +2274,7 @@ export interface FileRouteTypes {
     | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
+    | '/api/tasks-batch-execute'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
     | '/api/tasks-deploy-agents'
@@ -2478,6 +2489,7 @@ export interface FileRouteTypes {
     | '/api/tasks'
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
+    | '/api/tasks-batch-execute'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
     | '/api/tasks-deploy-agents'
@@ -2693,6 +2705,7 @@ export interface RootRouteChildren {
   ApiTasksRoute: typeof ApiTasksRoute
   ApiTasksAskAstraRoute: typeof ApiTasksAskAstraRoute
   ApiTasksAstraReviewRoute: typeof ApiTasksAstraReviewRoute
+  ApiTasksBatchExecuteRoute: typeof ApiTasksBatchExecuteRoute
   ApiTasksClarifyNudgeRoute: typeof ApiTasksClarifyNudgeRoute
   ApiTasksCompletionCheckRoute: typeof ApiTasksCompletionCheckRoute
   ApiTasksDeployAgentsRoute: typeof ApiTasksDeployAgentsRoute
@@ -3093,6 +3106,13 @@ declare module '@tanstack/react-router' {
       path: '/api/tasks-clarify-nudge'
       fullPath: '/api/tasks-clarify-nudge'
       preLoaderRoute: typeof ApiTasksClarifyNudgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-batch-execute': {
+      id: '/api/tasks-batch-execute'
+      path: '/api/tasks-batch-execute'
+      fullPath: '/api/tasks-batch-execute'
+      preLoaderRoute: typeof ApiTasksBatchExecuteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tasks-astra-review': {
@@ -4599,6 +4619,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTasksRoute: ApiTasksRoute,
   ApiTasksAskAstraRoute: ApiTasksAskAstraRoute,
   ApiTasksAstraReviewRoute: ApiTasksAstraReviewRoute,
+  ApiTasksBatchExecuteRoute: ApiTasksBatchExecuteRoute,
   ApiTasksClarifyNudgeRoute: ApiTasksClarifyNudgeRoute,
   ApiTasksCompletionCheckRoute: ApiTasksCompletionCheckRoute,
   ApiTasksDeployAgentsRoute: ApiTasksDeployAgentsRoute,

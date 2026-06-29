@@ -2523,3 +2523,42 @@ for (const task of TASKS) {
 
   return { taskCount: candidates.length }
 }
+// ---------------------------------------------------------------------------
+// batchExecuteBackground — fire executeTaskWithHermesBackground on review tasks
+// that have a real plan, up to `limit` at a time, staggered to avoid a
+// thundering herd of hermes processes.
+// ---------------------------------------------------------------------------
+export function batchExecuteBackground(limit = 5, taskIds?: Array<string>): { started: number; remaining: number } {
+  const PLAN_UNAVAILABLE = 'Plan unavailable'
+  const boundedLimit = Math.max(1, Math.min(Math.trunc(limit), 20))
+  let candidates: Array<TaskRecord>
+
+  if (taskIds && taskIds.length > 0) {
+    candidates = taskIds
+      .map((id) => getTask(id))
+      .filter((task): task is TaskRecord => {
+        if (task == null || task.column !== 'review' || task.agent_state) return false
+        const plannedHistory = (task.agent_history ?? []).filter((entry) => entry.action === 'planned')
+        if (plannedHistory.length === 0) return false
+        return !plannedHistory[plannedHistory.length - 1].note.includes(PLAN_UNAVAILABLE)
+      })
+  } else {
+    candidates = listTasks({ column: 'review' }).filter((task) => {
+      if (task.agent_state) return false
+      const plannedHistory = (task.agent_history ?? []).filter((entry) => entry.action === 'planned')
+      if (plannedHistory.length === 0) return false
+      return !plannedHistory[plannedHistory.length - 1].note.includes(PLAN_UNAVAILABLE)
+    })
+  }
+
+  const batch = candidates.slice(0, boundedLimit)
+  const remaining = Math.max(0, candidates.length - batch.length)
+
+  batch.forEach((task, index) => {
+    setTimeout(() => {
+      try { executeTaskWithHermesBackground(task.id) } catch { /* non-fatal */ }
+    }, index * 300)
+  })
+
+  return { started: batch.length, remaining }
+}

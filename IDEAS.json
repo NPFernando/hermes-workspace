@@ -70,5 +70,35 @@
     "description": "Move very old inactive backlog/todo tasks to done with an audit history entry so the deploy sweep stays focused on actionable work.",
     "category": "backend",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Add Execute Ready batch action for planned review tasks",
+    "description": "Show a Tasks board action that starts execution for review-column tasks with real plans, backed by an authenticated batch API that limits concurrency and reports remaining work.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Deduplicate active task creation by normalized title",
+    "description": "Prevent duplicate active tasks when the same title is submitted repeatedly by normalizing titles in the server task store before creating a new record.",
+    "category": "backend",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Harden task execution readiness helper tests",
+    "description": "Extract and test the logic that decides whether a review task has a usable execution plan so UI counts and batch execution stay aligned.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Show live progress after Execute Ready starts tasks",
+    "description": "After batch execution starts, show a compact live progress region with how many spawned tasks are working, completed, or failed so the operator does not need to inspect cards manually.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add focused API tests for tasks batch execution",
+    "description": "Cover the tasks-batch-execute route with authorization, limit clamping, explicit task ID filtering, and no-plan exclusion cases.",
+    "category": "backend",
+    "estimated_effort": "medium"
   }
 ]
