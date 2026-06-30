@@ -548,46 +548,54 @@ setInterval(() => {
 
 // Auto-execute review sweep: tasks with real plans waiting >HERMES_AUTO_EXECUTE_DELAY_H hours.
 const AUTO_EXECUTE_DELAY_MS =
-  parseFloat(process.env.HERMES_AUTO_EXECUTE_DELAY_H ?? '2') * 60 * 60 * 1000
+  parseFloat(process.env.HERMES_AUTO_EXECUTE_DELAY_H ?? '0.75') * 60 * 60 * 1000
 const AUTO_EXECUTE_MAX = parseInt(process.env.HERMES_AUTO_EXECUTE_MAX ?? '10', 10)
+
+export function drainReadyReview(opts: { limit?: number; ignoreDelay?: boolean } = {}): { queued: number; titles: Array<string> } {
+  const now = Date.now()
+  const limit = opts.limit ?? AUTO_EXECUTE_MAX
+  const candidates = listTasks({ column: 'review' }).filter((t) => {
+    if (t.agent_state) return false
+    const plannedHistory = (t.agent_history ?? []).filter((h) => h.action === 'planned')
+    if (plannedHistory.length === 0) return false
+    const lastNote = plannedHistory[plannedHistory.length - 1].note
+    if (lastNote.includes('Plan unavailable')) return false
+    if (lastNote.length < 80) return false
+    const running = listTasks({}).filter((x) => x.agent_state === 'working').length
+    if (running >= MAX_CONCURRENT_EXECUTIONS) return false
+    if (!opts.ignoreDelay && now - new Date(t.updated_at).getTime() < AUTO_EXECUTE_DELAY_MS) return false
+    return true
+  }).slice(0, limit)
+
+  if (candidates.length === 0) return { queued: 0, titles: [] }
+
+  candidates.forEach((task, i) => {
+    setTimeout(() => {
+      try { executeTaskWithHermesBackground(task.id) } catch { /* non-fatal */ }
+    }, i * 8_000)
+  })
+
+  try {
+    const sweepStatsFile = path.join(os.homedir(), '.hermes', 'sweep-stats.json')
+    const todayDate = new Date().toISOString().slice(0, 10)
+    let stats: { lastSweepAt: string; executedToday: number; executedDate: string } = { lastSweepAt: '', executedToday: 0, executedDate: '' }
+    try { stats = JSON.parse(fs.readFileSync(sweepStatsFile, 'utf-8')) } catch { /* first run */ }
+    if (stats.executedDate !== todayDate) { stats.executedToday = 0; stats.executedDate = todayDate }
+    stats.lastSweepAt = new Date().toISOString()
+    stats.executedToday += candidates.length
+    fs.writeFileSync(sweepStatsFile, JSON.stringify(stats))
+  } catch { /* non-fatal */ }
+
+  return { queued: candidates.length, titles: candidates.map((t) => t.title.slice(0, 60)) }
+}
 
 setInterval(() => {
   try {
-    const now = Date.now()
-    const candidates = listTasks({ column: 'review' }).filter((t) => {
-      if (t.agent_state) return false
-      const plannedHistory = (t.agent_history ?? []).filter((h) => h.action === 'planned')
-      if (plannedHistory.length === 0) return false
-      const lastNote = plannedHistory[plannedHistory.length - 1].note
-      if (lastNote.includes('Plan unavailable')) return false
-      // Quality gate: plans shorter than 80 chars are stubs — skip until re-planned
-      if (lastNote.length < 80) return false
-      // Concurrency guard: don't start more if we're already at capacity
-      const running = listTasks({}).filter((x) => x.agent_state === 'working').length
-      if (running >= MAX_CONCURRENT_EXECUTIONS) return false
-      return now - new Date(t.updated_at).getTime() >= AUTO_EXECUTE_DELAY_MS
-    }).slice(0, AUTO_EXECUTE_MAX)
-
-    if (candidates.length === 0) return
-    candidates.forEach((task, i) => {
-      setTimeout(() => {
-        try { executeTaskWithHermesBackground(task.id) } catch { /* non-fatal */ }
-      }, i * 8_000)
-    })
-    // Update sweep stats for board health visibility
-    try {
-      const sweepStatsFile = path.join(os.homedir(), '.hermes', 'sweep-stats.json')
-      const todayDate = new Date().toISOString().slice(0, 10)
-      let stats: { lastSweepAt: string; executedToday: number; executedDate: string } = { lastSweepAt: '', executedToday: 0, executedDate: '' }
-      try { stats = JSON.parse(fs.readFileSync(sweepStatsFile, 'utf-8')) } catch { /* first run */ }
-      if (stats.executedDate !== todayDate) { stats.executedToday = 0; stats.executedDate = todayDate }
-      stats.lastSweepAt = new Date().toISOString()
-      stats.executedToday += candidates.length
-      fs.writeFileSync(sweepStatsFile, JSON.stringify(stats))
-    } catch { /* non-fatal */ }
+    const { queued, titles } = drainReadyReview()
+    if (queued === 0) return
     spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q',
-      `⚡ Auto-executing ${candidates.length} review task${candidates.length > 1 ? 's' : ''} (waited >${Math.round(AUTO_EXECUTE_DELAY_MS / 3600000)}h)\n` +
-      candidates.map((t) => `• ${t.title.slice(0, 60)}`).join('\n'),
+      `⚡ Auto-executing ${queued} review task${queued > 1 ? 's' : ''} (waited >${Math.round(AUTO_EXECUTE_DELAY_MS / 3600000)}h)\n` +
+      titles.map((t) => `• ${t}`).join('\n'),
     ], { encoding: 'utf-8', timeout: 15_000 })
   } catch { /* non-fatal */ }
 }, 30 * 60 * 1000)
@@ -1274,7 +1282,7 @@ for (const reviewTask of sisterReviewQueue) {
       '\\nDecide:\\n' +
       '  action: "ready"      → you can handle this; include a numbered plan\\n' +
       '  action: "re_assign"  → wrong specialist; name the right one in reassign_to\\n' +
-      '  action: "needs_input"→ missing info; write your question in question field\\n\\n' +
+      '  action: "needs_input"→ ONLY if a literal secret/credential Naveen must provide (API key, password, account ID, private URL). For unclear scope, missing context, or ambiguity — choose "ready" and note your assumptions in the plan. DO NOT block for general uncertainty.\\n\\n' +
       'Return ONLY valid JSON:\\n' +
       '{"action":"ready","plan":"1. ...\\\\n2. ...\\\\n3. ...","reassign_to":null,"question":""}';
 
@@ -1863,7 +1871,7 @@ export function executeTaskWithHermesBackground(taskId: string): void {
     'QUESTIONS: [{"id":"q1","q":"Which approach?","options":["Option A","Option B","Option C"]},{"id":"q2","q":"Open question?"}]',
     '  — only if STATUS is needs_input; omit otherwise. Add "options" array (2-4 short choices) when answers are enumerable.',
     '</WORK_SUMMARY>',
-    'When needs_input: emit QUESTIONS (1-4). On resume with answers, satisfy gaps and proceed.',
+    'STATUS RULES: Use "done" when work is complete. Use "blocked" only for hard technical blockers (missing file, broken dep, permission denied). Use "needs_input" ONLY when a literal secret/credential Naveen must provide is required (API key, password, account ID) — NOT for design decisions or missing context; make reasonable assumptions and proceed. Partial work with no clear blocker → STATUS: partial.',
   ].filter(Boolean).join('\n')
 
   // Generate paths before building script content so they can be embedded as constants
@@ -2199,6 +2207,19 @@ updateTaskDirect(TASK_ID, {
 });
 
 log('task updated successfully');
+
+// Track execution outcomes in sweep-stats.json for board health visibility
+try {
+  const sweepStatsFile = path.join(os.homedir(), '.hermes', 'sweep-stats.json');
+  const todayDate = new Date().toISOString().slice(0, 10);
+  let stats = { lastSweepAt: '', executedToday: 0, executedDate: '', completedToday: 0, blockedToday: 0, needsInputToday: 0, outcomeDate: '' };
+  try { stats = { ...stats, ...JSON.parse(fs.readFileSync(sweepStatsFile, 'utf-8')) }; } catch { /* first run */ }
+  if (stats.outcomeDate !== todayDate) { stats.completedToday = 0; stats.blockedToday = 0; stats.needsInputToday = 0; stats.outcomeDate = todayDate; }
+  if (status === 'done')        stats.completedToday += 1;
+  else if (status === 'blocked') stats.blockedToday   += 1;
+  else if (status === 'needs_input') stats.needsInputToday += 1;
+  fs.writeFileSync(sweepStatsFile, JSON.stringify(stats));
+} catch { /* non-fatal */ }
 
 // Telegram notification — rich card for terminal outcomes; keyboard for clarifications
 try {

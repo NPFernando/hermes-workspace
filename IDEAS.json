@@ -148,5 +148,23 @@
     "description": "Add focused API tests for tasks-create-from-tg, tasks-exec-log, tasks-unlock-prereq, and telegram-find routes to lock down authorization and response shapes.",
     "category": "api",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Add task operations audit filters",
+    "description": "Add UI filters for recently dispatched, timed out, rescued, and replanned tasks so operators can audit automated task operations without reading raw history entries.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Turn focused lint fallback into a package script",
+    "description": "Add a workspace script that lints only changed source files with documented baseline-rule overrides, making auto-improvement verification repeatable and less ad hoc.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Archive unrelated untracked finance drafts outside src",
+    "description": "Move experimental finance server drafts out of src until their dependencies and routes are ready, preventing unrelated untracked files from breaking TypeScript gates.",
+    "category": "config",
+    "estimated_effort": "low"
   }
 ]

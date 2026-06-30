@@ -1,30 +1,38 @@
-# Plan: Fix Vitest collection baseline for E2E and TAP suites
+# Plan — Task operations visibility and large-board performance
 
 ## Summary of the change
-Default `pnpm test` should report Vitest unit-test failures, not collection failures from suites that require other runners. The current Vitest config excludes dependency/build folders but still lets Playwright `e2e/*.spec.ts` and Odysseus TAP `.mjs` suites enter the unit-test run. Add explicit excludes for those paths.
+Improve the Workspace Tasks board for operational control: virtualize large task lists, expose batch/task execution outcome telemetry, add routes for sweep/drain/rescue/replan status, and surface richer Telegram board summaries.
 
 ## Files to modify
-- `vite.config.ts`
-- `IDEAS.json`
-- `PLAN.md`
-- `TEST_REPORT.json`
-- `CLOSE_SUMMARY.md`
+- `src/screens/tasks/tasks-screen.tsx`
+- `src/screens/tasks/task-card.tsx`
+- `src/server/astra-tasks.ts`
+- `src/routes/api/tasks-completion-trend.ts`
+- `src/routes/api/tasks-drain-now.ts`
+- `src/routes/api/tasks-replan-stubs.ts`
+- `src/routes/api/tasks-rescue-timedout.ts`
+- `src/routes/api/tasks-stale.ts`
+- `src/routes/api/tasks-sweep-stats.ts`
+- `src/routes/api/telegram-board.ts`
+- `src/routeTree.gen.ts`
+- `package.json`, `pnpm-lock.yaml`
 
 ## Steps
-1. Preserve and de-duplicate the existing `IDEAS.json` backlog while adding this config-hygiene idea and follow-ups.
-2. Update the `test.exclude` list in `vite.config.ts` to exclude `e2e/**` and `services/odysseus/tests/**/*.mjs` from Vitest.
-3. Run TypeScript compile, focused Vitest collection/affected tests, full `pnpm test`, lint, build, and whitespace checks.
-4. Commit only the intended config/artifact files, leaving pre-existing dirty source files and gitlinks unstaged.
-5. Restart the workspace service because the mission treats source/config changes as deployment-triggering, then validate systemd state and JSON health body shape.
+1. Preserve useful existing dirty task-board work and discard unrelated/broken package/finance draft changes from the active source tree.
+2. Add `@tanstack/react-virtual` and render large task columns through virtualized rows while keeping small columns unchanged.
+3. Add task operation endpoints for sweep stats, stale/timed-out rescue, stub replan, completion trend, and manual drain.
+4. Surface task activity, selection, compact rows, progress/summary panels, and richer Telegram board outcome text.
+5. Fix TypeScript issues discovered during verification: route activity entries need full metadata, drag-end is a supported TaskCard prop, sweep stats must be declared before effects use it, and panel notes should use `agent_comment`.
+6. Verify with TypeScript, focused Tasks tests, full Vitest, focused lint fallback, and production build.
 
 ## How to verify the change works
-- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx tsc --noEmit`
-- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx vitest run --list`
-- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && pnpm test`
-- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && pnpm lint`
-- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && pnpm build`
-- `git diff --check`
-- JSON health validation requires HTTP 200, `application/json`, and `{"status":"ok"}`.
+- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH`
+- `npx tsc --noEmit`
+- `npx vitest run src/screens/tasks/tasks-ux.test.ts --reporter=dot`
+- `pnpm test`
+- `npx eslint --no-warn-ignored -f json --rule '@typescript-eslint/no-unnecessary-condition: off' <changed task files>`
+- `pnpm build`
+- Restart `hermes-workspace.service` and verify both systemd state and JSON health.
 
 ## Rollback procedure
-Revert the `test.exclude` additions in `vite.config.ts`, restore the prior artifacts from git, rebuild, restart `hermes-workspace.service`, and re-run the JSON health check.
+Revert the auto-improvement commit, run `pnpm install` to restore the dependency graph, rebuild, restart `hermes-workspace.service`, and validate `/api/health` returns JSON `{"status":"ok"}`.

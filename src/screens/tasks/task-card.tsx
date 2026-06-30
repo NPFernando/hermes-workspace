@@ -17,6 +17,7 @@ type Props = {
   assigneeLabels?: Record<string, string>
   onClick: () => void
   onDragStart: (e: React.DragEvent) => void
+  onDragEnd?: () => void
   isDragging?: boolean
   activeTagFilter: string | null
   onTagClick: (tag: string) => void
@@ -34,6 +35,9 @@ type Props = {
   onRequestRefresh?: () => void
   onComment?: (taskId: string, text: string) => Promise<void>
   queuePosition?: number | null
+  isSelected?: boolean
+  onToggleSelect?: (id: string) => void
+  dense?: boolean
 }
 
 export function formatTaskAssigneeLabel(
@@ -99,6 +103,7 @@ export const TaskCard = memo(function TaskCardComponent({
   assigneeLabels = {},
   onClick,
   onDragStart,
+  onDragEnd,
   isDragging,
   activeTagFilter,
   onTagClick,
@@ -116,6 +121,9 @@ export const TaskCard = memo(function TaskCardComponent({
   onRequestRefresh,
   onComment,
   queuePosition,
+  isSelected,
+  onToggleSelect,
+  dense,
 }: Props) {
   const [activityOpen, setActivityOpen] = useState(false)
   const [replyText, setReplyText] = useState('')
@@ -134,16 +142,55 @@ export const TaskCard = memo(function TaskCardComponent({
   const stuck = isStuckAgent(task)
   const isDimmed = Boolean(activeTagFilter && !task.tags.includes(activeTagFilter))
 
+  if (dense) {
+    return (
+      <div
+        draggable
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onClick={onClick}
+        className={cn(
+          'relative flex items-center gap-2 rounded border px-2 py-1 cursor-pointer transition-all select-none group',
+          'bg-[var(--theme-card)] border-[var(--theme-border)]',
+          'hover:border-[var(--theme-accent)]',
+          isDragging ? 'opacity-40' : '',
+          isSelected && 'ring-1 ring-[var(--theme-accent)]',
+          isAgentActive && 'ring-1 ring-violet-500/30',
+          isDimmed && 'opacity-40',
+        )}
+        style={{ borderLeftWidth: 2, borderLeftColor: priorityColor, minHeight: 32 }}
+      >
+        {onToggleSelect && (
+          <div
+            className={cn('shrink-0 transition-opacity', isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60')}
+            onClick={e => { e.stopPropagation(); onToggleSelect(task.id) }}
+          >
+            <div className={cn('w-3 h-3 rounded border flex items-center justify-center',
+              isSelected ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)]' : 'border-[var(--theme-border)]')}>
+              {isSelected && <span className="text-[7px] font-bold text-[var(--theme-bg)]">✓</span>}
+            </div>
+          </div>
+        )}
+        <span className="flex-1 text-[11px] text-[var(--theme-text)] truncate">{task.title}</span>
+        {isAgentActive && <span className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse" style={{ background: '#a855f7' }} />}
+        {assigneeLabel && <span className="shrink-0 text-[9px] text-[var(--theme-muted)] opacity-60">{assigneeLabel.slice(0, 6)}</span>}
+        {overdue && <span className="shrink-0 text-[9px] text-rose-400">!</span>}
+      </div>
+    )
+  }
+
   return (
     <div
       draggable
       onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       onClick={onClick}
       className={cn(
         'relative rounded-lg border p-3 cursor-pointer transition-all select-none group',
         'bg-[var(--theme-card)] border-[var(--theme-border)]',
         'hover:border-[var(--theme-accent)]',
         isDragging ? 'opacity-40 rotate-1 shadow-2xl' : 'hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]',
+        isSelected && 'ring-2 ring-[var(--theme-accent)] border-[var(--theme-accent)]',
         isExecuting && 'ring-2 ring-amber-500/50',
         isBreakingDown && !isExecuting && 'ring-2 ring-violet-500/50',
         isAgentActive && !isExecuting && !isBreakingDown && 'ring-1 ring-violet-500/30',
@@ -151,6 +198,26 @@ export const TaskCard = memo(function TaskCardComponent({
       )}
       style={{ borderLeftWidth: 3, borderLeftColor: priorityColor }}
     >
+      {/* Bulk-select checkbox */}
+      {onToggleSelect && (
+        <div
+          className={cn(
+            'absolute top-1.5 left-1.5 z-10 transition-opacity',
+            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60',
+          )}
+          onClick={e => { e.stopPropagation(); onToggleSelect(task.id) }}
+        >
+          <div className={cn(
+            'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
+            isSelected
+              ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)]'
+              : 'border-[var(--theme-border)] bg-[var(--theme-card)]',
+          )}>
+            {isSelected && <span className="text-[8px] font-bold text-[var(--theme-bg)]">✓</span>}
+          </div>
+        </div>
+      )}
+
       {/* Agent state gradient banner — decorative only; badge below is the click target */}
       {isAgentActive && (
         <div
@@ -335,6 +402,32 @@ export const TaskCard = memo(function TaskCardComponent({
             <span className="text-purple-500">✦</span> {task.agent_comment}
           </p>
         )}
+
+        {/* Last activity timestamp — quick scan for when something last happened */}
+        {(() => {
+          const history = task.agent_history ?? []
+          if (history.length === 0) return null
+          const last = history[history.length - 1] as { action: string; at?: string; by?: string }
+          if (!last.at) return null
+          const ageMs = Date.now() - new Date(last.at).getTime()
+          if (ageMs > 7 * 24 * 3600_000) return null // hide if >7d
+          const ageStr = ageMs < 3600_000
+            ? `${Math.round(ageMs / 60_000)}m ago`
+            : ageMs < 86_400_000
+            ? `${Math.round(ageMs / 3600_000)}h ago`
+            : `${Math.round(ageMs / 86_400_000)}d ago`
+          const actionColor: Record<string, string> = {
+            completed: 'text-emerald-500', blocked: 'text-red-400', timed_out: 'text-orange-400',
+            planned: 'text-violet-400', question: 'text-amber-400',
+          }
+          const col = actionColor[last.action] ?? 'text-[var(--theme-muted)]'
+          if (isAgentActive) return null
+          return (
+            <p className={`text-[9px] ${col} opacity-70`}>
+              {last.action.replace(/_/g, ' ')} · {ageStr}
+            </p>
+          )
+        })()}
 
         {/* Plan-ready banner — shown when task is in review with a sister's plan.
             Replaces the buried "expand history → find planned entry" workflow. */}

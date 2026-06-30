@@ -52,14 +52,20 @@ import { Route as ApiTelegramTaskClarifyRouteImport } from './routes/api/telegra
 import { Route as ApiTelegramFindRouteImport } from './routes/api/telegram-find'
 import { Route as ApiTelegramBoardRouteImport } from './routes/api/telegram-board'
 import { Route as ApiTasksUnlockPrereqRouteImport } from './routes/api/tasks-unlock-prereq'
+import { Route as ApiTasksSweepStatsRouteImport } from './routes/api/tasks-sweep-stats'
+import { Route as ApiTasksStaleRouteImport } from './routes/api/tasks-stale'
+import { Route as ApiTasksRescueTimedoutRouteImport } from './routes/api/tasks-rescue-timedout'
+import { Route as ApiTasksReplanStubsRouteImport } from './routes/api/tasks-replan-stubs'
 import { Route as ApiTasksPruneRouteImport } from './routes/api/tasks-prune'
 import { Route as ApiTasksProgressPingRouteImport } from './routes/api/tasks-progress-ping'
 import { Route as ApiTasksInjectIdeasRouteImport } from './routes/api/tasks-inject-ideas'
 import { Route as ApiTasksGenerateIdeasRouteImport } from './routes/api/tasks-generate-ideas'
 import { Route as ApiTasksFromTextRouteImport } from './routes/api/tasks-from-text'
 import { Route as ApiTasksExecLogRouteImport } from './routes/api/tasks-exec-log'
+import { Route as ApiTasksDrainNowRouteImport } from './routes/api/tasks-drain-now'
 import { Route as ApiTasksDeployAgentsRouteImport } from './routes/api/tasks-deploy-agents'
 import { Route as ApiTasksCreateFromTgRouteImport } from './routes/api/tasks-create-from-tg'
+import { Route as ApiTasksCompletionTrendRouteImport } from './routes/api/tasks-completion-trend'
 import { Route as ApiTasksCompletionCheckRouteImport } from './routes/api/tasks-completion-check'
 import { Route as ApiTasksClarifyNudgeRouteImport } from './routes/api/tasks-clarify-nudge'
 import { Route as ApiTasksBatchExecuteRouteImport } from './routes/api/tasks-batch-execute'
@@ -443,6 +449,26 @@ const ApiTasksUnlockPrereqRoute = ApiTasksUnlockPrereqRouteImport.update({
   path: '/api/tasks-unlock-prereq',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTasksSweepStatsRoute = ApiTasksSweepStatsRouteImport.update({
+  id: '/api/tasks-sweep-stats',
+  path: '/api/tasks-sweep-stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksStaleRoute = ApiTasksStaleRouteImport.update({
+  id: '/api/tasks-stale',
+  path: '/api/tasks-stale',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksRescueTimedoutRoute = ApiTasksRescueTimedoutRouteImport.update({
+  id: '/api/tasks-rescue-timedout',
+  path: '/api/tasks-rescue-timedout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksReplanStubsRoute = ApiTasksReplanStubsRouteImport.update({
+  id: '/api/tasks-replan-stubs',
+  path: '/api/tasks-replan-stubs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTasksPruneRoute = ApiTasksPruneRouteImport.update({
   id: '/api/tasks-prune',
   path: '/api/tasks-prune',
@@ -473,6 +499,11 @@ const ApiTasksExecLogRoute = ApiTasksExecLogRouteImport.update({
   path: '/api/tasks-exec-log',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTasksDrainNowRoute = ApiTasksDrainNowRouteImport.update({
+  id: '/api/tasks-drain-now',
+  path: '/api/tasks-drain-now',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTasksDeployAgentsRoute = ApiTasksDeployAgentsRouteImport.update({
   id: '/api/tasks-deploy-agents',
   path: '/api/tasks-deploy-agents',
@@ -481,6 +512,11 @@ const ApiTasksDeployAgentsRoute = ApiTasksDeployAgentsRouteImport.update({
 const ApiTasksCreateFromTgRoute = ApiTasksCreateFromTgRouteImport.update({
   id: '/api/tasks-create-from-tg',
   path: '/api/tasks-create-from-tg',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksCompletionTrendRoute = ApiTasksCompletionTrendRouteImport.update({
+  id: '/api/tasks-completion-trend',
+  path: '/api/tasks-completion-trend',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTasksCompletionCheckRoute = ApiTasksCompletionCheckRouteImport.update({
@@ -1446,14 +1482,20 @@ export interface FileRoutesByFullPath {
   '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
+  '/api/tasks-completion-trend': typeof ApiTasksCompletionTrendRoute
   '/api/tasks-create-from-tg': typeof ApiTasksCreateFromTgRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
+  '/api/tasks-drain-now': typeof ApiTasksDrainNowRoute
   '/api/tasks-exec-log': typeof ApiTasksExecLogRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
   '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/tasks-replan-stubs': typeof ApiTasksReplanStubsRoute
+  '/api/tasks-rescue-timedout': typeof ApiTasksRescueTimedoutRoute
+  '/api/tasks-stale': typeof ApiTasksStaleRoute
+  '/api/tasks-sweep-stats': typeof ApiTasksSweepStatsRoute
   '/api/tasks-unlock-prereq': typeof ApiTasksUnlockPrereqRoute
   '/api/telegram-board': typeof ApiTelegramBoardRoute
   '/api/telegram-find': typeof ApiTelegramFindRoute
@@ -1665,14 +1707,20 @@ export interface FileRoutesByTo {
   '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
+  '/api/tasks-completion-trend': typeof ApiTasksCompletionTrendRoute
   '/api/tasks-create-from-tg': typeof ApiTasksCreateFromTgRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
+  '/api/tasks-drain-now': typeof ApiTasksDrainNowRoute
   '/api/tasks-exec-log': typeof ApiTasksExecLogRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
   '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/tasks-replan-stubs': typeof ApiTasksReplanStubsRoute
+  '/api/tasks-rescue-timedout': typeof ApiTasksRescueTimedoutRoute
+  '/api/tasks-stale': typeof ApiTasksStaleRoute
+  '/api/tasks-sweep-stats': typeof ApiTasksSweepStatsRoute
   '/api/tasks-unlock-prereq': typeof ApiTasksUnlockPrereqRoute
   '/api/telegram-board': typeof ApiTelegramBoardRoute
   '/api/telegram-find': typeof ApiTelegramFindRoute
@@ -1886,14 +1934,20 @@ export interface FileRoutesById {
   '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
+  '/api/tasks-completion-trend': typeof ApiTasksCompletionTrendRoute
   '/api/tasks-create-from-tg': typeof ApiTasksCreateFromTgRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
+  '/api/tasks-drain-now': typeof ApiTasksDrainNowRoute
   '/api/tasks-exec-log': typeof ApiTasksExecLogRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
   '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/tasks-replan-stubs': typeof ApiTasksReplanStubsRoute
+  '/api/tasks-rescue-timedout': typeof ApiTasksRescueTimedoutRoute
+  '/api/tasks-stale': typeof ApiTasksStaleRoute
+  '/api/tasks-sweep-stats': typeof ApiTasksSweepStatsRoute
   '/api/tasks-unlock-prereq': typeof ApiTasksUnlockPrereqRoute
   '/api/telegram-board': typeof ApiTelegramBoardRoute
   '/api/telegram-find': typeof ApiTelegramFindRoute
@@ -2108,14 +2162,20 @@ export interface FileRouteTypes {
     | '/api/tasks-batch-execute'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
+    | '/api/tasks-completion-trend'
     | '/api/tasks-create-from-tg'
     | '/api/tasks-deploy-agents'
+    | '/api/tasks-drain-now'
     | '/api/tasks-exec-log'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
     | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/tasks-replan-stubs'
+    | '/api/tasks-rescue-timedout'
+    | '/api/tasks-stale'
+    | '/api/tasks-sweep-stats'
     | '/api/tasks-unlock-prereq'
     | '/api/telegram-board'
     | '/api/telegram-find'
@@ -2327,14 +2387,20 @@ export interface FileRouteTypes {
     | '/api/tasks-batch-execute'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
+    | '/api/tasks-completion-trend'
     | '/api/tasks-create-from-tg'
     | '/api/tasks-deploy-agents'
+    | '/api/tasks-drain-now'
     | '/api/tasks-exec-log'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
     | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/tasks-replan-stubs'
+    | '/api/tasks-rescue-timedout'
+    | '/api/tasks-stale'
+    | '/api/tasks-sweep-stats'
     | '/api/tasks-unlock-prereq'
     | '/api/telegram-board'
     | '/api/telegram-find'
@@ -2547,14 +2613,20 @@ export interface FileRouteTypes {
     | '/api/tasks-batch-execute'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
+    | '/api/tasks-completion-trend'
     | '/api/tasks-create-from-tg'
     | '/api/tasks-deploy-agents'
+    | '/api/tasks-drain-now'
     | '/api/tasks-exec-log'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
     | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/tasks-replan-stubs'
+    | '/api/tasks-rescue-timedout'
+    | '/api/tasks-stale'
+    | '/api/tasks-sweep-stats'
     | '/api/tasks-unlock-prereq'
     | '/api/telegram-board'
     | '/api/telegram-find'
@@ -2768,14 +2840,20 @@ export interface RootRouteChildren {
   ApiTasksBatchExecuteRoute: typeof ApiTasksBatchExecuteRoute
   ApiTasksClarifyNudgeRoute: typeof ApiTasksClarifyNudgeRoute
   ApiTasksCompletionCheckRoute: typeof ApiTasksCompletionCheckRoute
+  ApiTasksCompletionTrendRoute: typeof ApiTasksCompletionTrendRoute
   ApiTasksCreateFromTgRoute: typeof ApiTasksCreateFromTgRoute
   ApiTasksDeployAgentsRoute: typeof ApiTasksDeployAgentsRoute
+  ApiTasksDrainNowRoute: typeof ApiTasksDrainNowRoute
   ApiTasksExecLogRoute: typeof ApiTasksExecLogRoute
   ApiTasksFromTextRoute: typeof ApiTasksFromTextRoute
   ApiTasksGenerateIdeasRoute: typeof ApiTasksGenerateIdeasRoute
   ApiTasksInjectIdeasRoute: typeof ApiTasksInjectIdeasRoute
   ApiTasksProgressPingRoute: typeof ApiTasksProgressPingRoute
   ApiTasksPruneRoute: typeof ApiTasksPruneRoute
+  ApiTasksReplanStubsRoute: typeof ApiTasksReplanStubsRoute
+  ApiTasksRescueTimedoutRoute: typeof ApiTasksRescueTimedoutRoute
+  ApiTasksStaleRoute: typeof ApiTasksStaleRoute
+  ApiTasksSweepStatsRoute: typeof ApiTasksSweepStatsRoute
   ApiTasksUnlockPrereqRoute: typeof ApiTasksUnlockPrereqRoute
   ApiTelegramBoardRoute: typeof ApiTelegramBoardRoute
   ApiTelegramFindRoute: typeof ApiTelegramFindRoute
@@ -3138,6 +3216,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTasksUnlockPrereqRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/tasks-sweep-stats': {
+      id: '/api/tasks-sweep-stats'
+      path: '/api/tasks-sweep-stats'
+      fullPath: '/api/tasks-sweep-stats'
+      preLoaderRoute: typeof ApiTasksSweepStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-stale': {
+      id: '/api/tasks-stale'
+      path: '/api/tasks-stale'
+      fullPath: '/api/tasks-stale'
+      preLoaderRoute: typeof ApiTasksStaleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-rescue-timedout': {
+      id: '/api/tasks-rescue-timedout'
+      path: '/api/tasks-rescue-timedout'
+      fullPath: '/api/tasks-rescue-timedout'
+      preLoaderRoute: typeof ApiTasksRescueTimedoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-replan-stubs': {
+      id: '/api/tasks-replan-stubs'
+      path: '/api/tasks-replan-stubs'
+      fullPath: '/api/tasks-replan-stubs'
+      preLoaderRoute: typeof ApiTasksReplanStubsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tasks-prune': {
       id: '/api/tasks-prune'
       path: '/api/tasks-prune'
@@ -3180,6 +3286,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTasksExecLogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/tasks-drain-now': {
+      id: '/api/tasks-drain-now'
+      path: '/api/tasks-drain-now'
+      fullPath: '/api/tasks-drain-now'
+      preLoaderRoute: typeof ApiTasksDrainNowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tasks-deploy-agents': {
       id: '/api/tasks-deploy-agents'
       path: '/api/tasks-deploy-agents'
@@ -3192,6 +3305,13 @@ declare module '@tanstack/react-router' {
       path: '/api/tasks-create-from-tg'
       fullPath: '/api/tasks-create-from-tg'
       preLoaderRoute: typeof ApiTasksCreateFromTgRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-completion-trend': {
+      id: '/api/tasks-completion-trend'
+      path: '/api/tasks-completion-trend'
+      fullPath: '/api/tasks-completion-trend'
+      preLoaderRoute: typeof ApiTasksCompletionTrendRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tasks-completion-check': {
@@ -4722,14 +4842,20 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTasksBatchExecuteRoute: ApiTasksBatchExecuteRoute,
   ApiTasksClarifyNudgeRoute: ApiTasksClarifyNudgeRoute,
   ApiTasksCompletionCheckRoute: ApiTasksCompletionCheckRoute,
+  ApiTasksCompletionTrendRoute: ApiTasksCompletionTrendRoute,
   ApiTasksCreateFromTgRoute: ApiTasksCreateFromTgRoute,
   ApiTasksDeployAgentsRoute: ApiTasksDeployAgentsRoute,
+  ApiTasksDrainNowRoute: ApiTasksDrainNowRoute,
   ApiTasksExecLogRoute: ApiTasksExecLogRoute,
   ApiTasksFromTextRoute: ApiTasksFromTextRoute,
   ApiTasksGenerateIdeasRoute: ApiTasksGenerateIdeasRoute,
   ApiTasksInjectIdeasRoute: ApiTasksInjectIdeasRoute,
   ApiTasksProgressPingRoute: ApiTasksProgressPingRoute,
   ApiTasksPruneRoute: ApiTasksPruneRoute,
+  ApiTasksReplanStubsRoute: ApiTasksReplanStubsRoute,
+  ApiTasksRescueTimedoutRoute: ApiTasksRescueTimedoutRoute,
+  ApiTasksStaleRoute: ApiTasksStaleRoute,
+  ApiTasksSweepStatsRoute: ApiTasksSweepStatsRoute,
   ApiTasksUnlockPrereqRoute: ApiTasksUnlockPrereqRoute,
   ApiTelegramBoardRoute: ApiTelegramBoardRoute,
   ApiTelegramFindRoute: ApiTelegramFindRoute,

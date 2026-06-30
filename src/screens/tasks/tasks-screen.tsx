@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
@@ -116,6 +117,201 @@ function SkeletonCard() {
   )
 }
 
+const VIRTUAL_THRESHOLD = 40
+const CARD_ESTIMATE_PX = 96
+
+type VirtualRow =
+  | { kind: 'task'; task: ClaudeTask }
+  | { kind: 'group-header'; label: string; count: number; groupId: string; collapsed: boolean; onToggle: () => void }
+  | { kind: 'divider'; label?: string }
+
+function VirtualTaskList({
+  tasks,
+  rows,
+  renderCard,
+  sectionBreak,
+  sectionLabels,
+}: {
+  tasks: Array<ClaudeTask>
+  rows?: Array<VirtualRow>
+  renderCard: (task: ClaudeTask) => React.ReactNode
+  sectionBreak?: number
+  sectionLabels?: [string, string]
+}) {
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  if (rows) {
+    return <VirtualRowList parentRef={parentRef} rows={rows} renderCard={renderCard} />
+  }
+
+  return (
+    <FlatVirtualTaskList
+      parentRef={parentRef}
+      tasks={tasks}
+      renderCard={renderCard}
+      sectionBreak={sectionBreak}
+      sectionLabels={sectionLabels}
+    />
+  )
+}
+
+function FlatVirtualTaskList({
+  parentRef,
+  tasks,
+  renderCard,
+  sectionBreak,
+  sectionLabels,
+}: {
+  parentRef: React.RefObject<HTMLDivElement | null>
+  tasks: Array<ClaudeTask>
+  renderCard: (task: ClaudeTask) => React.ReactNode
+  sectionBreak?: number
+  sectionLabels?: [string, string]
+}) {
+  const hasDivider = sectionBreak != null && sectionBreak > 0 && sectionBreak < tasks.length
+  const totalItems = tasks.length + (hasDivider ? 1 : 0)
+  const virtualizer = useVirtualizer({
+    count: totalItems,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (i) => {
+      if (hasDivider && i === sectionBreak) return 28
+      return CARD_ESTIMATE_PX
+    },
+    overscan: 5,
+    gap: 8,
+  })
+  const items = virtualizer.getVirtualItems()
+
+  return (
+    <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-2">
+      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, transform: `translateY(${items[0]?.start ?? 0}px)` }}>
+          {items.map(vItem => {
+            if (hasDivider && vItem.index === sectionBreak) {
+              return (
+                <div key="__divider__" data-index={vItem.index} ref={virtualizer.measureElement} className="mt-2 mb-1">
+                  <div className="flex items-center gap-2 px-1">
+                    <div className="flex-1 h-px bg-[var(--theme-border)]" />
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 whitespace-nowrap">
+                      {sectionLabels?.[1] ?? 'Stubs'}
+                    </span>
+                    <div className="flex-1 h-px bg-[var(--theme-border)]" />
+                  </div>
+                </div>
+              )
+            }
+            const taskIdx = hasDivider && vItem.index > (sectionBreak ?? 0) ? vItem.index - 1 : vItem.index
+            const task = tasks[taskIdx]
+            return (
+              <div key={task.id} data-index={vItem.index} ref={virtualizer.measureElement} className={vItem.index > 0 ? 'mt-2' : ''}>
+                {renderCard(task)}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function VirtualRowList({ parentRef, rows, renderCard }: {
+  parentRef: React.RefObject<HTMLDivElement | null>
+  rows: Array<VirtualRow>
+  renderCard: (task: ClaudeTask) => React.ReactNode
+}) {
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (i) => {
+      const row = rows[i]
+      if (!row) return CARD_ESTIMATE_PX
+      if (row.kind === 'group-header') return 32
+      if (row.kind === 'divider') return 24
+      return CARD_ESTIMATE_PX
+    },
+    overscan: 5,
+    gap: 8,
+  })
+  const items = virtualizer.getVirtualItems()
+
+  return (
+    <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-2">
+      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, transform: `translateY(${items[0]?.start ?? 0}px)` }}>
+          {items.map(vItem => {
+            const row = rows[vItem.index]
+            if (!row) return null
+            if (row.kind === 'group-header') {
+              return (
+                <div key={`gh-${row.groupId}`} data-index={vItem.index} ref={virtualizer.measureElement} className="mt-1 mb-0.5">
+                  <button
+                    type="button"
+                    onClick={row.onToggle}
+                    className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--theme-hover)] transition-colors group"
+                  >
+                    <span className="text-[10px] text-[var(--theme-muted)] transition-transform" style={{ display: 'inline-block', transform: row.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
+                    <span className="flex-1 text-left text-[10px] font-semibold text-[var(--theme-text)] truncate">{row.label}</span>
+                    <span className="text-[9px] text-[var(--theme-muted)] opacity-60 shrink-0">{row.count}</span>
+                  </button>
+                </div>
+              )
+            }
+            if (row.kind === 'divider') {
+              return (
+                <div key={`div-${vItem.index}`} data-index={vItem.index} ref={virtualizer.measureElement} className="mt-2 mb-1">
+                  <div className="flex items-center gap-2 px-1">
+                    <div className="flex-1 h-px bg-[var(--theme-border)]" />
+                    {row.label && <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 whitespace-nowrap">{row.label}</span>}
+                    <div className="flex-1 h-px bg-[var(--theme-border)]" />
+                  </div>
+                </div>
+              )
+            }
+            return (
+              <div key={row.task.id} data-index={vItem.index} ref={virtualizer.measureElement} className={vItem.index > 0 ? 'mt-2' : ''}>
+                {renderCard(row.task)}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RunningTaskRow({ task, onOpen }: { task: ClaudeTask; onOpen: () => void }) {
+  const [log, setLog] = useState('')
+  useEffect(() => {
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/tasks-exec-log?task_id=${task.id}&lines=4`)
+        const data = await res.json() as { log?: string }
+        if (!cancelled && data.log) setLog(data.log)
+      } catch { /* non-fatal */ }
+    }
+    void poll()
+    const iv = setInterval(poll, 6_000)
+    return () => { cancelled = true; clearInterval(iv) }
+  }, [task.id])
+
+  return (
+    <div className="px-3 py-2 flex gap-3 items-start">
+      <div className="flex-1 min-w-0">
+        <button type="button" onClick={onOpen} className="text-[10px] font-medium text-violet-300 hover:text-violet-200 truncate max-w-full text-left transition-colors">
+          {task.title.slice(0, 70)}
+        </button>
+        {log && (
+          <pre className="mt-0.5 text-[9px] text-[var(--theme-muted)] font-mono leading-relaxed whitespace-pre-wrap break-all line-clamp-3 opacity-70">
+            {log.split('\n').slice(-3).join('\n')}
+          </pre>
+        )}
+      </div>
+      <span className="shrink-0 text-[9px] text-violet-500 opacity-60 capitalize">{task.assignee ?? 'astra'}</span>
+    </div>
+  )
+}
+
 export function TasksScreen() {
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
@@ -129,6 +325,9 @@ export function TasksScreen() {
   const [ideasLoading, setIdeasLoading] = useState(false)
   const [clearingStuck, setClearingStuck] = useState(false)
   const [batchExecuting, setBatchExecuting] = useState(false)
+  const [drainingNow, setDrainingNow] = useState(false)
+  const [replanningStubs, setReplanningStubs] = useState(false)
+  const [rescuingTimedOut, setRescuingTimedOut] = useState(false)
   const [unlockingPrereq, setUnlockingPrereq] = useState<string | null>(null)
   const [checkingCompletion, setCheckingCompletion] = useState(false)
   const [breakingDownId, setBreakingDownId] = useState<string | null>(null)
@@ -163,11 +362,150 @@ export function TasksScreen() {
   const [filterBlocked, setFilterBlocked] = useState(false)
   const [filterActiveAgent, setFilterActiveAgent] = useState(false)
   const [filterInReview, setFilterInReview] = useState(false)
+  const [filterTimedOut, setFilterTimedOut] = useState(false)
+  const [ageFilter, setAgeFilter] = useState<'fresh' | 'aging' | 'stale' | null>(null)
+  const [showRunningPanel, setShowRunningPanel] = useState(true)
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | null>(null)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
 
   const [quickAddCol, setQuickAddCol] = useState<TaskColumn | null>(null)
   const [quickAddTitle, setQuickAddTitle] = useState('')
+
+  // Bulk select
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }, [])
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+
+  // Task detail panel
+  const [panelTask, setPanelTask] = useState<ClaudeTask | null>(null)
+
+  // Column hide/collapse (persisted)
+  const [hiddenColumns, setHiddenColumns] = useState<Set<TaskColumn>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('hermes-hidden-cols') ?? '[]') as Array<TaskColumn>) } catch { return new Set() }
+  })
+  const toggleHideColumn = useCallback((col: TaskColumn) => {
+    setHiddenColumns(prev => {
+      const next = new Set(prev)
+      if (next.has(col)) next.delete(col); else next.add(col)
+      localStorage.setItem('hermes-hidden-cols', JSON.stringify([...next]))
+      return next
+    })
+  }, [])
+
+  // Subtask visibility
+  const [hideSubtasks, setHideSubtasks] = useState(false)
+
+  // Needs-input inbox panel
+  const [showInbox, setShowInbox] = useState(false)
+  const [inboxReplies, setInboxReplies] = useState<Record<string, string>>({})
+  const [inboxSending, setInboxSending] = useState<string | null>(null)
+
+  // Today's wins strip
+  const [showWins, setShowWins] = useState(true)
+
+  // Tags browser panel
+  const [showTagsPanel, setShowTagsPanel] = useState(false)
+  const [tagsPanelBulkTag, setTagsPanelBulkTag] = useState('')
+  const [taggingSelected, setTaggingSelected] = useState(false)
+
+  // Parent grouping in todo
+  const [groupByParent, setGroupByParent] = useState(false)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const toggleGroup = useCallback((groupId: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId); else next.add(groupId)
+      return next
+    })
+  }, [])
+
+  // Sister load panel + rebalance
+  const [showSisterLoad, setShowSisterLoad] = useState(false)
+  const [rebalanceFrom, setRebalanceFrom] = useState<string>('')
+  const [rebalanceTo, setRebalanceTo] = useState<string>('')
+  const [rebalanceCount, setRebalanceCount] = useState(20)
+  const [rebalancing, setRebalancing] = useState(false)
+  const [showRebalance, setShowRebalance] = useState(false)
+
+  // Daily completion goal
+  const [dailyGoal, setDailyGoal] = useState<number | null>(() => {
+    const v = parseInt(localStorage.getItem('hermes-daily-goal') ?? '', 10)
+    return isNaN(v) ? null : v
+  })
+  const setAndPersistGoal = useCallback((n: number | null) => {
+    setDailyGoal(n)
+    if (n == null) localStorage.removeItem('hermes-daily-goal')
+    else localStorage.setItem('hermes-daily-goal', String(n))
+  }, [])
+
+  // Keyboard shortcuts modal
+  const [showShortcuts, setShowShortcuts] = useState(false)
+
+  // Timeout analysis modal
+  const [showTimeoutAnalysis, setShowTimeoutAnalysis] = useState(false)
+
+  // Compact / dense card mode (persisted)
+  const [denseMode, setDenseMode] = useState(() => localStorage.getItem('hermes-dense-mode') === '1')
+  const toggleDenseMode = useCallback(() => {
+    setDenseMode(prev => {
+      const next = !prev
+      localStorage.setItem('hermes-dense-mode', next ? '1' : '0')
+      return next
+    })
+  }, [])
+
+  // View mode: board columns or swimlane by assignee
+  const [viewMode, setViewMode] = useState<'board' | 'swimlane'>('board')
+
+  // Stale task cleanup wizard
+  const [showArchiveWizard, setShowArchiveWizard] = useState(false)
+  const [archiveDays, setArchiveDays] = useState(60)
+  const [archiving, setArchiving] = useState(false)
+  const [archivePreview, setArchivePreview] = useState<{ buckets: { days30: number; days60: number; days90: number }; previews: Array<{ id: string; title: string; assignee: string | null; ageDays: number }> } | null>(null)
+
+  // Notification feed
+  const [showNotifFeed, setShowNotifFeed] = useState(false)
+  const [notifLastSeen, setNotifLastSeen] = useState<string>(() => localStorage.getItem('hermes-notif-seen') ?? new Date(0).toISOString())
+  const markNotifSeen = useCallback(() => {
+    const now = new Date().toISOString()
+    setNotifLastSeen(now)
+    localStorage.setItem('hermes-notif-seen', now)
+  }, [])
+
+  // Unlock prereq modal (enhanced from window.confirm)
+  const [unlockModalPrereq, setUnlockModalPrereq] = useState<{ id: string; title: string; count: number } | null>(null)
+
+  // Saved filter presets (persisted)
+  type FilterPreset = { name: string; assignee: string | null; query: string; overdue: boolean; blocked: boolean; activeAgent: boolean; inReview: boolean; timedOut: boolean; age: 'fresh' | 'aging' | 'stale' | null; priority: TaskPriority | null; tag: string | null }
+  const [filterPresets, setFilterPresets] = useState<Array<FilterPreset>>(() => {
+    try { return JSON.parse(localStorage.getItem('hermes-filter-presets') ?? '[]') as Array<FilterPreset> } catch { return [] }
+  })
+  const saveFilterPreset = useCallback((name: string) => {
+    const preset: FilterPreset = { name, assignee: assigneeFilter, query: searchQuery, overdue: filterOverdue, blocked: filterBlocked, activeAgent: filterActiveAgent, inReview: filterInReview, timedOut: filterTimedOut, age: ageFilter, priority: priorityFilter, tag: tagFilter }
+    setFilterPresets(prev => {
+      const next = [...prev.filter(p => p.name !== name), preset]
+      localStorage.setItem('hermes-filter-presets', JSON.stringify(next))
+      return next
+    })
+  }, [assigneeFilter, searchQuery, filterOverdue, filterBlocked, filterActiveAgent, filterInReview, filterTimedOut, ageFilter, priorityFilter, tagFilter])
+  const applyFilterPreset = useCallback((p: FilterPreset) => {
+    setAssigneeFilter(p.assignee); setSearchQuery(p.query); setFilterOverdue(p.overdue)
+    setFilterBlocked(p.blocked); setFilterActiveAgent(p.activeAgent); setFilterInReview(p.inReview)
+    setFilterTimedOut(p.timedOut); setAgeFilter(p.age); setPriorityFilter(p.priority); setTagFilter(p.tag)
+  }, [])
+  const deleteFilterPreset = useCallback((name: string) => {
+    setFilterPresets(prev => {
+      const next = prev.filter(p => p.name !== name)
+      localStorage.setItem('hermes-filter-presets', JSON.stringify(next))
+      return next
+    })
+  }, [])
 
   const tasksQuery = useQuery({
     queryKey: [...QUERY_KEY, showDone],
@@ -212,23 +550,57 @@ export function TasksScreen() {
     const columns: Record<TaskColumn, Array<ClaudeTask>> = {
       backlog: [], todo: [], in_progress: [], review: [], blocked: [], done: [], deleted: [],
     }
-    const q = searchQuery.trim().toLowerCase()
+
+    // Parse search operators: assignee:X tag:X is:blocked is:timedout is:overdue is:subtask is:active
+    let rawQ = searchQuery.trim().toLowerCase()
+    let opAssignee: string | null = null
+    let opTag: string | null = null
+    const opIs: Set<string> = new Set()
+    rawQ = rawQ.replace(/assignee:(\S+)/g, (_, v) => { opAssignee = v; return '' })
+    rawQ = rawQ.replace(/tag:(\S+)/g, (_, v) => { opTag = v; return '' })
+    rawQ = rawQ.replace(/is:(\S+)/g, (_, v) => { opIs.add(v); return '' })
+    const q = rawQ.trim()
+
+    // Merge operator-derived filters with chip filters
+    const effAssignee = opAssignee ?? assigneeFilter
+    const effTag = opTag ?? tagFilter
+    const effTimedOut = filterTimedOut || opIs.has('timedout')
+    const effBlocked = filterBlocked || opIs.has('blocked')
+    const effOverdue = filterOverdue || opIs.has('overdue')
+    const effActiveAgent = filterActiveAgent || opIs.has('active')
+    const effInReview = filterInReview || opIs.has('review')
+    const effHideSubtasks = hideSubtasks || opIs.has('subtask') === false // hideSubtasks chip
+    // is:subtask means SHOW only subtasks (opposite of hide)
+    const effOnlySubtasks = opIs.has('subtask')
+
     let matchCount = 0
 
     for (const t of tasks) {
-      if (assigneeFilter && t.assignee !== assigneeFilter) continue
+      if (effAssignee && t.assignee !== effAssignee) continue
       if (q) {
         const hit = t.title.toLowerCase().includes(q)
           || t.description.toLowerCase().includes(q)
           || t.tags.some(tag => tag.toLowerCase().includes(q))
         if (!hit) continue
       }
-      if (filterOverdue && !isOverdue(t)) continue
-      if (filterBlocked && t.column !== 'blocked') continue
-      if (filterActiveAgent && !t.agent_state) continue
-      if (filterInReview && t.column !== 'review') continue
+      if (effOverdue && !isOverdue(t)) continue
+      if (effBlocked && t.column !== 'blocked') continue
+      if (effActiveAgent && !t.agent_state) continue
+      if (effInReview && t.column !== 'review') continue
       if (priorityFilter && t.priority !== priorityFilter) continue
-      if (tagFilter && !t.tags.includes(tagFilter)) continue
+      if (effTag && !t.tags.includes(effTag)) continue
+      if (effTimedOut && !(t.agent_history ?? []).some((h: { action: string }) => h.action === 'timed_out')) continue
+      if (ageFilter) {
+        const createdAt = (t as unknown as { created_at?: string }).created_at
+        const ageDays = createdAt ? (Date.now() - new Date(createdAt).getTime()) / 86_400_000 : 0
+        if (ageFilter === 'fresh'  && ageDays >= 1) continue
+        if (ageFilter === 'aging'  && (ageDays < 1 || ageDays >= 3)) continue
+        if (ageFilter === 'stale'  && ageDays < 3) continue
+      }
+      // Subtask filtering
+      const isSubtask = t.tags.includes('subtask')
+      if (effHideSubtasks && isSubtask) continue
+      if (effOnlySubtasks && !isSubtask) continue
 
       columns[t.column].push(t)
       matchCount++
@@ -236,9 +608,9 @@ export function TasksScreen() {
     for (const col of COLUMN_ORDER) {
       columns[col].sort((a, b) => a.position - b.position)
     }
-    const hasAnyFilter = Boolean(assigneeFilter || q || filterOverdue || filterBlocked || filterActiveAgent || filterInReview || priorityFilter || tagFilter)
+    const hasAnyFilter = Boolean(effAssignee || q || effOverdue || effBlocked || effActiveAgent || effInReview || effTimedOut || ageFilter || priorityFilter || effTag || hideSubtasks || opIs.size > 0)
     return { columns, matchCount, totalTasks: tasks.length, hasAnyFilter }
-  }, [tasks, assigneeFilter, searchQuery, filterOverdue, filterBlocked, filterActiveAgent, filterInReview, priorityFilter, tagFilter])
+  }, [tasks, assigneeFilter, searchQuery, filterOverdue, filterBlocked, filterActiveAgent, filterInReview, filterTimedOut, ageFilter, priorityFilter, tagFilter, hideSubtasks])
 
   const columnMap = tasksByColumn.columns
   const taskRefreshStatus = formatTaskRefreshStatus(tasksQuery.isFetching, tasksQuery.isLoading)
@@ -285,12 +657,138 @@ export function TasksScreen() {
       })
     })
     const gatedPrereqs = [...prereqGroups.entries()].map(([id, { count, title }]) => ({ id, count, title }))
-    return { total, running, blocked, blockedWaiting, blockedExecFail, done, overdue, completion, agentActive, readyToExecute, gatedPrereqs }
+    const timedOut = tasks.filter(t => t.column !== 'done' && (t.agent_history ?? []).some((h: { action: string }) => h.action === 'timed_out')).length
+    const workingTasks = tasks.filter(t => t.agent_state === 'working')
+    const stubReviewCount = tasks.filter(t => {
+      if (t.column !== 'review' || t.agent_state) return false
+      const planned = (t.agent_history ?? []).filter((h: { action: string }) => h.action === 'planned')
+      if (planned.length === 0) return true
+      const note = (planned[planned.length - 1] as { note?: string }).note ?? ''
+      return note.includes('Plan unavailable') || note.length < 80
+    }).length
+    const sisterLoad: Record<string, number> = {}
+    tasks.filter(t => t.column !== 'done' && t.column !== 'deleted' && t.assignee)
+      .forEach(t => { sisterLoad[t.assignee!] = (sisterLoad[t.assignee!] ?? 0) + 1 })
+    const sisterChips = Object.entries(sisterLoad).sort((a, b) => b[1] - a[1]).slice(0, 8)
+
+    // Today's wins: tasks with a 'completed' history entry dated today
+    const today = new Date().toISOString().slice(0, 10)
+    const todayWins: Array<{ task: ClaudeTask; completedAt: string; note: string }> = []
+    tasks.forEach(t => {
+      ;(t.agent_history ?? []).forEach((h: { action: string; at?: string; note?: string }) => {
+        if (h.action === 'completed' && (h.at ?? '').startsWith(today)) {
+          todayWins.push({ task: t, completedAt: h.at ?? '', note: h.note ?? '' })
+        }
+      })
+    })
+    todayWins.sort((a, b) => b.completedAt.localeCompare(a.completedAt))
+
+    // Inbox: tasks waiting for user input
+    const inboxTasks = tasks.filter(t => t.waiting_for_user || t.column === 'blocked')
+
+    // Tag cloud across all active tasks
+    const tagCloud: Record<string, number> = {}
+    tasks.filter(t => t.column !== 'done' && t.column !== 'deleted')
+      .forEach(t => t.tags.forEach(tag => { tagCloud[tag] = (tagCloud[tag] ?? 0) + 1 }))
+
+    return { total, running, blocked, blockedWaiting, blockedExecFail, done, overdue, completion, agentActive, readyToExecute, gatedPrereqs, timedOut, workingTasks, stubReviewCount, sisterChips, todayWins, inboxTasks, tagCloud }
   }, [tasks])
 
   const invalidate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
   }, [queryClient])
+
+  // Grouped rows for todo column when groupByParent is enabled
+  const groupedTodoRows = useMemo<Array<VirtualRow> | null>(() => {
+    if (!groupByParent) return null
+    const columnMap = tasksByColumn.columns
+    const todoTasks = columnMap['todo'] ?? []
+    const allById = new Map(tasks.map(t => [t.id, t]))
+
+    // Separate tasks with known parent vs ungrouped
+    const parentGroups = new Map<string, { label: string; items: Array<ClaudeTask> }>()
+    const byAssignee = new Map<string, Array<ClaudeTask>>()
+
+    todoTasks.forEach(t => {
+      const parentId = t.depends_on?.[0]
+      if (parentId && allById.has(parentId)) {
+        const parent = allById.get(parentId)!
+        if (!parentGroups.has(parentId)) parentGroups.set(parentId, { label: parent.title, items: [] })
+        parentGroups.get(parentId)!.items.push(t)
+      } else {
+        const asgn = t.assignee ?? 'unassigned'
+        if (!byAssignee.has(asgn)) byAssignee.set(asgn, [])
+        byAssignee.get(asgn)!.push(t)
+      }
+    })
+
+    const rows: Array<VirtualRow> = []
+
+    // Parent-linked groups first
+    for (const [parentId, { label, items }] of parentGroups) {
+      const collapsed = collapsedGroups.has(parentId)
+      rows.push({ kind: 'group-header', label, count: items.length, groupId: parentId, collapsed, onToggle: () => toggleGroup(parentId) })
+      if (!collapsed) items.forEach(t => rows.push({ kind: 'task', task: t }))
+    }
+
+    // Assignee groups as fallback
+    const sortedAssignees = [...byAssignee.entries()].sort((a, b) => b[1].length - a[1].length)
+    for (const [asgn, items] of sortedAssignees) {
+      const groupId = `__asgn__${asgn}`
+      const collapsed = collapsedGroups.has(groupId)
+      rows.push({ kind: 'group-header', label: asgn, count: items.length, groupId, collapsed, onToggle: () => toggleGroup(groupId) })
+      if (!collapsed) items.forEach(t => rows.push({ kind: 'task', task: t }))
+    }
+
+    return rows
+  }, [groupByParent, tasksByColumn.columns, tasks, collapsedGroups, toggleGroup])
+
+  // Notification feed: recent agent_history events across all tasks
+  const notifEvents = useMemo(() => {
+    const events: Array<{ taskId: string; taskTitle: string; action: string; at: string; note: string; by: string }> = []
+    const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString() // last 24h
+    tasks.forEach(t => {
+      ;(t.agent_history ?? []).forEach((h: { action?: string; at?: string; note?: string; by?: string }) => {
+        if (!h.at || h.at < cutoff) return
+        const action = h.action ?? ''
+        if (!['completed', 'blocked', 'question', 'timed_out', 'rescued', 'planned'].includes(action)) return
+        events.push({ taskId: t.id, taskTitle: t.title, action, at: h.at, note: h.note ?? '', by: h.by ?? 'astra' })
+      })
+    })
+    events.sort((a, b) => b.at.localeCompare(a.at))
+    return events.slice(0, 60)
+  }, [tasks])
+
+  const unreadNotifCount = useMemo(
+    () => notifEvents.filter(e => e.at > notifLastSeen).length,
+    [notifEvents, notifLastSeen],
+  )
+
+  // Swimlane data: tasks grouped by assignee × status
+  const swimlaneData = useMemo(() => {
+    if (viewMode !== 'swimlane') return null
+    const SWIM_COLS: Array<TaskColumn> = ['todo', 'in_progress', 'review', 'blocked']
+    const assigneeMap = new Map<string, Record<TaskColumn, Array<ClaudeTask>>>()
+    const addRow = (asgn: string) => {
+      if (!assigneeMap.has(asgn)) {
+        const empty = {} as Record<TaskColumn, Array<ClaudeTask>>
+        for (const c of SWIM_COLS) empty[c] = []
+        assigneeMap.set(asgn, empty)
+      }
+      return assigneeMap.get(asgn)!
+    }
+    tasks.forEach(t => {
+      if (!SWIM_COLS.includes(t.column)) return
+      const asgn = t.assignee ?? 'unassigned'
+      addRow(asgn)[t.column].push(t)
+    })
+    const sorted = [...assigneeMap.entries()].sort((a, b) => {
+      const totalA = SWIM_COLS.reduce((s, c) => s + a[1][c].length, 0)
+      const totalB = SWIM_COLS.reduce((s, c) => s + b[1][c].length, 0)
+      return totalB - totalA
+    })
+    return { cols: SWIM_COLS, rows: sorted }
+  }, [viewMode, tasks])
 
   const createMutation = useMutation({
     mutationFn: createTask,
@@ -379,10 +877,22 @@ export function TasksScreen() {
         searchInputRef.current?.focus()
         return
       }
+      if (e.key === '?') {
+        e.preventDefault()
+        setShowShortcuts(v => !v)
+        return
+      }
+      if (e.key === 'Escape') {
+        setShowShortcuts(false)
+        setShowTimeoutAnalysis(false)
+        setPanelTask(null)
+        return
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
+
 
   // Agent deploy summary — waits for agents to start (agentsEverActive) then fires when all clear.
   useEffect(() => {
@@ -462,11 +972,44 @@ export function TasksScreen() {
     setFilterBlocked(false)
     setFilterActiveAgent(false)
     setFilterInReview(false)
+    setFilterTimedOut(false)
+    setAgeFilter(null)
     setPriorityFilter(null)
     setTagFilter(null)
+    setAssigneeFilter(null)
+    setHideSubtasks(false)
   }
 
-  const visibleColumns = COLUMN_ORDER
+  const sweepStatsQuery = useQuery({
+    queryKey: ['tasks', 'sweep-stats'],
+    queryFn: async () => {
+      const res = await fetch('/api/tasks-sweep-stats')
+      return res.json() as Promise<{ ok: boolean; dispatched: number; completed: number; blocked: number; needsInput: number; timedOutToday: number; lastSweepAt: string | null; successRate: number | null }>
+    },
+    refetchInterval: 30_000,
+    staleTime: 20_000,
+  })
+  const sweepStats = sweepStatsQuery.data
+
+  // Browser tab badge: count tasks needing attention
+  useEffect(() => {
+    const count = stats.blocked + (sweepStats?.timedOutToday ?? 0)
+    document.title = count > 0 ? `(${count}) Hermes Tasks` : 'Hermes Tasks'
+    return () => { document.title = 'Hermes Tasks' }
+  }, [stats.blocked, sweepStats?.timedOutToday])
+
+  const trendQuery = useQuery({
+    queryKey: ['tasks', 'completion-trend'],
+    queryFn: async () => {
+      const res = await fetch('/api/tasks-completion-trend')
+      return res.json() as Promise<{ ok: boolean; trend: Array<{ date: string; count: number }>; total: number }>
+    },
+    refetchInterval: 5 * 60_000,
+    staleTime: 4 * 60_000,
+  })
+  const trend = trendQuery.data
+
+  const visibleColumns = COLUMN_ORDER.filter(c => !hiddenColumns.has(c))
 
   return (
     <div data-route-page className="h-full overflow-hidden flex flex-col bg-surface text-ink">
@@ -491,7 +1034,7 @@ export function TasksScreen() {
               </div>
             )}
           </div>
-          {/* Stats — single subtitle line, full left-column width so it never wraps */}
+          {/* Stats row */}
           <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
             <span>{stats.total} tasks</span>
             <span>·</span>
@@ -500,8 +1043,9 @@ export function TasksScreen() {
               <>
                 <span>·</span>
                 <span
-                  className="text-red-400"
+                  className="text-red-400 cursor-pointer hover:opacity-80"
                   title={formatBlockedTaskBreakdownTitle(stats.blockedWaiting, stats.blockedExecFail)}
+                  onClick={() => setFilterBlocked(v => !v)}
                 >
                   {stats.blocked} blocked
                   {formatBlockedTaskBreakdownLabel(stats.blockedWaiting, stats.blockedExecFail) && (
@@ -512,6 +1056,19 @@ export function TasksScreen() {
                 </span>
               </>
             )}
+            {stats.timedOut > 0 && (
+              <>
+                <span>·</span>
+                <button
+                  type="button"
+                  onClick={() => setShowTimeoutAnalysis(true)}
+                  className="text-amber-500 hover:text-amber-300 transition-colors"
+                  title="View timeout failure analysis"
+                >
+                  ⏱ {stats.timedOut} timed out
+                </button>
+              </>
+            )}
             {stats.overdue > 0 && (
               <>
                 <span>·</span>
@@ -520,6 +1077,37 @@ export function TasksScreen() {
             )}
             <span>·</span>
             <span>{stats.completion}% done</span>
+            {/* Daily goal */}
+            {(() => {
+              const doneToday = trend?.trend?.find(d => d.date === new Date().toISOString().slice(0, 10))?.count ?? sweepStats?.completed ?? 0
+              if (dailyGoal == null) return (
+                <button
+                  type="button"
+                  onClick={() => { const n = parseInt(window.prompt('Set daily completion goal:') ?? '', 10); if (!isNaN(n) && n > 0) setAndPersistGoal(n) }}
+                  className="text-[var(--theme-muted)] hover:text-[var(--theme-accent)] transition-colors text-[10px] opacity-50 hover:opacity-100"
+                  title="Set daily goal"
+                >+ goal</button>
+              )
+              const pct = Math.min(1, doneToday / dailyGoal)
+              const r = 8, circ = 2 * Math.PI * r
+              const color = pct >= 1 ? '#34d399' : pct >= 0.5 ? '#f59e0b' : 'var(--theme-accent)'
+              return (
+                <button
+                  type="button"
+                  onClick={() => { const n = parseInt(window.prompt('Update daily goal (0 to clear):') ?? '', 10); if (!isNaN(n)) setAndPersistGoal(n <= 0 ? null : n) }}
+                  className="flex items-center gap-1 group"
+                  title={`${doneToday}/${dailyGoal} tasks completed today — click to edit goal`}
+                >
+                  <svg width="20" height="20" className="shrink-0">
+                    <circle cx="10" cy="10" r={r} fill="none" stroke="var(--theme-border)" strokeWidth="2.5" />
+                    <circle cx="10" cy="10" r={r} fill="none" stroke={color} strokeWidth="2.5"
+                      strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)}
+                      strokeLinecap="round" transform="rotate(-90 10 10)" />
+                  </svg>
+                  <span className="text-[10px]" style={{ color }}>{doneToday}/{dailyGoal}</span>
+                </button>
+              )
+            })()}
             {stats.agentActive > 0 && (
               <>
                 <span>·</span>
@@ -530,9 +1118,170 @@ export function TasksScreen() {
               </>
             )}
           </div>
+          {/* Pipeline throughput strip */}
+          {sweepStats && sweepStats.dispatched > 0 && (
+            <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--theme-muted)]">
+              <span className="opacity-60">Today:</span>
+              <span>🔄 {sweepStats.dispatched} dispatched</span>
+              {sweepStats.completed > 0 && <span className="text-emerald-400">✅ {sweepStats.completed} done</span>}
+              {sweepStats.blocked > 0 && <span className="text-red-400">🚫 {sweepStats.blocked} blocked</span>}
+              {sweepStats.needsInput > 0 && <span className="text-amber-400">❓ {sweepStats.needsInput} input</span>}
+              {(sweepStats.timedOutToday ?? 0) > 0 && <span className="text-orange-400">⏱ {sweepStats.timedOutToday} timeout</span>}
+              {sweepStats.successRate !== null && (
+                <span className={cn(
+                  'font-medium',
+                  sweepStats.successRate >= 50 ? 'text-emerald-400' : sweepStats.successRate >= 25 ? 'text-amber-400' : 'text-red-400',
+                )}>
+                  {sweepStats.successRate}% success
+                </span>
+              )}
+              {sweepStats.lastSweepAt && (
+                <span className="opacity-50">
+                  · sweep {Math.round((Date.now() - new Date(sweepStats.lastSweepAt).getTime()) / 60_000)}m ago
+                </span>
+              )}
+              {/* 7-day sparkline */}
+              {trend && trend.trend.length > 0 && (() => {
+                const max = Math.max(...trend.trend.map(d => d.count), 1)
+                const W = 56, H = 16, barW = 6, gap = 2
+                return (
+                  <span className="ml-1 flex items-center gap-0.5 opacity-60" title={`7-day completions: ${trend.total} total`}>
+                    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
+                      {trend.trend.map((d, i) => {
+                        const barH = Math.max(2, Math.round((d.count / max) * H))
+                        const x = i * (barW + gap)
+                        return (
+                          <rect
+                            key={d.date}
+                            x={x} y={H - barH} width={barW} height={barH}
+                            rx={1}
+                            fill={d.count === 0 ? 'currentColor' : 'var(--theme-accent)'}
+                            opacity={d.count === 0 ? 0.2 : 0.7}
+                          />
+                        )
+                      })}
+                    </svg>
+                    <span className="text-[9px]">{trend.total}w</span>
+                  </span>
+                )
+              })()}
+            </div>
+          )}
+          {/* Today's wins strip */}
+          {stats.todayWins.length > 0 && (
+            <div className="mt-0.5 flex items-center gap-1.5 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setShowWins(v => !v)}
+                className="text-emerald-400 font-medium hover:text-emerald-300 transition-colors shrink-0"
+              >🏆 {stats.todayWins.length} today {showWins ? '▲' : '▼'}</button>
+              {showWins && (
+                <div className="flex gap-1.5 overflow-x-auto scrollbar-none flex-nowrap">
+                  {stats.todayWins.slice(0, 12).map(({ task, completedAt }) => {
+                    const ageMs = Date.now() - new Date(completedAt).getTime()
+                    const ago = ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m` : `${Math.round(ageMs / 3600_000)}h`
+                    return (
+                      <button
+                        key={task.id + completedAt}
+                        type="button"
+                        onClick={() => setPanelTask(task)}
+                        className="shrink-0 max-w-[180px] truncate px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                        title={task.title}
+                      >
+                        {task.title.slice(0, 35)} <span className="opacity-50">{ago}</span>
+                      </button>
+                    )
+                  })}
+                  {stats.todayWins.length > 12 && (
+                    <span className="shrink-0 text-[var(--theme-muted)] opacity-50 self-center">+{stats.todayWins.length - 12} more</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          {/* Inbox button */}
+          {stats.inboxTasks.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowInbox(v => !v)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                showInbox
+                  ? 'border-amber-500/50 bg-amber-500/10 text-amber-400'
+                  : 'border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50',
+              )}
+              title="Tasks waiting for your input"
+            >
+              📥 {stats.inboxTasks.length}
+            </button>
+          )}
+          {/* Tags browser button */}
+          <button
+            type="button"
+            onClick={() => setShowTagsPanel(v => !v)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+              showTagsPanel
+                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]'
+                : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+            )}
+            title="Browse and filter by tag"
+          ># Tags</button>
+          {/* Notification feed bell */}
+          <button
+            type="button"
+            onClick={() => { setShowNotifFeed(v => !v); if (!showNotifFeed) markNotifSeen() }}
+            className={cn(
+              'relative flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+              showNotifFeed
+                ? 'border-violet-500/50 bg-violet-500/10 text-violet-400'
+                : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+            )}
+            title="Recent agent activity feed"
+          >
+            🔔
+            {unreadNotifCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-violet-500 text-[8px] font-bold text-white">{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
+            )}
+          </button>
+          {/* Dense mode toggle */}
+          <button
+            type="button"
+            onClick={toggleDenseMode}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+              denseMode
+                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]'
+                : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+            )}
+            title="Toggle compact card view"
+          >{denseMode ? '⬜ Compact' : '⬛ Dense'}</button>
+          {/* View mode toggle */}
+          <button
+            type="button"
+            onClick={() => setViewMode(v => v === 'board' ? 'swimlane' : 'board')}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+              viewMode === 'swimlane'
+                ? 'border-sky-500/50 bg-sky-500/10 text-sky-400'
+                : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+            )}
+            title="Toggle swimlane view by assignee"
+          >{viewMode === 'swimlane' ? '⊟ Swimlane' : '⊞ Swimlane'}</button>
+          {/* Stale task archive */}
+          <button
+            type="button"
+            onClick={async () => {
+              const res = await fetch('/api/tasks-stale')
+              const data = await res.json() as { ok: boolean; buckets: { days30: number; days60: number; days90: number }; previews: Array<{ id: string; title: string; assignee: string | null; ageDays: number }> }
+              if (data.ok) { setArchivePreview(data); setShowArchiveWizard(true) }
+            }}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
+            title="Archive stale tasks that have had no activity for 30+ days"
+          >🗂️ Archive</button>
           {/* Ask Astra */}
           <button
             onClick={async () => {
@@ -647,32 +1396,101 @@ export function TasksScreen() {
             </button>
           )}
 
+          {/* Drain Now — immediately queue all eligible review tasks, bypassing the 45-min delay */}
+          {stats.readyToExecute > 0 && (
+            <button
+              onClick={async () => {
+                setDrainingNow(true)
+                try {
+                  const res = await fetch('/api/tasks-drain-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 50 }) })
+                  const data = await res.json() as { ok: boolean; queued: number }
+                  await tasksQuery.refetch()
+                  toast(data.queued > 0 ? `Drained ${data.queued} task${data.queued !== 1 ? 's' : ''} to execution` : 'No eligible tasks (all running or below concurrency cap)')
+                } catch {
+                  toast('Drain failed', { type: 'error' })
+                } finally {
+                  setDrainingNow(false)
+                }
+              }}
+              disabled={drainingNow}
+              title={`Immediately queue all ${stats.readyToExecute} ready review tasks, bypassing the 45-min wait`}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                drainingNow
+                  ? 'border-orange-500/50 bg-orange-500/10 text-orange-400 cursor-wait'
+                  : 'border-[var(--theme-border)] text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/50',
+              )}
+            >
+              <HugeiconsIcon icon={AiMagicIcon} size={13} strokeWidth={1.8} className={drainingNow ? 'animate-spin' : ''} />
+              {drainingNow ? 'Draining…' : `Drain Now (${stats.readyToExecute})`}
+            </button>
+          )}
+
+          {/* Re-plan stubs — review tasks with too-short plans that auto-execute skips */}
+          {stats.stubReviewCount > 0 && (
+            <button
+              onClick={async () => {
+                setReplanningStubs(true)
+                try {
+                  const res = await fetch('/api/tasks-replan-stubs', { method: 'POST' })
+                  const data = await res.json() as { ok: boolean; moved: number }
+                  await tasksQuery.refetch()
+                  toast(`Moved ${data.moved} stub task${data.moved !== 1 ? 's' : ''} back to todo for re-planning`)
+                } catch {
+                  toast('Re-plan failed', { type: 'error' })
+                } finally {
+                  setReplanningStubs(false)
+                }
+              }}
+              disabled={replanningStubs}
+              title={`Move ${stats.stubReviewCount} review tasks with stub plans back to todo for re-planning`}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                replanningStubs
+                  ? 'border-sky-500/50 bg-sky-500/10 text-sky-400 cursor-wait'
+                  : 'border-[var(--theme-border)] text-sky-400 hover:bg-sky-500/10 hover:border-sky-500/50',
+              )}
+            >
+              <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.8} className={replanningStubs ? 'animate-spin' : ''} />
+              {replanningStubs ? 'Re-planning…' : `Re-plan Stubs (${stats.stubReviewCount})`}
+            </button>
+          )}
+
+          {/* Rescue timed-out — clear stuck agent states + unblock timed-out blocked tasks */}
+          {stats.timedOut > 0 && (
+            <button
+              onClick={async () => {
+                setRescuingTimedOut(true)
+                try {
+                  const res = await fetch('/api/tasks-rescue-timedout', { method: 'POST' })
+                  const data = await res.json() as { ok: boolean; rescued: number }
+                  await tasksQuery.refetch()
+                  toast(data.rescued > 0 ? `Rescued ${data.rescued} stuck task${data.rescued !== 1 ? 's' : ''}` : 'No stuck tasks found — all already in valid states')
+                } catch {
+                  toast('Rescue failed', { type: 'error' })
+                } finally {
+                  setRescuingTimedOut(false)
+                }
+              }}
+              disabled={rescuingTimedOut}
+              title="Clear stuck agent states and move blocked timed-out tasks back to todo"
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                rescuingTimedOut
+                  ? 'border-amber-500/50 bg-amber-500/10 text-amber-400 cursor-wait'
+                  : 'border-[var(--theme-border)] text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50',
+              )}
+            >
+              <HugeiconsIcon icon={Loading03Icon} size={13} strokeWidth={1.8} className={rescuingTimedOut ? 'animate-spin' : ''} />
+              {rescuingTimedOut ? 'Rescuing…' : `Rescue (${stats.timedOut})`}
+            </button>
+          )}
+
           {/* Unlock prereq — shown when tasks are gated on a credential prerequisite */}
           {stats.gatedPrereqs.map(({ id, count, title }) => (
             <button
               key={id}
-              onClick={async () => {
-                if (!window.confirm(`Mark "${title.slice(0, 60)}" as done and unlock ${count} waiting task${count !== 1 ? 's' : ''}?`)) return
-                setUnlockingPrereq(id)
-                try {
-                  const res = await fetch('/api/tasks-unlock-prereq', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prereq_id: id }),
-                  })
-                  const data = await res.json() as { ok: boolean; unblocked?: number; error?: string }
-                  if (data.ok) {
-                    await tasksQuery.refetch()
-                    toast(`Unlocked ${data.unblocked ?? count} task${(data.unblocked ?? count) !== 1 ? 's' : ''} — deploy sweep triggered`)
-                  } else {
-                    toast(data.error ?? 'Unlock failed', { type: 'error' })
-                  }
-                } catch {
-                  toast('Unlock failed', { type: 'error' })
-                } finally {
-                  setUnlockingPrereq(null)
-                }
-              }}
+              onClick={() => setUnlockModalPrereq({ id, count, title })}
               disabled={unlockingPrereq === id}
               title={`Mark "${title}" as done to unlock ${count} waiting task${count !== 1 ? 's' : ''}`}
               className={cn(
@@ -683,7 +1501,7 @@ export function TasksScreen() {
               )}
             >
               <HugeiconsIcon icon={CheckListIcon} size={13} strokeWidth={1.8} className={unlockingPrereq === id ? 'animate-pulse' : ''} />
-              {unlockingPrereq === id ? 'Unlocking…' : `Unlock (${count})`}
+              {unlockingPrereq === id ? 'Unlocking…' : `🔓 Unlock ${count}`}
             </button>
           ))}
 
@@ -842,26 +1660,16 @@ export function TasksScreen() {
             />
           </button>
 
-          {/* Keyboard shortcuts hint */}
-          <TooltipProvider>
-            <TooltipRoot>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    className="rounded-lg px-2 py-1 text-xs font-mono transition-colors hover:bg-[var(--theme-hover)] text-[var(--theme-muted)]"
-                    aria-label="Keyboard shortcuts"
-                  >
-                    ?
-                  </button>
-                }
-              />
-              <TooltipContent side="bottom" className="space-y-1 text-[11px] leading-relaxed">
-                <div><kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">n</kbd> New task (Triage)</div>
-                <div><kbd className="font-mono rounded px-1 bg-[var(--theme-hover)]">/</kbd> Focus search</div>
-              </TooltipContent>
-            </TooltipRoot>
-          </TooltipProvider>
+          {/* Keyboard shortcuts button */}
+          <button
+            type="button"
+            onClick={() => setShowShortcuts(v => !v)}
+            className="rounded-lg px-2 py-1 text-xs font-mono transition-colors hover:bg-[var(--theme-hover)] text-[var(--theme-muted)]"
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts (?)"
+          >
+            ?
+          </button>
 
           <button
             onClick={() => { setCreateColumn('backlog'); setShowCreate(true) }}
@@ -916,7 +1724,7 @@ export function TasksScreen() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search tasks… (/)"
+            placeholder="Search… (/) or assignee:ada tag:subtask is:blocked"
             className="w-full rounded-lg border pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-[var(--theme-accent)] bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]"
           />
           {searchQuery && (
@@ -935,8 +1743,11 @@ export function TasksScreen() {
         {([
           ['Overdue', filterOverdue, () => setFilterOverdue(v => !v)],
           ['Blocked', filterBlocked, () => setFilterBlocked(v => !v)],
+          ['Timed Out', filterTimedOut, () => setFilterTimedOut(v => !v)],
           ['Active Agent', filterActiveAgent, () => setFilterActiveAgent(v => !v)],
           ['In Review', filterInReview, () => setFilterInReview(v => !v)],
+          ['Hide Subtasks', hideSubtasks, () => setHideSubtasks(v => !v)],
+          ['Group by Parent', groupByParent, () => setGroupByParent(v => !v)],
         ] as Array<[string, boolean, () => void]>).map(([label, active, toggle]) => (
           <button
             key={label}
@@ -974,6 +1785,67 @@ export function TasksScreen() {
           </button>
         ))}
 
+        {/* Sister filter chips — one per assignee sorted by task count */}
+        {stats.sisterChips.length > 0 && (
+          <>
+            <span className="text-[10px] text-[var(--theme-muted)] opacity-40 select-none">|</span>
+            {stats.sisterChips.map(([name, count]) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => setAssigneeFilter(prev => prev === name ? null : name)}
+                aria-pressed={assigneeFilter === name}
+                className="text-[10px] px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap capitalize"
+                style={{
+                  borderColor: assigneeFilter === name ? 'var(--theme-accent)' : 'var(--theme-border)',
+                  color: assigneeFilter === name ? 'var(--theme-accent)' : 'var(--theme-muted)',
+                  background: assigneeFilter === name ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' : 'transparent',
+                }}
+              >
+                {name} <span className="opacity-50">{count}</span>
+              </button>
+            ))}
+          </>
+        )}
+
+        {/* Sister load expand button */}
+        {stats.sisterChips.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowSisterLoad(v => !v)}
+            className={cn('text-[10px] px-2 py-1 rounded-full border transition-colors whitespace-nowrap', showSisterLoad ? 'border-[var(--theme-accent)] text-[var(--theme-accent)]' : 'border-[var(--theme-border)] text-[var(--theme-muted)]')}
+            title="Show sister load distribution"
+          >⊖ Load</button>
+        )}
+
+        {/* Age filter chips */}
+        {([
+          ['fresh',  'Fresh <1d'],
+          ['aging',  'Aging 1-3d'],
+          ['stale',  'Stale >3d'],
+        ] as Array<['fresh' | 'aging' | 'stale', string]>).map(([band, label]) => (
+          <button
+            key={band}
+            type="button"
+            onClick={() => setAgeFilter(prev => prev === band ? null : band)}
+            aria-pressed={ageFilter === band}
+            className="text-[10px] px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
+            style={{
+              borderColor: ageFilter === band
+                ? band === 'fresh' ? '#34d399' : band === 'aging' ? '#f59e0b' : '#f87171'
+                : 'var(--theme-border)',
+              color: ageFilter === band
+                ? band === 'fresh' ? '#34d399' : band === 'aging' ? '#f59e0b' : '#f87171'
+                : 'var(--theme-muted)',
+              background: ageFilter === band
+                ? band === 'fresh' ? '#34d39918' : band === 'aging' ? '#f59e0b18' : '#f8717118'
+                : 'transparent',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+
         {/* Active tag filter chip */}
         {tagFilter && (
           <div
@@ -996,10 +1868,19 @@ export function TasksScreen() {
           </div>
         )}
 
-        {/* Match counter + clear all */}
+        {/* Match counter + save preset + clear all */}
         {tasksByColumn.hasAnyFilter && (
           <span className="ml-auto text-[10px] flex items-center gap-2 whitespace-nowrap text-[var(--theme-muted)]">
             {formatTaskFilterSummary(tasksByColumn.matchCount, tasksByColumn.totalTasks)}
+            <button
+              type="button"
+              onClick={() => {
+                const name = window.prompt('Save filter preset as:')
+                if (name?.trim()) { saveFilterPreset(name.trim()); toast(`Saved preset "${name.trim()}"`) }
+              }}
+              className="hover:underline text-violet-400"
+              title="Save current filters as a preset"
+            >★ Save</button>
             <button
               type="button"
               onClick={clearAllFilters}
@@ -1008,6 +1889,32 @@ export function TasksScreen() {
               Clear all
             </button>
           </span>
+        )}
+
+        {/* Saved filter presets row */}
+        {filterPresets.length > 0 && (
+          <>
+            <div className="w-full flex items-center gap-1.5 flex-wrap mt-0.5">
+              <span className="text-[10px] text-[var(--theme-muted)] opacity-40 select-none mr-0.5">Presets:</span>
+              {filterPresets.map(p => (
+                <div key={p.name} className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => applyFilterPreset(p)}
+                    className="text-[10px] px-2.5 py-1 rounded-l-full border border-r-0 transition-colors border-violet-500/30 text-violet-400 hover:bg-violet-500/10 whitespace-nowrap"
+                  >
+                    {p.name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteFilterPreset(p.name)}
+                    className="text-[10px] px-1.5 py-1 rounded-r-full border border-violet-500/30 text-[var(--theme-muted)] hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                    title="Delete preset"
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          </>
         )}
         <span
           role="status"
@@ -1023,8 +1930,179 @@ export function TasksScreen() {
       </div>
       </div>
 
+      {/* Sister load panel */}
+      {showSisterLoad && stats.sisterChips.length > 0 && (() => {
+        const maxLoad = Math.max(...stats.sisterChips.map(([, n]) => n), 1)
+        return (
+          <div className="shrink-0 mx-4 sm:mx-6 lg:mx-8 mb-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider">Sister Load</p>
+              <button
+                type="button"
+                onClick={() => setShowRebalance(true)}
+                className="text-[10px] px-2 py-0.5 rounded border border-[var(--theme-border)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)] text-[var(--theme-muted)] transition-colors"
+              >⇄ Rebalance</button>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {stats.sisterChips.map(([name, count]) => (
+                <div key={name} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAssigneeFilter(prev => prev === name ? null : name)}
+                    className="text-[10px] capitalize text-[var(--theme-muted)] hover:text-[var(--theme-accent)] transition-colors shrink-0 w-20 text-right"
+                  >{name}</button>
+                  <div className="flex-1 h-2 rounded-full bg-[var(--theme-hover)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${(count / maxLoad) * 100}%`,
+                        background: count / maxLoad > 0.8 ? '#ef4444' : count / maxLoad > 0.5 ? '#f59e0b' : 'var(--theme-accent)',
+                      }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-[var(--theme-muted)] shrink-0 w-8 text-right">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Running tasks panel — live log tails for all executing tasks */}
+      {stats.workingTasks.length > 0 && (
+        <div className="shrink-0 mx-4 sm:mx-6 lg:mx-8 mb-1 rounded-lg border border-violet-500/30 bg-violet-500/5 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowRunningPanel(v => !v)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[10px] text-violet-400 hover:bg-violet-500/10 transition-colors"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+            <span className="font-medium">{stats.workingTasks.length} executing</span>
+            <span className="opacity-50 truncate">{stats.workingTasks.slice(0, 3).map(t => t.title.slice(0, 40)).join(' · ')}</span>
+            <span className="ml-auto opacity-40">{showRunningPanel ? '▲' : '▼'}</span>
+          </button>
+          {showRunningPanel && (
+            <div className="divide-y divide-violet-500/10 max-h-52 overflow-y-auto">
+              {stats.workingTasks.map(t => (
+                <RunningTaskRow key={t.id} task={t} onOpen={() => setEditingTask(t)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pipeline stall alert */}
+      {(() => {
+        if (!sweepStats || sweepStats.dispatched === 0) return null
+        const sweepAgoMin = sweepStats.lastSweepAt
+          ? Math.round((Date.now() - new Date(sweepStats.lastSweepAt).getTime()) / 60_000)
+          : null
+        const stalled = sweepAgoMin !== null && sweepAgoMin > 60
+        const lowSuccess = sweepStats.successRate !== null && sweepStats.successRate < 10
+        if (!stalled && !lowSuccess) return null
+        const isRed = stalled
+        return (
+          <div className={cn(
+            'mx-4 sm:mx-6 lg:mx-8 mb-1 rounded-lg px-3 py-2 flex items-center gap-3 text-xs border',
+            isRed
+              ? 'bg-red-500/8 border-red-500/30 text-red-300'
+              : 'bg-amber-500/8 border-amber-500/30 text-amber-300',
+          )}>
+            <span>{isRed ? '🚨' : '⚠️'}</span>
+            <span className="flex-1">
+              {stalled && `Pipeline stalled — last sweep ${sweepAgoMin}m ago.`}
+              {!stalled && lowSuccess && `Low success rate: ${sweepStats.successRate}% (${sweepStats.timedOutToday ?? 0} timeouts today).`}
+            </span>
+            <button
+              onClick={async () => {
+                setDrainingNow(true)
+                try {
+                  const res = await fetch('/api/tasks-drain-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 50 }) })
+                  const data = await res.json() as { ok: boolean; queued: number }
+                  await tasksQuery.refetch()
+                  toast(data.queued > 0 ? `Drained ${data.queued} tasks` : 'No eligible tasks right now')
+                } catch { toast('Drain failed', { type: 'error' }) }
+                finally { setDrainingNow(false) }
+              }}
+              disabled={drainingNow}
+              className="shrink-0 text-[10px] font-medium px-2.5 py-1 rounded border transition-colors border-current opacity-70 hover:opacity-100"
+            >
+              {drainingNow ? 'Draining…' : 'Drain Now'}
+            </button>
+          </div>
+        )
+      })()}
+
+      {/* Hidden columns restore bar */}
+      {hiddenColumns.size > 0 && (
+        <div className="mx-4 sm:mx-6 lg:mx-8 mb-1 flex items-center gap-2 text-[10px] text-[var(--theme-muted)]">
+          <span className="opacity-50">Hidden:</span>
+          {[...hiddenColumns].map(col => (
+            <button
+              key={col}
+              onClick={() => toggleHideColumn(col)}
+              className="px-2 py-0.5 rounded-full border border-[var(--theme-border)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)] transition-colors capitalize"
+            >
+              {COLUMN_LABELS[col]} ↩
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Swimlane view — rows by assignee, columns by status */}
+      {viewMode === 'swimlane' && swimlaneData && (
+        <div className="flex-1 min-h-0 overflow-auto px-4 pb-[calc(var(--tabbar-h,80px)+1rem)] pt-3 sm:px-6 lg:px-8">
+          <table className="w-full border-collapse text-left" style={{ minWidth: 700 }}>
+            <thead>
+              <tr>
+                <th className="py-2 pr-3 text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider w-28">Assignee</th>
+                {swimlaneData.cols.map(c => (
+                  <th key={c} className="py-2 px-2 text-[10px] font-semibold uppercase tracking-wider" style={{ color: COLUMN_COLORS[c] }}>{COLUMN_LABELS[c]}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {swimlaneData.rows.map(([asgn, cells]) => (
+                <tr key={asgn} className="border-t border-[var(--theme-border)]">
+                  <td className="py-2 pr-3 align-top">
+                    <span className="text-[11px] font-medium text-[var(--theme-text)] truncate block max-w-[100px]">{asgn}</span>
+                    <span className="text-[9px] text-[var(--theme-muted)] opacity-50">
+                      {swimlaneData.cols.reduce((s, c) => s + cells[c].length, 0)} tasks
+                    </span>
+                  </td>
+                  {swimlaneData.cols.map(c => (
+                    <td key={c} className="py-1 px-1 align-top" style={{ minWidth: 160, maxWidth: 240 }}>
+                      <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto scrollbar-thin pr-1">
+                        {cells[c].length === 0
+                          ? <span className="text-[9px] text-[var(--theme-muted)] opacity-30 pl-1">—</span>
+                          : cells[c].slice(0, 20).map(t => (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => setPanelTask(t)}
+                                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-left hover:bg-[var(--theme-hover)] transition-colors group"
+                                style={{ borderLeft: `2px solid ${PRIORITY_COLORS[t.priority]}` }}
+                              >
+                                <span className="text-[10px] text-[var(--theme-text)] truncate flex-1">{t.title.slice(0, 50)}</span>
+                                {t.agent_state && <span className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse" style={{ background: '#a855f7' }} />}
+                              </button>
+                            ))
+                        }
+                        {cells[c].length > 20 && (
+                          <span className="text-[9px] text-[var(--theme-muted)] opacity-50 pl-1">+{cells[c].length - 20} more</span>
+                        )}
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Board */}
-      <div
+      {viewMode === 'board' && <div
         className="flex-1 min-h-0 w-full flex gap-3 overflow-x-auto overflow-y-hidden px-4 pb-[calc(var(--tabbar-h,80px)+1rem)] pt-3 sm:px-6 lg:px-8"
         style={{ boxShadow: 'inset 0 8px 24px rgba(0,0,0,0.2)' }}
       >
@@ -1089,7 +2167,7 @@ export function TasksScreen() {
                 <>
                   {/* Column header */}
                   <div
-                    className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--theme-border)] rounded-t-xl"
+                    className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--theme-border)] rounded-t-xl group/hdr"
                     style={{ borderTopWidth: 2, borderTopColor: colColor, borderTopStyle: 'solid' }}
                   >
                     <div className="flex items-center gap-2">
@@ -1101,132 +2179,194 @@ export function TasksScreen() {
                         ({tasksQuery.isFetching && tasksQuery.data === undefined ? '…' : colTasks.length})
                       </span>
                     </div>
-                    <button
-                      onClick={() => { setCreateColumn(col); setShowCreate(true) }}
-                      className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
-                      title={`Add to ${COLUMN_LABELS[col]}`}
-                    >
-                      <HugeiconsIcon icon={Add01Icon} size={14} className="text-[var(--theme-muted)]" />
-                    </button>
+                    <div className="flex items-center gap-0.5">
+                      {/* Review-column: execute valid tasks button */}
+                      {col === 'review' && (() => {
+                        const execIds = colTasks.filter(t => {
+                          if (t.agent_state) return false
+                          const planned = (t.agent_history ?? []).filter((h: { action: string }) => h.action === 'planned')
+                          if (planned.length === 0) return false
+                          const note = (planned[planned.length - 1] as { note?: string }).note ?? ''
+                          return !note.includes('Plan unavailable') && note.length >= 80
+                        }).map(t => t.id)
+                        if (execIds.length === 0) return null
+                        return (
+                          <button
+                            onClick={async () => {
+                              setBatchExecuting(true)
+                              try {
+                                const r = await batchExecuteTasks(50, execIds)
+                                await tasksQuery.refetch()
+                                toast(`Started ${r.started} review task${r.started !== 1 ? 's' : ''}`)
+                              } catch { toast('Execute failed', { type: 'error' }) }
+                              finally { setBatchExecuting(false) }
+                            }}
+                            disabled={batchExecuting}
+                            title={`Execute ${execIds.length} ready review tasks`}
+                            className="rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-400 hover:bg-amber-500/10 border border-amber-500/30 transition-colors whitespace-nowrap"
+                          >
+                            {batchExecuting ? '…' : `▶ ${execIds.length}`}
+                          </button>
+                        )
+                      })()}
+                      {/* Hide column button — shows on hover */}
+                      <button
+                        onClick={() => toggleHideColumn(col)}
+                        title={`Hide ${COLUMN_LABELS[col]} column`}
+                        className="rounded p-0.5 opacity-0 group-hover/hdr:opacity-40 hover:!opacity-100 hover:bg-[var(--theme-hover)] transition-all text-[var(--theme-muted)]"
+                      >
+                        <span className="text-[11px]">⊗</span>
+                      </button>
+                      <button
+                        onClick={() => { setCreateColumn(col); setShowCreate(true) }}
+                        className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
+                        title={`Add to ${COLUMN_LABELS[col]}`}
+                      >
+                        <HugeiconsIcon icon={Add01Icon} size={14} className="text-[var(--theme-muted)]" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Cards */}
-                  <div className="flex flex-col gap-2 p-2 flex-1 min-h-0 overflow-y-auto scrollbar-thin">
-                    {tasksQuery.isError ? (
-                      <motion.div
-                        key="error"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex flex-col items-center justify-center py-8 gap-2 text-red-400"
-                      >
+                  {tasksQuery.isError ? (
+                    <div className="flex flex-col gap-2 p-2 flex-1 min-h-0">
+                      <div className="flex flex-col items-center justify-center py-8 gap-2 text-red-400">
                         <p className="text-xs font-medium">Failed to load tasks</p>
-                        <button
-                          onClick={() => tasksQuery.refetch()}
-                          className="text-xs text-[var(--theme-accent)] hover:underline"
-                        >
-                          Retry
-                        </button>
-                      </motion.div>
-                    ) : tasksQuery.isLoading ? (
-                      <>
-                        <SkeletonCard />
-                        <SkeletonCard />
-                        <SkeletonCard />
-                      </>
-                    ) : (
-                      <AnimatePresence initial={false}>
-                        {colTasks.length === 0 ? (
-                          <motion.div
-                            key="empty"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="flex flex-col items-center justify-center py-8 gap-2 text-[var(--theme-muted)] opacity-60"
-                          >
-                            <HugeiconsIcon icon={CheckListIcon} size={22} />
-                            <p className="text-xs font-medium">No tasks</p>
-                            <p className="text-[10px]">Drop here or click + to add</p>
-                          </motion.div>
-                        ) : (
-                      colTasks.map(task => (
-                        <motion.div
-                          key={task.id}
-                          layout
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -6 }}
+                        <button onClick={() => tasksQuery.refetch()} className="text-xs text-[var(--theme-accent)] hover:underline">Retry</button>
+                      </div>
+                    </div>
+                  ) : tasksQuery.isLoading ? (
+                    <div className="flex flex-col gap-2 p-2 flex-1 min-h-0 overflow-y-auto">
+                      <SkeletonCard /><SkeletonCard /><SkeletonCard />
+                    </div>
+                  ) : colTasks.length === 0 ? (
+                    <div className="flex flex-col gap-2 p-2 flex-1 min-h-0">
+                      <div className="flex flex-col items-center justify-center py-8 gap-2 text-[var(--theme-muted)] opacity-60">
+                        <HugeiconsIcon icon={CheckListIcon} size={22} />
+                        <p className="text-xs font-medium">No tasks</p>
+                        <p className="text-[10px]">Drop here or click + to add</p>
+                      </div>
+                    </div>
+                  ) : colTasks.length >= VIRTUAL_THRESHOLD || (col === 'todo' && groupByParent && groupedTodoRows) ? (
+                    <VirtualTaskList
+                      tasks={col === 'review' ? (() => {
+                        const ready = colTasks.filter(t => {
+                          if (t.agent_state) return false
+                          const pl = (t.agent_history ?? []).filter((h: { action: string }) => h.action === 'planned')
+                          if (!pl.length) return false
+                          const note = (pl[pl.length - 1] as { note?: string }).note ?? ''
+                          return !note.includes('Plan unavailable') && note.length >= 80
+                        })
+                        const stubs = colTasks.filter(t => !ready.includes(t))
+                        return [...ready, ...stubs]
+                      })() : colTasks}
+                      rows={col === 'todo' && groupByParent && groupedTodoRows ? groupedTodoRows : undefined}
+                      sectionBreak={col === 'review' ? (() => {
+                        return colTasks.filter(t => {
+                          if (t.agent_state) return false
+                          const pl = (t.agent_history ?? []).filter((h: { action: string }) => h.action === 'planned')
+                          if (!pl.length) return false
+                          const note = (pl[pl.length - 1] as { note?: string }).note ?? ''
+                          return !note.includes('Plan unavailable') && note.length >= 80
+                        }).length
+                      })() : undefined}
+                      sectionLabels={col === 'review' ? ['Ready', 'Stubs — needs re-plan'] : undefined}
+                      renderCard={(task) => (
+                        <TaskCard
+                          task={task}
+                          assigneeLabels={assigneeLabels}
+                          isDragging={draggingId === task.id}
+                          onDragStart={e => handleDragStart(e, task.id)}
                           onDragEnd={handleDragEnd}
-                        >
-                          <TaskCard
-                            task={task}
-                            assigneeLabels={assigneeLabels}
-                            isDragging={draggingId === task.id}
-                            onDragStart={e => handleDragStart(e, task.id)}
-                            onClick={() => setEditingTask(task)}
-                            activeTagFilter={tagFilter}
-                            onTagClick={(tag) => setTagFilter(prev => prev === tag ? null : tag)}
-                            onAssigneeClick={(assignee) => setAssigneeFilter(prev => prev === assignee ? null : assignee)}
-                            onChangePriority={(priority) =>
-                              quickUpdateMutation.mutate({ id: task.id, input: { priority } })
-                            }
-                            onMoveToColumn={(column) =>
-                              moveMutation.mutate({ id: task.id, column })
-                            }
-                            onDelete={() => {
-                              if (window.confirm(`Delete "${task.title}"?`))
-                                deleteMutation.mutate(task.id)
-                            }}
-                            isLaunching={launchingTaskId === task.id}
-                            onLaunch={async () => {
-                              setLaunchingTaskId(task.id)
-                              try {
-                                const { sessionId } = await launchSession(task.id)
-                                void navigate({ to: '/chat/$sessionKey', params: { sessionKey: sessionId } })
-                              } catch {
-                                toast('Failed to launch session', { type: 'error' })
-                              } finally {
-                                setLaunchingTaskId(null)
-                              }
-                            }}
-                            isExecuting={executingTaskId === task.id}
-                            onExecute={async () => {
-                              setExecutingTaskId(task.id)
-                              try {
-                                await executeTask(task.id)
-                                await tasksQuery.refetch()
-                                toast(`Agent is working on "${task.title}"…`)
-                              } catch {
-                                toast('Failed to start agent execution', { type: 'error' })
-                              } finally {
-                                setExecutingTaskId(null)
-                              }
-                            }}
-                            isBreakingDown={breakingDownId === task.id}
-                            onBreakdown={async () => {
-                              setBreakingDownId(task.id)
-                              try {
-                                const { count, titles } = await breakdownTask(task.id)
-                                invalidate()
-                                toast(`Created ${count} subtask${count !== 1 ? 's' : ''}: ${titles.slice(0, 2).join(', ')}${count > 2 ? '…' : ''}`)
-                              } catch (e) {
-                                toast(e instanceof Error ? e.message : 'Breakdown failed', { type: 'error' })
-                              } finally {
-                                setBreakingDownId(null)
-                              }
-                            }}
-                            onResetAgent={() => {
-                              quickUpdateMutation.mutate({ id: task.id, input: { agent_state: null, agent_name: null, agent_action_at: null } })
-                            }}
-                            onRequestRefresh={() => void tasksQuery.refetch()}
-                            onComment={handleTaskComment}
-                            queuePosition={queuePositions[task.id] ?? null}
-                          />
-                        </motion.div>
-                      ))
+                          onClick={() => setPanelTask(task)}
+                          activeTagFilter={tagFilter}
+                          onTagClick={(tag) => setTagFilter(prev => prev === tag ? null : tag)}
+                          onAssigneeClick={(assignee) => setAssigneeFilter(prev => prev === assignee ? null : assignee)}
+                          onChangePriority={(priority) => quickUpdateMutation.mutate({ id: task.id, input: { priority } })}
+                          onMoveToColumn={(column) => moveMutation.mutate({ id: task.id, column })}
+                          onDelete={() => { if (window.confirm(`Delete "${task.title}"?`)) deleteMutation.mutate(task.id) }}
+                          isLaunching={launchingTaskId === task.id}
+                          onLaunch={async () => {
+                            setLaunchingTaskId(task.id)
+                            try { const { sessionId } = await launchSession(task.id); void navigate({ to: '/chat/$sessionKey', params: { sessionKey: sessionId } }) }
+                            catch { toast('Failed to launch session', { type: 'error' }) }
+                            finally { setLaunchingTaskId(null) }
+                          }}
+                          isExecuting={executingTaskId === task.id}
+                          onExecute={async () => {
+                            setExecutingTaskId(task.id)
+                            try { await executeTask(task.id); await tasksQuery.refetch(); toast(`Agent is working on "${task.title}"…`) }
+                            catch { toast('Failed to start agent execution', { type: 'error' }) }
+                            finally { setExecutingTaskId(null) }
+                          }}
+                          isBreakingDown={breakingDownId === task.id}
+                          onBreakdown={async () => {
+                            setBreakingDownId(task.id)
+                            try { const { count, titles } = await breakdownTask(task.id); invalidate(); toast(`Created ${count} subtask${count !== 1 ? 's' : ''}: ${titles.slice(0, 2).join(', ')}${count > 2 ? '…' : ''}`) }
+                            catch (e) { toast(e instanceof Error ? e.message : 'Breakdown failed', { type: 'error' }) }
+                            finally { setBreakingDownId(null) }
+                          }}
+                          onResetAgent={() => quickUpdateMutation.mutate({ id: task.id, input: { agent_state: null, agent_name: null, agent_action_at: null } })}
+                          onRequestRefresh={() => void tasksQuery.refetch()}
+                          onComment={handleTaskComment}
+                          queuePosition={queuePositions[task.id] ?? null}
+                          isSelected={selectedIds.has(task.id)}
+                          onToggleSelect={toggleSelect}
+                          dense={denseMode}
+                        />
                       )}
-                    </AnimatePresence>
+                    />
+                  ) : (
+                    <div className={cn('flex flex-col p-2 flex-1 min-h-0 overflow-y-auto scrollbar-thin', denseMode ? 'gap-0.5' : 'gap-2')}>
+                      <AnimatePresence initial={false}>
+                        {colTasks.map(task => (
+                          <motion.div key={task.id} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} onDragEnd={handleDragEnd}>
+                            <TaskCard
+                              task={task}
+                              assigneeLabels={assigneeLabels}
+                              isDragging={draggingId === task.id}
+                              onDragStart={e => handleDragStart(e, task.id)}
+                              onClick={() => setPanelTask(task)}
+                              activeTagFilter={tagFilter}
+                              onTagClick={(tag) => setTagFilter(prev => prev === tag ? null : tag)}
+                              onAssigneeClick={(assignee) => setAssigneeFilter(prev => prev === assignee ? null : assignee)}
+                              onChangePriority={(priority) => quickUpdateMutation.mutate({ id: task.id, input: { priority } })}
+                              onMoveToColumn={(column) => moveMutation.mutate({ id: task.id, column })}
+                              onDelete={() => { if (window.confirm(`Delete "${task.title}"?`)) deleteMutation.mutate(task.id) }}
+                              isLaunching={launchingTaskId === task.id}
+                              onLaunch={async () => {
+                                setLaunchingTaskId(task.id)
+                                try { const { sessionId } = await launchSession(task.id); void navigate({ to: '/chat/$sessionKey', params: { sessionKey: sessionId } }) }
+                                catch { toast('Failed to launch session', { type: 'error' }) }
+                                finally { setLaunchingTaskId(null) }
+                              }}
+                              isExecuting={executingTaskId === task.id}
+                              onExecute={async () => {
+                                setExecutingTaskId(task.id)
+                                try { await executeTask(task.id); await tasksQuery.refetch(); toast(`Agent is working on "${task.title}"…`) }
+                                catch { toast('Failed to start agent execution', { type: 'error' }) }
+                                finally { setExecutingTaskId(null) }
+                              }}
+                              isBreakingDown={breakingDownId === task.id}
+                              onBreakdown={async () => {
+                                setBreakingDownId(task.id)
+                                try { const { count, titles } = await breakdownTask(task.id); invalidate(); toast(`Created ${count} subtask${count !== 1 ? 's' : ''}: ${titles.slice(0, 2).join(', ')}${count > 2 ? '…' : ''}`) }
+                                catch (e) { toast(e instanceof Error ? e.message : 'Breakdown failed', { type: 'error' }) }
+                                finally { setBreakingDownId(null) }
+                              }}
+                              onResetAgent={() => quickUpdateMutation.mutate({ id: task.id, input: { agent_state: null, agent_name: null, agent_action_at: null } })}
+                              onRequestRefresh={() => void tasksQuery.refetch()}
+                              onComment={handleTaskComment}
+                              queuePosition={queuePositions[task.id] ?? null}
+                              isSelected={selectedIds.has(task.id)}
+                              onToggleSelect={toggleSelect}
+                              dense={denseMode}
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
                   )}
-                </div>
 
                 {/* Inline quick-add footer */}
                 {quickAddCol === col ? (
@@ -1264,7 +2404,7 @@ export function TasksScreen() {
             </div>
           )
         })}
-      </div>
+      </div>}
 
       {/* Create dialog */}
       <TaskDialog
@@ -1323,6 +2463,673 @@ export function TasksScreen() {
           }
         } : undefined}
       />
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-[calc(var(--tabbar-h,80px)+12px)] left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 shadow-2xl text-xs flex-wrap max-w-[92vw]">
+          <span className="text-[var(--theme-muted)] mr-1">{selectedIds.size} selected</span>
+          <button
+            onClick={async () => {
+              for (const id of selectedIds) await moveMutation.mutateAsync({ id, column: 'todo' })
+              clearSelection()
+              toast(`Moved ${selectedIds.size} tasks to Todo`)
+            }}
+            className="px-2.5 py-1 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-hover)] transition-colors text-[var(--theme-text)]"
+          >Move to Todo</button>
+          {/* Set priority */}
+          {(['high', 'medium', 'low'] as Array<TaskPriority>).map(p => (
+            <button
+              key={p}
+              onClick={async () => {
+                for (const id of selectedIds) await quickUpdateMutation.mutateAsync({ id, input: { priority: p } })
+                clearSelection()
+                toast(`Set ${selectedIds.size} tasks to ${p} priority`)
+              }}
+              className="px-2.5 py-1 rounded-lg border transition-colors capitalize"
+              style={{ borderColor: PRIORITY_COLORS[p], color: PRIORITY_COLORS[p], background: `${PRIORITY_COLORS[p]}18` }}
+            >{p}</button>
+          ))}
+          <button
+            onClick={async () => {
+              if (!window.confirm(`Delete ${selectedIds.size} tasks?`)) return
+              for (const id of selectedIds) await deleteMutation.mutateAsync(id)
+              clearSelection()
+              toast(`Deleted ${selectedIds.size} tasks`)
+            }}
+            className="px-2.5 py-1 rounded-lg border border-red-500/30 hover:bg-red-500/10 text-red-400 transition-colors"
+          >Delete</button>
+          <button onClick={clearSelection} className="px-2.5 py-1 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-hover)] text-[var(--theme-muted)] transition-colors">✕</button>
+        </div>
+      )}
+
+      {/* Task detail slide-in panel */}
+      {panelTask && (() => {
+        const live = tasks.find(t => t.id === panelTask.id) ?? panelTask
+        const history = live.agent_history ?? []
+        const lastPlan = [...history].reverse().find(h => h.action === 'planned')
+        const PRIORITY_COLOR: Record<string, string> = { high: '#ef4444', medium: '#f59e0b', low: '#6b7280' }
+        const priorityCol = PRIORITY_COLOR[live.priority] ?? '#6b7280'
+        const actionColors: Record<string, string> = {
+          completed: '#34d399', blocked: '#f87171', timed_out: '#f97316',
+          planned: '#a78bfa', question: '#fbbf24', rescued: '#60a5fa',
+        }
+        return (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setPanelTask(null)}
+            />
+            <div className="fixed right-0 top-0 bottom-0 z-50 w-[min(420px,92vw)] flex flex-col border-l border-[var(--theme-border)] shadow-2xl overflow-hidden"
+              style={{ background: 'var(--theme-panel)' }}
+            >
+              {/* Panel header */}
+              <div className="flex items-start gap-2 px-4 py-3 border-b border-[var(--theme-border)]">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[var(--theme-text)] leading-snug">{live.title}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full border" style={{ borderColor: priorityCol, color: priorityCol, background: `${priorityCol}18` }}>{live.priority}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-border)] text-[var(--theme-muted)] capitalize">{live.column.replace(/_/g, ' ')}</span>
+                    {live.assignee && <span className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-border)] text-[var(--theme-muted)] capitalize">{live.assignee}</span>}
+                  </div>
+                </div>
+                <button onClick={() => setPanelTask(null)} className="shrink-0 p-1 rounded hover:bg-[var(--theme-hover)] text-[var(--theme-muted)] transition-colors text-sm">✕</button>
+              </div>
+
+              {/* Plan */}
+              {lastPlan && (
+                <div className="px-4 pt-3 pb-0 shrink-0">
+                  <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-1">Plan</p>
+                  <p className="text-[11px] text-[var(--theme-text)] leading-relaxed line-clamp-6 whitespace-pre-wrap">{lastPlan.note}</p>
+                </div>
+              )}
+
+              {/* astra_note fallback */}
+              {!lastPlan && live.agent_comment && (
+                <div className="px-4 pt-3 pb-0 shrink-0">
+                  <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-1">Note</p>
+                  <p className="text-[11px] text-[var(--theme-text)] leading-relaxed line-clamp-6">{live.agent_comment}</p>
+                </div>
+              )}
+
+              {/* History timeline */}
+              <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-4 py-3">
+                <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">History ({history.length})</p>
+                {history.length === 0 && <p className="text-[11px] text-[var(--theme-muted)] opacity-50">No agent activity yet</p>}
+                <div className="flex flex-col gap-2">
+                  {[...history].reverse().slice(0, 30).map((h, i) => {
+                    const col = actionColors[h.action] ?? 'var(--theme-muted)'
+                    const ageMs = h.at ? Date.now() - new Date(h.at).getTime() : null
+                    const ageStr = ageMs === null ? '' : ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m ago` : ageMs < 86_400_000 ? `${Math.round(ageMs / 3600_000)}h ago` : `${Math.round(ageMs / 86_400_000)}d ago`
+                    return (
+                      <div key={i} className="flex gap-2 items-start">
+                        <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ background: col, marginTop: 4 }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-medium capitalize" style={{ color: col }}>{h.action.replace(/_/g, ' ')}</span>
+                            {ageStr && <span className="text-[9px] text-[var(--theme-muted)] opacity-50">{ageStr}</span>}
+                          </div>
+                          {h.note && <p className="text-[10px] text-[var(--theme-muted)] leading-relaxed mt-0.5 line-clamp-3">{h.note}</p>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Panel footer actions */}
+              <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-t border-[var(--theme-border)]">
+                <button
+                  onClick={() => { setPanelTask(null); setEditingTask(live) }}
+                  className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 hover:bg-[var(--theme-hover)] text-[var(--theme-text)] transition-colors"
+                >Edit</button>
+                {live.column !== 'done' && live.column !== 'blocked' && (
+                  <button
+                    onClick={async () => {
+                      setExecutingTaskId(live.id)
+                      try { await executeTask(live.id); await tasksQuery.refetch(); toast(`Agent is working on "${live.title}"…`) }
+                      catch { toast('Failed to start agent', { type: 'error' }) }
+                      finally { setExecutingTaskId(null) }
+                    }}
+                    disabled={executingTaskId === live.id || !!live.agent_state}
+                    className="flex-1 text-xs rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                  >{executingTaskId === live.id ? 'Starting…' : 'Execute'}</button>
+                )}
+              </div>
+            </div>
+          </>
+        )
+      })()}
+
+      {/* Inbox panel — tasks waiting for user input */}
+      {showInbox && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowInbox(false)} />
+          <div className="fixed right-0 top-0 bottom-0 z-50 w-[min(440px,94vw)] flex flex-col border-l border-[var(--theme-border)] shadow-2xl"
+            style={{ background: 'var(--theme-panel)' }}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border)]">
+              <h2 className="text-sm font-semibold text-[var(--theme-text)]">📥 Needs Your Input ({stats.inboxTasks.length})</h2>
+              <button onClick={() => setShowInbox(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin divide-y divide-[var(--theme-border)]">
+              {stats.inboxTasks.map(t => {
+                const lastAgentMsg = [...(t.agent_history ?? [])].reverse().find(h => h.action !== 'rescued' && h.note)
+                const ageMs = t.agent_action_at ? Date.now() - new Date(t.agent_action_at).getTime() : null
+                const ago = ageMs ? (ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m ago` : `${Math.round(ageMs / 3600_000)}h ago`) : ''
+                return (
+                  <div key={t.id} className="p-4">
+                    <div className="flex items-start gap-2 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => { setShowInbox(false); setPanelTask(t) }}
+                          className="text-xs font-medium text-[var(--theme-text)] hover:text-[var(--theme-accent)] text-left transition-colors line-clamp-2"
+                        >{t.title}</button>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[9px] text-[var(--theme-muted)] opacity-50 capitalize">{t.assignee ?? 'unassigned'}</span>
+                          {ago && <span className="text-[9px] text-[var(--theme-muted)] opacity-40">{ago}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    {(lastAgentMsg?.note || t.agent_comment) && (
+                      <div className="mb-2 text-[11px] text-[var(--theme-muted)] bg-[var(--theme-hover)] rounded-lg px-3 py-2 leading-relaxed line-clamp-4">
+                        {lastAgentMsg?.note ?? t.agent_comment}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={inboxReplies[t.id] ?? ''}
+                        onChange={e => setInboxReplies(prev => ({ ...prev, [t.id]: e.target.value }))}
+                        onKeyDown={async e => {
+                          if (e.key !== 'Enter') return
+                          const text = (inboxReplies[t.id] ?? '').trim()
+                          if (!text) return
+                          setInboxSending(t.id)
+                          try {
+                            await handleTaskComment(t.id, text)
+                            setInboxReplies(prev => { const n = { ...prev }; delete n[t.id]; return n })
+                            toast('Reply sent — Astra will resume')
+                          } catch { toast('Reply failed', { type: 'error' }) }
+                          finally { setInboxSending(null) }
+                        }}
+                        placeholder="Reply… (Enter to send)"
+                        disabled={inboxSending === t.id}
+                        className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2.5 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] placeholder:text-[var(--theme-muted)] disabled:opacity-50"
+                      />
+                      {inboxSending === t.id && <span className="text-[10px] text-[var(--theme-muted)] self-center">Sending…</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Tags browser panel */}
+      {showTagsPanel && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowTagsPanel(false)} />
+          <div className="fixed right-0 top-0 bottom-0 z-50 w-[min(320px,92vw)] flex flex-col border-l border-[var(--theme-border)] shadow-2xl"
+            style={{ background: 'var(--theme-panel)' }}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border)]">
+              <h2 className="text-sm font-semibold text-[var(--theme-text)]"># Tags</h2>
+              <button onClick={() => setShowTagsPanel(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
+            </div>
+            {/* Bulk tag input */}
+            {selectedIds.size > 0 && (
+              <div className="px-4 py-3 border-b border-[var(--theme-border)] bg-[var(--theme-hover)]">
+                <p className="text-[10px] text-[var(--theme-muted)] mb-1.5">{selectedIds.size} tasks selected — add tag:</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tagsPanelBulkTag}
+                    onChange={e => setTagsPanelBulkTag(e.target.value)}
+                    onKeyDown={async e => {
+                      if (e.key !== 'Enter') return
+                      const tag = tagsPanelBulkTag.trim().toLowerCase()
+                      if (!tag) return
+                      setTaggingSelected(true)
+                      try {
+                        const selected = tasks.filter(t => selectedIds.has(t.id))
+                        for (const t of selected) {
+                          if (!t.tags.includes(tag)) {
+                            await quickUpdateMutation.mutateAsync({ id: t.id, input: { tags: [...t.tags, tag] } })
+                          }
+                        }
+                        invalidate()
+                        toast(`Tagged ${selected.length} tasks with #${tag}`)
+                        setTagsPanelBulkTag('')
+                      } catch { toast('Tagging failed', { type: 'error' }) }
+                      finally { setTaggingSelected(false) }
+                    }}
+                    placeholder="tag name… Enter"
+                    disabled={taggingSelected}
+                    className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2.5 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] placeholder:text-[var(--theme-muted)]"
+                  />
+                </div>
+              </div>
+            )}
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4">
+              <div className="flex flex-col gap-1.5">
+                {Object.entries(stats.tagCloud)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([tag, count]) => {
+                    const isActive = tagFilter === tag
+                    const maxCount = Math.max(...Object.values(stats.tagCloud), 1)
+                    return (
+                      <div key={tag} className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setTagFilter(isActive ? null : tag); setShowTagsPanel(false) }}
+                          className="flex-1 flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors hover:bg-[var(--theme-hover)] text-left"
+                          style={isActive ? { background: 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' } : {}}
+                        >
+                          <div className="flex-1 h-1.5 rounded-full bg-[var(--theme-hover)] overflow-hidden">
+                            <div className="h-full rounded-full bg-[var(--theme-accent)] opacity-60" style={{ width: `${(count / maxCount) * 100}%` }} />
+                          </div>
+                          <span className="text-[11px] text-[var(--theme-muted)] shrink-0 w-28 truncate">#{tag}</span>
+                          <span className="text-[11px] font-medium text-[var(--theme-text)] shrink-0 w-8 text-right">{count}</span>
+                        </button>
+                      </div>
+                    )
+                  })
+                }
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Sister rebalance modal */}
+      {showRebalance && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowRebalance(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(380px,92vw)] rounded-xl border border-[var(--theme-border)] shadow-2xl p-5"
+            style={{ background: 'var(--theme-panel)' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-[var(--theme-text)]">⇄ Rebalance Sister Load</h2>
+              <button onClick={() => setShowRebalance(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
+            </div>
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-2 items-center">
+                <div className="flex-1">
+                  <label className="text-[10px] text-[var(--theme-muted)] block mb-1">From (overloaded)</label>
+                  <select
+                    value={rebalanceFrom}
+                    onChange={e => setRebalanceFrom(e.target.value)}
+                    className="w-full text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)]"
+                  >
+                    <option value="">Select sister…</option>
+                    {stats.sisterChips.map(([name, count]) => (
+                      <option key={name} value={name}>{name} ({count})</option>
+                    ))}
+                  </select>
+                </div>
+                <span className="text-[var(--theme-muted)] mt-4">→</span>
+                <div className="flex-1">
+                  <label className="text-[10px] text-[var(--theme-muted)] block mb-1">To (lighter)</label>
+                  <select
+                    value={rebalanceTo}
+                    onChange={e => setRebalanceTo(e.target.value)}
+                    className="w-full text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)]"
+                  >
+                    <option value="">Select sister…</option>
+                    {stats.sisterChips.map(([name, count]) => (
+                      <option key={name} value={name}>{name} ({count})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-[var(--theme-muted)] block mb-1">Move up to N tasks (todo/backlog only)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={200}
+                  value={rebalanceCount}
+                  onChange={e => setRebalanceCount(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)]"
+                />
+              </div>
+              <button
+                onClick={async () => {
+                  if (!rebalanceFrom || !rebalanceTo || rebalanceFrom === rebalanceTo) {
+                    toast('Pick two different sisters', { type: 'error' }); return
+                  }
+                  setRebalancing(true)
+                  try {
+                    const candidates = tasks
+                      .filter(t => t.assignee === rebalanceFrom && (t.column === 'todo' || t.column === 'backlog') && !t.agent_state)
+                      .slice(0, rebalanceCount)
+                    for (const t of candidates) {
+                      await quickUpdateMutation.mutateAsync({ id: t.id, input: { assignee: rebalanceTo } })
+                    }
+                    invalidate()
+                    toast(`Moved ${candidates.length} tasks from ${rebalanceFrom} → ${rebalanceTo}`)
+                    setShowRebalance(false)
+                  } catch { toast('Rebalance failed', { type: 'error' }) }
+                  finally { setRebalancing(false) }
+                }}
+                disabled={rebalancing || !rebalanceFrom || !rebalanceTo}
+                className="w-full text-xs rounded-lg border border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 px-3 py-2 text-[var(--theme-accent)] hover:bg-[var(--theme-accent)]/20 transition-colors disabled:opacity-40"
+              >
+                {rebalancing ? 'Moving…' : `Move ${rebalanceCount} tasks`}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Keyboard shortcuts modal */}
+      {showShortcuts && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowShortcuts(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(360px,92vw)] rounded-xl border border-[var(--theme-border)] shadow-2xl p-5"
+            style={{ background: 'var(--theme-panel)' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-[var(--theme-text)]">Keyboard Shortcuts</h2>
+              <button onClick={() => setShowShortcuts(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
+            </div>
+            <div className="flex flex-col gap-2">
+              {([
+                ['n', 'New task'],
+                ['/', 'Focus search (operators: assignee: tag: is:)'],
+                ['?', 'Toggle shortcuts panel'],
+                ['Esc', 'Close panels'],
+              ] as Array<[string, string]>).map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-xs text-[var(--theme-muted)]">{desc}</span>
+                  <kbd className="text-[11px] font-mono px-2 py-0.5 rounded border border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-text)]">{key}</kbd>
+                </div>
+              ))}
+              <div className="mt-2 pt-2 border-t border-[var(--theme-border)]">
+                <p className="text-[10px] text-[var(--theme-muted)] opacity-50">Shortcuts are disabled when typing in a text field.</p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Timeout failure analysis modal */}
+      {showTimeoutAnalysis && (() => {
+        const today = new Date().toISOString().slice(0, 10)
+        // Collect all timed_out history entries from today
+        const timedOutEntries: Array<{ task: ClaudeTask; note: string; at: string }> = []
+        tasks.forEach(t => {
+          ;(t.agent_history ?? []).forEach((h: { action: string; at?: string; note?: string }) => {
+            if (h.action === 'timed_out' && (h.at ?? '').startsWith(today)) {
+              timedOutEntries.push({ task: t, note: h.note ?? '', at: h.at ?? '' })
+            }
+          })
+        })
+        // Group by assignee
+        const byAssignee: Record<string, number> = {}
+        timedOutEntries.forEach(e => {
+          const a = e.task.assignee ?? 'unassigned'
+          byAssignee[a] = (byAssignee[a] ?? 0) + 1
+        })
+        // Group by tag (top tag per task)
+        const byTag: Record<string, number> = {}
+        timedOutEntries.forEach(e => {
+          const tag = e.task.tags?.[0] ?? 'untagged'
+          byTag[tag] = (byTag[tag] ?? 0) + 1
+        })
+        const topAssignees = Object.entries(byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 8)
+        const topTags = Object.entries(byTag).sort((a, b) => b[1] - a[1]).slice(0, 6)
+        const sample = timedOutEntries.slice(0, 8)
+        return (
+          <>
+            <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowTimeoutAnalysis(false)} />
+            <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(480px,94vw)] max-h-[80vh] rounded-xl border border-[var(--theme-border)] shadow-2xl flex flex-col"
+              style={{ background: 'var(--theme-panel)' }}
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--theme-border)]">
+                <h2 className="text-sm font-semibold text-[var(--theme-text)]">⏱ Timeout Analysis — today ({timedOutEntries.length} total)</h2>
+                <button onClick={() => setShowTimeoutAnalysis(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
+              </div>
+              <div className="overflow-y-auto scrollbar-thin p-5 flex flex-col gap-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">By Agent</p>
+                    {topAssignees.map(([name, count]) => (
+                      <div key={name} className="flex items-center gap-2 mb-1.5">
+                        <div className="flex-1 h-1.5 rounded-full bg-[var(--theme-hover)] overflow-hidden">
+                          <div className="h-full rounded-full bg-orange-400" style={{ width: `${(count / timedOutEntries.length) * 100}%` }} />
+                        </div>
+                        <span className="text-[11px] text-[var(--theme-muted)] capitalize shrink-0 w-20 truncate">{name}</span>
+                        <span className="text-[11px] font-medium text-orange-400 shrink-0">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">By Tag</p>
+                    {topTags.map(([tag, count]) => (
+                      <div key={tag} className="flex items-center gap-2 mb-1.5">
+                        <div className="flex-1 h-1.5 rounded-full bg-[var(--theme-hover)] overflow-hidden">
+                          <div className="h-full rounded-full bg-amber-400" style={{ width: `${(count / timedOutEntries.length) * 100}%` }} />
+                        </div>
+                        <span className="text-[11px] text-[var(--theme-muted)] shrink-0 w-20 truncate">{tag}</span>
+                        <span className="text-[11px] font-medium text-amber-400 shrink-0">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">Sample Tasks</p>
+                  {sample.map((e, i) => (
+                    <div key={i} className="mb-2 pb-2 border-b border-[var(--theme-border)]/50 last:border-0">
+                      <button
+                        type="button"
+                        onClick={() => { setShowTimeoutAnalysis(false); setPanelTask(e.task) }}
+                        className="text-[11px] text-[var(--theme-text)] hover:text-[var(--theme-accent)] text-left transition-colors line-clamp-1"
+                      >
+                        {e.task.title}
+                      </button>
+                      {e.note && <p className="text-[10px] text-[var(--theme-muted)] mt-0.5 line-clamp-2">{e.note}</p>}
+                      <p className="text-[9px] text-[var(--theme-muted)] opacity-40 mt-0.5 capitalize">{e.task.assignee ?? 'unassigned'} · {e.task.tags?.slice(0,2).join(', ') || 'no tags'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="shrink-0 flex gap-2 px-5 py-3 border-t border-[var(--theme-border)]">
+                <button
+                  onClick={() => { setShowTimeoutAnalysis(false); setFilterTimedOut(true) }}
+                  className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 hover:bg-[var(--theme-hover)] text-[var(--theme-text)] transition-colors"
+                >Filter to timed-out tasks</button>
+                <button
+                  onClick={async () => {
+                    setRescuingTimedOut(true)
+                    try {
+                      const res = await fetch('/api/tasks-rescue-timedout', { method: 'POST' })
+                      const data = await res.json() as { ok: boolean; rescued: number }
+                      await tasksQuery.refetch()
+                      toast(`Rescued ${data.rescued} tasks`)
+                      setShowTimeoutAnalysis(false)
+                    } catch { toast('Rescue failed', { type: 'error' }) }
+                    finally { setRescuingTimedOut(false) }
+                  }}
+                  disabled={rescuingTimedOut}
+                  className="flex-1 text-xs rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                >{rescuingTimedOut ? 'Rescuing…' : 'Rescue all'}</button>
+              </div>
+            </div>
+          </>
+        )
+      })()}
+
+      {/* Notification feed panel */}
+      {showNotifFeed && (
+        <div className="fixed inset-y-0 right-0 z-50 flex flex-col w-full max-w-sm bg-[var(--theme-card)] border-l border-[var(--theme-border)] shadow-2xl">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border)]">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-[var(--theme-text)]">🔔 Agent Activity</span>
+              {unreadNotifCount > 0 && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30">{unreadNotifCount} new</span>
+              )}
+            </div>
+            <button type="button" onClick={() => { setShowNotifFeed(false); markNotifSeen() }} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] transition-colors text-lg leading-none">×</button>
+          </div>
+          <div className="flex-1 overflow-y-auto scrollbar-thin p-3 flex flex-col gap-2">
+            {notifEvents.length === 0 && (
+              <div className="text-center py-8 text-xs text-[var(--theme-muted)] opacity-50">No activity in the last 24h</div>
+            )}
+            {notifEvents.map((ev, i) => {
+              const isNew = ev.at > notifLastSeen
+              const ageMs = Date.now() - new Date(ev.at).getTime()
+              const ago = ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m` : `${Math.round(ageMs / 3600_000)}h`
+              const icon = ev.action === 'completed' ? '✅' : ev.action === 'blocked' ? '🚫' : ev.action === 'timed_out' ? '⏱️' : ev.action === 'planned' ? '📋' : ev.action === 'question' ? '❓' : '🔄'
+              const color = ev.action === 'completed' ? 'text-emerald-400' : ev.action === 'blocked' || ev.action === 'timed_out' ? 'text-rose-400' : ev.action === 'planned' ? 'text-sky-400' : 'text-[var(--theme-muted)]'
+              return (
+                <button
+                  key={`${ev.taskId}-${ev.at}-${i}`}
+                  type="button"
+                  onClick={() => { const t = tasks.find(t => t.id === ev.taskId); if (t) { setPanelTask(t); setShowNotifFeed(false) } }}
+                  className={cn('text-left px-3 py-2 rounded-lg border transition-colors hover:bg-[var(--theme-hover)]', isNew ? 'border-violet-500/30 bg-violet-500/5' : 'border-[var(--theme-border)]')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>{icon}</span>
+                    <span className={cn('text-[10px] font-medium capitalize', color)}>{ev.action.replace('_', ' ')}</span>
+                    <span className="text-[9px] text-[var(--theme-muted)] opacity-50 ml-auto">{ago} ago</span>
+                  </div>
+                  <p className="text-[11px] text-[var(--theme-text)] truncate mt-0.5">{ev.taskTitle.slice(0, 60)}</p>
+                  {ev.note && <p className="text-[9px] text-[var(--theme-muted)] opacity-60 truncate mt-0.5">{ev.note.slice(0, 80)}</p>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Stale task archive wizard */}
+      {showArchiveWizard && archivePreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowArchiveWizard(false)} />
+          <div className="relative z-10 w-full max-w-md bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--theme-border)]">
+              <span className="font-semibold text-sm text-[var(--theme-text)]">🗂️ Archive Stale Tasks</span>
+              <button type="button" onClick={() => setShowArchiveWizard(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">×</button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-4">
+              <p className="text-xs text-[var(--theme-muted)]">Move inactive todo/backlog tasks to done. Only tasks with zero agent activity since the cutoff are affected.</p>
+              <div className="grid grid-cols-3 gap-3">
+                {([30, 60, 90] as const).map(days => {
+                  const count = days === 30 ? archivePreview.buckets.days30 : days === 60 ? archivePreview.buckets.days60 : archivePreview.buckets.days90
+                  return (
+                    <button
+                      key={days}
+                      type="button"
+                      onClick={() => setArchiveDays(days)}
+                      className={cn(
+                        'flex flex-col items-center p-3 rounded-lg border transition-colors',
+                        archiveDays === days ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]' : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+                      )}
+                    >
+                      <span className="text-lg font-bold">{count}</span>
+                      <span className="text-[9px] uppercase tracking-wide">{days}+ days</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--theme-muted)] mb-2">Oldest inactive tasks (preview):</p>
+                <div className="flex flex-col gap-1 max-h-40 overflow-y-auto scrollbar-thin">
+                  {archivePreview.previews.filter(p => p.ageDays >= archiveDays).slice(0, 10).map(p => (
+                    <div key={p.id} className="flex items-center gap-2 px-2 py-1 rounded bg-[var(--theme-hover)]">
+                      <span className="text-[10px] text-[var(--theme-text)] truncate flex-1">{p.title.slice(0, 55)}</span>
+                      <span className="text-[9px] text-[var(--theme-muted)] opacity-60 shrink-0">{p.ageDays}d</span>
+                    </div>
+                  ))}
+                  {archivePreview.previews.filter(p => p.ageDays >= archiveDays).length === 0 && (
+                    <p className="text-xs text-[var(--theme-muted)] opacity-50 text-center py-2">No tasks older than {archiveDays} days</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 px-5 py-4 border-t border-[var(--theme-border)]">
+              <button
+                type="button"
+                onClick={() => setShowArchiveWizard(false)}
+                className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
+              >Cancel</button>
+              <button
+                type="button"
+                disabled={archiving || archivePreview.buckets[`days${archiveDays}` as 'days30' | 'days60' | 'days90'] === 0}
+                onClick={async () => {
+                  setArchiving(true)
+                  try {
+                    const res = await fetch('/api/tasks-stale', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ age_days: archiveDays }) })
+                    const data = await res.json() as { ok: boolean; archived: number }
+                    if (data.ok) {
+                      await tasksQuery.refetch()
+                      toast(`Archived ${data.archived} stale task${data.archived !== 1 ? 's' : ''}`)
+                      setShowArchiveWizard(false)
+                    } else {
+                      toast('Archive failed', { type: 'error' })
+                    }
+                  } catch { toast('Archive failed', { type: 'error' }) }
+                  finally { setArchiving(false) }
+                }}
+                className="flex-1 text-xs rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-rose-400 hover:bg-rose-500/20 transition-colors disabled:opacity-40"
+              >{archiving ? 'Archiving…' : `Archive ${archivePreview.buckets[`days${archiveDays}` as 'days30' | 'days60' | 'days90']} tasks`}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unlock prereq modal */}
+      {unlockModalPrereq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setUnlockModalPrereq(null)} />
+          <div className="relative z-10 w-full max-w-md bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-xl shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--theme-border)]">
+              <span className="font-semibold text-sm text-[var(--theme-text)]">🔓 Unlock Gated Tasks</span>
+              <button type="button" onClick={() => setUnlockModalPrereq(null)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">×</button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-3">
+              <p className="text-xs text-[var(--theme-muted)]">
+                Marking this prerequisite as <strong className="text-amber-400">done</strong> will immediately unlock <strong className="text-[var(--theme-text)]">{unlockModalPrereq.count} waiting task{unlockModalPrereq.count !== 1 ? 's' : ''}</strong> and trigger a deploy sweep.
+              </p>
+              <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <p className="text-xs font-medium text-amber-400">{unlockModalPrereq.title.slice(0, 100)}</p>
+                <p className="text-[9px] text-amber-400/60 mt-0.5">{unlockModalPrereq.count} task{unlockModalPrereq.count !== 1 ? 's' : ''} waiting on this</p>
+              </div>
+              <div className="flex gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setUnlockModalPrereq(null)}
+                  className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
+                >Cancel</button>
+                <button
+                  type="button"
+                  disabled={unlockingPrereq === unlockModalPrereq.id}
+                  onClick={async () => {
+                    const { id, count } = unlockModalPrereq
+                    setUnlockingPrereq(id)
+                    try {
+                      const res = await fetch('/api/tasks-unlock-prereq', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prereq_id: id }) })
+                      const data = await res.json() as { ok: boolean; unblocked?: number; error?: string }
+                      if (data.ok) {
+                        await tasksQuery.refetch()
+                        toast(`Unlocked ${data.unblocked ?? count} task${(data.unblocked ?? count) !== 1 ? 's' : ''} — deploy sweep triggered`)
+                        setUnlockModalPrereq(null)
+                      } else {
+                        toast(data.error ?? 'Unlock failed', { type: 'error' })
+                      }
+                    } catch { toast('Unlock failed', { type: 'error' }) }
+                    finally { setUnlockingPrereq(null) }
+                  }}
+                  className="flex-1 text-xs rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                >{unlockingPrereq === unlockModalPrereq.id ? 'Unlocking…' : `Confirm — unlock ${unlockModalPrereq.count} tasks`}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

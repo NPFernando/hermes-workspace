@@ -55,24 +55,41 @@ function buildBoardMessage(): string {
 
   // Read sweep stats for pipeline health
   let executedToday = 0
+  let completedToday = 0
+  let blockedToday = 0
+  let needsInputToday = 0
   let lastSweepLine = ''
   try {
     const stats = JSON.parse(fs.readFileSync(path.join(HERMES_HOME, 'sweep-stats.json'), 'utf-8')) as {
       lastSweepAt?: string; executedToday?: number; executedDate?: string
+      completedToday?: number; blockedToday?: number; needsInputToday?: number; outcomeDate?: string
     }
     const todayDate = new Date().toISOString().slice(0, 10)
     if (stats.executedDate === todayDate) executedToday = stats.executedToday ?? 0
+    if (stats.outcomeDate === todayDate) {
+      completedToday  = stats.completedToday  ?? 0
+      blockedToday    = stats.blockedToday    ?? 0
+      needsInputToday = stats.needsInputToday ?? 0
+    }
     if (stats.lastSweepAt) {
       const agoMin = Math.round((Date.now() - new Date(stats.lastSweepAt).getTime()) / 60_000)
       lastSweepLine = agoMin < 120 ? `${agoMin}m ago` : `${Math.round(agoMin / 60)}h ago`
     }
   } catch { /* no stats yet */ }
 
+  const pipelineParts = [`Dispatched: ${executedToday}`]
+  if (completedToday > 0 || blockedToday > 0 || needsInputToday > 0) {
+    pipelineParts.push(`✅ ${completedToday} done`)
+    if (blockedToday > 0)    pipelineParts.push(`🚫 ${blockedToday} blocked`)
+    if (needsInputToday > 0) pipelineParts.push(`❓ ${needsInputToday} input`)
+  }
+  if (lastSweepLine) pipelineParts.push(`sweep ${lastSweepLine}`)
+
   const lines: Array<string> = [
     `📋 Board status — ${istStr}`,
     `Todo: ${cols['todo'] ?? 0} | Review: ${cols['review'] ?? 0} | Done today: ${doneToday}`,
     `▶️  Running: ${working} | ✅ Ready: ${reviewReady} | 🚫 Blocked: ${blocked}`,
-    `🔄 Executed today: ${executedToday}${lastSweepLine ? ` | Last sweep: ${lastSweepLine}` : ''}`,
+    `🔄 ${pipelineParts.join(' · ')}`,
   ]
   if (sisterLine)     lines.push(`👥 ${sisterLine}`)
   if (depWaiting > 0) lines.push(`⏳ Waiting on credentials: ${depWaiting}`)
