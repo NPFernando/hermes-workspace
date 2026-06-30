@@ -1,52 +1,55 @@
 {
-  "tests_passed": true,
-  "lint_errors": 0,
   "passed": true,
-  "commands": [
+  "tests_passed": true,
+  "lint_errors": 244,
+  "full_test": {
+    "command": "pnpm test",
+    "exit_code": 0,
+    "summary": "110 test files passed; 723 tests passed"
+  },
+  "full_lint": {
+    "command": "pnpm lint",
+    "exit_code": 1,
+    "errors": 244,
+    "warnings": 107,
+    "assessment": "Repository-wide baseline strict ESLint debt outside this focused change remains."
+  },
+  "focused_gates": [
     {
       "command": "npx tsc --noEmit",
       "exit_code": 0
     },
     {
-      "command": "npx vitest run src/screens/tasks/tasks-ux.test.ts --reporter=dot",
-      "exit_code": 0,
-      "summary": "1 file, 9 tests passed"
+      "command": "npx vitest run src/screens/tasks/tasks-ux.test.ts",
+      "exit_code": 0
     },
     {
-      "command": "pnpm test",
+      "command": "npx eslint --no-warn-ignored -f json --rule '@typescript-eslint/no-unnecessary-condition: off' src/screens/tasks/tasks-screen.tsx",
       "exit_code": 0,
-      "summary": "110 files, 723 tests passed"
+      "errors": 0,
+      "warnings": 2,
+      "note": "Known tasks-screen no-unnecessary-condition baseline disabled per workspace fallback guidance; remaining no-shadow warnings are non-blocking warnings."
     },
     {
-      "command": "focused eslint changed task/API files with @typescript-eslint/no-unnecessary-condition disabled",
-      "exit_code": 0,
-      "summary": "0 errors, 3 no-shadow/require-await warnings"
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "command": "pnpm -s lint:class-tokens",
+      "exit_code": 0
     },
     {
       "command": "pnpm build",
       "exit_code": 0
     }
   ],
-  "repo_wide_lint": {
-    "command": "pnpm lint",
-    "exit_code": 1,
-    "errors": 244,
-    "warnings": 107,
-    "note": "Repository baseline strict lint debt remains outside the focused passing gate."
+  "environment": {
+    "node": "v22.22.3",
+    "package_manager": "pnpm 11.6.0"
   },
   "notes": [
-    "Unrelated untracked finance-db.ts was moved out of src to /srv/projects/auto-improvement-reports/2026-06-30-task-ops-visibility/preexisting-worktree-backup/untracked-src/finance-db.ts so TypeScript does not compile an unplanned draft."
-  ],
-  "deployment": {
-    "service_restart": "initial restart reached healthy JSON but systemd later failed due stale node listener; stale pid 3161074 was killed, service reset, and service restarted",
-    "systemd_state": "active after recovery",
-    "health": {
-      "transient": "one 502 during warmup after recovery",
-      "final_status_code": 200,
-      "content_type": "application/json",
-      "body": {
-        "status": "ok"
-      }
-    }
-  }
+    "Fixed a TypeScript regression from MenuTrigger asChild by using the repository's render prop pattern.",
+    "Fixed a focused lint array-type error in the changed Tasks screen.",
+    "Unrelated dirty gitlink and untracked docs were intentionally left unstaged."
+  ]
 }

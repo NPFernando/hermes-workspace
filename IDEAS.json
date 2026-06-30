@@ -166,5 +166,29 @@
     "description": "Move experimental finance server drafts out of src until their dependencies and routes are ready, preventing unrelated untracked files from breaking TypeScript gates.",
     "category": "config",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Consolidate Tasks screen utility helpers",
+    "description": "Extract panel-state toggles, activity counters, and timeout-analysis shaping from tasks-screen.tsx into tested helpers to reduce the 3k-line component's render complexity.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add visual regression smoke for Tasks toolbar panels",
+    "description": "Capture desktop and mobile screenshots of Activity, Filter, More, Tags, Sister Load, and Rebalance panels so future compact-toolbar changes are validated beyond TypeScript and unit tests.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Reduce Tasks screen focused ESLint baseline debt",
+    "description": "Fix no-shadow and no-unnecessary-condition warnings in tasks-screen.tsx so focused lint can run strict without disabling baseline rules during UI improvement cycles.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Split destructive task confirmations into reusable dialogs",
+    "description": "Move clear-done, bulk-delete, prune-stale, and task-delete confirmation dialogs into a shared Tasks confirmation component with tests for button labels and disabled states.",
+    "category": "ui",
+    "estimated_effort": "medium"
   }
 ]

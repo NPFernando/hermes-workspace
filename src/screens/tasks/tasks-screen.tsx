@@ -401,16 +401,43 @@ export function TasksScreen() {
   // Subtask visibility
   const [hideSubtasks, setHideSubtasks] = useState(false)
 
-  // Needs-input inbox panel
-  const [showInbox, setShowInbox] = useState(false)
+  // Unified panel state — only one slide-over open at a time
+  const [activePanel, setActivePanel] = useState<'activity' | 'tags' | 'sisterLoad' | 'rebalance' | null>(null)
+  const showActivity = activePanel === 'activity'
+  const showTagsPanel = activePanel === 'tags'
+  const showSisterLoad = activePanel === 'sisterLoad'
+  const showRebalance = activePanel === 'rebalance'
+  const setShowActivity = (v: boolean | ((p: boolean) => boolean)) => setActivePanel(prev => { const cur = prev === 'activity'; const next = typeof v === 'function' ? v(cur) : v; if (next) return 'activity'; if (cur) return null; return prev })
+  const setShowTagsPanel = (v: boolean | ((p: boolean) => boolean)) => setActivePanel(prev => { const cur = prev === 'tags'; const next = typeof v === 'function' ? v(cur) : v; if (next) return 'tags'; if (cur) return null; return prev })
+  const setShowSisterLoad = (v: boolean | ((p: boolean) => boolean)) => setActivePanel(prev => { const cur = prev === 'sisterLoad'; const next = typeof v === 'function' ? v(cur) : v; if (next) return 'sisterLoad'; if (cur) return null; return prev })
+  const setShowRebalance = (v: boolean | ((p: boolean) => boolean)) => setActivePanel(prev => { const cur = prev === 'rebalance'; const next = typeof v === 'function' ? v(cur) : v; if (next) return 'rebalance'; if (cur) return null; return prev })
+  // Activity panel
+  const [activityTab, setActivityTab] = useState<'inbox' | 'feed'>('inbox')
+  const [showFilterPopover, setShowFilterPopover] = useState(false)
   const [inboxReplies, setInboxReplies] = useState<Record<string, string>>({})
   const [inboxSending, setInboxSending] = useState<string | null>(null)
 
-  // Today's wins strip
-  const [showWins, setShowWins] = useState(true)
+  // Today's wins popover
+  const [showWins, setShowWins] = useState(false)
 
-  // Tags browser panel
-  const [showTagsPanel, setShowTagsPanel] = useState(false)
+  // Confirm dialogs (replaces all window.confirm calls)
+  const [confirmClearDone, setConfirmClearDone] = useState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [confirmPruneStale, setConfirmPruneStale] = useState(false)
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+
+  // Search syntax help popover
+  const [showSearchHelp, setShowSearchHelp] = useState(false)
+
+  // Inline goal input (replaces window.prompt)
+  const [goalInputOpen, setGoalInputOpen] = useState(false)
+  const [goalInputVal, setGoalInputVal] = useState('')
+
+  // Inline preset name input (replaces window.prompt)
+  const [presetNameOpen, setPresetNameOpen] = useState(false)
+  const [presetNameVal, setPresetNameVal] = useState('')
+
+  // Tags browser panel helpers
   const [tagsPanelBulkTag, setTagsPanelBulkTag] = useState('')
   const [taggingSelected, setTaggingSelected] = useState(false)
 
@@ -425,13 +452,11 @@ export function TasksScreen() {
     })
   }, [])
 
-  // Sister load panel + rebalance
-  const [showSisterLoad, setShowSisterLoad] = useState(false)
+  // Sister load + rebalance params
   const [rebalanceFrom, setRebalanceFrom] = useState<string>('')
   const [rebalanceTo, setRebalanceTo] = useState<string>('')
   const [rebalanceCount, setRebalanceCount] = useState(20)
   const [rebalancing, setRebalancing] = useState(false)
-  const [showRebalance, setShowRebalance] = useState(false)
 
   // Daily completion goal
   const [dailyGoal, setDailyGoal] = useState<number | null>(() => {
@@ -470,7 +495,6 @@ export function TasksScreen() {
   const [archivePreview, setArchivePreview] = useState<{ buckets: { days30: number; days60: number; days90: number }; previews: Array<{ id: string; title: string; assignee: string | null; ageDays: number }> } | null>(null)
 
   // Notification feed
-  const [showNotifFeed, setShowNotifFeed] = useState(false)
   const [notifLastSeen, setNotifLastSeen] = useState<string>(() => localStorage.getItem('hermes-notif-seen') ?? new Date(0).toISOString())
   const markNotifSeen = useCallback(() => {
     const now = new Date().toISOString()
@@ -1010,6 +1034,35 @@ export function TasksScreen() {
   const trend = trendQuery.data
 
   const visibleColumns = COLUMN_ORDER.filter(c => !hiddenColumns.has(c))
+  const activityCount = stats.inboxTasks.length + unreadNotifCount
+  const activeFilterCount = [filterOverdue, filterBlocked, filterTimedOut, filterActiveAgent, filterInReview, hideSubtasks, !!priorityFilter, !!assigneeFilter, !!ageFilter, !!tagFilter].filter(Boolean).length
+
+  // Pre-compute live panel task (avoids tasks.find inside JSX IIFE every render)
+  const panelLive = panelTask ? (tasks.find(t => t.id === panelTask.id) ?? panelTask) : null
+
+  // Pre-compute timeout analysis data (only when modal is open)
+  const timeoutAnalysisData = useMemo(() => {
+    if (!showTimeoutAnalysis) return null
+    const today = new Date().toISOString().slice(0, 10)
+    const timedOutEntries: Array<{ task: ClaudeTask; note: string; at: string }> = []
+    tasks.forEach(t => {
+      ;(t.agent_history ?? []).forEach((h: { action: string; at?: string; note?: string }) => {
+        if (h.action === 'timed_out' && (h.at ?? '').startsWith(today)) {
+          timedOutEntries.push({ task: t, note: h.note ?? '', at: h.at ?? '' })
+        }
+      })
+    })
+    const byAssignee: Record<string, number> = {}
+    timedOutEntries.forEach(e => { const a = e.task.assignee ?? 'unassigned'; byAssignee[a] = (byAssignee[a] ?? 0) + 1 })
+    const byTag: Record<string, number> = {}
+    timedOutEntries.forEach(e => { const tag = e.task.tags?.[0] ?? 'untagged'; byTag[tag] = (byTag[tag] ?? 0) + 1 })
+    return {
+      timedOutEntries,
+      topAssignees: Object.entries(byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 8),
+      topTags: Object.entries(byTag).sort((a, b) => b[1] - a[1]).slice(0, 6),
+      sample: timedOutEntries.slice(0, 8),
+    }
+  }, [tasks, showTimeoutAnalysis])
 
   return (
     <div data-route-page className="h-full overflow-hidden flex flex-col bg-surface text-ink">
@@ -1034,254 +1087,171 @@ export function TasksScreen() {
               </div>
             )}
           </div>
-          {/* Stats row */}
-          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
+          {/* Stats — single compact row */}
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[var(--theme-muted)]">
             <span>{stats.total} tasks</span>
-            <span>·</span>
-            <span>{stats.running} running</span>
+            {stats.running > 0 && <><span className="opacity-30">·</span><span>{stats.running} running</span></>}
             {stats.blocked > 0 && (
-              <>
-                <span>·</span>
-                <span
-                  className="text-red-400 cursor-pointer hover:opacity-80"
-                  title={formatBlockedTaskBreakdownTitle(stats.blockedWaiting, stats.blockedExecFail)}
-                  onClick={() => setFilterBlocked(v => !v)}
-                >
-                  {stats.blocked} blocked
-                  {formatBlockedTaskBreakdownLabel(stats.blockedWaiting, stats.blockedExecFail) && (
-                    <span className="ml-1 opacity-60">
-                      ({formatBlockedTaskBreakdownLabel(stats.blockedWaiting, stats.blockedExecFail)})
-                    </span>
-                  )}
-                </span>
-              </>
+              <><span className="opacity-30">·</span>
+              <span className="text-red-400 cursor-pointer hover:opacity-80" onClick={() => setFilterBlocked(v => !v)} title={formatBlockedTaskBreakdownTitle(stats.blockedWaiting, stats.blockedExecFail)}>
+                {stats.blocked} blocked{formatBlockedTaskBreakdownLabel(stats.blockedWaiting, stats.blockedExecFail) ? ` (${formatBlockedTaskBreakdownLabel(stats.blockedWaiting, stats.blockedExecFail)})` : ''}
+              </span></>
             )}
             {stats.timedOut > 0 && (
-              <>
-                <span>·</span>
-                <button
-                  type="button"
-                  onClick={() => setShowTimeoutAnalysis(true)}
-                  className="text-amber-500 hover:text-amber-300 transition-colors"
-                  title="View timeout failure analysis"
-                >
-                  ⏱ {stats.timedOut} timed out
-                </button>
-              </>
+              <><span className="opacity-30">·</span>
+              <button type="button" onClick={() => setShowTimeoutAnalysis(true)} className="text-amber-500 hover:text-amber-300 transition-colors">⏱ {stats.timedOut}</button></>
             )}
-            {stats.overdue > 0 && (
-              <>
-                <span>·</span>
-                <span className="text-red-400">{stats.overdue} overdue</span>
-              </>
-            )}
-            <span>·</span>
+            {stats.overdue > 0 && <><span className="opacity-30">·</span><span className="text-red-400">{stats.overdue} overdue</span></>}
+            <span className="opacity-30">·</span>
             <span>{stats.completion}% done</span>
-            {/* Daily goal */}
+            {/* Daily goal ring */}
             {(() => {
               const doneToday = trend?.trend?.find(d => d.date === new Date().toISOString().slice(0, 10))?.count ?? sweepStats?.completed ?? 0
+              if (goalInputOpen) return (
+                <span className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={0}
+                    autoFocus
+                    value={goalInputVal}
+                    onChange={e => setGoalInputVal(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const n = parseInt(goalInputVal, 10)
+                        if (!isNaN(n)) setAndPersistGoal(n <= 0 ? null : n)
+                        setGoalInputOpen(false)
+                      } else if (e.key === 'Escape') {
+                        setGoalInputOpen(false)
+                      }
+                    }}
+                    onBlur={() => setGoalInputOpen(false)}
+                    className="w-12 rounded border border-[var(--theme-accent)]/50 bg-[var(--theme-card)] text-[10px] px-1 py-0.5 text-center focus:outline-none focus:border-[var(--theme-accent)]"
+                    placeholder="0=clear"
+                  />
+                </span>
+              )
               if (dailyGoal == null) return (
-                <button
-                  type="button"
-                  onClick={() => { const n = parseInt(window.prompt('Set daily completion goal:') ?? '', 10); if (!isNaN(n) && n > 0) setAndPersistGoal(n) }}
-                  className="text-[var(--theme-muted)] hover:text-[var(--theme-accent)] transition-colors text-[10px] opacity-50 hover:opacity-100"
-                  title="Set daily goal"
-                >+ goal</button>
+                <button type="button" onClick={() => { setGoalInputVal(''); setGoalInputOpen(true) }} className="text-[10px] opacity-40 hover:opacity-80 hover:text-[var(--theme-accent)] transition-colors">+ goal</button>
               )
               const pct = Math.min(1, doneToday / dailyGoal)
-              const r = 8, circ = 2 * Math.PI * r
+              const r = 7, circ = 2 * Math.PI * r
               const color = pct >= 1 ? '#34d399' : pct >= 0.5 ? '#f59e0b' : 'var(--theme-accent)'
               return (
-                <button
-                  type="button"
-                  onClick={() => { const n = parseInt(window.prompt('Update daily goal (0 to clear):') ?? '', 10); if (!isNaN(n)) setAndPersistGoal(n <= 0 ? null : n) }}
-                  className="flex items-center gap-1 group"
-                  title={`${doneToday}/${dailyGoal} tasks completed today — click to edit goal`}
-                >
-                  <svg width="20" height="20" className="shrink-0">
-                    <circle cx="10" cy="10" r={r} fill="none" stroke="var(--theme-border)" strokeWidth="2.5" />
-                    <circle cx="10" cy="10" r={r} fill="none" stroke={color} strokeWidth="2.5"
-                      strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)}
-                      strokeLinecap="round" transform="rotate(-90 10 10)" />
-                  </svg>
+                <button type="button" onClick={() => { setGoalInputVal(String(dailyGoal)); setGoalInputOpen(true) }} className="flex items-center gap-1" title={`${doneToday}/${dailyGoal} today — click to update`}>
+                  <svg width="16" height="16"><circle cx="8" cy="8" r={r} fill="none" stroke="var(--theme-border)" strokeWidth="2"/><circle cx="8" cy="8" r={r} fill="none" stroke={color} strokeWidth="2" strokeDasharray={circ} strokeDashoffset={circ*(1-pct)} strokeLinecap="round" transform="rotate(-90 8 8)"/></svg>
                   <span className="text-[10px]" style={{ color }}>{doneToday}/{dailyGoal}</span>
                 </button>
               )
             })()}
             {stats.agentActive > 0 && (
-              <>
-                <span>·</span>
-                <span className="flex items-center gap-1 text-violet-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse inline-block" />
-                  Astra reviewing {stats.agentActive}
-                </span>
-              </>
+              <><span className="opacity-30">·</span><span className="flex items-center gap-1 text-violet-400"><span className="w-1 h-1 rounded-full bg-violet-400 animate-pulse inline-block"/>Astra {stats.agentActive}</span></>
             )}
-          </div>
-          {/* Pipeline throughput strip */}
-          {sweepStats && sweepStats.dispatched > 0 && (
-            <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--theme-muted)]">
-              <span className="opacity-60">Today:</span>
-              <span>🔄 {sweepStats.dispatched} dispatched</span>
-              {sweepStats.completed > 0 && <span className="text-emerald-400">✅ {sweepStats.completed} done</span>}
-              {sweepStats.blocked > 0 && <span className="text-red-400">🚫 {sweepStats.blocked} blocked</span>}
-              {sweepStats.needsInput > 0 && <span className="text-amber-400">❓ {sweepStats.needsInput} input</span>}
-              {(sweepStats.timedOutToday ?? 0) > 0 && <span className="text-orange-400">⏱ {sweepStats.timedOutToday} timeout</span>}
-              {sweepStats.successRate !== null && (
-                <span className={cn(
-                  'font-medium',
-                  sweepStats.successRate >= 50 ? 'text-emerald-400' : sweepStats.successRate >= 25 ? 'text-amber-400' : 'text-red-400',
-                )}>
-                  {sweepStats.successRate}% success
-                </span>
-              )}
-              {sweepStats.lastSweepAt && (
-                <span className="opacity-50">
-                  · sweep {Math.round((Date.now() - new Date(sweepStats.lastSweepAt).getTime()) / 60_000)}m ago
-                </span>
-              )}
-              {/* 7-day sparkline */}
+            {/* Pipeline inline */}
+            {sweepStats && sweepStats.dispatched > 0 && (
+              <><span className="opacity-20 mx-0.5">|</span>
+              <span className="opacity-60">🔄 {sweepStats.dispatched}</span>
+              {sweepStats.completed > 0 && <span className="text-emerald-400">✅ {sweepStats.completed}</span>}
+              {sweepStats.successRate !== null && <span className={sweepStats.successRate >= 50 ? 'text-emerald-400' : sweepStats.successRate >= 25 ? 'text-amber-400' : 'text-red-400'}>{sweepStats.successRate}%</span>}
+              {sweepStats.lastSweepAt && <span className="opacity-40 text-[10px]">sweep {Math.round((Date.now()-new Date(sweepStats.lastSweepAt).getTime())/60_000)}m ago</span>}
               {trend && trend.trend.length > 0 && (() => {
                 const max = Math.max(...trend.trend.map(d => d.count), 1)
-                const W = 56, H = 16, barW = 6, gap = 2
+                const W = 42, H = 14, barW = 4, gap = 2
                 return (
-                  <span className="ml-1 flex items-center gap-0.5 opacity-60" title={`7-day completions: ${trend.total} total`}>
-                    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
-                      {trend.trend.map((d, i) => {
-                        const barH = Math.max(2, Math.round((d.count / max) * H))
-                        const x = i * (barW + gap)
-                        return (
-                          <rect
-                            key={d.date}
-                            x={x} y={H - barH} width={barW} height={barH}
-                            rx={1}
-                            fill={d.count === 0 ? 'currentColor' : 'var(--theme-accent)'}
-                            opacity={d.count === 0 ? 0.2 : 0.7}
-                          />
-                        )
-                      })}
+                  <span className="flex items-center gap-0.5 opacity-50" title={`7d: ${trend.total} completed`}>
+                    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+                      {trend.trend.map((d, i) => { const h = Math.max(1, Math.round((d.count/max)*H)); return <rect key={d.date} x={i*(barW+gap)} y={H-h} width={barW} height={h} rx={1} fill={d.count===0?'currentColor':'var(--theme-accent)'} opacity={d.count===0?0.2:0.7}/> })}
                     </svg>
                     <span className="text-[9px]">{trend.total}w</span>
                   </span>
                 )
               })()}
-            </div>
-          )}
-          {/* Today's wins strip */}
-          {stats.todayWins.length > 0 && (
-            <div className="mt-0.5 flex items-center gap-1.5 text-[10px]">
-              <button
-                type="button"
-                onClick={() => setShowWins(v => !v)}
-                className="text-emerald-400 font-medium hover:text-emerald-300 transition-colors shrink-0"
-              >🏆 {stats.todayWins.length} today {showWins ? '▲' : '▼'}</button>
-              {showWins && (
-                <div className="flex gap-1.5 overflow-x-auto scrollbar-none flex-nowrap">
-                  {stats.todayWins.slice(0, 12).map(({ task, completedAt }) => {
-                    const ageMs = Date.now() - new Date(completedAt).getTime()
-                    const ago = ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m` : `${Math.round(ageMs / 3600_000)}h`
-                    return (
-                      <button
-                        key={task.id + completedAt}
-                        type="button"
-                        onClick={() => setPanelTask(task)}
-                        className="shrink-0 max-w-[180px] truncate px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-                        title={task.title}
-                      >
-                        {task.title.slice(0, 35)} <span className="opacity-50">{ago}</span>
-                      </button>
-                    )
-                  })}
-                  {stats.todayWins.length > 12 && (
-                    <span className="shrink-0 text-[var(--theme-muted)] opacity-50 self-center">+{stats.todayWins.length - 12} more</span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+              </>
+            )}
+            {/* Wins popover */}
+            {stats.todayWins.length > 0 && (
+              <><span className="opacity-20 mx-0.5">|</span>
+              <div className="relative">
+                <button type="button" onClick={() => setShowWins(v => !v)} className="text-emerald-400 hover:text-emerald-300 transition-colors">🏆 {stats.todayWins.length}{showWins ? ' ▲' : ''}</button>
+                {showWins && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowWins(false)}/>
+                    <div className="absolute left-0 top-full mt-1 z-40 w-72 bg-[var(--theme-card)] border border-emerald-500/20 rounded-xl shadow-2xl p-2 flex flex-col gap-0.5 max-h-64 overflow-y-auto scrollbar-thin">
+                      <p className="text-[9px] font-semibold text-emerald-400/60 uppercase tracking-wider px-2 pb-1">Today's wins</p>
+                      {stats.todayWins.slice(0, 12).map(({ task, completedAt }) => {
+                        const ms = Date.now()-new Date(completedAt).getTime()
+                        const ago = ms<3600_000?`${Math.round(ms/60_000)}m`:`${Math.round(ms/3600_000)}h`
+                        return (
+                          <button key={task.id+completedAt} type="button" onClick={() => { setPanelTask(task); setShowWins(false) }} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-emerald-500/10 transition-colors text-left w-full">
+                            <span className="text-[11px] text-emerald-300 truncate">{task.title}</span>
+                            <span className="text-[9px] text-emerald-500/60 shrink-0">{ago}</span>
+                          </button>
+                        )
+                      })}
+                      {stats.todayWins.length > 12 && <p className="text-[9px] text-center text-emerald-500/40 pb-1">+{stats.todayWins.length-12} more</p>}
+                    </div>
+                  </>
+                )}
+              </div>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-          {/* Inbox button */}
-          {stats.inboxTasks.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowInbox(v => !v)}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-                showInbox
-                  ? 'border-amber-500/50 bg-amber-500/10 text-amber-400'
-                  : 'border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50',
-              )}
-              title="Tasks waiting for your input"
-            >
-              📥 {stats.inboxTasks.length}
-            </button>
-          )}
-          {/* Tags browser button */}
+          {/* ⚑ Activity — inbox + notifications merged */}
           <button
             type="button"
-            onClick={() => setShowTagsPanel(v => !v)}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-              showTagsPanel
-                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]'
-                : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
-            )}
-            title="Browse and filter by tag"
-          ># Tags</button>
-          {/* Notification feed bell */}
-          <button
-            type="button"
-            onClick={() => { setShowNotifFeed(v => !v); if (!showNotifFeed) markNotifSeen() }}
-            className={cn(
-              'relative flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-              showNotifFeed
-                ? 'border-violet-500/50 bg-violet-500/10 text-violet-400'
-                : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
-            )}
-            title="Recent agent activity feed"
-          >
-            🔔
-            {unreadNotifCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-violet-500 text-[8px] font-bold text-white">{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
-            )}
-          </button>
-          {/* Dense mode toggle */}
-          <button
-            type="button"
-            onClick={toggleDenseMode}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-              denseMode
-                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]'
-                : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
-            )}
-            title="Toggle compact card view"
-          >{denseMode ? '⬜ Compact' : '⬛ Dense'}</button>
-          {/* View mode toggle */}
-          <button
-            type="button"
-            onClick={() => setViewMode(v => v === 'board' ? 'swimlane' : 'board')}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-              viewMode === 'swimlane'
-                ? 'border-sky-500/50 bg-sky-500/10 text-sky-400'
-                : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
-            )}
-            title="Toggle swimlane view by assignee"
-          >{viewMode === 'swimlane' ? '⊟ Swimlane' : '⊞ Swimlane'}</button>
-          {/* Stale task archive */}
-          <button
-            type="button"
-            onClick={async () => {
-              const res = await fetch('/api/tasks-stale')
-              const data = await res.json() as { ok: boolean; buckets: { days30: number; days60: number; days90: number }; previews: Array<{ id: string; title: string; assignee: string | null; ageDays: number }> }
-              if (data.ok) { setArchivePreview(data); setShowArchiveWizard(true) }
+            onClick={() => {
+              if (!showActivity) { markNotifSeen(); setActivityTab(stats.inboxTasks.length > 0 ? 'inbox' : 'feed') }
+              setShowActivity(v => !v)
             }}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
-            title="Archive stale tasks that have had no activity for 30+ days"
-          >🗂️ Archive</button>
+            className={cn(
+              'relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+              showActivity ? 'border-amber-500/50 bg-amber-500/10 text-amber-400' : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+            )}
+            title="Inbox + recent agent activity"
+          >
+            ⚑ Activity
+            {activityCount > 0 && <span className={cn('text-[9px] px-1 rounded-full font-bold', showActivity ? 'bg-amber-500/20 text-amber-400' : 'bg-[var(--theme-accent)]/20 text-[var(--theme-accent)]')}>{activityCount}</span>}
+          </button>
+
+          {/* 🎛️ View dropdown */}
+          <MenuRoot>
+            <MenuTrigger render={
+              <button
+                type="button"
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                  (denseMode || viewMode === 'swimlane' || hideSubtasks || groupByParent)
+                    ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]'
+                    : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+                )}
+                title="View settings"
+              >
+                🎛️ View{(denseMode || viewMode === 'swimlane' || hideSubtasks || groupByParent) ? ' ●' : ''}
+              </button>
+            }/>
+            <MenuContent side="bottom" align="end">
+              <MenuItem onClick={toggleDenseMode}>
+                {denseMode ? '✓ ' : ''}Dense cards
+              </MenuItem>
+              <MenuItem onClick={() => setViewMode(v => v === 'board' ? 'swimlane' : 'board')}>
+                {viewMode === 'swimlane' ? '✓ ' : ''}Swimlane by assignee
+              </MenuItem>
+              <MenuItem onClick={() => setHideSubtasks(v => !v)}>
+                {hideSubtasks ? '✓ ' : ''}Hide subtasks
+              </MenuItem>
+              <MenuItem onClick={() => setGroupByParent(v => !v)}>
+                {groupByParent ? '✓ ' : ''}Group by parent (todo)
+              </MenuItem>
+              <MenuItem onClick={() => setShowTagsPanel(v => !v)}>
+                {showTagsPanel ? '✓ ' : ''}Tags browser
+              </MenuItem>
+              <MenuItem onClick={() => setShowSisterLoad(v => !v)}>
+                {showSisterLoad ? '✓ ' : ''}Sister load
+              </MenuItem>
+            </MenuContent>
+          </MenuRoot>
           {/* Ask Astra */}
           <button
             onClick={async () => {
@@ -1363,147 +1333,124 @@ export function TasksScreen() {
             {astraReviewing ? 'Deploying…' : 'Deploy Agents'}
           </button>
 
-          {/* Execute Ready — batch-fire all review tasks with real plans */}
-          {stats.readyToExecute > 0 && (
-            <button
-              onClick={async () => {
-                setBatchExecuting(true)
-                try {
-                  const res = await batchExecuteTasks(5)
-                  await tasksQuery.refetch()
-                  if (res.remaining > 0) {
-                    toast(`Started ${res.started} tasks · ${res.remaining} more in review`)
-                  } else {
-                    toast(`Started ${res.started} task${res.started !== 1 ? 's' : ''}`)
-                  }
-                } catch {
-                  toast('Batch execute failed', { type: 'error' })
-                } finally {
-                  setBatchExecuting(false)
-                }
-              }}
-              disabled={batchExecuting}
-              title={`Execute next 5 of ${stats.readyToExecute} review tasks with real plans`}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-                batchExecuting
-                  ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400 cursor-wait'
-                  : 'border-[var(--theme-border)] text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50',
-              )}
-            >
-              <HugeiconsIcon icon={AiMagicIcon} size={13} strokeWidth={1.8} className={batchExecuting ? 'animate-pulse' : ''} />
-              {batchExecuting ? 'Starting…' : `Execute Ready (${stats.readyToExecute})`}
-            </button>
-          )}
-
-          {/* Drain Now — immediately queue all eligible review tasks, bypassing the 45-min delay */}
-          {stats.readyToExecute > 0 && (
-            <button
-              onClick={async () => {
-                setDrainingNow(true)
-                try {
-                  const res = await fetch('/api/tasks-drain-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 50 }) })
-                  const data = await res.json() as { ok: boolean; queued: number }
-                  await tasksQuery.refetch()
-                  toast(data.queued > 0 ? `Drained ${data.queued} task${data.queued !== 1 ? 's' : ''} to execution` : 'No eligible tasks (all running or below concurrency cap)')
-                } catch {
-                  toast('Drain failed', { type: 'error' })
-                } finally {
-                  setDrainingNow(false)
-                }
-              }}
-              disabled={drainingNow}
-              title={`Immediately queue all ${stats.readyToExecute} ready review tasks, bypassing the 45-min wait`}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-                drainingNow
-                  ? 'border-orange-500/50 bg-orange-500/10 text-orange-400 cursor-wait'
-                  : 'border-[var(--theme-border)] text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/50',
-              )}
-            >
-              <HugeiconsIcon icon={AiMagicIcon} size={13} strokeWidth={1.8} className={drainingNow ? 'animate-spin' : ''} />
-              {drainingNow ? 'Draining…' : `Drain Now (${stats.readyToExecute})`}
-            </button>
-          )}
-
-          {/* Re-plan stubs — review tasks with too-short plans that auto-execute skips */}
-          {stats.stubReviewCount > 0 && (
-            <button
-              onClick={async () => {
-                setReplanningStubs(true)
-                try {
-                  const res = await fetch('/api/tasks-replan-stubs', { method: 'POST' })
-                  const data = await res.json() as { ok: boolean; moved: number }
-                  await tasksQuery.refetch()
-                  toast(`Moved ${data.moved} stub task${data.moved !== 1 ? 's' : ''} back to todo for re-planning`)
-                } catch {
-                  toast('Re-plan failed', { type: 'error' })
-                } finally {
-                  setReplanningStubs(false)
-                }
-              }}
-              disabled={replanningStubs}
-              title={`Move ${stats.stubReviewCount} review tasks with stub plans back to todo for re-planning`}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-                replanningStubs
-                  ? 'border-sky-500/50 bg-sky-500/10 text-sky-400 cursor-wait'
-                  : 'border-[var(--theme-border)] text-sky-400 hover:bg-sky-500/10 hover:border-sky-500/50',
-              )}
-            >
-              <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.8} className={replanningStubs ? 'animate-spin' : ''} />
-              {replanningStubs ? 'Re-planning…' : `Re-plan Stubs (${stats.stubReviewCount})`}
-            </button>
-          )}
-
-          {/* Rescue timed-out — clear stuck agent states + unblock timed-out blocked tasks */}
-          {stats.timedOut > 0 && (
-            <button
-              onClick={async () => {
-                setRescuingTimedOut(true)
-                try {
-                  const res = await fetch('/api/tasks-rescue-timedout', { method: 'POST' })
-                  const data = await res.json() as { ok: boolean; rescued: number }
-                  await tasksQuery.refetch()
-                  toast(data.rescued > 0 ? `Rescued ${data.rescued} stuck task${data.rescued !== 1 ? 's' : ''}` : 'No stuck tasks found — all already in valid states')
-                } catch {
-                  toast('Rescue failed', { type: 'error' })
-                } finally {
-                  setRescuingTimedOut(false)
-                }
-              }}
-              disabled={rescuingTimedOut}
-              title="Clear stuck agent states and move blocked timed-out tasks back to todo"
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-                rescuingTimedOut
-                  ? 'border-amber-500/50 bg-amber-500/10 text-amber-400 cursor-wait'
-                  : 'border-[var(--theme-border)] text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50',
-              )}
-            >
-              <HugeiconsIcon icon={Loading03Icon} size={13} strokeWidth={1.8} className={rescuingTimedOut ? 'animate-spin' : ''} />
-              {rescuingTimedOut ? 'Rescuing…' : `Rescue (${stats.timedOut})`}
-            </button>
-          )}
-
-          {/* Unlock prereq — shown when tasks are gated on a credential prerequisite */}
-          {stats.gatedPrereqs.map(({ id, count, title }) => (
-            <button
-              key={id}
-              onClick={() => setUnlockModalPrereq({ id, count, title })}
-              disabled={unlockingPrereq === id}
-              title={`Mark "${title}" as done to unlock ${count} waiting task${count !== 1 ? 's' : ''}`}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
-                unlockingPrereq === id
-                  ? 'border-amber-500/50 bg-amber-500/10 text-amber-400 cursor-wait'
-                  : 'border-[var(--theme-border)] text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50',
-              )}
-            >
-              <HugeiconsIcon icon={CheckListIcon} size={13} strokeWidth={1.8} className={unlockingPrereq === id ? 'animate-pulse' : ''} />
-              {unlockingPrereq === id ? 'Unlocking…' : `🔓 Unlock ${count}`}
-            </button>
-          ))}
+          {/* ⚡ Actions dropdown — all conditional ops */}
+          {(() => {
+            const totalActions = stats.readyToExecute + stats.stubReviewCount + stats.timedOut + stats.gatedPrereqs.reduce((s, g) => s + g.count, 0)
+            const anyBusy = batchExecuting || drainingNow || replanningStubs || rescuingTimedOut || unlockingPrereq != null
+            return (
+              <MenuRoot>
+                <MenuTrigger render={
+                  <button
+                    type="button"
+                    disabled={anyBusy}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                      totalActions > 0
+                        ? 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
+                        : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+                      anyBusy && 'cursor-wait opacity-70',
+                    )}
+                    title="Board actions"
+                  >
+                    <HugeiconsIcon icon={AiMagicIcon} size={13} strokeWidth={1.8} className={anyBusy ? 'animate-pulse' : ''}/>
+                    {anyBusy ? 'Working…' : 'Actions'}
+                    {totalActions > 0 && <span className="text-[9px] px-1 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">{totalActions}</span>}
+                  </button>
+                }/>
+                <MenuContent side="bottom" align="end">
+                  {stats.readyToExecute > 0 && (
+                    <MenuItem
+                      onClick={async () => {
+                        setBatchExecuting(true)
+                        try {
+                          const res = await batchExecuteTasks(5)
+                          await tasksQuery.refetch()
+                          toast(res.remaining > 0 ? `Started ${res.started} · ${res.remaining} more ready` : `Started ${res.started} task${res.started !== 1 ? 's' : ''}`)
+                        } catch { toast('Execute failed', { type: 'error' }) }
+                        finally { setBatchExecuting(false) }
+                      }}
+                      disabled={batchExecuting}
+                      className="text-emerald-400"
+                    >
+                      <HugeiconsIcon icon={AiMagicIcon} size={13}/>
+                      Execute ready ({stats.readyToExecute})
+                    </MenuItem>
+                  )}
+                  {stats.readyToExecute > 0 && (
+                    <MenuItem
+                      onClick={async () => {
+                        setDrainingNow(true)
+                        try {
+                          const res = await fetch('/api/tasks-drain-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 50 }) })
+                          const data = await res.json() as { ok: boolean; queued: number }
+                          await tasksQuery.refetch()
+                          toast(data.queued > 0 ? `Drained ${data.queued} to execution` : 'No eligible tasks right now')
+                        } catch { toast('Drain failed', { type: 'error' }) }
+                        finally { setDrainingNow(false) }
+                      }}
+                      disabled={drainingNow}
+                      className="text-orange-400"
+                    >
+                      <HugeiconsIcon icon={AiMagicIcon} size={13}/>
+                      Drain all now ({stats.readyToExecute})
+                    </MenuItem>
+                  )}
+                  {stats.stubReviewCount > 0 && (
+                    <MenuItem
+                      onClick={async () => {
+                        setReplanningStubs(true)
+                        try {
+                          const res = await fetch('/api/tasks-replan-stubs', { method: 'POST' })
+                          const data = await res.json() as { ok: boolean; moved: number }
+                          await tasksQuery.refetch()
+                          toast(`Moved ${data.moved} stubs back to todo`)
+                        } catch { toast('Re-plan failed', { type: 'error' }) }
+                        finally { setReplanningStubs(false) }
+                      }}
+                      disabled={replanningStubs}
+                      className="text-sky-400"
+                    >
+                      <HugeiconsIcon icon={RefreshIcon} size={13}/>
+                      Re-plan stubs ({stats.stubReviewCount})
+                    </MenuItem>
+                  )}
+                  {stats.timedOut > 0 && (
+                    <MenuItem
+                      onClick={async () => {
+                        setRescuingTimedOut(true)
+                        try {
+                          const res = await fetch('/api/tasks-rescue-timedout', { method: 'POST' })
+                          const data = await res.json() as { ok: boolean; rescued: number }
+                          await tasksQuery.refetch()
+                          toast(data.rescued > 0 ? `Rescued ${data.rescued} stuck tasks` : 'No stuck tasks')
+                        } catch { toast('Rescue failed', { type: 'error' }) }
+                        finally { setRescuingTimedOut(false) }
+                      }}
+                      disabled={rescuingTimedOut}
+                      className="text-amber-400"
+                    >
+                      <HugeiconsIcon icon={Loading03Icon} size={13}/>
+                      Rescue timed-out ({stats.timedOut})
+                    </MenuItem>
+                  )}
+                  {stats.gatedPrereqs.map(({ id, count, title }) => (
+                    <MenuItem
+                      key={id}
+                      onClick={() => setUnlockModalPrereq({ id, count, title })}
+                      disabled={unlockingPrereq === id}
+                      className="text-amber-400"
+                    >
+                      <HugeiconsIcon icon={CheckListIcon} size={13}/>
+                      🔓 Unlock {count} gated tasks
+                    </MenuItem>
+                  ))}
+                  {totalActions === 0 && (
+                    <MenuItem disabled className="text-[var(--theme-muted)] opacity-50 cursor-default">No pending actions</MenuItem>
+                  )}
+                </MenuContent>
+              </MenuRoot>
+            )
+          })()}
 
           {/* Secondary actions — overflow menu */}
           <MenuRoot>
@@ -1598,26 +1545,7 @@ export function TasksScreen() {
               {/* Prune Stale */}
               {tasks.some(t => (t.column === 'backlog' || t.column === 'todo') && !(t.agent_history?.length)) && (
                 <MenuItem
-                  onClick={async () => {
-                    if (!window.confirm('Delete todo/backlog tasks with no agent history older than 2 hours? Duplicates and stale AI-generated tasks will be removed.')) return
-                    setPruningStale(true)
-                    try {
-                      const res = await fetch('/api/tasks-prune', { method: 'POST' })
-                      const data = await res.json() as { ok: boolean; pruned: number; error?: string }
-                      if (data.pruned > 0) {
-                        await tasksQuery.refetch()
-                        toast(`Pruned ${data.pruned} stale task${data.pruned !== 1 ? 's' : ''}`)
-                      } else if (data.error) {
-                        toast(`Prune failed: ${data.error}`, { type: 'error' })
-                      } else {
-                        toast('No stale tasks to prune', { type: 'info' })
-                      }
-                    } catch {
-                      toast('Failed to reach prune endpoint', { type: 'error' })
-                    } finally {
-                      setPruningStale(false)
-                    }
-                  }}
+                  onClick={() => setConfirmPruneStale(true)}
                   disabled={pruningStale}
                   className="text-red-400"
                 >
@@ -1626,23 +1554,21 @@ export function TasksScreen() {
                 </MenuItem>
               )}
 
-              {/* Clear Done */}
-              {columnMap['done'].length > 0 && (
-                <MenuItem
-                  onClick={() => {
-                    const doneTasks = columnMap['done']
-                    if (!window.confirm(`Delete all ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}? This cannot be undone.`)) return
-                    void Promise.all(doneTasks.map(t => deleteTask(t.id))).then(() => {
-                      invalidate()
-                      toast(`Cleared ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}`)
-                    }).catch(() => toast('Failed to clear done tasks', { type: 'error' }))
-                  }}
-                  className="text-red-400"
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} size={13} />
-                  Clear Done ({columnMap['done'].length})
-                </MenuItem>
-              )}
+              {/* Archive stale — moved from header */}
+              <MenuItem
+                onClick={async () => {
+                  const res = await fetch('/api/tasks-stale')
+                  const data = await res.json() as { ok: boolean; buckets: { days30: number; days60: number; days90: number }; previews: Array<{ id: string; title: string; assignee: string | null; ageDays: number }> }
+                  if (data.ok) { setArchivePreview(data); setShowArchiveWizard(true) }
+                }}
+                className="text-[var(--theme-muted)]"
+              >
+                🗂️ Archive stale tasks
+              </MenuItem>
+              {/* Keyboard shortcuts — moved from header */}
+              <MenuItem onClick={() => setShowShortcuts(v => !v)} className="text-[var(--theme-muted)]">
+                ⌨️ Keyboard shortcuts
+              </MenuItem>
             </MenuContent>
           </MenuRoot>
 
@@ -1660,10 +1586,11 @@ export function TasksScreen() {
             />
           </button>
 
-          {/* Keyboard shortcuts button */}
+          {/* Keyboard shortcuts button — REMOVED (moved to overflow) */}
           <button
             type="button"
             onClick={() => setShowShortcuts(v => !v)}
+            style={{ display: 'none' }}
             className="rounded-lg px-2 py-1 text-xs font-mono transition-colors hover:bg-[var(--theme-hover)] text-[var(--theme-muted)]"
             aria-label="Keyboard shortcuts"
             title="Keyboard shortcuts (?)"
@@ -1711,14 +1638,10 @@ export function TasksScreen() {
       </header>
 
       {/* Search + Filter Bar */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 relative">
         {/* Text search */}
         <div className="relative flex-1 min-w-[180px]">
-          <HugeiconsIcon
-            icon={Search01Icon}
-            size={13}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--theme-muted)]"
-          />
+          <HugeiconsIcon icon={Search01Icon} size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--theme-muted)]"/>
           <input
             ref={searchInputRef}
             type="text"
@@ -1728,194 +1651,165 @@ export function TasksScreen() {
             className="w-full rounded-lg border pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:border-[var(--theme-accent)] bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]"
           />
           {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              aria-label="Clear task search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--theme-muted)]"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={12} />
+            <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear task search" className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--theme-muted)]">
+              <HugeiconsIcon icon={Cancel01Icon} size={12}/>
             </button>
           )}
         </div>
 
-        {/* Quick-filter chips */}
-        {([
-          ['Overdue', filterOverdue, () => setFilterOverdue(v => !v)],
-          ['Blocked', filterBlocked, () => setFilterBlocked(v => !v)],
-          ['Timed Out', filterTimedOut, () => setFilterTimedOut(v => !v)],
-          ['Active Agent', filterActiveAgent, () => setFilterActiveAgent(v => !v)],
-          ['In Review', filterInReview, () => setFilterInReview(v => !v)],
-          ['Hide Subtasks', hideSubtasks, () => setHideSubtasks(v => !v)],
-          ['Group by Parent', groupByParent, () => setGroupByParent(v => !v)],
-        ] as Array<[string, boolean, () => void]>).map(([label, active, toggle]) => (
+        {/* ? Search syntax help */}
+        <div className="relative">
           <button
-            key={label}
             type="button"
-            onClick={toggle}
-            aria-pressed={active}
-            aria-label={formatTaskFilterAriaLabel(label, active)}
-            className="text-[10px] px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
-            style={{
-              borderColor: active ? 'var(--theme-accent)' : 'var(--theme-border)',
-              color: active ? 'var(--theme-accent)' : 'var(--theme-muted)',
-              background: active ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' : 'transparent',
-            }}
+            onClick={() => setShowSearchHelp(v => !v)}
+            className={cn('rounded-full w-5 h-5 flex items-center justify-center text-[10px] border transition-colors', showSearchHelp ? 'border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-accent)]/10' : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent)]')}
+            title="Search syntax help"
+          >?</button>
+          {showSearchHelp && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setShowSearchHelp(false)}/>
+              <div className="absolute left-0 top-full mt-1 z-40 w-64 bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-xl shadow-2xl p-3 flex flex-col gap-1.5">
+                <p className="text-[9px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider pb-1 border-b border-[var(--theme-border)]">Search syntax</p>
+                {([
+                  ['assignee:ada', 'filter by sister'],
+                  ['tag:label', 'filter by tag'],
+                  ['is:blocked', 'only blocked tasks'],
+                  ['is:overdue', 'only overdue tasks'],
+                  ['is:review', 'only in review'],
+                  ['priority:high', 'high / medium / low'],
+                ] as const).map(([syntax, desc]) => (
+                  <div key={syntax} className="flex items-center justify-between gap-2">
+                    <code className="text-[10px] text-[var(--theme-accent)] font-mono">{syntax}</code>
+                    <span className="text-[10px] text-[var(--theme-muted)]">{desc}</span>
+                  </div>
+                ))}
+                <p className="text-[9px] text-[var(--theme-muted)] opacity-50 pt-1 border-t border-[var(--theme-border)]">Combine freely: <code className="text-[9px] text-[var(--theme-accent)]">assignee:ada is:blocked</code></p>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* 🔽 Filters button */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowFilterPopover(v => !v)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors whitespace-nowrap',
+              showFilterPopover || activeFilterCount > 0
+                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]'
+                : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+            )}
           >
-            {label}
+            🔽 Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
           </button>
-        ))}
+              {/* Popover */}
+              {showFilterPopover && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowFilterPopover(false)}/>
+                  <div className="absolute left-0 top-full mt-1 z-40 w-72 bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-xl shadow-2xl p-3 flex flex-col gap-3">
+                    {/* Status */}
+                    <div>
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 mb-1.5">Status</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {([['Overdue', filterOverdue, () => setFilterOverdue(v => !v)], ['Blocked', filterBlocked, () => setFilterBlocked(v => !v)], ['Timed Out', filterTimedOut, () => setFilterTimedOut(v => !v)], ['Active Agent', filterActiveAgent, () => setFilterActiveAgent(v => !v)], ['In Review', filterInReview, () => setFilterInReview(v => !v)]] as Array<[string, boolean, () => void]>).map(([label, active, toggle]) => (
+                          <button key={label} type="button" onClick={toggle} className="text-[10px] px-2 py-0.5 rounded-full border transition-colors" style={{ borderColor: active ? 'var(--theme-accent)' : 'var(--theme-border)', color: active ? 'var(--theme-accent)' : 'var(--theme-muted)', background: active ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' : 'transparent' }}>{label}</button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Priority */}
+                    <div>
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 mb-1.5">Priority</p>
+                      <div className="flex gap-1.5">
+                        {(['high', 'medium', 'low'] as Array<TaskPriority>).map(p => (
+                          <button key={p} type="button" onClick={() => setPriorityFilter(prev => prev === p ? null : p)} className="text-[10px] px-2.5 py-0.5 rounded-full border transition-colors capitalize" style={{ borderColor: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-border)', color: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-muted)', background: priorityFilter === p ? `${PRIORITY_COLORS[p]}1a` : 'transparent' }}>{p}</button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Age */}
+                    <div>
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 mb-1.5">Age</p>
+                      <div className="flex gap-1.5">
+                        {([['fresh', 'Fresh <1d', '#34d399'], ['aging', 'Aging 1-3d', '#f59e0b'], ['stale', 'Stale >3d', '#f87171']] as Array<['fresh'|'aging'|'stale', string, string]>).map(([band, label, color]) => (
+                          <button key={band} type="button" onClick={() => setAgeFilter(prev => prev === band ? null : band)} className="text-[10px] px-2 py-0.5 rounded-full border transition-colors" style={{ borderColor: ageFilter === band ? color : 'var(--theme-border)', color: ageFilter === band ? color : 'var(--theme-muted)', background: ageFilter === band ? `${color}18` : 'transparent' }}>{label}</button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Assignee */}
+                    {stats.sisterChips.length > 0 && (
+                      <div>
+                        <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 mb-1.5">Assignee</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {stats.sisterChips.map(([name, count]) => (
+                            <button key={name} type="button" onClick={() => setAssigneeFilter(prev => prev === name ? null : name)} className="text-[10px] px-2 py-0.5 rounded-full border transition-colors capitalize" style={{ borderColor: assigneeFilter === name ? 'var(--theme-accent)' : 'var(--theme-border)', color: assigneeFilter === name ? 'var(--theme-accent)' : 'var(--theme-muted)', background: assigneeFilter === name ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' : 'transparent' }}>{name} <span className="opacity-50">{count}</span></button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Presets row */}
+                    {filterPresets.length > 0 && (
+                      <div>
+                        <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 mb-1.5">Presets</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {filterPresets.map(p => (
+                            <div key={p.name} className="flex items-center gap-0.5">
+                              <button type="button" onClick={() => { applyFilterPreset(p); setShowFilterPopover(false) }} className="text-[10px] px-2 py-0.5 rounded-l-full border border-r-0 border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]">{p.name}</button>
+                              <button type="button" onClick={() => deleteFilterPreset(p.name)} className="text-[10px] px-1.5 py-0.5 rounded-r-full border border-[var(--theme-border)] text-[var(--theme-muted)] hover:text-red-400 hover:border-red-400/30">×</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-1 border-t border-[var(--theme-border)]">
+                      <span className="text-[10px] text-[var(--theme-muted)] opacity-60">{tasksByColumn.hasAnyFilter ? formatTaskFilterSummary(tasksByColumn.matchCount, tasksByColumn.totalTasks) : 'No active filters'}</span>
+                      <div className="flex gap-2">
+                        {presetNameOpen ? (
+                          <input
+                            type="text"
+                            autoFocus
+                            value={presetNameVal}
+                            onChange={e => setPresetNameVal(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && presetNameVal.trim()) {
+                                saveFilterPreset(presetNameVal.trim())
+                                toast(`Saved preset "${presetNameVal.trim()}"`)
+                                setPresetNameVal('')
+                                setPresetNameOpen(false)
+                              } else if (e.key === 'Escape') {
+                                setPresetNameOpen(false)
+                              }
+                            }}
+                            onBlur={() => { if (!presetNameVal.trim()) setPresetNameOpen(false) }}
+                            placeholder="preset name…"
+                            className="w-24 rounded border border-violet-500/40 bg-[var(--theme-card)] text-[10px] px-1.5 py-0.5 focus:outline-none focus:border-violet-500 text-violet-300"
+                          />
+                        ) : (
+                          <button type="button" onClick={() => { setPresetNameVal(''); setPresetNameOpen(true) }} className="text-[10px] text-violet-400 hover:underline">★ Save</button>
+                        )}
+                        {tasksByColumn.hasAnyFilter && <button type="button" onClick={() => { clearAllFilters(); setShowFilterPopover(false) }} className="text-[10px] text-[var(--theme-accent)] hover:underline">Clear all</button>}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+        </div>
 
-        {/* Priority filter chips */}
-        {(['high', 'medium', 'low'] as Array<TaskPriority>).map(p => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => setPriorityFilter(prev => prev === p ? null : p)}
-            aria-pressed={priorityFilter === p}
-            aria-label={formatTaskFilterAriaLabel(`${p} priority`, priorityFilter === p)}
-            className="text-[10px] px-2.5 py-1 rounded-full border transition-colors capitalize"
-            style={{
-              borderColor: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-border)',
-              color: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-muted)',
-              background: priorityFilter === p ? `${PRIORITY_COLORS[p]}1a` : 'transparent',
-            }}
-          >
-            {p}
-          </button>
-        ))}
-
-        {/* Sister filter chips — one per assignee sorted by task count */}
-        {stats.sisterChips.length > 0 && (
-          <>
-            <span className="text-[10px] text-[var(--theme-muted)] opacity-40 select-none">|</span>
-            {stats.sisterChips.map(([name, count]) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() => setAssigneeFilter(prev => prev === name ? null : name)}
-                aria-pressed={assigneeFilter === name}
-                className="text-[10px] px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap capitalize"
-                style={{
-                  borderColor: assigneeFilter === name ? 'var(--theme-accent)' : 'var(--theme-border)',
-                  color: assigneeFilter === name ? 'var(--theme-accent)' : 'var(--theme-muted)',
-                  background: assigneeFilter === name ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' : 'transparent',
-                }}
-              >
-                {name} <span className="opacity-50">{count}</span>
-              </button>
-            ))}
-          </>
-        )}
-
-        {/* Sister load expand button */}
-        {stats.sisterChips.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowSisterLoad(v => !v)}
-            className={cn('text-[10px] px-2 py-1 rounded-full border transition-colors whitespace-nowrap', showSisterLoad ? 'border-[var(--theme-accent)] text-[var(--theme-accent)]' : 'border-[var(--theme-border)] text-[var(--theme-muted)]')}
-            title="Show sister load distribution"
-          >⊖ Load</button>
-        )}
-
-        {/* Age filter chips */}
-        {([
-          ['fresh',  'Fresh <1d'],
-          ['aging',  'Aging 1-3d'],
-          ['stale',  'Stale >3d'],
-        ] as Array<['fresh' | 'aging' | 'stale', string]>).map(([band, label]) => (
-          <button
-            key={band}
-            type="button"
-            onClick={() => setAgeFilter(prev => prev === band ? null : band)}
-            aria-pressed={ageFilter === band}
-            className="text-[10px] px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
-            style={{
-              borderColor: ageFilter === band
-                ? band === 'fresh' ? '#34d399' : band === 'aging' ? '#f59e0b' : '#f87171'
-                : 'var(--theme-border)',
-              color: ageFilter === band
-                ? band === 'fresh' ? '#34d399' : band === 'aging' ? '#f59e0b' : '#f87171'
-                : 'var(--theme-muted)',
-              background: ageFilter === band
-                ? band === 'fresh' ? '#34d39918' : band === 'aging' ? '#f59e0b18' : '#f8717118'
-                : 'transparent',
-            }}
-          >
-            {label}
-          </button>
-        ))}
-
-        {/* Active tag filter chip */}
-        {tagFilter && (
-          <div
-            className="flex items-center gap-1 text-[10px] rounded-full px-2.5 py-1 border"
-            style={{
-              borderColor: 'var(--theme-accent)',
-              color: 'var(--theme-accent)',
-              background: 'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
-            }}
-          >
-            <span>#{tagFilter}</span>
-            <button
-              type="button"
-              onClick={() => setTagFilter(null)}
-              aria-label="Clear tag filter"
-              className="ml-0.5"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={10} />
-            </button>
-          </div>
-        )}
-
-        {/* Match counter + save preset + clear all */}
+        {/* Active filter pills — shown inline only when active */}
+        {filterOverdue && <button type="button" onClick={() => setFilterOverdue(false)} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-accent)]/10 hover:bg-[var(--theme-accent)]/20 transition-colors">Overdue <HugeiconsIcon icon={Cancel01Icon} size={9}/></button>}
+        {filterBlocked && <button type="button" onClick={() => setFilterBlocked(false)} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-accent)]/10 hover:bg-[var(--theme-accent)]/20 transition-colors">Blocked <HugeiconsIcon icon={Cancel01Icon} size={9}/></button>}
+        {filterTimedOut && <button type="button" onClick={() => setFilterTimedOut(false)} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-accent)]/10 hover:bg-[var(--theme-accent)]/20 transition-colors">Timed Out <HugeiconsIcon icon={Cancel01Icon} size={9}/></button>}
+        {filterActiveAgent && <button type="button" onClick={() => setFilterActiveAgent(false)} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-accent)]/10 hover:bg-[var(--theme-accent)]/20 transition-colors">Active Agent <HugeiconsIcon icon={Cancel01Icon} size={9}/></button>}
+        {filterInReview && <button type="button" onClick={() => setFilterInReview(false)} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-accent)]/10 hover:bg-[var(--theme-accent)]/20 transition-colors">In Review <HugeiconsIcon icon={Cancel01Icon} size={9}/></button>}
+        {hideSubtasks && <button type="button" onClick={() => setHideSubtasks(false)} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-accent)]/10 hover:bg-[var(--theme-accent)]/20 transition-colors">Subtasks hidden <HugeiconsIcon icon={Cancel01Icon} size={9}/></button>}
+        {priorityFilter && <button type="button" onClick={() => setPriorityFilter(null)} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border capitalize" style={{ borderColor: PRIORITY_COLORS[priorityFilter], color: PRIORITY_COLORS[priorityFilter], background: `${PRIORITY_COLORS[priorityFilter]}1a` }}>{priorityFilter} <HugeiconsIcon icon={Cancel01Icon} size={9}/></button>}
+        {assigneeFilter && <button type="button" onClick={() => setAssigneeFilter(null)} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-accent)]/10 capitalize">{assigneeFilter} <HugeiconsIcon icon={Cancel01Icon} size={9}/></button>}
+        {ageFilter && <button type="button" onClick={() => setAgeFilter(null)} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border" style={{ borderColor: ageFilter==='fresh'?'#34d399':ageFilter==='aging'?'#f59e0b':'#f87171', color: ageFilter==='fresh'?'#34d399':ageFilter==='aging'?'#f59e0b':'#f87171' }}>{ageFilter} <HugeiconsIcon icon={Cancel01Icon} size={9}/></button>}
+        {tagFilter && <button type="button" onClick={() => setTagFilter(null)} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-accent)] text-[var(--theme-accent)] bg-[var(--theme-accent)]/10">#{tagFilter} <HugeiconsIcon icon={Cancel01Icon} size={9}/></button>}
         {tasksByColumn.hasAnyFilter && (
-          <span className="ml-auto text-[10px] flex items-center gap-2 whitespace-nowrap text-[var(--theme-muted)]">
-            {formatTaskFilterSummary(tasksByColumn.matchCount, tasksByColumn.totalTasks)}
-            <button
-              type="button"
-              onClick={() => {
-                const name = window.prompt('Save filter preset as:')
-                if (name?.trim()) { saveFilterPreset(name.trim()); toast(`Saved preset "${name.trim()}"`) }
-              }}
-              className="hover:underline text-violet-400"
-              title="Save current filters as a preset"
-            >★ Save</button>
-            <button
-              type="button"
-              onClick={clearAllFilters}
-              className="hover:underline text-[var(--theme-accent)]"
-            >
-              Clear all
-            </button>
-          </span>
+          <span className="ml-auto text-[10px] text-[var(--theme-muted)] opacity-60 whitespace-nowrap">{formatTaskFilterSummary(tasksByColumn.matchCount, tasksByColumn.totalTasks)}</span>
         )}
 
-        {/* Saved filter presets row */}
-        {filterPresets.length > 0 && (
-          <>
-            <div className="w-full flex items-center gap-1.5 flex-wrap mt-0.5">
-              <span className="text-[10px] text-[var(--theme-muted)] opacity-40 select-none mr-0.5">Presets:</span>
-              {filterPresets.map(p => (
-                <div key={p.name} className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => applyFilterPreset(p)}
-                    className="text-[10px] px-2.5 py-1 rounded-l-full border border-r-0 transition-colors border-violet-500/30 text-violet-400 hover:bg-violet-500/10 whitespace-nowrap"
-                  >
-                    {p.name}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteFilterPreset(p.name)}
-                    className="text-[10px] px-1.5 py-1 rounded-r-full border border-violet-500/30 text-[var(--theme-muted)] hover:bg-red-500/10 hover:text-red-400 transition-colors"
-                    title="Delete preset"
-                  >✕</button>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
         <span
           role="status"
           aria-live="polite"
@@ -2180,35 +2074,6 @@ export function TasksScreen() {
                       </span>
                     </div>
                     <div className="flex items-center gap-0.5">
-                      {/* Review-column: execute valid tasks button */}
-                      {col === 'review' && (() => {
-                        const execIds = colTasks.filter(t => {
-                          if (t.agent_state) return false
-                          const planned = (t.agent_history ?? []).filter((h: { action: string }) => h.action === 'planned')
-                          if (planned.length === 0) return false
-                          const note = (planned[planned.length - 1] as { note?: string }).note ?? ''
-                          return !note.includes('Plan unavailable') && note.length >= 80
-                        }).map(t => t.id)
-                        if (execIds.length === 0) return null
-                        return (
-                          <button
-                            onClick={async () => {
-                              setBatchExecuting(true)
-                              try {
-                                const r = await batchExecuteTasks(50, execIds)
-                                await tasksQuery.refetch()
-                                toast(`Started ${r.started} review task${r.started !== 1 ? 's' : ''}`)
-                              } catch { toast('Execute failed', { type: 'error' }) }
-                              finally { setBatchExecuting(false) }
-                            }}
-                            disabled={batchExecuting}
-                            title={`Execute ${execIds.length} ready review tasks`}
-                            className="rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-400 hover:bg-amber-500/10 border border-amber-500/30 transition-colors whitespace-nowrap"
-                          >
-                            {batchExecuting ? '…' : `▶ ${execIds.length}`}
-                          </button>
-                        )
-                      })()}
                       {/* Hide column button — shows on hover */}
                       <button
                         onClick={() => toggleHideColumn(col)}
@@ -2224,6 +2089,129 @@ export function TasksScreen() {
                       >
                         <HugeiconsIcon icon={Add01Icon} size={14} className="text-[var(--theme-muted)]" />
                       </button>
+                      {/* Column micro-actions ⋮ */}
+                      {(col === 'in_progress' || col === 'blocked' || col === 'review' || col === 'todo' || col === 'backlog' || col === 'done') && (
+                        <MenuRoot>
+                          <MenuTrigger render={
+                            <button
+                              type="button"
+                              className="rounded p-0.5 opacity-0 group-hover/hdr:opacity-40 hover:!opacity-100 hover:bg-[var(--theme-hover)] transition-all text-[var(--theme-muted)]"
+                              title="Column actions"
+                            >
+                              <span className="text-[11px]">⋮</span>
+                            </button>
+                          }/>
+                          <MenuContent side="bottom" align="end">
+                            {col === 'in_progress' && (
+                              <MenuItem
+                                onClick={async () => {
+                                  setDrainingNow(true)
+                                  try {
+                                    const res = await fetch('/api/tasks-drain-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 50 }) })
+                                    const data = await res.json() as { ok: boolean; queued: number }
+                                    await tasksQuery.refetch()
+                                    toast(data.queued > 0 ? `Drained ${data.queued} to execution` : 'No eligible tasks right now')
+                                  } catch { toast('Drain failed', { type: 'error' }) }
+                                  finally { setDrainingNow(false) }
+                                }}
+                                disabled={drainingNow}
+                                className="text-orange-400"
+                              >
+                                {drainingNow ? 'Draining…' : 'Drain now'}
+                              </MenuItem>
+                            )}
+                            {col === 'blocked' && (
+                              <MenuItem
+                                onClick={async () => {
+                                  setRescuingTimedOut(true)
+                                  try {
+                                    const res = await fetch('/api/tasks-rescue-timedout', { method: 'POST' })
+                                    const data = await res.json() as { ok: boolean; rescued: number }
+                                    await tasksQuery.refetch()
+                                    toast(data.rescued > 0 ? `Rescued ${data.rescued} stuck tasks` : 'No stuck tasks')
+                                  } catch { toast('Rescue failed', { type: 'error' }) }
+                                  finally { setRescuingTimedOut(false) }
+                                }}
+                                disabled={rescuingTimedOut}
+                                className="text-amber-400"
+                              >
+                                {rescuingTimedOut ? 'Rescuing…' : 'Rescue stuck'}
+                              </MenuItem>
+                            )}
+                            {col === 'review' && (() => {
+                              const readyCount = colTasks.filter(t => {
+                                if (t.agent_state) return false
+                                const planned = (t.agent_history ?? []).filter((h: { action: string }) => h.action === 'planned')
+                                if (!planned.length) return false
+                                const note = (planned[planned.length - 1] as { note?: string }).note ?? ''
+                                return !note.includes('Plan unavailable') && note.length >= 80
+                              }).length
+                              return readyCount > 0 ? (
+                                <MenuItem
+                                  onClick={async () => {
+                                    const ids = colTasks.filter(t => {
+                                      if (t.agent_state) return false
+                                      const pl = (t.agent_history ?? []).filter((h: { action: string }) => h.action === 'planned')
+                                      if (!pl.length) return false
+                                      const note = (pl[pl.length - 1] as { note?: string }).note ?? ''
+                                      return !note.includes('Plan unavailable') && note.length >= 80
+                                    }).map(t => t.id)
+                                    setBatchExecuting(true)
+                                    try {
+                                      const r = await batchExecuteTasks(50, ids)
+                                      await tasksQuery.refetch()
+                                      toast(`Started ${r.started} review task${r.started !== 1 ? 's' : ''}`)
+                                    } catch { toast('Execute failed', { type: 'error' }) }
+                                    finally { setBatchExecuting(false) }
+                                  }}
+                                  disabled={batchExecuting}
+                                  className="text-amber-400"
+                                >
+                                  {batchExecuting ? '…' : `▶ Execute ready (${readyCount})`}
+                                </MenuItem>
+                              ) : null
+                            })()}
+                            {col === 'review' && (
+                              <MenuItem
+                                onClick={async () => {
+                                  setReplanningStubs(true)
+                                  try {
+                                    const res = await fetch('/api/tasks-replan-stubs', { method: 'POST' })
+                                    const data = await res.json() as { ok: boolean; moved: number }
+                                    await tasksQuery.refetch()
+                                    toast(`Moved ${data.moved} stubs back to todo`)
+                                  } catch { toast('Re-plan failed', { type: 'error' }) }
+                                  finally { setReplanningStubs(false) }
+                                }}
+                                disabled={replanningStubs}
+                                className="text-sky-400"
+                              >
+                                {replanningStubs ? 'Re-planning…' : 'Re-plan stubs'}
+                              </MenuItem>
+                            )}
+                            {(col === 'todo' || col === 'backlog') && (
+                              <MenuItem
+                                onClick={async () => {
+                                  const res = await fetch('/api/tasks-stale')
+                                  const data = await res.json() as { ok: boolean; buckets: { days30: number; days60: number; days90: number }; previews: Array<{ id: string; title: string; assignee: string | null; ageDays: number }> }
+                                  if (data.ok) { setArchivePreview(data); setShowArchiveWizard(true) }
+                                }}
+                                className="text-[var(--theme-muted)]"
+                              >
+                                Archive stale (60d+)
+                              </MenuItem>
+                            )}
+                            {col === 'done' && columnMap['done'].length > 0 && (
+                              <MenuItem
+                                onClick={() => setConfirmClearDone(true)}
+                                className="text-red-400"
+                              >
+                                Clear all done ({columnMap['done'].length})
+                              </MenuItem>
+                            )}
+                          </MenuContent>
+                        </MenuRoot>
+                      )}
                     </div>
                   </div>
 
@@ -2284,7 +2272,7 @@ export function TasksScreen() {
                           onAssigneeClick={(assignee) => setAssigneeFilter(prev => prev === assignee ? null : assignee)}
                           onChangePriority={(priority) => quickUpdateMutation.mutate({ id: task.id, input: { priority } })}
                           onMoveToColumn={(column) => moveMutation.mutate({ id: task.id, column })}
-                          onDelete={() => { if (window.confirm(`Delete "${task.title}"?`)) deleteMutation.mutate(task.id) }}
+                          onDelete={() => setDeleteConfirmId(task.id)}
                           isLaunching={launchingTaskId === task.id}
                           onLaunch={async () => {
                             setLaunchingTaskId(task.id)
@@ -2332,7 +2320,7 @@ export function TasksScreen() {
                               onAssigneeClick={(assignee) => setAssigneeFilter(prev => prev === assignee ? null : assignee)}
                               onChangePriority={(priority) => quickUpdateMutation.mutate({ id: task.id, input: { priority } })}
                               onMoveToColumn={(column) => moveMutation.mutate({ id: task.id, column })}
-                              onDelete={() => { if (window.confirm(`Delete "${task.title}"?`)) deleteMutation.mutate(task.id) }}
+                              onDelete={() => setDeleteConfirmId(task.id)}
                               isLaunching={launchingTaskId === task.id}
                               onLaunch={async () => {
                                 setLaunchingTaskId(task.id)
@@ -2468,14 +2456,25 @@ export function TasksScreen() {
       {selectedIds.size > 0 && (
         <div className="fixed bottom-[calc(var(--tabbar-h,80px)+12px)] left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 shadow-2xl text-xs flex-wrap max-w-[92vw]">
           <span className="text-[var(--theme-muted)] mr-1">{selectedIds.size} selected</span>
-          <button
-            onClick={async () => {
-              for (const id of selectedIds) await moveMutation.mutateAsync({ id, column: 'todo' })
-              clearSelection()
-              toast(`Moved ${selectedIds.size} tasks to Todo`)
-            }}
-            className="px-2.5 py-1 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-hover)] transition-colors text-[var(--theme-text)]"
-          >Move to Todo</button>
+          <MenuRoot>
+            <MenuTrigger
+              render={
+                <button
+                  type="button"
+                  className="px-2.5 py-1 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-hover)] transition-colors text-[var(--theme-text)]"
+                >Move to ▾</button>
+              }
+            />
+            <MenuContent>
+              {visibleColumns.map(col => (
+                <MenuItem key={col} onClick={async () => {
+                  for (const id of selectedIds) await moveMutation.mutateAsync({ id, column: col })
+                  clearSelection()
+                  toast(`Moved ${selectedIds.size} tasks to ${COLUMN_LABELS[col]}`)
+                }}>{COLUMN_LABELS[col]}</MenuItem>
+              ))}
+            </MenuContent>
+          </MenuRoot>
           {/* Set priority */}
           {(['high', 'medium', 'low'] as Array<TaskPriority>).map(p => (
             <button
@@ -2490,12 +2489,7 @@ export function TasksScreen() {
             >{p}</button>
           ))}
           <button
-            onClick={async () => {
-              if (!window.confirm(`Delete ${selectedIds.size} tasks?`)) return
-              for (const id of selectedIds) await deleteMutation.mutateAsync(id)
-              clearSelection()
-              toast(`Deleted ${selectedIds.size} tasks`)
-            }}
+            onClick={() => setConfirmBulkDelete(true)}
             className="px-2.5 py-1 rounded-lg border border-red-500/30 hover:bg-red-500/10 text-red-400 transition-colors"
           >Delete</button>
           <button onClick={clearSelection} className="px-2.5 py-1 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-hover)] text-[var(--theme-muted)] transition-colors">✕</button>
@@ -2503,8 +2497,8 @@ export function TasksScreen() {
       )}
 
       {/* Task detail slide-in panel */}
-      {panelTask && (() => {
-        const live = tasks.find(t => t.id === panelTask.id) ?? panelTask
+      {panelLive && (() => {
+        const live = panelLive
         const history = live.agent_history ?? []
         const lastPlan = [...history].reverse().find(h => h.action === 'planned')
         const PRIORITY_COLOR: Record<string, string> = { high: '#ef4444', medium: '#f59e0b', low: '#6b7280' }
@@ -2600,69 +2594,129 @@ export function TasksScreen() {
         )
       })()}
 
-      {/* Inbox panel — tasks waiting for user input */}
-      {showInbox && (
+      {/* Unified Activity panel — Action Required (inbox) + Recent (feed) */}
+      {showActivity && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowInbox(false)} />
+          <div className="fixed inset-0 z-40" onClick={() => { setShowActivity(false); markNotifSeen() }} />
           <div className="fixed right-0 top-0 bottom-0 z-50 w-[min(440px,94vw)] flex flex-col border-l border-[var(--theme-border)] shadow-2xl"
             style={{ background: 'var(--theme-panel)' }}
           >
+            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border)]">
-              <h2 className="text-sm font-semibold text-[var(--theme-text)]">📥 Needs Your Input ({stats.inboxTasks.length})</h2>
-              <button onClick={() => setShowInbox(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
+              <h2 className="text-sm font-semibold text-[var(--theme-text)]">⚑ Activity</h2>
+              <button onClick={() => { setShowActivity(false); markNotifSeen() }} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin divide-y divide-[var(--theme-border)]">
-              {stats.inboxTasks.map(t => {
-                const lastAgentMsg = [...(t.agent_history ?? [])].reverse().find(h => h.action !== 'rescued' && h.note)
-                const ageMs = t.agent_action_at ? Date.now() - new Date(t.agent_action_at).getTime() : null
-                const ago = ageMs ? (ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m ago` : `${Math.round(ageMs / 3600_000)}h ago`) : ''
-                return (
-                  <div key={t.id} className="p-4">
-                    <div className="flex items-start gap-2 mb-2">
-                      <div className="flex-1 min-w-0">
-                        <button
-                          type="button"
-                          onClick={() => { setShowInbox(false); setPanelTask(t) }}
-                          className="text-xs font-medium text-[var(--theme-text)] hover:text-[var(--theme-accent)] text-left transition-colors line-clamp-2"
-                        >{t.title}</button>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[9px] text-[var(--theme-muted)] opacity-50 capitalize">{t.assignee ?? 'unassigned'}</span>
-                          {ago && <span className="text-[9px] text-[var(--theme-muted)] opacity-40">{ago}</span>}
+            {/* Tabs */}
+            <div className="flex border-b border-[var(--theme-border)]">
+              <button
+                type="button"
+                onClick={() => setActivityTab('inbox')}
+                className={cn('flex-1 py-2 text-xs font-medium transition-colors', activityTab === 'inbox' ? 'text-[var(--theme-accent)] border-b-2 border-[var(--theme-accent)]' : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]')}
+              >
+                📥 Action Required{stats.inboxTasks.length > 0 ? ` (${stats.inboxTasks.length})` : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActivityTab('feed'); markNotifSeen() }}
+                className={cn('flex-1 py-2 text-xs font-medium transition-colors relative', activityTab === 'feed' ? 'text-[var(--theme-accent)] border-b-2 border-[var(--theme-accent)]' : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]')}
+              >
+                🔔 Recent
+                {unreadNotifCount > 0 && activityTab !== 'feed' && (
+                  <span className="ml-1 text-[9px] px-1 py-0.5 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30">{unreadNotifCount}</span>
+                )}
+              </button>
+            </div>
+
+            {/* Tab: Action Required */}
+            {activityTab === 'inbox' && (
+              <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin divide-y divide-[var(--theme-border)]">
+                {stats.inboxTasks.length === 0 && (
+                  <div className="text-center py-12 text-xs text-[var(--theme-muted)] opacity-50">No tasks waiting for your input</div>
+                )}
+                {stats.inboxTasks.map(t => {
+                  const lastAgentMsg = [...(t.agent_history ?? [])].reverse().find(h => h.action !== 'rescued' && h.note)
+                  const ageMs = t.agent_action_at ? Date.now() - new Date(t.agent_action_at).getTime() : null
+                  const ago = ageMs ? (ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m ago` : `${Math.round(ageMs / 3600_000)}h ago`) : ''
+                  return (
+                    <div key={t.id} className="p-4">
+                      <div className="flex items-start gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => { setShowActivity(false); setPanelTask(t) }}
+                            className="text-xs font-medium text-[var(--theme-text)] hover:text-[var(--theme-accent)] text-left transition-colors line-clamp-2"
+                          >{t.title}</button>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[9px] text-[var(--theme-muted)] opacity-50 capitalize">{t.assignee ?? 'unassigned'}</span>
+                            {ago && <span className="text-[9px] text-[var(--theme-muted)] opacity-40">{ago}</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    {(lastAgentMsg?.note || t.agent_comment) && (
-                      <div className="mb-2 text-[11px] text-[var(--theme-muted)] bg-[var(--theme-hover)] rounded-lg px-3 py-2 leading-relaxed line-clamp-4">
-                        {lastAgentMsg?.note ?? t.agent_comment}
+                      {(lastAgentMsg?.note || t.agent_comment) && (
+                        <div className="mb-2 text-[11px] text-[var(--theme-muted)] bg-[var(--theme-hover)] rounded-lg px-3 py-2 leading-relaxed line-clamp-4">
+                          {lastAgentMsg?.note ?? t.agent_comment}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={inboxReplies[t.id] ?? ''}
+                          onChange={e => setInboxReplies(prev => ({ ...prev, [t.id]: e.target.value }))}
+                          onKeyDown={async e => {
+                            if (e.key !== 'Enter') return
+                            const text = (inboxReplies[t.id] ?? '').trim()
+                            if (!text) return
+                            setInboxSending(t.id)
+                            try {
+                              await handleTaskComment(t.id, text)
+                              setInboxReplies(prev => { const n = { ...prev }; delete n[t.id]; return n })
+                              toast('Reply sent — Astra will resume')
+                            } catch { toast('Reply failed', { type: 'error' }) }
+                            finally { setInboxSending(null) }
+                          }}
+                          placeholder="Reply… (Enter to send)"
+                          disabled={inboxSending === t.id}
+                          className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2.5 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] placeholder:text-[var(--theme-muted)] disabled:opacity-50"
+                        />
+                        {inboxSending === t.id && <span className="text-[10px] text-[var(--theme-muted)] self-center">Sending…</span>}
                       </div>
-                    )}
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={inboxReplies[t.id] ?? ''}
-                        onChange={e => setInboxReplies(prev => ({ ...prev, [t.id]: e.target.value }))}
-                        onKeyDown={async e => {
-                          if (e.key !== 'Enter') return
-                          const text = (inboxReplies[t.id] ?? '').trim()
-                          if (!text) return
-                          setInboxSending(t.id)
-                          try {
-                            await handleTaskComment(t.id, text)
-                            setInboxReplies(prev => { const n = { ...prev }; delete n[t.id]; return n })
-                            toast('Reply sent — Astra will resume')
-                          } catch { toast('Reply failed', { type: 'error' }) }
-                          finally { setInboxSending(null) }
-                        }}
-                        placeholder="Reply… (Enter to send)"
-                        disabled={inboxSending === t.id}
-                        className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2.5 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] placeholder:text-[var(--theme-muted)] disabled:opacity-50"
-                      />
-                      {inboxSending === t.id && <span className="text-[10px] text-[var(--theme-muted)] self-center">Sending…</span>}
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Tab: Recent feed */}
+            {activityTab === 'feed' && (
+              <div className="flex-1 overflow-y-auto scrollbar-thin p-3 flex flex-col gap-2">
+                {notifEvents.length === 0 && (
+                  <div className="text-center py-8 text-xs text-[var(--theme-muted)] opacity-50">No activity in the last 24h</div>
+                )}
+                {notifEvents.map((ev, i) => {
+                  const isNew = ev.at > notifLastSeen
+                  const ageMs = Date.now() - new Date(ev.at).getTime()
+                  const ago = ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m` : `${Math.round(ageMs / 3600_000)}h`
+                  const icon = ev.action === 'completed' ? '✅' : ev.action === 'blocked' ? '🚫' : ev.action === 'timed_out' ? '⏱️' : ev.action === 'planned' ? '📋' : ev.action === 'question' ? '❓' : '🔄'
+                  const color = ev.action === 'completed' ? 'text-emerald-400' : ev.action === 'blocked' || ev.action === 'timed_out' ? 'text-rose-400' : ev.action === 'planned' ? 'text-sky-400' : 'text-[var(--theme-muted)]'
+                  return (
+                    <button
+                      key={`${ev.taskId}-${ev.at}-${i}`}
+                      type="button"
+                      onClick={() => { const t = tasks.find(t => t.id === ev.taskId); if (t) { setPanelTask(t); setShowActivity(false) } }}
+                      className={cn('text-left px-3 py-2 rounded-lg border transition-colors hover:bg-[var(--theme-hover)]', isNew ? 'border-violet-500/30 bg-violet-500/5' : 'border-[var(--theme-border)]')}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{icon}</span>
+                        <span className={cn('text-[10px] font-medium capitalize', color)}>{ev.action.replace('_', ' ')}</span>
+                        <span className="text-[9px] text-[var(--theme-muted)] opacity-50 ml-auto">{ago} ago</span>
+                      </div>
+                      <p className="text-[11px] text-[var(--theme-text)] truncate mt-0.5">{ev.taskTitle.slice(0, 60)}</p>
+                      {ev.note && <p className="text-[9px] text-[var(--theme-muted)] opacity-60 truncate mt-0.5">{ev.note.slice(0, 80)}</p>}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -2856,153 +2910,83 @@ export function TasksScreen() {
       )}
 
       {/* Timeout failure analysis modal */}
-      {showTimeoutAnalysis && (() => {
-        const today = new Date().toISOString().slice(0, 10)
-        // Collect all timed_out history entries from today
-        const timedOutEntries: Array<{ task: ClaudeTask; note: string; at: string }> = []
-        tasks.forEach(t => {
-          ;(t.agent_history ?? []).forEach((h: { action: string; at?: string; note?: string }) => {
-            if (h.action === 'timed_out' && (h.at ?? '').startsWith(today)) {
-              timedOutEntries.push({ task: t, note: h.note ?? '', at: h.at ?? '' })
-            }
-          })
-        })
-        // Group by assignee
-        const byAssignee: Record<string, number> = {}
-        timedOutEntries.forEach(e => {
-          const a = e.task.assignee ?? 'unassigned'
-          byAssignee[a] = (byAssignee[a] ?? 0) + 1
-        })
-        // Group by tag (top tag per task)
-        const byTag: Record<string, number> = {}
-        timedOutEntries.forEach(e => {
-          const tag = e.task.tags?.[0] ?? 'untagged'
-          byTag[tag] = (byTag[tag] ?? 0) + 1
-        })
-        const topAssignees = Object.entries(byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 8)
-        const topTags = Object.entries(byTag).sort((a, b) => b[1] - a[1]).slice(0, 6)
-        const sample = timedOutEntries.slice(0, 8)
-        return (
-          <>
-            <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowTimeoutAnalysis(false)} />
-            <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(480px,94vw)] max-h-[80vh] rounded-xl border border-[var(--theme-border)] shadow-2xl flex flex-col"
-              style={{ background: 'var(--theme-panel)' }}
-            >
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--theme-border)]">
-                <h2 className="text-sm font-semibold text-[var(--theme-text)]">⏱ Timeout Analysis — today ({timedOutEntries.length} total)</h2>
-                <button onClick={() => setShowTimeoutAnalysis(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
-              </div>
-              <div className="overflow-y-auto scrollbar-thin p-5 flex flex-col gap-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">By Agent</p>
-                    {topAssignees.map(([name, count]) => (
-                      <div key={name} className="flex items-center gap-2 mb-1.5">
-                        <div className="flex-1 h-1.5 rounded-full bg-[var(--theme-hover)] overflow-hidden">
-                          <div className="h-full rounded-full bg-orange-400" style={{ width: `${(count / timedOutEntries.length) * 100}%` }} />
-                        </div>
-                        <span className="text-[11px] text-[var(--theme-muted)] capitalize shrink-0 w-20 truncate">{name}</span>
-                        <span className="text-[11px] font-medium text-orange-400 shrink-0">{count}</span>
+      {showTimeoutAnalysis && timeoutAnalysisData && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowTimeoutAnalysis(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(480px,94vw)] max-h-[80vh] rounded-xl border border-[var(--theme-border)] shadow-2xl flex flex-col"
+            style={{ background: 'var(--theme-panel)' }}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--theme-border)]">
+              <h2 className="text-sm font-semibold text-[var(--theme-text)]">⏱ Timeout Analysis — today ({timeoutAnalysisData.timedOutEntries.length} total)</h2>
+              <button onClick={() => setShowTimeoutAnalysis(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
+            </div>
+            <div className="overflow-y-auto scrollbar-thin p-5 flex flex-col gap-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">By Agent</p>
+                  {timeoutAnalysisData.topAssignees.map(([name, count]) => (
+                    <div key={name} className="flex items-center gap-2 mb-1.5">
+                      <div className="flex-1 h-1.5 rounded-full bg-[var(--theme-hover)] overflow-hidden">
+                        <div className="h-full rounded-full bg-orange-400" style={{ width: `${(count / timeoutAnalysisData.timedOutEntries.length) * 100}%` }} />
                       </div>
-                    ))}
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">By Tag</p>
-                    {topTags.map(([tag, count]) => (
-                      <div key={tag} className="flex items-center gap-2 mb-1.5">
-                        <div className="flex-1 h-1.5 rounded-full bg-[var(--theme-hover)] overflow-hidden">
-                          <div className="h-full rounded-full bg-amber-400" style={{ width: `${(count / timedOutEntries.length) * 100}%` }} />
-                        </div>
-                        <span className="text-[11px] text-[var(--theme-muted)] shrink-0 w-20 truncate">{tag}</span>
-                        <span className="text-[11px] font-medium text-amber-400 shrink-0">{count}</span>
-                      </div>
-                    ))}
-                  </div>
+                      <span className="text-[11px] text-[var(--theme-muted)] capitalize shrink-0 w-20 truncate">{name}</span>
+                      <span className="text-[11px] font-medium text-orange-400 shrink-0">{count}</span>
+                    </div>
+                  ))}
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">Sample Tasks</p>
-                  {sample.map((e, i) => (
-                    <div key={i} className="mb-2 pb-2 border-b border-[var(--theme-border)]/50 last:border-0">
-                      <button
-                        type="button"
-                        onClick={() => { setShowTimeoutAnalysis(false); setPanelTask(e.task) }}
-                        className="text-[11px] text-[var(--theme-text)] hover:text-[var(--theme-accent)] text-left transition-colors line-clamp-1"
-                      >
-                        {e.task.title}
-                      </button>
-                      {e.note && <p className="text-[10px] text-[var(--theme-muted)] mt-0.5 line-clamp-2">{e.note}</p>}
-                      <p className="text-[9px] text-[var(--theme-muted)] opacity-40 mt-0.5 capitalize">{e.task.assignee ?? 'unassigned'} · {e.task.tags?.slice(0,2).join(', ') || 'no tags'}</p>
+                  <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">By Tag</p>
+                  {timeoutAnalysisData.topTags.map(([tag, count]) => (
+                    <div key={tag} className="flex items-center gap-2 mb-1.5">
+                      <div className="flex-1 h-1.5 rounded-full bg-[var(--theme-hover)] overflow-hidden">
+                        <div className="h-full rounded-full bg-amber-400" style={{ width: `${(count / timeoutAnalysisData.timedOutEntries.length) * 100}%` }} />
+                      </div>
+                      <span className="text-[11px] text-[var(--theme-muted)] shrink-0 w-20 truncate">{tag}</span>
+                      <span className="text-[11px] font-medium text-amber-400 shrink-0">{count}</span>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="shrink-0 flex gap-2 px-5 py-3 border-t border-[var(--theme-border)]">
-                <button
-                  onClick={() => { setShowTimeoutAnalysis(false); setFilterTimedOut(true) }}
-                  className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 hover:bg-[var(--theme-hover)] text-[var(--theme-text)] transition-colors"
-                >Filter to timed-out tasks</button>
-                <button
-                  onClick={async () => {
-                    setRescuingTimedOut(true)
-                    try {
-                      const res = await fetch('/api/tasks-rescue-timedout', { method: 'POST' })
-                      const data = await res.json() as { ok: boolean; rescued: number }
-                      await tasksQuery.refetch()
-                      toast(`Rescued ${data.rescued} tasks`)
-                      setShowTimeoutAnalysis(false)
-                    } catch { toast('Rescue failed', { type: 'error' }) }
-                    finally { setRescuingTimedOut(false) }
-                  }}
-                  disabled={rescuingTimedOut}
-                  className="flex-1 text-xs rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
-                >{rescuingTimedOut ? 'Rescuing…' : 'Rescue all'}</button>
+              <div>
+                <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">Sample Tasks</p>
+                {timeoutAnalysisData.sample.map((e, i) => (
+                  <div key={i} className="mb-2 pb-2 border-b border-[var(--theme-border)]/50 last:border-0">
+                    <button
+                      type="button"
+                      onClick={() => { setShowTimeoutAnalysis(false); setPanelTask(e.task) }}
+                      className="text-[11px] text-[var(--theme-text)] hover:text-[var(--theme-accent)] text-left transition-colors line-clamp-1"
+                    >
+                      {e.task.title}
+                    </button>
+                    {e.note && <p className="text-[10px] text-[var(--theme-muted)] mt-0.5 line-clamp-2">{e.note}</p>}
+                    <p className="text-[9px] text-[var(--theme-muted)] opacity-40 mt-0.5 capitalize">{e.task.assignee ?? 'unassigned'} · {e.task.tags?.slice(0,2).join(', ') || 'no tags'}</p>
+                  </div>
+                ))}
               </div>
             </div>
-          </>
-        )
-      })()}
-
-      {/* Notification feed panel */}
-      {showNotifFeed && (
-        <div className="fixed inset-y-0 right-0 z-50 flex flex-col w-full max-w-sm bg-[var(--theme-card)] border-l border-[var(--theme-border)] shadow-2xl">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border)]">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-[var(--theme-text)]">🔔 Agent Activity</span>
-              {unreadNotifCount > 0 && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30">{unreadNotifCount} new</span>
-              )}
+            <div className="shrink-0 flex gap-2 px-5 py-3 border-t border-[var(--theme-border)]">
+              <button
+                onClick={() => { setShowTimeoutAnalysis(false); setFilterTimedOut(true) }}
+                className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 hover:bg-[var(--theme-hover)] text-[var(--theme-text)] transition-colors"
+              >Filter to timed-out tasks</button>
+              <button
+                onClick={async () => {
+                  setRescuingTimedOut(true)
+                  try {
+                    const res = await fetch('/api/tasks-rescue-timedout', { method: 'POST' })
+                    const data = await res.json() as { ok: boolean; rescued: number }
+                    await tasksQuery.refetch()
+                    toast(`Rescued ${data.rescued} tasks`)
+                    setShowTimeoutAnalysis(false)
+                  } catch { toast('Rescue failed', { type: 'error' }) }
+                  finally { setRescuingTimedOut(false) }
+                }}
+                disabled={rescuingTimedOut}
+                className="flex-1 text-xs rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+              >{rescuingTimedOut ? 'Rescuing…' : 'Rescue all'}</button>
             </div>
-            <button type="button" onClick={() => { setShowNotifFeed(false); markNotifSeen() }} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] transition-colors text-lg leading-none">×</button>
           </div>
-          <div className="flex-1 overflow-y-auto scrollbar-thin p-3 flex flex-col gap-2">
-            {notifEvents.length === 0 && (
-              <div className="text-center py-8 text-xs text-[var(--theme-muted)] opacity-50">No activity in the last 24h</div>
-            )}
-            {notifEvents.map((ev, i) => {
-              const isNew = ev.at > notifLastSeen
-              const ageMs = Date.now() - new Date(ev.at).getTime()
-              const ago = ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m` : `${Math.round(ageMs / 3600_000)}h`
-              const icon = ev.action === 'completed' ? '✅' : ev.action === 'blocked' ? '🚫' : ev.action === 'timed_out' ? '⏱️' : ev.action === 'planned' ? '📋' : ev.action === 'question' ? '❓' : '🔄'
-              const color = ev.action === 'completed' ? 'text-emerald-400' : ev.action === 'blocked' || ev.action === 'timed_out' ? 'text-rose-400' : ev.action === 'planned' ? 'text-sky-400' : 'text-[var(--theme-muted)]'
-              return (
-                <button
-                  key={`${ev.taskId}-${ev.at}-${i}`}
-                  type="button"
-                  onClick={() => { const t = tasks.find(t => t.id === ev.taskId); if (t) { setPanelTask(t); setShowNotifFeed(false) } }}
-                  className={cn('text-left px-3 py-2 rounded-lg border transition-colors hover:bg-[var(--theme-hover)]', isNew ? 'border-violet-500/30 bg-violet-500/5' : 'border-[var(--theme-border)]')}
-                >
-                  <div className="flex items-center gap-2">
-                    <span>{icon}</span>
-                    <span className={cn('text-[10px] font-medium capitalize', color)}>{ev.action.replace('_', ' ')}</span>
-                    <span className="text-[9px] text-[var(--theme-muted)] opacity-50 ml-auto">{ago} ago</span>
-                  </div>
-                  <p className="text-[11px] text-[var(--theme-text)] truncate mt-0.5">{ev.taskTitle.slice(0, 60)}</p>
-                  {ev.note && <p className="text-[9px] text-[var(--theme-muted)] opacity-60 truncate mt-0.5">{ev.note.slice(0, 80)}</p>}
-                </button>
-              )
-            })}
-          </div>
-        </div>
+        </>
       )}
 
       {/* Stale task archive wizard */}
@@ -3126,6 +3110,32 @@ export function TasksScreen() {
                   className="flex-1 text-xs rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
                 >{unlockingPrereq === unlockModalPrereq.id ? 'Unlocking…' : `Confirm — unlock ${unlockModalPrereq.count} tasks`}</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm clear done */}
+      {confirmClearDone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmClearDone(false)}/>
+          <div className="relative z-10 w-full max-w-xs bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-xl shadow-2xl p-5 flex flex-col gap-4">
+            <p className="text-sm font-semibold text-[var(--theme-text)]">Clear {columnMap['done'].length} done task{columnMap['done'].length !== 1 ? 's' : ''}?</p>
+            <p className="text-[11px] text-[var(--theme-muted)]">This permanently deletes them. Cannot be undone.</p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setConfirmClearDone(false)} className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors">Cancel</button>
+              <button
+                type="button"
+                onClick={() => {
+                  const doneTasks = columnMap['done']
+                  setConfirmClearDone(false)
+                  void Promise.all(doneTasks.map(t => deleteTask(t.id))).then(() => {
+                    invalidate()
+                    toast(`Cleared ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}`)
+                  }).catch(() => toast('Failed to clear done tasks', { type: 'error' }))
+                }}
+                className="flex-1 text-xs rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-400 hover:bg-red-500/20 transition-colors"
+              >Delete all</button>
             </div>
           </div>
         </div>

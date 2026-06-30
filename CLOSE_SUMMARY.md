@@ -1,24 +1,33 @@
-# Close Summary — Task operations visibility and large-board performance
+# Close Summary: Compact Tasks Operations Toolbar
 
 ## What changed
-- Added large-list virtualization to Workspace Tasks using `@tanstack/react-virtual`, with compact/dense task-card rendering and drag-end support.
-- Added task operation routes for sweep stats, stale task inspection, timed-out rescue, stub replan, manual drain, and completion trend reporting.
-- Improved task-board operational feedback with selection/compact activity affordances, recent activity timestamps, progress/status summaries, and richer Telegram board pipeline outcome text.
-- Cleaned up unsafe pre-existing dirty work before verification: restored a broken `tsconfig.json`, removed unrelated `better-sqlite3` package drift, reverted an unrelated Hindsight recall mutation, and moved an untracked finance draft out of `src` for safekeeping.
+- Updated `src/screens/tasks/tasks-screen.tsx` to make the Tasks operations header denser and more usable on constrained screens.
+- Added unified slide-over panel state so Activity, Tags, Sister Load, and Rebalance panels do not stack over each other.
+- Replaced blocking browser prompt/confirm flows with inline goal/preset inputs and React confirmation dialog state for destructive actions.
+- Added compact activity/filter affordances and pre-computed timeout-analysis/panel-live data to reduce JSX render work.
+- Fixed the local TypeScript regression in the bulk `MenuTrigger` usage and the mechanical `TaskPriority` array-type lint error.
 
 ## Test results
-- `npx tsc --noEmit`: passed.
-- Focused Tasks UX Vitest: 9/9 passed.
-- `pnpm test`: 110 files / 723 tests passed.
-- Focused changed-file ESLint with the known strict `no-unnecessary-condition` baseline rule disabled: 0 errors, 3 warnings.
-- `pnpm build`: passed.
-- Repo-wide `pnpm lint` still fails on baseline strict lint debt: 244 errors, 107 warnings, documented in `TEST_REPORT.json`.
+- PASS: `npx tsc --noEmit`
+- PASS: `pnpm test` — 110 files / 723 tests passed.
+- PASS: focused `src/screens/tasks/tasks-ux.test.ts`.
+- PASS: focused relaxed ESLint on `src/screens/tasks/tasks-screen.tsx` with zero errors; known `no-unnecessary-condition` baseline was disabled for this focused fallback gate.
+- PASS: `git diff --check`.
+- PASS: `pnpm -s lint:class-tokens`.
+- PASS: `pnpm build`.
+- Baseline note: repository-wide `pnpm lint` still exits 1 with 244 errors and 107 warnings, concentrated in pre-existing strict ESLint debt outside this cycle's focused gate.
 
-## Side effects observed
-- The worktree had unrelated untracked finance/design drafts and a dirty `services/odysseus` gitlink before this cycle; they were left unstaged. The untracked `src/server/finance-db.ts` draft was moved to the external cycle backup because it introduced an unplanned `better-sqlite3` compile dependency.
-- Production deployment completed after stale-listener recovery: the first restart produced healthy JSON but systemd later failed because an old Node process held port 3000. I killed stale pid 3161074, ran `systemctl reset-failed` and `systemctl start`, observed one transient 502 during warmup, then confirmed `hermes-workspace.service` is `active` and `https://agent.fernandofamily.com/api/health` returns HTTP 200 `application/json` with `{"status":"ok"}`.
+## Deployment
+- PASS: rebuilt the committed worktree with `pnpm build`.
+- PASS: restarted `hermes-workspace.service`; `systemctl is-active` returned `active`.
+- PASS: `https://agent.fernandofamily.com/api/health` returned status `200`, content type `application/json`, and body `{"status":"ok"}`.
+
+## Side effects and worktree notes
+- `services/odysseus` remains a pre-existing dirty gitlink and was not staged.
+- Existing untracked finance/memory docs remain untouched and unstaged.
+- The workspace was deployed from local `main`, which remains ahead of `origin/main`; no push was performed.
 
 ## New ideas for the next cycle
-- Add task operations audit filters for dispatched, timed-out, rescued, and replanned tasks.
-- Add a reusable focused lint fallback package script for auto-improvement cycles.
-- Keep experimental finance drafts outside `src` until their dependencies and routes are ready.
+1. Extract Tasks screen panel-state and timeout-analysis helpers into smaller tested modules.
+2. Add visual regression smoke for the compact Tasks toolbar and slide-over panels.
+3. Reduce the focused Tasks screen ESLint baseline so relaxed lint is no longer needed.
