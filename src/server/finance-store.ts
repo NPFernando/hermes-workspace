@@ -243,6 +243,83 @@ export type TradingPlan = {
   updatedAt: string
 }
 
+export type TradeOrder = {
+  id: string
+  planId: string
+  platform: 'binance' | 'ibkr' | 'manual' | string
+  symbol: string
+  side: 'buy' | 'sell'
+  quantity: number
+  orderType: 'market' | 'limit' | 'stop_limit'
+  price?: number
+  filledQuantity?: number
+  averageFillPrice?: number
+  fee?: number
+  feeCurrency?: CurrencyCode
+  status: 'pending' | 'open' | 'closed' | 'cancelled' | 'rejected'
+  brokerOrderId?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type TradeExecution = {
+  id: string
+  orderId: string
+  planId: string
+  platform: 'binance' | 'ibkr' | 'manual' | string
+  symbol: string
+  side: 'buy' | 'sell'
+  quantity: number
+  price: number
+  fees: number
+  executedAt: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type VirtualAccount = {
+  id: string
+  platform: 'binance' | 'ibkr' | 'manual' | string
+  currency: CurrencyCode
+  balance: number
+  initialBalance: number
+  lockedAmount: number
+  totalTrades: number
+  winningTrades: number
+  totalPnl: number
+  totalPnlPercentage: number
+  availableBalance?: number
+  marginUsed?: number
+  unrealizedPnl?: number
+  realizedPnl?: number
+  maskedIdentifier?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type TradingSignal = {
+  id: string
+  symbol: string
+  action: 'buy' | 'sell' | 'hold'
+  strength: number  // 0-100
+  confidence: number  // 0-100
+  priceTarget: number
+  stopLoss: number
+  takeProfit?: number
+  suggestedEntryPrice?: number
+  suggestedExitPrice?: number
+  positionSize?: number
+  riskScore?: number
+  riskLevel?: RiskLevel
+  reasoning: string
+  indicators: Record<string, number>
+  timestamp: string
+  source: string
+}
+
 export type FinanceSettings = {
   baseCurrency: 'LKR'
   reportingCurrencies: Array<CurrencyCode>
@@ -264,9 +341,9 @@ export type FinanceSettings = {
     requireStopLoss: boolean
     requireTakeProfitOrExitCondition: boolean
   }
-}
+  }
 
-export type FinanceDatabase = {
+  export type FinanceDatabase = {
   schemaVersion: number
   createdAt: string
   updatedAt: string
@@ -288,8 +365,9 @@ export type FinanceDatabase = {
   sentiment_scores: Array<Record<string, unknown>>
   risk_scores: Array<RiskScore>
   trading_plans: Array<TradingPlan>
-  trade_orders: Array<Record<string, unknown>>
-  trade_executions: Array<Record<string, unknown>>
+  trade_orders: Array<TradeOrder>
+  trade_executions: Array<TradeExecution>
+  virtual_accounts: Array<VirtualAccount>
   portfolio_positions: Array<Record<string, unknown>>
   account_balances: Array<Record<string, unknown>>
   strategy_results: Array<Record<string, unknown>>
@@ -297,6 +375,7 @@ export type FinanceDatabase = {
   agent_memory: Array<Record<string, unknown>>
   audit_logs: Array<Record<string, unknown>>
   error_logs: Array<Record<string, unknown>>
+  trading_signals: Array<TradingSignal>
 }
 
 type AddPayload = Record<string, unknown>
@@ -359,6 +438,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     trading_plans: [],
     trade_orders: [],
     trade_executions: [],
+    virtual_accounts: [],
     portfolio_positions: [],
     account_balances: [],
     strategy_results: [],
@@ -366,6 +446,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     agent_memory: [],
     audit_logs: [],
     error_logs: [],
+    trading_signals: [],
   }
 }
 
@@ -504,6 +585,14 @@ export function addFinanceRecord(kind: string, payload: AddPayload): FinanceData
     })
   } else if (kind === 'trading_plan') {
     db.trading_plans.push(createTradingPlan(payload, base))
+  } else if (kind === 'virtual_account') {
+    db.virtual_accounts.push(createVirtualAccount(payload, base))
+  } else if (kind === 'trade_order') {
+    db.trade_orders.push(createTradeOrder(payload, base))
+  } else if (kind === 'trade_execution') {
+    db.trade_executions.push(createTradeExecution(payload, base))
+  } else if (kind === 'trading_signal') {
+    db.trading_signals.push(createTradingSignal(payload, base))
   } else {
     throw new Error(`Unsupported finance record kind: ${kind}`)
   }
@@ -567,6 +656,74 @@ export function createTradingPlan(
   }
 }
 
+export function createVirtualAccount(payload: AddPayload, base?: { id: string; source: string; createdAt: string; updatedAt: string }): VirtualAccount {
+  const createdAt = nowIso()
+  const recordBase = base ?? { id: randomUUID(), source: 'manual', createdAt, updatedAt: createdAt }
+  return {
+    ...recordBase,
+    platform: stringField(payload, 'platform', 'manual'),
+    currency: stringField(payload, 'currency', 'LKR'),
+    balance: numberField(payload, 'balance', 10000),
+    initialBalance: numberField(payload, 'initialBalance', numberField(payload, 'balance', 10000)),
+    lockedAmount: optionalNumber(payload, 'lockedAmount') ?? 0,
+    totalTrades: numberField(payload, 'totalTrades', 0),
+    winningTrades: numberField(payload, 'winningTrades', 0),
+    totalPnl: optionalNumber(payload, 'totalPnl') ?? 0,
+    totalPnlPercentage: optionalNumber(payload, 'totalPnlPercentage') ?? 0,
+  }
+}
+
+export function createTradeOrder(payload: AddPayload, base?: { id: string; source: string; createdAt: string; updatedAt: string }): TradeOrder {
+  const createdAt = nowIso()
+  const recordBase = base ?? { id: randomUUID(), source: 'manual', createdAt, updatedAt: createdAt }
+  return {
+    ...recordBase,
+    planId: stringField(payload, 'planId', ''),
+    platform: stringField(payload, 'platform', 'manual'),
+    symbol: stringField(payload, 'symbol', 'UNSPECIFIED'),
+    side: stringField(payload, 'side', 'buy') as 'buy' | 'sell',
+    quantity: numberField(payload, 'quantity', 0),
+    orderType: stringField(payload, 'orderType', 'market') as 'market' | 'limit' | 'stop_limit',
+    ...(optionalNumber(payload, 'price') !== undefined ? { price: optionalNumber(payload, 'price') } : {}),
+    status: 'pending',
+    ...(optionalString(payload, 'brokerOrderId') !== undefined ? { brokerOrderId: optionalString(payload, 'brokerOrderId') } : {}),
+  }
+}
+
+export function createTradeExecution(payload: AddPayload, base?: { id: string; source: string; createdAt: string; updatedAt: string }): TradeExecution {
+  const createdAt = nowIso()
+  const recordBase = base ?? { id: randomUUID(), source: 'manual', createdAt, updatedAt: createdAt }
+  return {
+    ...recordBase,
+    orderId: stringField(payload, 'orderId', ''),
+    planId: stringField(payload, 'planId', ''),
+    platform: stringField(payload, 'platform', 'manual'),
+    symbol: stringField(payload, 'symbol', 'UNSPECIFIED'),
+    side: stringField(payload, 'side', 'buy') as 'buy' | 'sell',
+    quantity: numberField(payload, 'quantity', 0),
+    price: numberField(payload, 'price', 0),
+    fees: numberField(payload, 'fees', 0),
+    executedAt: stringField(payload, 'executedAt', nowIso()),
+  }
+}
+
+export function createTradingSignal(payload: AddPayload, base?: { id: string; source: string; createdAt: string; updatedAt: string }): TradingSignal {
+  const createdAt = nowIso()
+  const recordBase = base ?? { id: randomUUID(), source: 'manual', createdAt, updatedAt: createdAt }
+  return {
+    ...recordBase,
+    symbol: stringField(payload, 'symbol', 'UNSPECIFIED'),
+    action: stringField(payload, 'action', 'hold') as 'buy' | 'sell' | 'hold',
+    strength: numberField(payload, 'strength', 50),
+    confidence: numberField(payload, 'confidence', 50),
+    priceTarget: numberField(payload, 'priceTarget', 0),
+    stopLoss: numberField(payload, 'stopLoss', 0),
+    reasoning: stringField(payload, 'reasoning', 'No specific reasoning provided'),
+    indicators: payload.indicators ? (payload.indicators as Record<string, number>) : {},
+    timestamp: stringField(payload, 'timestamp', nowIso()),
+  }
+}
+
 export function financeSummary(db: FinanceDatabase) {
   const totalIncomeLkr = db.income_records.reduce((sum, row) => sum + row.convertedLkrAmount, 0)
   const totalExpensesLkr = db.expense_records.reduce((sum, row) => sum + row.convertedLkrAmount, 0)
@@ -622,6 +779,221 @@ export function financeAlerts(db: FinanceDatabase): Array<{ level: 'info' | 'war
     alerts.push({ level: 'info', title: 'Emergency kill switch active', detail: 'Real order execution is disabled.' })
   }
   return alerts
+}
+
+export function executeTradingPlan(planId: string, useTestnet: boolean = false): { order: TradeOrder; execution: TradeExecution; updatedAccount: VirtualAccount } {
+  const db = ensureFinanceStore()
+
+  // Find the trading plan
+  const plan = db.trading_plans.find(p => p.id === planId)
+  if (!plan) {
+    throw new Error(`Trading plan not found: ${planId}`)
+  }
+
+  // Check if plan is executable
+  if (plan.executionStatus !== 'pending' && plan.userApprovalStatus !== 'approved') {
+    throw new Error(`Trading plan is not executable. Status: ${plan.executionStatus}`)
+  }
+
+  // Check if trading mode allows execution
+  const mode = db.settings.tradingMode
+  if (mode === 'observe_only') {
+    throw new Error('Trading is disabled in observe_only mode')
+  }
+
+  if (mode === 'live_recommend_only' || mode === 'live_manual_approval' || mode === 'live_auto_trade') {
+    if (!db.settings.liveTradingEnabled) {
+      throw new Error('Live trading is not enabled')
+    }
+  }
+
+  // For paper_trade or testnet_execute, we can proceed with simulation
+  // For live modes, we would integrate with actual exchange APIs
+
+  // Create market order based on plan
+  const orderPayload: any = {
+    planId: plan.id,
+    platform: plan.platform,
+    symbol: plan.symbol,
+    side: plan.decision === 'BUY_NOW' || plan.decision === 'PLAN_BUY_LATER' ? 'buy' : 'sell',
+    quantity: plan.positionSize ?? 0,
+    orderType: 'market',
+    price: plan.decision === 'BUY_NOW' || plan.decision === 'PLAN_BUY_LATER' ? (plan.suggestedEntryPrice ?? 0) : (plan.suggestedExitPrice ?? 0),
+  }
+
+  const order = createTradeOrder(orderPayload)
+  db.trade_orders.push(order)
+
+  // Simulate execution (in real implementation, this would call exchange API)
+  // For paper trading, we use the suggested price or current market price
+  const executionPrice = order.price ?? (Math.random() * 100 + 50) // Mock price
+
+  const executionPayload: any = {
+    orderId: order.id,
+    planId: plan.id,
+    platform: plan.platform,
+    symbol: plan.symbol,
+    side: order.side,
+    quantity: order.quantity,
+    price: executionPrice,
+    fees: Math.abs(order.quantity * executionPrice) * 0.001, // 0.1% fee
+    executedAt: new Date().toISOString(),
+  }
+
+  const execution = createTradeExecution(executionPayload)
+  db.trade_executions.push(execution)
+
+  // Update plan status
+  plan.executionStatus = 'executed'
+  plan.status = 'executed'
+  plan.actualOutcome = `Executed at ${executionPrice}`
+  plan.profitLoss = 0 // Will be calculated when position is closed
+
+  // Update or create virtual account
+  let account = db.virtual_accounts.find(acc => acc.platform === plan.platform && acc.currency === 'LKR')
+  if (!account) {
+    const accountPayload: any = {
+      platform: plan.platform,
+      currency: 'LKR',
+      balance: 10000, // Starting balance
+      initialBalance: 10000,
+    }
+    account = createVirtualAccount(accountPayload)
+    db.virtual_accounts.push(account)
+  }
+
+  // Update account based on trade
+  if (order.side === 'buy') {
+    // Buying: decrease cash balance, increase position value
+    const cost = order.quantity * executionPrice + execution.fees
+    account.balance -= cost
+    // In a real system, we'd track positions separately
+  } else {
+    // Selling: increase cash balance, decrease position value
+    const revenue = order.quantity * executionPrice - execution.fees
+    account.balance += revenue
+    // Calculate P&L (simplified)
+    account.totalPnl += revenue
+    account.winningTrades += revenue > 0 ? 1 : 0
+  }
+  account.totalTrades += 1
+  account.updatedAt = new Date().toISOString()
+
+  // Update plan P&L
+  plan.profitLoss = account.totalPnl
+
+  writeFinanceStore(db)
+  appendAuditLog('trade_executed', { planId, orderId: order.id, executionId: execution.id, platform: plan.platform, symbol: plan.symbol })
+
+  return { order, execution, updatedAccount: account }
+}
+
+export function generateTradingSignal(symbol: string, marketData: Record<string, any> = {}): TradingSignal {
+  // This is a simplified decision engine
+  // In a real implementation, this would use technical analysis, ML models, etc.
+
+  // Generate a mock signal based on some basic logic
+  const rsi = Math.random() * 100 // Simulated RSI
+  const macd = Math.random() * 2 - 1 // Simulated MACD
+  const smaRatio = Math.random() * 0.5 + 0.8 // Price vs SMA ratio
+
+  let action: 'buy' | 'sell' | 'hold' = 'hold'
+  let strength = 50
+  let confidence = 50
+
+  if (rsi < 30 && macd > 0) {
+    // Oversold and bullish momentum
+    action = 'buy'
+    strength = 80
+    confidence = 75
+  } else if (rsi > 70 && macd < 0) {
+    // Overbought and bearish momentum
+    action = 'sell'
+    strength = 80
+    confidence = 75
+  } else if (smaRatio > 1.05) {
+    // Price above SMA - bullish
+    action = 'buy'
+    strength = 60
+    confidence = 60
+  } else if (smaRatio < 0.95) {
+    // Price below SMA - bearish
+    action = 'sell'
+    strength = 60
+    confidence = 60
+  }
+
+  const price = 100 + Math.random() * 50 // Mock price
+
+  const signalPayload: any = {
+    symbol,
+    action,
+    strength,
+    confidence,
+    priceTarget: action === 'buy' ? price * 1.1 : price * 0.9,
+    stopLoss: action === 'buy' ? price * 0.95 : price * 1.05,
+    reasoning: `RSI: ${rsi.toFixed(1)}, MACD: ${macd.toFixed(3)}, SMA Ratio: ${smaRatio.toFixed(3)}`,
+    indicators: { rsi, macd, smaRatio },
+  }
+
+  return createTradingSignal(signalPayload)
+}
+
+export function updateVirtualAccountPrices(prices: Record<string, number>): void {
+  const db = ensureFinanceStore()
+
+  // Update unrealized P&L for all virtual accounts based on current prices
+  // In a real system, we would track individual positions
+  for (const account of db.virtual_accounts) {
+    // This is simplified - in reality we'd need to track what assets we hold
+    const priceChange = (Math.random() - 0.5) * 0.1 // Random +/- 5% change
+    const portfolioValue = account.balance * (1 + priceChange)
+    const unrealizedPnl = portfolioValue - account.balance
+
+    account.unrealizedPnl = unrealizedPnl
+    account.balance = portfolioValue
+    account.updatedAt = new Date().toISOString()
+  }
+
+  writeFinanceStore(db)
+}
+
+export function createPaperTradingAccount(platform: 'binance' | 'ibkr' = 'binance', initialBalance: number = 10000): VirtualAccount {
+  const db = ensureFinanceStore()
+
+  // Check if account already exists for this platform
+  let account = db.virtual_accounts.find(acc => acc.platform === platform && acc.currency === 'LKR')
+
+  if (!account) {
+    const accountPayload: any = {
+      platform,
+      currency: 'LKR',
+      balance: initialBalance,
+      initialBalance: initialBalance,
+    }
+    account = createVirtualAccount(accountPayload)
+    db.virtual_accounts.push(account)
+    writeFinanceStore(db)
+    appendAuditLog('paper_trading_account_created', { platform, initialBalance })
+  }
+
+  return account
+}
+
+export function getPaperTradingBalance(platform: 'binance' | 'ibkr' = 'binance'): { balance: number; initialBalance: number; totalPnl: number; totalPnlPercentage: number } | null {
+  const db = ensureFinanceStore()
+  const account = db.virtual_accounts.find(acc => acc.platform === platform && acc.currency === 'LKR')
+
+  if (!account) {
+    return null
+  }
+
+  return {
+    balance: account.balance,
+    initialBalance: account.initialBalance,
+    totalPnl: account.totalPnl,
+    totalPnlPercentage: account.totalPnlPercentage,
+  }
 }
 
 export function maskSensitive(value: unknown): unknown {

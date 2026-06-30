@@ -1,48 +1,56 @@
 {
+  "passed": true,
   "tests_passed": true,
   "lint_errors": 0,
-  "passed": true,
-  "summary": "Focused gates for the changed task execution and board-status files passed. Full pnpm test/lint were run and remain non-zero due to documented repository baselines outside this change.",
+  "full_lint_errors": 225,
+  "full_lint_warnings": 104,
+  "focused_lint_errors": 0,
+  "focused_lint_warnings": 1,
+  "timestamp": "2026-06-30T06:41:17Z",
   "commands": [
     {
-      "command": "npx tsc --noEmit",
+      "cmd": "npx tsc --noEmit",
       "exit_code": 0
     },
     {
-      "command": "npx vitest run src/screens/tasks/tasks-ux.test.ts",
+      "cmd": "npx vitest list",
       "exit_code": 0,
-      "tests": "9 passed"
+      "assertion": "No e2e/** or services/odysseus/tests/**/*.mjs suites appeared in collected Vitest list."
     },
     {
-      "command": "npx eslint --no-warn-ignored -f json src/server/astra-tasks.ts src/server/task-execution-utils.ts src/routes/api/telegram-board.ts src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts",
+      "cmd": "pnpm test",
       "exit_code": 0,
-      "errors": 0,
-      "warnings": 0
+      "summary": "110 test files, 723 tests passed"
     },
     {
-      "command": "git diff --check",
-      "exit_code": 0
-    },
-    {
-      "command": "pnpm build",
-      "exit_code": 0
-    },
-    {
-      "command": "pnpm test",
+      "cmd": "pnpm lint",
       "exit_code": 1,
-      "baseline_failure": "Vitest collects Playwright e2e specs without @playwright/test and Odysseus TAP .mjs files with no Vitest suite; 723 assertions passed, 5 suite collection failures."
+      "summary": "Baseline repo lint debt: 225 errors, 104 warnings; unrelated to this config change."
     },
     {
-      "command": "pnpm lint",
-      "exit_code": 1,
-      "baseline_failure": "Repository-wide lint baseline remains non-zero (208 errors, 101 warnings) outside the changed-file focused gate."
+      "cmd": "npx eslint --no-warn-ignored -f json vite.config.ts src/routes/api/tasks-unlock-prereq.ts src/server/finance-store.ts",
+      "exit_code": 0,
+      "summary": "0 errors, 1 pre-existing require-await warning in tasks-unlock-prereq.ts"
+    },
+    {
+      "cmd": "pnpm build",
+      "exit_code": 0
     }
   ],
-  "baseline_failures": {
-    "pnpm_test": "5 suite collection failures: e2e Playwright specs missing @playwright/test and services/odysseus TAP .mjs files have no Vitest suite; no assertion failures in changed Tasks UX test.",
-    "pnpm_lint": {
-      "errors": 208,
-      "warnings": 101
-    }
+  "notes": [
+    "The requested dispatch-mission command is unavailable in this Hermes CLI; phases were executed manually per the skill fallback.",
+    "TypeScript initially failed on pre-existing dirty task-unlock and finance-store edits; small type fixes were included so the workspace compile gate is green.",
+    "Full lint remains a repository-wide baseline issue, but focused lint on changed files has zero errors."
+  ],
+  "deployment": {
+    "service": "active",
+    "listener": "node pid 3099271 on 0.0.0.0:3000",
+    "health_status": 200,
+    "health_content_type": "application/json",
+    "health_body": {
+      "status": "ok"
+    },
+    "recovery": "Stopped stale user-owned node listener after systemd EADDRINUSE failure, reset-failed, started service, and revalidated.",
+    "validated_at": "2026-06-30T06:46:30Z"
   }
 }

@@ -256,7 +256,11 @@ export function clearStuckTasks(): number {
       lastUserActivity ? new Date(lastUserActivity.at).getTime() : 0,
       lastBlockedMs,
     )
-    if (!lastActivityMs || now - lastActivityMs < AUTO_RETRY_AFTER_MS) continue
+    // Exponential backoff: retry 1 waits 4h, retry 2 waits 8h, giving transient
+    // failures (rate limits, model outages) more time to clear before the last attempt.
+    const currentRetryCount = task.auto_retry_count ?? 0
+    const retryDelayMs = AUTO_RETRY_AFTER_MS * Math.pow(2, currentRetryCount)
+    if (!lastActivityMs || now - lastActivityMs < retryDelayMs) continue
 
     const retryCount = (task.auto_retry_count ?? 0) + 1
     const ageH       = Math.round((now - lastActivityMs) / (60 * 60 * 1000))
@@ -384,22 +388,38 @@ setInterval(() => {
     if (_boardHealthLastSentDate === istDate) return
     _boardHealthLastSentDate = istDate
 
-    const all = listTasks({ includeDone: false })
+    const all = listTasks({ includeDone: true })
     const cols: Record<string, number> = {}
     all.forEach((t) => { cols[t.column] = (cols[t.column] ?? 0) + 1 })
     const reviewReady = all.filter(
       (t) => t.column === 'review' && !t.agent_state &&
-        (t.agent_history ?? []).some((h) => h.action === 'planned' && !h.note.includes('Plan unavailable'))
+        (t.agent_history ?? []).some((h) => h.action === 'planned' && !h.note?.includes('Plan unavailable') && (h.note?.length ?? 0) >= 80)
     ).length
     const depWaiting = all.filter(
       (t) => t.column === 'todo' && Array.isArray(t.depends_on) && t.depends_on.length > 0
     ).length
     const blockedCount = cols['blocked'] ?? 0
+    // Count tasks moved to 'done' in the last 24 h
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000
+    const doneToday = all.filter(
+      (t) => t.column === 'done' && new Date(t.updated_at).getTime() >= oneDayAgo
+    ).length
+    // Sister load: count active (non-done) tasks by assignee
+    const sisterLoad: Record<string, number> = {}
+    all.filter((t) => t.column !== 'done' && t.column !== 'deleted' && t.assignee).forEach((t) => {
+      sisterLoad[t.assignee!] = (sisterLoad[t.assignee!] ?? 0) + 1
+    })
+    const sisterLine = Object.entries(sisterLoad)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([name, count]) => `${name}:${count}`)
+      .join(' · ')
     const msg =
       `📊 Board health ${istDate} (IST)\n` +
       `Todo: ${cols['todo'] ?? 0} | Review: ${cols['review'] ?? 0} | Blocked: ${blockedCount}\n` +
-      `✅ Ready to Execute: ${reviewReady}\n` +
-      `⏳ Waiting on credentials: ${depWaiting}\n` +
+      `✅ Done today: ${doneToday} | Ready to execute: ${reviewReady}\n` +
+      (sisterLine ? `👥 ${sisterLine}\n` : '') +
+      (depWaiting > 0 ? `⏳ Waiting on credentials: ${depWaiting}\n` : '') +
       (blockedCount > 0 ? `⚠️ ${blockedCount} task(s) blocked — check workspace\n` : '') +
       `→ agent.fernandofamily.com/tasks`
     spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q', msg], {
@@ -408,10 +428,128 @@ setInterval(() => {
   } catch { /* non-fatal */ }
 }, 30 * 60 * 1000)
 
+// Weekly board summary every Monday at 9 AM IST — shows 7-day trend.
+let _weeklyHealthLastSentWeek = ''
+setInterval(() => {
+  try {
+    const nowUtc = new Date()
+    const istMs  = nowUtc.getTime() + (5 * 60 + 30) * 60 * 1000
+    const ist    = new Date(istMs)
+    if (ist.getUTCDay() !== 1) return        // Monday only
+    if (ist.getUTCHours() !== 9) return      // 9 AM IST only
+    const weekKey = ist.toISOString().slice(0, 10)
+    if (_weeklyHealthLastSentWeek === weekKey) return
+    _weeklyHealthLastSentWeek = weekKey
+
+    const all = listTasks({ includeDone: true })
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const doneThisWeek = all.filter(
+      (t) => t.column === 'done' && new Date(t.updated_at).getTime() >= sevenDaysAgo
+    ).length
+    const addedThisWeek = all.filter(
+      (t) => new Date(t.created_at).getTime() >= sevenDaysAgo
+    ).length
+    const net = doneThisWeek - addedThisWeek
+    const netStr = net >= 0 ? `↓ ${net} (shrinking)` : `↑ ${Math.abs(net)} (growing)`
+    const active = all.filter((t) => t.column !== 'done' && t.column !== 'deleted').length
+    const blockedNow = all.filter((t) => t.column === 'blocked').length
+
+    // Sister load for weekly: tasks completed this week per assignee
+    const weekSisterLoad: Record<string, number> = {}
+    all.filter((t) => t.column === 'done' && new Date(t.updated_at).getTime() >= sevenDaysAgo && t.assignee)
+      .forEach((t) => { weekSisterLoad[t.assignee!] = (weekSisterLoad[t.assignee!] ?? 0) + 1 })
+    const weekSisterLine = Object.entries(weekSisterLoad)
+      .sort((a, b) => b[1] - a[1]).slice(0, 6)
+      .map(([name, count]) => `${name}:${count}`).join(' · ')
+    const weekMsg =
+      `📈 Weekly summary — ${weekKey}\n` +
+      `Completed this week: ${doneThisWeek}\n` +
+      `Added this week: ${addedThisWeek} | Net: ${netStr}\n` +
+      `Active tasks: ${active} | Blocked: ${blockedNow}\n` +
+      (weekSisterLine ? `🏆 Top sisters: ${weekSisterLine}\n` : '') +
+      `→ agent.fernandofamily.com/tasks`
+    spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q', weekMsg], {
+      encoding: 'utf-8', timeout: 15_000,
+    })
+  } catch { /* non-fatal */ }
+}, 30 * 60 * 1000)
+
+// Description enrichment sweep: every 2 hours, enrich up to 10 todo tasks that have no
+// description (or <30 chars). Nemotron generates a 2-3 sentence context from the title.
+// Better descriptions → better planning prompts → better execution plans.
+setInterval(() => {
+  try {
+    const candidates = listTasks({ column: 'todo' }).filter((t) => {
+      if (t.agent_state) return false
+      if (t.waiting_for_user) return false
+      if (Array.isArray(t.depends_on) && t.depends_on.length > 0) return false  // gated
+      if ((t.description ?? '').trim().length >= 30) return false  // already has description
+      if ((t.agent_history ?? []).some((h) => h.action === 'description_enriched')) return false
+      return true
+    }).slice(0, 10)
+
+    for (const task of candidates) {
+      try {
+        const prompt =
+          `You are a task context generator. Given a task title, write 2-3 concise sentences ` +
+          `that describe what the task involves, its goal, and a clear definition of done. ` +
+          `Be specific and technical. Output only the description text, no labels or prefixes.\n\n` +
+          `Task title: ${task.title}`
+
+        const r = spawnSync(HERMES_BIN, [
+          '-m', 'nvidia/nemotron-3-super-120b-a12b:free', '--provider', 'openrouter',
+          '-z', prompt,
+        ], { encoding: 'utf-8', timeout: 60_000, maxBuffer: 2 * 1024 * 1024 })
+
+        const desc = (r.stdout ?? '').trim().replace(/^["']|["']$/g, '')
+        if (!desc || desc.length < 20) continue
+
+        const nowIso = new Date().toISOString()
+        updateTask(task.id, {
+          description: desc.slice(0, 500),
+          agent_history: [...(task.agent_history ?? []), {
+            id: randomUUID(), by: 'astra', byEmoji: '🌟',
+            action: 'description_enriched',
+            note: 'Description auto-generated from title to improve planning quality.',
+            at: nowIso,
+          }],
+        })
+      } catch { /* non-fatal per-task */ }
+    }
+  } catch { /* non-fatal */ }
+}, 2 * 60 * 60 * 1000)
+
+// Telegram bot command registration — runs once on startup to register /board, /find, /todo
+// with the Telegram Bot API so they appear in the command autocomplete picker.
+;(async () => {
+  try {
+    let token = process.env.TELEGRAM_BOT_TOKEN ?? ''
+    if (!token) {
+      // Fall back to reading from ~/.hermes/.env directly (same pattern as clarification keyboard)
+      const envPath = path.join(os.homedir(), '.hermes', '.env')
+      const envContent = fs.readFileSync(envPath, 'utf-8')
+      const match = envContent.match(/^TELEGRAM_BOT_TOKEN=(.+)$/m)
+      token = match ? match[1].trim() : ''
+    }
+    if (!token) return
+    await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        commands: [
+          { command: 'board',  description: 'Show task board status (todo/review/blocked/done today)' },
+          { command: 'find',   description: 'Search tasks — /find <keyword>' },
+          { command: 'todo',   description: 'Create a task — /todo <description>' },
+        ],
+      }),
+    })
+  } catch { /* non-fatal — server still runs without command registration */ }
+})()
+
 // Auto-execute review sweep: tasks with real plans waiting >HERMES_AUTO_EXECUTE_DELAY_H hours.
 const AUTO_EXECUTE_DELAY_MS =
   parseFloat(process.env.HERMES_AUTO_EXECUTE_DELAY_H ?? '2') * 60 * 60 * 1000
-const AUTO_EXECUTE_MAX = parseInt(process.env.HERMES_AUTO_EXECUTE_MAX ?? '5', 10)
+const AUTO_EXECUTE_MAX = parseInt(process.env.HERMES_AUTO_EXECUTE_MAX ?? '10', 10)
 
 setInterval(() => {
   try {
@@ -434,8 +572,19 @@ setInterval(() => {
     candidates.forEach((task, i) => {
       setTimeout(() => {
         try { executeTaskWithHermesBackground(task.id) } catch { /* non-fatal */ }
-      }, i * 500)
+      }, i * 8_000)
     })
+    // Update sweep stats for board health visibility
+    try {
+      const sweepStatsFile = path.join(os.homedir(), '.hermes', 'sweep-stats.json')
+      const todayDate = new Date().toISOString().slice(0, 10)
+      let stats: { lastSweepAt: string; executedToday: number; executedDate: string } = { lastSweepAt: '', executedToday: 0, executedDate: '' }
+      try { stats = JSON.parse(fs.readFileSync(sweepStatsFile, 'utf-8')) } catch { /* first run */ }
+      if (stats.executedDate !== todayDate) { stats.executedToday = 0; stats.executedDate = todayDate }
+      stats.lastSweepAt = new Date().toISOString()
+      stats.executedToday += candidates.length
+      fs.writeFileSync(sweepStatsFile, JSON.stringify(stats))
+    } catch { /* non-fatal */ }
     spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q',
       `⚡ Auto-executing ${candidates.length} review task${candidates.length > 1 ? 's' : ''} (waited >${Math.round(AUTO_EXECUTE_DELAY_MS / 3600000)}h)\n` +
       candidates.map((t) => `• ${t.title.slice(0, 60)}`).join('\n'),
@@ -2801,7 +2950,7 @@ export function batchExecuteBackground(limit = 5, taskIds?: Array<string>): { st
   batch.forEach((task, index) => {
     setTimeout(() => {
       try { executeTaskWithHermesBackground(task.id) } catch { /* non-fatal */ }
-    }, index * 300)
+    }, index * 4_000)
   })
 
   return { started: batch.length, remaining }

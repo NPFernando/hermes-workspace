@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import type { ActivityEntry, ClarificationQuestion, ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority } from '@/lib/tasks-api'
 import {
   DialogContent,
@@ -272,6 +272,44 @@ function ClarificationPanel({
   )
 }
 
+// Polls the execution log tail for a running task, refreshing every 6 seconds.
+function ExecLogTail({ taskId }: { taskId: string }) {
+  const [log, setLog] = useState<string>('')
+  const [show, setShow] = useState(false)
+  const fetchLog = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/tasks-exec-log?task_id=${encodeURIComponent(taskId)}&lines=25`)
+      if (!res.ok) return
+      const data = await res.json() as { ok: boolean; found?: boolean; log?: string }
+      if (data.ok && data.found && data.log) setLog(data.log)
+    } catch { /* non-fatal */ }
+  }, [taskId])
+
+  useEffect(() => {
+    fetchLog()
+    const id = setInterval(fetchLog, 6_000)
+    return () => clearInterval(id)
+  }, [fetchLog])
+
+  if (!log) return null
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        className="text-[10px] text-violet-400/60 hover:text-violet-400 transition-colors"
+      >
+        {show ? '▲ hide log' : '▼ view log'}
+      </button>
+      {show && (
+        <pre className="mt-1 max-h-36 overflow-y-auto text-[10px] leading-relaxed text-violet-300/70 whitespace-pre-wrap break-all" style={{ scrollbarWidth: 'thin' }}>
+          {log}
+        </pre>
+      )}
+    </div>
+  )
+}
+
 export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTags, defaultTitle, defaultDescription, defaultPriority, defaultAssignee, assignees, onSubmit, isSubmitting, onComment, onClarify, onExecute, isExecuting, onBreakdown, isBreakingDown, onOpenSession }: Props) {
   const isEdit = Boolean(task)
 
@@ -527,13 +565,18 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                 </div>
               )}
 
-              {/* Live "currently working" pulse — mirrors card expand panel */}
+              {/* Live "currently working" pulse + execution log tail */}
               {(isExecuting || (task?.agent_state && task.agent_state !== 'waiting_for_input')) && (
-                <div className="flex items-center gap-2 mb-3 rounded-md border border-violet-400/20 bg-violet-400/8 px-2.5 py-2">
-                  <span className="w-1.5 h-1.5 rounded-full animate-ping shrink-0 bg-violet-400" />
-                  <span className="text-xs animate-pulse text-violet-400">
-                    {isExecuting ? 'Sending task to agent…' : task?.agent_state === 'reviewing' ? 'Astra reviewing…' : task?.agent_state === 'delegating' ? 'Delegating to specialist…' : 'Agent working on this task…'}
-                  </span>
+                <div className="mb-3 rounded-md border border-violet-400/20 bg-violet-400/8 px-2.5 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full animate-ping shrink-0 bg-violet-400" />
+                    <span className="text-xs animate-pulse text-violet-400">
+                      {isExecuting ? 'Sending task to agent…' : task?.agent_state === 'reviewing' ? 'Astra reviewing…' : task?.agent_state === 'delegating' ? 'Delegating to specialist…' : 'Agent working on this task…'}
+                    </span>
+                  </div>
+                  {task?.id && task.agent_state === 'working' && (
+                    <ExecLogTail taskId={task.id} />
+                  )}
                 </div>
               )}
 

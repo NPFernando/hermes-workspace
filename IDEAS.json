@@ -118,5 +118,35 @@
     "description": "Require review tasks to have a substantive planned history note before showing Execute Ready or auto-starting execution, preventing one-line stubs from being executed as if they were real plans.",
     "category": "backend",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Document dedicated E2E and Odysseus test runners",
+    "description": "Add workspace documentation that explains which commands should run Playwright E2E specs and Odysseus TAP tests separately from Vitest.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add focused CI check for Vitest collection hygiene",
+    "description": "Add a lightweight CI/script gate that lists collected Vitest suites and fails if e2e or services/odysseus TAP files re-enter the unit-test set.",
+    "category": "config",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Document dedicated workspace test runners",
+    "description": "Add a short testing guide that distinguishes Vitest unit tests, Playwright E2E specs, and Odysseus TAP tests so future agents choose the right command first.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Reduce repository-wide ESLint baseline debt",
+    "description": "Tackle the current repo lint baseline by prioritizing no-unnecessary-condition and no-control-regex errors outside actively changed files.",
+    "category": "config",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add tests for Telegram task helper routes",
+    "description": "Add focused API tests for tasks-create-from-tg, tasks-exec-log, tasks-unlock-prereq, and telegram-find routes to lock down authorization and response shapes.",
+    "category": "api",
+    "estimated_effort": "medium"
   }
 ]

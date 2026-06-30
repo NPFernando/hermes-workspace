@@ -49,13 +49,17 @@ import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-res
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
 import { Route as ApiTelegramTaskClarifyRouteImport } from './routes/api/telegram-task-clarify'
+import { Route as ApiTelegramFindRouteImport } from './routes/api/telegram-find'
 import { Route as ApiTelegramBoardRouteImport } from './routes/api/telegram-board'
+import { Route as ApiTasksUnlockPrereqRouteImport } from './routes/api/tasks-unlock-prereq'
 import { Route as ApiTasksPruneRouteImport } from './routes/api/tasks-prune'
 import { Route as ApiTasksProgressPingRouteImport } from './routes/api/tasks-progress-ping'
 import { Route as ApiTasksInjectIdeasRouteImport } from './routes/api/tasks-inject-ideas'
 import { Route as ApiTasksGenerateIdeasRouteImport } from './routes/api/tasks-generate-ideas'
 import { Route as ApiTasksFromTextRouteImport } from './routes/api/tasks-from-text'
+import { Route as ApiTasksExecLogRouteImport } from './routes/api/tasks-exec-log'
 import { Route as ApiTasksDeployAgentsRouteImport } from './routes/api/tasks-deploy-agents'
+import { Route as ApiTasksCreateFromTgRouteImport } from './routes/api/tasks-create-from-tg'
 import { Route as ApiTasksCompletionCheckRouteImport } from './routes/api/tasks-completion-check'
 import { Route as ApiTasksClarifyNudgeRouteImport } from './routes/api/tasks-clarify-nudge'
 import { Route as ApiTasksBatchExecuteRouteImport } from './routes/api/tasks-batch-execute'
@@ -424,9 +428,19 @@ const ApiTelegramTaskClarifyRoute = ApiTelegramTaskClarifyRouteImport.update({
   path: '/api/telegram-task-clarify',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTelegramFindRoute = ApiTelegramFindRouteImport.update({
+  id: '/api/telegram-find',
+  path: '/api/telegram-find',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTelegramBoardRoute = ApiTelegramBoardRouteImport.update({
   id: '/api/telegram-board',
   path: '/api/telegram-board',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksUnlockPrereqRoute = ApiTasksUnlockPrereqRouteImport.update({
+  id: '/api/tasks-unlock-prereq',
+  path: '/api/tasks-unlock-prereq',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTasksPruneRoute = ApiTasksPruneRouteImport.update({
@@ -454,9 +468,19 @@ const ApiTasksFromTextRoute = ApiTasksFromTextRouteImport.update({
   path: '/api/tasks-from-text',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTasksExecLogRoute = ApiTasksExecLogRouteImport.update({
+  id: '/api/tasks-exec-log',
+  path: '/api/tasks-exec-log',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTasksDeployAgentsRoute = ApiTasksDeployAgentsRouteImport.update({
   id: '/api/tasks-deploy-agents',
   path: '/api/tasks-deploy-agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksCreateFromTgRoute = ApiTasksCreateFromTgRouteImport.update({
+  id: '/api/tasks-create-from-tg',
+  path: '/api/tasks-create-from-tg',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTasksCompletionCheckRoute = ApiTasksCompletionCheckRouteImport.update({
@@ -1422,13 +1446,17 @@ export interface FileRoutesByFullPath {
   '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
+  '/api/tasks-create-from-tg': typeof ApiTasksCreateFromTgRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
+  '/api/tasks-exec-log': typeof ApiTasksExecLogRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
   '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/tasks-unlock-prereq': typeof ApiTasksUnlockPrereqRoute
   '/api/telegram-board': typeof ApiTelegramBoardRoute
+  '/api/telegram-find': typeof ApiTelegramFindRoute
   '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -1637,13 +1665,17 @@ export interface FileRoutesByTo {
   '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
+  '/api/tasks-create-from-tg': typeof ApiTasksCreateFromTgRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
+  '/api/tasks-exec-log': typeof ApiTasksExecLogRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
   '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/tasks-unlock-prereq': typeof ApiTasksUnlockPrereqRoute
   '/api/telegram-board': typeof ApiTelegramBoardRoute
+  '/api/telegram-find': typeof ApiTelegramFindRoute
   '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -1854,13 +1886,17 @@ export interface FileRoutesById {
   '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
+  '/api/tasks-create-from-tg': typeof ApiTasksCreateFromTgRoute
   '/api/tasks-deploy-agents': typeof ApiTasksDeployAgentsRoute
+  '/api/tasks-exec-log': typeof ApiTasksExecLogRoute
   '/api/tasks-from-text': typeof ApiTasksFromTextRoute
   '/api/tasks-generate-ideas': typeof ApiTasksGenerateIdeasRoute
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
   '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/tasks-unlock-prereq': typeof ApiTasksUnlockPrereqRoute
   '/api/telegram-board': typeof ApiTelegramBoardRoute
+  '/api/telegram-find': typeof ApiTelegramFindRoute
   '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -2072,13 +2108,17 @@ export interface FileRouteTypes {
     | '/api/tasks-batch-execute'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
+    | '/api/tasks-create-from-tg'
     | '/api/tasks-deploy-agents'
+    | '/api/tasks-exec-log'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
     | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/tasks-unlock-prereq'
     | '/api/telegram-board'
+    | '/api/telegram-find'
     | '/api/telegram-task-clarify'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -2287,13 +2327,17 @@ export interface FileRouteTypes {
     | '/api/tasks-batch-execute'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
+    | '/api/tasks-create-from-tg'
     | '/api/tasks-deploy-agents'
+    | '/api/tasks-exec-log'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
     | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/tasks-unlock-prereq'
     | '/api/telegram-board'
+    | '/api/telegram-find'
     | '/api/telegram-task-clarify'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -2503,13 +2547,17 @@ export interface FileRouteTypes {
     | '/api/tasks-batch-execute'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
+    | '/api/tasks-create-from-tg'
     | '/api/tasks-deploy-agents'
+    | '/api/tasks-exec-log'
     | '/api/tasks-from-text'
     | '/api/tasks-generate-ideas'
     | '/api/tasks-inject-ideas'
     | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/tasks-unlock-prereq'
     | '/api/telegram-board'
+    | '/api/telegram-find'
     | '/api/telegram-task-clarify'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -2720,13 +2768,17 @@ export interface RootRouteChildren {
   ApiTasksBatchExecuteRoute: typeof ApiTasksBatchExecuteRoute
   ApiTasksClarifyNudgeRoute: typeof ApiTasksClarifyNudgeRoute
   ApiTasksCompletionCheckRoute: typeof ApiTasksCompletionCheckRoute
+  ApiTasksCreateFromTgRoute: typeof ApiTasksCreateFromTgRoute
   ApiTasksDeployAgentsRoute: typeof ApiTasksDeployAgentsRoute
+  ApiTasksExecLogRoute: typeof ApiTasksExecLogRoute
   ApiTasksFromTextRoute: typeof ApiTasksFromTextRoute
   ApiTasksGenerateIdeasRoute: typeof ApiTasksGenerateIdeasRoute
   ApiTasksInjectIdeasRoute: typeof ApiTasksInjectIdeasRoute
   ApiTasksProgressPingRoute: typeof ApiTasksProgressPingRoute
   ApiTasksPruneRoute: typeof ApiTasksPruneRoute
+  ApiTasksUnlockPrereqRoute: typeof ApiTasksUnlockPrereqRoute
   ApiTelegramBoardRoute: typeof ApiTelegramBoardRoute
+  ApiTelegramFindRoute: typeof ApiTelegramFindRoute
   ApiTelegramTaskClarifyRoute: typeof ApiTelegramTaskClarifyRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
@@ -3065,11 +3117,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramTaskClarifyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/telegram-find': {
+      id: '/api/telegram-find'
+      path: '/api/telegram-find'
+      fullPath: '/api/telegram-find'
+      preLoaderRoute: typeof ApiTelegramFindRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/telegram-board': {
       id: '/api/telegram-board'
       path: '/api/telegram-board'
       fullPath: '/api/telegram-board'
       preLoaderRoute: typeof ApiTelegramBoardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-unlock-prereq': {
+      id: '/api/tasks-unlock-prereq'
+      path: '/api/tasks-unlock-prereq'
+      fullPath: '/api/tasks-unlock-prereq'
+      preLoaderRoute: typeof ApiTasksUnlockPrereqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tasks-prune': {
@@ -3107,11 +3173,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTasksFromTextRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/tasks-exec-log': {
+      id: '/api/tasks-exec-log'
+      path: '/api/tasks-exec-log'
+      fullPath: '/api/tasks-exec-log'
+      preLoaderRoute: typeof ApiTasksExecLogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tasks-deploy-agents': {
       id: '/api/tasks-deploy-agents'
       path: '/api/tasks-deploy-agents'
       fullPath: '/api/tasks-deploy-agents'
       preLoaderRoute: typeof ApiTasksDeployAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-create-from-tg': {
+      id: '/api/tasks-create-from-tg'
+      path: '/api/tasks-create-from-tg'
+      fullPath: '/api/tasks-create-from-tg'
+      preLoaderRoute: typeof ApiTasksCreateFromTgRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tasks-completion-check': {
@@ -4642,13 +4722,17 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTasksBatchExecuteRoute: ApiTasksBatchExecuteRoute,
   ApiTasksClarifyNudgeRoute: ApiTasksClarifyNudgeRoute,
   ApiTasksCompletionCheckRoute: ApiTasksCompletionCheckRoute,
+  ApiTasksCreateFromTgRoute: ApiTasksCreateFromTgRoute,
   ApiTasksDeployAgentsRoute: ApiTasksDeployAgentsRoute,
+  ApiTasksExecLogRoute: ApiTasksExecLogRoute,
   ApiTasksFromTextRoute: ApiTasksFromTextRoute,
   ApiTasksGenerateIdeasRoute: ApiTasksGenerateIdeasRoute,
   ApiTasksInjectIdeasRoute: ApiTasksInjectIdeasRoute,
   ApiTasksProgressPingRoute: ApiTasksProgressPingRoute,
   ApiTasksPruneRoute: ApiTasksPruneRoute,
+  ApiTasksUnlockPrereqRoute: ApiTasksUnlockPrereqRoute,
   ApiTelegramBoardRoute: ApiTelegramBoardRoute,
+  ApiTelegramFindRoute: ApiTelegramFindRoute,
   ApiTelegramTaskClarifyRoute: ApiTelegramTaskClarifyRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,

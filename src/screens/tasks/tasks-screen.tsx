@@ -129,6 +129,7 @@ export function TasksScreen() {
   const [ideasLoading, setIdeasLoading] = useState(false)
   const [clearingStuck, setClearingStuck] = useState(false)
   const [batchExecuting, setBatchExecuting] = useState(false)
+  const [unlockingPrereq, setUnlockingPrereq] = useState<string | null>(null)
   const [checkingCompletion, setCheckingCompletion] = useState(false)
   const [breakingDownId, setBreakingDownId] = useState<string | null>(null)
   const [pruningStale, setPruningStale] = useState(false)
@@ -272,7 +273,19 @@ export function TasksScreen() {
     const completion = total > 0 ? Math.round((done / total) * 100) : 0
     const agentActive = tasks.filter(t => t.agent_state).length
     const readyToExecute = countExecutableReviewTasks(tasks)
-    return { total, running, blocked, blockedWaiting, blockedExecFail, done, overdue, completion, agentActive, readyToExecute }
+    // Group gated tasks by prereq ID so we can show unlock buttons
+    const prereqGroups = new Map<string, { count: number; title: string }>()
+    tasks.forEach((t) => {
+      if (!Array.isArray(t.depends_on) || t.depends_on.length === 0) return
+      t.depends_on.forEach((depId) => {
+        const prereq = tasks.find((p) => p.id === depId)
+        const entry = prereqGroups.get(depId)
+        if (entry) { entry.count++ }
+        else { prereqGroups.set(depId, { count: 1, title: prereq?.title ?? 'prerequisite' }) }
+      })
+    })
+    const gatedPrereqs = [...prereqGroups.entries()].map(([id, { count, title }]) => ({ id, count, title }))
+    return { total, running, blocked, blockedWaiting, blockedExecFail, done, overdue, completion, agentActive, readyToExecute, gatedPrereqs }
   }, [tasks])
 
   const invalidate = useCallback(() => {
@@ -633,6 +646,46 @@ export function TasksScreen() {
               {batchExecuting ? 'Starting…' : `Execute Ready (${stats.readyToExecute})`}
             </button>
           )}
+
+          {/* Unlock prereq — shown when tasks are gated on a credential prerequisite */}
+          {stats.gatedPrereqs.map(({ id, count, title }) => (
+            <button
+              key={id}
+              onClick={async () => {
+                if (!window.confirm(`Mark "${title.slice(0, 60)}" as done and unlock ${count} waiting task${count !== 1 ? 's' : ''}?`)) return
+                setUnlockingPrereq(id)
+                try {
+                  const res = await fetch('/api/tasks-unlock-prereq', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prereq_id: id }),
+                  })
+                  const data = await res.json() as { ok: boolean; unblocked?: number; error?: string }
+                  if (data.ok) {
+                    await tasksQuery.refetch()
+                    toast(`Unlocked ${data.unblocked ?? count} task${(data.unblocked ?? count) !== 1 ? 's' : ''} — deploy sweep triggered`)
+                  } else {
+                    toast(data.error ?? 'Unlock failed', { type: 'error' })
+                  }
+                } catch {
+                  toast('Unlock failed', { type: 'error' })
+                } finally {
+                  setUnlockingPrereq(null)
+                }
+              }}
+              disabled={unlockingPrereq === id}
+              title={`Mark "${title}" as done to unlock ${count} waiting task${count !== 1 ? 's' : ''}`}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+                unlockingPrereq === id
+                  ? 'border-amber-500/50 bg-amber-500/10 text-amber-400 cursor-wait'
+                  : 'border-[var(--theme-border)] text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50',
+              )}
+            >
+              <HugeiconsIcon icon={CheckListIcon} size={13} strokeWidth={1.8} className={unlockingPrereq === id ? 'animate-pulse' : ''} />
+              {unlockingPrereq === id ? 'Unlocking…' : `Unlock (${count})`}
+            </button>
+          ))}
 
           {/* Secondary actions — overflow menu */}
           <MenuRoot>
