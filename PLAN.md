@@ -1,32 +1,38 @@
-# Plan: Execute Ready batch action for planned review tasks
+# Plan: Harden automated task execution and board status reporting
 
 ## Summary of the change
-Add a small Tasks board action that lets the operator execute up to five review-column tasks that already have real plans. The backend exposes an authenticated batch endpoint that starts existing Hermes task execution with a concurrency cap and returns how many tasks started and how many remain.
+Improve Hermes workspace task execution reliability by adding VM-safe execution guards, clearer Telegram/operator visibility, and stricter readiness checks for planned review tasks. Add a lightweight `/api/telegram-board` route that can render or send a compact board status summary.
 
 ## Files to modify
-- `src/lib/tasks-api.ts`
-- `src/routes/api/tasks-batch-execute.ts`
 - `src/server/astra-tasks.ts`
+- `src/server/task-execution-utils.ts`
+- `src/routes/api/telegram-board.ts`
+- `src/routeTree.gen.ts`
 - `src/screens/tasks/tasks-screen.tsx`
 - `src/screens/tasks/tasks-ux.test.ts`
-- `src/routeTree.gen.ts`
+- `IDEAS.json`
+- `PLAN.md`
+- `TEST_REPORT.json`
+- `CLOSE_SUMMARY.md`
 
 ## Steps
-1. Preserve the existing idea backlog and append the batch-execution idea without deleting prior entries.
-2. Add `batchExecuteTasks()` to the client task API.
-3. Add `/api/tasks-batch-execute` with authentication, a bounded `limit`, and optional explicit task IDs.
-4. Add `batchExecuteBackground()` on the server to select review tasks with usable plans, stagger starts, and return `{ started, remaining }`.
-5. Extract shared UI readiness logic into `countExecutableReviewTasks()` and cover it with focused Vitest tests.
-6. Render an `Execute Ready` button only when at least one review task is executable; show loading and toast feedback.
+1. Preserve the existing idea backlog and append the execution-hardening, Telegram-board-summary, and stub-plan-readiness ideas without deleting prior entries.
+2. Add task execution preflight and concurrency safeguards in `astra-tasks.ts` so background execution checks gateway/OpenRouter reachability, caps concurrent workers, and records deferrals instead of spawning blindly.
+3. Add periodic operator visibility: daily board health summary, auto-execute sweep for aged real review plans, and long-running execution progress pings.
+4. Add `/api/telegram-board` and route-tree registration so the workspace can return/send a formatted board status summary.
+5. Centralize/document `parseWorkSummary` behavior in `task-execution-utils.ts` for future drift checks with the embedded subprocess parser.
+6. Require substantive planned notes (>=80 chars and not `Plan unavailable`) before review tasks count as executable in UI and backend batch execution; update focused UX tests.
+7. Verify with TypeScript, focused Tasks UX Vitest, focused ESLint, git diff whitespace check, full build, and JSON health validation after service restart.
 
 ## How to verify the change works
 - `export PATH=/home/ubuntu/.hermes/node/bin:$PATH`
 - `npx tsc --noEmit`
 - `npx vitest run src/screens/tasks/tasks-ux.test.ts`
-- `npx eslint --no-warn-ignored -f json src/lib/tasks-api.ts src/routes/api/tasks-batch-execute.ts src/server/astra-tasks.ts src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts`
+- `npx eslint --no-warn-ignored -f json src/server/astra-tasks.ts src/server/task-execution-utils.ts src/routes/api/telegram-board.ts src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts`
 - `git diff --check`
 - `pnpm build`
-- Restart `hermes-workspace.service` because source files changed, then validate `/api/health` returns JSON `{ "status": "ok" }`.
+- `sudo systemctl restart hermes-workspace.service`
+- Validate `https://agent.fernandofamily.com/api/health` returns HTTP 200, `application/json`, and `{ "status": "ok" }`.
 
 ## Rollback procedure
 Revert the auto-improvement commit, rebuild the workspace, restart `hermes-workspace.service`, and re-run the JSON health check.

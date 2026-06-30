@@ -90,7 +90,8 @@ export function countExecutableReviewTasks(tasks: Array<ExecutableReviewCandidat
     if (task.column !== 'review' || task.agent_state) return false
     const plannedHistory = (task.agent_history ?? []).filter((entry) => entry.action === 'planned')
     if (plannedHistory.length === 0) return false
-    return !plannedHistory[plannedHistory.length - 1].note.includes('Plan unavailable')
+    const lastNote = plannedHistory[plannedHistory.length - 1].note
+    return !lastNote.includes('Plan unavailable') && lastNote.length >= 80
   }).length
 }
 

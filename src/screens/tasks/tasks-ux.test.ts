@@ -65,13 +65,21 @@ describe('tasks UX copy', () => {
   })
 
   it('counts only review tasks with usable execution plans', () => {
-    const plannedHistory = [{ id: 'h1', action: 'planned', note: '1. Do the work', by: 'astra', at: '2026-01-01T00:00:00Z' }]
+    const plannedHistory = [{
+      id: 'h1',
+      action: 'planned',
+      note: '1. Inspect the target files. 2. Apply the requested code change. 3. Run focused verification and report the result.',
+      by: 'astra',
+      at: '2026-01-01T00:00:00Z',
+    }]
+    const stubHistory = [{ id: 'h3', action: 'planned', note: '1. Do the work', by: 'astra', at: '2026-01-01T00:00:00Z' }]
     const unavailableHistory = [{ id: 'h2', action: 'planned', note: 'Plan unavailable — press Execute to proceed.', by: 'astra', at: '2026-01-01T00:00:00Z' }]
 
     expect(countExecutableReviewTasks([
       { column: 'review', agent_state: null, agent_history: plannedHistory },
       { column: 'review', agent_state: 'working', agent_history: plannedHistory },
       { column: 'review', agent_state: null, agent_history: unavailableHistory },
+      { column: 'review', agent_state: null, agent_history: stubHistory },
       { column: 'todo', agent_state: null, agent_history: plannedHistory },
       { column: 'review', agent_state: null, agent_history: [] },
     ])).toBe(1)

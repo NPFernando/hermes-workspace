@@ -49,6 +49,7 @@ import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-res
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
 import { Route as ApiTelegramTaskClarifyRouteImport } from './routes/api/telegram-task-clarify'
+import { Route as ApiTelegramBoardRouteImport } from './routes/api/telegram-board'
 import { Route as ApiTasksPruneRouteImport } from './routes/api/tasks-prune'
 import { Route as ApiTasksProgressPingRouteImport } from './routes/api/tasks-progress-ping'
 import { Route as ApiTasksInjectIdeasRouteImport } from './routes/api/tasks-inject-ideas'
@@ -421,6 +422,11 @@ const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
 const ApiTelegramTaskClarifyRoute = ApiTelegramTaskClarifyRouteImport.update({
   id: '/api/telegram-task-clarify',
   path: '/api/telegram-task-clarify',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTelegramBoardRoute = ApiTelegramBoardRouteImport.update({
+  id: '/api/telegram-board',
+  path: '/api/telegram-board',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTasksPruneRoute = ApiTasksPruneRouteImport.update({
@@ -1422,6 +1428,7 @@ export interface FileRoutesByFullPath {
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
   '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/telegram-board': typeof ApiTelegramBoardRoute
   '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -1636,6 +1643,7 @@ export interface FileRoutesByTo {
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
   '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/telegram-board': typeof ApiTelegramBoardRoute
   '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -1852,6 +1860,7 @@ export interface FileRoutesById {
   '/api/tasks-inject-ideas': typeof ApiTasksInjectIdeasRoute
   '/api/tasks-progress-ping': typeof ApiTasksProgressPingRoute
   '/api/tasks-prune': typeof ApiTasksPruneRoute
+  '/api/telegram-board': typeof ApiTelegramBoardRoute
   '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
@@ -2069,6 +2078,7 @@ export interface FileRouteTypes {
     | '/api/tasks-inject-ideas'
     | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/telegram-board'
     | '/api/telegram-task-clarify'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -2283,6 +2293,7 @@ export interface FileRouteTypes {
     | '/api/tasks-inject-ideas'
     | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/telegram-board'
     | '/api/telegram-task-clarify'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -2498,6 +2509,7 @@ export interface FileRouteTypes {
     | '/api/tasks-inject-ideas'
     | '/api/tasks-progress-ping'
     | '/api/tasks-prune'
+    | '/api/telegram-board'
     | '/api/telegram-task-clarify'
     | '/api/terminal-close'
     | '/api/terminal-input'
@@ -2714,6 +2726,7 @@ export interface RootRouteChildren {
   ApiTasksInjectIdeasRoute: typeof ApiTasksInjectIdeasRoute
   ApiTasksProgressPingRoute: typeof ApiTasksProgressPingRoute
   ApiTasksPruneRoute: typeof ApiTasksPruneRoute
+  ApiTelegramBoardRoute: typeof ApiTelegramBoardRoute
   ApiTelegramTaskClarifyRoute: typeof ApiTelegramTaskClarifyRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
@@ -3050,6 +3063,13 @@ declare module '@tanstack/react-router' {
       path: '/api/telegram-task-clarify'
       fullPath: '/api/telegram-task-clarify'
       preLoaderRoute: typeof ApiTelegramTaskClarifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telegram-board': {
+      id: '/api/telegram-board'
+      path: '/api/telegram-board'
+      fullPath: '/api/telegram-board'
+      preLoaderRoute: typeof ApiTelegramBoardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tasks-prune': {
@@ -4628,6 +4648,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTasksInjectIdeasRoute: ApiTasksInjectIdeasRoute,
   ApiTasksProgressPingRoute: ApiTasksProgressPingRoute,
   ApiTasksPruneRoute: ApiTasksPruneRoute,
+  ApiTelegramBoardRoute: ApiTelegramBoardRoute,
   ApiTelegramTaskClarifyRoute: ApiTelegramTaskClarifyRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,

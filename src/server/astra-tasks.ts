@@ -85,6 +85,7 @@ function resolveHermesBin(): string {
   return r.stdout.trim() || 'hermes'
 }
 const HERMES_BIN = resolveHermesBin()
+const TG_TARGET = 'telegram:2130622225'
 
 // ---------------------------------------------------------------------------
 // clearStuckTasks — recover tasks whose agent process died without cleanup
@@ -318,6 +319,44 @@ export function clearStuckTasks(): number {
     console.log(`[clearStuckTasks] Auto-archived ${archived} stale tasks (>60 days inactive)`)
   }
 
+  // ── Part 6: auto-breakdown blocked tasks that exhausted all retries ──────
+  // Instead of leaving a task permanently blocked, break it into subtasks so
+  // progress continues. Fires once per task (guarded by 'auto_breakdown' history entry).
+  for (const task of all) {
+    if (task.column !== 'blocked') continue
+    if (task.agent_state) continue
+    if (task.waiting_for_user) continue
+    if ((task.auto_retry_count ?? 0) < MAX_AUTO_RETRIES) continue  // retries not exhausted yet
+
+    const history = task.agent_history ?? []
+    if (history.some((h) => h.action === 'auto_breakdown')) continue  // already attempted
+
+    // Wait the same cooldown before breaking down (avoid thrashing on fresh blocks)
+    const lastRetry = [...history].reverse().find((e) => e.action === 'auto_retry' || e.action === 'blocked')
+    if (!lastRetry) continue
+    if (now - new Date(lastRetry.at).getTime() < AUTO_RETRY_AFTER_MS) continue
+
+    const nowIso = new Date().toISOString()
+    updateTask(task.id, {
+      agent_history: [...history, {
+        id: randomUUID(), by: 'astra', byEmoji: '🌟',
+        action: 'auto_breakdown',
+        note: `Max retries (${MAX_AUTO_RETRIES}) exhausted — auto-breaking into subtasks. Original task kept for reference.`,
+        at: nowIso,
+      }],
+    })
+
+    breakdownTaskWithAI(task.id)
+      .then((result) => {
+        if (result && result.count > 0) {
+          spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q',
+            `🔨 Auto-breakdown: "${task.title.slice(0, 50)}" → ${result.count} subtask${result.count !== 1 ? 's' : ''} created`],
+            { encoding: 'utf-8', timeout: 15_000 })
+        }
+      })
+      .catch(() => { /* non-fatal */ })
+  }
+
   return cleared
 }
 
@@ -331,6 +370,136 @@ setInterval(clearStuckTasks, 10 * 60 * 1000)
 setInterval(() => {
   try { runAgentDeployBackground('auto') } catch { /* non-fatal */ }
 }, 15 * 60 * 1000)
+
+// Daily board health summary at 9 AM IST (UTC+5:30 = 03:30 UTC).
+let _boardHealthLastSentDate = ''
+setInterval(() => {
+  try {
+    const nowUtc = new Date()
+    const istMs = nowUtc.getTime() + (5 * 60 + 30) * 60 * 1000
+    const ist = new Date(istMs)
+    const istHour = ist.getUTCHours()
+    const istDate = ist.toISOString().slice(0, 10)
+    if (istHour !== 9) return
+    if (_boardHealthLastSentDate === istDate) return
+    _boardHealthLastSentDate = istDate
+
+    const all = listTasks({ includeDone: false })
+    const cols: Record<string, number> = {}
+    all.forEach((t) => { cols[t.column] = (cols[t.column] ?? 0) + 1 })
+    const reviewReady = all.filter(
+      (t) => t.column === 'review' && !t.agent_state &&
+        (t.agent_history ?? []).some((h) => h.action === 'planned' && !h.note.includes('Plan unavailable'))
+    ).length
+    const depWaiting = all.filter(
+      (t) => t.column === 'todo' && Array.isArray(t.depends_on) && t.depends_on.length > 0
+    ).length
+    const blockedCount = cols['blocked'] ?? 0
+    const msg =
+      `📊 Board health ${istDate} (IST)\n` +
+      `Todo: ${cols['todo'] ?? 0} | Review: ${cols['review'] ?? 0} | Blocked: ${blockedCount}\n` +
+      `✅ Ready to Execute: ${reviewReady}\n` +
+      `⏳ Waiting on credentials: ${depWaiting}\n` +
+      (blockedCount > 0 ? `⚠️ ${blockedCount} task(s) blocked — check workspace\n` : '') +
+      `→ agent.fernandofamily.com/tasks`
+    spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q', msg], {
+      encoding: 'utf-8', timeout: 15_000,
+    })
+  } catch { /* non-fatal */ }
+}, 30 * 60 * 1000)
+
+// Auto-execute review sweep: tasks with real plans waiting >HERMES_AUTO_EXECUTE_DELAY_H hours.
+const AUTO_EXECUTE_DELAY_MS =
+  parseFloat(process.env.HERMES_AUTO_EXECUTE_DELAY_H ?? '2') * 60 * 60 * 1000
+const AUTO_EXECUTE_MAX = parseInt(process.env.HERMES_AUTO_EXECUTE_MAX ?? '5', 10)
+
+setInterval(() => {
+  try {
+    const now = Date.now()
+    const candidates = listTasks({ column: 'review' }).filter((t) => {
+      if (t.agent_state) return false
+      const plannedHistory = (t.agent_history ?? []).filter((h) => h.action === 'planned')
+      if (plannedHistory.length === 0) return false
+      const lastNote = plannedHistory[plannedHistory.length - 1].note
+      if (lastNote.includes('Plan unavailable')) return false
+      // Quality gate: plans shorter than 80 chars are stubs — skip until re-planned
+      if (lastNote.length < 80) return false
+      // Concurrency guard: don't start more if we're already at capacity
+      const running = listTasks({}).filter((x) => x.agent_state === 'working').length
+      if (running >= MAX_CONCURRENT_EXECUTIONS) return false
+      return now - new Date(t.updated_at).getTime() >= AUTO_EXECUTE_DELAY_MS
+    }).slice(0, AUTO_EXECUTE_MAX)
+
+    if (candidates.length === 0) return
+    candidates.forEach((task, i) => {
+      setTimeout(() => {
+        try { executeTaskWithHermesBackground(task.id) } catch { /* non-fatal */ }
+      }, i * 500)
+    })
+    spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q',
+      `⚡ Auto-executing ${candidates.length} review task${candidates.length > 1 ? 's' : ''} (waited >${Math.round(AUTO_EXECUTE_DELAY_MS / 3600000)}h)\n` +
+      candidates.map((t) => `• ${t.title.slice(0, 60)}`).join('\n'),
+    ], { encoding: 'utf-8', timeout: 15_000 })
+  } catch { /* non-fatal */ }
+}, 30 * 60 * 1000)
+
+// Execution progress pings: tasks executing >8 min get a Telegram log tail.
+setInterval(() => {
+  try {
+    const hermesHome = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+    const logsDir = path.join(hermesHome, 'logs')
+    const PING_AFTER_MS = 8 * 60 * 1000
+    const now = Date.now()
+    const longRunning = listTasks({}).filter(
+      (t) => t.agent_state === 'working' &&
+             t.agent_action_at &&
+             now - new Date(t.agent_action_at).getTime() > PING_AFTER_MS &&
+             !(t.agent_progress_pinged_at &&
+               now - new Date(t.agent_progress_pinged_at).getTime() < 15 * 60 * 1000)
+    )
+    for (const task of longRunning) {
+      try {
+        const prefix = `exec-${task.id.slice(0, 8)}-`
+        const logs = fs.readdirSync(logsDir).filter((f) => f.startsWith(prefix)).sort().slice(-1)
+        const logTail = logs.length > 0
+          ? fs.readFileSync(path.join(logsDir, logs[0]), 'utf-8').split('\n').filter(Boolean).slice(-8).join('\n')
+          : '(log not found)'
+        const elapsed = Math.round((now - new Date(task.agent_action_at!).getTime()) / 60000)
+        spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q',
+          `⏳ Still running (${elapsed}min): ${task.title.slice(0, 60)}\n\n${logTail.slice(0, 500)}`,
+        ], { encoding: 'utf-8', timeout: 15_000 })
+        updateTask(task.id, { agent_progress_pinged_at: new Date().toISOString() })
+      } catch { /* skip this task */ }
+    }
+  } catch { /* non-fatal */ }
+}, 10 * 60 * 1000)
+
+// Priority aging: tasks in todo for >7 days with non-high priority get bumped.
+setInterval(() => {
+  try {
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+    const now = Date.now()
+    const stale = listTasks({ column: 'todo' }).filter(
+      (t) => t.priority !== 'high' &&
+             !t.agent_state &&
+             now - new Date(t.created_at).getTime() > SEVEN_DAYS_MS
+    )
+    for (const task of stale) {
+      updateTask(task.id, {
+        priority: 'high',
+        agent_history: [...(task.agent_history ?? []), {
+          id: randomUUID(), by: 'astra', byEmoji: '🌟',
+          action: 'priority_bumped',
+          note: `Auto-bumped to high priority after ${Math.floor((now - new Date(task.created_at).getTime()) / 86400000)} days in todo.`,
+          at: new Date().toISOString(),
+        }],
+      })
+    }
+    if (stale.length > 0) {
+      console.log(`[astra-tasks] Priority-bumped ${stale.length} stale todo tasks to high`)
+    }
+  } catch { /* non-fatal */ }
+}, 60 * 60 * 1000) // hourly
 
 // ---------------------------------------------------------------------------
 // markTasksAsReviewing
@@ -527,7 +696,7 @@ export function runAgentDeployBackground(mode: 'manual' | 'auto' = 'manual'): { 
       const db = new Date(b.created_at).getTime()
       return da - db                                      // older tasks first within same priority
     })
-  const MAX_PER_CYCLE = 3
+  const MAX_PER_CYCLE = 8
 
   // Build a set of done task IDs to resolve depends_on checks
   const doneTasks = new Set(listTasks({ includeDone: true })
@@ -643,9 +812,9 @@ function updateTaskDirect(taskId, updates) {
   });
 }
 
-function callHermes(prompt, profileDir) {
+function callHermes(prompt, profileDir, modelArgs = ['-m', 'nvidia/nemotron-3-super-120b-a12b:free', '--provider', 'openrouter']) {
   const profileArgs = profileDir ? ['--profile', profileDir] : [];
-  const r = spawnSync(HERMES_BIN, [...profileArgs, '-z', prompt], { encoding: 'utf-8', timeout: 90000, maxBuffer: 4 * 1024 * 1024 });
+  const r = spawnSync(HERMES_BIN, [...profileArgs, ...modelArgs, '-z', prompt], { encoding: 'utf-8', timeout: 90000, maxBuffer: 4 * 1024 * 1024 });
   return r.stdout || '';
 }
 
@@ -720,6 +889,7 @@ async function sendTelegramClarificationKeyboard(taskId, taskTitle, questions) {
 }
 
 // Shared WORK_SUMMARY parser used for auto-execution results
+// Canonical source: src/server/task-execution-utils.ts — keep in sync with that file.
 function parseWorkSummary(output, stderr, exitCode) {
   let status = 'partial', summary = '', next = '', question = '';
   const block = output.match(/<WORK_SUMMARY>([\\s\\S]*?)<\\/WORK_SUMMARY>/)?.[1] ?? '';
@@ -734,9 +904,12 @@ function parseWorkSummary(output, stderr, exitCode) {
     if (nx) next     = nx[1].trim().replace(/^\\[|\\]$/g, '');
     if (q)  question = q[1].trim().replace(/^\\[|\\]$/g, '');
   }
-  if (exitCode !== 0 && status === 'partial') {
+  const isTransientFailure = stderr.includes('no final response') || stderr.includes('timed out') || stderr.includes('connection refused') || stderr.includes('rate limit');
+  if (exitCode !== 0 && status === 'partial' && !isTransientFailure) {
     status  = 'blocked';
     summary = summary || ('hermes exited with code ' + exitCode + (stderr ? ': ' + stderr.slice(0, 200) : ''));
+  } else if (exitCode !== 0 && status === 'partial' && isTransientFailure) {
+    summary = summary || ('Transient execution failure (model unavailable) — will retry automatically. ' + stderr.slice(0, 150));
   }
   const freeText = output.replace(/<WORK_SUMMARY>[\\s\\S]*?<\\/WORK_SUMMARY>/g, '').trim();
   const note = summary || freeText.slice(0, 800) ||
@@ -956,7 +1129,16 @@ for (const reviewTask of sisterReviewQueue) {
       'Return ONLY valid JSON:\\n' +
       '{"action":"ready","plan":"1. ...\\\\n2. ...\\\\n3. ...","reassign_to":null,"question":""}';
 
-    const planResult = parseJSON(callHermes(planPrompt, profileDir));
+    const SISTER_MODELS = {
+      luna: ['-m', 'google/gemma-3-27b-it:free', '--provider', 'openrouter'],
+      researcher: ['-m', 'google/gemma-3-27b-it:free', '--provider', 'openrouter'],
+      ada: ['-m', 'meta-llama/llama-4-maverick:free', '--provider', 'openrouter'],
+      coder: ['-m', 'meta-llama/llama-4-maverick:free', '--provider', 'openrouter'],
+      maya: ['-m', 'nvidia/nemotron-3-super-120b-a12b:free', '--provider', 'openrouter'],
+      builder: ['-m', 'nvidia/nemotron-3-super-120b-a12b:free', '--provider', 'openrouter'],
+    };
+    const sisterModelArgs = SISTER_MODELS[assignee] || ['-m', 'nvidia/nemotron-3-super-120b-a12b:free', '--provider', 'openrouter'];
+    const planResult = parseJSON(callHermes(planPrompt, profileDir, sisterModelArgs));
     const cur = getTaskDirect(reviewTask.id);
     const exH = Array.isArray(cur?.agent_history) ? cur.agent_history : [];
     const now = new Date().toISOString();
@@ -1421,9 +1603,66 @@ export function executeTaskBackground(taskId: string): void {
 // "user replied" conversational-continuation path.
 // ---------------------------------------------------------------------------
 
+const MAX_CONCURRENT_EXECUTIONS = parseInt(process.env.HERMES_MAX_CONCURRENT ?? '5', 10)
+
+function isOpenRouterReachable(): boolean {
+  try {
+    const r = spawnSync('curl', ['-sf', '--max-time', '5', '-o', '/dev/null',
+      'https://openrouter.ai/api/v1/models'], { encoding: 'utf-8', timeout: 6_000 })
+    return r.status === 0
+  } catch { return true }
+}
+
+function isGatewayReachable(): boolean {
+  try {
+    const r = spawnSync('curl', ['-sf', '--max-time', '3', '-o', '/dev/null',
+      'http://127.0.0.1:8642/health'], { encoding: 'utf-8', timeout: 4_000 })
+    return r.status === 0
+  } catch { return true }  // fail-open: don't block execution if curl unavailable
+}
+
 export function executeTaskWithHermesBackground(taskId: string): void {
   const task = getTask(taskId)
   if (!task) return
+
+  // Concurrency cap: don't spawn more hermes processes than the VM can handle.
+  const running = listTasks({}).filter((t) => t.agent_state === 'working').length
+  if (running >= MAX_CONCURRENT_EXECUTIONS) {
+    updateTask(taskId, {
+      agent_history: [...(task.agent_history ?? []), {
+        id: randomUUID(), by: 'astra', byEmoji: '🌟',
+        action: 'deferred',
+        note: `Deferred: ${running}/${MAX_CONCURRENT_EXECUTIONS} executions already running. Will auto-execute on next sweep.`,
+        at: new Date().toISOString(),
+      }],
+    })
+    return
+  }
+
+  // Pre-flight: abort early if the hermes gateway or OpenRouter are unreachable.
+  if (!isGatewayReachable()) {
+    updateTask(taskId, {
+      agent_history: [...(task.agent_history ?? []), {
+        id: randomUUID(), by: 'astra', byEmoji: '🌟',
+        action: 'attempted',
+        note: 'Pre-flight check failed — Hermes gateway (:8642) unreachable. Run `hermes gateway run` to restart.',
+        at: new Date().toISOString(),
+      }],
+    })
+    return
+  }
+
+  if (!isOpenRouterReachable()) {
+    updateTask(taskId, {
+      agent_history: [...(task.agent_history ?? []), {
+        id: randomUUID(), by: 'astra', byEmoji: '🌟',
+        action: 'attempted',
+        note: 'Pre-flight check failed — OpenRouter unreachable. Will retry on next deploy cycle.',
+        at: new Date().toISOString(),
+      }],
+    })
+    return
+  }
 
   const { workCwd, profileDir, displayName, emoji } = resolveSisterAndCwd(task)
   const hermesHome =
@@ -1511,9 +1750,12 @@ const AUTO_RETRY_COUNT = ${task.auto_retry_count ?? 0};
 // OpenRouter tier; operators can opt into a paid model via environment when needed.
 const RETRY_MODEL = process.env.HERMES_TASK_RETRY_MODEL || 'openrouter/owl-alpha';
 const RETRY_PROVIDER = process.env.HERMES_TASK_RETRY_PROVIDER || 'openrouter';
+// First run: nemotron (free, reliable — avoids gpt-5.5/codex "no final response" failures).
+// Retry ≥1: escalate to a configurable model (owl-alpha by default, or set HERMES_TASK_RETRY_MODEL).
+const BASE_MODEL_ARGS = ['-m', 'nvidia/nemotron-3-super-120b-a12b:free', '--provider', 'openrouter'];
 const RETRY_MODEL_ARGS = AUTO_RETRY_COUNT >= 1
   ? ['-m', RETRY_MODEL, '--provider', RETRY_PROVIDER]
-  : [];
+  : BASE_MODEL_ARGS;
 
 const LOCK_FILE = TASKS_FILE + '.lock';
 
@@ -2540,14 +2782,16 @@ export function batchExecuteBackground(limit = 5, taskIds?: Array<string>): { st
         if (task == null || task.column !== 'review' || task.agent_state) return false
         const plannedHistory = (task.agent_history ?? []).filter((entry) => entry.action === 'planned')
         if (plannedHistory.length === 0) return false
-        return !plannedHistory[plannedHistory.length - 1].note.includes(PLAN_UNAVAILABLE)
+        const lastNote = plannedHistory[plannedHistory.length - 1].note
+        return !lastNote.includes(PLAN_UNAVAILABLE) && lastNote.length >= 80
       })
   } else {
     candidates = listTasks({ column: 'review' }).filter((task) => {
       if (task.agent_state) return false
       const plannedHistory = (task.agent_history ?? []).filter((entry) => entry.action === 'planned')
       if (plannedHistory.length === 0) return false
-      return !plannedHistory[plannedHistory.length - 1].note.includes(PLAN_UNAVAILABLE)
+      const lastNote = plannedHistory[plannedHistory.length - 1].note
+      return !lastNote.includes(PLAN_UNAVAILABLE) && lastNote.length >= 80
     })
   }
 

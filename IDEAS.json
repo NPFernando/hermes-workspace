@@ -100,5 +100,23 @@
     "description": "Cover the tasks-batch-execute route with authorization, limit clamping, explicit task ID filtering, and no-plan exclusion cases.",
     "category": "backend",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Harden automated task execution preflight and progress reporting",
+    "description": "Add gateway/OpenRouter preflight checks, configurable free-model execution defaults, concurrency guards, and long-running progress pings so task execution fails less silently and avoids overloading the VM.",
+    "category": "backend",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Expose on-demand Telegram task board summary endpoint",
+    "description": "Add an authenticated-friendly workspace API route that formats current task board health for Telegram, including running, ready, blocked, and dependency-waiting counts.",
+    "category": "api",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Treat stub execution plans as not ready",
+    "description": "Require review tasks to have a substantive planned history note before showing Execute Ready or auto-starting execution, preventing one-line stubs from being executed as if they were real plans.",
+    "category": "backend",
+    "estimated_effort": "low"
   }
 ]
