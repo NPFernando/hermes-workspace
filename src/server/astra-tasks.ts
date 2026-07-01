@@ -2100,8 +2100,33 @@ try {
   });
   log('hermes finished — exit=' + result.status + ' stdout_len=' + (result.stdout || '').length + (RETRY_MODEL_ARGS.length ? ' [retry-model]' : ''));
 } catch (e) {
-  // spawnSync throws on timeout (ETIMEDOUT) or spawn failure
+  // spawnSync throws on timeout (ETIMEDOUT) or spawn failure. Any file edits
+  // hermes had already made via its own tool calls before being killed are
+  // NOT rolled back -- they're left uncommitted on disk. Previously this
+  // path only cleared agent_state with no agent_history trace, making a
+  // killed mid-edit run indistinguishable from a task nobody ever touched
+  // (tasks-rescue-timedout.ts looks for action:'timed_out' in agent_history
+  // to find stuck tasks -- this path never wrote one, so it was invisible
+  // to that sweep too).
   log('spawnSync threw: ' + e);
+  try {
+    const file = readTasks();
+    const taskRec = file.tasks.find(t => t.id === TASK_ID);
+    const existing = Array.isArray(taskRec && taskRec.agent_history) ? taskRec.agent_history : [];
+    const isTimeout = (e && e.code === 'ETIMEDOUT') || /timed? ?out/i.test(String(e));
+    updateTaskDirect(TASK_ID, {
+      agent_history: [...existing, {
+        id: randomUUID(), by: DISPLAY_NAME.toLowerCase(), byEmoji: BY_EMOJI,
+        action: 'timed_out',
+        note: isTimeout
+          ? 'Execution timed out after 20 min and was killed. Any file edits already made before the kill were not rolled back -- check for uncommitted changes before retrying.'
+          : 'Execution process failed to start or crashed: ' + String(e).slice(0, 300),
+        at: new Date().toISOString(),
+      }],
+    });
+  } catch (histErr) {
+    log('failed to record timeout history: ' + histErr);
+  }
   clearAgentState();
   cleanup();
   process.exit(1);
