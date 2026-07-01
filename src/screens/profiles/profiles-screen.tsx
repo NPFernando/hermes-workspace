@@ -134,6 +134,7 @@ function ProfileStat({
   return (
     <div className="flex flex-col items-center py-2.5 px-1">
       <div
+        title={truncate ? String(value) : undefined}
         className={cn(
           'text-sm font-bold text-[var(--theme-text)]',
           truncate && 'max-w-[72px] truncate text-xs',
