@@ -28,6 +28,7 @@ import {
   shouldBlockZeroForkModelSwitch,
 } from './chat-composer-model-switch'
 import { ContextBar } from './context-bar'
+import { useComposerMenus } from './use-composer-menus'
 import type { CSSProperties, Ref } from 'react'
 
 import type { ModelCatalogEntry, ModelSwitchResponse } from '@/lib/model-types'
@@ -934,14 +935,16 @@ function ChatComposerComponent({
     if (typeof window === 'undefined') return false
     return window.matchMedia('(max-width: 767px)').matches
   })
-  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
-  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false)
-  const [isThinkingMenuOpen, setIsThinkingMenuOpen] = useState(false)
-  const [isControlsMenuOpen, setIsControlsMenuOpen] = useState(false)
-  const [isProviderSwitcherExpanded, setIsProviderSwitcherExpanded] =
-    useState(false)
-  const [isMobileActionsMenuOpen, setIsMobileActionsMenuOpen] = useState(false)
+  const {
+    isModelMenuOpen, setIsModelMenuOpen,
+    isProfileMenuOpen, setIsProfileMenuOpen,
+    isWorkspaceMenuOpen, setIsWorkspaceMenuOpen,
+    isThinkingMenuOpen, setIsThinkingMenuOpen,
+    isControlsMenuOpen, setIsControlsMenuOpen,
+    isProviderSwitcherExpanded, setIsProviderSwitcherExpanded,
+    isMobileActionsMenuOpen, setIsMobileActionsMenuOpen,
+    profileMenuRef, modelSelectorRef, thinkingMenuRef, controlsMenuRef,
+  } = useComposerMenus()
   const [isWebSearchMode, _setIsWebSearchMode] = useState(false)
   const [isSlashMenuDismissed, setIsSlashMenuDismissed] = useState(false)
   const [modelNotice, setModelNotice] = useState<ModelSwitchNotice | null>(null)
@@ -964,15 +967,10 @@ function ChatComposerComponent({
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
   const slashMenuRef = useRef<SlashCommandMenuHandle | null>(null)
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
-  const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const dragCounterRef = useRef(0)
   const shouldRefocusAfterSendRef = useRef(false)
   const submittingRef = useRef(false)
   const pendingSubmitAfterAttachmentsRef = useRef(false)
-  const modelSelectorRef = useRef<HTMLDivElement | null>(null)
-  const workspaceMenuRef = useRef<HTMLDivElement | null>(null)
-  const thinkingMenuRef = useRef<HTMLDivElement | null>(null)
-  const controlsMenuRef = useRef<HTMLDivElement | null>(null)
   const composerWrapperRef = useRef<HTMLDivElement | null>(null)
   const focusFrameRef = useRef<number | null>(null)
 
@@ -1356,37 +1354,7 @@ function ChatComposerComponent({
     setValue(savedDraft ?? '')
   }, [draftStorageKey])
 
-  useEffect(() => {
-    if (
-      !isModelMenuOpen &&
-      !isProfileMenuOpen &&
-      !isThinkingMenuOpen &&
-      !isControlsMenuOpen
-    )
-      return
-    function handleOutsideClick(event: MouseEvent) {
-      const target = event.target as Node
-      if (controlsMenuRef.current?.contains(target)) return
-      if (modelSelectorRef.current?.contains(target)) return
-      if (profileMenuRef.current?.contains(target)) return
-      if (thinkingMenuRef.current?.contains(target)) return
-      setIsControlsMenuOpen(false)
-      setIsModelMenuOpen(false)
-      setIsProviderSwitcherExpanded(false)
-      setIsProfileMenuOpen(false)
-      setIsThinkingMenuOpen(false)
-    }
-
-    document.addEventListener('mousedown', handleOutsideClick)
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick)
-    }
-  }, [
-    isModelMenuOpen,
-    isProfileMenuOpen,
-    isThinkingMenuOpen,
-    isControlsMenuOpen,
-  ])
+  // Menu open/close state + outside-click handling: see use-composer-menus.ts
 
   const persistDraft = useCallback(
     function persistDraft(nextValue: string) {
