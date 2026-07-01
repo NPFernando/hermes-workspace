@@ -745,13 +745,29 @@ function writeTasks(data) {
   fs.renameSync(tmp, TASKS_FILE);
 }
 
-// Helper: clear agent state on a set of task ids
-function clearAgentState(taskIds) {
+// Helper: clear agent state on a set of task ids. historyNote, when given,
+// also appends an agent_history entry (action 'timed_out' by default) so a
+// failed/killed review pass leaves a trace instead of looking identical to
+// a task nobody touched. Use action:'attempted' for non-timeout failures
+// (e.g. unparseable output) so tasks-rescue-timedout.ts's timed_out filter
+// stays accurate.
+function clearAgentState(taskIds, historyNote, action) {
   const file = readTasks();
   const now = new Date().toISOString();
   file.tasks = file.tasks.map((t) => {
     if (taskIds.includes(t.id)) {
-      return { ...t, agent_state: null, agent_name: null, agent_action_at: null, updated_at: now };
+      const updated = { ...t, agent_state: null, agent_name: null, agent_action_at: null, updated_at: now };
+      if (historyNote) {
+        const existing = Array.isArray(t.agent_history) ? t.agent_history : [];
+        updated.agent_history = [...existing, {
+          id: Math.random().toString(36).slice(2, 10),
+          by: 'astra', byEmoji: '🌟',
+          action: action || 'timed_out',
+          note: historyNote,
+          at: now,
+        }];
+      }
+      return updated;
     }
     return t;
   });
@@ -769,8 +785,8 @@ const result = spawnSync(
 const taskIds = ${JSON.stringify(candidates.map((t) => t.id))};
 
 if (result.status !== 0 || !result.stdout) {
-  // hermes failed — just clear agent state
-  clearAgentState(taskIds);
+  // hermes failed (non-zero exit, or killed by the 90s timeout with no output)
+  clearAgentState(taskIds, 'Backlog review run failed or timed out (90s) with no usable output.');
   process.exit(0);
 }
 
@@ -794,7 +810,7 @@ try {
 
 if (!Array.isArray(updates)) {
   // Could not parse — clear agent state without making priority changes
-  clearAgentState(taskIds);
+  clearAgentState(taskIds, 'Backlog review run completed but returned no parseable JSON array.', 'attempted');
   process.exit(0);
 }
 
@@ -1101,7 +1117,17 @@ function doBreakdown(task, assignee) {
     if (!Array.isArray(subtasks)) { const m = t.match(/\\[[\\s\\S]*\\]/); if (m) subtasks = JSON.parse(m[0]); }
   } catch {}
   if (!Array.isArray(subtasks) || subtasks.length === 0) {
-    updateTaskDirect(task.id, { agent_state: null, agent_name: null, agent_action_at: null });
+    const cur = getTaskDirect(task.id);
+    const priorHistory = (cur && Array.isArray(cur.agent_history)) ? cur.agent_history : [];
+    updateTaskDirect(task.id, {
+      agent_state: null, agent_name: null, agent_action_at: null,
+      agent_history: [...priorHistory, {
+        id: randomUUID(), by: 'astra', byEmoji: '🌟',
+        action: 'timed_out',
+        note: 'Breakdown call timed out (90s) or returned no parseable subtasks.',
+        at: new Date().toISOString(),
+      }],
+    });
     return 0;
   }
 
@@ -1176,7 +1202,17 @@ for (const task of TASKS) {
   const astraResult = parseJSON(astraText);
 
   if (!astraResult) {
-    updateTaskDirect(task.id, { agent_state: null, agent_name: null, agent_action_at: null });
+    const cur = getTaskDirect(task.id);
+    const priorHistory = (cur && Array.isArray(cur.agent_history)) ? cur.agent_history : [];
+    updateTaskDirect(task.id, {
+      agent_state: null, agent_name: null, agent_action_at: null,
+      agent_history: [...priorHistory, {
+        id: randomUUID(), by: 'astra', byEmoji: '🌟',
+        action: 'timed_out',
+        note: 'Review call timed out (90s) or returned no parseable JSON.',
+        at: new Date().toISOString(),
+      }],
+    });
     continue;
   }
 
