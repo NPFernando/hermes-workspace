@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatTaskAssigneeLabel, formatTaskDependencyLabel } from './task-card'
+import { formatTaskAssigneeLabel, formatTaskDependencyLabel, formatTaskSelectionToggleLabel } from './task-card'
 import {
   TASKS_BOARD_HELP_TEXT,
   countExecutableReviewTasks,
@@ -30,6 +30,11 @@ describe('tasks UX copy', () => {
     expect(formatTaskDependencyLabel(0)).toBeNull()
     expect(formatTaskDependencyLabel(1)).toBe('waiting on 1 prerequisite')
     expect(formatTaskDependencyLabel(3)).toBe('waiting on 3 prerequisites')
+  })
+
+  it('formats task selection toggle labels from selected state', () => {
+    expect(formatTaskSelectionToggleLabel('Review deployment plan', false)).toBe('Select task: Review deployment plan')
+    expect(formatTaskSelectionToggleLabel('Review deployment plan', true)).toBe('Deselect task: Review deployment plan')
   })
 
   it('formats filter result summaries with clear zero-match and plural copy', () => {

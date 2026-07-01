@@ -52,6 +52,10 @@ export function formatTaskDependencyLabel(dependencyCount: number): string | nul
   return `waiting on ${dependencyCount} prerequisite${dependencyCount === 1 ? '' : 's'}`
 }
 
+export function formatTaskSelectionToggleLabel(title: string, isSelected: boolean): string {
+  return `${isSelected ? 'Deselect' : 'Select'} task: ${title}`
+}
+
 const AGENT_STATE_CONFIG: Record<
   NonNullable<TaskAgentState>,
   { label: string; color: string; pulse: boolean }
@@ -138,6 +142,7 @@ export const TaskCard = memo(function TaskCardComponent({
   const assigneeLabel = formatTaskAssigneeLabel(task.assignee, assigneeLabels)
   const isAgentActive = Boolean(task.agent_state)
   const dependencyLabel = formatTaskDependencyLabel(task.depends_on?.length ?? 0)
+  const selectionToggleLabel = formatTaskSelectionToggleLabel(task.title, Boolean(isSelected))
   const hasHistory = (task.agent_history?.length ?? 0) > 0
   const stuck = isStuckAgent(task)
   const isDimmed = Boolean(activeTagFilter && !task.tags.includes(activeTagFilter))
@@ -169,15 +174,18 @@ export const TaskCard = memo(function TaskCardComponent({
         style={{ borderLeftWidth: 2, borderLeftColor: priorityColor, minHeight: 32 }}
       >
         {onToggleSelect && (
-          <div
+          <button
+            type="button"
             className={cn('shrink-0 transition-opacity', isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60')}
+            aria-label={selectionToggleLabel}
+            aria-pressed={Boolean(isSelected)}
             onClick={e => { e.stopPropagation(); onToggleSelect(task.id) }}
           >
-            <div className={cn('w-3 h-3 rounded border flex items-center justify-center',
+            <span className={cn('w-3 h-3 rounded border flex items-center justify-center',
               isSelected ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)]' : 'border-[var(--theme-border)]')}>
               {isSelected && <span className="text-[7px] font-bold text-[var(--theme-bg)]">✓</span>}
-            </div>
-          </div>
+            </span>
+          </button>
         )}
         <span className="flex-1 text-[11px] text-[var(--theme-text)] truncate">{task.title}</span>
         {isAgentActive && <span className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse" style={{ background: '#a855f7' }} />}
@@ -216,22 +224,25 @@ export const TaskCard = memo(function TaskCardComponent({
     >
       {/* Bulk-select checkbox */}
       {onToggleSelect && (
-        <div
+        <button
+          type="button"
           className={cn(
             'absolute top-1.5 left-1.5 z-10 transition-opacity',
             isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60',
           )}
+          aria-label={selectionToggleLabel}
+          aria-pressed={Boolean(isSelected)}
           onClick={e => { e.stopPropagation(); onToggleSelect(task.id) }}
         >
-          <div className={cn(
+          <span className={cn(
             'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
             isSelected
               ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)]'
               : 'border-[var(--theme-border)] bg-[var(--theme-card)]',
           )}>
             {isSelected && <span className="text-[8px] font-bold text-[var(--theme-bg)]">✓</span>}
-          </div>
-        </div>
+          </span>
+        </button>
       )}
 
       {/* Agent state gradient banner — decorative only; badge below is the click target */}

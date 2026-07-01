@@ -226,5 +226,23 @@
     "description": "Add optional last-updated timing copy near the Tasks refresh status so operators know whether the board data is stale.",
     "category": "ui",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Make task card selection controls keyboard accessible",
+    "description": "Replace the Tasks card bulk-select click targets with named native buttons and helper-tested labels so keyboard and screen-reader users can select cards without opening them.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add Tasks card action button focus smoke tests",
+    "description": "Cover TaskCard launch, execute, selection, and menu button accessible names so compact card actions remain keyboard discoverable.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Expose task card queue status to screen readers",
+    "description": "Add concise aria-label copy for queue position chips so non-visual users can tell why backlog/todo cards are ordered the way they are.",
+    "category": "ui",
+    "estimated_effort": "low"
   }
 ]
