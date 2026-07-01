@@ -67,6 +67,36 @@ function getOutputPreview(content: string): string {
   return `${normalized.slice(0, 200).trimEnd()}…`
 }
 
+export function formatJobActionLabel(
+  jobName: string | undefined,
+  action:
+    | 'run'
+    | 'pause'
+    | 'resume'
+    | 'edit'
+    | 'delete'
+    | 'showHistory'
+    | 'hideHistory',
+): string {
+  const name = jobName?.trim() || 'unnamed job'
+  switch (action) {
+    case 'run':
+      return `Run job now: ${name}`
+    case 'pause':
+      return `Pause job: ${name}`
+    case 'resume':
+      return `Resume job: ${name}`
+    case 'edit':
+      return `Edit job: ${name}`
+    case 'delete':
+      return `Delete job: ${name}`
+    case 'showHistory':
+      return `Show run history for job: ${name}`
+    case 'hideHistory':
+      return `Hide run history for job: ${name}`
+  }
+}
+
 function getLastRunStatus(job: ClaudeJob): {
   label: string
   color: string
@@ -189,6 +219,7 @@ function JobCard({
             onClick={() => onTrigger(job.id)}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
             title="Run now"
+            aria-label={formatJobActionLabel(job.name, 'run')}
           >
             <HugeiconsIcon
               icon={PlayIcon}
@@ -200,6 +231,10 @@ function JobCard({
             onClick={() => (isPaused ? onResume(job.id) : onPause(job.id))}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
             title={isPaused ? 'Resume' : 'Pause'}
+            aria-label={formatJobActionLabel(
+              job.name,
+              isPaused ? 'resume' : 'pause',
+            )}
           >
             <HugeiconsIcon
               icon={isPaused ? PlayIcon : PauseIcon}
@@ -211,6 +246,7 @@ function JobCard({
             onClick={() => onEdit(job)}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
             title="Edit"
+            aria-label={formatJobActionLabel(job.name, 'edit')}
           >
             <HugeiconsIcon
               icon={PencilEdit02Icon}
@@ -222,6 +258,10 @@ function JobCard({
             onClick={() => setExpanded((current) => !current)}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
             title={expanded ? 'Hide run history' : 'Show run history'}
+            aria-label={formatJobActionLabel(
+              job.name,
+              expanded ? 'hideHistory' : 'showHistory',
+            )}
           >
             <HugeiconsIcon
               icon={expanded ? ArrowUp01Icon : ArrowDown01Icon}
@@ -233,6 +273,7 @@ function JobCard({
             onClick={() => onDelete(job.id)}
             className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)]"
             title="Delete"
+            aria-label={formatJobActionLabel(job.name, 'delete')}
           >
             <HugeiconsIcon
               icon={Delete01Icon}

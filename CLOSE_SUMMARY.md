@@ -1,30 +1,30 @@
-# Close Summary: Task card selection accessibility
-
-Cycle `cycle-20260701-123527-task-card-selection` completed one manual auto-improvement iteration because `hermes dispatch-mission` is not available in this Hermes CLI build.
+# Close Summary: Jobs action labels
 
 ## What changed
-- Added `formatTaskSelectionToggleLabel()` in `src/screens/tasks/task-card.tsx`.
-- Replaced both dense and expanded TaskCard bulk-select clickable `<div>` wrappers with native `<button type="button">` controls.
-- Added `aria-label` and `aria-pressed` to selection toggles so keyboard and screen-reader users can select or deselect cards without opening them.
-- Added helper coverage in `src/screens/tasks/tasks-ux.test.ts`.
-- Appended follow-up ideas to `IDEAS.json` and refreshed `PLAN.md` for this cycle.
+- Added `formatJobActionLabel` in `src/screens/jobs/jobs-screen.tsx`.
+- Applied job-specific `aria-label` text to the Jobs card icon-only Run, Pause/Resume, Edit, Show/Hide history, and Delete buttons while preserving existing visuals and tooltips.
+- Added focused helper coverage in `src/screens/jobs/jobs-screen.test.ts`.
+- Updated `IDEAS.json`, `PLAN.md`, and `TEST_REPORT.json` for this auto-improvement cycle.
 
-## Verification
+## Test results
 - `npx tsc --noEmit`: passed.
-- Focused Vitest `src/screens/tasks/tasks-ux.test.ts`: passed, 11 tests.
-- Full `pnpm test`: passed, 110 files / 725 tests.
-- Focused ESLint on touched TaskCard/test files with the known baseline rule disabled: 0 errors / 0 warnings.
+- `npx vitest run src/screens/jobs/jobs-screen.test.ts`: passed, 2 tests.
+- Focused changed-file ESLint: passed with 0 errors and 0 warnings for `src/screens/jobs/jobs-screen.tsx`.
 - `git diff --check`: passed.
-- Class-token smoke: package script is missing, fallback scan over touched files passed.
+- `pnpm test`: passed, 111 files / 727 tests.
 - `pnpm build`: passed.
-- Deployment: restarted `hermes-workspace.service`, service is active, and external JSON health returned HTTP 200 `application/json` with `{"status":"ok"}`.
+- `pnpm lint`: still fails on existing repository-wide baseline debt outside the changed Jobs files: 241 errors and 105 warnings.
+- `pnpm -s lint:class-tokens`: unavailable/empty; fallback scan over the changed Jobs TSX file found 0 class-token issues.
 
-## Side effects / worktree notes
-- Full `pnpm lint` still reports baseline repository debt: 241 errors and 105 warnings, outside this cycle's touched TaskCard files.
-- Pre-existing untracked market-data TypeScript drafts were moved to `/srv/projects/auto-improvement-reports/cycle-20260701-123527-task-card-selection/preexisting-worktree-backup/` because they caused parser failures before any cycle code ran.
-- Existing unrelated dirty finance and documentation work remains unstaged; only this cycle's intended UI/artifact files should be committed.
+## Deployment and health
+Because `src/screens/jobs/jobs-screen.tsx` changed, the workspace was rebuilt and `hermes-workspace.service` was restarted. `systemctl is-active hermes-workspace.service` returned `active`, and the external health endpoint returned HTTP 200 `application/json` with `{ "status": "ok" }`.
 
-## New ideas for next cycle
-- Add component-level keyboard/focus tests for TaskCard hover actions and selection controls.
-- Add concise screen-reader copy for TaskCard queue position chips.
-- Add a checked-in `lint:class-tokens` script or equivalent package script so fallback scans are no longer ad hoc.
+## Side effects / boundaries
+- No remote push or PR was created; this cron mission only committed locally.
+- Pre-existing unrelated dirty work remains unstaged: `services/odysseus`, `src/routes/api/finance.ts`, `src/server/finance-store.ts`, and several untracked finance/research/design documents.
+- The repository-wide lint baseline remains a separate improvement target; focused verification for this cycle passed.
+
+## New follow-up ideas
+- Add component-level keyboard tests for the Jobs card action button accessible names.
+- Add stale-run status copy for scheduled jobs that have not produced output recently.
+- Turn the missing class-token fallback into a real package script so UI sweeps have a reusable gate.

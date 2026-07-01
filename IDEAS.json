@@ -244,5 +244,23 @@
     "description": "Add concise aria-label copy for queue position chips so non-visual users can tell why backlog/todo cards are ordered the way they are.",
     "category": "ui",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Add named action labels for scheduled job cards",
+    "description": "Give Jobs screen icon-only card actions job-specific aria-labels and helper tests so run, pause, edit, history, and delete controls are screen-reader discoverable.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add focused Jobs card action keyboard smoke tests",
+    "description": "Add component-level tests that verify scheduled job card icon buttons expose keyboard-accessible names and do not regress to title-only affordances.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Show scheduled job stale-run copy",
+    "description": "Add concise status copy when a scheduled job has not run recently so operators can distinguish dormant schedules from healthy recurring jobs.",
+    "category": "ui",
+    "estimated_effort": "medium"
   }
 ]
