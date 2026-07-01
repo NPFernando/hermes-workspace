@@ -10,6 +10,7 @@ import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListI
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
 import { useTaskExecLog } from './use-task-exec-log'
+import { useTaskFilters } from './use-task-filters'
 import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority, UpdateTaskInput } from '@/lib/tasks-api'
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from '@/components/ui/menu'
 import {
@@ -329,7 +330,23 @@ export function TasksScreen() {
   const search = useSearch({ from: '/tasks' })
   const navigate = useNavigate()
   const initialAssignee = typeof search.assignee === 'string' ? search.assignee : null
-  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(initialAssignee)
+  const {
+    searchQuery, setSearchQuery,
+    filterOverdue, setFilterOverdue,
+    filterBlocked, setFilterBlocked,
+    filterActiveAgent, setFilterActiveAgent,
+    filterInReview, setFilterInReview,
+    filterTimedOut, setFilterTimedOut,
+    ageFilter, setAgeFilter,
+    priorityFilter, setPriorityFilter,
+    tagFilter, setTagFilter,
+    assigneeFilter, setAssigneeFilter,
+    hideSubtasks, setHideSubtasks,
+    showFilterPopover, setShowFilterPopover,
+    hiddenColumns, toggleHideColumn,
+    filterPresets, saveFilterPreset, applyFilterPreset, deleteFilterPreset,
+    clearAllFilters,
+  } = useTaskFilters(initialAssignee)
   const taskIdFromUrl = typeof search.task === 'string' ? search.task : null
   // Track which task ID was auto-opened from the URL to avoid re-opening after close
   const autoOpenedTaskIdRef = useRef<string | null>(null)
@@ -348,18 +365,9 @@ export function TasksScreen() {
   // Becomes true when we observe at least one agent_state → ensures we don't fire summary before agents start
   const [agentsEverActive, setAgentsEverActive] = useState(false)
 
-  // — Search + filter state
-  const [searchQuery, setSearchQuery] = useState('')
+  // — Search + filter state (see use-task-filters.ts)
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const [filterOverdue, setFilterOverdue] = useState(false)
-  const [filterBlocked, setFilterBlocked] = useState(false)
-  const [filterActiveAgent, setFilterActiveAgent] = useState(false)
-  const [filterInReview, setFilterInReview] = useState(false)
-  const [filterTimedOut, setFilterTimedOut] = useState(false)
-  const [ageFilter, setAgeFilter] = useState<'fresh' | 'aging' | 'stale' | null>(null)
   const [showRunningPanel, setShowRunningPanel] = useState(true)
-  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | null>(null)
-  const [tagFilter, setTagFilter] = useState<string | null>(null)
 
   const [quickAddCol, setQuickAddCol] = useState<TaskColumn | null>(null)
   const [quickAddTitle, setQuickAddTitle] = useState('')
@@ -378,21 +386,7 @@ export function TasksScreen() {
   // Task detail panel
   const [panelTask, setPanelTask] = useState<ClaudeTask | null>(null)
 
-  // Column hide/collapse (persisted)
-  const [hiddenColumns, setHiddenColumns] = useState<Set<TaskColumn>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('hermes-hidden-cols') ?? '[]') as Array<TaskColumn>) } catch { return new Set() }
-  })
-  const toggleHideColumn = useCallback((col: TaskColumn) => {
-    setHiddenColumns(prev => {
-      const next = new Set(prev)
-      if (next.has(col)) next.delete(col); else next.add(col)
-      localStorage.setItem('hermes-hidden-cols', JSON.stringify([...next]))
-      return next
-    })
-  }, [])
-
-  // Subtask visibility
-  const [hideSubtasks, setHideSubtasks] = useState(false)
+  // Column hide/collapse + subtask visibility: see use-task-filters.ts
 
   // Unified panel state — only one slide-over open at a time
   const [activePanel, setActivePanel] = useState<'activity' | 'tags' | 'sisterLoad' | 'rebalance' | null>(null)
@@ -406,7 +400,6 @@ export function TasksScreen() {
   const setShowRebalance = (v: boolean | ((p: boolean) => boolean)) => setActivePanel(prev => { const cur = prev === 'rebalance'; const next = typeof v === 'function' ? v(cur) : v; if (next) return 'rebalance'; if (cur) return null; return prev })
   // Activity panel
   const [activityTab, setActivityTab] = useState<'inbox' | 'feed'>('inbox')
-  const [showFilterPopover, setShowFilterPopover] = useState(false)
   const [inboxReplies, setInboxReplies] = useState<Record<string, string>>({})
   const [inboxSending, setInboxSending] = useState<string | null>(null)
 
@@ -498,31 +491,7 @@ export function TasksScreen() {
   // Unlock prereq modal (enhanced from window.confirm)
   const [unlockModalPrereq, setUnlockModalPrereq] = useState<{ id: string; title: string; count: number } | null>(null)
 
-  // Saved filter presets (persisted)
-  type FilterPreset = { name: string; assignee: string | null; query: string; overdue: boolean; blocked: boolean; activeAgent: boolean; inReview: boolean; timedOut: boolean; age: 'fresh' | 'aging' | 'stale' | null; priority: TaskPriority | null; tag: string | null }
-  const [filterPresets, setFilterPresets] = useState<Array<FilterPreset>>(() => {
-    try { return JSON.parse(localStorage.getItem('hermes-filter-presets') ?? '[]') as Array<FilterPreset> } catch { return [] }
-  })
-  const saveFilterPreset = useCallback((name: string) => {
-    const preset: FilterPreset = { name, assignee: assigneeFilter, query: searchQuery, overdue: filterOverdue, blocked: filterBlocked, activeAgent: filterActiveAgent, inReview: filterInReview, timedOut: filterTimedOut, age: ageFilter, priority: priorityFilter, tag: tagFilter }
-    setFilterPresets(prev => {
-      const next = [...prev.filter(p => p.name !== name), preset]
-      localStorage.setItem('hermes-filter-presets', JSON.stringify(next))
-      return next
-    })
-  }, [assigneeFilter, searchQuery, filterOverdue, filterBlocked, filterActiveAgent, filterInReview, filterTimedOut, ageFilter, priorityFilter, tagFilter])
-  const applyFilterPreset = useCallback((p: FilterPreset) => {
-    setAssigneeFilter(p.assignee); setSearchQuery(p.query); setFilterOverdue(p.overdue)
-    setFilterBlocked(p.blocked); setFilterActiveAgent(p.activeAgent); setFilterInReview(p.inReview)
-    setFilterTimedOut(p.timedOut); setAgeFilter(p.age); setPriorityFilter(p.priority); setTagFilter(p.tag)
-  }, [])
-  const deleteFilterPreset = useCallback((name: string) => {
-    setFilterPresets(prev => {
-      const next = prev.filter(p => p.name !== name)
-      localStorage.setItem('hermes-filter-presets', JSON.stringify(next))
-      return next
-    })
-  }, [])
+  // Saved filter presets: see use-task-filters.ts
 
   const tasksQuery = useQuery({
     queryKey: [...QUERY_KEY, showDone],
@@ -981,20 +950,6 @@ export function TasksScreen() {
   function handleDragEnd() {
     setDraggingId(null)
     setDragOverColumn(null)
-  }
-
-  function clearAllFilters() {
-    setSearchQuery('')
-    setFilterOverdue(false)
-    setFilterBlocked(false)
-    setFilterActiveAgent(false)
-    setFilterInReview(false)
-    setFilterTimedOut(false)
-    setAgeFilter(null)
-    setPriorityFilter(null)
-    setTagFilter(null)
-    setAssigneeFilter(null)
-    setHideSubtasks(false)
   }
 
   const sweepStatsQuery = useQuery({
