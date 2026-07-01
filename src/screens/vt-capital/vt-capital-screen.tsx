@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 type VtWorker = {
   workerId: string
@@ -247,7 +248,7 @@ export function VtCapitalScreen() {
         )
       setData(payload)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(safeErrorMessage(err))
     } finally {
       setLoading(false)
     }

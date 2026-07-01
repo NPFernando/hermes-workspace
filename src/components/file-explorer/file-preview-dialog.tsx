@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 const LANGUAGE_MAP: Record<string, string> = {
   ts: 'typescript',
@@ -81,7 +82,7 @@ export default function FilePreviewDialog({
       }
       setDirty(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(safeErrorMessage(err))
     } finally {
       setLoading(false)
     }

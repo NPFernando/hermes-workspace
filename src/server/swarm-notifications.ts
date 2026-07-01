@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { getSwarmProfilePath } from './swarm-foundation'
 import { publishChatEvent } from './chat-event-bus'
+import { safeErrorMessage } from './rate-limit'
 import type { ParsedSwarmCheckpoint } from './swarm-checkpoints'
 
 const ORCHESTRATOR_WORKER_ID = process.env.SWARM_ORCHESTRATOR_WORKER_ID?.trim() || 'orchestrator'
@@ -28,7 +29,7 @@ function tmuxSendText(session: string, text: string): { sent: boolean; error?: s
     execFileSync('tmux', ['send-keys', '-t', session, 'Enter'], { stdio: 'ignore' })
     return { sent: true }
   } catch (err) {
-    return { sent: false, error: err instanceof Error ? err.message : String(err) }
+    return { sent: false, error: safeErrorMessage(err) }
   }
 }
 

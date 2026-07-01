@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 export type FileEntry = {
   name: string
@@ -148,7 +149,7 @@ export function FileExplorerSidebar({
       const nextEntries = await fetchFileTree()
       setEntries(nextEntries)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(safeErrorMessage(err))
     } finally {
       setLoading(false)
     }

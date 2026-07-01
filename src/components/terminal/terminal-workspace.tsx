@@ -21,6 +21,7 @@ import { DebugPanel } from '@/components/terminal/debug-panel'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 // Dynamic imports to avoid SSR crash (xterm uses `self` which doesn't exist on server)
 let xtermLoaded = false
@@ -241,7 +242,7 @@ export function TerminalWorkspace({
 
         setDebugAnalysis(analysis)
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
+        const message = safeErrorMessage(error)
         setDebugAnalysis({
           summary: 'Debug analysis failed.',
           rootCause: message,

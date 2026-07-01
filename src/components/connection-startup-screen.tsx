@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AuthStatus } from '@/lib/claude-auth'
 import { writeTextToClipboard } from '@/lib/clipboard'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 const POLL_INTERVAL_MS = 2_000
 const FAILURE_REVEAL_MS = 5_000
@@ -201,7 +202,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
       // Show manual steps when auto-start fails
       setShowManual(true)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = safeErrorMessage(err)
       setServerLog([`Failed: ${msg}`])
       setServerError(msg)
       setServerStarting(false)

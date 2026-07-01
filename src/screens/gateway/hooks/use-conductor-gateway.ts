@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import type { Dispatch, SetStateAction } from 'react'
 import type { GatewaySession } from '@/lib/gateway-api'
 import { fetchSessions } from '@/lib/gateway-api'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 type HistoryMessagePart = {
   type?: string
@@ -1686,7 +1687,7 @@ export function useConductorGateway() {
     },
     onError: (error) => {
       doneRef.current = true
-      setStreamError(error instanceof Error ? error.message : String(error))
+      setStreamError(safeErrorMessage(error))
       setPhase('complete')
       setCompletedAt(new Date().toISOString())
     },

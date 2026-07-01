@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { createTask, getTask, listTasks, updateTask } from './tasks-store'
 import { openaiChat } from './openai-compat-api'
 import { sendTelegramClarification, sendTelegramTaskDone } from './telegram-clarify'
+import { safeErrorMessage } from './rate-limit'
 import type { ActivityEntry, TaskColumn, TaskPriority, TaskRecord } from './tasks-store'
 
 // ---------------------------------------------------------------------------
@@ -1597,7 +1598,7 @@ export function executeTaskBackground(taskId: string): void {
     try {
       output = await doDirectChat(AbortSignal.timeout(30_000))
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = safeErrorMessage(err)
       lastError = msg
       console.warn(`[executeTaskBackground] OpenRouter direct failed: ${msg} — trying gateway`)
       try {
@@ -1607,7 +1608,7 @@ export function executeTaskBackground(taskId: string): void {
         try {
           output = await doDirectChat(AbortSignal.timeout(25_000))
         } catch (err3) {
-          lastError = err3 instanceof Error ? err3.message : String(err3)
+          lastError = safeErrorMessage(err3)
           console.error('[executeTaskBackground] all attempts failed:', lastError)
         }
       }

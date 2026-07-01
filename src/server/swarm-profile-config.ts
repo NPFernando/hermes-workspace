@@ -18,6 +18,7 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSy
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import * as yaml from 'yaml'
+import { safeErrorMessage } from './rate-limit'
 
 export type ConfigSyncResult =
   | { ok: true; changed: boolean; previous?: { provider: string; default: string } }
@@ -137,7 +138,7 @@ export function ensureSwarmProfileConfig(profilePath: string): ProfileBootstrapR
     }
     return result
   } catch (err) {
-    return { ...result, ok: false, error: err instanceof Error ? err.message : String(err) }
+    return { ...result, ok: false, error: safeErrorMessage(err) }
   }
 }
 
@@ -186,7 +187,7 @@ export function syncSwarmProfileIdentity(profilePath: string, worker: SwarmWorke
     renameSync(tmpPath, identityPath)
     return { ok: true, changed: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    return { ok: false, error: safeErrorMessage(err) }
   }
 }
 
@@ -208,7 +209,7 @@ export function syncSwarmProfileModel(
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: safeErrorMessage(err),
     }
   }
 
@@ -218,7 +219,7 @@ export function syncSwarmProfileModel(
   } catch (err) {
     return {
       ok: false,
-      error: `failed to parse config.yaml: ${err instanceof Error ? err.message : String(err)}`,
+      error: `failed to parse config.yaml: ${safeErrorMessage(err)}`,
     }
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -266,7 +267,7 @@ export function syncSwarmProfileModel(
   } catch (err) {
     return {
       ok: false,
-      error: `failed to stringify config.yaml: ${err instanceof Error ? err.message : String(err)}`,
+      error: `failed to stringify config.yaml: ${safeErrorMessage(err)}`,
     }
   }
 
@@ -278,7 +279,7 @@ export function syncSwarmProfileModel(
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: safeErrorMessage(err),
     }
   }
 }

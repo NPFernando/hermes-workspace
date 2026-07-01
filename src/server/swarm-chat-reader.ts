@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { safeErrorMessage } from './rate-limit'
 
 export type SwarmChatMessage = {
   id: string
@@ -167,7 +168,7 @@ export function readWorkerMessages(profilePath: string, limit: number): SwarmCha
       sessionTitle: null,
       messages: [],
       ok: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: safeErrorMessage(err),
     }
   }
 }

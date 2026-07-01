@@ -3,6 +3,7 @@ import type { ChatAttachment, ChatMessage } from '../types'
 import { readResolvedSessionHeaders } from '@/lib/send-stream-session-headers'
 import { useChatStore } from '@/stores/chat-store'
 import { pushActivity } from '@/components/inspector/activity-store'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 /**
  * Determine whether a stream-resolved session key change should trigger
@@ -1023,7 +1024,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           onAbort?.()
           return
         }
-        const errorMessage = err instanceof Error ? err.message : String(err)
+        const errorMessage = safeErrorMessage(err)
         markFailed(errorMessage)
       }
     },

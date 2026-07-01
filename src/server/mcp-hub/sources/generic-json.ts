@@ -17,6 +17,7 @@
 import { getCache, setCache, touchCache } from '../cache'
 import { normalizeTemplate } from '../trust'
 import { assertNotPrivate } from '../lib/ssrf-guard'
+import { safeErrorMessage } from '../../rate-limit'
 import type { HubMcpEntry, HubTrust } from '../types'
 
 export interface GenericJsonResult {
@@ -207,7 +208,7 @@ export async function fetchGenericJson(
   try {
     await assertNotPrivate(url)
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = safeErrorMessage(err)
     warnings.push(`${sourceId}: ${msg}`)
     return { entries: [], warnings, degraded: true }
   }
@@ -227,7 +228,7 @@ export async function fetchGenericJson(
     // HIGH-1: disable redirects to prevent redirect-based SSRF bypass.
     response = await fetch(url, { headers, signal, redirect: 'error' })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = safeErrorMessage(err)
     warnings.push(`${sourceId}: network error: ${msg}`)
     if (cached) {
       return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }
@@ -287,7 +288,7 @@ export async function fetchGenericJson(
   try {
     data = JSON.parse(bodyText)
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = safeErrorMessage(err)
     warnings.push(`${sourceId}: failed to parse JSON: ${msg}`)
     if (cached) {
       return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }

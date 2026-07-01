@@ -10,6 +10,7 @@
  * and routes them through the generic-json adapter.
  */
 import { readHubSources } from '../mcp-hub-sources-store'
+import { safeErrorMessage } from '../rate-limit'
 import { fetchLocalFile } from './sources/local-file'
 import { fetchMcpGet } from './sources/mcp-get'
 import { fetchGenericJson } from './sources/generic-json'
@@ -224,7 +225,7 @@ export async function unifiedSearch(
       warnings.push('all remote sources failed — local-file fallback used')
     } catch (err) {
       warnings.push(
-        `local-file fallback also failed: ${err instanceof Error ? err.message : String(err)}`,
+        `local-file fallback also failed: ${safeErrorMessage(err)}`,
       )
     }
   }

@@ -32,6 +32,7 @@ import { RouterChat } from '@/components/swarm/router-chat'
 import { SwarmTerminal } from '@/components/swarm/swarm-terminal'
 import { WorkflowHelpModal } from '@/components/workflow-help-modal'
 import { cn } from '@/lib/utils'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 const SWARM2_ROOM_STORAGE_KEY = 'claude-swarm2-room-v1'
 
@@ -1069,7 +1070,7 @@ export function Swarm2Screen() {
         }
       } catch (err) {
         toast(
-          `Failed to start ${workerId}: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to start ${workerId}: ${safeErrorMessage(err)}`,
           { type: 'error' },
         )
       } finally {

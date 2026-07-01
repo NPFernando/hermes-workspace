@@ -13,6 +13,7 @@
  */
 import { getCache, setCache, touchCache } from '../cache'
 import { normalizeTemplate } from '../trust'
+import { safeErrorMessage } from '../../rate-limit'
 import type { HubMcpEntry } from '../types'
 
 const SOURCE_ID = 'mcp-get'
@@ -150,7 +151,7 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
   try {
     response = await fetch(REGISTRY_URL, { headers, signal })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = safeErrorMessage(err)
     warnings.push(`mcp-get: network error: ${msg}`)
     if (cached) {
       return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }
@@ -202,7 +203,7 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
   try {
     data = await response.json()
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = safeErrorMessage(err)
     warnings.push(`mcp-get: failed to parse JSON: ${msg}`)
     if (cached) {
       return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }

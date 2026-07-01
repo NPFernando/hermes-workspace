@@ -13,6 +13,7 @@ import {
   updateSwarmKanbanCard
 } from './swarm-kanban-store'
 import { CLAUDE_DASHBOARD_URL, getCapabilities } from './gateway-capabilities'
+import { safeErrorMessage } from './rate-limit'
 import {
   
   createDashboardKanbanTask,
@@ -179,7 +180,7 @@ function checkClaudeCli(): { ok: boolean; path?: string | null; reason?: string 
     execFileSync(cli, ['--version'], { encoding: 'utf8', timeout: 10_000, env: { ...process.env, CLAUDE_HOME: claudeProfileRoot() } })
     return { ok: true, path: cli }
   } catch (error) {
-    return { ok: false, path: cli, reason: error instanceof Error ? error.message : String(error) }
+    return { ok: false, path: cli, reason: safeErrorMessage(error) }
   }
 }
 

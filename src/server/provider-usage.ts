@@ -12,6 +12,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { safeErrorMessage } from './rate-limit'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -254,7 +255,7 @@ export async function fetchClaudeUsage(): Promise<ProviderUsageResult> {
         provider: 'claude',
         displayName: 'Claude (OAuth)',
         status: 'auth_expired',
-        message: e instanceof Error ? e.message : String(e),
+        message: safeErrorMessage(e),
         lines: [],
         updatedAt: now,
       }
@@ -278,7 +279,7 @@ export async function fetchClaudeUsage(): Promise<ProviderUsageResult> {
       provider: 'claude',
       displayName: 'Claude (OAuth)',
       status: 'error',
-      message: `Request failed: ${e instanceof Error ? e.message : String(e)}`,
+      message: `Request failed: ${safeErrorMessage(e)}`,
       lines: [],
       updatedAt: now,
     }
@@ -304,7 +305,7 @@ export async function fetchClaudeUsage(): Promise<ProviderUsageResult> {
         provider: 'claude',
         displayName: 'Claude (OAuth)',
         status: 'auth_expired',
-        message: e instanceof Error ? e.message : String(e),
+        message: safeErrorMessage(e),
         lines: [],
         updatedAt: now,
       }
@@ -558,7 +559,7 @@ export async function fetchCodexUsage(): Promise<ProviderUsageResult> {
         provider: 'codex',
         displayName: 'Codex',
         status: 'auth_expired',
-        message: e instanceof Error ? e.message : String(e),
+        message: safeErrorMessage(e),
         lines: [],
         updatedAt: now,
       }
@@ -583,7 +584,7 @@ export async function fetchCodexUsage(): Promise<ProviderUsageResult> {
       provider: 'codex',
       displayName: 'Codex',
       status: 'error',
-      message: `Request failed: ${e instanceof Error ? e.message : String(e)}`,
+      message: `Request failed: ${safeErrorMessage(e)}`,
       lines: [],
       updatedAt: now,
     }
@@ -602,7 +603,7 @@ export async function fetchCodexUsage(): Promise<ProviderUsageResult> {
         provider: 'codex',
         displayName: 'Codex',
         status: 'auth_expired',
-        message: e instanceof Error ? e.message : String(e),
+        message: safeErrorMessage(e),
         lines: [],
         updatedAt: now,
       }
@@ -883,7 +884,7 @@ export async function fetchOpenAIUsage(): Promise<ProviderUsageResult> {
       provider: 'openai',
       displayName: 'OpenAI',
       status: 'error',
-      message: e instanceof Error ? e.message : String(e),
+      message: safeErrorMessage(e),
       lines: [],
       updatedAt: now,
     }
@@ -976,7 +977,7 @@ export async function fetchOpenRouterUsage(): Promise<ProviderUsageResult> {
       provider: 'openrouter',
       displayName: 'OpenRouter',
       status: 'error',
-      message: e instanceof Error ? e.message : String(e),
+      message: safeErrorMessage(e),
       lines: [],
       updatedAt: now,
     }
@@ -1054,7 +1055,7 @@ export async function fetchGeminiUsage(): Promise<ProviderUsageResult> {
       provider: 'gemini',
       displayName: 'Gemini',
       status: 'error',
-      message: e instanceof Error ? e.message : String(e),
+      message: safeErrorMessage(e),
       lines: [],
       updatedAt: now,
     }

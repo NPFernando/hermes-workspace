@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { chatQueryKeys } from '../chat-queries'
 import { readError } from '../utils'
 import { updateSessionTitleState } from '../session-title-store'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 export type RenameSessionResult = {
   renameSession: (
@@ -80,7 +81,7 @@ export function useRenameSession(): RenameSessionResult {
           context.previousSessions,
         )
       }
-      setError(err instanceof Error ? err.message : String(err))
+      setError(safeErrorMessage(err))
     },
     onSuccess: function onSuccess(payload) {
       const targetId = payload.friendlyId || payload.sessionKey

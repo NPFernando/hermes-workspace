@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { safeErrorMessage } from './rate-limit'
 import type { ClarificationQuestion, TaskRecord } from './tasks-store'
 
 // ---------------------------------------------------------------------------
@@ -244,7 +245,7 @@ export async function editTelegramClarification(
     })
   } catch (err) {
     // Edit may fail if message hasn't changed — that's fine
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = safeErrorMessage(err)
     if (!msg.includes('message is not modified')) {
       console.warn('[telegram-clarify] editMessageText:', msg)
     }

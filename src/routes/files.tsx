@@ -19,6 +19,7 @@ import {
 import { usePageTitle } from '@/hooks/use-page-title'
 import { FileExplorerSidebar } from '@/components/file-explorer'
 import { resolveTheme, useSettings } from '@/hooks/use-settings'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 const PLACEHOLDER_VALUE = `// Files workspace
 // Click a file in the tree to load it into this editor.
@@ -188,7 +189,7 @@ function FilesRoute() {
           ? {
               ...prev,
               loading: false,
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             }
           : prev,
       )
@@ -232,7 +233,7 @@ function FilesRoute() {
         prev
           ? {
               ...prev,
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             }
           : prev,
       )

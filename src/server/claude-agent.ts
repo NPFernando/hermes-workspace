@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { homedir } from 'node:os'
+import { safeErrorMessage } from './rate-limit'
 
 const CLAUDE_HEALTH_TIMEOUT_MS = 2_000
 const CLAUDE_START_PORT = 8642
@@ -204,7 +205,7 @@ export async function startClaudeAgent(): Promise<StartClaudeAgentResult> {
     } catch (error) {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: safeErrorMessage(error),
       }
     }
   })()

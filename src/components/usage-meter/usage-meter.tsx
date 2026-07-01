@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
 import { SEARCH_MODAL_EVENTS } from '@/hooks/use-search-modal'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 const POLL_INTERVAL_MS = 10_000
 const PROVIDER_POLL_INTERVAL_MS = 30_000
@@ -493,7 +494,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
       setUsage(parsed)
       setError(null)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err)
+      const errorMessage = safeErrorMessage(err)
       setError(errorMessage)
       const silent =
         /unauthorized/i.test(errorMessage) || /not found/i.test(errorMessage)
@@ -521,7 +522,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
       setProviderUpdatedAt(data?.updatedAt ?? Date.now())
       setProviderError(null)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err)
+      const errorMessage = safeErrorMessage(err)
       setProviderError(errorMessage)
     }
   }, [])

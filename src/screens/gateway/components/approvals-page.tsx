@@ -3,6 +3,7 @@ import type { ApprovalRequest } from '../lib/approvals-store'
 import type {GatewayApprovalEntry} from '@/lib/gateway-api';
 import {  fetchGatewayApprovals } from '@/lib/gateway-api'
 import { cn } from '@/lib/utils'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 type ApprovalsPageProps = {
   approvals: Array<ApprovalRequest>
@@ -156,7 +157,7 @@ export function ApprovalsPage({ approvals, onApprove, onDeny }: ApprovalsPagePro
         setError(null)
         await refreshPending()
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) setError(safeErrorMessage(err))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -202,7 +203,7 @@ export function ApprovalsPage({ approvals, onApprove, onDeny }: ApprovalsPagePro
 
       await refreshPending()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(safeErrorMessage(err))
     } finally {
       setResolvingIds((prev) => {
         const next = { ...prev }

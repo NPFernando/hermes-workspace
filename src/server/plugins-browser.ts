@@ -1,5 +1,6 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { safeErrorMessage } from './rate-limit'
 import {
   
   getWorkspacePluginRoots,
@@ -39,7 +40,7 @@ export function listWorkspacePlugins(): Array<WorkspacePluginInfo> {
           workerScopes: ['all'],
           boundary: 'workspace-only',
           validationErrors: ['manifest parse failed'],
-          error: error instanceof Error ? error.message : String(error),
+          error: safeErrorMessage(error),
         })
       }
     }

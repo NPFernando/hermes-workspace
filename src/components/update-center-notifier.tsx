@@ -14,6 +14,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 type ProductId = 'workspace' | 'agent'
 type ProductUpdateStatus = {
@@ -278,7 +279,7 @@ export function UpdateCenterNotifier() {
       setPhases((prev) => ({ ...prev, [product.id]: 'error' }))
       setErrors((prev) => ({
         ...prev,
-        [product.id]: err instanceof Error ? err.message : String(err),
+        [product.id]: safeErrorMessage(err),
       }))
     }
   }
@@ -364,7 +365,7 @@ export function UpdateCenterNotifier() {
       }
     } catch (err) {
       setNaveenPhase('error')
-      setNaveenError(err instanceof Error ? err.message : String(err))
+      setNaveenError(safeErrorMessage(err))
     }
   }
 

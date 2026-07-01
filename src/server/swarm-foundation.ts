@@ -5,6 +5,7 @@ import * as YAML from 'yaml'
 import { z } from 'zod'
 import { getLocalBinDir, getProfilesDir } from './claude-paths'
 import { isSwarmWorkerId, rosterByWorkerId } from './swarm-roster'
+import { safeErrorMessage } from './rate-limit'
 
 export const SwarmWorkerStateSchema = z.enum([
   'idle',
@@ -445,7 +446,7 @@ export function patchSwarmRuntimeFile(
     }
     return {
       ok: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: safeErrorMessage(err),
     }
   }
 }

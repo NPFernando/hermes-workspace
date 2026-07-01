@@ -20,6 +20,7 @@ import { Markdown } from '@/components/prompt-kit/markdown'
 import { cn } from '@/lib/utils'
 import { writeTextToClipboard } from '@/lib/clipboard'
 import { toast } from '@/components/ui/toast'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 type SkillsTab = 'installed' | 'marketplace' | 'featured' | 'workspace'
 type SkillsSort = 'name' | 'category'
@@ -597,7 +598,7 @@ export function SkillsScreen() {
         }
       })
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err)
+      const errorMessage = safeErrorMessage(err)
       setActionError(errorMessage)
       toast(errorMessage, { type: 'error', icon: '❌' })
     } finally {

@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
+import { safeErrorMessage } from './rate-limit'
 
 // ── Path resolution ────────────────────────────────────────────────────────
 // Probes standard locations in priority order.
@@ -241,7 +242,7 @@ export function applyHarpPatch(patch: HarpPatch): HarpPatchResult {
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: safeErrorMessage(err),
     }
   }
 }
@@ -295,7 +296,7 @@ export function createStarterHarpConfig(): HarpPatchResult {
     writeHarpConfig(starter)
     return { ok: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    return { ok: false, error: safeErrorMessage(err) }
   }
 }
 

@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 import { readError } from '../utils'
 import type { PathsPayload } from '../types'
 import { writeTextToClipboard } from '@/lib/clipboard'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 export function useChatSettings() {
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -36,7 +37,7 @@ export function useChatSettings() {
         storePath: String(data.storePath ?? ''),
       })
     } catch (err) {
-      setPathsError(err instanceof Error ? err.message : String(err))
+      setPathsError(safeErrorMessage(err))
     } finally {
       setPathsLoading(false)
     }

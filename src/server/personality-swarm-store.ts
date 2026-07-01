@@ -14,6 +14,7 @@ import os from 'node:os'
 import YAML from 'yaml'
 import { getHermesRoot, getProfilesDir } from './claude-paths'
 import { readSwarmRoster } from './swarm-roster'
+import { safeErrorMessage } from './rate-limit'
 
 // ── Personality presets — The 12 Sisters ────────────────────────────────────
 // Each prompt defines the sister's identity, role, and behavior.
@@ -237,7 +238,7 @@ export function applyPersonalityToSwarm(opts: ApplyPersonalitySwarmOptions): App
       workerId: 'main',
       profilePath: mainConfigPath,
       ok: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: safeErrorMessage(err),
     })
   }
 
@@ -269,7 +270,7 @@ export function applyPersonalityToSwarm(opts: ApplyPersonalitySwarmOptions): App
         workerId: assignment.workerId,
         profilePath: configPath,
         ok: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: safeErrorMessage(err),
       })
     }
   }

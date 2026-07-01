@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Markdown } from '@/components/prompt-kit/markdown'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Types
@@ -725,7 +726,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
         setEditValue(data.content)
       }
     } catch (err) {
-      setFileError(err instanceof Error ? err.message : String(err))
+      setFileError(safeErrorMessage(err))
     } finally {
       setLoadingFile(false)
     }
@@ -754,7 +755,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
       setSavedOk(true)
       setTimeout(() => setSavedOk(false), 2000)
     } catch (err) {
-      setFileError(err instanceof Error ? err.message : String(err))
+      setFileError(safeErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -1069,7 +1070,7 @@ export function FilesScreen() {
           'Could not load files — request timed out. Check that HERMES_WORKSPACE_DIR is set.',
         )
       } else {
-        setTreeError(err instanceof Error ? err.message : String(err))
+        setTreeError(safeErrorMessage(err))
       }
     } finally {
       clearTimeout(timeoutId)

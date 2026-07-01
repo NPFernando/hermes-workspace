@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
+import { safeErrorMessage } from './rate-limit'
 import {
   
   readKnowledgeBaseConfig
@@ -180,7 +181,7 @@ class GitHubKnowledgeProvider {
       await this.fetchDir(this.repoPath)
     } catch (err) {
       throw new Error(
-        `GitHub sync failed for ${this.repo} (branch ${this.branch}): ${err instanceof Error ? err.message : String(err)}`,
+        `GitHub sync failed for ${this.repo} (branch ${this.branch}): ${safeErrorMessage(err)}`,
       )
     }
   }
@@ -326,7 +327,7 @@ export async function syncKnowledgeSource(): Promise<{
     return {
       source,
       success: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: safeErrorMessage(err),
     }
   }
 }

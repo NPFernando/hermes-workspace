@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path'
 import { getProfilesDir } from './claude-paths'
 import { listSwarmWorkerIds } from './swarm-foundation'
+import { safeErrorMessage } from './rate-limit'
 
 export type SwarmRuntimeResetResult = {
   workerId: string
@@ -93,7 +94,7 @@ export function resetSwarmWorkerRuntime(workerId: string, input: { actor: string
     return {
       workerId,
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: safeErrorMessage(error),
     }
   }
 }

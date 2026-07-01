@@ -123,6 +123,7 @@ import { setActiveResearch, useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useChatMode } from '@/hooks/use-chat-mode'
 import {  useChatActivityStore } from '@/stores/chat-activity-store'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 export let _localModelOverride = ''
 export function setLocalModelOverride(model: string) { _localModelOverride = model }
@@ -1653,7 +1654,7 @@ export function ChatScreen({
       }
     } catch (err) {
       setError(
-        `Failed to switch model. ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to switch model. ${safeErrorMessage(err)}`,
       )
     }
   }, [suggestion, resolvedSessionKey, dismiss])

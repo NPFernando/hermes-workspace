@@ -3,6 +3,7 @@ import { BrainIcon, Search01Icon } from '@hugeicons/core-free-icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 type ExternalMemoryProvider = {
   id: string
@@ -363,7 +364,7 @@ export function ExternalMemoryBrowserScreen() {
           ) : null}
           {error ? (
             <p className="p-3 text-sm text-rose-600">
-              {error instanceof Error ? error.message : String(error)}
+              {safeErrorMessage(error)}
             </p>
           ) : null}
           {!isLoading && candidates.length === 0 ? (

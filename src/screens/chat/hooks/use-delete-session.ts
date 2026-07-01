@@ -9,6 +9,7 @@ import { clearPendingSendForSession, resetPendingSend } from '../pending-send'
 import { clearSessionDeleted, markSessionDeleted } from '../session-tombstones'
 import { readError } from '../utils'
 import { clearSessionTitleState } from '../session-title-store'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 export type DeleteSessionResult = {
   deleteSession: (
@@ -68,7 +69,7 @@ export function useDeleteSession(): DeleteSessionResult {
         )
       }
       clearSessionDeleted(_payload.sessionKey || _payload.friendlyId)
-      setError(err instanceof Error ? err.message : String(err))
+      setError(safeErrorMessage(err))
     },
     onSuccess: function onSuccess(payload) {
       if (payload.isActive) {

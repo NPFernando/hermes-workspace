@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import WebSocket from 'ws'
+import { safeErrorMessage } from './rate-limit'
 import type { RawData } from 'ws'
 
 export type GatewayFrame =
@@ -766,7 +767,7 @@ if (existingClient) {
     ;(globalThis as any)[GW_LAST_RECONNECT_KEY] = now
     console.warn('[gateway] WARNING: Reused singleton is disconnected — triggering reconnect')
     existingClient.ensureConnected().catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = safeErrorMessage(error)
       console.warn(`[gateway] Reconnect attempt after singleton reuse failed: ${message}`)
     })
   }
@@ -781,7 +782,7 @@ const GW_UHR_KEY = '__clawsuite_gateway_uhr_installed__' as const
 if (!(globalThis as any)[GW_UHR_KEY]) {
   ;(globalThis as any)[GW_UHR_KEY] = true
   process.on('unhandledRejection', (reason: unknown) => {
-    const msg = reason instanceof Error ? reason.message : String(reason)
+    const msg = safeErrorMessage(reason)
     // Only swallow gateway-related rejections — let others propagate
     if (
       msg.includes('gateway') ||

@@ -35,6 +35,7 @@ import {
 import { ErrorBoundary } from '@/components/error-boundary'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
+import { safeErrorMessage } from '@/lib/error-utils'
 
 const APP_CSP = [
   "default-src 'self'",
@@ -218,7 +219,7 @@ export const Route = createRootRoute({
           Something went wrong
         </h1>
         <pre className="p-4 bg-[var(--theme-hover)] rounded-lg text-sm text-[var(--theme-muted)] max-w-full overflow-auto mb-6">
-          {error instanceof Error ? error.message : String(error)}
+          {safeErrorMessage(error)}
         </pre>
         <button
           onClick={() => (window.location.href = '/')}
