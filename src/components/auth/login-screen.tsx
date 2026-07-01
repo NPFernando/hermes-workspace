@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 const MAX_ATTEMPTS = 5
@@ -67,10 +67,16 @@ export function LoginScreen() {
   const [gatewayStatus, setGatewayStatus] = useState<'checking' | 'online' | 'offline'>('checking')
   const [googleEnabled, setGoogleEnabled] = useState(false)
 
+  // Where to return the user after a successful login. Captured before the
+  // effect below overwrites the address bar with the cosmetic '/login' URL,
+  // since that path has no real route and would 404 on reload.
+  const returnPathRef = useRef<string>('/')
+
   // Set clean /login URL in the address bar
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (window.location.pathname !== '/login') {
+      returnPathRef.current = window.location.pathname + window.location.search
       window.history.replaceState({}, '', '/login')
     }
   }, [])
@@ -142,7 +148,9 @@ export function LoginScreen() {
 
         if (data.ok) {
           setSuccess(true)
-          setTimeout(() => window.location.reload(), 800)
+          setTimeout(() => {
+            window.location.href = returnPathRef.current || '/'
+          }, 800)
         } else {
           const newAttempts = attempts + 1
           setAttempts(newAttempts)
