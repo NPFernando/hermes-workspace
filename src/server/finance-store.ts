@@ -602,6 +602,58 @@ export function addFinanceRecord(kind: string, payload: AddPayload): FinanceData
   return db
 }
 
+export function updateFinanceRecord(kind: string, id: string, payload: AddPayload): FinanceDatabase {
+  const db = ensureFinanceStore()
+  let updated = false
+  if (kind === 'income') {
+    const index = db.income_records.findIndex(r => r.id === id)
+    if (index !== -1) {
+      db.income_records[index] = { ...db.income_records[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
+  } else if (kind === 'expense') {
+    const index = db.expense_records.findIndex(r => r.id === id)
+    if (index !== -1) {
+      db.expense_records[index] = { ...db.expense_records[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
+  } else if (kind === 'account') {
+    const index = db.finance_accounts.findIndex(r => r.id === id)
+    if (index !== -1) {
+      db.finance_accounts[index] = { ...db.finance_accounts[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
+  } else if (kind === 'goal') {
+    const index = db.savings_goals.findIndex(r => r.id === id)
+    if (index !== -1) {
+      db.savings_goals[index] = { ...db.savings_goals[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
+  } else if (kind === 'tax') {
+    const index = db.tax_records.findIndex(r => r.id === id)
+    if (index !== -1) {
+      db.tax_records[index] = { ...db.tax_records[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
+  } else if (kind === 'budget_category') {
+    const index = db.budget_categories.findIndex(r => r.id === id)
+    if (index !== -1) {
+      db.budget_categories[index] = { ...db.budget_categories[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
+  } else {
+    throw new Error(`Unsupported finance record kind for update: ${kind}`)
+  }
+
+  if (!updated) {
+    throw new Error(`Record not found for kind ${kind} and id ${id}`)
+  }
+
+  writeFinanceStore(db)
+  appendAuditLog(`record_updated:${kind}`, { id, kind })
+  return db
+}
+
 export function createTradingPlan(
   payload: AddPayload,
   base?: { id: string; source: string; createdAt: string; updatedAt: string },
@@ -1083,3 +1135,119 @@ function decisionField(payload: AddPayload, key: string, fallback: TradingDecisi
   const value = payload[key]
   return DECISIONS.includes(value as TradingDecision) ? (value as TradingDecision) : fallback
 }
+
+
+function parseDate(dateString: string): { year: number; month: number } | null {
+  const match = dateString.match(/^(\d{4})-(\d{2})-\d{2}$/)
+  if (!match) return null
+  return {
+    year: parseInt(match[1], 10),
+    month: parseInt(match[2], 10)
+  }
+}
+
+export function getMonthlySummary(db: FinanceDatabase, year?: number, month?: number): Array<{ year: number; month: number; income: number; expense: number; savings: number }> {
+  const incomeMap = new Map<string, number>()
+  const expenseMap = new Map<string, number>()
+
+  for (const inc of db.income_records) {
+    const dateInfo = parseDate(inc.dateReceived)
+    if (!dateInfo) continue
+    if (year !== undefined && dateInfo.year !== year) continue
+    if (month !== undefined && dateInfo.month !== month) continue
+    const key = `${dateInfo.year}-${dateInfo.month}`
+    const current = incomeMap.get(key) ?? 0
+    incomeMap.set(key, current + inc.convertedLkrAmount)
+  }
+
+  for (const exp of db.expense_records) {
+    const dateInfo = parseDate(exp.date)
+    if (!dateInfo) continue
+    if (year !== undefined && dateInfo.year !== year) continue
+    if (month !== undefined && dateInfo.month !== month) continue
+    const key = `${dateInfo.year}-${dateInfo.month}`
+    const current = expenseMap.get(key) ?? 0
+    expenseMap.set(key, current + exp.convertedLkrAmount)
+  }
+
+  const result: Array<{ year: number; month: number; income: number; expense: number; savings: number }> = []
+  const allKeys = new Set([...incomeMap.keys(), ...expenseMap.keys()])
+  for (const key of allKeys) {
+    const [y, m] = key.split('-').map(Number)
+    const income = incomeMap.get(key) ?? 0
+    const expense = expenseMap.get(key) ?? 0
+    result.push({
+      year: y,
+      month: m,
+      income,
+      expense,
+      savings: income - expense
+    })
+  }
+
+  // Sort by year, then month
+  result.sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year
+    return a.month - b.month
+  })
+
+  return result
+}
+
+export function getBudgetVsActual(db: FinanceDatabase, category: string, year: number, month: number): { budget: number; actual: number; variance: number } | null {
+  // Format month as MM with leading zero
+  const monthStr = month.toString().padStart(2, '0')
+  const monthKey = `${year}-${monthStr}`
+  
+  // Find the budget category for the given category, year, month
+  const budgetEntry = db.budget_categories.find(
+    b => b.category === category && b.month === monthKey
+  )
+  if (!budgetEntry) return null
+
+  // Calculate actual expenses for that category, year, month
+  let actual = 0
+  for (const exp of db.expense_records) {
+    const dateInfo = parseDate(exp.date)
+    if (!dateInfo) continue
+    if (dateInfo.year === year && dateInfo.month === month && exp.category === category) {
+      actual += exp.convertedLkrAmount
+    }
+  }
+
+  return {
+    budget: budgetEntry.budgetAmount,
+    actual,
+    variance: budgetEntry.budgetAmount - actual
+  }
+}
+
+export function updateExchangeRate(base: string, target: string, rate: number, date?: string): FinanceDatabase {
+  const db = ensureFinanceStore()
+  const dateStr = date ?? new Date().toISOString().split('T')[0]
+  const rateRecord = { base, target, rate, date: dateStr, updatedAt: new Date().toISOString() }
+  
+  db.exchange_rates.push(rateRecord)
+  writeFinanceStore(db)
+  appendAuditLog('exchange_rate_updated', { base, target, rate, date: dateStr })
+  return db
+}
+
+export function getExchangeRate(db: FinanceDatabase, base: string, target: string): number | undefined {
+  // Filter rates for the base and target, then take the one with the latest date
+  const relevant = db.exchange_rates
+    .filter((r: any) => 
+      r.base === base && 
+      r.target === target && 
+      typeof r.rate === 'number'
+    )
+    .sort((a: any, b: any) => {
+      const dateA = new Date(a.date || 0).getTime()
+      const dateB = new Date(b.date || 0).getTime()
+      return dateB - dateA // descending
+    })
+  
+  if (relevant.length === 0) return undefined
+  return relevant[0].rate as number
+}
+

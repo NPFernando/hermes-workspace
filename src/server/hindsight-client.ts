@@ -120,11 +120,26 @@ export async function recallHindsight(
   budget = 'mid',
   bank = DEFAULT_BANK,
 ): Promise<{ results: Array<HindsightRecallResult> }> {
-  return hFetch(`/v1/default/banks/${bank}/memories/recall`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, budget }),
-  })
+  const result = await hFetch<{ results: Array<HindsightRecallResult> }>(
+    `/v1/default/banks/${bank}/memories/recall`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, budget }),
+    },
+  )
+
+  // Reinforce each recalled memory by calling retainHindsight
+  for (const memory of result.results) {
+    try {
+      await retainHindsight(memory.text, memory.context ?? undefined, bank)
+    } catch (error) {
+      // Log error but don't fail the recall operation
+      console.warn(`Failed to reinforce memory ${memory.id}:`, error)
+    }
+  }
+
+  return result
 }
 
 export async function listHindsightOperations(
