@@ -1,30 +1,24 @@
-# Close Summary — Reduce Tasks screen focused ESLint shadowing debt
+# Close Summary: Task stat filter accessibility
 
 ## What changed
-- Cleaned two `no-shadow` findings in `src/screens/tasks/tasks-screen.tsx` without changing behavior:
-  - Renamed the grouped todo row column alias from `columnMap` to `taskColumnsByStatus`.
-  - Renamed the activity notification click-handler local from `t` to `selectedTask`.
-- Preserved and appended new follow-up ideas in `IDEAS.json`.
-- Wrote this cycle's plan and test report in `PLAN.md` and `TEST_REPORT.json`.
+- `src/screens/tasks/tasks-screen.tsx`: converted the Tasks header blocked-count control from a clickable `<span>` into a semantic `<button type="button">` with `aria-pressed`, an explicit accessible label, and keyboard-visible focus styling.
+- `src/screens/tasks/tasks-screen.tsx`: added an accessible label and focus ring to the timed-out analysis button.
+- `src/screens/tasks/tasks-screen.tsx`: added `formatTaskStatFilterButtonLabel()` for reusable, tested header-stat filter copy.
+- `src/screens/tasks/tasks-ux.test.ts`: added focused coverage for the new stat filter button label helper.
+- `IDEAS.json`, `PLAN.md`, and `TEST_REPORT.json`: updated the current auto-improvement artifacts while preserving the existing idea backlog.
 
 ## Test results
 - `npx tsc --noEmit`: passed.
-- Focused relaxed Tasks lint (`npx eslint --no-warn-ignored -f json --rule '@typescript-eslint/no-unnecessary-condition: off' src/screens/tasks/tasks-screen.tsx`): passed with 0 errors and 0 warnings.
+- `npx vitest run src/screens/tasks/tasks-ux.test.ts`: passed, 10 tests.
+- `pnpm test`: passed, 110 files / 724 tests.
+- Focused relaxed ESLint for touched Tasks files: 0 errors, 0 warnings.
 - `git diff --check`: passed.
-- Class-token fallback scan on changed TS/TSX/CSS files: passed with no findings. The package script `pnpm -s lint:class-tokens` is not present in this checkout and returned command-not-found.
-- `pnpm test`: passed.
-- `pnpm lint`: failed on existing repository-wide strict-lint baseline debt outside this focused cleanup; the touched file's focused gate is clean under the documented baseline-rule override.
 - `pnpm build`: passed.
+- `pnpm lint`: still fails on repository-wide baseline debt outside touched files (240 errors, 105 warnings), so it was recorded as baseline rather than a changed-file regression.
+- `pnpm -s lint:class-tokens`: script is absent in this checkout; fallback scan over touched TS/TSX files found no known joined class-token patterns.
 
-## Deployment result
-Deployment succeeded. `pnpm build` passed, `sudo systemctl restart hermes-workspace.service` completed, `systemctl is-active hermes-workspace.service` returned `active`, and `/api/health` returned HTTP 200 with `application/json` body `{"status":"ok"}`.
+## Deployment
+`main` was fast-forwarded locally to the auto-improvement commit without pushing. Because `src/` changed, the workspace was rebuilt, `hermes-workspace.service` was restarted, and health was validated. The first external health request hit the known transient nginx 502 warmup, then the second attempt returned HTTP 200 `application/json` with `{ "status": "ok" }`; systemd reported the service as `active`.
 
-## Side effects / blockers
-- The requested `hermes dispatch-mission` command is not available in this Hermes CLI build, so this run used the documented manual fallback.
-- Pre-existing dirty/untracked files were left unstaged: `scripts/upstream-sync.py`, `services/odysseus`, and finance/memory draft docs.
-- During final validation the worktree also showed unrelated unstaged source edits (`src/components/prompt-kit/mermaid-block.tsx`, `src/routes/api/events.ts`, `src/routes/api/files.ts`, `src/routes/api/tasks-exec-log.ts`, `src/screens/chat/components/chat-composer.tsx`, `src/screens/tasks/task-card.tsx`, `src/server/astra-tasks.ts`, `src/server/telegram-clarify.ts`). These were not staged or included in this auto-improvement commit.
-
-## New improvement ideas
-- Reduce the remaining `@typescript-eslint/no-unnecessary-condition` findings in `src/screens/tasks/tasks-screen.tsx` so the focused lint gate can run strict.
-- Add a checked-in class-token smoke script/package entry for this checkout, or remove stale references to `lint:class-tokens` where unsupported.
-- Extract grouped-row and activity-notification helper logic from `tasks-screen.tsx` into small tested utilities.
+## Side effects and follow-up ideas
+Unrelated pre-existing worktree entries remain unstaged (`services/odysseus` gitlink plus untracked finance/memory documentation drafts). Follow-up ideas appended or preserved include adding Tasks stat button focus smoke coverage, exposing task-board refresh timing copy, and reducing repository-wide lint baseline debt so full lint can become a hard gate again.

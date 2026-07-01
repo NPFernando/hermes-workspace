@@ -104,6 +104,10 @@ export function formatBlockedTaskBreakdownTitle(waitingForInput: number, executi
   ].filter(Boolean).join(', ')
 }
 
+export function formatTaskStatFilterButtonLabel(label: string, active: boolean) {
+  return `${active ? 'Disable' : 'Enable'} ${label.toLowerCase()} task filter`
+}
+
 function SkeletonCard() {
   return (
     <div className="skeleton-shimmer rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
@@ -1082,13 +1086,25 @@ export function TasksScreen() {
             {stats.running > 0 && <><span className="opacity-30">·</span><span>{stats.running} running</span></>}
             {stats.blocked > 0 && (
               <><span className="opacity-30">·</span>
-              <span className="text-red-400 cursor-pointer hover:opacity-80" onClick={() => setFilterBlocked(v => !v)} title={formatBlockedTaskBreakdownTitle(stats.blockedWaiting, stats.blockedExecFail)}>
+              <button
+                type="button"
+                aria-pressed={filterBlocked}
+                aria-label={formatTaskStatFilterButtonLabel('Blocked', filterBlocked)}
+                className="text-red-400 cursor-pointer hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 rounded-sm"
+                onClick={() => setFilterBlocked(v => !v)}
+                title={formatBlockedTaskBreakdownTitle(stats.blockedWaiting, stats.blockedExecFail)}
+              >
                 {stats.blocked} blocked{formatBlockedTaskBreakdownLabel(stats.blockedWaiting, stats.blockedExecFail) ? ` (${formatBlockedTaskBreakdownLabel(stats.blockedWaiting, stats.blockedExecFail)})` : ''}
-              </span></>
+              </button></>
             )}
             {stats.timedOut > 0 && (
               <><span className="opacity-30">·</span>
-              <button type="button" onClick={() => setShowTimeoutAnalysis(true)} className="text-amber-500 hover:text-amber-300 transition-colors">⏱ {stats.timedOut}</button></>
+              <button
+                type="button"
+                aria-label="Open timed-out task analysis"
+                onClick={() => setShowTimeoutAnalysis(true)}
+                className="text-amber-500 hover:text-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 rounded-sm transition-colors"
+              >⏱ {stats.timedOut}</button></>
             )}
             {stats.overdue > 0 && <><span className="opacity-30">·</span><span className="text-red-400">{stats.overdue} overdue</span></>}
             <span className="opacity-30">·</span>

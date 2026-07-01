@@ -208,5 +208,23 @@
     "description": "Replace closure-mutated search parser state and typed array indexing patterns in tasks-screen.tsx so the focused Tasks lint gate no longer needs a baseline rule override.",
     "category": "ui",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Make Tasks stat filters keyboard accessible",
+    "description": "Convert clickable stat text in the Tasks header into named buttons with helper-tested labels so keyboard and screen-reader users can toggle blocked/timed-out filters reliably.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add Tasks stat button focus smoke tests",
+    "description": "Cover user-visible labels for header stat filter buttons so future compact toolbar work preserves keyboard semantics.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Expose task board refresh timing copy",
+    "description": "Add optional last-updated timing copy near the Tasks refresh status so operators know whether the board data is stale.",
+    "category": "ui",
+    "estimated_effort": "medium"
   }
 ]

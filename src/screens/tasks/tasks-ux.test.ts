@@ -11,6 +11,7 @@ import {
   formatTaskFilterAriaLabel,
   formatTaskFilterSummary,
   formatTaskRefreshStatus,
+  formatTaskStatFilterButtonLabel,
 } from './tasks-screen'
 
 describe('tasks UX copy', () => {
@@ -42,6 +43,11 @@ describe('tasks UX copy', () => {
     expect(formatTaskFilterAriaLabel('Overdue', false)).toBe('Enable overdue task filter')
     expect(formatTaskFilterAriaLabel('Active Agent', true)).toBe('Disable active agent task filter')
     expect(formatTaskFilterAriaLabel('high priority', false)).toBe('Enable high priority task filter')
+  })
+
+  it('formats task stat filter button labels from active state', () => {
+    expect(formatTaskStatFilterButtonLabel('Blocked', false)).toBe('Enable blocked task filter')
+    expect(formatTaskStatFilterButtonLabel('Blocked', true)).toBe('Disable blocked task filter')
   })
 
   it('formats task refresh status copy for loading and background updates', () => {
