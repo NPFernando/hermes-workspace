@@ -190,5 +190,23 @@
     "description": "Move clear-done, bulk-delete, prune-stale, and task-delete confirmation dialogs into a shared Tasks confirmation component with tests for button labels and disabled states.",
     "category": "ui",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Extract Tasks screen lint-clean helpers",
+    "description": "Move grouped row construction and notification selection helpers out of tasks-screen.tsx so strict focused lint can run without local shadowing or baseline rule overrides.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add focused Tasks screen shadowing regression test",
+    "description": "Add a lightweight lint or unit guard around Tasks activity click handling and grouped todo rows so no-shadow regressions are caught before auto-improvement verification.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Reduce remaining Tasks no-unnecessary-condition debt",
+    "description": "Replace closure-mutated search parser state and typed array indexing patterns in tasks-screen.tsx so the focused Tasks lint gate no longer needs a baseline rule override.",
+    "category": "ui",
+    "estimated_effort": "low"
   }
 ]

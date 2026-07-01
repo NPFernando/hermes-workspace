@@ -1,7 +1,7 @@
-# Plan: Compact Tasks Operations Toolbar
+# Plan: Reduce Tasks screen focused ESLint shadowing debt
 
-## Summary of the change
-Polish the Tasks workspace so frequent operational controls take less vertical space, avoid blocking browser prompts/confirmations, and keep slide-over panels mutually exclusive. This cycle uses the existing dirty `src/screens/tasks/tasks-screen.tsx` worktree change as the implementation candidate, then hardens it with TypeScript and lint fixes.
+## Summary
+Clean up low-risk `no-shadow` lint debt in the Workspace Tasks screen so the focused fallback lint gate can run with only the known baseline `@typescript-eslint/no-unnecessary-condition` rule disabled. This reduces ad-hoc verification noise for future Tasks UI cycles without changing runtime behavior.
 
 ## Files to modify
 - `src/screens/tasks/tasks-screen.tsx`
@@ -11,23 +11,22 @@ Polish the Tasks workspace so frequent operational controls take less vertical s
 - `CLOSE_SUMMARY.md`
 
 ## Steps
-1. Replace separate panel booleans with one `activePanel` state for Activity, Tags, Sister Load, and Rebalance panels.
-2. Compact the Tasks header statistics, toolbar buttons, and filter affordances so they fit better on constrained screens.
-3. Replace `window.prompt` / `window.confirm` flows with inline inputs and React confirmation dialogs.
-4. Pre-compute live panel and timeout-analysis data outside JSX-heavy render blocks.
-5. Fix TypeScript and mechanical lint regressions introduced by the UI refactor.
-6. Preserve unrelated dirty worktree entries (`services/odysseus` and untracked docs) unstaged.
+1. Inspect the current focused lint output for `src/screens/tasks/tasks-screen.tsx`.
+2. Rename the grouped todo column local variable so it no longer shadows an outer `columnMap` binding.
+3. Rename the activity notification click-handler selected task local so it no longer shadows callback variables.
+4. Run TypeScript and a focused ESLint gate on the touched Tasks screen with the known baseline `@typescript-eslint/no-unnecessary-condition` rule disabled.
+5. Run broader test/lint/build checks, documenting repository-wide baseline failures separately from changed-file regressions.
+6. Commit only intended files on `main` without pushing.
+7. Because a `src/` file changed, build, restart `hermes-workspace.service`, and validate service state plus JSON health body shape.
 
 ## How to verify the change works
-- `npx tsc --noEmit`
-- `npx vitest run src/screens/tasks/tasks-ux.test.ts`
-- `pnpm test`
-- `npx eslint --no-warn-ignored -f json --rule '@typescript-eslint/no-unnecessary-condition: off' src/screens/tasks/tasks-screen.tsx`
-- `pnpm lint` for repository baseline visibility
+- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx tsc --noEmit`
+- `npx eslint --no-warn-ignored -f json --rule '@typescript-eslint/no-unnecessary-condition: off' src/screens/tasks/tasks-screen.tsx` reports 0 errors and 0 warnings.
 - `git diff --check`
 - `pnpm -s lint:class-tokens`
 - `pnpm build`
-- Restart `hermes-workspace.service` and validate `https://agent.fernandofamily.com/api/health` returns JSON `{"status":"ok"}` because a source file changed.
+- `systemctl is-active hermes-workspace.service`
+- `https://agent.fernandofamily.com/api/health` returns HTTP 200, `application/json`, and `{"status":"ok"}`.
 
 ## Rollback procedure
-Revert the auto-improvement commit or restore `src/screens/tasks/tasks-screen.tsx` from the previous commit, then rebuild/restart the workspace service and re-run the JSON health check.
+Revert the auto-improvement commit with `git revert <commit>` and restart `hermes-workspace.service` if the deployed UI needs to be rolled back.

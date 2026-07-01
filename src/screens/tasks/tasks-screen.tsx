@@ -725,8 +725,8 @@ export function TasksScreen() {
   // Grouped rows for todo column when groupByParent is enabled
   const groupedTodoRows = useMemo<Array<VirtualRow> | null>(() => {
     if (!groupByParent) return null
-    const columnMap = tasksByColumn.columns
-    const todoTasks = columnMap['todo'] ?? []
+    const taskColumnsByStatus = tasksByColumn.columns
+    const todoTasks = taskColumnsByStatus['todo'] ?? []
     const allById = new Map(tasks.map(t => [t.id, t]))
 
     // Separate tasks with known parent vs ungrouped
@@ -2702,7 +2702,7 @@ export function TasksScreen() {
                     <button
                       key={`${ev.taskId}-${ev.at}-${i}`}
                       type="button"
-                      onClick={() => { const t = tasks.find(t => t.id === ev.taskId); if (t) { setPanelTask(t); setShowActivity(false) } }}
+                      onClick={() => { const selectedTask = tasks.find(t => t.id === ev.taskId); if (selectedTask) { setPanelTask(selectedTask); setShowActivity(false) } }}
                       className={cn('text-left px-3 py-2 rounded-lg border transition-colors hover:bg-[var(--theme-hover)]', isNew ? 'border-violet-500/30 bg-violet-500/5' : 'border-[var(--theme-border)]')}
                     >
                       <div className="flex items-center gap-2">
