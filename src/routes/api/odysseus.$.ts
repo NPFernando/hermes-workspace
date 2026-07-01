@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { ODYSSEUS_BASE, getOdysseusCookie, invalidateOdysseusCookie } from '../../server/odysseus-session'
 
+import { safeErrorMessage } from '../../server/rate-limit'
+
 export const Route = createFileRoute('/api/odysseus/$')({
   server: {
     handlers: {
@@ -85,7 +87,7 @@ async function handler({ request }: { request: Request }): Promise<Response> {
       headers: responseHeaders,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Odysseus unreachable'
+    const message = safeErrorMessage(err)
     return new Response(
       JSON.stringify({ ok: false, error: `Odysseus unreachable (${target}): ${message}` }),
       {

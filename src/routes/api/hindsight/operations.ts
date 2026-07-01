@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { listHindsightOperations } from '../../../server/hindsight-client'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/hindsight/operations')({
   server: {
     handlers: {
@@ -17,7 +19,7 @@ export const Route = createFileRoute('/api/hindsight/operations')({
           return json(await listHindsightOperations(Number.isFinite(limit) ? limit : 20))
         } catch (err) {
           return json(
-            { error: err instanceof Error ? err.message : 'Failed to list operations' },
+            { error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

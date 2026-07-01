@@ -3,7 +3,13 @@ import { buildResolvedSessionHeaders } from '../../lib/send-stream-session-heade
 import { buildWorkspaceScopedTextMessage } from '../../lib/workspace-message-scope'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import {
   registerActiveSendRun,
   unregisterActiveSendRun,
@@ -196,7 +202,7 @@ function normalizePortableHistory(
 }
 
 function normalizeClaudeErrorMessage(error: unknown): string {
-  const raw = error instanceof Error ? error.message : String(error)
+  const raw = safeErrorMessage(error)
   const message = raw.trim()
   if (!message) return 'Claude request failed'
   return message.replace(/\bserver\b/gi, 'Claude')
@@ -286,6 +292,9 @@ export const Route = createFileRoute('/api/send-stream')({
             JSON.stringify({ ok: false, error: 'Unauthorized' }),
             { status: 401, headers: { 'Content-Type': 'application/json' } },
           )
+        }
+        if (!rateLimit(`send-stream:${getClientIp(request)}`, 60, 60_000)) {
+          return rateLimitResponse()
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck

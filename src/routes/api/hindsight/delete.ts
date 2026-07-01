@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { deleteHindsightMemory } from '../../../server/hindsight-client'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/hindsight/delete')({
   server: {
     handlers: {
@@ -21,7 +23,7 @@ export const Route = createFileRoute('/api/hindsight/delete')({
           return json({ ok: true })
         } catch (err) {
           return json(
-            { error: err instanceof Error ? err.message : 'Delete failed' },
+            { error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

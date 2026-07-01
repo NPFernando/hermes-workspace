@@ -247,6 +247,7 @@ export function CommandCenterScreen() {
       return res.json() as Promise<AgentBusHealth>
     },
     refetchInterval: 30_000,
+    staleTime: 15_000,
   })
   const agentBus = agentBusQuery.data ?? null
   const agentBusPending = agentBusQuery.isPending

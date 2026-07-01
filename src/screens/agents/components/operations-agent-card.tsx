@@ -17,35 +17,12 @@ import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { toast } from '@/components/ui/toast'
 import { runCronJob, toggleCronJob } from '@/lib/cron-api'
+import { sisterBadgeColors, sisterTierLabel } from '@/lib/sister-badge-colors'
 import { cn } from '@/lib/utils'
 
-const SISTER_BADGE_STYLES: Partial<Record<string, { bg: string; text: string; border: string }>> = {
-  astra:    { bg: 'bg-violet-500/15',  text: 'text-violet-300',  border: 'border-violet-400/30' },
-  novus:    { bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-400/30' },
-  nova:     { bg: 'bg-sky-500/15',     text: 'text-sky-300',     border: 'border-sky-400/30' },
-  business: { bg: 'bg-amber-500/15',   text: 'text-amber-300',   border: 'border-amber-400/30' },
-  default:  { bg: 'bg-[var(--theme-panel)]0/10', text: 'text-[var(--theme-muted)]', border: 'border-[var(--theme-border)]/20' },
-}
-
-const FALLBACK_STYLE = { bg: 'bg-[var(--theme-panel)]0/10', text: 'text-[var(--theme-muted)]', border: 'border-[var(--theme-border)]/20' }
-
-function badgeStyle(sister: SisterInfo): { bg: string; text: string; border: string } {
-  return SISTER_BADGE_STYLES[sister.id]
-    ?? (sister.type === 'business_agent' ? SISTER_BADGE_STYLES.business : undefined)
-    ?? FALLBACK_STYLE
-}
-
 function PersonalityBadge({ sister }: { sister: SisterInfo }) {
-  const style = badgeStyle(sister)
-  const tier = sister.modelPreference
-    ? sister.modelPreference.startsWith('local:')
-      ? 'local'
-      : sister.modelPreference.includes(':free')
-        ? 'free'
-        : sister.modelPreference.includes(':paid')
-          ? 'paid'
-          : null
-    : null
+  const style = sisterBadgeColors(sister.id, sister.type)
+  const tier = sisterTierLabel(sister.modelPreference)
   const hasGrowth = (sister.growthEntryCount ?? 0) > 0
   const growthTitle = hasGrowth
     ? `${sister.growthLabel} (${sister.growthEntryCount} improvement${(sister.growthEntryCount ?? 0) === 1 ? '' : 's'})${sister.lastNote ? `\n"${sister.lastNote}"` : ''}`

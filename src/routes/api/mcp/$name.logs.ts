@@ -6,6 +6,7 @@ import {
   dashboardFetch,
   ensureGatewayProbed,
 } from '../../../server/gateway-capabilities'
+import { safeErrorMessage } from '../../../server/rate-limit'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 /**
@@ -57,7 +58,7 @@ export const Route = createFileRoute('/api/mcp/$name/logs')({
         } catch (err) {
           request.signal.removeEventListener('abort', onClientAbort)
           return json(
-            { ok: false, error: err instanceof Error ? err.message : String(err) },
+            { ok: false, error: safeErrorMessage(err) },
             { status: 502 },
           )
         }
@@ -113,7 +114,7 @@ export const Route = createFileRoute('/api/mcp/$name/logs')({
                 }
               }
             } catch (err) {
-              const msg = err instanceof Error ? err.message : String(err)
+              const msg = safeErrorMessage(err)
               try {
                 controller.enqueue(
                   encoder.encode(`event: error\ndata: ${JSON.stringify({ message: msg })}\n\n`),

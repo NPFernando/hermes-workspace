@@ -15,7 +15,10 @@ import {
   setDashboardUrl,
   setGatewayUrl,
 } from '../../server/gateway-capabilities'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 
 function isValidHttpUrl(u: string): boolean {
   try {
@@ -72,9 +75,7 @@ export const Route = createFileRoute('/api/connection-settings')({
           return json({ ok: true, ...getResolvedUrls() })
         } catch (error) {
           const message =
-            error instanceof Error
-              ? error.message
-              : 'Failed to update connection settings'
+            safeErrorMessage(error)
           return json({ error: message }, { status: 500 })
         }
       },

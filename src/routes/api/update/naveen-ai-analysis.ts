@@ -6,6 +6,7 @@ import {
   rateLimit,
   rateLimitResponse,
   requireJsonContentType,
+  safeErrorMessage,
 } from '../../../server/rate-limit'
 import {
   
@@ -51,7 +52,7 @@ export const Route = createFileRoute('/api/update/naveen-ai-analysis')({
           return json({ ok: true, analysis })
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : String(err) },
+            { ok: false, error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

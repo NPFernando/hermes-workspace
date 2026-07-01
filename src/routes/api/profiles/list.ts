@@ -4,6 +4,8 @@ import { isAuthenticated } from '../../../server/auth-middleware'
 import { listProfilesWithFallback } from '../../../server/profiles-browser'
 import { bootstrapOnceLazy } from '../../../server/sisters-registry'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/profiles/list')({
   server: {
     handlers: {
@@ -20,9 +22,7 @@ export const Route = createFileRoute('/api/profiles/list')({
           return json(
             {
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to list profiles',
+                safeErrorMessage(error),
               profiles: [],
             },
             { status: 500 },

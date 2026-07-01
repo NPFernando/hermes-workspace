@@ -12,6 +12,7 @@ import { appendSwarmMemoryEvent, buildSwarmStartupSnapshot } from '../../server/
 import {  rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
+import { safeErrorMessage } from '../../server/rate-limit'
 import type {SwarmRosterWorker} from '../../server/swarm-roster';
 import type {ParsedSwarmCheckpoint} from '../../server/swarm-checkpoints';
 
@@ -1047,7 +1048,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
         workerId,
         ok: false,
         output: '',
-        error: error instanceof Error ? error.message : String(error),
+        error: safeErrorMessage(error),
         durationMs: 0,
         exitCode: null,
         delivery: 'oneshot',
@@ -1186,7 +1187,7 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
           if (error instanceof SwarmDispatchError) {
             return json({ error: error.message }, { status: error.status })
           }
-          return json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 })
+          return json({ error: safeErrorMessage(error) }, { status: 500 })
         }
       },
     },

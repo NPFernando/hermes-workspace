@@ -8,6 +8,8 @@ import {
 } from '../../server/gateway-capabilities'
 import { getMemory } from '../../server/claude-api'
 
+import { safeErrorMessage } from '../../server/rate-limit'
+
 export const Route = createFileRoute('/api/memory')({
   server: {
     handlers: {
@@ -31,7 +33,7 @@ export const Route = createFileRoute('/api/memory')({
           return json(await getMemory())
         } catch (err) {
           return json(
-            { error: err instanceof Error ? err.message : String(err) },
+            { error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

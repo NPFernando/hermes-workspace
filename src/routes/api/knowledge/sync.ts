@@ -6,6 +6,7 @@ import {
   readKnowledgeBaseConfig
 } from '../../../server/knowledge-config'
 import { syncKnowledgeSource } from '../../../server/knowledge-browser'
+import { safeErrorMessage } from '../../../server/rate-limit'
 import type {KnowledgeBaseConfig} from '../../../server/knowledge-config';
 
 export const Route = createFileRoute('/api/knowledge/sync')({
@@ -41,9 +42,7 @@ export const Route = createFileRoute('/api/knowledge/sync')({
           return json(
             {
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to sync knowledge source',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )

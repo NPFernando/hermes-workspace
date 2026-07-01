@@ -316,7 +316,7 @@ export function MobileTabBar() {
         onTouchEnd={handlePillTouchEnd}
       >
         <div ref={scrollRef} className="flex items-center gap-0.5 overflow-x-auto scrollbar-none px-2">
-          {MOBILE_NAV_TABS.map((tab, idx) => {
+          {MOBILE_NAV_TABS.map((tab) => {
             const isActive = tab.match(pathname)
             const isCenter = tab.id === 'chat'
             const circleSize =
@@ -343,7 +343,6 @@ export function MobileTabBar() {
                   'select-none touch-manipulation',
                   'outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0',
                 )}
-                data-tab-idx={idx}
               >
                 <span
                   className={cn(

@@ -19,6 +19,7 @@ import type { CrewMember } from '@/hooks/use-crew-status'
 import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { AgentProgress } from '@/components/agent-view/agent-progress'
 import { getOnlineStatus } from '@/hooks/use-crew-status'
+import { sisterBadgeColors } from '@/lib/sister-badge-colors'
 import { cn } from '@/lib/utils'
 
 type SisterData = { id: string; name: string; emoji: string; role: string; type: string }
@@ -37,36 +38,6 @@ const ROLE_TO_SISTER_ID: Record<string, string> = {
   // Numbered display labels (from roleFromId())
   'pr / issues': 'keeper', 'qwen pc1': 'novus', benchloop: 'novus',
   research: 'nova', ops: 'bia', hackathon: 'novus', worker: 'astra',
-}
-
-const SISTER_BADGE_COLORS: Partial<Record<string, { bg: string; text: string; border: string }>> = {
-  astra:    { bg: 'bg-violet-500/12',  text: 'text-violet-300',  border: 'border-violet-400/25' },
-  novus:    { bg: 'bg-emerald-500/12', text: 'text-emerald-300', border: 'border-emerald-400/25' },
-  nova:     { bg: 'bg-sky-500/12',     text: 'text-sky-300',     border: 'border-sky-400/25' },
-  luna:     { bg: 'bg-indigo-500/12',  text: 'text-indigo-300',  border: 'border-indigo-400/25' },
-  ada:      { bg: 'bg-cyan-500/12',    text: 'text-cyan-300',    border: 'border-cyan-400/25' },
-  maya:     { bg: 'bg-lime-500/12',    text: 'text-lime-300',    border: 'border-lime-400/25' },
-  vega:     { bg: 'bg-orange-500/12',  text: 'text-orange-300',  border: 'border-orange-400/25' },
-  atlas:    { bg: 'bg-teal-500/12',    text: 'text-teal-300',    border: 'border-teal-400/25' },
-  lyra:     { bg: 'bg-purple-500/12',  text: 'text-purple-300',  border: 'border-purple-400/25' },
-  bia:      { bg: 'bg-rose-500/12',    text: 'text-rose-300',    border: 'border-rose-400/25' },
-  keeper:   { bg: 'bg-slate-500/12',   text: 'text-slate-300',   border: 'border-slate-400/25' },
-  daiane:   { bg: 'bg-yellow-500/12',  text: 'text-yellow-300',  border: 'border-yellow-400/25' },
-  sentinel: { bg: 'bg-stone-500/12',   text: 'text-stone-300',   border: 'border-stone-400/25' },
-  vitoria:  { bg: 'bg-pink-500/12',    text: 'text-pink-300',    border: 'border-pink-400/25' },
-  larissa:  { bg: 'bg-green-500/12',   text: 'text-green-300',   border: 'border-green-400/25' },
-  clara:    { bg: 'bg-amber-500/12',   text: 'text-amber-300',   border: 'border-amber-400/25' },
-  helena:   { bg: 'bg-[var(--theme-card2)]',    text: 'text-[var(--theme-muted)]',    border: 'border-[var(--theme-border)]' },
-  business: { bg: 'bg-amber-500/12',   text: 'text-amber-300',   border: 'border-amber-400/25' },
-  default:  { bg: 'bg-primary-500/10', text: 'text-primary-300', border: 'border-primary-300/20' },
-}
-
-const FALLBACK_COLORS = { bg: 'bg-primary-500/10', text: 'text-primary-300', border: 'border-primary-300/20' }
-
-function badgeColors(id: string, type: string): { bg: string; text: string; border: string } {
-  return SISTER_BADGE_COLORS[id]
-    ?? (type === 'business_agent' ? SISTER_BADGE_COLORS.business : undefined)
-    ?? FALLBACK_COLORS
 }
 
 function useSistersByRole() {
@@ -96,7 +67,7 @@ function PersonalityBadge({ role, workerId }: { role: string; workerId?: string 
   // Try role first, then fall back to workerId (role descriptions don't match keys; IDs do)
   const sister = sistersByRole[role.toLowerCase()] ?? (workerId ? sistersByRole[workerId.toLowerCase()] : undefined)
   if (!sister) return null
-  const colors = badgeColors(sister.id, sister.type)
+  const colors = sisterBadgeColors(sister.id, sister.type)
   return (
     <span
       className={cn(

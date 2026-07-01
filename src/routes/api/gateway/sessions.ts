@@ -12,6 +12,8 @@ import { isAuthenticated } from '../../../server/auth-middleware'
 import { ensureGatewayProbed, listSessions } from '../../../server/claude-api'
 import { getCapabilities } from '../../../server/gateway-capabilities'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/gateway/sessions')({
   server: {
     handlers: {
@@ -32,7 +34,7 @@ export const Route = createFileRoute('/api/gateway/sessions')({
           return json({ ok: true, data: { sessions: Array.isArray(sessions) ? sessions : [] } })
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : 'Failed to list sessions' },
+            { ok: false, error: safeErrorMessage(err) },
             { status: 502 },
           )
         }

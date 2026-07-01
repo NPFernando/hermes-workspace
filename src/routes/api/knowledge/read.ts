@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { readKnowledgePage } from '../../../server/knowledge-browser'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/knowledge/read')({
   server: {
     handlers: {
@@ -19,9 +21,7 @@ export const Route = createFileRoute('/api/knowledge/read')({
           return json({ page: meta, content, backlinks })
         } catch (error) {
           const message =
-            error instanceof Error
-              ? error.message
-              : 'Failed to read knowledge page'
+            safeErrorMessage(error)
           const status =
             /not allowed|outside knowledge root|required|traversal/i.test(
               message,

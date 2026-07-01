@@ -2,6 +2,8 @@ import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 
+import { safeErrorMessage } from '../../server/rate-limit'
+
 const ODYSSEUS_BASE = 'http://127.0.0.1:7100'
 
 export const Route = createFileRoute('/api/odysseus-bootstrap')({
@@ -44,7 +46,7 @@ export const Route = createFileRoute('/api/odysseus-bootstrap')({
 
           return json({ ok: true, created: true })
         } catch (err) {
-          const message = err instanceof Error ? err.message : 'Unknown error'
+          const message = safeErrorMessage(err)
           return json({ ok: false, error: message }, { status: 500 })
         }
       },

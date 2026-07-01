@@ -4,6 +4,8 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { SWARM_ROSTER_PATH, readSwarmRoster, upsertSwarmRosterWorker } from '../../server/swarm-roster'
 import { listSwarmWorkerIds } from '../../server/swarm-foundation'
 
+import { safeErrorMessage } from '../../server/rate-limit'
+
 export const Route = createFileRoute('/api/swarm-roster')({
   server: {
     handlers: {
@@ -36,7 +38,7 @@ export const Route = createFileRoute('/api/swarm-roster')({
         } catch (error) {
           return json({
             ok: false,
-            error: error instanceof Error ? error.message : 'Failed to save swarm roster entry',
+            error: safeErrorMessage(error),
           }, { status: 400 })
         }
       },

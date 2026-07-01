@@ -1536,6 +1536,10 @@ function ChatComposerComponent({
 
             const dataUrlMimeType = readDataUrlMimeType(dataUrl)
             if (!isImageMimeType(dataUrlMimeType || '')) {
+              toast(
+                `"${file.name || 'Image'}" is not a supported image format and was skipped.`,
+                { type: 'warning' },
+              )
               return null
             }
 

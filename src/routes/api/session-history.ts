@@ -18,6 +18,7 @@ import {
   getLocalMessages,
   getLocalSession,
 } from '../../server/local-session-store'
+import { safeErrorMessage } from '../../server/rate-limit'
 import { isAuthenticated } from '@/server/auth-middleware'
 
 export const Route = createFileRoute('/api/session-history')({
@@ -73,9 +74,7 @@ export const Route = createFileRoute('/api/session-history')({
               messages: [],
               sessionKey: key,
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to load history',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { getClientIp, rateLimit, rateLimitResponse } from '../../server/rate-limit'
 import { listSisters } from '../../server/sisters-registry'
 import { BEARER_TOKEN, CLAUDE_API } from '../../server/gateway-capabilities'
 import { classifyMultiple, classifyOne } from '../../lib/sister-routing'
@@ -57,6 +58,9 @@ export const Route = createFileRoute('/api/orchestrate')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        if (!rateLimit(`orchestrate:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
         }
 
         let message = ''

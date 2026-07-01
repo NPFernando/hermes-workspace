@@ -571,6 +571,7 @@ export function useOperations() {
     queryKey: ['operations', 'config'],
     queryFn: fetchOperationsConfig,
     refetchInterval: 30_000,
+    staleTime: 15_000,
   })
 
   const sessionsQuery = useQuery({
@@ -580,12 +581,14 @@ export function useOperations() {
       return Array.isArray(response.sessions) ? response.sessions : []
     },
     refetchInterval: 15_000,
+    staleTime: 7_500,
   })
 
   const cronJobsQuery = useQuery({
     queryKey: ['operations', 'cron'],
     queryFn: fetchCronJobs,
     refetchInterval: 30_000,
+    staleTime: 15_000,
   })
 
   const sistersQuery = useQuery({

@@ -14,6 +14,7 @@ import {
   shouldBindMainToPortableSession,
 } from '../../server/session-utils'
 import { getLocalMessages, getLocalSession } from '../../server/local-session-store'
+import { safeErrorMessage } from '../../server/rate-limit'
 import { isAuthenticated } from '@/server/auth-middleware'
 
 export const Route = createFileRoute('/api/history')({
@@ -135,7 +136,7 @@ export const Route = createFileRoute('/api/history')({
         } catch (err) {
           return json(
             {
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             },
             { status: 500 },
           )

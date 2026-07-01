@@ -23,6 +23,7 @@ import {
   dashboardFetch,
   ensureGatewayProbed,
 } from '../../../server/gateway-capabilities'
+import { safeErrorMessage } from '../../../server/rate-limit'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 const PROFILE_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
@@ -86,7 +87,7 @@ export const Route = createFileRoute('/api/profiles/skills')({
           return json({ profile, items })
         } catch (err) {
           return json(
-            { error: err instanceof Error ? err.message : String(err) },
+            { error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

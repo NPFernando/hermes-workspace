@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import { gatewayFetch } from '../../server/gateway-capabilities'
 
 export const Route = createFileRoute('/api/agent-pause')({
@@ -25,7 +28,7 @@ export const Route = createFileRoute('/api/agent-pause')({
           return json(payload, { status: res.status })
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : 'Gateway error' },
+            { ok: false, error: safeErrorMessage(err) },
             { status: 502 },
           )
         }

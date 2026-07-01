@@ -16,7 +16,10 @@ import {
   dashboardFetch,
   ensureGatewayProbed,
 } from '../../../server/gateway-capabilities'
-import { requireJsonContentType } from '../../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 const PROFILE_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
@@ -84,7 +87,7 @@ export const Route = createFileRoute('/api/profiles/toggle-skill')({
           return json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             },
             { status: 500 },
           )

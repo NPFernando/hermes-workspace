@@ -627,9 +627,9 @@ export function ProfilesScreen() {
           if (!open) resetWizard()
         }}
       >
-        <DialogContent className="w-[min(560px,94vw)] max-w-none p-0">
+        <DialogContent className="w-[min(560px,94vw)] max-w-none p-0 max-h-[85vh] flex flex-col">
           {/* ── Header ─────────────────────────────────── */}
-          <div className="border-b border-[var(--theme-border)] px-6 pb-4 pt-5">
+          <div className="shrink-0 border-b border-[var(--theme-border)] px-6 pb-4 pt-5">
             <div className="flex items-center gap-3">
               <div className="inline-flex size-10 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]">
                 <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.7} />
@@ -690,7 +690,7 @@ export function ProfilesScreen() {
           </div>
 
           {/* ── Body ──────────────────────────────────── */}
-          <div className="px-6 py-5">
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             {wizardStep === 1 && (
               <div className="space-y-5">
                 <div className="space-y-1.5">
@@ -1003,7 +1003,7 @@ export function ProfilesScreen() {
           </div>
 
           {/* ── Footer ─────────────────────────────────── */}
-          <div className="flex items-center justify-between border-t border-[var(--theme-border)] px-6 py-4">
+          <div className="shrink-0 flex items-center justify-between border-t border-[var(--theme-border)] px-6 py-4">
             <div>
               {wizardStep > 1 && (
                 <Button

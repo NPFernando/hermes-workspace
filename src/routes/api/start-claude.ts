@@ -3,6 +3,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { startClaudeAgent } from '../../server/claude-agent'
 
+import { safeErrorMessage } from '../../server/rate-limit'
+
 export const Route = createFileRoute('/api/start-claude')({
   server: {
     handlers: {
@@ -18,7 +20,7 @@ export const Route = createFileRoute('/api/start-claude')({
           return json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             },
             { status: 500 },
           )

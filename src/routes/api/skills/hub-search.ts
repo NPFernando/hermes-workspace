@@ -6,6 +6,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 const execFileAsync = promisify(execFile)
 
 type SkillSearchResult = {
@@ -183,9 +185,7 @@ export const Route = createFileRoute('/api/skills/hub-search')({
             {
               ok: false,
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to search skills hub',
+                safeErrorMessage(error),
               results: [],
               source: 'error',
             },

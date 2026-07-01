@@ -9,7 +9,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/session-send')({
   server: {
@@ -70,9 +73,7 @@ export const Route = createFileRoute('/api/session-send')({
             {
               ok: false,
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to queue message',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )

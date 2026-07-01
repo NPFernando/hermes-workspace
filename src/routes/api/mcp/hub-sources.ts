@@ -11,6 +11,7 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
+import { safeErrorMessage } from '../../../server/rate-limit'
 import {
   addHubSource,
   deleteHubSource,
@@ -40,7 +41,7 @@ export const Route = createFileRoute('/api/mcp/hub-sources')({
             ok: false,
             sources: [],
             source: 'invalid',
-            error: err instanceof Error ? err.message : String(err),
+            error: safeErrorMessage(err),
           })
         }
       },

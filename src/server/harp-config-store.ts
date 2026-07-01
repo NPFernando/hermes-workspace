@@ -28,7 +28,7 @@ function candidatePaths(): Array<string> {
   ].filter(Boolean)
 }
 
-export function resolveHarpConfigPath(): string {
+function resolveHarpConfigPath(): string {
   for (const candidate of candidatePaths()) {
     if (fs.existsSync(candidate)) return candidate
   }
@@ -38,7 +38,7 @@ export function resolveHarpConfigPath(): string {
   return process.env.HARP_CONFIG_PATH ?? path.join(hermesHome, 'harp-config.yaml')
 }
 
-export function getHarpCandidatePaths(): Array<string> {
+function getHarpCandidatePaths(): Array<string> {
   return candidatePaths()
 }
 
@@ -109,7 +109,7 @@ export type HarpConfig = {
 
 // ── Read ───────────────────────────────────────────────────────────────────
 
-export function readHarpConfig(): HarpConfig | null {
+function readHarpConfig(): HarpConfig | null {
   const configPath = resolveHarpConfigPath()
   try {
     if (!fs.existsSync(configPath)) return null

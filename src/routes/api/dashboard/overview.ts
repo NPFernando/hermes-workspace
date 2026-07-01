@@ -17,6 +17,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
+import { safeErrorMessage } from '../../../server/rate-limit'
 import {
   dashboardFetch,
   gatewayFetch,
@@ -70,7 +71,7 @@ export const Route = createFileRoute('/api/dashboard/overview')({
           return json(
             {
               error:
-                err instanceof Error ? err.message : 'overview build failed',
+                safeErrorMessage(err),
             },
             { status: 500 },
           )

@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { getActiveRunForSession } from '../../../server/run-store'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/sessions/$sessionKey/active-run')({
   server: {
     handlers: {
@@ -26,7 +28,7 @@ export const Route = createFileRoute('/api/sessions/$sessionKey/active-run')({
           return json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             },
             { status: 500 },
           )

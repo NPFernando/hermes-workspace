@@ -39,7 +39,6 @@ import {
 } from '@/components/ui/scroll-area'
 import { formatCost, useAgentView } from '@/hooks/use-agent-view'
 import { useCliAgents } from '@/hooks/use-cli-agents'
-import { useSounds } from '@/hooks/use-sounds'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useOrchestratorState } from '@/hooks/use-orchestrator-state'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
@@ -563,8 +562,6 @@ function getStatusBubble(
 }
 
 export function AgentViewPanel() {
-  // Sound notifications for agent events
-  useSounds({ autoPlay: true })
 
   // Start gateway polling for orchestrator state (detects activity from Telegram/other channels)
   const startGatewayPoll = useChatActivityStore((s) => s.startGatewayPoll)

@@ -149,6 +149,14 @@ export const TaskCard = memo(function TaskCardComponent({
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         onClick={onClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onClick()
+          }
+        }}
         className={cn(
           'relative flex items-center gap-2 rounded border px-2 py-1 cursor-pointer transition-all select-none group',
           'bg-[var(--theme-card)] border-[var(--theme-border)]',
@@ -185,6 +193,14 @@ export const TaskCard = memo(function TaskCardComponent({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
       className={cn(
         'relative rounded-lg border p-3 cursor-pointer transition-all select-none group',
         'bg-[var(--theme-card)] border-[var(--theme-border)]',

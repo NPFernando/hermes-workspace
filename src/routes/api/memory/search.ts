@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { searchMemoryFiles } from '../../../server/memory-browser'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/memory/search')({
   server: {
     handlers: {
@@ -19,9 +21,7 @@ export const Route = createFileRoute('/api/memory/search')({
           return json(
             {
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to search memory files',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )

@@ -275,6 +275,23 @@ def msg_build_failed(commits, build_output):
         f"<pre>{build_output[-800:]}</pre>",
     ])
 
+def msg_restart_failed(commits, touched, merged_prs, build_time_s):
+    lines = [f"⚠️ <b>hermes-workspace: rebuilt but restart failed</b>"]
+    lines.append(
+        f"<b>{len(commits)} upstream commits</b> rebased + built ({build_time_s:.0f}s) "
+        f"but <code>systemctl restart hermes-workspace.service</code> did not come up cleanly."
+    )
+    lines.append(
+        "\nThe service may now be serving stale assets or be down. "
+        "SSH in and run <code>systemctl status hermes-workspace.service</code> "
+        "and <code>journalctl -u hermes-workspace.service -n 50</code> to diagnose."
+    )
+    if touched:
+        lines.append(f"\n⚡ <b>Custom files merged cleanly:</b>")
+        for f in touched:
+            lines.append(f"  • {f}")
+    return "\n".join(lines)
+
 def msg_success(commits, touched, merged_prs, build_time_s):
     lines = [f"✅ <b>hermes-workspace updated</b>"]
     lines.append(f"<b>{len(commits)} upstream commits</b> rebased + built + restarted ({build_time_s:.0f}s)")
@@ -384,11 +401,15 @@ def main():
 
     log("Build succeeded. Restarting service...")
     restart_ok = do_restart()
-    if not restart_ok:
-        log("WARNING: service restart failed — check systemctl status hermes-workspace.service")
 
-    # 6. Push updated branch to Naveen's fork
+    # 6. Push updated branch to Naveen's fork (code is good even if the live
+    # restart below failed — the failure is about the running process, not the commit)
     push_to_naveen_fork()
+
+    if not restart_ok:
+        log("ERROR: service restart failed — check systemctl status hermes-workspace.service")
+        notify(TG_APPROVALS, msg_restart_failed(commits, touched, merged_prs, build_time))
+        sys.exit(4)
 
     log(f"Sync complete ({len(commits)} commits, {build_time:.0f}s build).")
     notify(TG_MONITORING, msg_success(commits, touched, merged_prs, build_time))

@@ -6,11 +6,12 @@ import {
   rateLimit,
   rateLimitResponse,
   requireJsonContentType,
+  safeErrorMessage,
 } from '../../server/rate-limit'
 import {
-  
   bootstrapAllSisters,
   ensureSisterProfile,
+  getSisterById,
   invalidateSistersCache,
   listSisters
 } from '../../server/sisters-registry'
@@ -32,8 +33,7 @@ export const Route = createFileRoute('/api/sisters-bootstrap')({
           const body = (await request.json().catch(() => ({}))) as { id?: string }
           if (body.id) {
             // Bootstrap single sister
-            const sisters = listSisters()
-            const sister = sisters.find((s: Sister) => s.id === body.id)
+            const sister = getSisterById(body.id)
             if (!sister) {
               return json({ ok: false, error: `Sister '${body.id}' not found` }, { status: 404 })
             }
@@ -47,7 +47,7 @@ export const Route = createFileRoute('/api/sisters-bootstrap')({
           return json({ ok: true, bootstrapped: after.map((s: Sister) => s.id) })
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : String(err) },
+            { ok: false, error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

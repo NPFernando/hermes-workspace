@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { readNaveenUpdateStatus } from '../../../server/naveen-update'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/update/naveen-status')({
   server: {
     handlers: {
@@ -17,7 +19,7 @@ export const Route = createFileRoute('/api/update/naveen-status')({
           return json(status)
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : String(err) },
+            { ok: false, error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

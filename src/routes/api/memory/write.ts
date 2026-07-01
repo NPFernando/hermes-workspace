@@ -4,7 +4,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { getMemoryWorkspaceRoot } from '../../../server/memory-browser'
-import { requireJsonContentType } from '../../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 
 function validateMemoryWritePath(inputPath: unknown): {
   relativePath: string
@@ -57,9 +60,7 @@ export const Route = createFileRoute('/api/memory/write')({
           return json({ success: true, path: relativePath })
         } catch (error) {
           const message =
-            error instanceof Error
-              ? error.message
-              : 'Failed to write memory file'
+            safeErrorMessage(error)
           const status =
             /required|absolute|traversal|outside workspace|\.md/i.test(message)
               ? 400

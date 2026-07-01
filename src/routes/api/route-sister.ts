@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { getClientIp, rateLimit, rateLimitResponse } from '../../server/rate-limit'
 import { classifyOne } from '../../lib/sister-routing'
 
 export const Route = createFileRoute('/api/route-sister')({
@@ -9,6 +10,9 @@ export const Route = createFileRoute('/api/route-sister')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        if (!rateLimit(`route-sister:${getClientIp(request)}`, 60, 60_000)) {
+          return rateLimitResponse()
         }
 
         let message = ''

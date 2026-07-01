@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { searchExternalMemoryCandidates } from '../../../server/external-memory-browser'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/external-memory/search')({
   server: {
     handlers: {
@@ -24,9 +26,7 @@ export const Route = createFileRoute('/api/external-memory/search')({
           return json(
             {
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to search external memory candidates',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )

@@ -84,47 +84,6 @@ function emojiForRole(role: string, fallbackEmoji?: string): string {
   return ROLE_EMOJIS[role.toLowerCase()] ?? ROLE_EMOJIS.default
 }
 
-// Model preference → display tier
-export function tierLabel(modelPreference?: string): string {
-  if (!modelPreference) return 'any'
-  if (modelPreference.startsWith('local:')) return 'local'
-  if (modelPreference.includes(':free')) return 'free'
-  if (modelPreference.includes(':paid')) return 'paid'
-  return modelPreference
-}
-
-// Color for badge UI rendering
-export const SISTER_COLORS: Partial<Record<string, { bg: string; text: string; border: string }>> = {
-  astra:      { bg: 'bg-violet-500/15',  text: 'text-violet-400',  border: 'border-violet-400/30' },
-  novus:      { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-400/30' },
-  nova:       { bg: 'bg-sky-500/15',     text: 'text-sky-400',     border: 'border-sky-400/30' },
-  researcher: { bg: 'bg-sky-500/15',     text: 'text-sky-400',     border: 'border-sky-400/30' },
-  coder:      { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-400/30' },
-  business:   { bg: 'bg-amber-500/15',   text: 'text-amber-400',   border: 'border-amber-400/30' },
-  default:    { bg: 'bg-[var(--theme-accent)]/10', text: 'text-[var(--theme-muted)]', border: 'border-[var(--theme-border)]/20' },
-}
-
-export function colorForSister(id: string, type: SisterType) {
-  if (SISTER_COLORS[id]) return SISTER_COLORS[id]
-  if (type === 'business_agent') return SISTER_COLORS.business
-  return SISTER_COLORS.default
-}
-
-// Map swarm worker roles to sister personalities
-export const WORKER_ROLE_TO_SISTER: Record<string, string> = {
-  orchestrator: 'astra',
-  'km-agent':   'astra',
-  strategist:   'astra',
-  'ops-watch':  'astra',
-  'inbox-triage': 'astra',
-  researcher:   'nova',
-  reviewer:     'nova',
-  builder:      'novus',
-  qa:           'novus',
-  maintainer:   'novus',
-  docs:         'nova',
-}
-
 // Astra IS the default profile — its path is ~/.hermes/ itself, not a subdir.
 // The workspace profiles-browser always synthesizes it from config.yaml at root.
 const ASTRA_IS_DEFAULT = true

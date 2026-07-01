@@ -12,7 +12,10 @@ import {
   ensureGatewayProbed,
   getCapabilities,
 } from '../../server/gateway-capabilities'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 function getSkillsDir(): string {
@@ -519,7 +522,7 @@ export const Route = createFileRoute('/api/skills')({
           })
         } catch (err) {
           return json(
-            { error: err instanceof Error ? err.message : String(err) },
+            { error: safeErrorMessage(err) },
             { status: 500 },
           )
         }
@@ -615,7 +618,7 @@ export const Route = createFileRoute('/api/skills')({
           return json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             },
             { status: 500 },
           )

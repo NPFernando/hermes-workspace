@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { retainHindsight } from '../../../server/hindsight-client'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/hindsight/retain')({
   server: {
     handlers: {
@@ -20,7 +22,7 @@ export const Route = createFileRoute('/api/hindsight/retain')({
           return json(await retainHindsight(content, body.context?.trim(), bank))
         } catch (err) {
           return json(
-            { error: err instanceof Error ? err.message : 'Retain failed' },
+            { error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

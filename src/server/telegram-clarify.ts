@@ -19,7 +19,12 @@ function loadTgConfig(): TgConfig | null {
     const env = fs.readFileSync(envPath, 'utf-8')
     const token = env.match(/^TELEGRAM_BOT_TOKEN=(.+)$/m)?.[1]?.trim()
     if (!token) return null
-    const relay = 'https://tg-api.fernandofamily.com/8c778d763c97aa414644fc5bd95da90a'
+    // Relay bearer credential — must come from env now (no hardcoded
+    // fallback: that literal was exposed in this repo's git history).
+    const relay =
+      process.env.TELEGRAM_RELAY_BASE ||
+      env.match(/^TELEGRAM_RELAY_BASE=(.+)$/m)?.[1]?.trim()
+    if (!relay) return null
     return { token, relayBase: relay, chatId: 2130622225 }
   } catch {
     return null

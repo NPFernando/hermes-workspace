@@ -1005,7 +1005,7 @@ async function sendTelegramClarificationKeyboard(taskId, taskTitle, questions) {
     token = match ? match[1].trim() : '';
   } catch {}
   if (!token) { sendTelegram('❓ Clarification needed\\nTask: ' + taskTitle); return; }
-  const relayBase = 'https://tg-api.fernandofamily.com/8c778d763c97aa414644fc5bd95da90a';
+  const relayBase = loadTgRelayBase();
   const chatId = 2130622225;
   const taskPrefix = taskId.replace(/-/g, '').slice(0, 12);
   function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -1977,7 +1977,20 @@ function loadTgToken() {
   } catch { return ''; }
 }
 
-const TG_RELAY_BASE = 'https://tg-api.fernandofamily.com/8c778d763c97aa414644fc5bd95da90a';
+// Relay bearer credential — must come from env now (no hardcoded fallback:
+// that literal was exposed in this repo's git history).
+function loadTgRelayBase() {
+  if (process.env.TELEGRAM_RELAY_BASE) return process.env.TELEGRAM_RELAY_BASE;
+  try {
+    const envPath = path.join(os.homedir(), '.hermes', '.env');
+    const envContent = fs.readFileSync(envPath, 'utf-8');
+    const match = envContent.match(/^TELEGRAM_RELAY_BASE=(.+)$/m);
+    if (match) return match[1].trim();
+  } catch { /* fall through */ }
+  return '';
+}
+
+const TG_RELAY_BASE = loadTgRelayBase();
 const TG_CHAT_ID = 2130622225;
 
 function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }

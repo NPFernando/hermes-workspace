@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { safeErrorMessage } from '../../server/rate-limit'
 import {
   ensureBusStarted,
   subscribeToChatEvents,
@@ -82,7 +83,7 @@ export const Route = createFileRoute('/api/chat-events')({
                 sendEvent('heartbeat', { timestamp: Date.now() })
               }, 30_000)
             } catch (err) {
-              const errorMsg = err instanceof Error ? err.message : String(err)
+              const errorMsg = safeErrorMessage(err)
               sendEvent('error', { message: errorMsg })
               closeStream()
             }

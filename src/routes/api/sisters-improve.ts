@@ -7,7 +7,7 @@ import {
   rateLimitResponse,
   requireJsonContentType,
 } from '../../server/rate-limit'
-import { invalidateSistersCache, listSisters } from '../../server/sisters-registry'
+import { getSisterById, invalidateSistersCache } from '../../server/sisters-registry'
 import {
   
   appendGrowthEntry,
@@ -60,8 +60,7 @@ export const Route = createFileRoute('/api/sisters-improve')({
         }
 
         // Verify sister exists
-        const sisters = listSisters()
-        const sister = sisters.find((s) => s.id === id)
+        const sister = getSisterById(id)
         if (!sister) {
           return json({ ok: false, error: `Sister '${id}' not found` }, { status: 404 })
         }

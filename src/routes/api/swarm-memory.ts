@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { safeErrorMessage } from '../../server/rate-limit'
 import {
   
   
@@ -71,7 +72,7 @@ export const Route = createFileRoute('/api/swarm-memory')({
         try {
           return json(readSwarmMemory({ workerId, kind, missionId, date }))
         } catch (error) {
-          return json({ error: error instanceof Error ? error.message : 'Failed to read swarm memory' }, { status: 400 })
+          return json({ error: safeErrorMessage(error) }, { status: 400 })
         }
       },
       POST: async ({ request }) => {
@@ -145,7 +146,7 @@ export const Route = createFileRoute('/api/swarm-memory')({
           })
           return json({ ok: true, workerId, kind, eventType })
         } catch (error) {
-          return json({ error: error instanceof Error ? error.message : 'Failed to write swarm memory' }, { status: 400 })
+          return json({ error: safeErrorMessage(error) }, { status: 400 })
         }
       },
     },

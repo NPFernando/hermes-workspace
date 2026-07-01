@@ -4,7 +4,10 @@ import { dirname, resolve } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import { dashboardFetch, ensureGatewayProbed } from '../../server/gateway-capabilities'
 import { sanitizeConductorMissionGoal } from '../../server/conductor-mission-sanitize'
 import { getSwarmMission, recordMissionCheckpoint  } from '../../server/swarm-missions'
@@ -325,7 +328,7 @@ function createNativeConductorMission(input: {
     checkpointPollSeconds: 10,
     notifySessionKey: 'main',
   }).catch((error) => {
-    console.error('[conductor] native swarm dispatch failed:', error instanceof Error ? error.message : String(error))
+    console.error('[conductor] native swarm dispatch failed:', safeErrorMessage(error))
   })
   return { missionId: input.missionName, missionTitle, assignments }
 }
@@ -487,7 +490,7 @@ export const Route = createFileRoute('/api/conductor-spawn')({
             warnings: goalSanitization.warnings,
           })
         } catch (error) {
-          return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 })
+          return json({ ok: false, error: safeErrorMessage(error) }, { status: 500 })
         }
       },
     },

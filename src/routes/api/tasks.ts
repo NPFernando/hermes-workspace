@@ -9,7 +9,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import {
   createClaudeTask,
   listClaudeTasks,
@@ -51,7 +54,7 @@ export const Route = createFileRoute('/api/tasks')({
           return json({ tasks: records.map(toTaskShape) })
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : 'Failed to list tasks' },
+            { ok: false, error: safeErrorMessage(err) },
             { status: 500 },
           )
         }
@@ -87,7 +90,7 @@ export const Route = createFileRoute('/api/tasks')({
           return json({ ok: true, task: toTaskShape(record) })
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : 'Failed to create task' },
+            { ok: false, error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

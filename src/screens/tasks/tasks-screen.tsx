@@ -9,6 +9,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, Delete01Icon, Loading03Icon, MoreVerticalIcon, RefreshIcon, Search01Icon } from '@hugeicons/core-free-icons'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
+import { useTaskExecLog } from './use-task-exec-log'
 import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority, UpdateTaskInput } from '@/lib/tasks-api'
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from '@/components/ui/menu'
 import {
@@ -280,20 +281,8 @@ function VirtualRowList({ parentRef, rows, renderCard }: {
 }
 
 function RunningTaskRow({ task, onOpen }: { task: ClaudeTask; onOpen: () => void }) {
-  const [log, setLog] = useState('')
-  useEffect(() => {
-    let cancelled = false
-    const poll = async () => {
-      try {
-        const res = await fetch(`/api/tasks-exec-log?task_id=${task.id}&lines=4`)
-        const data = await res.json() as { log?: string }
-        if (!cancelled && data.log) setLog(data.log)
-      } catch { /* non-fatal */ }
-    }
-    void poll()
-    const iv = setInterval(poll, 6_000)
-    return () => { cancelled = true; clearInterval(iv) }
-  }, [task.id])
+  const fullLog = useTaskExecLog(task.id)
+  const log = fullLog.split('\n').slice(-4).join('\n')
 
   return (
     <div className="px-3 py-2 flex gap-3 items-start">

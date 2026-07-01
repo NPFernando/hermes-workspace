@@ -13,7 +13,10 @@ import YAML from 'yaml'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import {
   getActiveProfileName,
   readProfile,
@@ -411,7 +414,7 @@ export const Route = createFileRoute('/api/workspace')({
               isValid: false,
               workspaces: [],
               last: '',
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             },
             { status: 500 },
           )
@@ -433,7 +436,7 @@ export const Route = createFileRoute('/api/workspace')({
           return json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             },
             { status: 400 },
           )

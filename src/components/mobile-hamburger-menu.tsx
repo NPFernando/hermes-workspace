@@ -209,6 +209,15 @@ export function MobileHamburgerMenu() {
     setOpen(false)
   }
 
+  useEffect(() => {
+    if (!open) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [open])
+
   return (
     <>
       {/* No floating button — each page has MobilePageHeader with HamburgerTrigger inline */}
@@ -236,6 +245,9 @@ export function MobileHamburgerMenu() {
 
       {/* Slide-over drawer */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
         className={cn(
           'fixed top-0 left-0 bottom-0 z-[96] w-72 md:hidden',
           'shadow-2xl bg-[var(--theme-panel)]',

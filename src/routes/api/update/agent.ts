@@ -6,6 +6,7 @@ import {
   rateLimit,
   rateLimitResponse,
   requireJsonContentType,
+  safeErrorMessage,
 } from '../../../server/rate-limit'
 import { applyAgentUpdate } from '../../../server/update-system'
 
@@ -28,7 +29,7 @@ export const Route = createFileRoute('/api/update/agent')({
           return json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             },
             { status: 500 },
           )

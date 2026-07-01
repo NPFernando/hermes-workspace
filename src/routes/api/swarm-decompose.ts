@@ -4,6 +4,8 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { ensureGatewayProbed, getResolvedUrls } from '../../server/gateway-capabilities'
 import { getBearerToken } from '../../server/openai-compat-api'
 
+import { safeErrorMessage } from '../../server/rate-limit'
+
 type DecomposeRequest = {
   prompt?: unknown
   workers?: unknown
@@ -214,7 +216,7 @@ export const Route = createFileRoute('/api/swarm-decompose')({
           return json({
             ok: true,
             fallback: true,
-            warning: error instanceof Error ? error.message : 'decompose failed',
+            warning: safeErrorMessage(error),
             decomposedAt: Date.now(),
             model: requestedModel,
             ...fallback,

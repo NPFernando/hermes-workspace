@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ActivityEntry, ClarificationQuestion, ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority } from '@/lib/tasks-api'
 import {
   DialogContent,
@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { COLUMN_LABELS, COLUMN_ORDER, relativeTime } from '@/lib/tasks-api'
+import { useTaskExecLog } from './use-task-exec-log'
 
 type Props = {
   open: boolean
@@ -273,23 +274,11 @@ function ClarificationPanel({
 }
 
 // Polls the execution log tail for a running task, refreshing every 6 seconds.
+// Shares its poll with RunningTaskRow (tasks-screen.tsx) via useTaskExecLog's
+// react-query cache when both are mounted for the same task.
 function ExecLogTail({ taskId }: { taskId: string }) {
-  const [log, setLog] = useState<string>('')
+  const log = useTaskExecLog(taskId)
   const [show, setShow] = useState(false)
-  const fetchLog = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/tasks-exec-log?task_id=${encodeURIComponent(taskId)}&lines=25`)
-      if (!res.ok) return
-      const data = await res.json() as { ok: boolean; found?: boolean; log?: string }
-      if (data.ok && data.found && data.log) setLog(data.log)
-    } catch { /* non-fatal */ }
-  }, [taskId])
-
-  useEffect(() => {
-    fetchLog()
-    const id = setInterval(fetchLog, 6_000)
-    return () => clearInterval(id)
-  }, [fetchLog])
 
   if (!log) return null
   return (

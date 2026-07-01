@@ -1,8 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { createFileRoute } from '@tanstack/react-router'
+import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 // ---------------------------------------------------------------------------
 // GET /api/tasks-exec-log?task_id=<id>&lines=<n>
@@ -41,6 +42,9 @@ export const Route = createFileRoute('/api/tasks-exec-log')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         const url = new URL(request.url)
         const taskId = url.searchParams.get('task_id')?.trim()
         const lines  = Math.min(parseInt(url.searchParams.get('lines') ?? '40', 10), 200)

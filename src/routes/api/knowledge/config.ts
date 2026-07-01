@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
+import { safeErrorMessage } from '../../../server/rate-limit'
 import {
   
   readKnowledgeBaseConfig,
@@ -21,9 +22,7 @@ export const Route = createFileRoute('/api/knowledge/config')({
           return json(
             {
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to read knowledge base config',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )
@@ -45,9 +44,7 @@ export const Route = createFileRoute('/api/knowledge/config')({
           return json(
             {
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to save knowledge base config',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )

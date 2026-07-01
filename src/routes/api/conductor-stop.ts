@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import { deleteSession } from '../../server/claude-api'
 import { dashboardFetch, ensureGatewayProbed } from '../../server/gateway-capabilities'
 import { cancelSwarmMission } from '../../server/swarm-missions'
@@ -88,7 +91,7 @@ export const Route = createFileRoute('/api/conductor-stop')({
           return json(
             {
               ok: false,
-              error: error instanceof Error ? error.message : String(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

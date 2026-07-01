@@ -11,6 +11,8 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { forceReprobeGateway } from '../../server/gateway-capabilities'
 import { clearProbe, listProbes } from '../../server/mcp-tools-cache'
 
+import { safeErrorMessage } from '../../server/rate-limit'
+
 export const Route = createFileRoute('/api/env-reset')({
   server: {
     handlers: {
@@ -31,7 +33,7 @@ export const Route = createFileRoute('/api/env-reset')({
         try {
           capabilities = await forceReprobeGateway()
         } catch (err) {
-          gatewayError = err instanceof Error ? err.message : 'Gateway reprobe failed'
+          gatewayError = safeErrorMessage(err)
         }
 
         return json({

@@ -10,6 +10,7 @@ import {
   getGatewayCapabilities,
 } from '../../server/claude-api'
 import { BEARER_TOKEN, CLAUDE_API } from '../../server/gateway-capabilities'
+import { safeErrorMessage } from '../../server/rate-limit'
 import {
   ensureDiscovery,
   ensureProviderInConfig,
@@ -492,7 +493,7 @@ export const Route = createFileRoute('/api/models')({
           return json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             },
             { status: 503 },
           )

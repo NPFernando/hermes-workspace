@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { z } from 'zod'
+import { isAuthenticated } from '../../server/auth-middleware'
+
+import { safeErrorMessage } from '../../server/rate-limit'
 
 const BodySchema = z.object({
   provider: z.string().min(1),
@@ -10,6 +13,9 @@ export const Route = createFileRoute('/api/oauth/device-code')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ error: 'Unauthorized' }, { status: 401 })
+        }
         let body: unknown
         try {
           body = await request.json()
@@ -46,7 +52,7 @@ export const Route = createFileRoute('/api/oauth/device-code')({
             return json(data)
           } catch (err) {
             return json(
-              { error: err instanceof Error ? err.message : 'Network error' },
+              { error: safeErrorMessage(err) },
               { status: 500 },
             )
           }

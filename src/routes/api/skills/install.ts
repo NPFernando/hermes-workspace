@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
+import { safeErrorMessage } from '../../../server/rate-limit'
 import {
   BEARER_TOKEN,
   CLAUDE_API,
@@ -67,9 +68,7 @@ export const Route = createFileRoute('/api/skills/install')({
             {
               ok: false,
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to install skill',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )

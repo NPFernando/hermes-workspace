@@ -9,6 +9,7 @@ import { rosterByWorkerId } from '../../server/swarm-roster'
 import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
 import { syncSwarmProfileModel } from '../../server/swarm-profile-config'
 
+import { safeErrorMessage } from '../../server/rate-limit'
 // Inlined to avoid SSR module-resolution races against freshly-written
 // helpers; mirrors `src/server/claude-paths.ts` getProfilesDir().
 function getProfilesDir(): string {
@@ -228,7 +229,7 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
             }
           }
         } catch (err) {
-          modelSync.error = err instanceof Error ? err.message : String(err)
+          modelSync.error = safeErrorMessage(err)
         }
 
         const sessionName = `swarm-${workerId}`

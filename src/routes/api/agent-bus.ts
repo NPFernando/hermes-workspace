@@ -5,6 +5,8 @@ import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
 
+import { safeErrorMessage } from '../../server/rate-limit'
+
 const execFileAsync = promisify(execFile)
 
 const AGENT_BUS_DIR =
@@ -159,7 +161,7 @@ async function handleAction(request: Request) {
       return Response.json({ ok: true, action, result: await syncRoadmap() })
     } catch (err) {
       return Response.json(
-        { ok: false, action, error: err instanceof Error ? err.message : 'sync falhou' },
+        { ok: false, action, error: safeErrorMessage(err) },
         { status: 500 },
       )
     }

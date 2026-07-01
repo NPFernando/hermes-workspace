@@ -14,6 +14,7 @@ import {
   createProfileCronJob,
   listProfileCronJobs,
 } from '../../server/hermes-cron-profiles'
+import { safeErrorMessage } from '../../server/rate-limit'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 function authHeaders(): Record<string, string> {
@@ -117,7 +118,7 @@ export const Route = createFileRoute('/api/claude-jobs')({
             return new Response(
               JSON.stringify({
                 ok: false,
-                error: error instanceof Error ? error.message : String(error),
+                error: safeErrorMessage(error),
               }),
               { status: 400, headers: { 'Content-Type': 'application/json' } },
             )

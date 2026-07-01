@@ -7,6 +7,8 @@ import {
 } from '../../../server/knowledge-browser'
 import { readKnowledgeBaseConfig } from '../../../server/knowledge-config'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/knowledge/list')({
   server: {
     handlers: {
@@ -28,9 +30,7 @@ export const Route = createFileRoute('/api/knowledge/list')({
           return json(
             {
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to list knowledge pages',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )

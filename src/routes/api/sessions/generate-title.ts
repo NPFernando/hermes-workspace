@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { openaiChat } from '../../../server/openai-compat-api'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 const MAX_MSG_CHARS = 600
 const MAX_TITLE_LENGTH = 60
 
@@ -52,7 +54,7 @@ export const Route = createFileRoute('/api/sessions/generate-title')({
           if (!title) throw new Error('empty title from model')
           return json({ ok: true, title })
         } catch (err) {
-          const message = err instanceof Error ? err.message : String(err)
+          const message = safeErrorMessage(err)
           return json({ ok: false, error: message }, { status: 500 })
         }
       },

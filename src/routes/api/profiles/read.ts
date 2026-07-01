@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { readProfileWithFallback } from '../../../server/profiles-browser'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/profiles/read')({
   server: {
     handlers: {
@@ -19,9 +21,7 @@ export const Route = createFileRoute('/api/profiles/read')({
           return json(
             {
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to read profile',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )

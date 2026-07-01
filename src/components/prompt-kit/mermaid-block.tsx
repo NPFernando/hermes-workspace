@@ -14,7 +14,11 @@ function getMermaid() {
       mod.default.initialize({
         startOnLoad: false,
         theme: 'neutral',
-        securityLevel: 'loose',
+        // 'strict' disables click/script bindings in diagram definitions.
+        // Mermaid blocks can originate from assistant messages influenced by
+        // untrusted fetched content (e.g. Deep Research), so 'loose' here
+        // would be a stored-XSS path into an authenticated session.
+        securityLevel: 'strict',
       })
       return mod.default
     })

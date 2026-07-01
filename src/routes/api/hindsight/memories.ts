@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { listHindsightMemories } from '../../../server/hindsight-client'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/hindsight/memories')({
   server: {
     handlers: {
@@ -27,7 +29,7 @@ export const Route = createFileRoute('/api/hindsight/memories')({
           )
         } catch (err) {
           return json(
-            { error: err instanceof Error ? err.message : 'Failed to list memories' },
+            { error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

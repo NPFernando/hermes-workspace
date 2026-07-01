@@ -12,6 +12,8 @@ import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 
+import { safeErrorMessage } from '../../server/rate-limit'
+
 const MAX_BYTES = 5 * 1024 * 1024 // 5MB ceiling for embedded previews
 const MIME_BY_EXT: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -94,7 +96,7 @@ export const Route = createFileRoute('/api/preview-file')({
           })
         } catch (error) {
           return new Response(
-            error instanceof Error ? error.message : 'Preview failed',
+            safeErrorMessage(error),
             { status: 500 },
           )
         }

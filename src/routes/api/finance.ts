@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { safeErrorMessage } from '../../server/rate-limit'
 import {
   FINANCE_AUDIT_PATH,
   FINANCE_DATA_PATH,
@@ -112,8 +113,8 @@ export const Route = createFileRoute('/api/finance')({
           }
           return json({ ok: false, error: `Unsupported finance action: ${action}` }, { status: 400 })
         } catch (error) {
-          appendAuditLog('finance_api_error', { action, error: error instanceof Error ? error.message : String(error) })
-          return json({ ok: false, error: error instanceof Error ? error.message : 'Finance API failed' }, { status: 400 })
+          appendAuditLog('finance_api_error', { action, error: safeErrorMessage(error) })
+          return json({ ok: false, error: safeErrorMessage(error) }, { status: 400 })
         }
       },
     },

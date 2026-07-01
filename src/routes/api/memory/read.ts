@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { readMemoryFile } from '../../../server/memory-browser'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/memory/read')({
   server: {
     handlers: {
@@ -18,9 +20,7 @@ export const Route = createFileRoute('/api/memory/read')({
           return json({ path: pathParam, content })
         } catch (error) {
           const message =
-            error instanceof Error
-              ? error.message
-              : 'Failed to read memory file'
+            safeErrorMessage(error)
           const status = /not allowed|outside workspace|required/i.test(message)
             ? 400
             : /ENOENT/.test(message)

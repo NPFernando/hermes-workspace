@@ -11,6 +11,8 @@ import { extname, isAbsolute, resolve as resolvePath } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
 
+import { safeErrorMessage } from '../../server/rate-limit'
+
 const MAX_BYTES = 10 * 1024 * 1024
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -105,7 +107,7 @@ export const Route = createFileRoute('/api/media')({
           })
         } catch (err) {
           return new Response(
-            err instanceof Error ? err.message : 'Media request failed',
+            safeErrorMessage(err),
             { status: 500 },
           )
         }

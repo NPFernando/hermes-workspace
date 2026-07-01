@@ -6,6 +6,7 @@ import {
   rateLimit,
   rateLimitResponse,
   requireJsonContentType,
+  safeErrorMessage,
 } from '../../../server/rate-limit'
 import {  applyNaveenSmartUpdate } from '../../../server/naveen-update'
 import type {NaveenApplyOptions} from '../../../server/naveen-update';
@@ -28,7 +29,7 @@ export const Route = createFileRoute('/api/update/naveen-apply')({
           return json(result, { status: result.ok ? 200 : 409 })
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : String(err) },
+            { ok: false, error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

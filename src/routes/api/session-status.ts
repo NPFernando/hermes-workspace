@@ -14,6 +14,7 @@ import {
 } from '../../server/session-utils'
 import { getLocalSession } from '../../server/local-session-store'
 import { getActiveRunForSession } from '../../server/run-store'
+import { safeErrorMessage } from '../../server/rate-limit'
 import { isAuthenticated } from '@/server/auth-middleware'
 import { readContextUsage } from '@/server/context-usage'
 
@@ -201,7 +202,7 @@ export const Route = createFileRoute('/api/session-status')({
             })
           } catch (sessionErr) {
             const message =
-              sessionErr instanceof Error ? sessionErr.message : String(sessionErr)
+              safeErrorMessage(sessionErr)
             if (!/not found|404/i.test(message)) {
               throw sessionErr
             }
@@ -228,7 +229,7 @@ export const Route = createFileRoute('/api/session-status')({
           return json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             },
             { status: 503 },
           )

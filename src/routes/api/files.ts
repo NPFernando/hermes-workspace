@@ -19,6 +19,11 @@ import { loadWorkspaceCatalog } from './workspace'
 
 const execFileAsync = promisify(execFile)
 
+// Client-side caps exist (chat-composer.tsx) but are trivially bypassable by
+// any authenticated caller (e.g. curl with a valid session cookie) — enforce
+// the limit server-side too, mirroring transcribe.ts's MAX_AUDIO_UPLOAD_BYTES.
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
 type FileEntry = {
   name: string
   path: string
@@ -372,6 +377,12 @@ export const Route = createFileRoute('/api/files')({
             const targetPath = String(form.get('path') || '')
             if (!(file instanceof File)) {
               return json({ error: 'Missing file' }, { status: 400 })
+            }
+            if (file.size > MAX_UPLOAD_BYTES) {
+              return json(
+                { error: `File exceeds ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB limit` },
+                { status: 413 },
+              )
             }
             const resolvedTarget = ensureWorkspacePath(
               targetPath,

@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { recallHindsight } from '../../../server/hindsight-client'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/hindsight/recall')({
   server: {
     handlers: {
@@ -22,7 +24,7 @@ export const Route = createFileRoute('/api/hindsight/recall')({
           return json(await recallHindsight(query, budget, bank))
         } catch (err) {
           return json(
-            { error: err instanceof Error ? err.message : 'Recall failed' },
+            { error: safeErrorMessage(err) },
             { status: 500 },
           )
         }

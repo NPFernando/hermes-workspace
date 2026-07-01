@@ -8,7 +8,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 
 type ProviderValidationResult = { ok: boolean; error?: string }
 
@@ -25,7 +28,7 @@ async function validateAnthropicKey(apiKey: string): Promise<ProviderValidationR
     if (!res.ok) return { ok: false, error: `Provider returned ${res.status}` }
     return { ok: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Network error' }
+    return { ok: false, error: safeErrorMessage(err) }
   }
 }
 
@@ -39,7 +42,7 @@ async function validateOpenRouterKey(apiKey: string): Promise<ProviderValidation
     if (!res.ok) return { ok: false, error: `Provider returned ${res.status}` }
     return { ok: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Network error' }
+    return { ok: false, error: safeErrorMessage(err) }
   }
 }
 
@@ -53,7 +56,7 @@ async function validateOpenAIKey(apiKey: string): Promise<ProviderValidationResu
     if (!res.ok) return { ok: false, error: `Provider returned ${res.status}` }
     return { ok: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Network error' }
+    return { ok: false, error: safeErrorMessage(err) }
   }
 }
 

@@ -12,6 +12,8 @@ import {
 } from '../../../server/external-memory-browser'
 import { retainHindsight } from '../../../server/hindsight-client'
 
+import { safeErrorMessage } from '../../../server/rate-limit'
+
 export const Route = createFileRoute('/api/external-memory/candidates')({
   server: {
     handlers: {
@@ -34,9 +36,7 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
           return json(
             {
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to list external memory candidates',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )
@@ -103,9 +103,7 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
           return json(
             {
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to update external memory candidate',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )
@@ -125,9 +123,7 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
           return json(
             {
               error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to delete external memory candidate',
+                safeErrorMessage(error),
             },
             { status: 500 },
           )

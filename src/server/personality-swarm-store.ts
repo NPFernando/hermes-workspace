@@ -160,7 +160,7 @@ const ROLE_PRESET_MAP: Array<{ keywords: Array<string>; preset: PersonalityPrese
   { keywords: ['analytics', 'data', 'report', 'metrics', 'performance'], preset: 'daiane' },
 ]
 
-export function recommendPresetForWorker(workerId: string, role: string): PersonalityPresetKey {
+function recommendPresetForWorker(workerId: string, role: string): PersonalityPresetKey {
   const combined = `${workerId} ${role}`.toLowerCase()
   for (const { keywords, preset } of ROLE_PRESET_MAP) {
     if (keywords.some((k) => combined.includes(k))) return preset

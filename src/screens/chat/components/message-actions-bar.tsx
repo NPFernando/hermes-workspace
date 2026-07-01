@@ -3,8 +3,6 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Copy01Icon,
   RefreshIcon,
-  ThumbsDownIcon,
-  ThumbsUpIcon,
   Tick02Icon,
 } from '@hugeicons/core-free-icons'
 import { MessageTimestamp } from './message-timestamp'
@@ -66,7 +64,6 @@ export function MessageActionsBar({
   onRegenerate,
 }: MessageActionsBarProps) {
   const [copied, setCopied] = useState(false)
-  const [thumbs, setThumbs] = useState<'up' | 'down' | null>(null)
 
   const handleCopy = async () => {
     try {
@@ -117,45 +114,6 @@ export function MessageActionsBar({
             <TooltipContent side="top">Regenerate response</TooltipContent>
           </TooltipRoot>
         </TooltipProvider>
-      )}
-
-      {isAssistant && (
-        <>
-          <TooltipProvider>
-            <TooltipRoot>
-              <TooltipTrigger
-                type="button"
-                onClick={() => setThumbs(thumbs === 'up' ? null : 'up')}
-                className={cn(
-                  'inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 transition-colors',
-                  thumbs === 'up'
-                    ? 'text-green-600 bg-green-50 dark:bg-green-900/30'
-                    : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
-                )}
-              >
-                <HugeiconsIcon icon={ThumbsUpIcon} size={14} strokeWidth={1.6} />
-              </TooltipTrigger>
-              <TooltipContent side="top">Good response</TooltipContent>
-            </TooltipRoot>
-          </TooltipProvider>
-          <TooltipProvider>
-            <TooltipRoot>
-              <TooltipTrigger
-                type="button"
-                onClick={() => setThumbs(thumbs === 'down' ? null : 'down')}
-                className={cn(
-                  'inline-flex items-center justify-center rounded border border-transparent bg-transparent p-1 transition-colors',
-                  thumbs === 'down'
-                    ? 'text-red-600 bg-red-50 dark:bg-red-900/30'
-                    : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
-                )}
-              >
-                <HugeiconsIcon icon={ThumbsDownIcon} size={14} strokeWidth={1.6} />
-              </TooltipTrigger>
-              <TooltipContent side="top">Poor response</TooltipContent>
-            </TooltipRoot>
-          </TooltipProvider>
-        </>
       )}
 
       <TooltipProvider>

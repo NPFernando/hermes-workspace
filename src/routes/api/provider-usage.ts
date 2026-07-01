@@ -3,6 +3,8 @@ import { json } from '@tanstack/react-start'
 import { getProviderUsage } from '../../server/provider-usage'
 import { isAuthenticated } from '../../server/auth-middleware'
 
+import { safeErrorMessage } from '../../server/rate-limit'
+
 const REQUEST_TIMEOUT_MS = 5000 // 5 second timeout
 
 async function withTimeout<T>(
@@ -50,7 +52,7 @@ export const Route = createFileRoute('/api/provider-usage')({
               ok: false,
               updatedAt: Date.now(),
               providers: [],
-              error: err instanceof Error ? err.message : String(err),
+              error: safeErrorMessage(err),
             },
             { status: 503 },
           )

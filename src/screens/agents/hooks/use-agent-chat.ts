@@ -69,6 +69,7 @@ export function useAgentChat(sessionKey: string) {
       return Array.isArray(response.messages) ? response.messages : []
     },
     refetchInterval: 5_000,
+    staleTime: 2_500,
     enabled: Boolean(sessionKey),
   })
 

@@ -1,8 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { listTasks, deleteTask } from '../../server/tasks-store'
+import { deleteTask, listTasks } from '../../server/tasks-store'
 
+import { safeErrorMessage } from '../../server/rate-limit'
 // POST /api/tasks-prune — delete todo/backlog tasks that:
 //   - have no agent history (never processed)
 //   - are older than 2 hours
@@ -37,7 +38,7 @@ export const Route = createFileRoute('/api/tasks-prune')({
 
           return json({ ok: true, pruned })
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err)
+          const msg = safeErrorMessage(err)
           return json({ ok: false, pruned: 0, error: msg }, { status: 500 })
         }
       },
