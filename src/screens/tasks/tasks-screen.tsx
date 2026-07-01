@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
@@ -9,10 +8,32 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Add01Icon, AiBrainIcon, AiMagicIcon, BulbIcon, Cancel01Icon, CheckListIcon, Delete01Icon, Loading03Icon, MoreVerticalIcon, RefreshIcon, Search01Icon } from '@hugeicons/core-free-icons'
 import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
-import { useTaskExecLog } from './use-task-exec-log'
 import { useTaskFilters } from './use-task-filters'
+import {
+  countExecutableReviewTasks,
+  formatBlockedTaskBreakdownLabel,
+  formatBlockedTaskBreakdownTitle,
+  formatCompactTaskColumnActionLabel,
+  formatCompactTaskColumnAriaLabel,
+  formatTaskFilterSummary,
+  formatTaskRefreshStatus,
+  formatTaskStatFilterButtonLabel,
+  isTypingTarget,
+} from './format-utils'
+import { RunningTaskRow, SkeletonCard, VIRTUAL_THRESHOLD, VirtualTaskList } from './virtual-task-list'
+import { KeyboardShortcutsModal } from './panels/keyboard-shortcuts-modal'
+import { TimeoutAnalysisModal } from './panels/timeout-analysis-modal'
+import { ArchiveWizardModal } from './panels/archive-wizard-modal'
+import { UnlockPrereqModal } from './panels/unlock-prereq-modal'
+import { SisterRebalanceModal } from './panels/sister-rebalance-modal'
+import { TagsBrowserPanel } from './panels/tags-browser-panel'
+import { ActivityPanel } from './panels/activity-panel'
+import { TaskDetailPanel } from './panels/task-detail-panel'
+import type { VirtualRow } from './virtual-task-list'
 import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority, UpdateTaskInput } from '@/lib/tasks-api'
-import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from '@/components/ui/menu'
+import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+import { toast } from '@/components/ui/toast'
 import {
   COLUMN_COLORS,
   COLUMN_LABELS,
@@ -34,277 +55,10 @@ import {
   submitClarificationAnswers,
   updateTask,
 } from '@/lib/tasks-api'
-import { toast } from '@/components/ui/toast'
-import { cn } from '@/lib/utils'
-import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
-
-function isTypingTarget(target: EventTarget | null) {
-  const el = target as HTMLElement | null
-  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
-}
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from '@/components/ui/menu'
 
 const QUERY_KEY = ['claude', 'tasks'] as const
 const ASSIGNEES_KEY = ['claude', 'tasks', 'assignees'] as const
-
-export const TASKS_BOARD_HELP_TEXT =
-  'Workspace Tasks is a lightweight task board. Drag cards to change status. Use Dashboard Kanban for native multi-board controls.'
-
-function pluralizeTask(count: number) {
-  return count === 1 ? 'task' : 'tasks'
-}
-
-export function formatTaskFilterSummary(matchCount: number, totalTasks: number) {
-  if (totalTasks === 0) return 'No tasks yet'
-  if (matchCount === 0) return `No matches across ${totalTasks} ${pluralizeTask(totalTasks)}`
-  if (matchCount === totalTasks) return `Showing all ${totalTasks} ${pluralizeTask(totalTasks)}`
-  return `Showing ${matchCount} of ${totalTasks} ${pluralizeTask(totalTasks)}`
-}
-
-export function formatTaskFilterAriaLabel(label: string, active: boolean) {
-  return `${active ? 'Disable' : 'Enable'} ${label.toLowerCase()} task filter`
-}
-
-export function formatTaskRefreshStatus(isFetching: boolean, isInitialLoading: boolean) {
-  if (isInitialLoading) return 'Loading task board…'
-  if (isFetching) return 'Updating task board…'
-  return null
-}
-
-export function formatCompactTaskColumnAriaLabel(label: string, taskCount: number) {
-  if (taskCount === 0) return `${label} column is empty. Add a task or drop one here.`
-  return `${label} column with ${taskCount} ${pluralizeTask(taskCount)}`
-}
-
-export function formatCompactTaskColumnActionLabel(label: string) {
-  return `Add a task to the ${label} column`
-}
-
-export function formatBlockedTaskBreakdownLabel(waitingForInput: number, executionFailures: number) {
-  if (waitingForInput > 0 && executionFailures > 0) return `${waitingForInput} input · ${executionFailures} err`
-  if (waitingForInput > 0) return 'needs input'
-  if (executionFailures > 0) return 'exec error'
-  return null
-}
-
-type ExecutableReviewCandidate = Pick<ClaudeTask, 'column' | 'agent_history'> & { agent_state?: ClaudeTask['agent_state'] }
-
-export function countExecutableReviewTasks(tasks: Array<ExecutableReviewCandidate>) {
-  return tasks.filter((task) => {
-    if (task.column !== 'review' || task.agent_state) return false
-    const plannedHistory = (task.agent_history ?? []).filter((entry) => entry.action === 'planned')
-    if (plannedHistory.length === 0) return false
-    const lastNote = plannedHistory[plannedHistory.length - 1].note
-    return !lastNote.includes('Plan unavailable') && lastNote.length >= 80
-  }).length
-}
-
-export function formatBlockedTaskBreakdownTitle(waitingForInput: number, executionFailures: number) {
-  return [
-    waitingForInput > 0 ? `${waitingForInput} waiting for input` : '',
-    executionFailures > 0 ? `${executionFailures} execution failure${executionFailures === 1 ? '' : 's'}` : '',
-  ].filter(Boolean).join(', ')
-}
-
-export function formatTaskStatFilterButtonLabel(label: string, active: boolean) {
-  return `${active ? 'Disable' : 'Enable'} ${label.toLowerCase()} task filter`
-}
-
-function SkeletonCard() {
-  return (
-    <div className="skeleton-shimmer rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-3">
-      <div className="h-3.5 bg-[var(--theme-hover)] rounded w-3/4 mb-2" />
-      <div className="h-2.5 bg-[var(--theme-hover)] rounded w-full mb-1" />
-      <div className="h-2.5 bg-[var(--theme-hover)] rounded w-2/3 mb-3" />
-      <div className="flex gap-1.5">
-        <div className="h-4 w-12 bg-[var(--theme-hover)] rounded" />
-        <div className="h-4 w-10 bg-[var(--theme-hover)] rounded" />
-      </div>
-    </div>
-  )
-}
-
-const VIRTUAL_THRESHOLD = 40
-const CARD_ESTIMATE_PX = 96
-
-type VirtualRow =
-  | { kind: 'task'; task: ClaudeTask }
-  | { kind: 'group-header'; label: string; count: number; groupId: string; collapsed: boolean; onToggle: () => void }
-  | { kind: 'divider'; label?: string }
-
-function VirtualTaskList({
-  tasks,
-  rows,
-  renderCard,
-  sectionBreak,
-  sectionLabels,
-}: {
-  tasks: Array<ClaudeTask>
-  rows?: Array<VirtualRow>
-  renderCard: (task: ClaudeTask) => React.ReactNode
-  sectionBreak?: number
-  sectionLabels?: [string, string]
-}) {
-  const parentRef = useRef<HTMLDivElement>(null)
-
-  if (rows) {
-    return <VirtualRowList parentRef={parentRef} rows={rows} renderCard={renderCard} />
-  }
-
-  return (
-    <FlatVirtualTaskList
-      parentRef={parentRef}
-      tasks={tasks}
-      renderCard={renderCard}
-      sectionBreak={sectionBreak}
-      sectionLabels={sectionLabels}
-    />
-  )
-}
-
-function FlatVirtualTaskList({
-  parentRef,
-  tasks,
-  renderCard,
-  sectionBreak,
-  sectionLabels,
-}: {
-  parentRef: React.RefObject<HTMLDivElement | null>
-  tasks: Array<ClaudeTask>
-  renderCard: (task: ClaudeTask) => React.ReactNode
-  sectionBreak?: number
-  sectionLabels?: [string, string]
-}) {
-  const hasDivider = sectionBreak != null && sectionBreak > 0 && sectionBreak < tasks.length
-  const totalItems = tasks.length + (hasDivider ? 1 : 0)
-  const virtualizer = useVirtualizer({
-    count: totalItems,
-    getScrollElement: () => parentRef.current,
-    estimateSize: (i) => {
-      if (hasDivider && i === sectionBreak) return 28
-      return CARD_ESTIMATE_PX
-    },
-    overscan: 5,
-    gap: 8,
-  })
-  const items = virtualizer.getVirtualItems()
-
-  return (
-    <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-2">
-      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, transform: `translateY(${items[0]?.start ?? 0}px)` }}>
-          {items.map(vItem => {
-            if (hasDivider && vItem.index === sectionBreak) {
-              return (
-                <div key="__divider__" data-index={vItem.index} ref={virtualizer.measureElement} className="mt-2 mb-1">
-                  <div className="flex items-center gap-2 px-1">
-                    <div className="flex-1 h-px bg-[var(--theme-border)]" />
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 whitespace-nowrap">
-                      {sectionLabels?.[1] ?? 'Stubs'}
-                    </span>
-                    <div className="flex-1 h-px bg-[var(--theme-border)]" />
-                  </div>
-                </div>
-              )
-            }
-            const taskIdx = hasDivider && vItem.index > (sectionBreak ?? 0) ? vItem.index - 1 : vItem.index
-            const task = tasks[taskIdx]
-            return (
-              <div key={task.id} data-index={vItem.index} ref={virtualizer.measureElement} className={vItem.index > 0 ? 'mt-2' : ''}>
-                {renderCard(task)}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function VirtualRowList({ parentRef, rows, renderCard }: {
-  parentRef: React.RefObject<HTMLDivElement | null>
-  rows: Array<VirtualRow>
-  renderCard: (task: ClaudeTask) => React.ReactNode
-}) {
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: (i) => {
-      const row = rows[i]
-      if (!row) return CARD_ESTIMATE_PX
-      if (row.kind === 'group-header') return 32
-      if (row.kind === 'divider') return 24
-      return CARD_ESTIMATE_PX
-    },
-    overscan: 5,
-    gap: 8,
-  })
-  const items = virtualizer.getVirtualItems()
-
-  return (
-    <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-2">
-      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, transform: `translateY(${items[0]?.start ?? 0}px)` }}>
-          {items.map(vItem => {
-            const row = rows[vItem.index]
-            if (!row) return null
-            if (row.kind === 'group-header') {
-              return (
-                <div key={`gh-${row.groupId}`} data-index={vItem.index} ref={virtualizer.measureElement} className="mt-1 mb-0.5">
-                  <button
-                    type="button"
-                    onClick={row.onToggle}
-                    className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--theme-hover)] transition-colors group"
-                  >
-                    <span className="text-[10px] text-[var(--theme-muted)] transition-transform" style={{ display: 'inline-block', transform: row.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
-                    <span className="flex-1 text-left text-[10px] font-semibold text-[var(--theme-text)] truncate">{row.label}</span>
-                    <span className="text-[9px] text-[var(--theme-muted)] opacity-60 shrink-0">{row.count}</span>
-                  </button>
-                </div>
-              )
-            }
-            if (row.kind === 'divider') {
-              return (
-                <div key={`div-${vItem.index}`} data-index={vItem.index} ref={virtualizer.measureElement} className="mt-2 mb-1">
-                  <div className="flex items-center gap-2 px-1">
-                    <div className="flex-1 h-px bg-[var(--theme-border)]" />
-                    {row.label && <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 whitespace-nowrap">{row.label}</span>}
-                    <div className="flex-1 h-px bg-[var(--theme-border)]" />
-                  </div>
-                </div>
-              )
-            }
-            return (
-              <div key={row.task.id} data-index={vItem.index} ref={virtualizer.measureElement} className={vItem.index > 0 ? 'mt-2' : ''}>
-                {renderCard(row.task)}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function RunningTaskRow({ task, onOpen }: { task: ClaudeTask; onOpen: () => void }) {
-  const fullLog = useTaskExecLog(task.id)
-  const log = fullLog.split('\n').slice(-4).join('\n')
-
-  return (
-    <div className="px-3 py-2 flex gap-3 items-start">
-      <div className="flex-1 min-w-0">
-        <button type="button" onClick={onOpen} className="text-[10px] font-medium text-violet-300 hover:text-violet-200 truncate max-w-full text-left transition-colors">
-          {task.title.slice(0, 70)}
-        </button>
-        {log && (
-          <pre className="mt-0.5 text-[9px] text-[var(--theme-muted)] font-mono leading-relaxed whitespace-pre-wrap break-all line-clamp-3 opacity-70">
-            {log.split('\n').slice(-3).join('\n')}
-          </pre>
-        )}
-      </div>
-      <span className="shrink-0 text-[9px] text-violet-500 opacity-60 capitalize">{task.assignee ?? 'astra'}</span>
-    </div>
-  )
-}
 
 export function TasksScreen() {
   const queryClient = useQueryClient()
@@ -2457,622 +2211,191 @@ export function TasksScreen() {
       )}
 
       {/* Task detail slide-in panel */}
-      {panelLive && (() => {
-        const live = panelLive
-        const history = live.agent_history ?? []
-        const lastPlan = [...history].reverse().find(h => h.action === 'planned')
-        const PRIORITY_COLOR: Record<string, string> = { high: '#ef4444', medium: '#f59e0b', low: '#6b7280' }
-        const priorityCol = PRIORITY_COLOR[live.priority] ?? '#6b7280'
-        const actionColors: Record<string, string> = {
-          completed: '#34d399', blocked: '#f87171', timed_out: '#f97316',
-          planned: '#a78bfa', question: '#fbbf24', rescued: '#60a5fa',
-        }
-        return (
-          <>
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setPanelTask(null)}
-            />
-            <div className="fixed right-0 top-0 bottom-0 z-50 w-[min(420px,92vw)] flex flex-col border-l border-[var(--theme-border)] shadow-2xl overflow-hidden"
-              style={{ background: 'var(--theme-panel)' }}
-            >
-              {/* Panel header */}
-              <div className="flex items-start gap-2 px-4 py-3 border-b border-[var(--theme-border)]">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[var(--theme-text)] leading-snug">{live.title}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] px-2 py-0.5 rounded-full border" style={{ borderColor: priorityCol, color: priorityCol, background: `${priorityCol}18` }}>{live.priority}</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-border)] text-[var(--theme-muted)] capitalize">{live.column.replace(/_/g, ' ')}</span>
-                    {live.assignee && <span className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--theme-border)] text-[var(--theme-muted)] capitalize">{live.assignee}</span>}
-                  </div>
-                </div>
-                <button onClick={() => setPanelTask(null)} className="shrink-0 p-1 rounded hover:bg-[var(--theme-hover)] text-[var(--theme-muted)] transition-colors text-sm">✕</button>
-              </div>
-
-              {/* Plan */}
-              {lastPlan && (
-                <div className="px-4 pt-3 pb-0 shrink-0">
-                  <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-1">Plan</p>
-                  <p className="text-[11px] text-[var(--theme-text)] leading-relaxed line-clamp-6 whitespace-pre-wrap">{lastPlan.note}</p>
-                </div>
-              )}
-
-              {/* astra_note fallback */}
-              {!lastPlan && live.agent_comment && (
-                <div className="px-4 pt-3 pb-0 shrink-0">
-                  <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-1">Note</p>
-                  <p className="text-[11px] text-[var(--theme-text)] leading-relaxed line-clamp-6">{live.agent_comment}</p>
-                </div>
-              )}
-
-              {/* History timeline */}
-              <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-4 py-3">
-                <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">History ({history.length})</p>
-                {history.length === 0 && <p className="text-[11px] text-[var(--theme-muted)] opacity-50">No agent activity yet</p>}
-                <div className="flex flex-col gap-2">
-                  {[...history].reverse().slice(0, 30).map((h, i) => {
-                    const col = actionColors[h.action] ?? 'var(--theme-muted)'
-                    const ageMs = h.at ? Date.now() - new Date(h.at).getTime() : null
-                    const ageStr = ageMs === null ? '' : ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m ago` : ageMs < 86_400_000 ? `${Math.round(ageMs / 3600_000)}h ago` : `${Math.round(ageMs / 86_400_000)}d ago`
-                    return (
-                      <div key={i} className="flex gap-2 items-start">
-                        <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ background: col, marginTop: 4 }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-medium capitalize" style={{ color: col }}>{h.action.replace(/_/g, ' ')}</span>
-                            {ageStr && <span className="text-[9px] text-[var(--theme-muted)] opacity-50">{ageStr}</span>}
-                          </div>
-                          {h.note && <p className="text-[10px] text-[var(--theme-muted)] leading-relaxed mt-0.5 line-clamp-3">{h.note}</p>}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Panel footer actions */}
-              <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-t border-[var(--theme-border)]">
-                <button
-                  onClick={() => { setPanelTask(null); setEditingTask(live) }}
-                  className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 hover:bg-[var(--theme-hover)] text-[var(--theme-text)] transition-colors"
-                >Edit</button>
-                {live.column !== 'done' && live.column !== 'blocked' && (
-                  <button
-                    onClick={async () => {
-                      setExecutingTaskId(live.id)
-                      try { await executeTask(live.id); await tasksQuery.refetch(); toast(`Agent is working on "${live.title}"…`) }
-                      catch { toast('Failed to start agent', { type: 'error' }) }
-                      finally { setExecutingTaskId(null) }
-                    }}
-                    disabled={executingTaskId === live.id || !!live.agent_state}
-                    className="flex-1 text-xs rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
-                  >{executingTaskId === live.id ? 'Starting…' : 'Execute'}</button>
-                )}
-              </div>
-            </div>
-          </>
-        )
-      })()}
+      {panelLive && (
+        <TaskDetailPanel
+          task={panelLive}
+          isExecuting={executingTaskId === panelLive.id}
+          onClose={() => setPanelTask(null)}
+          onEdit={() => { setPanelTask(null); setEditingTask(panelLive) }}
+          onExecute={async () => {
+            const live = panelLive
+            setExecutingTaskId(live.id)
+            try { await executeTask(live.id); await tasksQuery.refetch(); toast(`Agent is working on "${live.title}"…`) }
+            catch { toast('Failed to start agent', { type: 'error' }) }
+            finally { setExecutingTaskId(null) }
+          }}
+        />
+      )}
 
       {/* Unified Activity panel — Action Required (inbox) + Recent (feed) */}
       {showActivity && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => { setShowActivity(false); markNotifSeen() }} />
-          <div className="fixed right-0 top-0 bottom-0 z-50 w-[min(440px,94vw)] flex flex-col border-l border-[var(--theme-border)] shadow-2xl"
-            style={{ background: 'var(--theme-panel)' }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border)]">
-              <h2 className="text-sm font-semibold text-[var(--theme-text)]">⚑ Activity</h2>
-              <button onClick={() => { setShowActivity(false); markNotifSeen() }} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
-            </div>
-            {/* Tabs */}
-            <div className="flex border-b border-[var(--theme-border)]">
-              <button
-                type="button"
-                onClick={() => setActivityTab('inbox')}
-                className={cn('flex-1 py-2 text-xs font-medium transition-colors', activityTab === 'inbox' ? 'text-[var(--theme-accent)] border-b-2 border-[var(--theme-accent)]' : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]')}
-              >
-                📥 Action Required{stats.inboxTasks.length > 0 ? ` (${stats.inboxTasks.length})` : ''}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActivityTab('feed'); markNotifSeen() }}
-                className={cn('flex-1 py-2 text-xs font-medium transition-colors relative', activityTab === 'feed' ? 'text-[var(--theme-accent)] border-b-2 border-[var(--theme-accent)]' : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]')}
-              >
-                🔔 Recent
-                {unreadNotifCount > 0 && activityTab !== 'feed' && (
-                  <span className="ml-1 text-[9px] px-1 py-0.5 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30">{unreadNotifCount}</span>
-                )}
-              </button>
-            </div>
-
-            {/* Tab: Action Required */}
-            {activityTab === 'inbox' && (
-              <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin divide-y divide-[var(--theme-border)]">
-                {stats.inboxTasks.length === 0 && (
-                  <div className="text-center py-12 text-xs text-[var(--theme-muted)] opacity-50">No tasks waiting for your input</div>
-                )}
-                {stats.inboxTasks.map(t => {
-                  const lastAgentMsg = [...(t.agent_history ?? [])].reverse().find(h => h.action !== 'rescued' && h.note)
-                  const ageMs = t.agent_action_at ? Date.now() - new Date(t.agent_action_at).getTime() : null
-                  const ago = ageMs ? (ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m ago` : `${Math.round(ageMs / 3600_000)}h ago`) : ''
-                  return (
-                    <div key={t.id} className="p-4">
-                      <div className="flex items-start gap-2 mb-2">
-                        <div className="flex-1 min-w-0">
-                          <button
-                            type="button"
-                            onClick={() => { setShowActivity(false); setPanelTask(t) }}
-                            className="text-xs font-medium text-[var(--theme-text)] hover:text-[var(--theme-accent)] text-left transition-colors line-clamp-2"
-                          >{t.title}</button>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[9px] text-[var(--theme-muted)] opacity-50 capitalize">{t.assignee ?? 'unassigned'}</span>
-                            {ago && <span className="text-[9px] text-[var(--theme-muted)] opacity-40">{ago}</span>}
-                          </div>
-                        </div>
-                      </div>
-                      {(lastAgentMsg?.note || t.agent_comment) && (
-                        <div className="mb-2 text-[11px] text-[var(--theme-muted)] bg-[var(--theme-hover)] rounded-lg px-3 py-2 leading-relaxed line-clamp-4">
-                          {lastAgentMsg?.note ?? t.agent_comment}
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={inboxReplies[t.id] ?? ''}
-                          onChange={e => setInboxReplies(prev => ({ ...prev, [t.id]: e.target.value }))}
-                          onKeyDown={async e => {
-                            if (e.key !== 'Enter') return
-                            const text = (inboxReplies[t.id] ?? '').trim()
-                            if (!text) return
-                            setInboxSending(t.id)
-                            try {
-                              await handleTaskComment(t.id, text)
-                              setInboxReplies(prev => { const n = { ...prev }; delete n[t.id]; return n })
-                              toast('Reply sent — Astra will resume')
-                            } catch { toast('Reply failed', { type: 'error' }) }
-                            finally { setInboxSending(null) }
-                          }}
-                          placeholder="Reply… (Enter to send)"
-                          disabled={inboxSending === t.id}
-                          className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2.5 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] placeholder:text-[var(--theme-muted)] disabled:opacity-50"
-                        />
-                        {inboxSending === t.id && <span className="text-[10px] text-[var(--theme-muted)] self-center">Sending…</span>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Tab: Recent feed */}
-            {activityTab === 'feed' && (
-              <div className="flex-1 overflow-y-auto scrollbar-thin p-3 flex flex-col gap-2">
-                {notifEvents.length === 0 && (
-                  <div className="text-center py-8 text-xs text-[var(--theme-muted)] opacity-50">No activity in the last 24h</div>
-                )}
-                {notifEvents.map((ev, i) => {
-                  const isNew = ev.at > notifLastSeen
-                  const ageMs = Date.now() - new Date(ev.at).getTime()
-                  const ago = ageMs < 3600_000 ? `${Math.round(ageMs / 60_000)}m` : `${Math.round(ageMs / 3600_000)}h`
-                  const icon = ev.action === 'completed' ? '✅' : ev.action === 'blocked' ? '🚫' : ev.action === 'timed_out' ? '⏱️' : ev.action === 'planned' ? '📋' : ev.action === 'question' ? '❓' : '🔄'
-                  const color = ev.action === 'completed' ? 'text-emerald-400' : ev.action === 'blocked' || ev.action === 'timed_out' ? 'text-rose-400' : ev.action === 'planned' ? 'text-sky-400' : 'text-[var(--theme-muted)]'
-                  return (
-                    <button
-                      key={`${ev.taskId}-${ev.at}-${i}`}
-                      type="button"
-                      onClick={() => { const selectedTask = tasks.find(t => t.id === ev.taskId); if (selectedTask) { setPanelTask(selectedTask); setShowActivity(false) } }}
-                      className={cn('text-left px-3 py-2 rounded-lg border transition-colors hover:bg-[var(--theme-hover)]', isNew ? 'border-violet-500/30 bg-violet-500/5' : 'border-[var(--theme-border)]')}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{icon}</span>
-                        <span className={cn('text-[10px] font-medium capitalize', color)}>{ev.action.replace('_', ' ')}</span>
-                        <span className="text-[9px] text-[var(--theme-muted)] opacity-50 ml-auto">{ago} ago</span>
-                      </div>
-                      <p className="text-[11px] text-[var(--theme-text)] truncate mt-0.5">{ev.taskTitle.slice(0, 60)}</p>
-                      {ev.note && <p className="text-[9px] text-[var(--theme-muted)] opacity-60 truncate mt-0.5">{ev.note.slice(0, 80)}</p>}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </>
+        <ActivityPanel
+          activityTab={activityTab}
+          onTabChange={(tab) => { setActivityTab(tab); if (tab === 'feed') markNotifSeen() }}
+          inboxTasks={stats.inboxTasks}
+          inboxReplies={inboxReplies}
+          onReplyChange={(taskId, value) => setInboxReplies(prev => ({ ...prev, [taskId]: value }))}
+          onReplySubmit={async (taskId) => {
+            const text = (inboxReplies[taskId] ?? '').trim()
+            if (!text) return
+            setInboxSending(taskId)
+            try {
+              await handleTaskComment(taskId, text)
+              setInboxReplies(prev => { const n = { ...prev }; delete n[taskId]; return n })
+              toast('Reply sent — Astra will resume')
+            } catch { toast('Reply failed', { type: 'error' }) }
+            finally { setInboxSending(null) }
+          }}
+          inboxSending={inboxSending}
+          notifEvents={notifEvents}
+          unreadNotifCount={unreadNotifCount}
+          notifLastSeen={notifLastSeen}
+          onSelectTask={(t) => { setShowActivity(false); setPanelTask(t) }}
+          onSelectTaskById={(taskId) => { const selectedTask = tasks.find(t => t.id === taskId); if (selectedTask) { setPanelTask(selectedTask); setShowActivity(false) } }}
+          onClose={() => { setShowActivity(false); markNotifSeen() }}
+        />
       )}
 
       {/* Tags browser panel */}
       {showTagsPanel && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowTagsPanel(false)} />
-          <div className="fixed right-0 top-0 bottom-0 z-50 w-[min(320px,92vw)] flex flex-col border-l border-[var(--theme-border)] shadow-2xl"
-            style={{ background: 'var(--theme-panel)' }}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border)]">
-              <h2 className="text-sm font-semibold text-[var(--theme-text)]"># Tags</h2>
-              <button onClick={() => setShowTagsPanel(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
-            </div>
-            {/* Bulk tag input */}
-            {selectedIds.size > 0 && (
-              <div className="px-4 py-3 border-b border-[var(--theme-border)] bg-[var(--theme-hover)]">
-                <p className="text-[10px] text-[var(--theme-muted)] mb-1.5">{selectedIds.size} tasks selected — add tag:</p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={tagsPanelBulkTag}
-                    onChange={e => setTagsPanelBulkTag(e.target.value)}
-                    onKeyDown={async e => {
-                      if (e.key !== 'Enter') return
-                      const tag = tagsPanelBulkTag.trim().toLowerCase()
-                      if (!tag) return
-                      setTaggingSelected(true)
-                      try {
-                        const selected = tasks.filter(t => selectedIds.has(t.id))
-                        for (const t of selected) {
-                          if (!t.tags.includes(tag)) {
-                            await quickUpdateMutation.mutateAsync({ id: t.id, input: { tags: [...t.tags, tag] } })
-                          }
-                        }
-                        invalidate()
-                        toast(`Tagged ${selected.length} tasks with #${tag}`)
-                        setTagsPanelBulkTag('')
-                      } catch { toast('Tagging failed', { type: 'error' }) }
-                      finally { setTaggingSelected(false) }
-                    }}
-                    placeholder="tag name… Enter"
-                    disabled={taggingSelected}
-                    className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2.5 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] placeholder:text-[var(--theme-muted)]"
-                  />
-                </div>
-              </div>
-            )}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4">
-              <div className="flex flex-col gap-1.5">
-                {Object.entries(stats.tagCloud)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([tag, count]) => {
-                    const isActive = tagFilter === tag
-                    const maxCount = Math.max(...Object.values(stats.tagCloud), 1)
-                    return (
-                      <div key={tag} className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => { setTagFilter(isActive ? null : tag); setShowTagsPanel(false) }}
-                          className="flex-1 flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors hover:bg-[var(--theme-hover)] text-left"
-                          style={isActive ? { background: 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' } : {}}
-                        >
-                          <div className="flex-1 h-1.5 rounded-full bg-[var(--theme-hover)] overflow-hidden">
-                            <div className="h-full rounded-full bg-[var(--theme-accent)] opacity-60" style={{ width: `${(count / maxCount) * 100}%` }} />
-                          </div>
-                          <span className="text-[11px] text-[var(--theme-muted)] shrink-0 w-28 truncate">#{tag}</span>
-                          <span className="text-[11px] font-medium text-[var(--theme-text)] shrink-0 w-8 text-right">{count}</span>
-                        </button>
-                      </div>
-                    )
-                  })
+        <TagsBrowserPanel
+          tagCloud={stats.tagCloud}
+          tagFilter={tagFilter}
+          onSelectTag={(tag) => { setTagFilter(tag); setShowTagsPanel(false) }}
+          onClose={() => setShowTagsPanel(false)}
+          selectedCount={selectedIds.size}
+          bulkTagValue={tagsPanelBulkTag}
+          onBulkTagValueChange={setTagsPanelBulkTag}
+          taggingSelected={taggingSelected}
+          onBulkTagSubmit={async () => {
+            const tag = tagsPanelBulkTag.trim().toLowerCase()
+            if (!tag) return
+            setTaggingSelected(true)
+            try {
+              const selected = tasks.filter(t => selectedIds.has(t.id))
+              for (const t of selected) {
+                if (!t.tags.includes(tag)) {
+                  await quickUpdateMutation.mutateAsync({ id: t.id, input: { tags: [...t.tags, tag] } })
                 }
-              </div>
-            </div>
-          </div>
-        </>
+              }
+              invalidate()
+              toast(`Tagged ${selected.length} tasks with #${tag}`)
+              setTagsPanelBulkTag('')
+            } catch { toast('Tagging failed', { type: 'error' }) }
+            finally { setTaggingSelected(false) }
+          }}
+        />
       )}
 
       {/* Sister rebalance modal */}
       {showRebalance && (
-        <>
-          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowRebalance(false)} />
-          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(380px,92vw)] rounded-xl border border-[var(--theme-border)] shadow-2xl p-5"
-            style={{ background: 'var(--theme-panel)' }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-[var(--theme-text)]">⇄ Rebalance Sister Load</h2>
-              <button onClick={() => setShowRebalance(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
-            </div>
-            <div className="flex flex-col gap-3">
-              <div className="flex gap-2 items-center">
-                <div className="flex-1">
-                  <label className="text-[10px] text-[var(--theme-muted)] block mb-1">From (overloaded)</label>
-                  <select
-                    value={rebalanceFrom}
-                    onChange={e => setRebalanceFrom(e.target.value)}
-                    className="w-full text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)]"
-                  >
-                    <option value="">Select sister…</option>
-                    {stats.sisterChips.map(([name, count]) => (
-                      <option key={name} value={name}>{name} ({count})</option>
-                    ))}
-                  </select>
-                </div>
-                <span className="text-[var(--theme-muted)] mt-4">→</span>
-                <div className="flex-1">
-                  <label className="text-[10px] text-[var(--theme-muted)] block mb-1">To (lighter)</label>
-                  <select
-                    value={rebalanceTo}
-                    onChange={e => setRebalanceTo(e.target.value)}
-                    className="w-full text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)]"
-                  >
-                    <option value="">Select sister…</option>
-                    {stats.sisterChips.map(([name, count]) => (
-                      <option key={name} value={name}>{name} ({count})</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] text-[var(--theme-muted)] block mb-1">Move up to N tasks (todo/backlog only)</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={200}
-                  value={rebalanceCount}
-                  onChange={e => setRebalanceCount(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full text-xs rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5 text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)]"
-                />
-              </div>
-              <button
-                onClick={async () => {
-                  if (!rebalanceFrom || !rebalanceTo || rebalanceFrom === rebalanceTo) {
-                    toast('Pick two different sisters', { type: 'error' }); return
-                  }
-                  setRebalancing(true)
-                  try {
-                    const candidates = tasks
-                      .filter(t => t.assignee === rebalanceFrom && (t.column === 'todo' || t.column === 'backlog') && !t.agent_state)
-                      .slice(0, rebalanceCount)
-                    for (const t of candidates) {
-                      await quickUpdateMutation.mutateAsync({ id: t.id, input: { assignee: rebalanceTo } })
-                    }
-                    invalidate()
-                    toast(`Moved ${candidates.length} tasks from ${rebalanceFrom} → ${rebalanceTo}`)
-                    setShowRebalance(false)
-                  } catch { toast('Rebalance failed', { type: 'error' }) }
-                  finally { setRebalancing(false) }
-                }}
-                disabled={rebalancing || !rebalanceFrom || !rebalanceTo}
-                className="w-full text-xs rounded-lg border border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 px-3 py-2 text-[var(--theme-accent)] hover:bg-[var(--theme-accent)]/20 transition-colors disabled:opacity-40"
-              >
-                {rebalancing ? 'Moving…' : `Move ${rebalanceCount} tasks`}
-              </button>
-            </div>
-          </div>
-        </>
+        <SisterRebalanceModal
+          sisterChips={stats.sisterChips}
+          rebalanceFrom={rebalanceFrom}
+          rebalanceTo={rebalanceTo}
+          rebalanceCount={rebalanceCount}
+          rebalancing={rebalancing}
+          onClose={() => setShowRebalance(false)}
+          onFromChange={setRebalanceFrom}
+          onToChange={setRebalanceTo}
+          onCountChange={setRebalanceCount}
+          onConfirm={async () => {
+            if (!rebalanceFrom || !rebalanceTo || rebalanceFrom === rebalanceTo) {
+              toast('Pick two different sisters', { type: 'error' }); return
+            }
+            setRebalancing(true)
+            try {
+              const candidates = tasks
+                .filter(t => t.assignee === rebalanceFrom && (t.column === 'todo' || t.column === 'backlog') && !t.agent_state)
+                .slice(0, rebalanceCount)
+              for (const t of candidates) {
+                await quickUpdateMutation.mutateAsync({ id: t.id, input: { assignee: rebalanceTo } })
+              }
+              invalidate()
+              toast(`Moved ${candidates.length} tasks from ${rebalanceFrom} → ${rebalanceTo}`)
+              setShowRebalance(false)
+            } catch { toast('Rebalance failed', { type: 'error' }) }
+            finally { setRebalancing(false) }
+          }}
+        />
       )}
 
       {/* Keyboard shortcuts modal */}
       {showShortcuts && (
-        <>
-          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowShortcuts(false)} />
-          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(360px,92vw)] rounded-xl border border-[var(--theme-border)] shadow-2xl p-5"
-            style={{ background: 'var(--theme-panel)' }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-[var(--theme-text)]">Keyboard Shortcuts</h2>
-              <button onClick={() => setShowShortcuts(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
-            </div>
-            <div className="flex flex-col gap-2">
-              {([
-                ['n', 'New task'],
-                ['/', 'Focus search (operators: assignee: tag: is:)'],
-                ['?', 'Toggle shortcuts panel'],
-                ['Esc', 'Close panels'],
-              ] as Array<[string, string]>).map(([key, desc]) => (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-xs text-[var(--theme-muted)]">{desc}</span>
-                  <kbd className="text-[11px] font-mono px-2 py-0.5 rounded border border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-text)]">{key}</kbd>
-                </div>
-              ))}
-              <div className="mt-2 pt-2 border-t border-[var(--theme-border)]">
-                <p className="text-[10px] text-[var(--theme-muted)] opacity-50">Shortcuts are disabled when typing in a text field.</p>
-              </div>
-            </div>
-          </div>
-        </>
+        <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
       )}
 
       {/* Timeout failure analysis modal */}
       {showTimeoutAnalysis && timeoutAnalysisData && (
-        <>
-          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowTimeoutAnalysis(false)} />
-          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[min(480px,94vw)] max-h-[80vh] rounded-xl border border-[var(--theme-border)] shadow-2xl flex flex-col"
-            style={{ background: 'var(--theme-panel)' }}
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--theme-border)]">
-              <h2 className="text-sm font-semibold text-[var(--theme-text)]">⏱ Timeout Analysis — today ({timeoutAnalysisData.timedOutEntries.length} total)</h2>
-              <button onClick={() => setShowTimeoutAnalysis(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">✕</button>
-            </div>
-            <div className="overflow-y-auto scrollbar-thin p-5 flex flex-col gap-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">By Agent</p>
-                  {timeoutAnalysisData.topAssignees.map(([name, count]) => (
-                    <div key={name} className="flex items-center gap-2 mb-1.5">
-                      <div className="flex-1 h-1.5 rounded-full bg-[var(--theme-hover)] overflow-hidden">
-                        <div className="h-full rounded-full bg-orange-400" style={{ width: `${(count / timeoutAnalysisData.timedOutEntries.length) * 100}%` }} />
-                      </div>
-                      <span className="text-[11px] text-[var(--theme-muted)] capitalize shrink-0 w-20 truncate">{name}</span>
-                      <span className="text-[11px] font-medium text-orange-400 shrink-0">{count}</span>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">By Tag</p>
-                  {timeoutAnalysisData.topTags.map(([tag, count]) => (
-                    <div key={tag} className="flex items-center gap-2 mb-1.5">
-                      <div className="flex-1 h-1.5 rounded-full bg-[var(--theme-hover)] overflow-hidden">
-                        <div className="h-full rounded-full bg-amber-400" style={{ width: `${(count / timeoutAnalysisData.timedOutEntries.length) * 100}%` }} />
-                      </div>
-                      <span className="text-[11px] text-[var(--theme-muted)] shrink-0 w-20 truncate">{tag}</span>
-                      <span className="text-[11px] font-medium text-amber-400 shrink-0">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold text-[var(--theme-muted)] uppercase tracking-wider mb-2">Sample Tasks</p>
-                {timeoutAnalysisData.sample.map((e, i) => (
-                  <div key={i} className="mb-2 pb-2 border-b border-[var(--theme-border)]/50 last:border-0">
-                    <button
-                      type="button"
-                      onClick={() => { setShowTimeoutAnalysis(false); setPanelTask(e.task) }}
-                      className="text-[11px] text-[var(--theme-text)] hover:text-[var(--theme-accent)] text-left transition-colors line-clamp-1"
-                    >
-                      {e.task.title}
-                    </button>
-                    {e.note && <p className="text-[10px] text-[var(--theme-muted)] mt-0.5 line-clamp-2">{e.note}</p>}
-                    <p className="text-[9px] text-[var(--theme-muted)] opacity-40 mt-0.5 capitalize">{e.task.assignee ?? 'unassigned'} · {e.task.tags?.slice(0,2).join(', ') || 'no tags'}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="shrink-0 flex gap-2 px-5 py-3 border-t border-[var(--theme-border)]">
-              <button
-                onClick={() => { setShowTimeoutAnalysis(false); setFilterTimedOut(true) }}
-                className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 hover:bg-[var(--theme-hover)] text-[var(--theme-text)] transition-colors"
-              >Filter to timed-out tasks</button>
-              <button
-                onClick={async () => {
-                  setRescuingTimedOut(true)
-                  try {
-                    const res = await fetch('/api/tasks-rescue-timedout', { method: 'POST' })
-                    const data = await res.json() as { ok: boolean; rescued: number }
-                    await tasksQuery.refetch()
-                    toast(`Rescued ${data.rescued} tasks`)
-                    setShowTimeoutAnalysis(false)
-                  } catch { toast('Rescue failed', { type: 'error' }) }
-                  finally { setRescuingTimedOut(false) }
-                }}
-                disabled={rescuingTimedOut}
-                className="flex-1 text-xs rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
-              >{rescuingTimedOut ? 'Rescuing…' : 'Rescue all'}</button>
-            </div>
-          </div>
-        </>
+        <TimeoutAnalysisModal
+          data={timeoutAnalysisData}
+          rescuing={rescuingTimedOut}
+          onClose={() => setShowTimeoutAnalysis(false)}
+          onSelectTask={(task) => { setShowTimeoutAnalysis(false); setPanelTask(task) }}
+          onFilterTimedOut={() => { setShowTimeoutAnalysis(false); setFilterTimedOut(true) }}
+          onRescueAll={async () => {
+            setRescuingTimedOut(true)
+            try {
+              const res = await fetch('/api/tasks-rescue-timedout', { method: 'POST' })
+              const data = await res.json() as { ok: boolean; rescued: number }
+              await tasksQuery.refetch()
+              toast(`Rescued ${data.rescued} tasks`)
+              setShowTimeoutAnalysis(false)
+            } catch { toast('Rescue failed', { type: 'error' }) }
+            finally { setRescuingTimedOut(false) }
+          }}
+        />
       )}
 
       {/* Stale task archive wizard */}
       {showArchiveWizard && archivePreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowArchiveWizard(false)} />
-          <div className="relative z-10 w-full max-w-md bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--theme-border)]">
-              <span className="font-semibold text-sm text-[var(--theme-text)]">🗂️ Archive Stale Tasks</span>
-              <button type="button" onClick={() => setShowArchiveWizard(false)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">×</button>
-            </div>
-            <div className="px-5 py-4 flex flex-col gap-4">
-              <p className="text-xs text-[var(--theme-muted)]">Move inactive todo/backlog tasks to done. Only tasks with zero agent activity since the cutoff are affected.</p>
-              <div className="grid grid-cols-3 gap-3">
-                {([30, 60, 90] as const).map(days => {
-                  const count = days === 30 ? archivePreview.buckets.days30 : days === 60 ? archivePreview.buckets.days60 : archivePreview.buckets.days90
-                  return (
-                    <button
-                      key={days}
-                      type="button"
-                      onClick={() => setArchiveDays(days)}
-                      className={cn(
-                        'flex flex-col items-center p-3 rounded-lg border transition-colors',
-                        archiveDays === days ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]' : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
-                      )}
-                    >
-                      <span className="text-lg font-bold">{count}</span>
-                      <span className="text-[9px] uppercase tracking-wide">{days}+ days</span>
-                    </button>
-                  )
-                })}
-              </div>
-              <div>
-                <p className="text-[10px] text-[var(--theme-muted)] mb-2">Oldest inactive tasks (preview):</p>
-                <div className="flex flex-col gap-1 max-h-40 overflow-y-auto scrollbar-thin">
-                  {archivePreview.previews.filter(p => p.ageDays >= archiveDays).slice(0, 10).map(p => (
-                    <div key={p.id} className="flex items-center gap-2 px-2 py-1 rounded bg-[var(--theme-hover)]">
-                      <span className="text-[10px] text-[var(--theme-text)] truncate flex-1">{p.title.slice(0, 55)}</span>
-                      <span className="text-[9px] text-[var(--theme-muted)] opacity-60 shrink-0">{p.ageDays}d</span>
-                    </div>
-                  ))}
-                  {archivePreview.previews.filter(p => p.ageDays >= archiveDays).length === 0 && (
-                    <p className="text-xs text-[var(--theme-muted)] opacity-50 text-center py-2">No tasks older than {archiveDays} days</p>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 px-5 py-4 border-t border-[var(--theme-border)]">
-              <button
-                type="button"
-                onClick={() => setShowArchiveWizard(false)}
-                className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
-              >Cancel</button>
-              <button
-                type="button"
-                disabled={archiving || archivePreview.buckets[`days${archiveDays}` as 'days30' | 'days60' | 'days90'] === 0}
-                onClick={async () => {
-                  setArchiving(true)
-                  try {
-                    const res = await fetch('/api/tasks-stale', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ age_days: archiveDays }) })
-                    const data = await res.json() as { ok: boolean; archived: number }
-                    if (data.ok) {
-                      await tasksQuery.refetch()
-                      toast(`Archived ${data.archived} stale task${data.archived !== 1 ? 's' : ''}`)
-                      setShowArchiveWizard(false)
-                    } else {
-                      toast('Archive failed', { type: 'error' })
-                    }
-                  } catch { toast('Archive failed', { type: 'error' }) }
-                  finally { setArchiving(false) }
-                }}
-                className="flex-1 text-xs rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-rose-400 hover:bg-rose-500/20 transition-colors disabled:opacity-40"
-              >{archiving ? 'Archiving…' : `Archive ${archivePreview.buckets[`days${archiveDays}` as 'days30' | 'days60' | 'days90']} tasks`}</button>
-            </div>
-          </div>
-        </div>
+        <ArchiveWizardModal
+          preview={archivePreview}
+          days={archiveDays}
+          onDaysChange={setArchiveDays}
+          archiving={archiving}
+          onClose={() => setShowArchiveWizard(false)}
+          onConfirm={async () => {
+            setArchiving(true)
+            try {
+              const res = await fetch('/api/tasks-stale', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ age_days: archiveDays }) })
+              const data = await res.json() as { ok: boolean; archived: number }
+              if (data.ok) {
+                await tasksQuery.refetch()
+                toast(`Archived ${data.archived} stale task${data.archived !== 1 ? 's' : ''}`)
+                setShowArchiveWizard(false)
+              } else {
+                toast('Archive failed', { type: 'error' })
+              }
+            } catch { toast('Archive failed', { type: 'error' }) }
+            finally { setArchiving(false) }
+          }}
+        />
       )}
 
       {/* Unlock prereq modal */}
       {unlockModalPrereq && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setUnlockModalPrereq(null)} />
-          <div className="relative z-10 w-full max-w-md bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-xl shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--theme-border)]">
-              <span className="font-semibold text-sm text-[var(--theme-text)]">🔓 Unlock Gated Tasks</span>
-              <button type="button" onClick={() => setUnlockModalPrereq(null)} className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] text-lg leading-none">×</button>
-            </div>
-            <div className="px-5 py-4 flex flex-col gap-3">
-              <p className="text-xs text-[var(--theme-muted)]">
-                Marking this prerequisite as <strong className="text-amber-400">done</strong> will immediately unlock <strong className="text-[var(--theme-text)]">{unlockModalPrereq.count} waiting task{unlockModalPrereq.count !== 1 ? 's' : ''}</strong> and trigger a deploy sweep.
-              </p>
-              <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                <p className="text-xs font-medium text-amber-400">{unlockModalPrereq.title.slice(0, 100)}</p>
-                <p className="text-[9px] text-amber-400/60 mt-0.5">{unlockModalPrereq.count} task{unlockModalPrereq.count !== 1 ? 's' : ''} waiting on this</p>
-              </div>
-              <div className="flex gap-3 mt-2">
-                <button
-                  type="button"
-                  onClick={() => setUnlockModalPrereq(null)}
-                  className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
-                >Cancel</button>
-                <button
-                  type="button"
-                  disabled={unlockingPrereq === unlockModalPrereq.id}
-                  onClick={async () => {
-                    const { id, count } = unlockModalPrereq
-                    setUnlockingPrereq(id)
-                    try {
-                      const res = await fetch('/api/tasks-unlock-prereq', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prereq_id: id }) })
-                      const data = await res.json() as { ok: boolean; unblocked?: number; error?: string }
-                      if (data.ok) {
-                        await tasksQuery.refetch()
-                        toast(`Unlocked ${data.unblocked ?? count} task${(data.unblocked ?? count) !== 1 ? 's' : ''} — deploy sweep triggered`)
-                        setUnlockModalPrereq(null)
-                      } else {
-                        toast(data.error ?? 'Unlock failed', { type: 'error' })
-                      }
-                    } catch { toast('Unlock failed', { type: 'error' }) }
-                    finally { setUnlockingPrereq(null) }
-                  }}
-                  className="flex-1 text-xs rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
-                >{unlockingPrereq === unlockModalPrereq.id ? 'Unlocking…' : `Confirm — unlock ${unlockModalPrereq.count} tasks`}</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <UnlockPrereqModal
+          prereq={unlockModalPrereq}
+          unlocking={unlockingPrereq === unlockModalPrereq.id}
+          onClose={() => setUnlockModalPrereq(null)}
+          onConfirm={async () => {
+            const { id, count } = unlockModalPrereq
+            setUnlockingPrereq(id)
+            try {
+              const res = await fetch('/api/tasks-unlock-prereq', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prereq_id: id }) })
+              const data = await res.json() as { ok: boolean; unblocked?: number; error?: string }
+              if (data.ok) {
+                await tasksQuery.refetch()
+                toast(`Unlocked ${data.unblocked ?? count} task${(data.unblocked ?? count) !== 1 ? 's' : ''} — deploy sweep triggered`)
+                setUnlockModalPrereq(null)
+              } else {
+                toast(data.error ?? 'Unlock failed', { type: 'error' })
+              }
+            } catch { toast('Unlock failed', { type: 'error' }) }
+            finally { setUnlockingPrereq(null) }
+          }}
+        />
       )}
 
       {/* Confirm clear done */}

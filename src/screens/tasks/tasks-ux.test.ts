@@ -12,7 +12,7 @@ import {
   formatTaskFilterSummary,
   formatTaskRefreshStatus,
   formatTaskStatFilterButtonLabel,
-} from './tasks-screen'
+} from './format-utils'
 
 describe('tasks UX copy', () => {
   it('exposes helper copy that explains drag and assignment behavior', () => {
