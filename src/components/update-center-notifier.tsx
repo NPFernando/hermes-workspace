@@ -222,7 +222,18 @@ export function UpdateCenterNotifier() {
   }, [data?.pendingReleaseNotes])
 
   const visibleProducts = useMemo(() => {
-    const products = data ? [data.products.workspace, data.products.agent] : []
+    // Defensive: a malformed /api/update/status payload (missing products,
+    // or products not shaped as {workspace, agent}) must degrade to "no
+    // banner", not throw and take the whole route down with it. The widened
+    // type expresses that the wire payload may not match UpdateStatus.
+    const raw = data as
+      | { products?: Partial<Record<'workspace' | 'agent', ProductUpdateStatus>> }
+      | null
+      | undefined
+    const products = [raw?.products?.workspace, raw?.products?.agent].filter(
+      (product): product is ProductUpdateStatus =>
+        Boolean(product && typeof product === 'object' && 'id' in product),
+    )
     return products.filter((product) => {
       // Product decision: only show the top-of-app update banner when a
       // one-click update is actually safe. Dirty checkouts, non-main branches,
