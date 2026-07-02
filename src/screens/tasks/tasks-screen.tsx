@@ -10,6 +10,7 @@ import { TaskCard } from './task-card'
 import { TaskDialog } from './task-dialog'
 import { useTaskFilters } from './use-task-filters'
 import {
+  TASK_STATS_ROW_CLASS,
   countExecutableReviewTasks,
   formatBlockedTaskBreakdownLabel,
   formatBlockedTaskBreakdownTitle,
@@ -789,8 +790,10 @@ export function TasksScreen() {
               </div>
             )}
           </div>
-          {/* Stats — single compact row */}
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[var(--theme-muted)]">
+          {/* Stats — single compact row. whitespace-nowrap keeps each stat ("22 blocked (…)")
+              as one atomic unit that wraps to a new line together, instead of the browser
+              breaking mid-phrase at the space between words when the row runs out of width. */}
+          <div className={TASK_STATS_ROW_CLASS}>
             <span>{stats.total} tasks</span>
             {stats.running > 0 && <><span className="opacity-30">·</span><span>{stats.running} running</span></>}
             {stats.blocked > 0 && (

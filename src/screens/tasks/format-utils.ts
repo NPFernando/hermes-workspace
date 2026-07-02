@@ -8,6 +8,9 @@ export function isTypingTarget(target: EventTarget | null) {
 export const TASKS_BOARD_HELP_TEXT =
   'Workspace Tasks is a lightweight task board. Drag cards to change status. Use Dashboard Kanban for native multi-board controls.'
 
+export const TASK_STATS_ROW_CLASS =
+  'mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 whitespace-nowrap text-[11px] text-[var(--theme-muted)]'
+
 function pluralizeTask(count: number) {
   return count === 1 ? 'task' : 'tasks'
 }

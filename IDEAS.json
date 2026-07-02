@@ -262,5 +262,23 @@
     "description": "Add concise status copy when a scheduled job has not run recently so operators can distinguish dormant schedules from healthy recurring jobs.",
     "category": "ui",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Keep Tasks header stats readable on narrow screens",
+    "description": "Prevent compact Tasks header stats such as blocked breakdowns from splitting mid-phrase or requiring horizontal scrolling by sharing a tested class token for wrapping whole stat units.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add visual smoke coverage for compact Tasks header stats",
+    "description": "Capture a mobile Tasks header viewport after blocked/timed-out stats are populated so responsive stat-row regressions are visible before deployment.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Reduce Tasks header className duplication",
+    "description": "Move repeated responsive utility class groups in the Tasks header into named constants covered by focused tests, reducing accidental Tailwind token drift.",
+    "category": "ui",
+    "estimated_effort": "low"
   }
 ]

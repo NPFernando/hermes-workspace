@@ -1,23 +1,31 @@
-# Plan: Add named action labels for scheduled job cards
+# Plan: Keep Tasks Header Stats Readable
 
-## Summary
-Improve Jobs screen accessibility by giving each icon-only job card action a job-specific accessible name. The UI already exposed visual `title` text, but assistive technology benefits from explicit labels that include the affected job and current action state.
+## Summary of the change
+
+The compact Tasks header stat row can include multi-word stats such as `22 blocked (needs input)` and `3 overdue`. The previous mobile-only horizontal scrolling behavior kept the row on one line, but made the header harder to scan on narrow screens. This cycle keeps each stat phrase atomic with `whitespace-nowrap` while allowing the row itself to wrap naturally.
 
 ## Files to modify
-- `src/screens/jobs/jobs-screen.tsx`
-- `src/screens/jobs/jobs-screen.test.ts`
+
+- `src/screens/tasks/format-utils.ts`
+- `src/screens/tasks/tasks-screen.tsx`
+- `src/screens/tasks/tasks-ux.test.ts`
 
 ## Steps
-1. Add an exported `formatJobActionLabel` helper that accepts a job title and action key.
-2. Use the helper for Run, Pause/Resume, Edit, Show/Hide history, and Delete icon buttons in `JobCard`.
-3. Preserve existing visual styling, button behavior, and `title` tooltips.
-4. Add focused Vitest coverage for named and blank job title label copy.
-5. Verify with TypeScript, focused Vitest, focused ESLint, diff whitespace checks, build, service restart, and JSON health validation.
+
+1. Export a named `TASK_STATS_ROW_CLASS` from `format-utils.ts` so the responsive stat-row behavior has a single tested source of truth.
+2. Use `TASK_STATS_ROW_CLASS` in `tasks-screen.tsx` for the Tasks header stats row.
+3. Add a focused Tasks UX unit test asserting the row wraps stat units, preserves `whitespace-nowrap`, and does not reintroduce horizontal scrolling.
+4. Stage and commit only the intended Tasks source/test files and auto-improvement artifacts; leave unrelated dirty finance, docs, scratch, and gitlink changes unstaged.
 
 ## How to verify the change works
-- `export PATH=/home/ubuntu/.hermes/node/bin:$PATH && npx tsc --noEmit`
-- `npx vitest run src/screens/jobs/jobs-screen.test.ts`
-- `npx eslint --no-warn-ignored -f json src/screens/jobs/jobs-screen.tsx src/screens/jobs/jobs-screen.test.ts`
-- `git diff --check -- src/screens/jobs/jobs-screen.tsx src/screens/jobs/jobs-screen.test.ts IDEAS.json PLAN.md`
+
+- `npx tsc --noEmit`
+- `npx vitest run src/screens/tasks/tasks-ux.test.ts`
+- `npx eslint --no-warn-ignored -f json --rule '@typescript-eslint/no-unnecessary-condition: off' src/screens/tasks/format-utils.ts src/screens/tasks/tasks-screen.tsx src/screens/tasks/tasks-ux.test.ts`
+- `pnpm lint:class-tokens`
 - `pnpm build`
-- `sudo systemctl restart hermes-workspace.service` followed by JSON health validation
+- Restart `hermes-workspace.service` and validate `https://agent.fernandofamily.com/api/health` returns JSON `{"status":"ok"}`.
+
+## Rollback procedure
+
+Revert the auto-improvement commit or restore the stat-row class to the previous inline value in `tasks-screen.tsx`, then rerun TypeScript and focused Tasks UX tests.

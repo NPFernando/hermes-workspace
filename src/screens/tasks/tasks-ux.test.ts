@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { formatTaskAssigneeLabel, formatTaskDependencyLabel, formatTaskSelectionToggleLabel } from './task-card'
 import {
   TASKS_BOARD_HELP_TEXT,
+  TASK_STATS_ROW_CLASS,
   countExecutableReviewTasks,
   formatCompactTaskColumnActionLabel,
   formatBlockedTaskBreakdownLabel,
@@ -53,6 +54,12 @@ describe('tasks UX copy', () => {
   it('formats task stat filter button labels from active state', () => {
     expect(formatTaskStatFilterButtonLabel('Blocked', false)).toBe('Enable blocked task filter')
     expect(formatTaskStatFilterButtonLabel('Blocked', true)).toBe('Disable blocked task filter')
+  })
+
+  it('keeps compact task stats readable without horizontal scrolling', () => {
+    expect(TASK_STATS_ROW_CLASS).toContain('flex-wrap')
+    expect(TASK_STATS_ROW_CLASS).toContain('whitespace-nowrap')
+    expect(TASK_STATS_ROW_CLASS).not.toContain('overflow-x-auto')
   })
 
   it('formats task refresh status copy for loading and background updates', () => {
