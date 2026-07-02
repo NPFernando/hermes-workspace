@@ -747,18 +747,18 @@ export function SkillsScreen() {
               ) : null}
 
               <TabsList
-                className="ml-auto rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)] p-1"
+                className="ml-auto max-w-full overflow-x-auto rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)] p-1"
                 variant="default"
               >
-                <TabsTab value="installed" className="min-w-[110px]">
+                <TabsTab value="installed" className="min-w-0 sm:min-w-[110px]">
                   Installed
                 </TabsTab>
                 {isOnActiveProfile ? (
-                  <TabsTab value="marketplace" className="min-w-[120px]">
+                  <TabsTab value="marketplace" className="min-w-0 sm:min-w-[120px]">
                     Marketplace
                   </TabsTab>
                 ) : null}
-                <TabsTab value="workspace" className="min-w-[110px]">
+                <TabsTab value="workspace" className="min-w-0 sm:min-w-[110px]">
                   Workspace
                 </TabsTab>
               </TabsList>

@@ -736,7 +736,7 @@ export function ClaudeConfigSection({
               key={provider.id}
               label={provider.name}
               description={
-                provider.configured ? '✅ Configured' : '❌ Not configured'
+                provider.configured ? '✅ Configured' : '— Not configured'
               }
             >
               <div className="flex w-full max-w-sm items-center gap-2">
