@@ -774,7 +774,7 @@ export function TasksScreen() {
         <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-medium text-ink shrink-0">Tasks</h1>
+            <h1 className="hidden text-2xl font-medium text-ink shrink-0 md:block">Tasks</h1>
             {assigneeFilter && (
               <div className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
                 <span>·</span>
