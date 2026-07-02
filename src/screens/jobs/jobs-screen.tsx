@@ -466,9 +466,9 @@ export function JobsScreen() {
             <HugeiconsIcon
               icon={Clock01Icon}
               size={18}
-              className="text-[var(--theme-accent)] shrink-0"
+              className="hidden text-[var(--theme-accent)] shrink-0 md:block"
             />
-            <h1 className="text-base font-semibold text-[var(--theme-text)] shrink-0">
+            <h1 className="hidden text-base font-semibold text-[var(--theme-text)] shrink-0 md:block">
               Jobs
             </h1>
             {jobsQuery.data && (

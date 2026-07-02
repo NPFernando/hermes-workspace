@@ -652,7 +652,7 @@ export function SkillsScreen() {
               <p className="text-xs font-medium uppercase text-[var(--theme-muted)] tabular-nums">
                 Hermes Workspace Marketplace
               </p>
-              <h1 className="text-2xl font-medium text-ink text-balance sm:text-3xl">
+              <h1 className="hidden text-2xl font-medium text-ink text-balance md:block sm:text-3xl">
                 Skills Browser
               </h1>
               <p className="text-sm text-[var(--theme-muted)] text-pretty sm:text-base">

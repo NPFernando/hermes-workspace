@@ -280,7 +280,7 @@ export function CommandCenterScreen() {
               🌟
             </div>
             <div>
-              <h1 className="text-base font-semibold text-[var(--theme-text)]">Command Center</h1>
+              <h1 className="hidden text-base font-semibold text-[var(--theme-text)] md:block">Command Center</h1>
               <p className="mt-1 text-sm text-[var(--theme-muted)]">
                 {sisters.length > 0
                   ? `${sisters.length} agents · ${aiSisters.length} AI sisters · ${presets.length} swarm roles`

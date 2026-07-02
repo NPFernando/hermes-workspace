@@ -377,7 +377,7 @@ export function ProfilesScreen() {
     <div data-route-page className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 md:px-6">
       <div className="flex flex-col gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm md:flex-row md:items-center md:justify-between">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 md:flex">
             <HugeiconsIcon icon={UserGroupIcon} size={22} strokeWidth={1.7} />
             <h1 className="text-lg font-semibold text-[var(--theme-text)]">Profiles</h1>
           </div>
