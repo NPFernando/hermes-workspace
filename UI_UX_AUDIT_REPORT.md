@@ -20,11 +20,33 @@
 > | Phase 5 polish (settings ❌, research CTA, skills tabs) | **Done** (`polish/audit-phase5`) |
 > | Title tooltips (rounds 1–3) | **Done** (`fix/skills-title-tooltips`, `fix/profiles-jobs-title-tooltips`) |
 >
-> Still open: Phase 4 accessibility (keyboard drag-and-drop alternative,
-> contrast measurement); a follow-up sweep for `bg-accent-500` usages, which
-> was discovered during Phase 5 to compute to transparent (the utility doesn't
-> resolve in this Tailwind setup — other call sites are likely silently
-> broken); and the §13 known gaps (Profile wizard steps 2–4, HARP mobile).
+> **Phase 4 accessibility results (2026-07-02):**
+>
+> - *Keyboard alternative for board drag-and-drop*: already existed — every
+>   task card's kebab menu (aria-label "Task options") has a full "Move to
+>   [column]" section. The real gap was that the kebab lives in an
+>   `opacity-0 group-hover:opacity-100` cluster, invisible to keyboard users
+>   even when focused. Fixed with `focus-within:opacity-100` on the action
+>   cluster and `focus-visible:opacity-100` on both hidden bulk-select
+>   checkboxes (`fix/task-card-focus-visibility`).
+> - *Mobile tab-bar aria-labels*: verified already correct — every tab has a
+>   state-aware label including "(current page)". No change needed.
+> - *`--theme-muted` contrast (WCAG, muted-on-bg / muted-on-card)*: 8 of 11
+>   parsed themes pass AA 4.5:1 (odysseus 4.91/5.36, matrix 6.42/6.35,
+>   claude-official 7.79/7.15, claude-classic 5.46/4.72, claude-slate
+>   6.15/5.26, claude-classic-light 4.98/5.34, claude-slate-light 6.00/6.39,
+>   claude-nous 5.92/5.21). Three light themes clear only the 3:1 large-text
+>   bar while muted text is used at 10–11px: **matrix-light 3.65**,
+>   **claude-nous-light 3.75**, **claude-official-light 3.87**. Darkening
+>   their `--theme-muted` ~15% would pass AA; left as a design decision.
+>   (`scifi-light` defines its vars in `scifi-theme.css`, not measured.)
+>
+> Still open: the three sub-AA light-theme muted colors above (needs a
+> palette decision); the `bg-accent-500`/theme-token fix — implemented on
+> `fix/tailwind-theme-color-tokens` (the entire primary/accent/ink/surface
+> utility vocabulary generated no CSS since the Tailwind v4 migration),
+> pending sign-off due to app-wide visual blast radius; and the §13 known
+> gaps (Profile wizard steps 2–4, HARP mobile).
 
 **Date:** 2026-07-01–02 (rounds 1–4, same continued session)
 **Scope requested:** full-app UI/UX review (layout, navigation, components, mobile,
