@@ -13,6 +13,46 @@
   --radius-xl: 0.5rem; /* 8px  — was 12px */
   --radius-2xl: 0.625rem; /* 10px — was 16px */
   --radius-3xl: 0.875rem; /* 14px — was 24px */
+
+  /* ── Custom color tokens ─────────────────────────────────────────────
+     Tailwind v4 only generates utilities (bg-surface, text-ink,
+     bg-primary-900, bg-accent-500, …) for colors declared in @theme.
+     These were lost in the v4 migration: the per-theme remap blocks
+     further down (`[data-theme=…] { --color-primary-50: … }`) set the
+     variables, but without these declarations no utility ever consumed
+     them — every primary/accent/ink/surface class in the app compiled
+     to nothing. Values here are the dark-theme defaults; the per-theme
+     blocks override them at runtime exactly as originally intended. */
+  --color-surface: var(--theme-bg, #101014);
+  --color-surface-deep: var(--theme-bg, #0b0b0e);
+  --color-ink: var(--theme-text, #e8e8ea);
+
+  --color-primary-50: var(--theme-panel, #18181d);
+  --color-primary-100: var(--theme-card, #1e1e24);
+  --color-primary-200: var(--theme-border, #2a2a32);
+  --color-primary-300: var(--theme-border-subtle, #26262d);
+  --color-primary-400: var(--theme-muted, #8b8b93);
+  --color-primary-500: var(--theme-muted, #8b8b93);
+  --color-primary-600: var(--theme-muted, #8b8b93);
+  --color-primary-700: var(--theme-text, #e8e8ea);
+  --color-primary-800: var(--theme-text, #e8e8ea);
+  --color-primary-900: var(--theme-text, #e8e8ea);
+  --color-primary-950: var(--theme-text, #e8e8ea);
+
+  /* Accent ramp follows Tailwind's 50=lightest → 950=darkest convention,
+     derived from the live theme accent so every theme stays coherent.
+     400/500/600 defer to the theme vars the remap blocks also target. */
+  --color-accent-50: color-mix(in srgb, var(--theme-accent, #f08090) 10%, white);
+  --color-accent-100: color-mix(in srgb, var(--theme-accent, #f08090) 20%, white);
+  --color-accent-200: color-mix(in srgb, var(--theme-accent, #f08090) 35%, white);
+  --color-accent-300: color-mix(in srgb, var(--theme-accent, #f08090) 55%, white);
+  --color-accent-400: var(--theme-accent-secondary, var(--theme-accent, #f08090));
+  --color-accent-500: var(--theme-accent, #f08090);
+  --color-accent-600: var(--theme-accent, #f08090);
+  --color-accent-700: color-mix(in srgb, var(--theme-accent, #f08090) 70%, black);
+  --color-accent-800: color-mix(in srgb, var(--theme-accent, #f08090) 55%, black);
+  --color-accent-900: color-mix(in srgb, var(--theme-accent, #f08090) 40%, black);
+  --color-accent-950: color-mix(in srgb, var(--theme-accent, #f08090) 25%, black);
 }
 
 /* Tailwind v4 — enable dark: variant on .dark class (set by __root.tsx) */
