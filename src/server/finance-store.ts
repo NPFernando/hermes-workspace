@@ -1233,21 +1233,166 @@ export function updateExchangeRate(base: string, target: string, rate: number, d
   return db
 }
 
-export function getExchangeRate(db: FinanceDatabase, base: string, target: string): number | undefined {
+export function getExchangeRate(base: string, target: string, date?: string): number | undefined {
   // Filter rates for the base and target, then take the one with the latest date
-  const relevant = db.exchange_rates
+  const db = ensureFinanceStore()
+  let relevant = db.exchange_rates
     .filter((r: any) => 
       r.base === base && 
       r.target === target && 
       typeof r.rate === 'number'
-    )
-    .sort((a: any, b: any) => {
-      const dateA = new Date(a.date || 0).getTime()
-      const dateB = new Date(b.date || 0).getTime()
-      return dateB - dateA // descending
-    })
-  
+    );
+
+  // If a date is provided, only consider rates on or before that date
+  if (date !== undefined) {
+    const targetDate = new Date(date).getTime();
+    relevant = relevant.filter((r: any) => {
+      const rDate = new Date(r.date || 0).getTime();
+      return rDate <= targetDate;
+    });
+  }
+
+  // Sort by date descending (latest first)
+  relevant = relevant.sort((a: any, b: any) => {
+    const dateA = new Date(a.date || 0).getTime()
+    const dateB = new Date(b.date || 0).getTime()
+    return dateB - dateA
+  });
+
   if (relevant.length === 0) return undefined
   return relevant[0].rate as number
+}
+
+export function convertCurrency(
+  amount: number,
+  fromCurrency: CurrencyCode,
+  toCurrency: CurrencyCode,
+  date?: string
+): number | undefined {
+  if (fromCurrency === toCurrency) {
+    return amount
+  }
+
+  // Try direct rate
+  let rate = getExchangeRate(fromCurrency, toCurrency, date)
+  if (rate !== undefined) {
+    return amount * rate
+  }
+
+  // Try via base currency (LKR) if both legs exist
+  const baseCurrency = 'LKR'
+  const rateFromToBase = getExchangeRate(fromCurrency, baseCurrency, date)
+  const rateBaseTo = getExchangeRate(baseCurrency, toCurrency, date)
+  if (rateFromToBase !== undefined && rateBaseTo !== undefined) {
+    return amount * rateFromToBase * rateBaseTo
+  }
+
+  // Try the inverse: if we have toCurrency -> fromCurrency, then use 1/rate
+  const rateInverse = getExchangeRate(toCurrency, fromCurrency, date)
+  if (rateInverse !== undefined) {
+    return amount / rateInverse
+  }
+
+  // If we still don't have a rate, return undefined
+  return undefined
+}
+
+
+
+export function tradingPerformanceSummary(db: FinanceDatabase) {
+  // Get all executed trading plans with profitLoss
+  const trades = db.trading_plans
+    .flatMap(plan => {
+      if (plan.executionStatus !== 'executed' || typeof plan.profitLoss !== 'number') return []
+      return [{
+        id: plan.id,
+        profitLoss: plan.profitLoss,
+        decision: plan.decision,
+        expectedOutcome: plan.expectedOutcome ?? '',
+        actualOutcome: plan.actualOutcome ?? '',
+        date: new Date(plan.updatedAt), // or plan.createdAt? We'll use updatedAt as the time when the plan was last updated (should be after execution)
+        symbol: plan.symbol,
+      }]
+    })
+    .sort((a, b) => a.date.getTime() - b.date.getTime()); // ascending chronological
+
+  if (trades.length === 0) {
+    return {
+      winRate: 0,
+      avgProfit: 0,
+      avgLoss: 0,
+      avgProfitLossPerTrade: 0,
+      sharpeRatio: 0,
+      maxDrawdown: 0,
+      predictionAccuracy: 0,
+      totalTrades: 0,
+    };
+  }
+
+  const profits = trades.filter(t => t.profitLoss > 0).map(t => t.profitLoss);
+  const losses = trades.filter(t => t.profitLoss < 0).map(t => t.profitLoss);
+  const totalProfit = profits.reduce((sum, p) => sum + p, 0);
+  const totalLoss = losses.reduce((sum, l) => sum + l, 0); // negative number
+  const totalNet = totalProfit + totalLoss;
+  const winRate = profits.length / trades.length;
+  const avgProfit = profits.length > 0 ? totalProfit / profits.length : 0;
+  const avgLoss = losses.length > 0 ? totalLoss / losses.length : 0; // will be negative
+  const avgProfitLossPerTrade = totalNet / trades.length;
+
+  // Sharpe ratio: using profitLoss as return, risk-free rate = 0
+  const returns = trades.map(t => t.profitLoss);
+  const meanReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+  const variance = returns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / returns.length;
+  const stdDev = Math.sqrt(variance);
+  const sharpeRatio = stdDev !== 0 ? meanReturn / stdDev : 0;
+
+  // Max drawdown: compute cumulative sum and track peak
+  let cumulative = 0;
+  let peak = 0;
+  let maxDrawdown = 0;
+  for (const t of trades) {
+    cumulative += t.profitLoss;
+    if (cumulative > peak) {
+      peak = cumulative;
+    }
+    const drawdown = peak - cumulative; // positive when below peak
+    if (drawdown > maxDrawdown) {
+      maxDrawdown = drawdown;
+    }
+  }
+  // maxDrawdown is the largest peak-to-trough decline (positive number)
+
+  // Prediction accuracy: compare expectedOutcome with actual profit/loss sign
+  let correctPredictions = 0;
+  for (const t of trades) {
+    const expected = t.expectedOutcome.toLowerCase();
+    const profit = t.profitLoss;
+    let correct = false;
+    if (expected.includes('profit') && profit > 0) {
+      correct = true;
+    } else if (expected.includes('loss') && profit < 0) {
+      correct = true;
+    } else if (expected.includes('break even') || expected.includes('break-even') || expected.includes('breakeven')) {
+      if (Math.abs(profit) < 1e-9) { // approximately zero
+        correct = true;
+      }
+    }
+    // If expectedOutcome is empty, we cannot judge; we'll treat as incorrect.
+    if (correct) {
+      correctPredictions++;
+    }
+  }
+  const predictionAccuracy = correctPredictions / trades.length;
+
+  return {
+    winRate,
+    avgProfit,
+    avgLoss,
+    avgProfitLossPerTrade,
+    sharpeRatio,
+    maxDrawdown,
+    predictionAccuracy,
+    totalTrades: trades.length,
+  };
 }
 
