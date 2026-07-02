@@ -507,6 +507,11 @@ const config = defineConfig(({ mode, command }) => {
         '**/.{idea,git,cache,output,temp}/**',
         'e2e/**',
         'services/odysseus/tests/**/*.mjs',
+        // Root-level currency conversion files are ad-hoc scratch scripts, not
+        // Vitest suites. Keep them runnable manually without breaking pnpm test.
+        'testCurrencyConversion.test.ts',
+        'testCurrencyConversion.ts',
+        'testCurrencyConversion.js',
       ],
       // Force vitest to run React through its own transform pipeline so ESM
       // `import` and CJS `require('react')` share a single module instance.

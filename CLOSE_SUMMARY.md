@@ -1,36 +1,22 @@
-# Close Summary: Scheduled Job Stale-Run Copy
+# Close Summary: Quarantine scratch root Vitest files
 
 ## What changed
-
-- Added `formatJobFreshnessCopy` in `src/screens/jobs/jobs-screen.tsx` so active scheduled jobs now show concise copy when they have never run or have not run recently.
-- Rendered the freshness copy directly on each Jobs card below the existing last-run status, using warning-colored text without changing paused or completed job cards.
-- Expanded `src/screens/jobs/jobs-screen.test.ts` with focused coverage for never-run, recent-run, stale-run, paused, completed, and invalid-date job states.
-- Preserved the existing idea backlog and appended follow-up ideas rather than replacing `IDEAS.json`.
+- Updated `vite.config.ts` so the default Vitest run excludes root-level ad-hoc currency-conversion scratch files: `testCurrencyConversion.test.ts`, `testCurrencyConversion.ts`, and `testCurrencyConversion.js`.
+- Preserved the scratch files themselves and did not touch unrelated dirty worktree changes.
+- Appended/de-duplicated improvement ideas in `IDEAS.json` and wrote this cycle's `PLAN.md`, `TEST_REPORT.json`, and close summary artifacts.
 
 ## Test results
+- `pnpm -s exec tsc --noEmit --pretty false`: passed.
+- `pnpm test`: passed after the change with 111 test files and 732 tests passing. The previous failure was the non-suite scratch file being collected by Vitest.
+- `pnpm build`: passed.
+- `pnpm lint`: still fails on repository-wide baseline/dirty-worktree lint debt (302 errors, 109 warnings), including unrelated finance/performance files and existing strict-lint issues. The changed config file is ignored by the default lint run; `--no-ignore` exposes pre-existing `vite.config.ts` strict-lint debt outside this small exclude-list edit.
+- Deployment check: `sudo systemctl restart hermes-workspace.service` returned active. External health validation returned HTTP 200, `application/json`, and `{"status":"ok"}`.
 
-- PASS: `npx tsc --noEmit --pretty false`
-- PASS: `npx vitest run src/screens/jobs/jobs-screen.test.ts` (6 tests)
-- PASS: focused ESLint on `src/screens/jobs/jobs-screen.tsx` and `src/screens/jobs/jobs-screen.test.ts` (0 errors, 0 warnings)
-- PASS: `git diff --check` on intended files
-- PASS: `pnpm build`
-- Baseline only: full `pnpm test` still exits 1 because pre-existing untracked `testCurrencyConversion.test.ts` is collected with no Vitest suite.
-- Baseline only: full `pnpm lint` still exits 1 with repository-wide lint debt and unrelated root scratch-file parser issues.
+## Side effects observed
+- `systemctl restart` printed a warning that the unit file or drop-ins changed on disk and suggested `daemon-reload`; I did not run daemon-reload because this cycle did not modify service unit files.
+- The repository still has many unrelated pre-existing modified and untracked files; only the intended cycle files were staged for commit.
 
-## Deployment
-
-- Restarted `hermes-workspace.service`; `systemctl is-active` returned `active`.
-- Validated `https://agent.fernandofamily.com/api/health` with status `200`, content type `application/json`, and body `{"status":"ok"}`.
-- Observed a systemd daemon-reload warning after restart, but did not run daemon-reload because this cycle did not touch service unit files and the mission forbids unnecessary daemon reloads.
-
-## Side effects and boundaries
-
-- Committed only intended Jobs screen/test and auto-improvement artifact files.
-- Left pre-existing finance/package/docs/scratch dirty worktree changes unstaged.
-- Did not push to any remote and did not create a PR, per mission instructions.
-
-## New follow-up ideas
-
-- Add a Jobs health summary filter for stale, failed, paused, and never-run jobs.
-- Surface workspace service unit drift warnings in health/status UI.
-- Quarantine root-level scratch test files from the default Vitest collection.
+## New improvement ideas
+1. Add a documented scratch-test directory and script for finance experiments so ad-hoc diagnostics never land at repo root.
+2. Add a small repo hygiene check that reports root-level test-looking files before Vitest collects them.
+3. Tackle the existing repository-wide lint baseline separately, starting with generated/scratch root files and touched finance/performance modules.

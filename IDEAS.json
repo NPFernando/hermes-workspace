@@ -310,5 +310,17 @@
     "description": "Move or ignore root-level scratch tests like testCurrencyConversion.test.ts so pnpm test reports source regressions instead of collection failures from experimental files.",
     "category": "config",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Add explicit scratch-test documentation for finance experiments",
+    "description": "Document where one-off finance verification scripts should live and how to run them without polluting default Vitest discovery.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Add root scratch artifact cleanup check",
+    "description": "Add a lightweight check that reports root-level ad-hoc test scripts before they get accidentally collected by the default test runner.",
+    "category": "config",
+    "estimated_effort": "medium"
   }
 ]

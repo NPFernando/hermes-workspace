@@ -1,34 +1,30 @@
-# Plan: Show scheduled job stale-run copy
+# Plan: Quarantine scratch root test files from default Vitest
 
 ## Summary of the change
-
-Add helper-tested copy on Jobs cards that surfaces when enabled scheduled jobs have never run or have not run recently. This makes dormant schedules visibly different from healthy recurring jobs without requiring operators to inspect run history.
+The default `pnpm test` command currently discovers an ad-hoc root-level `testCurrencyConversion.test.ts` scratch script. The file prints useful manual finance diagnostics but does not define a Vitest suite, so Vitest reports "No test suite found" and exits non-zero even while all real tests pass. This cycle will quarantine the known root scratch files from default Vitest discovery without touching the scratch files or unrelated dirty worktree changes.
 
 ## Files to modify
-
-- `src/screens/jobs/jobs-screen.tsx`
-- `src/screens/jobs/jobs-screen.test.ts`
-- `IDEAS.json`
-- `PLAN.md`
-- `TEST_REPORT.json`
-- `CLOSE_SUMMARY.md`
+- `vite.config.ts` — add explicit Vitest excludes for root-level scratch currency-conversion scripts.
+- `IDEAS.json` — append/de-duplicate current and follow-up improvement ideas.
+- `PLAN.md` — this implementation plan.
+- `TEST_REPORT.json` — captured verification output.
+- `CLOSE_SUMMARY.md` — close/reflection artifact after verification and deployment.
 
 ## Steps
-
-1. Export a small helper from `jobs-screen.tsx` that formats stale-run status copy from a job's enabled/state/last-run fields and an injectable current time.
-2. Render the helper output below the existing last-run status line when it returns copy.
-3. Add focused Vitest tests for never-run, recent-run, stale-run, paused, and invalid-date cases.
-4. Run TypeScript, focused tests, focused lint, build, and deployment health validation.
-5. Preserve unrelated dirty worktree files unstaged.
+1. Update the `test.exclude` list in `vite.config.ts` with root-only excludes for `/testCurrencyConversion.test.ts`, `/testCurrencyConversion.ts`, and `/testCurrencyConversion.js`.
+2. Run TypeScript compilation with Node 22: `pnpm -s exec tsc --noEmit --pretty false`.
+3. Run `pnpm test` to verify the scratch file is no longer collected and all real suites pass.
+4. Run `pnpm lint`; if repository-wide lint fails on pre-existing dirty files, record the exact result and run focused lint on `vite.config.ts`.
+5. Run `pnpm build` because `vite.config.ts` affects build/test tooling.
+6. Restart `hermes-workspace.service` and validate both systemd state and JSON health body.
+7. Stage only the intended cycle files and commit locally with `auto-improve: quarantine scratch vitest files`. Do not push.
 
 ## How to verify the change works
-
-- `npx tsc --noEmit --pretty false`
-- `npx vitest run src/screens/jobs/jobs-screen.test.ts`
-- `npx eslint --no-warn-ignored -f json src/screens/jobs/jobs-screen.tsx src/screens/jobs/jobs-screen.test.ts`
-- `pnpm build`
-- `sudo systemctl restart hermes-workspace.service` followed by JSON health validation for `/api/health`.
+- `pnpm test` exits 0 and no longer reports `No test suite found in file /home/ubuntu/hermes-workspace/testCurrencyConversion.test.ts`.
+- `pnpm -s exec tsc --noEmit --pretty false` exits 0.
+- `pnpm -s exec eslint vite.config.ts` exits 0.
+- `pnpm build` exits 0.
+- `systemctl is-active hermes-workspace.service` returns `active` and `https://agent.fernandofamily.com/api/health` returns JSON with `{"status":"ok"}`.
 
 ## Rollback procedure
-
-Revert the local auto-improve commit or remove the helper/render block and the associated tests, then rerun the same verification commands.
+Revert the local commit or remove the three added root scratch-file exclude entries from `vite.config.ts`, then rerun `pnpm test` to confirm the old collection behavior returns if needed.
