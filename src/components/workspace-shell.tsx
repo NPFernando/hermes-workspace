@@ -30,8 +30,14 @@ import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
-import { ChatPanel } from '@/components/chat-panel'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
+// Lazy: ChatPanel statically imports ChatScreen and with it the whole chat
+// markdown pipeline (~500 KB minified). Keeping it out of the eager entry
+// means non-chat routes stop paying for chat at first paint; the panel
+// chunk loads in the background right after mount.
+const ChatPanel = lazy(() =>
+  import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
+)
 import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
@@ -482,7 +488,11 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           </main>
 
           {/* Chat panel — visible on non-chat routes */}
-          {!isOnChatRoute && !isMobile && <ChatPanel />}
+          {!isOnChatRoute && !isMobile && (
+            <Suspense fallback={null}>
+              <ChatPanel />
+            </Suspense>
+          )}
         </div>
 
         {/* Floating chat toggle — visible on non-chat routes */}

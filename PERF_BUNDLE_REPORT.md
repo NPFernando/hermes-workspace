@@ -99,3 +99,18 @@ open takes ~2–3s while the chunk compiles — prebuilt in production).
   `rehype-raw` + `rehype-sanitize` — sanitized raw-HTML rendering in chat
   markdown. Removing it changes rendering behavior; needs a product decision.
 - **#1 (lazy ChatPanel) remains the big lever** (~300–450 KB), unchanged.
+
+### Slice 2 (2026-07-02): proposal #1 — lazy ChatPanel
+
+**Result: main 1,947 → 1,045 KB (−902 KB). Combined with slice 1:
+2,152 → 1,045 KB, −51%; wire size 607 → 334 KB gzip.**
+
+`chat-panel.tsx` was the single static import path to `ChatScreen` (the
+chat route already lazy-loads it) — so one `lazy()` boundary in
+`workspace-shell.tsx` evicted the chat screen plus the entire markdown
+pipeline (parse5, micromark, shiki core, marked) from the eager entry.
+The panel chunk (`chat-panel-*.js`) loads in the background after mount
+on desktop non-chat routes.
+
+Verified: tsc at baseline; Jobs route renders; /chat/new renders with
+agent picker and a composer that accepts typing; zero page errors.
