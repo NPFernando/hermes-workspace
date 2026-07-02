@@ -114,3 +114,16 @@ on desktop non-chat routes.
 
 Verified: tsc at baseline; Jobs route renders; /chat/new renders with
 agent picker and a composer that accepts typing; zero page errors.
+
+### Post-series composition (what the remaining 1,045 KB is)
+
+~65% is framework baseline: `@base-ui/react` 182 KB, `react-dom` 177 KB,
+`motion` 121 KB (shell animations), TanStack router+query 116 KB, `zod` 52 KB
+(route search validation at boot), `tailwind-merge` 26 KB. App code is down
+to 120 KB components + 89 KB screens — dominated by the chat sidebar, which
+is the app's always-visible navigation.
+
+**Series conclusion: no slice 3 with comparable economics exists.** Further
+reduction means replacing frameworks or dieting the sidebar — heavy effort,
+low yield. 2,152 → 1,045 KB (−51%) is the practical floor for this
+architecture.
