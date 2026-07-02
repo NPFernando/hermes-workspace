@@ -439,7 +439,7 @@ export function ResearchScreen() {
                   size="sm"
                   onClick={() => void startResearch()}
                   disabled={!query.trim()}
-                  className="ml-auto gap-2"
+                  className="ml-auto gap-2 bg-[var(--theme-accent)] text-white hover:opacity-90"
                 >
                   Start research
                   <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={2} />
