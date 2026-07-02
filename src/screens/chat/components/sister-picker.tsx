@@ -6,6 +6,9 @@ export type SisterOption = {
   emoji: string
   description: string
   systemPrompt?: string
+  /** Registry type — delegation profiles can share a display name with an AI sister */
+  type?: 'ai_sister' | 'business_agent' | 'delegation_profile'
+  role?: string
 }
 
 type SisterPickerProps = {
@@ -39,16 +42,21 @@ export function SisterPicker({
         const isManual = selectedId === s.id
         const isAuto = !isManual && autoSelectedId === s.id
         const isOrchestrating = orchestrating && orchestratingSisterIds?.includes(s.id)
+        // Delegation profiles can share a display name with an AI sister
+        // (e.g. the "researcher" profile is also named Luna) — surface the
+        // profile role so the two pills are distinguishable.
+        const isProfile = s.type === 'delegation_profile'
+        const fullName = isProfile && s.role ? `${s.name} (${s.role} profile)` : s.name
         return (
           <button
             key={s.id}
             type="button"
             title={
               isOrchestrating
-                ? `${s.name} — being consulted by Astra`
+                ? `${fullName} — being consulted by Astra`
                 : isAuto
-                  ? `${s.name} (auto-selected) — ${s.description}`
-                  : `${s.name} — ${s.description}`
+                  ? `${fullName} (auto-selected) — ${s.description}`
+                  : `${fullName} — ${s.description}`
             }
             onClick={() => onSelect(selectedId === s.id ? null : s.id)}
             className={cn(
@@ -61,6 +69,9 @@ export function SisterPicker({
           >
             <span>{s.emoji}</span>
             <span>{s.name}</span>
+            {isProfile && s.role && (
+              <span className="text-[9px] opacity-60">· {s.role}</span>
+            )}
             {isAuto && !isOrchestrating && <span className="text-[9px] opacity-60 ml-0.5">auto</span>}
             {isOrchestrating && <span className="text-[9px] opacity-70 ml-0.5">✦</span>}
           </button>

@@ -33,6 +33,7 @@ import { TaskDetailPanel } from './panels/task-detail-panel'
 import type { VirtualRow } from './virtual-task-list'
 import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority, UpdateTaskInput } from '@/lib/tasks-api'
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
 import {
@@ -775,7 +776,7 @@ export function TasksScreen() {
         <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-medium text-ink shrink-0">Tasks</h1>
+            <h1 className="hidden text-2xl font-medium text-ink shrink-0 md:block">Tasks</h1>
             {assigneeFilter && (
               <div className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
                 <span>·</span>
@@ -2403,28 +2404,76 @@ export function TasksScreen() {
 
       {/* Confirm clear done */}
       {confirmClearDone && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmClearDone(false)}/>
-          <div className="relative z-10 w-full max-w-xs bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-xl shadow-2xl p-5 flex flex-col gap-4">
-            <p className="text-sm font-semibold text-[var(--theme-text)]">Clear {columnMap['done'].length} done task{columnMap['done'].length !== 1 ? 's' : ''}?</p>
-            <p className="text-[11px] text-[var(--theme-muted)]">This permanently deletes them. Cannot be undone.</p>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setConfirmClearDone(false)} className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors">Cancel</button>
-              <button
-                type="button"
-                onClick={() => {
-                  const doneTasks = columnMap['done']
-                  setConfirmClearDone(false)
-                  void Promise.all(doneTasks.map(t => deleteTask(t.id))).then(() => {
-                    invalidate()
-                    toast(`Cleared ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}`)
-                  }).catch(() => toast('Failed to clear done tasks', { type: 'error' }))
-                }}
-                className="flex-1 text-xs rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-400 hover:bg-red-500/20 transition-colors"
-              >Delete all</button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={`Clear ${columnMap['done'].length} done task${columnMap['done'].length !== 1 ? 's' : ''}?`}
+          body="This permanently deletes them. Cannot be undone."
+          confirmLabel="Delete all"
+          onCancel={() => setConfirmClearDone(false)}
+          onConfirm={() => {
+            const doneTasks = columnMap['done']
+            setConfirmClearDone(false)
+            void Promise.all(doneTasks.map(t => deleteTask(t.id))).then(() => {
+              invalidate()
+              toast(`Cleared ${doneTasks.length} done task${doneTasks.length !== 1 ? 's' : ''}`)
+            }).catch(() => toast('Failed to clear done tasks', { type: 'error' }))
+          }}
+        />
+      )}
+
+      {/* Confirm delete single task (kebab menu on cards sets deleteConfirmId) */}
+      {deleteConfirmId && (
+        <ConfirmDialog
+          title={`Delete "${(tasks.find(t => t.id === deleteConfirmId)?.title ?? 'this task').slice(0, 60)}"?`}
+          body="This permanently deletes the task. Cannot be undone."
+          confirmLabel="Delete"
+          busy={deleteMutation.isPending}
+          onCancel={() => setDeleteConfirmId(null)}
+          onConfirm={() => {
+            const id = deleteConfirmId
+            setDeleteConfirmId(null)
+            deleteMutation.mutate(id)
+          }}
+        />
+      )}
+
+      {/* Confirm prune stale auto-generated tasks */}
+      {confirmPruneStale && (
+        <ConfirmDialog
+          title="Prune stale auto-generated tasks?"
+          body="Deletes todo/backlog tasks older than 2 hours that were auto-created (Astra/idea jobs) and never picked up. Human-created tasks are untouched."
+          confirmLabel="Prune"
+          onCancel={() => setConfirmPruneStale(false)}
+          onConfirm={() => {
+            setConfirmPruneStale(false)
+            void fetch('/api/tasks-prune', { method: 'POST' })
+              .then(async (res) => {
+                const data = await res.json() as { ok: boolean; pruned: number }
+                if (!data.ok) throw new Error('prune failed')
+                invalidate()
+                toast(`Pruned ${data.pruned} stale task${data.pruned !== 1 ? 's' : ''}`)
+              })
+              .catch(() => toast('Prune failed', { type: 'error' }))
+          }}
+        />
+      )}
+
+      {/* Confirm bulk delete of selected tasks */}
+      {confirmBulkDelete && (
+        <ConfirmDialog
+          title={`Delete ${selectedIds.size} selected task${selectedIds.size !== 1 ? 's' : ''}?`}
+          body="This permanently deletes them. Cannot be undone."
+          confirmLabel="Delete"
+          onCancel={() => setConfirmBulkDelete(false)}
+          onConfirm={() => {
+            const ids = Array.from(selectedIds)
+            setConfirmBulkDelete(false)
+            void Promise.all(ids.map(id => deleteTask(id))).then(() => {
+              invalidate()
+              clearSelection()
+              toast(`Deleted ${ids.length} task${ids.length !== 1 ? 's' : ''}`)
+            }).catch(() => toast('Failed to delete selected tasks', { type: 'error' }))
+          }}
+        />
       )}
     </div>
   )

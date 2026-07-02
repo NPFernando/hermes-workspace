@@ -275,7 +275,7 @@ export function ResearchScreen() {
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-[var(--theme-border)] px-4 py-3">
         <HugeiconsIcon icon={Search01Icon} size={20} strokeWidth={1.5} className="text-accent-500 shrink-0" />
-        <h1 className="text-base font-semibold">Deep Research</h1>
+        <h1 className="hidden text-base font-semibold md:block">Deep Research</h1>
         <div className="ml-auto flex gap-2">
           <button
             type="button"
@@ -439,7 +439,7 @@ export function ResearchScreen() {
                   size="sm"
                   onClick={() => void startResearch()}
                   disabled={!query.trim()}
-                  className="ml-auto gap-2"
+                  className="ml-auto gap-2 bg-[var(--theme-accent)] text-white hover:opacity-90"
                 >
                   Start research
                   <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={2} />

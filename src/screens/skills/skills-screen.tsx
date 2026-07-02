@@ -652,7 +652,7 @@ export function SkillsScreen() {
               <p className="text-xs font-medium uppercase text-[var(--theme-muted)] tabular-nums">
                 Hermes Workspace Marketplace
               </p>
-              <h1 className="text-2xl font-medium text-ink text-balance sm:text-3xl">
+              <h1 className="hidden text-2xl font-medium text-ink text-balance md:block sm:text-3xl">
                 Skills Browser
               </h1>
               <p className="text-sm text-[var(--theme-muted)] text-pretty sm:text-base">
@@ -747,18 +747,18 @@ export function SkillsScreen() {
               ) : null}
 
               <TabsList
-                className="ml-auto rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)] p-1"
+                className="ml-auto max-w-full overflow-x-auto rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)] p-1"
                 variant="default"
               >
-                <TabsTab value="installed" className="min-w-[110px]">
+                <TabsTab value="installed" className="min-w-0 sm:min-w-[110px]">
                   Installed
                 </TabsTab>
                 {isOnActiveProfile ? (
-                  <TabsTab value="marketplace" className="min-w-[120px]">
+                  <TabsTab value="marketplace" className="min-w-0 sm:min-w-[120px]">
                     Marketplace
                   </TabsTab>
                 ) : null}
-                <TabsTab value="workspace" className="min-w-[110px]">
+                <TabsTab value="workspace" className="min-w-0 sm:min-w-[110px]">
                   Workspace
                 </TabsTab>
               </TabsList>
@@ -1246,12 +1246,15 @@ function SkillsGrid({
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xl leading-none">{skill.icon}</span>
-                    <h3 className="line-clamp-1 min-w-0 text-base font-medium text-ink text-balance">
+                    <h3
+                      title={skill.name}
+                      className="line-clamp-1 min-w-0 text-base font-medium text-ink text-balance"
+                    >
                       {skill.name}
                     </h3>
                   </div>
                   {skill.author ? (
-                    <p className="line-clamp-1 text-xs text-[var(--theme-muted)]">
+                    <p title={`by ${skill.author}`} className="line-clamp-1 text-xs text-[var(--theme-muted)]">
                       by {skill.author}
                     </p>
                   ) : null}
@@ -1289,7 +1292,7 @@ function SkillsGrid({
                 </div>
               </div>
 
-              <p className="line-clamp-3 min-h-[58px] text-sm text-[var(--theme-muted)] text-pretty">
+              <p title={skill.description} className="line-clamp-3 min-h-[58px] text-sm text-[var(--theme-muted)] text-pretty">
                 {skill.description}
               </p>
 
@@ -1427,7 +1430,7 @@ function FeaturedGrid({
               </span>
             </div>
 
-            <p className="line-clamp-3 mb-3 text-sm text-[var(--theme-muted)] text-pretty">
+            <p title={skill.description} className="line-clamp-3 mb-3 text-sm text-[var(--theme-muted)] text-pretty">
               {skill.description}
             </p>
 

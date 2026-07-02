@@ -176,11 +176,11 @@ function JobCard({
                     : 'var(--theme-text)',
               }}
             />
-            <h3 className="truncate text-sm font-medium text-[var(--theme-text)]">
+            <h3 title={job.name || '(unnamed)'} className="truncate text-sm font-medium text-[var(--theme-text)]">
               {job.name || '(unnamed)'}
             </h3>
           </div>
-          <p className="mb-2 line-clamp-2 text-xs text-[var(--theme-muted)]">
+          <p title={job.prompt} className="mb-2 line-clamp-2 text-xs text-[var(--theme-muted)]">
             {job.prompt}
           </p>
           <div className="mb-2 flex flex-wrap items-center gap-3 text-[10px] text-[var(--theme-muted)]">
@@ -466,9 +466,9 @@ export function JobsScreen() {
             <HugeiconsIcon
               icon={Clock01Icon}
               size={18}
-              className="text-[var(--theme-accent)] shrink-0"
+              className="hidden text-[var(--theme-accent)] shrink-0 md:block"
             />
-            <h1 className="text-base font-semibold text-[var(--theme-text)] shrink-0">
+            <h1 className="hidden text-base font-semibold text-[var(--theme-text)] shrink-0 md:block">
               Jobs
             </h1>
             {jobsQuery.data && (

@@ -614,10 +614,10 @@ function MemorySectionBlock({
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-[var(--theme-text)]">
+                  <span title={file.name} className="block truncate text-sm font-medium text-[var(--theme-text)]">
                     {file.name}
                   </span>
-                  <span className="block truncate text-xs text-[var(--theme-muted)]">
+                  <span title={file.path} className="block truncate text-xs text-[var(--theme-muted)]">
                     {file.path}
                   </span>
                 </span>
