@@ -41,12 +41,28 @@
 >   their `--theme-muted` ~15% would pass AA; left as a design decision.
 >   (`scifi-light` defines its vars in `scifi-theme.css`, not measured.)
 >
-> Still open: the three sub-AA light-theme muted colors above (needs a
-> palette decision); the `bg-accent-500`/theme-token fix — implemented on
-> `fix/tailwind-theme-color-tokens` (the entire primary/accent/ink/surface
-> utility vocabulary generated no CSS since the Tailwind v4 migration),
-> pending sign-off due to app-wide visual blast radius; and the §13 known
-> gaps (Profile wizard steps 2–4, HARP mobile).
+> **Final closure (2026-07-02, later same day):** everything above has since
+> landed on `main` with user sign-off — the theme-token fix (`232b044f`),
+> Phase 4 focus-visibility (`0800da4c`), and the three light themes' muted
+> colors brought to AA with minimal hue-preserving adjustments
+> (`2d1528df`; matrix-light α .55→.63, claude-nous-light α .6→.68,
+> claude-official-light #6f7d96→#647187 — all 11 styles.css themes now pass
+> 4.5:1). The last §13 gaps are also closed:
+>
+> - `scifi-light` measured from `scifi-theme.css`: **passes** (4.88/5.11);
+>   scifi dark passes too (6.41/5.16). All 13 themes AA-compliant.
+> - Profile wizard steps 2–4 walked through live: model select with a
+>   sensible skip default, personality preset + optional prompt + swarm
+>   distribution toggle, and a review step that states exactly what will be
+>   created on disk before the CTA. **No issues** — matches round 4's step-1
+>   assessment.
+> - HARP Routing captured on mobile: renders correctly (toggles, mode
+>   select, budget cap, tier list). Round 4's capture failure was
+>   **confirmed test-tooling** (element needed a JS-dispatched click), not
+>   an app bug.
+>
+> Nothing from this audit remains open. Deploy timing is the only pending
+> operational decision.
 
 **Date:** 2026-07-01–02 (rounds 1–4, same continued session)
 **Scope requested:** full-app UI/UX review (layout, navigation, components, mobile,
