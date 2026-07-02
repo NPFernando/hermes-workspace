@@ -1,5 +1,31 @@
 # Hermes Workspace — UI/UX Audit Report
 
+> ## Implementation status addendum (2026-07-02, post-round-4)
+>
+> Everything below was written as of round 4, when most findings were
+> "recommended, not applied." Since then the implementation session completed
+> all Critical items and more. Current status, integrated on
+> `integration/ui-audit`:
+>
+> | Finding | Status |
+> |---|---|
+> | Critical #1 — duplicate mobile titles (7 screens) | **Fixed** (`fix/mobile-duplicate-title-files`, `fix/mobile-duplicate-titles-batch2`) |
+> | Critical #2 — Tasks stats row unreadable on mobile | **Fixed** — landed on `main` via the autonomous auto-improve loop (`9cd9db87`); the parallel branch `fix/tasks-mobile-stats-scroll` is superseded and excluded from integration |
+> | Critical #3 — Swarm worker-card overlap | **Fixed** (`fix/swarm-worker-card-mobile-overlap`) — also fixed a latent role-badge truncation bug affecting desktop |
+> | Critical #4 — Terminal input behind tab bar | **Fixed** (`fix/terminal-mobile-input-tabbar`) — confirmed by geometry + typing interaction, not just screenshots |
+> | Critical #5 — Dashboard skills-count / fake hint | **Fixed** (`fix/dashboard-skills-count-and-hint-loading`) — root cause was error-swallowing in the count query, not the data source |
+> | Critical #6 — dead confirm dialogs in Tasks | **Fixed twice**: original fix (`fix/tasks-dead-confirm-dialogs`, now stale) was lost to the tasks-screen refactor on main; re-fixed via the shared component (`feat/shared-confirm-dialog`), which also implements §9.1 |
+> | Critical #7 — sister-picker duplicate names | **Fixed** (`fix/sister-picker-profile-distinction`) — confirmed to be AI sisters + delegation profiles sharing display names; profile pills now show their role |
+> | §9.1 shared ConfirmDialog | **Done** (`feat/shared-confirm-dialog`) |
+> | Phase 5 polish (settings ❌, research CTA, skills tabs) | **Done** (`polish/audit-phase5`) |
+> | Title tooltips (rounds 1–3) | **Done** (`fix/skills-title-tooltips`, `fix/profiles-jobs-title-tooltips`) |
+>
+> Still open: Phase 4 accessibility (keyboard drag-and-drop alternative,
+> contrast measurement); a follow-up sweep for `bg-accent-500` usages, which
+> was discovered during Phase 5 to compute to transparent (the utility doesn't
+> resolve in this Tailwind setup — other call sites are likely silently
+> broken); and the §13 known gaps (Profile wizard steps 2–4, HARP mobile).
+
 **Date:** 2026-07-01–02 (rounds 1–4, same continued session)
 **Scope requested:** full-app UI/UX review (layout, navigation, components, mobile,
 accessibility, forms, states, visual consistency, content, behavior).
