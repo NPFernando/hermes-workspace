@@ -176,7 +176,7 @@ export const TaskCard = memo(function TaskCardComponent({
         {onToggleSelect && (
           <button
             type="button"
-            className={cn('shrink-0 transition-opacity', isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60')}
+            className={cn('shrink-0 transition-opacity', isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60 focus-visible:opacity-100')}
             aria-label={selectionToggleLabel}
             aria-pressed={Boolean(isSelected)}
             onClick={e => { e.stopPropagation(); onToggleSelect(task.id) }}
@@ -228,7 +228,7 @@ export const TaskCard = memo(function TaskCardComponent({
           type="button"
           className={cn(
             'absolute top-1.5 left-1.5 z-10 transition-opacity',
-            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60',
+            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60 focus-visible:opacity-100',
           )}
           aria-label={selectionToggleLabel}
           aria-pressed={Boolean(isSelected)}
@@ -255,7 +255,7 @@ export const TaskCard = memo(function TaskCardComponent({
 
       {/* Hover action buttons (▶ launch + ⋮ menu) */}
       <div
-        className="absolute top-1.5 right-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-1.5 right-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
         onClick={e => e.stopPropagation()}
       >
         {/* ▶ Launch Session */}
