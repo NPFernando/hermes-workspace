@@ -29,16 +29,10 @@ function isPaidAndReplaceable(modelId: string): boolean {
 function buildSuggestions(overview: DashboardOverview | null, cycleIdx: number): Array<Suggestion> {
   const suggestions: Array<Suggestion> = []
 
-  if (!overview) {
-    suggestions.push({
-      id: 'no-data',
-      icon: 'idea',
-      title: 'Dashboard loading',
-      body: 'Overview data not yet available. Suggestions will appear once analytics are loaded.',
-      impact: 'low',
-    })
-    return suggestions
-  }
+  // No fake "Dashboard loading" suggestion here — the card renders a real
+  // loading state instead, so a placeholder never wears a hint's impact
+  // chip and icon while data is still on the way.
+  if (!overview) return suggestions
 
   const analytics = overview.analytics
   const status = overview.status
@@ -154,6 +148,31 @@ export function ProactiveSuggestionsCard({
     () => buildSuggestions(overview, cycleIdx),
     [overview, cycleIdx],
   )
+
+  // Loading state — same card frame, but visibly a placeholder rather
+  // than a suggestion dressed with an icon and impact chip.
+  if (!overview) {
+    return (
+      <div
+        className="relative flex flex-col gap-2 overflow-hidden rounded-xl border p-3"
+        style={{
+          background:
+            'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 97%, transparent), color-mix(in srgb, var(--theme-card) 93%, transparent))',
+          borderColor: 'var(--theme-border)',
+        }}
+      >
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
+          Optimization hint
+        </h3>
+        <div className="flex animate-pulse flex-col gap-1.5" aria-hidden>
+          <div className="h-2.5 w-2/3 rounded bg-[var(--theme-border)]" />
+          <div className="h-2 w-full rounded bg-[color-mix(in_srgb,var(--theme-border)_60%,transparent)]" />
+          <div className="h-2 w-4/5 rounded bg-[color-mix(in_srgb,var(--theme-border)_60%,transparent)]" />
+        </div>
+        <span className="sr-only">Loading suggestions…</span>
+      </div>
+    )
+  }
 
   // Show one suggestion at a time, cycle on refresh
   const active = suggestions[cycleIdx % suggestions.length]

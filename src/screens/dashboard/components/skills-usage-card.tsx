@@ -19,7 +19,8 @@ export function SkillsUsageCard({
   onOpen,
 }: {
   usage: DashboardOverview['skillsUsage']
-  installedCount: number
+  /** null = count not loaded (query pending/failed) — distinct from a real 0 */
+  installedCount: number | null
   onOpen: () => void
 }) {
   const navigate = useNavigate()
@@ -59,8 +60,12 @@ export function SkillsUsageCard({
           className="font-mono text-[9px] uppercase tracking-[0.15em] transition-colors group-hover:text-[var(--theme-accent)] text-[var(--theme-muted)]"
         >
           {hasUsage
-            ? `${usage.distinctSkills} of ${installedCount} used`
-            : `${installedCount} installed`}
+            ? installedCount != null
+              ? `${usage.distinctSkills} of ${installedCount} used`
+              : `${usage.distinctSkills} used`
+            : installedCount != null
+              ? `${installedCount} installed`
+              : 'skills'}
           {' · manage →'}
         </span>
       </div>
@@ -112,7 +117,9 @@ export function SkillsUsageCard({
         >
           {installedCount === 0
             ? 'no skills installed'
-            : 'no usage in this window yet'}
+            : installedCount === null
+              ? 'skill count unavailable'
+              : 'no usage in this window yet'}
         </div>
       )}
     </button>

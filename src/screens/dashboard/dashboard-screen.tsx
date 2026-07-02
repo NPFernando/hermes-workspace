@@ -675,7 +675,10 @@ export function DashboardScreen() {
       const res = await fetch(
         '/api/skills?tab=installed&limit=200&summary=search',
       )
-      if (!res.ok) return 0
+      // Throw on failure so react-query retries and the card can tell
+      // "count unknown" apart from a real zero — returning 0 here caches
+      // a transient failure as "no skills installed" for staleTime.
+      if (!res.ok) throw new Error(`skills count failed (${res.status})`)
       const data = (await res.json()) as {
         skills?: Array<unknown>
       }
@@ -684,7 +687,7 @@ export function DashboardScreen() {
     staleTime: 60_000,
     enabled: skillsAvailable,
   })
-  const skillsInstalled = skillsCountQuery.data ?? 0
+  const skillsInstalled = skillsCountQuery.data ?? null
 
   // Per-user widget visibility + edit-mode state (localStorage backed).
   const layout = useDashboardLayout()
