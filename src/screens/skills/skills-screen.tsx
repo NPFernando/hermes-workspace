@@ -1246,12 +1246,15 @@ function SkillsGrid({
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xl leading-none">{skill.icon}</span>
-                    <h3 className="line-clamp-1 min-w-0 text-base font-medium text-ink text-balance">
+                    <h3
+                      title={skill.name}
+                      className="line-clamp-1 min-w-0 text-base font-medium text-ink text-balance"
+                    >
                       {skill.name}
                     </h3>
                   </div>
                   {skill.author ? (
-                    <p className="line-clamp-1 text-xs text-[var(--theme-muted)]">
+                    <p title={`by ${skill.author}`} className="line-clamp-1 text-xs text-[var(--theme-muted)]">
                       by {skill.author}
                     </p>
                   ) : null}
@@ -1289,7 +1292,7 @@ function SkillsGrid({
                 </div>
               </div>
 
-              <p className="line-clamp-3 min-h-[58px] text-sm text-[var(--theme-muted)] text-pretty">
+              <p title={skill.description} className="line-clamp-3 min-h-[58px] text-sm text-[var(--theme-muted)] text-pretty">
                 {skill.description}
               </p>
 
@@ -1427,7 +1430,7 @@ function FeaturedGrid({
               </span>
             </div>
 
-            <p className="line-clamp-3 mb-3 text-sm text-[var(--theme-muted)] text-pretty">
+            <p title={skill.description} className="line-clamp-3 mb-3 text-sm text-[var(--theme-muted)] text-pretty">
               {skill.description}
             </p>
 
