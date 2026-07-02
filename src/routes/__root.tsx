@@ -6,18 +6,24 @@ import {
   useRouterState,
 } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
 import { getRootSurfaceState } from './-root-layout-state'
 import type { AuthStatus } from '@/lib/claude-auth'
 import { SearchModal } from '@/components/search/search-modal'
-import { UsageMeter } from '@/components/usage-meter'
+const UsageMeter = lazy(() =>
+  import('@/components/usage-meter').then((m) => ({ default: m.UsageMeter })),
+)
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import KeyboardShortcuts from '@/components/KeyboardShortcuts'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { Toaster } from '@/components/ui/toast'
-import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
+const OnboardingTour = lazy(() =>
+  import('@/components/onboarding/onboarding-tour').then((m) => ({
+    default: m.OnboardingTour,
+  })),
+)
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { NotificationHub } from '@/components/notification-hub'
 import {
@@ -28,10 +34,14 @@ import {
 import { useApplyChatWidth } from '@/hooks/use-chat-settings'
 import { useSettingsSync } from '@/hooks/use-settings-sync'
 import {
-  ClaudeOnboarding,
   ONBOARDING_COMPLETE_EVENT,
   ONBOARDING_KEY,
-} from '@/components/onboarding/claude-onboarding'
+} from '@/components/onboarding/onboarding-constants'
+const ClaudeOnboarding = lazy(() =>
+  import('@/components/onboarding/claude-onboarding').then((m) => ({
+    default: m.ClaudeOnboarding,
+  })),
+)
 import { ErrorBoundary } from '@/components/error-boundary'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
@@ -414,7 +424,11 @@ function RootLayout() {
       ) : (
         <>
           {mounted && rootSurfaceState.showLogin ? <LoginScreen /> : null}
-          {mounted && rootSurfaceState.showOnboarding ? <ClaudeOnboarding /> : null}
+          {mounted && rootSurfaceState.showOnboarding ? (
+            <Suspense fallback={null}>
+              <ClaudeOnboarding />
+            </Suspense>
+          ) : null}
           {rootSurfaceState.showWorkspaceShell ? (
             <>
               <SettingsSyncMount />
@@ -432,11 +446,15 @@ function RootLayout() {
               </WorkspaceShell>
               <SearchModal />
               {/* Keep UsageMeter mounted so search-modal OPEN_USAGE still works even when the pill is hidden by default. */}
-              <UsageMeter visible={settings.showUsageMeter} />
+              <Suspense fallback={null}>
+                <UsageMeter visible={settings.showUsageMeter} />
+              </Suspense>
               <KeyboardShortcutsModal />
               <NotificationHub />
               {rootSurfaceState.showPostOnboardingOverlays ? (
-                <OnboardingTour />
+                <Suspense fallback={null}>
+                  <OnboardingTour />
+                </Suspense>
               ) : null}
             </>
           ) : null}

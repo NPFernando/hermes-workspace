@@ -1,8 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 
-import { UpdateCenterNotifier } from './update-center-notifier'
+import { Suspense, lazy, useEffect, useState } from 'react'
+const UpdateCenterNotifier = lazy(() =>
+  import('./update-center-notifier').then((m) => ({
+    default: m.UpdateCenterNotifier,
+  })),
+)
 import { hasUnseenUpdates, WhatsNewModal } from './whats-new-modal'
 import { MobilePromptTrigger } from './mobile-prompt/MobilePromptTrigger'
 
@@ -64,7 +68,9 @@ export function NotificationHub() {
   return (
     <>
       {/* UpdateCenterNotifier is always present — it self-manages visibility */}
-      <UpdateCenterNotifier />
+      <Suspense fallback={null}>
+        <UpdateCenterNotifier />
+      </Suspense>
 
       {/* WhatsNewModal: mount only when the hub decides it should show */}
       {showWhatsNew && <WhatsNewModal onDismissed={handleWhatsNewDismissed} />}

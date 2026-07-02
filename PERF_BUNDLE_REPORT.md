@@ -64,3 +64,38 @@ chat-route experience.
 - `cpp/wasm/wardley/mermaid/cytoscape/AreaChart/xterm` chunks are correctly lazy.
 - gzip serving is enabled (`.gz` assets present); 2,152 KB ships as ~600 KB wire,
   but parse cost on mobile is the real tax.
+
+---
+
+## Implementation log
+
+### Slice 1 (2026-07-02): proposal #4 — lazy interaction-gated components
+
+**Result: main 2,152 → 1,947 KB (−205 KB, −9.5%).** New lazy chunks:
+`claude-onboarding`, `onboarding-tour` (takes react-floater/popper with it),
+`update-center-notifier`, settings-dialog, usage-meter.
+
+Mechanics: `lazy()` + `<Suspense fallback={null}>` at each mount;
+`ONBOARDING_KEY`/`ONBOARDING_COMPLETE_EVENT` extracted to
+`onboarding-constants.ts` so the root route stops statically reaching the
+wizard module; settings dialog mounts on first open and stays mounted
+afterward so Base UI close animations still play.
+
+Verified: tsc clean at baseline; settings dialog opens through the lazy
+boundary and closes cleanly, zero page errors (note: in Vite dev the first
+open takes ~2–3s while the chunk compiles — prebuilt in production).
+
+### Honest revisions to the original proposals
+
+- **#2 (animation dedup) retracted:** `motion-dom` + `framer-motion` are the
+  internals of `motion` v12 — one library, not two. Only cleanup available is
+  removing the redundant direct `framer-motion` entry from package.json
+  (0 bytes; deferred anyway since package.json is another agent's active WIP).
+- **#3 (marked dedup) re-rated medium risk:** `marked.lexer` defines the
+  memoized block boundaries in `prompt-kit/markdown.tsx`; replacing it needs a
+  fence-aware splitter plus fixture tests comparing boundaries against marked.
+  ~40 KB available but not the quick win originally claimed.
+- **parse5 (124 KB) is a product feature, not waste:** it arrives via
+  `rehype-raw` + `rehype-sanitize` — sanitized raw-HTML rendering in chat
+  markdown. Removing it changes rendering behavior; needs a product decision.
+- **#1 (lazy ChatPanel) remains the big lever** (~300–450 KB), unchanged.

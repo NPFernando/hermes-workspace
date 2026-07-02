@@ -25,7 +25,7 @@ import {
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { CHAT_OPEN_SETTINGS_EVENT } from '../chat-events'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
@@ -38,7 +38,11 @@ import { SidebarSessions } from './sidebar/sidebar-sessions'
 import type { ChatOpenSettingsDetail } from '../chat-events'
 import type { SessionMeta } from '../types'
 import { t } from '@/lib/i18n'
-import { SettingsDialog } from '@/components/settings-dialog'
+const SettingsDialog = lazy(() =>
+  import('@/components/settings-dialog').then((m) => ({
+    default: m.SettingsDialog,
+  })),
+)
 import {
   TooltipContent,
   TooltipProvider,
@@ -531,6 +535,12 @@ function ChatSidebarComponent({
 }: ChatSidebarProps) {
   const { settingsOpen, settingsSection, setSettingsOpen, handleOpenSettings } =
     useSidebarSettings()
+  // Mount the (lazy) settings dialog only once it has been opened, then keep
+  // it mounted so Base UI's close animation still plays on later closes.
+  const [settingsEverOpened, setSettingsEverOpened] = useState(false)
+  useEffect(() => {
+    if (settingsOpen) setSettingsEverOpened(true)
+  }, [settingsOpen])
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
   const profileAvatarDataUrl = useChatSettingsStore(
     selectChatProfileAvatarDataUrl,
@@ -1225,11 +1235,15 @@ function ChatSidebarComponent({
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        initialSection={settingsSection}
-      />
+      {settingsEverOpened ? (
+        <Suspense fallback={null}>
+          <SettingsDialog
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            initialSection={settingsSection}
+          />
+        </Suspense>
+      ) : null}
 
       <ProvidersDialog open={providersOpen} onOpenChange={setProvidersOpen} />
 
