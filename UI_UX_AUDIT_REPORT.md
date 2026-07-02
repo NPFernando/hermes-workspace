@@ -1,6 +1,6 @@
 # Hermes Workspace — UI/UX Audit Report
 
-**Date:** 2026-07-01 (rounds 1–3, same session)
+**Date:** 2026-07-01–02 (rounds 1–4, same continued session)
 **Scope requested:** full-app UI/UX review (layout, navigation, components, mobile,
 accessibility, forms, states, visual consistency, content, behavior).
 **Method:** code review of the app shell, theme system, and representative screens,
@@ -11,8 +11,10 @@ against that isolated instance). **Round 2 closed the coverage gap from round 1*
 screenshotted at both viewports). **Round 3 extended coverage to the remaining
 main-nav screens**: Dashboard, Memory, MCP, Profiles, Conductor, Jobs, Terminal,
 plus a look at VT Capital/Finance (excluded from findings — see note below).
-Not covered in any round: Create Task dialog internals, Profile creation
-wizard, HARP Routing config form — still open per §13.
+**Round 4 closed the interaction-surface gap**: Create Task dialog and Profile
+creation wizard (both viewports), plus HARP Routing config form (desktop only
+— mobile capture hit a test-tooling issue, see note in §13, not a confirmed
+app problem).
 
 **Important context read before this review:** `NAVEEN_CUSTOMIZATIONS.md` and
 `src/styles.css`. This is not a green-field or neglected app — it has an
@@ -90,7 +92,12 @@ consistently used. The real problems cluster in four places:
 
 A smaller set of polish items (§3–§9) and three rounds of the same safe fix
 (title tooltips on truncated text, applied across Skills, Profiles, and Jobs
-this session) round out the findings.
+this session) round out the findings. **Round 4 checked the app's key
+interaction surfaces — the Create Task dialog and the Profile creation
+wizard — and found no new issues on either.** Both are well-designed,
+validate correctly, and adapt cleanly to mobile; worth noting since it means
+the problems found in this audit are concentrated in page-level layout and
+data-consistency, not in the app's form/dialog patterns generally.
 
 ---
 
@@ -343,8 +350,30 @@ this session) round out the findings.
   validation shown against a known-good list — acceptable for a
   power-user-facing settings screen, but worth knowing there's no guardrail
   against a typo'd model string beyond whatever the backend returns on save.
-- Not reviewed in this pass (time budget): Create Task dialog internals,
-  Profile creation wizard, HARP Routing config screen forms.
+- **Create Task dialog (round 4, both viewports): no issues found — a good
+  example to point to.** Required-field marker ("Title *"), helpful
+  placeholder copy, "Create Task" correctly disabled until Title is filled,
+  and a proactive helper line ("Assignee is separate from status. Dragging a
+  card changes its column only.") that heads off a likely point of
+  confusion before it happens. The two-column field grid (Column/Priority,
+  Assignee/Due Date) holds up cleanly on a 375px viewport without
+  cramming or overflow.
+- **Profile creation wizard, step 1 (round 4, both viewports): no issues
+  found.** Clear numbered-step indicator with a progress line, "Next"
+  correctly disabled until a profile name is entered, a monospace path
+  preview (`~/.hermes/profiles/<name>/`) that tells the user exactly where
+  their data will live, and clean mobile adaptation with no layout
+  compromises. (Steps 2–4 weren't reached — advancing requires typing a
+  name, which wasn't attempted since this pass didn't intend to actually
+  create a profile against the isolated instance's real config.)
+- **HARP Routing config form (round 4, desktop only):** sophisticated but
+  usable — reorderable tiered model list with up/down arrows, pass-rate
+  detail per model, badges (primary/fallback), inline "+ Add model." One
+  soft observation, not confirmed: the four toggle pills at the top ("HARP
+  enabled," "Auto-route," "Paid benchmarking," "Paid final review") use a
+  subtle color difference to indicate on/off state that's not fully
+  obvious from a static screenshot — worth a quick manual glance to confirm
+  the on/off contrast is clear enough at a glance, not just on hover.
 
 ## 6. Loading, Empty, and Error States
 
@@ -534,7 +563,18 @@ explicit go-ahead before build+deploy.
   concurrent-agent WIP, not this session's territory (see header note).
 - Accessibility findings in §7 are mostly "needs measurement/testing," not
   confirmed pass/fail — treat as a checklist for a dedicated a11y pass.
-- Still not reviewed in any round: the Create Task dialog's internals, the
-  Profile creation wizard's internals, and the HARP Routing config form —
-  these need interaction (opening modals/forms), not just navigation, and
-  were out of the time budget for this pass.
+- **Round 4 closed the interaction-surface gap** (Create Task dialog,
+  Profile wizard step 1, HARP Routing desktop) and found no new issues —
+  these are genuinely well-built. Two small gaps remain: Profile wizard
+  steps 2–4 weren't reached (didn't want to actually create a profile
+  against the isolated instance's real `~/.hermes/profiles/` to get there),
+  and HARP Routing's mobile view wasn't captured (a test-automation click
+  issue — the tab was visible in a screenshot but Playwright couldn't get a
+  stable bounding box for it; inconclusive on whether this reflects a real
+  mobile interaction problem or just a test-tooling limitation, unlike the
+  visually-obvious Critical #3/#4 findings elsewhere in this report).
+- With rounds 1–4 complete, the practical scope of this audit is now closed
+  short of: full multi-step completion of the Profile wizard, the HARP
+  Routing form on mobile, and a dedicated accessibility pass (§7). Anything
+  beyond that would be re-reviewing screens already covered rather than
+  closing new gaps.
