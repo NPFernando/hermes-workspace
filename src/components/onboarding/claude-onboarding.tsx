@@ -30,8 +30,8 @@ function stripProviderPrefix(model: string): string {
   return model
 }
 
-export const ONBOARDING_KEY = 'claude-onboarding-complete'
-export const ONBOARDING_COMPLETE_EVENT = 'claude:onboarding-complete'
+export { ONBOARDING_COMPLETE_EVENT, ONBOARDING_KEY } from './onboarding-constants'
+import { ONBOARDING_COMPLETE_EVENT, ONBOARDING_KEY } from './onboarding-constants'
 
 function dispatchOnboardingCompletionChanged(completed: boolean) {
   if (typeof window === 'undefined') return
