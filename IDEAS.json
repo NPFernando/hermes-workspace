@@ -280,5 +280,35 @@
     "description": "Move repeated responsive utility class groups in the Tasks header into named constants covered by focused tests, reducing accidental Tailwind token drift.",
     "category": "ui",
     "estimated_effort": "low"
+  },
+  {
+    "title": "Add Jobs stale-run threshold settings",
+    "description": "Let operators tune stale-run warning thresholds per scheduled job profile so daily, weekly, and one-off cron jobs use appropriate freshness copy.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add scheduled-job health summary filter",
+    "description": "Add a Jobs screen filter for stale, failed, paused, and never-run jobs so operators can triage scheduled automation quickly.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Show scheduled-job health summary filter",
+    "description": "Add a Jobs screen filter for stale, failed, paused, and never-run jobs so operators can triage scheduled automation quickly.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Expose workspace service unit drift warning",
+    "description": "Surface systemd unit-file drift in the workspace health/status UI when restarts report daemon-reload warnings, so operators know service configuration changed on disk.",
+    "category": "backend",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Quarantine scratch root test files from default Vitest",
+    "description": "Move or ignore root-level scratch tests like testCurrencyConversion.test.ts so pnpm test reports source regressions instead of collection failures from experimental files.",
+    "category": "config",
+    "estimated_effort": "low"
   }
 ]

@@ -61,6 +61,30 @@ function formatRunTimestamp(value?: string | null): string {
   }
 }
 
+const STALE_RUN_THRESHOLD_MS = 36 * 60 * 60 * 1000
+
+export function formatJobFreshnessCopy(
+  job: Pick<ClaudeJob, 'enabled' | 'last_run_at' | 'name' | 'state'>,
+  nowMs = Date.now(),
+): string | null {
+  const isPaused = job.state === 'paused' || !job.enabled
+  if (isPaused || job.state === 'completed') return null
+
+  const name = job.name.trim() || 'This job'
+  if (!job.last_run_at) {
+    return `${name} has not produced a run yet.`
+  }
+
+  const lastRunMs = new Date(job.last_run_at).getTime()
+  if (!Number.isFinite(lastRunMs)) return null
+
+  const ageMs = nowMs - lastRunMs
+  if (ageMs < STALE_RUN_THRESHOLD_MS) return null
+
+  const staleDays = Math.max(2, Math.round(ageMs / 86_400_000))
+  return `${name} has not run in ${staleDays} days; check the schedule if it should be recurring.`
+}
+
 function getOutputPreview(content: string): string {
   const normalized = content.replace(/\s+/g, ' ').trim()
   if (normalized.length <= 200) return normalized
@@ -144,6 +168,7 @@ function JobCard({
   const isPaused = job.state === 'paused' || !job.enabled
   const isCompleted = job.state === 'completed'
   const lastRunStatus = getLastRunStatus(job)
+  const freshnessCopy = formatJobFreshnessCopy(job)
   const outputQuery = useQuery({
     queryKey: ['claude', 'jobs', job.id, 'output'],
     queryFn: () => fetchJobOutput(job.id),
@@ -176,11 +201,17 @@ function JobCard({
                     : 'var(--theme-text)',
               }}
             />
-            <h3 title={job.name || '(unnamed)'} className="truncate text-sm font-medium text-[var(--theme-text)]">
+            <h3
+              title={job.name || '(unnamed)'}
+              className="truncate text-sm font-medium text-[var(--theme-text)]"
+            >
               {job.name || '(unnamed)'}
             </h3>
           </div>
-          <p title={job.prompt} className="mb-2 line-clamp-2 text-xs text-[var(--theme-muted)]">
+          <p
+            title={job.prompt}
+            className="mb-2 line-clamp-2 text-xs text-[var(--theme-muted)]"
+          >
             {job.prompt}
           </p>
           <div className="mb-2 flex flex-wrap items-center gap-3 text-[10px] text-[var(--theme-muted)]">
@@ -213,6 +244,11 @@ function JobCard({
             />
             <span>{lastRunStatus.label}</span>
           </div>
+          {freshnessCopy ? (
+            <p className="mt-1 text-[10px] leading-4 text-[var(--theme-warning,#f59e0b)]">
+              {freshnessCopy}
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -459,7 +495,10 @@ export function JobsScreen() {
   )
 
   return (
-    <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
+    <div
+      data-route-page
+      className="min-h-full overflow-y-auto bg-surface text-ink"
+    >
       <div className="flex w-full flex-col gap-4 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
         <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/85 p-4 backdrop-blur-xl">
           <div className="flex items-center gap-3">
@@ -492,7 +531,9 @@ export function JobsScreen() {
               />
             </div>
             {profilesQuery.isError && (
-              <span className="text-xs text-amber-400 shrink-0">Profiles failed to load</span>
+              <span className="text-xs text-amber-400 shrink-0">
+                Profiles failed to load
+              </span>
             )}
             <button
               onClick={() =>
