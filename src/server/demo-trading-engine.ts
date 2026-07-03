@@ -1,20 +1,19 @@
 /**
- * Automated demo trading engine.
+ * Automated demo trading engine — VT-Capital concepts folded in.
  *
- * One cycle: for each configured symbol, evaluate every enabled strategy on
- * fresh demo-environment candles, then:
- *   - if flat and a strategy says BUY  → open a demo position (MARKET buy)
- *   - if in a position and the owning strategy says SELL (or a stop/target is
- *     hit) → close it (MARKET sell) and fold the realized PnL into the
- *     strategy's score.
+ * One cycle per symbol:
+ *   1. every enabled strategy evaluates fresh demo candles
+ *   2. the COUNCIL combines their signals, weighted by each strategy's
+ *      accumulated score (proven formulas count more)
+ *   3. a BUY verdict must then pass the GUARDIAN risk layer (position cap,
+ *      per-trade cap, daily-loss halt, loss-streak cooldown, balance floor)
+ *   4. open positions close on stop-loss / take-profit / owner-strategy SELL
+ *      / strong council SELL; realized PnL updates the owner's score and is
+ *      appended to a persistent trade log for refinement
  *
  * Runs only while finance `tradingMode === 'testnet_execute'` and the
  * emergency kill switch is off. All execution goes through BinanceDemoClient,
  * which is hard-locked to the demo host, so this can never touch real money.
- *
- * State (open positions + strategy scores) is persisted in the finance store's
- * `strategy_results` array so scores accumulate across restarts and can be
- * used to refine the formulas over time.
  */
 import {
   BinanceDemoClient,
@@ -23,11 +22,22 @@ import {
 import {
   STRATEGIES,
   applyTradeOutcome,
+  councilVote,
   emptyScore,
   getStrategy,
+  scaledQuoteSize,
   type Candle,
+  type CouncilMember,
   type StrategyScore,
 } from './trading-strategies'
+import {
+  DEFAULT_GUARDIAN_CONFIG,
+  checkOrderProposal,
+  cooldownUntil,
+  dayKey,
+  type GuardianBlock,
+  type GuardianConfig,
+} from './trading-guardian'
 import {
   readFinanceStore,
   writeFinanceStore,
@@ -36,14 +46,21 @@ import {
 
 const SR_KIND_SCORE = 'demo_strategy_score'
 const SR_KIND_POSITION = 'demo_open_position'
+const SR_KIND_TRADE = 'demo_trade_log'
+const SR_KIND_BLOCK = 'demo_guardian_block'
+const TRADE_LOG_CAP = 200
+const BLOCK_LOG_CAP = 50
 
 export interface EngineConfig {
   symbols: Array<string>
   interval: string
-  quotePerTrade: number // USDT to spend per BUY
+  quotePerTrade: number
   enabledStrategies: Array<string>
-  stopLossPct: number // e.g. 0.02 = -2%
-  takeProfitPct: number // e.g. 0.03 = +3%
+  stopLossPct: number
+  takeProfitPct: number
+  /** Council net-vote threshold to act. */
+  councilThreshold: number
+  guardian: GuardianConfig
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -53,6 +70,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   enabledStrategies: STRATEGIES.map((s) => s.id),
   stopLossPct: 0.02,
   takeProfitPct: 0.03,
+  councilThreshold: 0.6,
+  guardian: DEFAULT_GUARDIAN_CONFIG,
 }
 
 interface OpenPosition {
@@ -65,10 +84,25 @@ interface OpenPosition {
   openedAt: string
 }
 
+export interface TradeLogEntry {
+  id: string
+  symbol: string
+  strategyId: string
+  entryPrice: number
+  exitPrice: number
+  quantity: number
+  entryQuote: number
+  exitQuote: number
+  pnlQuote: number
+  reason: string
+  openedAt: string
+  closedAt: string
+}
+
 export interface CycleAction {
   symbol: string
   strategyId: string
-  action: 'OPEN' | 'CLOSE' | 'SKIP'
+  action: 'OPEN' | 'CLOSE' | 'SKIP' | 'BLOCKED'
   reason: string
   price?: number
   pnlQuote?: number
@@ -80,6 +114,7 @@ export interface CycleResult {
   actions: Array<CycleAction>
   scores: Array<StrategyScore>
   openPositions: number
+  dailyPnlQuote: number
   ranAt: string
 }
 
@@ -91,29 +126,70 @@ function loadScores(rows: Array<SRRow>): Map<string, StrategyScore> {
   const map = new Map<string, StrategyScore>()
   for (const r of rows) {
     if (r.kind === SR_KIND_SCORE && typeof r.strategyId === 'string') {
-      map.set(r.strategyId, r as unknown as StrategyScore & SRRow)
+      map.set(r.strategyId, { ...emptyScore(r.strategyId), ...(r as object) } as StrategyScore)
     }
   }
   for (const s of STRATEGIES) if (!map.has(s.id)) map.set(s.id, emptyScore(s.id))
   return map
 }
 
-function loadPositions(rows: Array<SRRow>): Array<OpenPosition> {
-  return rows.filter((r) => r.kind === SR_KIND_POSITION) as unknown as Array<OpenPosition>
+function loadOfKind<T>(rows: Array<SRRow>, kind: string): Array<T> {
+  return rows.filter((r) => r.kind === kind) as unknown as Array<T>
 }
 
-function persist(scores: Map<string, StrategyScore>, positions: Array<OpenPosition>): void {
+interface PersistInput {
+  scores: Map<string, StrategyScore>
+  positions: Array<OpenPosition>
+  trades: Array<TradeLogEntry>
+  blocks: Array<SRRow>
+}
+
+function persist(input: PersistInput): void {
   const db = readFinanceStore()
   const others = (db.strategy_results || []).filter(
-    (r: SRRow) => r.kind !== SR_KIND_SCORE && r.kind !== SR_KIND_POSITION,
+    (r: SRRow) =>
+      r.kind !== SR_KIND_SCORE &&
+      r.kind !== SR_KIND_POSITION &&
+      r.kind !== SR_KIND_TRADE &&
+      r.kind !== SR_KIND_BLOCK,
   )
   db.strategy_results = [
     ...others,
-    ...[...scores.values()].map((s) => ({ kind: SR_KIND_SCORE, ...s })),
-    ...positions.map((p) => ({ kind: SR_KIND_POSITION, ...p })),
+    ...[...input.scores.values()].map((s) => ({ kind: SR_KIND_SCORE, ...s })),
+    ...input.positions.map((p) => ({ kind: SR_KIND_POSITION, ...p })),
+    ...input.trades.slice(-TRADE_LOG_CAP).map((t) => ({ kind: SR_KIND_TRADE, ...t })),
+    ...input.blocks.slice(-BLOCK_LOG_CAP),
   ]
   db.updatedAt = new Date().toISOString()
   writeFinanceStore(db)
+}
+
+function realizedToday(trades: Array<TradeLogEntry>, now = new Date()): number {
+  const today = dayKey(now)
+  return trades
+    .filter((t) => dayKey(t.closedAt) === today)
+    .reduce((sum, t) => sum + t.pnlQuote, 0)
+}
+
+/** Engine config = defaults ⊕ finance settings.demoTrading ⊕ per-call overrides. */
+export function resolveEngineConfig(
+  settingsOverride: unknown,
+  callOverride?: Partial<EngineConfig>,
+): EngineConfig {
+  const fromSettings =
+    settingsOverride && typeof settingsOverride === 'object'
+      ? (settingsOverride as Partial<EngineConfig>)
+      : {}
+  return {
+    ...DEFAULT_ENGINE_CONFIG,
+    ...fromSettings,
+    ...callOverride,
+    guardian: {
+      ...DEFAULT_GUARDIAN_CONFIG,
+      ...(fromSettings.guardian ?? {}),
+      ...(callOverride?.guardian ?? {}),
+    },
+  }
 }
 
 // ── engine ───────────────────────────────────────────────────────────────────
@@ -127,33 +203,51 @@ export interface RunCycleOptions {
 
 export async function runTradingCycle(options: RunCycleOptions = {}): Promise<CycleResult> {
   const ranAt = new Date().toISOString()
-  const config = { ...DEFAULT_ENGINE_CONFIG, ...options.config }
   const db = readFinanceStore()
+  const config = resolveEngineConfig((db.settings as Record<string, unknown>).demoTrading, options.config)
 
-  if (db.settings.emergencyKillSwitch) {
-    return { ran: false, reason: 'emergency kill switch is active', actions: [], scores: [], openPositions: 0, ranAt }
-  }
+  const rows = (db.strategy_results || []) as Array<SRRow>
+  const scores = loadScores(rows)
+  let positions = loadOfKind<OpenPosition>(rows, SR_KIND_POSITION)
+  const trades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE)
+  const blocks = rows.filter((r) => r.kind === SR_KIND_BLOCK)
+  const dailyPnlQuote = realizedToday(trades)
+
+  const bail = (reason: string): CycleResult => ({
+    ran: false, reason, actions: [], scores: [...scores.values()],
+    openPositions: positions.length, dailyPnlQuote, ranAt,
+  })
+
+  if (db.settings.emergencyKillSwitch) return bail('emergency kill switch is active')
   if (!options.force && db.settings.tradingMode !== 'testnet_execute') {
-    return {
-      ran: false,
-      reason: `tradingMode is "${db.settings.tradingMode}", not "testnet_execute"`,
-      actions: [], scores: [], openPositions: 0, ranAt,
-    }
+    return bail(`tradingMode is "${db.settings.tradingMode}", not "testnet_execute"`)
   }
 
   let client = options.client
   if (!client) {
     const built = createDemoClientFromEnv()
-    if (!built.client) {
-      return { ran: false, reason: built.reason || 'demo client unavailable', actions: [], scores: [], openPositions: 0, ranAt }
-    }
+    if (!built.client) return bail(built.reason || 'demo client unavailable')
     client = built.client
   }
 
-  const rows = (db.strategy_results || []) as Array<SRRow>
-  const scores = loadScores(rows)
-  let positions = loadPositions(rows)
+  // One account read per cycle: quote balance feeds the guardian floor check.
+  let quoteBalance = 0
+  try {
+    const account = await client.getAccount()
+    quoteBalance = account.balances.find((b) => b.asset === 'USDT')?.free ?? 0
+  } catch (err) {
+    return bail(`account read failed: ${(err as Error).message}`)
+  }
+
   const actions: Array<CycleAction> = []
+
+  const recordBlocks = (symbol: string, strategyId: string, verdictBlocks: Array<GuardianBlock>) => {
+    for (const b of verdictBlocks) {
+      blocks.push({ kind: SR_KIND_BLOCK, symbol, strategyId, rule: b.rule, detail: b.detail, at: new Date().toISOString() })
+      actions.push({ symbol, strategyId, action: 'BLOCKED', reason: `${b.rule}: ${b.detail}` })
+    }
+    appendAuditLog('demo_guardian_block', { symbol, strategyId, blocks: verdictBlocks })
+  }
 
   for (const symbol of config.symbols) {
     let candles: Array<Candle>
@@ -166,24 +260,55 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
       continue
     }
 
-    // 1. Manage existing positions for this symbol (exit rules first).
+    // Council opinion for this symbol (used for entries AND collective exits).
+    const members: Array<CouncilMember> = STRATEGIES
+      .filter((s) => config.enabledStrategies.includes(s.id))
+      .map((s) => ({ strategyId: s.id, decision: s.evaluate(candles), score: scores.get(s.id)?.score ?? 0 }))
+    const vote = councilVote(members, config.councilThreshold)
+
+    // 1. Manage existing positions (exits first).
     const held = positions.filter((p) => p.symbol === symbol)
     for (const pos of held) {
-      const strat = getStrategy(pos.strategyId)
-      const decision = strat?.evaluate(candles) ?? { signal: 'HOLD' as const, confidence: 0, reason: 'strategy gone' }
+      const ownerDecision = getStrategy(pos.strategyId)?.evaluate(candles)
       const changePct = (price - pos.entryPrice) / pos.entryPrice
       const hitStop = changePct <= -config.stopLossPct
       const hitTarget = changePct >= config.takeProfitPct
-      const stratExit = decision.signal === 'SELL'
-      if (hitStop || hitTarget || stratExit) {
+      const ownerExit = ownerDecision?.signal === 'SELL'
+      const councilExit = vote.signal === 'SELL'
+      if (hitStop || hitTarget || ownerExit || councilExit) {
         try {
           const order = await client.placeOrder({ symbol, side: 'SELL', type: 'MARKET', quantity: pos.quantity })
           const exitQuote = order.cummulativeQuoteQty || price * pos.quantity
           const pnlQuote = exitQuote - pos.entryQuote
           const reason = hitStop ? `stop-loss ${(changePct * 100).toFixed(2)}%`
             : hitTarget ? `take-profit ${(changePct * 100).toFixed(2)}%`
-            : `strategy exit: ${decision.reason}`
-          scores.set(pos.strategyId, applyTradeOutcome(scores.get(pos.strategyId) ?? emptyScore(pos.strategyId), pnlQuote, pos.entryQuote))
+            : ownerExit ? `strategy exit: ${ownerDecision!.reason}`
+            : `council exit (net ${vote.net.toFixed(2)})`
+
+          let nextScore = applyTradeOutcome(
+            scores.get(pos.strategyId) ?? emptyScore(pos.strategyId),
+            pnlQuote,
+            pos.entryQuote,
+          )
+          if (nextScore.lossStreak >= config.guardian.lossStreakLimit) {
+            nextScore = { ...nextScore, cooldownUntil: cooldownUntil(config.guardian) }
+          }
+          scores.set(pos.strategyId, nextScore)
+
+          trades.push({
+            id: `trade_${symbol}_${Date.now()}`,
+            symbol,
+            strategyId: pos.strategyId,
+            entryPrice: pos.entryPrice,
+            exitPrice: order.avgPrice || price,
+            quantity: pos.quantity,
+            entryQuote: pos.entryQuote,
+            exitQuote,
+            pnlQuote,
+            reason,
+            openedAt: pos.openedAt,
+            closedAt: new Date().toISOString(),
+          })
           positions = positions.filter((p) => p.id !== pos.id)
           actions.push({ symbol, strategyId: pos.strategyId, action: 'CLOSE', reason, price: order.avgPrice || price, pnlQuote })
           appendAuditLog('demo_trade_close', { symbol, strategyId: pos.strategyId, pnlQuote, reason })
@@ -193,51 +318,86 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
       }
     }
 
-    // 2. Look for new entries (only if flat on this symbol).
+    // 2. Entries: council BUY + guardian approval, only if flat on the symbol.
     const stillHeld = positions.some((p) => p.symbol === symbol)
-    if (!stillHeld) {
-      // Rank enabled strategies by score, then by signal confidence.
-      const ranked = STRATEGIES
-        .filter((s) => config.enabledStrategies.includes(s.id))
-        .map((s) => ({ strat: s, decision: s.evaluate(candles), score: scores.get(s.id)?.score ?? 0 }))
-        .filter((r) => r.decision.signal === 'BUY')
-        .sort((a, b) => b.score - a.score || b.decision.confidence - a.decision.confidence)
-      const best = ranked[0]
-      if (best) {
+    if (!stillHeld && vote.signal === 'BUY' && vote.leadStrategyId) {
+      const leadScore = scores.get(vote.leadStrategyId) ?? emptyScore(vote.leadStrategyId)
+      const proposedQuote = scaledQuoteSize(config.quotePerTrade, leadScore.score)
+      const verdict = checkOrderProposal(
+        { symbol, strategyId: vote.leadStrategyId, quoteAmount: proposedQuote },
+        {
+          openPositions: positions.length,
+          quoteBalance,
+          dailyPnlQuote: realizedToday(trades),
+          strategyLossStreak: leadScore.lossStreak ?? 0,
+          strategyCooldownUntil: leadScore.cooldownUntil,
+        },
+        config.guardian,
+      )
+      if (!verdict.allowed) {
+        recordBlocks(symbol, vote.leadStrategyId, verdict.blocks)
+      } else {
         try {
-          const order = await client.placeOrder({ symbol, side: 'BUY', type: 'MARKET', quoteOrderQty: config.quotePerTrade })
+          const order = await client.placeOrder({ symbol, side: 'BUY', type: 'MARKET', quoteOrderQty: verdict.approvedQuote })
           if (order.executedQty > 0) {
+            const spent = order.cummulativeQuoteQty || verdict.approvedQuote
+            quoteBalance -= spent
             positions.push({
               id: `pos_${symbol}_${Date.now()}`,
               symbol,
-              strategyId: best.strat.id,
+              strategyId: vote.leadStrategyId,
               entryPrice: order.avgPrice || price,
               quantity: order.executedQty,
-              entryQuote: order.cummulativeQuoteQty || config.quotePerTrade,
+              entryQuote: spent,
               openedAt: new Date().toISOString(),
             })
-            actions.push({ symbol, strategyId: best.strat.id, action: 'OPEN', reason: best.decision.reason, price: order.avgPrice || price })
-            appendAuditLog('demo_trade_open', { symbol, strategyId: best.strat.id, quote: config.quotePerTrade })
+            actions.push({
+              symbol,
+              strategyId: vote.leadStrategyId,
+              action: 'OPEN',
+              reason: `council BUY (net ${vote.net.toFixed(2)}): ${vote.reasons.join('; ')}`,
+              price: order.avgPrice || price,
+            })
+            appendAuditLog('demo_trade_open', { symbol, strategyId: vote.leadStrategyId, quote: verdict.approvedQuote, vote: vote.net })
           }
         } catch (err) {
-          actions.push({ symbol, strategyId: best.strat.id, action: 'SKIP', reason: `open failed: ${(err as Error).message}` })
+          actions.push({ symbol, strategyId: vote.leadStrategyId, action: 'SKIP', reason: `open failed: ${(err as Error).message}` })
         }
-      } else {
-        actions.push({ symbol, strategyId: '-', action: 'SKIP', reason: 'no BUY signal' })
       }
+    } else if (!stillHeld) {
+      actions.push({ symbol, strategyId: '-', action: 'SKIP', reason: `council: ${vote.signal} (net ${vote.net.toFixed(2)})` })
     }
   }
 
-  persist(scores, positions)
-  return { ran: true, actions, scores: [...scores.values()], openPositions: positions.length, ranAt }
+  persist({ scores, positions, trades, blocks })
+  return {
+    ran: true,
+    actions,
+    scores: [...scores.values()],
+    openPositions: positions.length,
+    dailyPnlQuote: realizedToday(trades),
+    ranAt,
+  }
 }
 
-/** Read-only snapshot of scores + open positions for the API/UI. */
-export function getEngineState(): { scores: Array<StrategyScore>; positions: Array<OpenPosition> } {
+/** Read-only snapshot for the API/UI. */
+export function getEngineState(): {
+  scores: Array<StrategyScore>
+  positions: Array<OpenPosition>
+  trades: Array<TradeLogEntry>
+  guardianBlocks: Array<SRRow>
+  dailyPnlQuote: number
+  config: EngineConfig
+} {
   const db = readFinanceStore()
   const rows = (db.strategy_results || []) as Array<SRRow>
+  const trades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE)
   return {
     scores: [...loadScores(rows).values()],
-    positions: loadPositions(rows),
+    positions: loadOfKind<OpenPosition>(rows, SR_KIND_POSITION),
+    trades: trades.slice(-20).reverse(),
+    guardianBlocks: rows.filter((r) => r.kind === SR_KIND_BLOCK).slice(-20).reverse(),
+    dailyPnlQuote: realizedToday(trades),
+    config: resolveEngineConfig((db.settings as Record<string, unknown>).demoTrading),
   }
 }

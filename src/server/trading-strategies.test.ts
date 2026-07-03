@@ -2,9 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import {
   applyTradeOutcome,
+  breakoutStrategy,
+  councilVote,
+  ema,
   emptyScore,
+  macdMomentumStrategy,
   rsi,
   rsiReversionStrategy,
+  scaledQuoteSize,
   sma,
   smaCrossoverStrategy,
   type Candle,
@@ -80,5 +85,72 @@ describe('applyTradeOutcome scoring', () => {
     expect(s.wins).toBe(2)
     expect(s.score).toBeLessThanOrEqual(1.5 + 1e-9)
     expect(s.score).toBeCloseTo(0.5 - 0.2 + 1, 5)
+  })
+})
+
+describe('new strategies', () => {
+  it('macd momentum emits a decision on a long series', () => {
+    const closes = [
+      ...Array.from({ length: 30 }, (_, i) => 100 - i * 0.5),
+      ...Array.from({ length: 20 }, (_, i) => 85 + i * 1.5),
+    ]
+    const d = macdMomentumStrategy.evaluate(candlesFromCloses(closes))
+    expect(['BUY', 'SELL', 'HOLD']).toContain(d.signal)
+  })
+
+  it('breakout signals BUY when price breaks the prior high', () => {
+    const closes = [...Array.from({ length: 21 }, () => 100), 110]
+    const candles = closes.map((c, i) => ({ openTime: i, open: c, high: c, low: c, close: c, volume: 1 }))
+    expect(breakoutStrategy.evaluate(candles, { lookback: 20 }).signal).toBe('BUY')
+  })
+
+  it('ema tracks toward recent values', () => {
+    expect(ema([1, 1, 1, 1, 1], 3)).toBeCloseTo(1, 5)
+  })
+})
+
+describe('councilVote', () => {
+  it('returns BUY when weighted votes exceed threshold', () => {
+    const v = councilVote([
+      { strategyId: 'a', decision: { signal: 'BUY', confidence: 1, reason: 'up' }, score: 5 },
+      { strategyId: 'b', decision: { signal: 'BUY', confidence: 0.8, reason: 'up2' }, score: 0 },
+    ], 0.6)
+    expect(v.signal).toBe('BUY')
+    expect(v.leadStrategyId).toBe('a')
+  })
+
+  it('returns HOLD when votes cancel out', () => {
+    const v = councilVote([
+      { strategyId: 'a', decision: { signal: 'BUY', confidence: 1, reason: 'up' }, score: 0 },
+      { strategyId: 'b', decision: { signal: 'SELL', confidence: 1, reason: 'down' }, score: 0 },
+    ], 0.6)
+    expect(v.signal).toBe('HOLD')
+  })
+
+  it('weights proven strategies more heavily', () => {
+    const v = councilVote([
+      { strategyId: 'proven', decision: { signal: 'BUY', confidence: 1, reason: 'up' }, score: 8 },
+      { strategyId: 'weak', decision: { signal: 'SELL', confidence: 1, reason: 'down' }, score: -4 },
+    ], 0.6)
+    expect(v.signal).toBe('BUY')
+    expect(v.leadStrategyId).toBe('proven')
+  })
+})
+
+describe('scaledQuoteSize', () => {
+  it('scales up for proven strategies and down for poor ones', () => {
+    expect(scaledQuoteSize(25, 5)).toBeGreaterThan(25)
+    expect(scaledQuoteSize(25, -5)).toBeLessThan(25)
+  })
+})
+
+describe('applyTradeOutcome loss streak', () => {
+  it('increments lossStreak on losses and resets on a win', () => {
+    let s = emptyScore('x')
+    s = applyTradeOutcome(s, -5, 100)
+    s = applyTradeOutcome(s, -5, 100)
+    expect(s.lossStreak).toBe(2)
+    s = applyTradeOutcome(s, 5, 100)
+    expect(s.lossStreak).toBe(0)
   })
 })

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { DemoTradingPanel } from './demo-trading-panel'
 
 type FinancePayload = {
   ok: boolean
@@ -220,6 +221,8 @@ export function FinanceScreen() {
           </div>
         </div>
       </section>
+
+      <DemoTradingPanel />
 
       <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
         <h2 className="text-lg font-semibold">Phased rollout</h2>

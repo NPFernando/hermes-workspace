@@ -26,7 +26,7 @@ function fakeClient(overrides: Partial<any> = {}) {
     ping: async () => true,
     getPrice: async () => 100,
     getKlines: async () => steadyDowntrend(),
-    getAccount: async () => ({ accountType: 'SPOT', canTrade: true, balances: [] }),
+    getAccount: async () => ({ accountType: 'SPOT', canTrade: true, balances: [{ asset: 'USDT', free: 5000, locked: 0 }] }),
     placeOrder: async (o: any) => ({
       symbol: o.symbol,
       orderId: Math.floor(Math.random() * 1e6),
@@ -81,7 +81,7 @@ describe('runTradingCycle gating', () => {
   it('force runs regardless of mode', async () => {
     await setMode('observe_only')
     const { runTradingCycle } = await import('./demo-trading-engine')
-    const res = await runTradingCycle({ client: fakeClient() as never, force: true, config: { symbols: ['BTCUSDT'] } })
+    const res = await runTradingCycle({ client: fakeClient() as never, force: true, config: { symbols: ['BTCUSDT'], enabledStrategies: ['rsi_reversion'] } })
     expect(res.ran).toBe(true)
   })
 })
@@ -91,8 +91,11 @@ describe('runTradingCycle open → close → score', () => {
     await setMode('testnet_execute')
     const { runTradingCycle, getEngineState } = await import('./demo-trading-engine')
 
-    // Cycle 1: flat → should OPEN.
-    const r1 = await runTradingCycle({ client: fakeClient() as never, config: { symbols: ['BTCUSDT'] } })
+    // Isolate the RSI strategy so the council reduces to one clear voter.
+    const cfg = { symbols: ['BTCUSDT'], enabledStrategies: ['rsi_reversion'] }
+
+    // Cycle 1: flat → council BUY (RSI oversold) → guardian OK → OPEN.
+    const r1 = await runTradingCycle({ client: fakeClient() as never, config: cfg })
     expect(r1.ran).toBe(true)
     expect(r1.actions.some((a) => a.action === 'OPEN')).toBe(true)
     expect(getEngineState().positions.length).toBe(1)
@@ -101,7 +104,7 @@ describe('runTradingCycle open → close → score', () => {
     const highClient = fakeClient({
       getKlines: async () => Array.from({ length: 31 }, (_, i) => ({ openTime: i, open: 130, high: 130, low: 130, close: 130, volume: 1 })),
     })
-    const r2 = await runTradingCycle({ client: highClient as never, config: { symbols: ['BTCUSDT'] } })
+    const r2 = await runTradingCycle({ client: highClient as never, config: cfg })
     const close = r2.actions.find((a) => a.action === 'CLOSE')
     expect(close).toBeTruthy()
     expect(close!.pnlQuote).toBeGreaterThan(0)
