@@ -15,6 +15,7 @@ import {
   deriveFriendlyIdFromKey,
   isMissingAuth,
   readError,
+  resolveRuntimeModelLabel,
   textFromMessage,
 } from './utils'
 import {
@@ -1098,6 +1099,30 @@ export function ChatScreen({
 
   const gatewayModel = currentModelQuery.data || ''
   const currentModel = _localModelOverride || gatewayModel
+
+  // Same session key expression the composer receives below — hoisted so the
+  // empty-state chip resolves the identical per-session model override.
+  const composerSessionKey = isNewChat
+    ? undefined
+    : forcedSessionKey ||
+      resolvedSessionKey ||
+      activeCanonicalKey ||
+      activeSessionKey
+  const persistedSessionModel = useSessionModelStore((s) =>
+    s.getModel(composerSessionKey),
+  )
+  const configuredModel = useMemo(() => {
+    const models = modelsQuery.data?.models ?? []
+    if (!models.length) return ''
+    const first = models[0]
+    return typeof first === 'string' ? first : first.id || first.name || ''
+  }, [modelsQuery.data])
+  // Mirrors the composer's model-button label so the two never disagree.
+  const runtimeModelLabel = resolveRuntimeModelLabel(
+    persistedSessionModel,
+    currentModel,
+    configuredModel,
+  )
 
   // Ref so sendMessage can always read latest thinkingLevel without being in deps
   const thinkingLevelRef = useRef<ThinkingLevel>(thinkingLevel)
@@ -3066,6 +3091,7 @@ export function ChatScreen({
               emptyState={
                 <ChatEmptyState
                   compact={compact}
+                  runtimeModel={runtimeModelLabel}
                   onSuggestionClick={(prompt) => {
                     composerHandleRef.current?.setValue(prompt + ' ')
                   }}

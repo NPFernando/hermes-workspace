@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import { isMac } from '@/lib/platform'
 import { useNavigate } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -113,10 +114,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
     if (typeof window === 'undefined') return true
     return window.matchMedia('(min-width: 768px)').matches
   })
-  const isMacPlatform = useMemo(() => {
-    if (typeof navigator === 'undefined') return true
-    return navigator.platform.toLowerCase().includes('mac')
-  }, [])
+  const isMacPlatform = isMac
 
   const runSlashCommand = (command: string) => {
     if (command === '/new') {

@@ -2,6 +2,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { BrainIcon, CodeIcon, PuzzleIcon } from '@hugeicons/core-free-icons'
 import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
+import { formatModelName } from '@/lib/format-model-name'
 
 type ProfileSummary = {
   name: string
@@ -38,11 +39,15 @@ const SUGGESTIONS: Array<SuggestionChip> = [
 type ChatEmptyStateProps = {
   onSuggestionClick?: (prompt: string) => void
   compact?: boolean
+  /** Resolved runtime model (same chain as the composer button) — the
+   *  profile's configured `model` field can be stale, so never show it. */
+  runtimeModel?: string
 }
 
 export function ChatEmptyState({
   onSuggestionClick,
   compact = false,
+  runtimeModel,
 }: ChatEmptyStateProps) {
   const [activeProfile, setActiveProfile] = useState<ProfileSummary | null>(null)
 
@@ -89,7 +94,7 @@ export function ChatEmptyState({
         {activeProfile && (
           <span className="mt-2 text-xs text-[var(--theme-accent)]">
             {activeProfile.name}
-            {activeProfile.model ? ` · ${activeProfile.model}` : ''}
+            {runtimeModel ? ` · ${formatModelName(runtimeModel)}` : ''}
           </span>
         )}
 

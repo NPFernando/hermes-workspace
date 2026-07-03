@@ -2,6 +2,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon, Search01Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { isMac } from '@/lib/platform'
 
 type SearchInputProps = {
   value: string
@@ -16,11 +17,7 @@ export function SearchInput({
   onClear,
   inputRef,
 }: SearchInputProps) {
-  const shortcut =
-    typeof navigator !== 'undefined' &&
-    /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
-      ? '⌘K'
-      : 'Ctrl K'
+  const shortcut = isMac ? '⌘K' : 'Ctrl K'
 
   return (
     <div className="relative">

@@ -30,6 +30,18 @@ function formatTokens(n: number): string {
   return String(n)
 }
 
+/**
+ * The meter only carries information once tokens have been consumed; on a
+ * fresh session a full-width colored track reads as a stray strip, so stay
+ * hidden until there is real usage (also covers the pre-load state).
+ */
+export function shouldRenderContextBar(ctx: ContextData): boolean {
+  return ctx.usedTokens > 0
+}
+
+// Neutral track so only the fill carries the usage color.
+const TRACK_BG = 'bg-[var(--theme-border)]/50'
+
 function ContextBarComponent({
   compact: _compact,
   sessionId,
@@ -85,8 +97,7 @@ function ContextBarComponent({
   const pct = ctx.contextPercent
   const clampedPct = Math.min(Math.max(pct, 0), 100)
 
-  // Hide only before any model/context info has loaded.
-  if (ctx.maxTokens <= 0 && ctx.usedTokens <= 0 && !ctx.model) return null
+  if (!shouldRenderContextBar(ctx)) return null
   const isCritical = clampedPct > 90
   const isDanger = clampedPct >= 75 && clampedPct <= 90
   const isWarning = clampedPct >= 50 && clampedPct < 75
@@ -126,7 +137,7 @@ function ContextBarComponent({
           aria-label={`Context: ${Math.round(clampedPct)}% used`}
         />
         {/* Bar — always 3px, never moves */}
-        <div className={cn('w-full h-[3px]', barBg)}>
+        <div className={cn('w-full h-[3px]', TRACK_BG)}>
           <div
             className={cn(
               'h-full transition-all duration-700 ease-out',
@@ -155,8 +166,8 @@ function ContextBarComponent({
       <PreviewCardTrigger className="block w-full cursor-pointer">
         <div
           className={cn(
-            'shrink-0 w-full h-2 transition-colors duration-300 relative',
-            barBg,
+            'shrink-0 w-full h-[3px] transition-colors duration-300 relative',
+            TRACK_BG,
           )}
         >
           <div

@@ -29,6 +29,8 @@ import {
 } from './chat-composer-model-switch'
 import { ContextBar } from './context-bar'
 import { useComposerMenus } from './use-composer-menus'
+import { resolveRuntimeModelLabel } from '../utils'
+import { isMac } from '@/lib/platform'
 import type { CSSProperties, Ref } from 'react'
 
 import type { ModelCatalogEntry, ModelSwitchResponse } from '@/lib/model-types'
@@ -1244,7 +1246,11 @@ function ChatComposerComponent({
   // Derive the label directly from the store so navigation between sessions
   // updates without a render-window flash from a stale React-state mirror.
   const modelButtonLabel =
-    persistedSessionModel || currentModel || configuredModel || '⚕ Hermes Agent'
+    resolveRuntimeModelLabel(
+      persistedSessionModel,
+      currentModel,
+      configuredModel,
+    ) || '⚕ Hermes Agent'
 
   // Measure composer height and set CSS variable for scroll padding
   useLayoutEffect(() => {
@@ -1715,7 +1721,7 @@ function ChatComposerComponent({
   const hasDraft = value.trim().length > 0 || attachments.length > 0
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
-    : 'Ask anything... (↵ to send · ⇧↵ new line · ⌘⇧M switch model)'
+    : `Ask anything... (↵ to send · ⇧↵ new line · ${isMac ? '⌘⇧M' : 'Ctrl+Shift+M'} switch model)`
   const [serverCommands, setServerCommands] = useState<Array<SlashCommandDefinition>>([])
 
   useEffect(() => {

@@ -3,11 +3,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-
-const isMac =
-  typeof navigator !== 'undefined' &&
-  /Mac|iPod|iPhone|iPad/.test(navigator.userAgent)
-const MOD = isMac ? '⌘' : 'Ctrl'
+import { MOD } from '@/lib/platform'
 
 const SHORTCUT_GROUPS = [
   {
