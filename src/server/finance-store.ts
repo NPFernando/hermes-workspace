@@ -16,6 +16,7 @@ export const TRADING_MODES = [
   'live_recommend_only',
   'live_manual_approval',
   'live_auto_trade',
+  'live_monitored',
 ] as const
 export const DECISIONS = [
   'BUY_NOW',
@@ -289,6 +290,8 @@ export type VirtualAccount = {
   totalTrades: number
   winningTrades: number
   totalPnl: number
+  totalCost: number
+  totalQuantity: number
   totalPnlPercentage: number
   availableBalance?: number
   marginUsed?: number
@@ -326,6 +329,8 @@ export type FinanceSettings = {
   tradingMode: TradingMode
   liveTradingEnabled: boolean
   emergencyKillSwitch: boolean
+  monitoringActive: boolean   // for live_monitored mode
+  autonomousTradingEnabled: boolean   // for live_auto_trade mode
   binanceWithdrawalsAllowed: false
   leverageEnabled: false
   futuresEnabled: false
@@ -341,7 +346,7 @@ export type FinanceSettings = {
     requireStopLoss: boolean
     requireTakeProfitOrExitCondition: boolean
   }
-  }
+}
 
   export type FinanceDatabase = {
   schemaVersion: number
@@ -391,6 +396,8 @@ function defaultSettings(): FinanceSettings {
     tradingMode: 'observe_only',
     liveTradingEnabled: false,
     emergencyKillSwitch: true,
+    monitoringActive: false,
+    autonomousTradingEnabled: false,
     binanceWithdrawalsAllowed: false,
     leverageEnabled: false,
     futuresEnabled: false,
@@ -721,7 +728,9 @@ export function createVirtualAccount(payload: AddPayload, base?: { id: string; s
     totalTrades: numberField(payload, 'totalTrades', 0),
     winningTrades: numberField(payload, 'winningTrades', 0),
     totalPnl: optionalNumber(payload, 'totalPnl') ?? 0,
-    totalPnlPercentage: optionalNumber(payload, 'totalPnlPercentage') ?? 0,
+    totalCost: numberField(payload, 'totalCost', 0),
+    totalQuantity: numberField(payload, 'totalQuantity', 0),
+    totalPnlPercentage: numberField(payload, 'totalPnlPercentage', 0),
   }
 }
 
@@ -849,18 +858,43 @@ export function executeTradingPlan(planId: string, useTestnet: boolean = false):
 
   // Check if trading mode allows execution
   const mode = db.settings.tradingMode
-  if (mode === 'observe_only') {
-    throw new Error('Trading is disabled in observe_only mode')
+  switch (mode) {
+    case 'observe_only':
+      throw new Error('Trading is disabled in observe_only mode')
+    case 'live_recommend_only':
+      if (!db.settings.liveTradingEnabled) {
+        throw new Error('Live trading is not enabled')
+      }
+      break
+    case 'live_manual_approval':
+      if (!db.settings.liveTradingEnabled) {
+        throw new Error('Live trading is not enabled')
+      }
+      break
+    case 'live_auto_trade':
+      if (!db.settings.liveTradingEnabled) {
+        throw new Error('Live trading is not enabled')
+      }
+      if (!db.settings.autonomousTradingEnabled) {
+        throw new Error('Autonomous trading must be enabled for live_auto_trade mode')
+      }
+      break
+    case 'live_monitored':
+      if (!db.settings.liveTradingEnabled) {
+        throw new Error('Live trading is not enabled')
+      }
+      if (!db.settings.monitoringActive) {
+        throw new Error('Monitoring must be active for live_monitored mode')
+      }
+      break
+    case 'paper_trade':
+    case 'testnet_execute':
+      // allowed, no extra checks
+      break
+    default:
+      // Should not happen due to type, but keep for safety
+      throw new Error('Unknown trading mode')
   }
-
-  if (mode === 'live_recommend_only' || mode === 'live_manual_approval' || mode === 'live_auto_trade') {
-    if (!db.settings.liveTradingEnabled) {
-      throw new Error('Live trading is not enabled')
-    }
-  }
-
-  // For paper_trade or testnet_execute, we can proceed with simulation
-  // For live modes, we would integrate with actual exchange APIs
 
   // Create market order based on plan
   const orderPayload: any = {
@@ -919,14 +953,27 @@ export function executeTradingPlan(planId: string, useTestnet: boolean = false):
     // Buying: decrease cash balance, increase position value
     const cost = order.quantity * executionPrice + execution.fees
     account.balance -= cost
+    account.totalQuantity += order.quantity
+    account.totalCost += cost
     // In a real system, we'd track positions separately
   } else {
     // Selling: increase cash balance, decrease position value
     const revenue = order.quantity * executionPrice - execution.fees
     account.balance += revenue
-    // Calculate P&L (simplified)
-    account.totalPnl += revenue
-    account.winningTrades += revenue > 0 ? 1 : 0
+    // Calculate realized P&L
+    if (account.totalQuantity > 0) {
+      const averageCost = account.totalCost / account.totalQuantity
+      const costOfSold = averageCost * order.quantity
+      const realizedProfit = revenue - costOfSold
+      account.totalPnl += realizedProfit
+      account.winningTrades += realizedProfit > 0 ? 1 : 0
+      account.totalQuantity -= order.quantity
+      account.totalCost -= costOfSold
+    } else {
+      // No position to sell; treat as realized loss (or ignore)
+      account.totalPnl += revenue
+      account.winningTrades += revenue > 0 ? 1 : 0
+    }
   }
   account.totalTrades += 1
   account.updatedAt = new Date().toISOString()
@@ -1274,7 +1321,7 @@ export function convertCurrency(
   }
 
   // Try direct rate
-  let rate = getExchangeRate(fromCurrency, toCurrency, date)
+  const rate = getExchangeRate(fromCurrency, toCurrency, date)
   if (rate !== undefined) {
     return amount * rate
   }

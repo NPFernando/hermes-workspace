@@ -34,6 +34,9 @@ const VT_WORKERS = [
 ]
 
 type JsonRecord = Record<string, unknown>
+type BiasSummary = JsonRecord & {
+  candidates: Array<JsonRecord>
+}
 
 function safeStat(filePath: string): fs.Stats | null {
   try {
@@ -124,14 +127,14 @@ function readWorkerRuntime(workerId: string): JsonRecord {
   }
 }
 
-function summarizeLatestBias(records: Array<JsonRecord>): JsonRecord | null {
+function summarizeLatestBias(records: Array<JsonRecord>): BiasSummary | null {
   if (records.length === 0) return null
   const latest = records[records.length - 1]
-  const candidates = Array.isArray(latest.council_candidates)
+  const candidates = (Array.isArray(latest.council_candidates)
     ? latest.council_candidates
     : Array.isArray(latest.assets)
       ? latest.assets
-      : []
+      : []) as Array<JsonRecord>
   return {
     generatedAt:
       latest.generated_at ?? latest.generatedAt ?? latest.timestamp ?? null,
@@ -222,6 +225,16 @@ export const Route = createFileRoute('/api/vt-capital')({
         const lastRiskCheck = lastOrderProposed ?? sourceProposal(
           executedRecords.at(-1) ?? null,
         )
+        const latestBias = summarizeLatestBias(biasRecords);
+        // Enhance candidates with risk check info
+        if (latestBias && lastRiskCheck && typeof lastRiskCheck.symbol === 'string') {
+          const symbol = lastRiskCheck.symbol
+          for (const candidate of latestBias.candidates) {
+            if (candidate.asset === symbol) {
+              candidate.risk_check = { ...lastRiskCheck };
+            }
+          }
+        }
         return json({
           ok: true,
           checkedAt: Date.now(),
@@ -243,7 +256,7 @@ export const Route = createFileRoute('/api/vt-capital')({
             fileExists: Boolean(biasStat),
             updatedAt: biasStat?.mtimeMs ?? null,
             sizeBytes: biasStat?.size ?? 0,
-            latest: summarizeLatestBias(biasRecords),
+            latest: latestBias,
             recent: biasRecords.slice(-5),
           },
           council: {
