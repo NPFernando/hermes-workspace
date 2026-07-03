@@ -20,6 +20,31 @@ type SisterPickerProps = {
   onSelect: (id: string | null) => void
 }
 
+/**
+ * Hide delegation-profile entries whose display name collides with an AI
+ * sister (e.g. the "researcher" profile is also named Luna) — in the picker
+ * they read as duplicate pills. The full list still flows everywhere else
+ * (auto-routing addresses delegation profiles by id), and a hidden profile
+ * reappears while it is selected, auto-routed, or being orchestrated so the
+ * active state stays visible.
+ */
+export function dedupeSistersForPicker(
+  sisters: Array<SisterOption>,
+  keepIds?: ReadonlySet<string>,
+): Array<SisterOption> {
+  const aiSisterNames = new Set(
+    sisters
+      .filter((s) => s.type !== 'delegation_profile' && s.type !== 'business_agent')
+      .map((s) => s.name.toLowerCase()),
+  )
+  return sisters.filter(
+    (s) =>
+      s.type !== 'delegation_profile' ||
+      !aiSisterNames.has(s.name.toLowerCase()) ||
+      keepIds?.has(s.id),
+  )
+}
+
 export function SisterPicker({
   sisters,
   selectedId,
@@ -28,7 +53,13 @@ export function SisterPicker({
   orchestratingSisterIds,
   onSelect,
 }: SisterPickerProps) {
-  if (sisters.length === 0) return null
+  const activeIds = new Set<string>(
+    [selectedId, autoSelectedId, ...(orchestratingSisterIds ?? [])].filter(
+      (id): id is string => Boolean(id),
+    ),
+  )
+  const visibleSisters = dedupeSistersForPicker(sisters, activeIds)
+  if (visibleSisters.length === 0) return null
 
   const hasOverride = Boolean(selectedId || autoSelectedId)
 
@@ -38,7 +69,7 @@ export function SisterPicker({
       {orchestrating && !orchestratingSisterIds?.length && (
         <span className="text-xs text-muted-foreground animate-pulse mr-1">🌟 Astra orchestrating…</span>
       )}
-      {sisters.map((s) => {
+      {visibleSisters.map((s) => {
         const isManual = selectedId === s.id
         const isAuto = !isManual && autoSelectedId === s.id
         const isOrchestrating = orchestrating && orchestratingSisterIds?.includes(s.id)

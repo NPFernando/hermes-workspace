@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowDown01Icon,
@@ -1405,44 +1406,55 @@ export function AgentViewPanel() {
         </AnimatePresence>
       )}
 
-      <AnimatePresence>
-        {showFloatingToggle ? (
-          <motion.button
-            type="button"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            onClick={function handleOpenPanel() {
-              setOpen(true)
-            }}
-            className="fixed right-4 bottom-4 z-30 inline-flex size-12 items-center justify-center rounded-full bg-linear-to-br from-accent-500 to-accent-600 text-[var(--theme-text)] shadow-lg"
-            aria-label="Open Agent View"
-          >
-            <motion.span
-              animate={
-                activeCount > 0
-                  ? {
-                      scale: [1, 1.05, 1],
-                      opacity: [0.95, 1, 0.95],
+      {/* Portaled to <body>: a transformed/animated ancestor becomes the
+          containing block for position:fixed, which shoved this toggle past
+          the viewport edge. The offset tracks the metrics footer height. */}
+      {typeof document !== 'undefined'
+        ? createPortal(
+            <AnimatePresence>
+              {showFloatingToggle ? (
+                <motion.button
+                  type="button"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  onClick={function handleOpenPanel() {
+                    setOpen(true)
+                  }}
+                  className="fixed right-4 z-30 inline-flex size-12 items-center justify-center rounded-full bg-linear-to-br from-accent-500 to-accent-600 text-[var(--theme-text)] shadow-lg"
+                  style={{ bottom: 'calc(var(--metrics-footer-h, 0px) + 1rem)' }}
+                  aria-label="Open Agent View"
+                >
+                  <motion.span
+                    animate={
+                      activeCount > 0
+                        ? {
+                            scale: [1, 1.05, 1],
+                            opacity: [0.95, 1, 0.95],
+                          }
+                        : { scale: 1, opacity: 1 }
                     }
-                  : { scale: 1, opacity: 1 }
-              }
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-              className="inline-flex"
-            >
-              <HugeiconsIcon icon={BotIcon} size={20} strokeWidth={1.5} />
-            </motion.span>
-            <span className="absolute -top-1 -right-1 inline-flex size-5 items-center justify-center rounded-full bg-[var(--theme-bg)] text-[11px] font-medium text-[var(--theme-text)] tabular-nums">
-              {activeCount}
-            </span>
-          </motion.button>
-        ) : null}
-      </AnimatePresence>
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                    }}
+                    className="inline-flex"
+                  >
+                    <HugeiconsIcon icon={BotIcon} size={20} strokeWidth={1.5} />
+                  </motion.span>
+                  {activeCount > 0 ? (
+                    <span className="absolute -top-1 -right-1 inline-flex size-5 items-center justify-center rounded-full bg-[var(--theme-bg)] text-[11px] font-medium text-[var(--theme-text)] tabular-nums">
+                      {activeCount}
+                    </span>
+                  ) : null}
+                </motion.button>
+              ) : null}
+            </AnimatePresence>,
+            document.body,
+          )
+        : null}
 
       <AgentChatModal
         open={selectedAgentChat !== null}

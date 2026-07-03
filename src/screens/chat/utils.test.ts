@@ -39,3 +39,21 @@ describe('chat utils workspace directive cleanup', () => {
     expect(sessions[1]?.derivedTitle).toBe('Fix Docker publish')
   })
 })
+
+describe('resolveRuntimeModelLabel', () => {
+  it('prefers the per-session override', async () => {
+    const { resolveRuntimeModelLabel } = await import('./utils')
+    expect(resolveRuntimeModelLabel('override-model', 'live', 'configured')).toBe('override-model')
+  })
+
+  it('falls back to the live session model, then the configured model', async () => {
+    const { resolveRuntimeModelLabel } = await import('./utils')
+    expect(resolveRuntimeModelLabel(undefined, 'live', 'configured')).toBe('live')
+    expect(resolveRuntimeModelLabel(undefined, '', 'configured')).toBe('configured')
+  })
+
+  it('returns empty string when nothing is known', async () => {
+    const { resolveRuntimeModelLabel } = await import('./utils')
+    expect(resolveRuntimeModelLabel(undefined, '', '')).toBe('')
+  })
+})

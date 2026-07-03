@@ -73,18 +73,35 @@ function getSessionShortId(session: SessionMeta): string {
   return ''
 }
 
-function getSessionDisplayTitle(
+// Gateway-written titles often embed a date suffix ("key · Jul 2"), which the
+// title line truncates mid-date while the subtitle already shows a timestamp.
+// Conservative, end-anchored: only a "·"/"•"-separated date-ish tail is
+// removed, never arbitrary text.
+const TRAILING_DATE_SUFFIX_RE = new RegExp(
+  String.raw`\s+[·•]\s+(?:` +
+    String.raw`(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}(?:,\s*\d{4})?(?:\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s?[AP]M)?)?` +
+    String.raw`|\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?` +
+    String.raw`)$`,
+  'i',
+)
+
+export function stripTrailingDateSuffix(title: string): string {
+  const stripped = title.replace(TRAILING_DATE_SUFFIX_RE, '').trim()
+  return stripped.length > 0 ? stripped : title
+}
+
+export function getSessionDisplayTitle(
   session: SessionMeta,
   isGenerating: boolean,
 ): string {
   const label = normalizeTitleValue(session.label)
-  if (label) return label
+  if (label) return stripTrailingDateSuffix(label)
 
   const derivedTitle = normalizeTitleValue(session.derivedTitle)
-  if (derivedTitle) return derivedTitle
+  if (derivedTitle) return stripTrailingDateSuffix(derivedTitle)
 
   const title = normalizeTitleValue(session.title)
-  if (title) return title
+  if (title) return stripTrailingDateSuffix(title)
 
   if (isGenerating) return 'Naming…'
   const shortId = getSessionShortId(session)
@@ -94,6 +111,15 @@ function getSessionDisplayTitle(
 function getFriendlyIdLabel(friendlyId: string): string {
   if (!isUuidLike(friendlyId)) return friendlyId
   return `ID ${friendlyId.slice(0, 8)}`
+}
+
+/** The subtitle repeats the session key; skip it when the visible title
+ *  already contains it (e.g. title "atlas_prompt_update" + id the same). */
+export function shouldShowFriendlyId(
+  title: string,
+  friendlyId: string,
+): boolean {
+  return !title.toLowerCase().includes(friendlyId.toLowerCase())
 }
 
 function SessionItemComponent({
@@ -122,9 +148,11 @@ function SessionItemComponent({
     const parts: Array<string> = []
     const formatted = formatSessionTimestamp(updatedAt)
     if (formatted) parts.push(formatted)
-    if (session.friendlyId) parts.push(getFriendlyIdLabel(session.friendlyId))
+    if (session.friendlyId && shouldShowFriendlyId(baseTitle, session.friendlyId)) {
+      parts.push(getFriendlyIdLabel(session.friendlyId))
+    }
     return parts.join(' • ')
-  }, [isError, session.friendlyId, session.titleError, updatedAt])
+  }, [baseTitle, isError, session.friendlyId, session.titleError, updatedAt])
 
   return (
     <Link

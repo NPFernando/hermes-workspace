@@ -8,6 +8,21 @@ import type {
   ToolCallContent,
 } from './types'
 
+/**
+ * Resolve the model label the runtime will actually use for a session:
+ * per-session override → live session-status model → first configured model.
+ * Returns '' when nothing is known yet; callers supply their own fallback.
+ * Shared by the composer button and the empty-state chip so the two can
+ * never disagree.
+ */
+export function resolveRuntimeModelLabel(
+  persistedSessionModel: string | undefined,
+  currentModel: string,
+  configuredModel: string,
+): string {
+  return persistedSessionModel || currentModel || configuredModel || ''
+}
+
 export function deriveFriendlyIdFromKey(key: string | undefined): string {
   if (!key) return 'main'
   const trimmed = key.trim()
