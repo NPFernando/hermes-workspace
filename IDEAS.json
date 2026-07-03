@@ -322,5 +322,23 @@
     "description": "Add a lightweight check that reports root-level ad-hoc test scripts before they get accidentally collected by the default test runner.",
     "category": "config",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Add workspace shell component regression tests",
+    "description": "workspace-shell.tsx, mobile-hamburger-menu.tsx, mobile-tab-bar.tsx, and use-swipe-navigation.ts all have uncommitted shell navigation changes. Add focused unit/component tests for shell behavior (mobile menu toggle, tab bar active-route detection, swipe-to-navigate gestures) to lock in expected behavior before committing.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Systematic root scratch artifact cleanup with .gitignore rules",
+    "description": "Archive all 25+ untracked root/docs/src scratch files (docs/, risk_model_prototype/, market_data_spec/, news_intelligence_*, TASK_SUMMARY.md, TASK_VERIFICATION.md, WORK_SUMMARY.txt, TRADING_ALERT_SYSTEM_DESIGN.md, ebbinghaus_model.md, investment_platforms_market_data_requirements.md, and the deleted testCurrencyConversion.ts) to /srv/projects/auto-improvement-reports/scratch-2026-07-03/. Add .gitignore patterns for *.mmd, investment_platforms_*, market_data_*, news_intelligence_*, risk_model_prototype/, ebbinghaus_*, trading_alert_*, and common scratch suffixes to prevent future root pollution.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Integrate orphaned untracked API routes with tests",
+    "description": "The worktree has untracked API routes in src/routes/api/ (native-cron-overview.ts, native-dashboard-capabilities.ts, ops-logs.ts) and src/lib/ops-snapshot-regression.ts. Review each for quality, add auth guards and focused API tests, and either integrate properly into the route tree or archive to external reports.",
+    "category": "api",
+    "estimated_effort": "medium"
   }
 ]
