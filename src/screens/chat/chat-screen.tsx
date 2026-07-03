@@ -1111,8 +1111,38 @@ export function ChatScreen({
   const persistedSessionModel = useSessionModelStore((s) =>
     s.getModel(composerSessionKey),
   )
+  // Status query with the composer's exact key semantics: NO sessionKey param
+  // on a new chat (the server then reports the live default session), unlike
+  // currentModelQuery above which asks for the not-yet-created key and gets
+  // the gateway's placeholder model back.
+  const chipModelQuery = useQuery({
+    queryKey: ['claude', 'empty-state-model', composerSessionKey ?? 'default'],
+    queryFn: async () => {
+      try {
+        const query = composerSessionKey?.trim()
+          ? `?sessionKey=${encodeURIComponent(composerSessionKey.trim())}`
+          : ''
+        const res = await fetch(`/api/session-status${query}`)
+        if (!res.ok) return ''
+        const data = await res.json()
+        const payload = data.payload ?? data
+        if (payload.model) return String(payload.model)
+        if (payload.currentModel) return String(payload.currentModel)
+        return ''
+      } catch {
+        return ''
+      }
+    },
+    refetchInterval: 30_000,
+    retry: false,
+  })
   const configuredModel = useMemo(() => {
-    const models = modelsQuery.data?.models ?? []
+    // /api/models responds with { data: [...] } (OpenAI-style) or { models },
+    // matching the composer's fetchModels() normalization.
+    const raw = modelsQuery.data
+    const models: Array<any> = Array.isArray(raw)
+      ? raw
+      : raw?.models ?? raw?.data ?? []
     if (!models.length) return ''
     const first = models[0]
     return typeof first === 'string' ? first : first.id || first.name || ''
@@ -1120,7 +1150,7 @@ export function ChatScreen({
   // Mirrors the composer's model-button label so the two never disagree.
   const runtimeModelLabel = resolveRuntimeModelLabel(
     persistedSessionModel,
-    currentModel,
+    _localModelOverride || chipModelQuery.data || '',
     configuredModel,
   )
 
