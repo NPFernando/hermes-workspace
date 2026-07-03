@@ -67,6 +67,13 @@ This registry groups supported environment keys so deployments can audit what is
 - `API_SERVER_KEY`
 - `HERMES_PASSWORD`
 
+## Trading and market data
+
+- `BINANCE_TESTNET_API_KEY`
+- `BINANCE_TESTNET_API_SECRET`
+- `BINANCE_TESTNET_BASE_URL`
+- `BINANCE_API_KEY` / `BINANCE_API_SECRET` only when explicitly moving beyond testnet; do not use live keys for demo-account tests.
+
 ## Platforms and auth
 
 - `INFISICAL_CLIENT_ID`
