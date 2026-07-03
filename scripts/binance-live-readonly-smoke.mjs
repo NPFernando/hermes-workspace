@@ -12,9 +12,7 @@ function parseEnvFile(filePath) {
     const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
     if (!match) continue
     let value = match[2].trim()
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1)
-    }
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1)
     env[match[1]] = value
   }
   return env
@@ -28,25 +26,23 @@ function redact(text) {
 
 const envFromFile = parseEnvFile(resolve(process.cwd(), '.env'))
 const mergedEnv = { ...envFromFile, ...process.env }
-const usesTestnetCredentials = Boolean(mergedEnv.BINANCE_TESTNET_API_KEY && mergedEnv.BINANCE_TESTNET_API_SECRET)
-const apiKey = mergedEnv.BINANCE_TESTNET_API_KEY
-const apiSecret = mergedEnv.BINANCE_TESTNET_API_SECRET
-const baseUrl = (mergedEnv.BINANCE_TESTNET_BASE_URL || 'https://testnet.binance.vision').replace(/\/$/, '')
-const isTestnetUrl = baseUrl.includes('testnet.binance.vision')
+const apiKey = mergedEnv.BINANCE_API_KEY
+const apiSecret = mergedEnv.BINANCE_API_SECRET
+const baseUrl = (mergedEnv.BINANCE_BASE_URL || 'https://api.binance.com').replace(/\/$/, '')
 const liveReadApproval = mergedEnv.BINANCE_ALLOW_LIVE_ACCOUNT_READ === 'I_APPROVE_LIVE_ACCOUNT_READ'
 
 if (!apiKey || !apiSecret) {
-  console.error('Missing Binance testnet credentials. Add BINANCE_TESTNET_API_KEY and BINANCE_TESTNET_API_SECRET to hermes-workspace/.env, then restart hermes-workspace.service. Production BINANCE_API_KEY/BINANCE_API_SECRET are intentionally ignored by this smoke test.')
+  console.error('Missing production Binance credentials. Add BINANCE_API_KEY and BINANCE_API_SECRET to hermes-workspace/.env for a live read-only account check.')
   process.exit(2)
 }
 
-if (!usesTestnetCredentials) {
-  console.error('Refusing to use production Binance key variables in the testnet smoke script. Use BINANCE_TESTNET_API_KEY/BINANCE_TESTNET_API_SECRET for demo tests.')
+if (!liveReadApproval) {
+  console.error('Refusing live Binance account access without BINANCE_ALLOW_LIVE_ACCOUNT_READ=I_APPROVE_LIVE_ACCOUNT_READ. This script is read-only but still touches the production account API.')
   process.exit(2)
 }
 
-if (!isTestnetUrl && !liveReadApproval) {
-  console.error('Refusing to contact a non-testnet Binance URL. Set BINANCE_ALLOW_LIVE_ACCOUNT_READ=I_APPROVE_LIVE_ACCOUNT_READ only for an intentional read-only production account check.')
+if (baseUrl.includes('testnet')) {
+  console.error('Refusing testnet URL in live read-only smoke script. Use scripts/binance-testnet-smoke.mjs for testnet/demo keys.')
   process.exit(2)
 }
 
@@ -59,23 +55,16 @@ async function requestJson(url, init = {}) {
   } catch {
     body = text
   }
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}: ${redact(typeof body === 'string' ? body : JSON.stringify(body))}`)
-  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${redact(typeof body === 'string' ? body : JSON.stringify(body))}`)
   return body
 }
 
 async function main() {
   await requestJson(`${baseUrl}/api/v3/ping`)
-  const params = new URLSearchParams({
-    timestamp: Date.now().toString(),
-    recvWindow: '5000',
-  })
+  const params = new URLSearchParams({ timestamp: Date.now().toString(), recvWindow: '5000' })
   const signature = createHmac('sha256', apiSecret).update(params.toString()).digest('hex')
   params.set('signature', signature)
-  const account = await requestJson(`${baseUrl}/api/v3/account?${params.toString()}`, {
-    headers: { 'X-MBX-APIKEY': apiKey },
-  })
+  const account = await requestJson(`${baseUrl}/api/v3/account?${params.toString()}`, { headers: { 'X-MBX-APIKEY': apiKey } })
   const balances = Array.isArray(account?.balances) ? account.balances : []
   const nonZeroBalances = balances
     .filter((item) => Number(item.free) > 0 || Number(item.locked) > 0)
@@ -83,12 +72,15 @@ async function main() {
     .map((item) => ({ asset: item.asset, free: item.free, locked: item.locked }))
   console.log(JSON.stringify({
     ok: true,
-    mode: 'spot-testnet-readonly-smoke',
+    mode: 'production-readonly-account-smoke',
     baseUrl,
     canPing: true,
     canReadAccount: true,
     accountType: account?.accountType ?? null,
     permissions: account?.permissions ?? [],
+    canTrade: account?.canTrade ?? null,
+    canWithdraw: account?.canWithdraw ?? null,
+    canDeposit: account?.canDeposit ?? null,
     nonZeroBalanceCount: nonZeroBalances.length,
     nonZeroBalances,
   }, null, 2))
