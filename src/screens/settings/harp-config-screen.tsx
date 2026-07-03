@@ -18,6 +18,7 @@ import type * as React from 'react'
 import type {
   HarpBlocklistEntry,
   HarpConfigView,
+  HarpHealthView,
   HarpTier,
   HarpTierModel,
 } from '@/server/harp-config-store'
@@ -123,6 +124,96 @@ function RoleBadge({ role }: { role: string }) {
     >
       {role.replace(/_/g, ' ')}
     </span>
+  )
+}
+
+function healthStatusClass(status: string): string {
+  if (status === 'ready') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+  if (status === 'cooldown') return 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+  return 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'
+}
+
+function compactDateTime(value: string | null | undefined): string {
+  if (!value) return 'n/a'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleString(undefined, {
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function HarpHealthPanel({ health }: { health?: HarpHealthView }) {
+  if (!health) return null
+  const blockedCount = health.cooldowns.length + health.deadCatalogModels.length
+  const primaryStatus = health.routes.find((route) => route.model === health.primaryModel)?.status ?? 'ready'
+  return (
+    <SectionCard
+      title="Live HARP Health"
+      description="Runtime cooldowns, selected route, and free/paid readiness"
+      icon={InformationCircleIcon}
+    >
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Selected route</p>
+          <p className="mt-1 truncate font-mono text-xs text-[var(--theme-text)]">{health.primaryProvider}/{health.primaryModel}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className={cn('rounded-md px-1.5 py-0.5 text-[10px] font-medium', healthStatusClass(primaryStatus))}>{primaryStatus}</span>
+            <span className="rounded-md bg-[var(--theme-hover)] px-1.5 py-0.5 text-[10px] text-[var(--theme-muted)]">{health.routeDecision}</span>
+          </div>
+        </div>
+        <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Blocked candidates</p>
+          <p className={cn('mt-1 text-2xl font-semibold', blockedCount > 0 ? 'text-amber-500' : 'text-emerald-500')}>{blockedCount}</p>
+          <p className="mt-1 text-[11px] text-[var(--theme-muted)]">{health.cooldowns.length} cooldown · {health.deadCatalogModels.length} missing catalog</p>
+        </div>
+        <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">OpenRouter credits</p>
+          <p className="mt-1 text-xs text-[var(--theme-text)]">{health.openrouterCredits || 'not checked'}</p>
+          <p className="mt-1 text-[10px] text-[var(--theme-muted)]">Updated {compactDateTime(health.generatedAt)}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-semibold text-[var(--theme-text)]">Route chain</p>
+            <span className="text-[10px] text-[var(--theme-muted)]">debugging / complex</span>
+          </div>
+          <div className="space-y-1.5">
+            {health.routes.slice(0, 8).map((route) => (
+              <div key={`${route.provider}:${route.model}`} className="flex items-center gap-2 rounded-lg bg-[var(--theme-panel)] px-2 py-1.5">
+                <span className={cn('shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium', healthStatusClass(route.status))}>{route.status}</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--theme-text)]">{route.provider}/{route.model}</span>
+                <span className="text-[10px] text-[var(--theme-muted)]">{route.tier}</span>
+              </div>
+            ))}
+            {health.routes.length === 0 && <p className="text-xs text-[var(--theme-muted)]">No route data available.</p>}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-semibold text-[var(--theme-text)]">Active cooldowns</p>
+            <span className="text-[10px] text-[var(--theme-muted)]">runtime DB</span>
+          </div>
+          <div className="space-y-1.5">
+            {health.cooldowns.slice(0, 8).map((item) => (
+              <div key={item.modelId} className="rounded-lg bg-[var(--theme-panel)] px-2 py-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--theme-text)]">{item.modelId}</span>
+                  <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">{item.cooldownReason ?? 'cooldown'}</span>
+                </div>
+                <p className="mt-0.5 text-[10px] text-[var(--theme-muted)]">until {compactDateTime(item.cooldownUntil)} · failures {item.failures} · 429s {item.rateLimitCount}</p>
+              </div>
+            ))}
+            {health.cooldowns.length === 0 && <p className="text-xs text-[var(--theme-muted)]">No active cooldowns.</p>}
+          </div>
+        </div>
+      </div>
+    </SectionCard>
   )
 }
 
@@ -602,6 +693,8 @@ export function HarpConfigScreen() {
         </div>
         <div className="flex items-center gap-2">{savingIndicator}</div>
       </div>
+
+      <HarpHealthPanel health={data.health} />
 
       {/* Global settings */}
       <SectionCard
