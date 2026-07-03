@@ -72,7 +72,7 @@ This registry groups supported environment keys so deployments can audit what is
 - `BINANCE_TESTNET_API_KEY`
 - `BINANCE_TESTNET_API_SECRET`
 - `BINANCE_TESTNET_BASE_URL`
-- `BINANCE_API_KEY` / `BINANCE_API_SECRET` for the user's main Binance account only when explicitly needed; start with account read-only checks, keep them separate from testnet keys, disable withdrawals, disable futures/margin/leverage, and require an explicit approval flag before any production account access.
+- `BINANCE_API_KEY` / `BINANCE_API_SECRET` for the user's main Binance account only when explicitly needed; initial production access must be read-only. Disable withdrawals, Universal Transfer, Margin Loan/Repay/Transfer, Prediction Trading, futures, margin, and leverage permissions. Spot trading may be enabled later only after Hermes approval/risk controls are live. Use Binance IP restrictions where available.
 - `BINANCE_BASE_URL` defaults to `https://api.binance.com` for production/main-account read-only checks.
 - `BINANCE_ALLOW_LIVE_ACCOUNT_READ` must equal `I_APPROVE_LIVE_ACCOUNT_READ` before tooling may contact a non-testnet Binance URL for a read-only account check.
 

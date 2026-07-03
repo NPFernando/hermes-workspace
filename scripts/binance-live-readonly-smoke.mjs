@@ -65,6 +65,14 @@ async function main() {
   const signature = createHmac('sha256', apiSecret).update(params.toString()).digest('hex')
   params.set('signature', signature)
   const account = await requestJson(`${baseUrl}/api/v3/account?${params.toString()}`, { headers: { 'X-MBX-APIKEY': apiKey } })
+  if (account?.canWithdraw === true) {
+    throw new Error('Unsafe Binance API key: account reports canWithdraw=true. Disable withdrawals or revoke this key before using it with Hermes.')
+  }
+  const permissions = Array.isArray(account?.permissions) ? account.permissions : []
+  const riskyPermissions = permissions.filter((permission) => String(permission).toUpperCase().match(/MARGIN|FUTURE|LEVERAGE|TRANSFER|WITHDRAW|PREDICTION/))
+  if (riskyPermissions.length > 0) {
+    throw new Error(`Unsafe Binance API key permissions: ${riskyPermissions.join(', ')}. Use a read-only key first; add spot trading only after Hermes approval/risk controls are enabled.`)
+  }
   const balances = Array.isArray(account?.balances) ? account.balances : []
   const nonZeroBalances = balances
     .filter((item) => Number(item.free) > 0 || Number(item.locked) > 0)
