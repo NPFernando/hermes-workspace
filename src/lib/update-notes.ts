@@ -65,6 +65,22 @@ export function storeNotes(
   return notes
 }
 
+/** Read the last stored release notes regardless of seen-state (for
+ * re-opening the digest from the notification inbox). */
+export function readStoredNotes(): ReleaseNotes | null {
+  try {
+    const raw = localStorage.getItem(NOTES_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<ReleaseNotes>
+    if (typeof parsed.id !== 'string' || !Array.isArray(parsed.sections)) {
+      return null
+    }
+    return parsed as ReleaseNotes
+  } catch {
+    return null
+  }
+}
+
 export function markNotesSeen(notes: ReleaseNotes): void {
   try {
     localStorage.setItem(NOTES_SEEN_KEY, notes.id)

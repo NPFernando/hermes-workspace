@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { cn } from '@/lib/utils'
+import { Z_LAYER } from '@/lib/z-layers'
+import { useBannerSlot } from '@/stores/popup-queue-store'
+
 type CreditsLevel = 'ok' | 'warning' | 'critical' | 'exhausted'
 
 type CreditsData = {
@@ -69,7 +73,12 @@ export function OpenRouterCreditsBanner() {
     setVisible(false)
   }
 
-  if (!visible || !data || data.level === 'ok') return null
+  // Central banner lane: lower priority than the connection banner, so a
+  // disconnect notice always wins the docked strip.
+  const wanted = Boolean(visible && data && data.level !== 'ok')
+  const slotActive = useBannerSlot('openrouter-credits', 50, wanted)
+
+  if (!wanted || !slotActive || !data) return null
 
   const isExhausted = data.level === 'exhausted'
   const isCritical = data.level === 'critical'
@@ -86,7 +95,7 @@ export function OpenRouterCreditsBanner() {
 
   return (
     <div
-      className="fixed inset-x-0 z-40 px-4"
+      className={cn('fixed inset-x-0 px-4', Z_LAYER.banner)}
       style={{ top: 'calc(var(--titlebar-h, 0px) + 4px)' }}
     >
       <div

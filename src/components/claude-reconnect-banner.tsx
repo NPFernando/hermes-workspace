@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { Z_LAYER } from '@/lib/z-layers'
+import { useBannerSlot } from '@/stores/popup-queue-store'
 
 const POLL_INTERVAL_MS = 10_000
 const FLASH_DURATION_MS = 1_800
@@ -229,7 +231,13 @@ export function ClaudeReconnectBanner({
     }
   }
 
-  if (!enabled || bannerState === 'hidden') {
+  // Central banner lane: connection state outranks every other banner.
+  // The hook must run unconditionally (rules of hooks); "wanted" carries
+  // the visibility condition.
+  const wanted = enabled && bannerState !== 'hidden'
+  const slotActive = useBannerSlot('claude-reconnect', 100, wanted)
+
+  if (!wanted || !slotActive) {
     return null
   }
 
@@ -237,7 +245,7 @@ export function ClaudeReconnectBanner({
 
   return (
     <div
-      className="fixed inset-x-0 z-50 px-4 pt-3"
+      className={cn('fixed inset-x-0 px-4 pt-3', Z_LAYER.banner)}
       style={{ top: 'var(--titlebar-h, 0px)' }}
     >
       <div

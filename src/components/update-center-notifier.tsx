@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
 import { safeErrorMessage } from '@/lib/error-utils'
 import { NOTES_SEEN_KEY, shortSha, storeNotes } from '@/lib/update-notes'
+import { useNotificationCenterStore } from '@/stores/notification-center-store'
 
 type ProductId = 'workspace' | 'agent'
 type ProductUpdateStatus = {
@@ -108,6 +109,9 @@ function productDismissKey(product: ProductUpdateStatus): string {
 
 export function UpdateCenterNotifier() {
   const queryClient = useQueryClient()
+  const showUpdateCards = useNotificationCenterStore(
+    (s) => s.prefs.showUpdateCards,
+  )
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set())
   const [phases, setPhases] = useState<Record<ProductId, Phase>>({
     workspace: 'idle',
@@ -170,6 +174,8 @@ export function UpdateCenterNotifier() {
   // Post-apply notes (set in update() below) still show immediately.
 
   const visibleProducts = useMemo(() => {
+    // Settings → Notifications can hide the update cards entirely
+    if (!showUpdateCards) return []
     // Defensive: a malformed /api/update/status payload (missing products,
     // or products not shaped as {workspace, agent}) must degrade to "no
     // banner", not throw and take the whole route down with it. The widened
@@ -193,7 +199,7 @@ export function UpdateCenterNotifier() {
       if (phases[product.id] === 'done') return false
       return !dismissed.has(productDismissKey(product))
     })
-  }, [data, dismissed, phases])
+  }, [data, dismissed, phases, showUpdateCards])
 
   function dismiss(product: ProductUpdateStatus) {
     const key = productDismissKey(product)
