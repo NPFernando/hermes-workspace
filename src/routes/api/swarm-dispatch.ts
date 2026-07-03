@@ -86,6 +86,40 @@ const MAX_PROMPT_CHARS = 32_000
 const MAX_OUTPUT_CHARS = 200_000
 const DEFAULT_TIMEOUT_S = 240
 const MAX_TIMEOUT_S = 600
+const HARP_ROTATE_SCRIPT = '/srv/projects/_hermes-control/scripts/harp-rotate-delegate.py'
+const HARP_ROTATE_TIMEOUT_MS = 360_000
+
+type HarpRotationAttempt = {
+  provider?: string
+  model?: string
+  tier?: string
+  role?: string
+  status?: string
+  http_code?: number | null
+  error?: string
+  skipped_reason?: string
+  cooldown_until?: string
+}
+
+type HarpRotationOutput = {
+  status?: string
+  winner?: {
+    provider?: string
+    model?: string
+    tier?: string
+    role?: string
+  } | null
+  attempts?: Array<HarpRotationAttempt>
+  result_file?: string
+  openrouter_paid_credit_check?: string
+}
+
+type HarpRotationResult = {
+  ok: boolean
+  output: string
+  error: string | null
+  checkpoint?: ParsedSwarmCheckpoint | null
+}
 
 function getProfilesDir(): string {
   const base = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME
@@ -228,7 +262,7 @@ function parseAssignments(value: unknown): Array<AssignmentRequest> {
     const workerId = typeof obj.workerId === 'string' ? obj.workerId.trim() : ''
     const task = typeof obj.task === 'string' ? obj.task.trim() : ''
     const rationale = typeof obj.rationale === 'string' ? obj.rationale.trim() : undefined
-    const dependsOn = Array.isArray(obj.dependsOn) ? obj.dependsOn.filter((value): value is string => typeof value === 'string' && value.trim().length > 0) : undefined
+    const dependsOn = Array.isArray(obj.dependsOn) ? obj.dependsOn.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : undefined
     const reviewRequired = typeof obj.reviewRequired === 'boolean' ? obj.reviewRequired : undefined
     const direct = typeof obj.direct === 'boolean' ? obj.direct : undefined
     if (!workerId || !task || !validateWorkerId(workerId)) continue
@@ -612,7 +646,191 @@ async function captureTmuxPane(tmuxBin: string, sessionName: string): Promise<st
 function redactStartupOutput(output: string): string {
   return output
     .replace(/(sk-[A-Za-z0-9_-]{12,})/g, '[REDACTED]')
+    .replace(/(sk-or-v1-[A-Za-z0-9_-]{12,})/g, 'sk-or-v1-[REDACTED]')
     .replace(/(gh[pousr]_[A-Za-z0-9_]{12,})/g, '[REDACTED]')
+    .replace(/"user_id"\s*:\s*"[^"]+"/g, '"user_id":"REDACTED"')
+}
+
+function isLikelyModelRoutingFailure(error: string | null | undefined): boolean {
+  const text = (error ?? '').toLowerCase()
+  return Boolean(text.match(/model .*not found|model .*does not exist|openrouter|rate limit|rate-limited|quota|http 429|http 404|provider returned error|free-models-per-day|api call/))
+}
+
+function inferHarpTaskType(assignment: AssignmentRequest): string {
+  const text = `${assignment.workerId} ${assignment.task}`.toLowerCase()
+  if (text.match(/security|vulnerab|threat/)) return 'audit'
+  if (text.match(/review|gate|quality/)) return 'code_review'
+  if (text.match(/debug|bug|error|blocked|fix|failure|runtime/)) return 'debugging'
+  if (text.match(/implement|build|code|patch|ship/)) return 'code_generation'
+  if (text.match(/doc|handoff|readme|summary/)) return 'documentation'
+  if (text.match(/json|schema|extract|structured/)) return 'structured_output'
+  return assignment.workerId === 'reviewer' ? 'code_review' : assignment.workerId === 'qa' ? 'debugging' : 'code_generation'
+}
+
+function inferHarpRiskLevel(assignment: AssignmentRequest): string {
+  const text = assignment.task.toLowerCase()
+  if (text.match(/production|deploy|release|public|secret|credential|payment|security/)) return 'production'
+  if (text.match(/architecture|multi-step|autonomous|conductor|mission|webapp|runtime|gateway|service/)) return 'complex'
+  return 'standard'
+}
+
+function formatHarpAttempts(attempts: Array<HarpRotationAttempt> | undefined): string {
+  if (!attempts?.length) return 'No HARP rotation attempts were reported.'
+  return attempts.map((attempt, index) => {
+    const provider = attempt.provider ?? 'unknown'
+    const model = attempt.model ?? 'unknown'
+    const status = attempt.status ?? 'unknown'
+    const reason = attempt.error || attempt.skipped_reason || ''
+    const cooldown = attempt.cooldown_until ? ` cooldown=${attempt.cooldown_until}` : ''
+    const code = typeof attempt.http_code === 'number' ? ` HTTP ${attempt.http_code}` : ''
+    return `${index + 1}. ${provider}/${model} -> ${status}${code}${cooldown}${reason ? ` — ${reason.slice(0, 240)}` : ''}`
+  }).join('\n')
+}
+
+function readHarpRotationResponse(resultFile: string | undefined): string {
+  if (!resultFile || !existsSync(resultFile)) return ''
+  try {
+    const parsed = JSON.parse(readFileSync(resultFile, 'utf8')) as { response_full?: unknown; response_preview?: unknown }
+    const full = typeof parsed.response_full === 'string' ? parsed.response_full : ''
+    if (full.trim()) return full
+    return typeof parsed.response_preview === 'string' ? parsed.response_preview : ''
+  } catch {
+    return ''
+  }
+}
+
+function synthesizeHarpCheckpoint(rotation: HarpRotationOutput, response: string): ParsedSwarmCheckpoint {
+  const winner = rotation.winner
+  const result = response.trim()
+    ? response.trim().slice(0, 1600)
+    : `HARP rotation completed via ${winner?.provider ?? 'unknown'} / ${winner?.model ?? 'unknown'}`
+  const raw = [
+    'STATE: DONE',
+    'FILES_CHANGED: none',
+    'COMMANDS_RUN: HARP model rotation fallback',
+    `RESULT: ${result}`,
+    'BLOCKER: none',
+    'NEXT_ACTION: Review the fallback output and continue mission orchestration.',
+  ].join('\n')
+  return parseSwarmCheckpoint(raw) ?? {
+    stateLabel: 'DONE',
+    runtimeState: 'idle',
+    checkpointStatus: 'done',
+    filesChanged: 'none',
+    commandsRun: 'HARP model rotation fallback',
+    result,
+    blocker: 'none',
+    nextAction: 'Review the fallback output and continue mission orchestration.',
+    raw,
+  }
+}
+
+function runHarpRotationFallback(assignment: AssignmentRequest, prompt: string): Promise<HarpRotationResult> {
+  return new Promise((resolve) => {
+    if (!existsSync(HARP_ROTATE_SCRIPT)) {
+      resolve({ ok: false, output: '', error: `HARP rotation script missing at ${HARP_ROTATE_SCRIPT}` })
+      return
+    }
+    const args = [
+      HARP_ROTATE_SCRIPT,
+      '--task', inferHarpTaskType(assignment),
+      '--risk', inferHarpRiskLevel(assignment),
+      '--prompt', prompt,
+      '--max-attempts', process.env.HARP_SWARM_MAX_ATTEMPTS || '10',
+      '--allow-codex',
+      '--json',
+    ]
+    if (process.env.HARP_SWARM_ALLOW_PAID_OPENROUTER === '1') {
+      args.push('--allow-paid-openrouter')
+    }
+    execFile('python3', args, { timeout: HARP_ROTATE_TIMEOUT_MS, maxBuffer: MAX_OUTPUT_CHARS }, (error, stdout, stderr) => {
+      const stdoutStr = (stdout || '').toString()
+      const stderrStr = (stderr || '').toString()
+      let rotation: HarpRotationOutput | null = null
+      try {
+        rotation = JSON.parse(stdoutStr) as HarpRotationOutput
+      } catch {
+        resolve({ ok: false, output: stdoutStr, error: stderrStr.trim() || error?.message || 'HARP rotation returned non-JSON output' })
+        return
+      }
+      const attempts = formatHarpAttempts(rotation.attempts)
+      if (rotation.status !== 'success' || !rotation.winner) {
+        resolve({
+          ok: false,
+          output: stdoutStr,
+          error: [
+            'HARP model rotation exhausted all suitable fallbacks.',
+            attempts,
+            rotation.openrouter_paid_credit_check ? `OpenRouter paid credit check: ${rotation.openrouter_paid_credit_check}` : '',
+            rotation.result_file ? `Result file: ${rotation.result_file}` : '',
+          ].filter(Boolean).join('\n'),
+        })
+        return
+      }
+      const response = readHarpRotationResponse(rotation.result_file)
+      const parsedCheckpoint = response ? parseSwarmCheckpoint(response) : null
+      const checkpoint = parsedCheckpoint ?? synthesizeHarpCheckpoint(rotation, response)
+      resolve({
+        ok: true,
+        output: [
+          `HARP rotation fallback succeeded via ${rotation.winner.provider ?? 'unknown'} / ${rotation.winner.model ?? 'unknown'}.`,
+          rotation.result_file ? `Result file: ${rotation.result_file}` : '',
+          '',
+          response || checkpoint.raw,
+        ].filter(Boolean).join('\n'),
+        error: null,
+        checkpoint,
+      })
+    })
+  })
+}
+
+async function tryHarpRotationAfterModelFailure(input: {
+  workerId: string
+  assignment: AssignmentRequest
+  prompt: string
+  result: WorkerResult
+  options?: { missionId?: string | null; notifySessionKey?: string | null }
+  startedAt: number
+}): Promise<WorkerResult> {
+  const originalError = input.result.error || input.result.output
+  if (!isLikelyModelRoutingFailure(originalError)) return input.result
+  const rotated = await runHarpRotationFallback(input.assignment, input.prompt)
+  if (!rotated.ok) {
+    return {
+      ...input.result,
+      error: `${originalError}\n\n${rotated.error ?? 'HARP rotation failed.'}`,
+      output: [input.result.output, rotated.output].filter(Boolean).join('\n'),
+    }
+  }
+  if (rotated.checkpoint) {
+    markCheckpointResult(input.workerId, rotated.checkpoint, input.options?.notifySessionKey ?? 'main')
+    recordMissionCheckpoint({
+      missionId: input.options?.missionId,
+      assignmentId: input.assignment.assignmentId ?? null,
+      workerId: input.workerId,
+      checkpoint: rotated.checkpoint,
+      source: 'harp-rotation',
+    })
+    publishSwarmCheckpointNotification({
+      workerId: input.workerId,
+      missionId: input.options?.missionId ?? null,
+      assignmentId: input.assignment.assignmentId ?? null,
+      checkpoint: rotated.checkpoint,
+      notifySessionKey: input.options?.notifySessionKey ?? 'main',
+    })
+  }
+  return {
+    workerId: input.workerId,
+    ok: true,
+    output: rotated.output,
+    error: null,
+    durationMs: Date.now() - input.startedAt,
+    exitCode: 0,
+    delivery: 'oneshot',
+    checkpoint: rotated.checkpoint ?? null,
+    checkpointStatus: rotated.checkpoint ? 'checkpointed' : 'not-requested',
+  }
 }
 
 async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmuxBin: string; sessionName: string } | { ok: false; error: string }> {
@@ -841,9 +1059,19 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
     // Prefer the persistent live agent session when available/startable.
     const liveResult = await sendPromptToLiveSession(workerId, prompt)
     if (liveResult) {
-      markDispatchResult(workerId, liveResult)
-      if (options?.waitForCheckpoint && liveResult.ok) {
-        const checkpoint = await waitForFreshCheckpoint(
+      const effectiveLiveResult = liveResult.ok
+        ? liveResult
+        : await tryHarpRotationAfterModelFailure({
+          workerId,
+          assignment,
+          prompt,
+          result: liveResult,
+          options,
+          startedAt,
+        })
+      markDispatchResult(workerId, effectiveLiveResult)
+      if (options?.waitForCheckpoint && effectiveLiveResult.ok) {
+        const checkpoint = effectiveLiveResult.checkpoint ?? await waitForFreshCheckpoint(
           workerId,
           previousRaw,
           baselineRuntimeSignature,
@@ -894,19 +1122,19 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
             checkpoint,
             notifySessionKey: options.notifySessionKey ?? 'main',
           })
-          liveResult.checkpoint = checkpoint
-          liveResult.checkpointStatus = 'checkpointed'
-          liveResult.output = `${liveResult.output}\nCheckpoint ${checkpoint.stateLabel}: ${checkpoint.result ?? 'no result'}`
+          effectiveLiveResult.checkpoint = checkpoint
+          effectiveLiveResult.checkpointStatus = 'checkpointed'
+          effectiveLiveResult.output = `${effectiveLiveResult.output}\nCheckpoint ${checkpoint.stateLabel}: ${checkpoint.result ?? 'no result'}`
         } else {
-          liveResult.checkpoint = null
-          liveResult.checkpointStatus = 'timeout'
-          liveResult.output = `${liveResult.output}\nNo fresh checkpoint before poll timeout.`
+          effectiveLiveResult.checkpoint = null
+          effectiveLiveResult.checkpointStatus = 'timeout'
+          effectiveLiveResult.output = `${effectiveLiveResult.output}\nNo fresh checkpoint before poll timeout.`
         }
       } else {
-        liveResult.checkpointStatus = 'not-requested'
+        effectiveLiveResult.checkpointStatus = 'not-requested'
       }
-      recordDispatchBlock(workerId, assignment, liveResult, options)
-      resolve(liveResult)
+      recordDispatchBlock(workerId, assignment, effectiveLiveResult, options)
+      resolve(effectiveLiveResult)
       return
     }
 
@@ -949,7 +1177,7 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
         maxBuffer: MAX_OUTPUT_CHARS,
         killSignal: 'SIGTERM',
       },
-      (error, stdout, stderr) => {
+      async (error, stdout, stderr) => {
         const durationMs = Date.now() - startedAt
         const stdoutStr = (stdout || '').toString()
         const stderrStr = (stderr || '').toString()
@@ -966,9 +1194,17 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
             exitCode: typeof code === 'number' ? code : null,
             delivery: 'oneshot',
           }
-          markDispatchResult(workerId, result)
-          recordDispatchBlock(workerId, assignment, result, options)
-          resolve(result)
+          const rotatedResult = await tryHarpRotationAfterModelFailure({
+            workerId,
+            assignment,
+            prompt,
+            result,
+            options,
+            startedAt,
+          })
+          markDispatchResult(workerId, rotatedResult)
+          recordDispatchBlock(workerId, assignment, rotatedResult, options)
+          resolve(rotatedResult)
           return
         }
 
