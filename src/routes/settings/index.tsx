@@ -30,6 +30,7 @@ import { NetworkAccessSection } from '@/screens/settings/sections/network-access
 import { WhatsNewSection } from '@/screens/settings/sections/whats-new-section'
 import { ClaudeConfigSection } from '@/screens/settings/sections/claude-config-section'
 import { ConnectionSection } from '@/screens/settings/sections/connection-section'
+import { useNotificationCenterStore } from '@/stores/notification-center-store'
 
 
 const VALID_SECTION_IDS: ReadonlyArray<SettingsNavId> = SETTINGS_NAV_ITEMS.map(
@@ -56,6 +57,8 @@ type SettingsSectionId = SettingsNavId
 function SettingsRoute() {
   usePageTitle('Settings')
   const { settings, updateSettings } = useSettings()
+  const notificationPrefs = useNotificationCenterStore((s) => s.prefs)
+  const setNotificationPref = useNotificationCenterStore((s) => s.setPref)
 
   // Phase 4.2: Fetch models for preferred model dropdowns
   const [availableModels, setAvailableModels] = useState<
@@ -343,6 +346,49 @@ function SettingsRoute() {
                       {settings.usageThreshold}%
                     </span>
                   </div>
+                </SettingsRow>
+              </SettingsSection>
+
+              <SettingsSection
+                title="Popups & Inbox"
+                description="Where update news lands: quietly in the bell inbox, or as popups."
+                icon={Notification03Icon}
+              >
+                <SettingsRow
+                  label="Pop up release notes automatically"
+                  description="Open the combined 'what changed' dialog on page load instead of only placing it in the inbox."
+                >
+                  <Switch
+                    checked={notificationPrefs.autoPopupDigest}
+                    onCheckedChange={(checked) =>
+                      setNotificationPref('autoPopupDigest', checked)
+                    }
+                    aria-label="Pop up release notes automatically"
+                  />
+                </SettingsRow>
+                <SettingsRow
+                  label="Toast on new inbox items"
+                  description="Show a brief 'Updates available' toast when something new lands in the inbox."
+                >
+                  <Switch
+                    checked={notificationPrefs.toastOnNewItems}
+                    onCheckedChange={(checked) =>
+                      setNotificationPref('toastOnNewItems', checked)
+                    }
+                    aria-label="Toast on new inbox items"
+                  />
+                </SettingsRow>
+                <SettingsRow
+                  label="Update available cards"
+                  description="Show the top-of-app cards offering one-click updates for Workspace and Hermes Agent."
+                >
+                  <Switch
+                    checked={notificationPrefs.showUpdateCards}
+                    onCheckedChange={(checked) =>
+                      setNotificationPref('showUpdateCards', checked)
+                    }
+                    aria-label="Update available cards"
+                  />
                 </SettingsRow>
               </SettingsSection>
 

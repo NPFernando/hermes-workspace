@@ -12,9 +12,12 @@ import {
   Loading03Icon,
   Tick01Icon,
 } from '@hugeicons/core-free-icons'
+import type { ReleaseNotes as Notes, ReleaseNoteSection } from '@/lib/update-notes'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
 import { safeErrorMessage } from '@/lib/error-utils'
+import { NOTES_SEEN_KEY, shortSha, storeNotes } from '@/lib/update-notes'
+import { useNotificationCenterStore } from '@/stores/notification-center-store'
 
 type ProductId = 'workspace' | 'agent'
 type ProductUpdateStatus = {
@@ -43,14 +46,6 @@ type UpdateStatus = {
   pendingReleaseNotes?: Array<ReleaseNoteSection>
 }
 
-type ReleaseNoteSection = {
-  product: ProductId
-  label: string
-  from: string | null
-  to: string | null
-  commits: Array<string>
-}
-
 type ApplyUpdateResult = {
   ok: boolean
   product: ProductId
@@ -62,11 +57,6 @@ type ApplyUpdateResult = {
 }
 
 type Phase = 'idle' | 'updating' | 'done' | 'error'
-type Notes = {
-  id: string
-  sections: Array<ReleaseNoteSection>
-  updatedAt: number
-}
 
 // ── Naveen smart-update types ────────────────────────────────────────────────
 type ConflictFile = {
@@ -112,53 +102,16 @@ type NaveenPhase = 'idle' | 'applying' | 'done' | 'error'
 
 const CHECK_INTERVAL_MS = 30 * 60 * 1000
 const DISMISS_PREFIX = 'hermes-update-v2-dismissed:'
-const NOTES_KEY = 'hermes-update-v2-release-notes'
-const NOTES_SEEN_KEY = 'hermes-update-v2-release-notes-seen'
-
-function shortSha(value: string | null | undefined): string {
-  return value ? value.slice(0, 7) : 'unknown'
-}
 
 function productDismissKey(product: ProductUpdateStatus): string {
   return `${product.id}:${product.latestHead ?? product.version}`
 }
 
-function notesId(sections: Array<ReleaseNoteSection>): string {
-  return sections
-    .map((section) => `${section.product}:${section.from}:${section.to}`)
-    .sort()
-    .join('|')
-}
-
-function storeNotes(sections: Array<ReleaseNoteSection>): Notes | null {
-  if (!sections.length) return null
-  const id = notesId(sections)
-  const notes = { id, sections, updatedAt: Date.now() }
-  // Only clear the "seen" marker when the release-notes payload actually
-  // changed. Without this guard the modal pops up on every page refresh
-  // because /api/update/status returns the same pendingReleaseNotes on every
-  // poll, useEffect fires, and we used to drop the seen marker every time.
-  // See #356.
-  let existingId: string | null = null
-  try {
-    const raw = localStorage.getItem(NOTES_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<Notes>
-      existingId = typeof parsed.id === 'string' ? parsed.id : null
-    }
-  } catch {
-    existingId = null
-  }
-  if (existingId !== id) {
-    localStorage.removeItem(NOTES_SEEN_KEY)
-  }
-  localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
-  if (localStorage.getItem(NOTES_SEEN_KEY) === id) return null
-  return notes
-}
-
 export function UpdateCenterNotifier() {
   const queryClient = useQueryClient()
+  const showUpdateCards = useNotificationCenterStore(
+    (s) => s.prefs.showUpdateCards,
+  )
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set())
   const [phases, setPhases] = useState<Record<ProductId, Phase>>({
     workspace: 'idle',
@@ -215,13 +168,14 @@ export function UpdateCenterNotifier() {
     retry: false,
   })
 
-  useEffect(() => {
-    if (!data?.pendingReleaseNotes?.length) return
-    const stored = storeNotes(data.pendingReleaseNotes)
-    if (stored) setNotes((current) => current ?? stored)
-  }, [data?.pendingReleaseNotes])
+  // NOTE: pendingReleaseNotes from the status poll are intentionally NOT
+  // surfaced here anymore — NotificationHub folds them into the combined
+  // UpdateDigestModal so users get one "what changed" popup instead of two.
+  // Post-apply notes (set in update() below) still show immediately.
 
   const visibleProducts = useMemo(() => {
+    // Settings → Notifications can hide the update cards entirely
+    if (!showUpdateCards) return []
     // Defensive: a malformed /api/update/status payload (missing products,
     // or products not shaped as {workspace, agent}) must degrade to "no
     // banner", not throw and take the whole route down with it. The widened
@@ -245,7 +199,7 @@ export function UpdateCenterNotifier() {
       if (phases[product.id] === 'done') return false
       return !dismissed.has(productDismissKey(product))
     })
-  }, [data, dismissed, phases])
+  }, [data, dismissed, phases, showUpdateCards])
 
   function dismiss(product: ProductUpdateStatus) {
     const key = productDismissKey(product)

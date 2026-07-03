@@ -9,12 +9,18 @@ import { cn } from '@/lib/utils'
 
 type ToastType = 'info' | 'success' | 'warning' | 'error'
 
+type ToastAction = {
+  label: string
+  onClick: () => void
+}
+
 interface ToastItem {
   id: number
   message: string
   type: ToastType
   duration: number
   icon?: string
+  action?: ToastAction
 }
 
 let toastId = 0
@@ -22,7 +28,12 @@ const listeners: Set<(t: ToastItem) => void> = new Set()
 
 export function toast(
   message: string,
-  opts?: { type?: ToastType; duration?: number; icon?: string },
+  opts?: {
+    type?: ToastType
+    duration?: number
+    icon?: string
+    action?: ToastAction
+  },
 ) {
   const item: ToastItem = {
     id: ++toastId,
@@ -30,6 +41,7 @@ export function toast(
     type: opts?.type ?? 'info',
     duration: opts?.duration ?? 5000,
     icon: opts?.icon,
+    action: opts?.action,
   }
   listeners.forEach((fn) => fn(item))
 }
@@ -87,6 +99,18 @@ export function Toaster() {
         >
           <span className="text-base">{t.icon ?? defaultIcons[t.type]}</span>
           <span className="min-w-0 break-words">{t.message}</span>
+          {t.action && (
+            <button
+              type="button"
+              onClick={() => {
+                t.action?.onClick()
+                setToasts((prev) => prev.filter((x) => x.id !== t.id))
+              }}
+              className="shrink-0 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold transition-colors hover:bg-white/30"
+            >
+              {t.action.label}
+            </button>
+          )}
           <button
             type="button"
             onClick={() =>

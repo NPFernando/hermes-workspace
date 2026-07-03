@@ -19,7 +19,7 @@ const KIND_STYLE: Record<ChangeKind, { label: string; className: string }> = {
   removed:  { label: 'Removed',  className: 'bg-[var(--theme-muted)]/10 text-[var(--theme-muted)]' },
 }
 
-function ChangeList({ entry }: { entry: VersionEntry }) {
+export function ChangeList({ entry }: { entry: VersionEntry }) {
   return (
     <div className="space-y-2">
       {entry.changes.map((c, i) => {
@@ -35,6 +35,15 @@ function ChangeList({ entry }: { entry: VersionEntry }) {
       })}
     </div>
   )
+}
+
+/** Mark the current workspace changelog version as seen */
+export function markWhatsNewSeen(): void {
+  try {
+    localStorage.setItem(SEEN_KEY, CHANGELOG[0].version)
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 /** Returns true if the current version hasn't been marked as seen */
