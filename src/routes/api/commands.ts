@@ -21,6 +21,13 @@ export const Route = createFileRoute('/api/commands')({
         try {
           const res = await gatewayFetch('/v1/commands')
 
+          if (res.status === 404) {
+            // Gateway builds without /v1/commands (e.g. hermes-agent 0.16.0)
+            // have no server-side command list; the composer merges its own
+            // defaults, so report "none" instead of surfacing an error.
+            return json({ commands: [] })
+          }
+
           if (!res.ok) {
             return json(
               { error: `Gateway responded with status ${res.status}` },
