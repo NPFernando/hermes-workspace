@@ -135,6 +135,7 @@ import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
 import { Route as ApiDownloadApkRouteImport } from './routes/api/download-apk'
+import { Route as ApiDemoTradingRouteImport } from './routes/api/demo-trading'
 import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
@@ -865,6 +866,11 @@ const ApiDownloadApkRoute = ApiDownloadApkRouteImport.update({
   path: '/api/download-apk',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDemoTradingRoute = ApiDemoTradingRouteImport.update({
+  id: '/api/demo-trading',
+  path: '/api/demo-trading',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDebugAnalyzeRoute = ApiDebugAnalyzeRouteImport.update({
   id: '/api/debug-analyze',
   path: '/api/debug-analyze',
@@ -1413,6 +1419,7 @@ export interface FileRoutesByFullPath {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
+  '/api/demo-trading': typeof ApiDemoTradingRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
@@ -1638,6 +1645,7 @@ export interface FileRoutesByTo {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
+  '/api/demo-trading': typeof ApiDemoTradingRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
@@ -1865,6 +1873,7 @@ export interface FileRoutesById {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
+  '/api/demo-trading': typeof ApiDemoTradingRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
@@ -2093,6 +2102,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/debug-analyze'
+    | '/api/demo-trading'
     | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
@@ -2318,6 +2328,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/debug-analyze'
+    | '/api/demo-trading'
     | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
@@ -2544,6 +2555,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/crew-status'
     | '/api/debug-analyze'
+    | '/api/demo-trading'
     | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
@@ -2771,6 +2783,7 @@ export interface RootRouteChildren {
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
   ApiDebugAnalyzeRoute: typeof ApiDebugAnalyzeRoute
+  ApiDemoTradingRoute: typeof ApiDemoTradingRoute
   ApiDownloadApkRoute: typeof ApiDownloadApkRoute
   ApiEnvResetRoute: typeof ApiEnvResetRoute
   ApiEventsRoute: typeof ApiEventsRoute
@@ -3797,6 +3810,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDownloadApkRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/demo-trading': {
+      id: '/api/demo-trading'
+      path: '/api/demo-trading'
+      fullPath: '/api/demo-trading'
+      preLoaderRoute: typeof ApiDemoTradingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/debug-analyze': {
       id: '/api/debug-analyze'
       path: '/api/debug-analyze'
@@ -4773,6 +4793,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiCrewStatusRoute: ApiCrewStatusRoute,
   ApiDebugAnalyzeRoute: ApiDebugAnalyzeRoute,
+  ApiDemoTradingRoute: ApiDemoTradingRoute,
   ApiDownloadApkRoute: ApiDownloadApkRoute,
   ApiEnvResetRoute: ApiEnvResetRoute,
   ApiEventsRoute: ApiEventsRoute,
