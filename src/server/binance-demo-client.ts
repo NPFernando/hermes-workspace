@@ -172,6 +172,36 @@ export class BinanceDemoClient {
     return res.ok
   }
 
+  /** Unsigned: latest price for a symbol on the demo environment. */
+  async getPrice(symbol: string): Promise<number> {
+    assertDemoBaseUrl(this.base)
+    const res = await this.fetchImpl(`${this.base}/api/v3/ticker/price?symbol=${symbol}`, {
+      signal: AbortSignal.timeout(10_000),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new DemoEnvironmentError(`price ${symbol} failed (${res.status})`)
+    return parseFloat((body as any).price)
+  }
+
+  /** Unsigned: recent candles for strategy evaluation. */
+  async getKlines(symbol: string, interval = '1h', limit = 100): Promise<Array<{
+    openTime: number; open: number; high: number; low: number; close: number; volume: number
+  }>> {
+    assertDemoBaseUrl(this.base)
+    const url = `${this.base}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
+    const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(12_000) })
+    const rows = await res.json().catch(() => [])
+    if (!res.ok || !Array.isArray(rows)) throw new DemoEnvironmentError(`klines ${symbol} failed (${res.status})`)
+    return rows.map((r: any) => ({
+      openTime: r[0],
+      open: parseFloat(r[1]),
+      high: parseFloat(r[2]),
+      low: parseFloat(r[3]),
+      close: parseFloat(r[4]),
+      volume: parseFloat(r[5]),
+    }))
+  }
+
   async getAccount(): Promise<DemoAccount> {
     const raw = await this.signedRequest('GET', '/api/v3/account')
     return {
