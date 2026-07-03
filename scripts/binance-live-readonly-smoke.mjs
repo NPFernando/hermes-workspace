@@ -59,25 +59,35 @@ async function requestJson(url, init = {}) {
   return body
 }
 
+function signedParams(secret) {
+  const params = new URLSearchParams({ timestamp: Date.now().toString(), recvWindow: '5000' })
+  const signature = createHmac('sha256', secret).update(params.toString()).digest('hex')
+  params.set('signature', signature)
+  return params
+}
+
 async function main() {
   await requestJson(`${baseUrl}/api/v3/ping`)
-  const params = new URLSearchParams({ timestamp: Date.now().toString(), recvWindow: '5000' })
-  const signature = createHmac('sha256', apiSecret).update(params.toString()).digest('hex')
-  params.set('signature', signature)
-  const account = await requestJson(`${baseUrl}/api/v3/account?${params.toString()}`, { headers: { 'X-MBX-APIKEY': apiKey } })
-  if (account?.canWithdraw === true) {
-    throw new Error('Unsafe Binance API key: account reports canWithdraw=true. Disable withdrawals or revoke this key before using it with Hermes.')
+  const apiRestrictions = await requestJson(`${baseUrl}/sapi/v1/account/apiRestrictions?${signedParams(apiSecret).toString()}`, { headers: { 'X-MBX-APIKEY': apiKey } })
+  const unsafeFlags = [
+    'enableWithdrawals',
+    'enableInternalTransfer',
+    'permitsUniversalTransfer',
+    'enableMargin',
+    'enableFutures',
+    'enablePortfolioMarginTrading',
+    'enableFixApiTrade',
+    'enableSpotAndMarginTrading',
+  ].filter((field) => apiRestrictions?.[field] === true)
+  if (unsafeFlags.length > 0) {
+    throw new Error(`Unsafe Binance API key permissions: ${unsafeFlags.join(', ')}. For this phase keep only Reading enabled; spot trading can be added later after Hermes approval/risk controls are enabled.`)
   }
-  const permissions = Array.isArray(account?.permissions) ? account.permissions : []
-  const riskyPermissions = permissions.filter((permission) => String(permission).toUpperCase().match(/MARGIN|FUTURE|LEVERAGE|TRANSFER|WITHDRAW|PREDICTION/))
-  if (riskyPermissions.length > 0) {
-    throw new Error(`Unsafe Binance API key permissions: ${riskyPermissions.join(', ')}. Use a read-only key first; add spot trading only after Hermes approval/risk controls are enabled.`)
-  }
+  const account = await requestJson(`${baseUrl}/api/v3/account?${signedParams(apiSecret).toString()}`, { headers: { 'X-MBX-APIKEY': apiKey } })
   const balances = Array.isArray(account?.balances) ? account.balances : []
-  const nonZeroBalances = balances
+  const assetsWithNonZeroBalance = balances
     .filter((item) => Number(item.free) > 0 || Number(item.locked) > 0)
     .slice(0, 10)
-    .map((item) => ({ asset: item.asset, free: item.free, locked: item.locked }))
+    .map((item) => item.asset)
   console.log(JSON.stringify({
     ok: true,
     mode: 'production-readonly-account-smoke',
@@ -89,8 +99,16 @@ async function main() {
     canTrade: account?.canTrade ?? null,
     canWithdraw: account?.canWithdraw ?? null,
     canDeposit: account?.canDeposit ?? null,
-    nonZeroBalanceCount: nonZeroBalances.length,
-    nonZeroBalances,
+    apiKeyPermissions: {
+      ipRestrict: apiRestrictions?.ipRestrict ?? null,
+      tradingEnabled: apiRestrictions?.enableSpotAndMarginTrading ?? null,
+      withdrawalsEnabled: apiRestrictions?.enableWithdrawals ?? null,
+      marginEnabled: apiRestrictions?.enableMargin ?? null,
+      futuresEnabled: apiRestrictions?.enableFutures ?? null,
+      universalTransferEnabled: apiRestrictions?.permitsUniversalTransfer ?? null,
+    },
+    nonZeroBalanceCount: assetsWithNonZeroBalance.length,
+    assetsWithNonZeroBalance,
   }, null, 2))
 }
 
