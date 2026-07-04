@@ -326,7 +326,37 @@ function tradeAlertDigest(actions: Array<CycleAction>): string {
   return lines.length ? `⚙️ Demo trading (testnet)\n${lines.join('\n')}` : ''
 }
 
+let cycleInProgress = false
+
+/**
+ * Public entry point. Serializes cycles: every cycle runs in the single workspace
+ * server process (the 20-min cron and the manual "Run cycle" button both POST to
+ * /api/demo-trading), so an in-process flag prevents two overlapping runs from
+ * both reading "flat", double-entering the same symbol, and racing each other's
+ * store writes. Safe with a plain boolean because Node is single-threaded and the
+ * check-and-set happens before the first await.
+ */
 export async function runTradingCycle(options: RunCycleOptions = {}): Promise<CycleResult> {
+  if (cycleInProgress) {
+    return {
+      ran: false,
+      reason: 'a trading cycle is already in progress',
+      actions: [],
+      scores: [],
+      openPositions: 0,
+      dailyPnlQuote: 0,
+      ranAt: new Date().toISOString(),
+    }
+  }
+  cycleInProgress = true
+  try {
+    return await runTradingCycleInner(options)
+  } finally {
+    cycleInProgress = false
+  }
+}
+
+async function runTradingCycleInner(options: RunCycleOptions = {}): Promise<CycleResult> {
   const ranAt = new Date().toISOString()
   const db = readFinanceStore()
   const config = resolveEngineConfig((db.settings as Record<string, unknown>).demoTrading, options.config)

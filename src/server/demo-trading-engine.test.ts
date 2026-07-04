@@ -116,3 +116,17 @@ describe('runTradingCycle open → close → score', () => {
     expect(scored!.score).toBeGreaterThan(0)
   })
 })
+
+describe('runTradingCycle concurrency', () => {
+  it('serializes overlapping cycles — the second is rejected as busy', async () => {
+    await setMode('testnet_execute')
+    const { runTradingCycle } = await import('./demo-trading-engine')
+    const cfg = { symbols: ['BTCUSDT'], enabledStrategies: ['rsi_reversion'] }
+    const [a, b] = await Promise.all([
+      runTradingCycle({ client: fakeClient() as never, config: cfg }),
+      runTradingCycle({ client: fakeClient() as never, config: cfg }),
+    ])
+    const busy = [a, b].filter((r) => !r.ran && /already in progress/.test(r.reason ?? ''))
+    expect(busy).toHaveLength(1)
+  })
+})
