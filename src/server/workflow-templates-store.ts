@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import {
   existsSync,
   mkdirSync,
@@ -69,13 +70,13 @@ export function toStoredWorkflowTemplate(
 ): StoredWorkflowTemplate | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const row = value as Record<string, unknown>
-  const id = stringValue(row.id)
   const name = stringValue(row.name)
   const description = stringValue(row.description)
   const goal = stringValue(row.goal)
-  if (!id || !name || !description || !goal) return null
+  if (!name || !description || !goal) return null
 
   const now = Date.now()
+  const id = stringValue(row.id) ?? `tpl-${randomUUID().slice(0, 8)}`
   const icon = stringValue(row.icon) ?? '⚙️'
   const createdAt = timestampValue(row.createdAt, now)
   const updatedAt = timestampValue(row.updatedAt, createdAt)
