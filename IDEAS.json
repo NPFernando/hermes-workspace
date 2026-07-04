@@ -358,5 +358,29 @@
     "description": "Extract repeated mobile/sidebar navigation calls behind a small typed helper and test that it clears stale search params consistently.",
     "category": "ui",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Add Jobs health filter counts to screen-reader labels",
+    "description": "Include per-filter counts in the Jobs screen health filter labels so assistive technology users can understand the impact before switching filters.",
+    "category": "ui",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Persist last selected Jobs health filter",
+    "description": "Remember the operator's last Jobs health filter in local settings so stale or failed triage views survive page reloads.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Group scheduled-job health filters by profile",
+    "description": "Extend the Jobs health filter row with optional per-profile grouping so operators can isolate stale or failed jobs by Hermes profile.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Fix finance route TypeScript baseline",
+    "description": "Clean up the untracked budget route dependencies and typing errors so npx tsc --noEmit can return to a strict green baseline.",
+    "category": "backend",
+    "estimated_effort": "medium"
   }
 ]

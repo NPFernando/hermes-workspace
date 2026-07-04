@@ -27,6 +27,7 @@ import {
   fetchJobOutput,
   fetchJobProfiles,
   fetchJobs,
+  isFailedJobState,
   pauseJob,
   resumeJob,
   triggerJob,
@@ -83,6 +84,121 @@ export function formatJobFreshnessCopy(
 
   const staleDays = Math.max(2, Math.round(ageMs / 86_400_000))
   return `${name} has not run in ${staleDays} days; check the schedule if it should be recurring.`
+}
+
+export type JobHealthFilter = 'all' | 'stale' | 'failed' | 'paused' | 'neverRun'
+
+export const JOB_HEALTH_FILTERS: Array<JobHealthFilter> = [
+  'all',
+  'stale',
+  'failed',
+  'paused',
+  'neverRun',
+]
+
+function isPausedJob(job: Pick<ClaudeJob, 'enabled' | 'state'>): boolean {
+  return job.state === 'paused' || !job.enabled
+}
+
+function isNeverRunJob(job: Pick<ClaudeJob, 'last_run_at'>): boolean {
+  return !job.last_run_at
+}
+
+function isStaleRunJob(
+  job: Pick<ClaudeJob, 'enabled' | 'last_run_at' | 'name' | 'state'>,
+  nowMs = Date.now(),
+): boolean {
+  return Boolean(job.last_run_at) && formatJobFreshnessCopy(job, nowMs) !== null
+}
+
+export function getJobHealthFilterLabel(filter: JobHealthFilter): string {
+  switch (filter) {
+    case 'all':
+      return 'All'
+    case 'stale':
+      return 'Stale'
+    case 'failed':
+      return 'Failed'
+    case 'paused':
+      return 'Paused'
+    case 'neverRun':
+      return 'Never run'
+  }
+}
+
+export function doesJobMatchHealthFilter(
+  job: ClaudeJob,
+  filter: JobHealthFilter,
+  nowMs = Date.now(),
+): boolean {
+  switch (filter) {
+    case 'all':
+      return true
+    case 'stale':
+      return isStaleRunJob(job, nowMs)
+    case 'failed':
+      return job.last_run_success === false || isFailedJobState(job.state)
+    case 'paused':
+      return isPausedJob(job)
+    case 'neverRun':
+      return isNeverRunJob(job)
+  }
+}
+
+export function getJobHealthFilterCounts(
+  jobs: Array<ClaudeJob>,
+  nowMs = Date.now(),
+): Record<JobHealthFilter, number> {
+  return {
+    all: jobs.length,
+    stale: jobs.filter((job) => doesJobMatchHealthFilter(job, 'stale', nowMs))
+      .length,
+    failed: jobs.filter((job) => doesJobMatchHealthFilter(job, 'failed', nowMs))
+      .length,
+    paused: jobs.filter((job) => doesJobMatchHealthFilter(job, 'paused', nowMs))
+      .length,
+    neverRun: jobs.filter((job) =>
+      doesJobMatchHealthFilter(job, 'neverRun', nowMs),
+    ).length,
+  }
+}
+
+export function getJobHealthFilterButtonLabel(
+  filter: JobHealthFilter,
+  count: number,
+  isActive: boolean,
+): string {
+  const label = getJobHealthFilterLabel(filter)
+  const suffix = count === 1 ? 'job' : 'jobs'
+  return `${isActive ? 'Showing' : 'Show'} ${label.toLowerCase()} scheduled jobs (${count} ${suffix})`
+}
+
+export function getJobsEmptyStateCopy(
+  search: string,
+  healthFilter: JobHealthFilter,
+): { title: string; description: string } {
+  const hasSearch = search.trim().length > 0
+  if (healthFilter !== 'all') {
+    const filterLabel = getJobHealthFilterLabel(healthFilter).toLowerCase()
+    return {
+      title: `No ${filterLabel} jobs`,
+      description: hasSearch
+        ? 'No scheduled jobs match both the search text and selected health filter.'
+        : `No scheduled jobs match the ${filterLabel} health filter.`,
+    }
+  }
+
+  if (hasSearch) {
+    return {
+      title: 'No matching jobs',
+      description: 'No scheduled jobs match the current search text.',
+    }
+  }
+
+  return {
+    title: 'No scheduled jobs',
+    description: 'No cron jobs found across Hermes profiles',
+  }
 }
 
 function getOutputPreview(content: string): string {
@@ -382,6 +498,7 @@ export function JobsScreen() {
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [editingJob, setEditingJob] = useState<ClaudeJob | null>(null)
+  const [healthFilter, setHealthFilter] = useState<JobHealthFilter>('all')
 
   const jobsQuery = useQuery({
     queryKey: QUERY_KEY,
@@ -467,7 +584,9 @@ export function JobsScreen() {
     },
   })
 
-  const filteredJobs = useMemo(() => {
+  const jobHealthNowMs = useMemo(() => Date.now(), [jobsQuery.data])
+
+  const searchedJobs = useMemo(() => {
     const jobs = jobsQuery.data ?? []
     if (!search.trim()) return jobs
     const q = search.toLowerCase()
@@ -478,6 +597,21 @@ export function JobsScreen() {
         j.profile?.toLowerCase().includes(q),
     )
   }, [jobsQuery.data, search])
+
+  const healthFilterCounts = useMemo(
+    () => getJobHealthFilterCounts(searchedJobs, jobHealthNowMs),
+    [jobHealthNowMs, searchedJobs],
+  )
+
+  const filteredJobs = useMemo(
+    () =>
+      searchedJobs.filter((job) =>
+        doesJobMatchHealthFilter(job, healthFilter, jobHealthNowMs),
+      ),
+    [healthFilter, jobHealthNowMs, searchedJobs],
+  )
+
+  const emptyStateCopy = getJobsEmptyStateCopy(search, healthFilter)
 
   const handleCreate = useCallback(
     async (input: {
@@ -541,6 +675,7 @@ export function JobsScreen() {
               }
               className="rounded-lg p-1.5 transition-colors hover:bg-[var(--theme-hover)] shrink-0"
               title="Refresh"
+              aria-label="Refresh scheduled jobs"
             >
               <HugeiconsIcon
                 icon={RefreshIcon}
@@ -555,6 +690,37 @@ export function JobsScreen() {
               <HugeiconsIcon icon={Add01Icon} size={14} />
               New Job
             </button>
+          </div>
+          <div
+            className="mt-3 flex gap-1.5 overflow-x-auto pb-1 scrollbar-none"
+            aria-label="Scheduled job health filters"
+          >
+            {JOB_HEALTH_FILTERS.map((filter) => {
+              const isActive = healthFilter === filter
+              const count = healthFilterCounts[filter]
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setHealthFilter(filter)}
+                  aria-pressed={isActive}
+                  aria-label={getJobHealthFilterButtonLabel(
+                    filter,
+                    count,
+                    isActive,
+                  )}
+                  className={cn(
+                    'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                    isActive
+                      ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)] text-white'
+                      : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
+                  )}
+                >
+                  {getJobHealthFilterLabel(filter)}
+                  <span className="ml-1 tabular-nums opacity-80">{count}</span>
+                </button>
+              )
+            })}
           </div>
         </header>
 
@@ -577,10 +743,8 @@ export function JobsScreen() {
                 size={32}
                 className="mb-3 opacity-40"
               />
-              <p className="text-sm font-medium">No scheduled jobs</p>
-              <p className="mt-1 text-xs">
-                No cron jobs found across Hermes profiles
-              </p>
+              <p className="text-sm font-medium">{emptyStateCopy.title}</p>
+              <p className="mt-1 text-xs">{emptyStateCopy.description}</p>
             </div>
           ) : (
             <AnimatePresence mode="popLayout">
