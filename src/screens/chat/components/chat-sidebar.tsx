@@ -397,6 +397,7 @@ function SectionLabel({
         {navigateTo ? (
           <Link
             to={navigateTo}
+            search={{}}
             className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] hover:text-[var(--theme-muted)] select-none transition-colors"
           >
             {label}
@@ -433,6 +434,7 @@ function SectionLabel({
       {navigateTo ? (
         <Link
           to={navigateTo}
+          search={{}}
           className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] hover:text-[var(--theme-muted)] select-none transition-colors"
         >
           {label}

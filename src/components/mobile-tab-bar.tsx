@@ -214,7 +214,7 @@ export function MobileTabBar() {
         nextIdx < MOBILE_NAV_TABS.length
       ) {
         hapticTap()
-        void navigate({ to: MOBILE_NAV_TABS[nextIdx].to })
+        void navigate({ to: MOBILE_NAV_TABS[nextIdx].to, search: {} })
       }
     },
     [navigate, pathname],
@@ -330,7 +330,7 @@ export function MobileTabBar() {
                   // Don't fire navigate if this was a drag swipe
                   if (!isDragging) {
                     hapticTap()
-                    void navigate({ to: tab.to })
+                    void navigate({ to: tab.to, search: {} })
                   }
                 }}
                 aria-current={isActive ? 'page' : undefined}

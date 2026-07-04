@@ -70,7 +70,7 @@ function ChatRoute() {
     typeof params.sessionKey === 'string' ? params.sessionKey : 'main'
   const isNewChat = activeFriendlyId === 'new'
   const forcedSessionKey =
-    forcedSession?.friendlyId === activeFriendlyId
+    forcedSession && forcedSession.friendlyId === activeFriendlyId
       ? forcedSession.sessionKey
       : undefined
 
@@ -82,7 +82,7 @@ function ChatRoute() {
   }, [isNewChat, queryClient])
 
   const handleSessionResolved = useCallback(
-    function handleSessionResolved(payload: {
+    function handleSessionResolvedPayload(payload: {
       friendlyId: string
       sessionKey: string
     }) {

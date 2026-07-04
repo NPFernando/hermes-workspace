@@ -141,7 +141,7 @@ export function useSwipeNavigation() {
       if (nextIndex === currentIndex) return
 
       triggerHaptic()
-      void navigate({ to: TAB_ORDER[nextIndex] as string })
+      void navigate({ to: TAB_ORDER[nextIndex] as string, search: {} })
     },
     [navigate, pathname],
   )

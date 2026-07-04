@@ -205,7 +205,7 @@ export function MobileHamburgerMenu() {
 
   function handleNav(to: string) {
     hapticTap()
-    void navigate({ to })
+    void navigate({ to, search: {} })
     setOpen(false)
   }
 

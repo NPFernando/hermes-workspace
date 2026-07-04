@@ -97,7 +97,7 @@ export function DashboardOverflowPanel({ open, onClose }: Props) {
 
   function handleSelect(to: string) {
     onClose()
-    void navigate({ to })
+    void navigate({ to, search: {} })
   }
 
   // Detect actual current theme family from data-theme attribute

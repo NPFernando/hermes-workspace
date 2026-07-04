@@ -1,12 +1,42 @@
 {
+  "cycle": "2026-07-04-navigation-search",
   "tests_passed": true,
-  "test_files": 119,
-  "test_count": 781,
-  "test_exit_code": 0,
-  "lint_errors": 334,
-  "lint_warnings": 109,
-  "lint_exit_code": 1,
+  "test_command": "pnpm test",
+  "test_summary": "120 test files passed; 798 tests passed.",
+  "typescript_passed": true,
+  "typescript_command": "npx tsc --noEmit",
+  "build_passed": true,
+  "build_command": "pnpm build",
+  "focused_lint": {
+    "strict_errors": 17,
+    "strict_warnings": 1,
+    "strict_baseline_rules": [
+      "import/first",
+      "import/newline-after-import",
+      "@typescript-eslint/no-unnecessary-condition"
+    ],
+    "relaxed_errors": 0,
+    "relaxed_warnings": 1,
+    "relaxed_warning": "Pre-existing @typescript-eslint/require-await warning in chat-sidebar.tsx."
+  },
+  "lint_errors": 547,
+  "lint_warnings": 104,
   "lint_baseline_debt": true,
+  "lint_command": "pnpm lint",
+  "lint_summary": "Repository-wide lint still fails with baseline debt and unrelated dirty/untracked finance server drafts; focused changed-file lint passes with known baseline rules disabled.",
   "passed": true,
-  "notes": "All lint errors/warnings are pre-existing baseline debt. No source files were modified. Changed files: .gitignore (config), IDEAS.json (data), PLAN.md (doc). Deleted: testCurrencyConversion.ts (already deleted from working tree). TypeScript compiles clean."
+  "generated_at_utc": "2026-07-04T00:37:31Z",
+  "deployment": {
+    "restart_command": "sudo systemctl restart hermes-workspace.service",
+    "service_active": true,
+    "health_check": "https://agent.fernandofamily.com/api/health",
+    "health_result": {
+      "status_code": 200,
+      "content_type": "application/json",
+      "body": {
+        "status": "ok"
+      }
+    },
+    "transient_first_attempt": "First external request returned nginx 502 while Node warmed up; bounded retry succeeded."
+  }
 }

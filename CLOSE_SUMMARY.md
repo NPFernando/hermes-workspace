@@ -1,61 +1,43 @@
-# Close Summary — Auto-Improvement Cycle 2026-07-03-1830
+# Close Summary: Normalize Mobile Navigation Search Params
 
-## What Was Changed
+## What changed
 
-**Idea**: Systematic root scratch artifact cleanup with .gitignore rules
-**Category**: config
-**Effort**: low
+This auto-improvement cycle normalized several top-level mobile/sidebar navigation paths so TanStack Router receives explicit empty search params when moving between workspace screens. That keeps stale query params from leaking across screen changes and removes avoidable type friction in static route links and redirects.
 
-### Files Modified
-- `.gitignore` — added 50+ patterns for scratch/prototype artifact lifecycle
-- `IDEAS.json` — appended 3 new improvement ideas (57 total entries)
-- `PLAN.md` — detailed implementation plan
-- `testCurrencyConversion.ts` — removed from git tracking (already deleted from working tree)
-- `TEST_REPORT.json` — test results
-- `CLOSE_SUMMARY.md` — this file
+Changed runtime files:
+- `src/components/dashboard-overflow-panel.tsx`
+- `src/components/mobile-hamburger-menu.tsx`
+- `src/components/mobile-tab-bar.tsx`
+- `src/hooks/use-swipe-navigation.ts`
+- `src/routes/$.tsx`
+- `src/routes/chat/$sessionKey.tsx`
+- `src/routes/index.tsx`
+- `src/screens/chat/components/chat-sidebar.tsx`
+- `src/screens/tasks/tasks-screen.tsx`
 
-### Files Archived
-132 scratch/prototype files moved from workspace root to `/srv/projects/auto-improvement-reports/scratch-2026-07-03/`:
+Mission artifacts updated:
+- `IDEAS.json` appended three de-duplicated follow-up ideas.
+- `PLAN.md` records the selected navigation/search-param plan.
+- `TEST_REPORT.json` records verification, lint baseline debt, deployment, and health results.
 
-| Category | Count | Examples |
-|----------|-------|----------|
-| Root scratch docs | 6 | TASK_SUMMARY.md, TRADING_ALERT_SYSTEM_DESIGN.md, ebbinghaus_model.md |
-| docs/ subdirectory | 110 | hermesworld/, swarm/, screenshots/, design/ |
-| market_data_spec/ | 4 | spec docs, API connections, table schemas |
-| risk_model_prototype/ | 4 | Python risk model, notebook, requirements |
-| news_intelligence_* | 3 | architecture (.mmd), pipeline, spec |
-| Scratch test files | 5 | test-finance-operations.js, test-ibkr.ts, test-paper-trading-* |
-| Stale backups | 4 | vt-capital.ts.{backup,backup2,bak}, ibkr-market.service.ts.backup |
+## Test results
 
-### Files Intentionally KEPT (active WIP)
-15 untracked source files in `src/` were preserved — they are intentional work-in-progress for API routes, server services, and UI screens:
-- `src/routes/api/native-cron-overview.ts`, `native-dashboard-capabilities.ts`, `ops-logs.ts`, `ops-snapshot.ts`, `ops-snapshots.ts`, `sister-readiness.ts`, `system-health.ts`
-- `src/routes/logs.tsx`, `snapshots.tsx`
-- `src/server/binance-market.service.ts`, `ibkr-market.service.ts`, `native-cron-overview.ts`, `native-dashboard-capabilities.ts`, `performance.ts`
-- `src/lib/ops-snapshot-regression.ts`
+- `npx tsc --noEmit`: passed before commit and after close-artifact amend.
+- Focused ESLint on changed files: strict run exposed known baseline debt; relaxed focused gate passed with 0 errors and 1 pre-existing `require-await` warning.
+- `pnpm test`: passed, 120 test files / 798 tests.
+- `pnpm lint`: still fails repo-wide with 547 errors and 104 warnings from existing baseline debt and unrelated dirty/untracked finance drafts; no focused regression was found in this cycle.
+- `pnpm build`: passed.
 
-## Test Results
+## Deployment and health
 
-| Check | Result |
-|-------|--------|
-| TypeScript (`npx tsc --noEmit`) | ✅ Clean |
-| Unit tests (`pnpm test`) | ✅ 119 files, 781 tests passed |
-| Lint (`pnpm lint`) | ⚠️ 334 errors, 109 warnings (all baseline debt, none from this cycle) |
-| Git diff check | ✅ Clean |
-| Health endpoint | ✅ 200, `{"status":"ok"}` |
+Because source files changed, the workspace was rebuilt and `hermes-workspace.service` was restarted. `systemctl is-active hermes-workspace.service` reported `active`. The first external health request returned a transient nginx 502 while Node warmed up, then the bounded retry succeeded with HTTP 200, `application/json`, and body `{"status":"ok"}`.
 
-## Deployment
+## Side effects / worktree boundary
 
-No source files changed — `.gitignore`, `IDEAS.json`, `PLAN.md` only. Skipped build/restart. Service remains healthy.
+The cycle intentionally left unrelated pre-existing dirty work unstaged: `package.json`, `pnpm-lock.yaml`, `services/odysseus`, `src/routes/api/finance.ts`, `dist.old-20260704_035903/`, and untracked finance/performance server drafts. Those files were not part of this improvement commit.
 
-## Side Effects
+## New ideas added for future cycles
 
-- **Unstaged deletions**: The 132 archived files were mostly untracked (not in git). 110 tracked docs/ files were archived and then restored from git — their .gitignore rules are in place for when they are eventually untracked from the repo.
-- **Dirty worktree**: 17 pre-existing dirty tracked source files remain unstaged (shell components, route files, screens). These are unrelated to this cycle.
-- **Untracked WIP**: 15 intentional WIP source files preserved in `src/`.
-
-## New Improvement Ideas for Next Cycle
-
-1. **Audit and integrate orphaned src/ route additions** (api, medium) — The 15 preserved WIP source files need review, auth guards, and tests before integration.
-2. **Add workspace shell component regression tests** (ui, medium) — workspace-shell.tsx, mobile-hamburger-menu.tsx, mobile-tab-bar.tsx, and use-swipe-navigation.ts all have uncommitted changes needing tests.
-3. **Deduplicate active task creation by normalized title** (backend, low) — Prevent duplicate active tasks when the same title is submitted repeatedly.
+1. Archive stale `dist.old-*` build backups outside the repo or ignore them explicitly.
+2. Extract shared typed navigation helpers and add coverage for clearing stale search params.
+3. Continue reducing repo-wide ESLint baseline debt so focused gates need fewer rule overrides.

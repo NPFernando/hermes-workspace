@@ -2133,7 +2133,15 @@ export function TasksScreen() {
         onOpenChange={(open) => {
           if (!open) {
             setEditingTask(null)
-            if (taskIdFromUrl) void navigate({ to: '/tasks', search: (prev) => ({ ...prev, task: undefined }) })
+            if (taskIdFromUrl) {
+              void navigate({
+                to: '/tasks',
+                search: (prev: Record<string, unknown>) => ({
+                  ...prev,
+                  task: undefined,
+                }),
+              })
+            }
           }
         }}
         task={editingTask ? (tasks.find(t => t.id === editingTask.id) ?? editingTask) : null}
