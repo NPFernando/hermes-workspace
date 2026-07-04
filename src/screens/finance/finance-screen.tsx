@@ -121,6 +121,124 @@ function DataTable({ title, rows, columns }: { title: string; rows: Array<Record
   )
 }
 
+const SELECTABLE_MODES: Array<{ id: string; label: string; hint: string }> = [
+  { id: 'observe_only', label: 'Observe only', hint: 'No trading — market data only' },
+  { id: 'paper_trade', label: 'Paper trade', hint: 'Simulated; no orders placed' },
+  { id: 'testnet_execute', label: 'Testnet execute', hint: 'Fake-money orders on Binance testnet' },
+]
+
+function TradingControls({ summary, onPayload }: { summary: FinancePayload['summary']; onPayload: (p: FinancePayload) => void }) {
+  const [busy, setBusy] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function post(body: Record<string, unknown>, busyKey: string) {
+    setBusy(busyKey)
+    setErr(null)
+    try {
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = (await res.json()) as FinancePayload & { error?: string }
+      if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`)
+      onPayload(data)
+    } catch (nextError) {
+      setErr(nextError instanceof Error ? nextError.message : 'Request failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const cutoffOn = summary.emergencyKillSwitch
+
+  function disarmCutoff() {
+    const confirmed = window.confirm(
+      'Disarm the emergency safety cutoff?\n\nThis lets the engine place orders (fake-money on Binance testnet while in testnet_execute mode). ' +
+        'Only do this deliberately — you can re-arm it at any time.',
+    )
+    if (!confirmed) return
+    void post({ action: 'set_kill_switch', engaged: false, approval: 'I_UNDERSTAND_DISABLE_SAFETY_CUTOFF' }, 'cutoff')
+  }
+
+  return (
+    <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Trading controls</h2>
+        <span
+          className={`rounded-full border px-3 py-1 text-xs font-medium ${
+            cutoffOn ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200' : 'border-red-400/30 bg-red-500/10 text-red-200'
+          }`}
+        >
+          Cutoff: {cutoffOn ? 'ARMED (trading halted)' : 'DISARMED (trading can execute)'}
+        </span>
+      </div>
+
+      {err && <p className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 p-2 text-sm text-red-200">{err}</p>}
+
+      <div className="mt-4">
+        <div className="text-xs uppercase tracking-[0.2em] text-[var(--theme-muted)]">Trading mode</div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {SELECTABLE_MODES.map((mode) => {
+            const active = summary.tradingMode === mode.id
+            return (
+              <button
+                key={mode.id}
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void post({ action: 'set_trading_mode', mode: mode.id }, `mode-${mode.id}`)}
+                className={`rounded-2xl border px-3.5 py-2 text-left text-sm transition disabled:opacity-50 ${
+                  active
+                    ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100'
+                    : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-text)] hover:border-emerald-400/30'
+                }`}
+              >
+                <div className="font-medium">
+                  {mode.label}
+                  {active ? ' ✓' : ''}
+                </div>
+                <div className="text-xs text-[var(--theme-muted)]">{mode.hint}</div>
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-2 text-xs text-[var(--theme-muted)]">Live / real-money modes require the explicit approval phrase and are not exposed here yet.</p>
+      </div>
+
+      <div className="mt-5 border-t border-[var(--theme-border)]/60 pt-4">
+        <div className="text-xs uppercase tracking-[0.2em] text-[var(--theme-muted)]">Emergency safety cutoff</div>
+        <p className="mt-1 text-xs text-[var(--theme-muted)]">Master switch — while ARMED the engine cannot place any order, regardless of mode.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy !== null || cutoffOn}
+            onClick={() => void post({ action: 'set_kill_switch', engaged: true }, 'cutoff')}
+            className="rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-500/25 disabled:opacity-40"
+          >
+            {busy === 'cutoff' ? '…' : 'Arm cutoff (safe)'}
+          </button>
+          <button
+            type="button"
+            disabled={busy !== null || !cutoffOn}
+            onClick={disarmCutoff}
+            className="rounded-2xl border border-red-400/40 bg-red-500/15 px-4 py-2 text-sm font-medium text-red-100 transition hover:bg-red-500/25 disabled:opacity-40"
+          >
+            {busy === 'cutoff' ? '…' : 'Disarm cutoff (enable trading)'}
+          </button>
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void post({ action: 'emergency_stop' }, 'estop')}
+            className="rounded-2xl border border-red-400/50 bg-red-600/20 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-600/30 disabled:opacity-40"
+          >
+            {busy === 'estop' ? '…' : 'EMERGENCY STOP'}
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function FinanceScreen() {
   const [payload, setPayload] = useState<FinancePayload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -199,6 +317,8 @@ export function FinanceScreen() {
         <StatCard label="Net worth" value={formatLkr(summary.netWorthLkr)} />
         <StatCard label="Trading safety" value={summary.liveTradingEnabled ? 'Live enabled' : 'Live blocked'} tone={riskTone} />
       </section>
+
+      <TradingControls summary={summary} onPayload={setPayload} />
 
       <section className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
