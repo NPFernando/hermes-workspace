@@ -17,6 +17,7 @@ build
 .nitro
 .tanstack
 .vite
+native-dashboard
 
 # Environment variables
 .env

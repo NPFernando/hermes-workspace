@@ -39,6 +39,7 @@ import { Route as SettingsProvidersRouteImport } from './routes/settings/provide
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceVersionRouteImport } from './routes/api/workspace-version'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
+import { Route as ApiWorkflowTemplatesRouteImport } from './routes/api/workflow-templates'
 import { Route as ApiVtCapitalRouteImport } from './routes/api/vt-capital'
 import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
 import { Route as ApiUserSettingsRouteImport } from './routes/api/user-settings'
@@ -106,6 +107,7 @@ import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-hist
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiRouteSisterRouteImport } from './routes/api/route-sister'
+import { Route as ApiRiskCheckRouteImport } from './routes/api/risk-check'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
@@ -231,6 +233,8 @@ import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/se
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
 import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
+import { Route as ApiFinanceReportIncomeRouteImport } from './routes/api/finance/report/income'
+import { Route as ApiFinanceReportExpenseRouteImport } from './routes/api/finance/report/expense'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth.google.callback'
 import { Route as ApiWorkspaceSkillsSkillIdContentRouteImport } from './routes/api/workspace/skills.$skillId.content'
 import { Route as ApiRunsSessionKeyRunIdAbandonRouteImport } from './routes/api/runs/$sessionKey.$runId.abandon'
@@ -383,6 +387,11 @@ const ApiWorkspaceVersionRoute = ApiWorkspaceVersionRouteImport.update({
 const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
   id: '/api/workspace',
   path: '/api/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkflowTemplatesRoute = ApiWorkflowTemplatesRouteImport.update({
+  id: '/api/workflow-templates',
+  path: '/api/workflow-templates',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiVtCapitalRoute = ApiVtCapitalRouteImport.update({
@@ -719,6 +728,11 @@ const ApiSendRoute = ApiSendRouteImport.update({
 const ApiRouteSisterRoute = ApiRouteSisterRouteImport.update({
   id: '/api/route-sister',
   path: '/api/route-sister',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRiskCheckRoute = ApiRiskCheckRouteImport.update({
+  id: '/api/risk-check',
+  path: '/api/risk-check',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
@@ -1352,6 +1366,16 @@ const ApiMcpNameLogsRoute = ApiMcpNameLogsRouteImport.update({
   path: '/logs',
   getParentRoute: () => ApiMcpNameRoute,
 } as any)
+const ApiFinanceReportIncomeRoute = ApiFinanceReportIncomeRouteImport.update({
+  id: '/report/income',
+  path: '/report/income',
+  getParentRoute: () => ApiFinanceRoute,
+} as any)
+const ApiFinanceReportExpenseRoute = ApiFinanceReportExpenseRouteImport.update({
+  id: '/report/expense',
+  path: '/report/expense',
+  getParentRoute: () => ApiFinanceRoute,
+} as any)
 const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
@@ -1424,7 +1448,7 @@ export interface FileRoutesByFullPath {
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
-  '/api/finance': typeof ApiFinanceRoute
+  '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
@@ -1449,6 +1473,7 @@ export interface FileRoutesByFullPath {
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1516,6 +1541,7 @@ export interface FileRoutesByFullPath {
   '/api/user-settings': typeof ApiUserSettingsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
+  '/api/workflow-templates': typeof ApiWorkflowTemplatesRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-version': typeof ApiWorkspaceVersionRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -1590,6 +1616,8 @@ export interface FileRoutesByFullPath {
   '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
   '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/finance/report/expense': typeof ApiFinanceReportExpenseRoute
+  '/api/finance/report/income': typeof ApiFinanceReportIncomeRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
@@ -1650,7 +1678,7 @@ export interface FileRoutesByTo {
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
-  '/api/finance': typeof ApiFinanceRoute
+  '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
@@ -1675,6 +1703,7 @@ export interface FileRoutesByTo {
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1742,6 +1771,7 @@ export interface FileRoutesByTo {
   '/api/user-settings': typeof ApiUserSettingsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
+  '/api/workflow-templates': typeof ApiWorkflowTemplatesRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-version': typeof ApiWorkspaceVersionRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -1816,6 +1846,8 @@ export interface FileRoutesByTo {
   '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
   '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/finance/report/expense': typeof ApiFinanceReportExpenseRoute
+  '/api/finance/report/income': typeof ApiFinanceReportIncomeRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
@@ -1878,7 +1910,7 @@ export interface FileRoutesById {
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
-  '/api/finance': typeof ApiFinanceRoute
+  '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
@@ -1903,6 +1935,7 @@ export interface FileRoutesById {
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
+  '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1970,6 +2003,7 @@ export interface FileRoutesById {
   '/api/user-settings': typeof ApiUserSettingsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/vt-capital': typeof ApiVtCapitalRoute
+  '/api/workflow-templates': typeof ApiWorkflowTemplatesRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-version': typeof ApiWorkspaceVersionRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
@@ -2044,6 +2078,8 @@ export interface FileRoutesById {
   '/api/workspace/skills': typeof ApiWorkspaceSkillsRouteWithChildren
   '/api/workspace/stats': typeof ApiWorkspaceStatsRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/finance/report/expense': typeof ApiFinanceReportExpenseRoute
+  '/api/finance/report/income': typeof ApiFinanceReportIncomeRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
@@ -2132,6 +2168,7 @@ export interface FileRouteTypes {
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/provider-usage'
+    | '/api/risk-check'
     | '/api/route-sister'
     | '/api/send'
     | '/api/send-stream'
@@ -2199,6 +2236,7 @@ export interface FileRouteTypes {
     | '/api/user-settings'
     | '/api/validate-provider'
     | '/api/vt-capital'
+    | '/api/workflow-templates'
     | '/api/workspace'
     | '/api/workspace-version'
     | '/chat/$sessionKey'
@@ -2273,6 +2311,8 @@ export interface FileRouteTypes {
     | '/api/workspace/skills'
     | '/api/workspace/stats'
     | '/api/auth/google/callback'
+    | '/api/finance/report/expense'
+    | '/api/finance/report/income'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
@@ -2358,6 +2398,7 @@ export interface FileRouteTypes {
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/provider-usage'
+    | '/api/risk-check'
     | '/api/route-sister'
     | '/api/send'
     | '/api/send-stream'
@@ -2425,6 +2466,7 @@ export interface FileRouteTypes {
     | '/api/user-settings'
     | '/api/validate-provider'
     | '/api/vt-capital'
+    | '/api/workflow-templates'
     | '/api/workspace'
     | '/api/workspace-version'
     | '/chat/$sessionKey'
@@ -2499,6 +2541,8 @@ export interface FileRouteTypes {
     | '/api/workspace/skills'
     | '/api/workspace/stats'
     | '/api/auth/google/callback'
+    | '/api/finance/report/expense'
+    | '/api/finance/report/income'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
@@ -2585,6 +2629,7 @@ export interface FileRouteTypes {
     | '/api/plugins'
     | '/api/preview-file'
     | '/api/provider-usage'
+    | '/api/risk-check'
     | '/api/route-sister'
     | '/api/send'
     | '/api/send-stream'
@@ -2652,6 +2697,7 @@ export interface FileRouteTypes {
     | '/api/user-settings'
     | '/api/validate-provider'
     | '/api/vt-capital'
+    | '/api/workflow-templates'
     | '/api/workspace'
     | '/api/workspace-version'
     | '/chat/$sessionKey'
@@ -2726,6 +2772,8 @@ export interface FileRouteTypes {
     | '/api/workspace/skills'
     | '/api/workspace/stats'
     | '/api/auth/google/callback'
+    | '/api/finance/report/expense'
+    | '/api/finance/report/income'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
@@ -2788,7 +2836,7 @@ export interface RootRouteChildren {
   ApiEnvResetRoute: typeof ApiEnvResetRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
-  ApiFinanceRoute: typeof ApiFinanceRoute
+  ApiFinanceRoute: typeof ApiFinanceRouteWithChildren
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHarpConfigRoute: typeof ApiHarpConfigRoute
@@ -2813,6 +2861,7 @@ export interface RootRouteChildren {
   ApiPluginsRoute: typeof ApiPluginsRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
+  ApiRiskCheckRoute: typeof ApiRiskCheckRoute
   ApiRouteSisterRoute: typeof ApiRouteSisterRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
@@ -2880,6 +2929,7 @@ export interface RootRouteChildren {
   ApiUserSettingsRoute: typeof ApiUserSettingsRoute
   ApiValidateProviderRoute: typeof ApiValidateProviderRoute
   ApiVtCapitalRoute: typeof ApiVtCapitalRoute
+  ApiWorkflowTemplatesRoute: typeof ApiWorkflowTemplatesRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRouteWithChildren
   ApiWorkspaceVersionRoute: typeof ApiWorkspaceVersionRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
@@ -3136,6 +3186,13 @@ declare module '@tanstack/react-router' {
       path: '/api/workspace'
       fullPath: '/api/workspace'
       preLoaderRoute: typeof ApiWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workflow-templates': {
+      id: '/api/workflow-templates'
+      path: '/api/workflow-templates'
+      fullPath: '/api/workflow-templates'
+      preLoaderRoute: typeof ApiWorkflowTemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/vt-capital': {
@@ -3605,6 +3662,13 @@ declare module '@tanstack/react-router' {
       path: '/api/route-sister'
       fullPath: '/api/route-sister'
       preLoaderRoute: typeof ApiRouteSisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/risk-check': {
+      id: '/api/risk-check'
+      path: '/api/risk-check'
+      fullPath: '/api/risk-check'
+      preLoaderRoute: typeof ApiRiskCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/provider-usage': {
@@ -4482,6 +4546,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMcpNameLogsRouteImport
       parentRoute: typeof ApiMcpNameRoute
     }
+    '/api/finance/report/income': {
+      id: '/api/finance/report/income'
+      path: '/report/income'
+      fullPath: '/api/finance/report/income'
+      preLoaderRoute: typeof ApiFinanceReportIncomeRouteImport
+      parentRoute: typeof ApiFinanceRoute
+    }
+    '/api/finance/report/expense': {
+      id: '/api/finance/report/expense'
+      path: '/report/expense'
+      fullPath: '/api/finance/report/expense'
+      preLoaderRoute: typeof ApiFinanceReportExpenseRouteImport
+      parentRoute: typeof ApiFinanceRoute
+    }
     '/api/auth/google/callback': {
       id: '/api/auth/google/callback'
       path: '/callback'
@@ -4577,6 +4655,20 @@ const ApiClaudeTasksRouteChildren: ApiClaudeTasksRouteChildren = {
 
 const ApiClaudeTasksRouteWithChildren = ApiClaudeTasksRoute._addFileChildren(
   ApiClaudeTasksRouteChildren,
+)
+
+interface ApiFinanceRouteChildren {
+  ApiFinanceReportExpenseRoute: typeof ApiFinanceReportExpenseRoute
+  ApiFinanceReportIncomeRoute: typeof ApiFinanceReportIncomeRoute
+}
+
+const ApiFinanceRouteChildren: ApiFinanceRouteChildren = {
+  ApiFinanceReportExpenseRoute: ApiFinanceReportExpenseRoute,
+  ApiFinanceReportIncomeRoute: ApiFinanceReportIncomeRoute,
+}
+
+const ApiFinanceRouteWithChildren = ApiFinanceRoute._addFileChildren(
+  ApiFinanceRouteChildren,
 )
 
 interface ApiHermesTasksRouteChildren {
@@ -4798,7 +4890,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEnvResetRoute: ApiEnvResetRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
-  ApiFinanceRoute: ApiFinanceRoute,
+  ApiFinanceRoute: ApiFinanceRouteWithChildren,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHarpConfigRoute: ApiHarpConfigRoute,
@@ -4823,6 +4915,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPluginsRoute: ApiPluginsRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
+  ApiRiskCheckRoute: ApiRiskCheckRoute,
   ApiRouteSisterRoute: ApiRouteSisterRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
@@ -4890,6 +4983,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUserSettingsRoute: ApiUserSettingsRoute,
   ApiValidateProviderRoute: ApiValidateProviderRoute,
   ApiVtCapitalRoute: ApiVtCapitalRoute,
+  ApiWorkflowTemplatesRoute: ApiWorkflowTemplatesRoute,
   ApiWorkspaceRoute: ApiWorkspaceRouteWithChildren,
   ApiWorkspaceVersionRoute: ApiWorkspaceVersionRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
