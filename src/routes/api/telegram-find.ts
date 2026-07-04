@@ -1,9 +1,8 @@
+import { spawnSync } from 'node:child_process'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { spawnSync } from 'node:child_process'
-import os from 'node:os'
-import path from 'node:path'
 import { listTasks } from '../../server/tasks-store'
+import { resolveHermesBin } from '../../server/hermes-bin'
 
 // ---------------------------------------------------------------------------
 // POST /api/telegram-find
@@ -13,8 +12,7 @@ import { listTasks } from '../../server/tasks-store'
 // Body: { keyword: string; chat_id?: string; limit?: number }
 // ---------------------------------------------------------------------------
 
-const HERMES_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
-const HERMES_BIN  = path.join(HERMES_HOME, 'node_modules/.bin/hermes')
+const HERMES_BIN  = resolveHermesBin()
 const DEFAULT_TG  = 'telegram:2130622225'
 
 const COLUMN_EMOJI: Record<string, string> = {

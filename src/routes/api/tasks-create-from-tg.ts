@@ -1,10 +1,9 @@
+import { spawnSync } from 'node:child_process'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { spawnSync } from 'node:child_process'
-import os from 'node:os'
-import path from 'node:path'
 import { generateTaskFromText } from '../../server/astra-tasks'
 import { createTask } from '../../server/tasks-store'
+import { resolveHermesBin } from '../../server/hermes-bin'
 
 // ---------------------------------------------------------------------------
 // POST /api/tasks-create-from-tg
@@ -14,8 +13,7 @@ import { createTask } from '../../server/tasks-store'
 // Body: { text: string; chat_id?: string; priority?: string; assignee?: string }
 // ---------------------------------------------------------------------------
 
-const HERMES_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
-const HERMES_BIN  = path.join(HERMES_HOME, 'node_modules/.bin/hermes')
+const HERMES_BIN  = resolveHermesBin()
 const DEFAULT_TG  = 'telegram:2130622225'
 
 export const Route = createFileRoute('/api/tasks-create-from-tg')({
