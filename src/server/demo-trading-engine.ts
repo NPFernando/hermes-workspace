@@ -445,6 +445,18 @@ async function runTradingCycleInner(options: RunCycleOptions = {}): Promise<Cycl
       if (hitStop || hitTarget || ownerExit || councilExit) {
         try {
           const order = await client.placeOrder({ symbol, side: 'SELL', type: 'MARKET', quantity: pos.quantity })
+          if (order.executedQty <= 0) {
+            // Sell didn't fill — keep the position rather than dropping it from the
+            // store while the base asset is still held on the exchange (orphan).
+            actions.push({ symbol, strategyId: pos.strategyId, action: 'SKIP', reason: 'sell order did not fill — position retained' })
+            appendAuditLog('demo_sell_unfilled', { symbol, strategyId: pos.strategyId, requested: pos.quantity })
+            continue
+          }
+          if (order.executedQty < pos.quantity) {
+            // Partial market fill (rare on liquid pairs): close on realized proceeds;
+            // the small unsold remainder is dropped rather than tracked. Logged for audit.
+            appendAuditLog('demo_partial_sell', { symbol, requested: pos.quantity, filled: order.executedQty })
+          }
           const exitQuote = order.cummulativeQuoteQty || price * pos.quantity
           const feesQuote = pos.entryFeeQuote + orderFeeQuote(order.fills, order.avgPrice || price)
           const pnlQuote = exitQuote - pos.entryQuote - feesQuote

@@ -130,3 +130,33 @@ describe('runTradingCycle concurrency', () => {
     expect(busy).toHaveLength(1)
   })
 })
+
+describe('runTradingCycle fill handling', () => {
+  it('retains the position when a sell order does not fill', async () => {
+    await setMode('testnet_execute')
+    const { runTradingCycle, getEngineState } = await import('./demo-trading-engine')
+    const cfg = { symbols: ['BTCUSDT'], enabledStrategies: ['rsi_reversion'] }
+    // Cycle 1: oversold downtrend → BUY fills normally → 1 open position.
+    await runTradingCycle({ client: fakeClient() as never, config: cfg })
+    expect(getEngineState().positions.length).toBe(1)
+    // Cycle 2: price well above entry → take-profit exit, but the SELL returns zero fill.
+    const noFillSell = fakeClient({
+      getKlines: async () => Array.from({ length: 31 }, (_, i) => ({ openTime: i, open: 130, high: 130, low: 130, close: 130, volume: 1 })),
+      placeOrder: async (o: any) => ({
+        symbol: o.symbol,
+        orderId: 1,
+        status: o.side === 'SELL' ? 'EXPIRED' : 'FILLED',
+        side: o.side,
+        type: o.type,
+        executedQty: o.side === 'SELL' ? 0 : 0.25,
+        cummulativeQuoteQty: o.side === 'SELL' ? 0 : 25,
+        fills: [],
+        transactTime: Date.now(),
+        avgPrice: 130,
+      }),
+    })
+    const r = await runTradingCycle({ client: noFillSell as never, config: cfg })
+    expect(r.actions.some((a) => a.action === 'CLOSE')).toBe(false)
+    expect(getEngineState().positions.length).toBe(1)
+  })
+})
