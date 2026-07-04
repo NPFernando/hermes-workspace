@@ -27,6 +27,7 @@ import {
   fetchIBKRTicker,
   getIBKRCandles,
 } from '../../server/ibkr-market.service'
+import { demoTradingPerformance } from '../../server/demo-trading-engine'
 
 type JsonRecord = Record<string, unknown>
 
@@ -77,6 +78,7 @@ function financePayload() {
     },
     summary: financeSummary(db),
     tradingPerformance: tradingPerformanceSummary(db),
+    demoPerformance: demoTradingPerformance(),
     alerts: financeAlerts(db),
     settings: db.settings,
     data: maskSensitive(db),

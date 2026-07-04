@@ -82,6 +82,8 @@ interface OpenPosition {
   entryPrice: number
   quantity: number
   entryQuote: number
+  /** Buy-side commission in quote currency, carried so it can be netted at close. */
+  entryFeeQuote: number
   openedAt: string
 }
 
@@ -94,7 +96,10 @@ export interface TradeLogEntry {
   quantity: number
   entryQuote: number
   exitQuote: number
+  /** Net P/L after subtracting buy + sell commissions. */
   pnlQuote: number
+  /** Total round-trip commission (buy + sell) in quote currency. */
+  feesQuote: number
   reason: string
   openedAt: string
   closedAt: string
@@ -204,6 +209,24 @@ async function openUnrealizedQuote(
   return total
 }
 
+/**
+ * Total commission for a filled order expressed in quote currency (USDT).
+ * Commission charged in the quote asset is counted as-is; commission charged in
+ * the base asset (Binance spot/testnet default) or another asset is valued at
+ * the fill price. First-order correction so realized P/L stops ignoring fees —
+ * without it, a 0.5% take-profit against ~0.2% round-trip fees would report a
+ * win rate and profit factor materially higher than reality.
+ */
+function orderFeeQuote(
+  fills: Array<{ price: number; commission: number; commissionAsset: string }>,
+  fallbackPrice: number,
+): number {
+  return fills.reduce((sum, fill) => {
+    if (fill.commissionAsset === 'USDT') return sum + fill.commission
+    return sum + fill.commission * (fill.price || fallbackPrice)
+  }, 0)
+}
+
 /** Engine config = defaults ⊕ finance settings.demoTrading ⊕ per-call overrides. */
 export function resolveEngineConfig(
   settingsOverride: unknown,
@@ -252,8 +275,8 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
   })
 
   if (db.settings.emergencyKillSwitch) return bail('emergency kill switch is active')
-  if (!options.force && db.settings.tradingMode !== 'testnet_execute') {
-    return bail(`tradingMode is "${db.settings.tradingMode}", not "testnet_execute"`)
+  if (!options.force && !['testnet_execute', 'paper_trade'].includes(db.settings.tradingMode)) {
+    return bail(`tradingMode is "${db.settings.tradingMode}", not "testnet_execute" or "paper_trade"`)
   }
 
   let client = options.client
@@ -318,7 +341,8 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
         try {
           const order = await client.placeOrder({ symbol, side: 'SELL', type: 'MARKET', quantity: pos.quantity })
           const exitQuote = order.cummulativeQuoteQty || price * pos.quantity
-          const pnlQuote = exitQuote - pos.entryQuote
+          const feesQuote = pos.entryFeeQuote + orderFeeQuote(order.fills, order.avgPrice || price)
+          const pnlQuote = exitQuote - pos.entryQuote - feesQuote
           const reason = hitStop ? `stop-loss ${(changePct * 100).toFixed(2)}%`
             : hitTarget ? `take-profit ${(changePct * 100).toFixed(2)}%`
             : ownerExit ? `strategy exit: ${ownerDecision!.reason}`
@@ -344,6 +368,7 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
             entryQuote: pos.entryQuote,
             exitQuote,
             pnlQuote,
+            feesQuote,
             reason,
             openedAt: pos.openedAt,
             closedAt: new Date().toISOString(),
@@ -390,6 +415,7 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
               entryPrice: order.avgPrice || price,
               quantity: order.executedQty,
               entryQuote: spent,
+              entryFeeQuote: orderFeeQuote(order.fills, order.avgPrice || price),
               openedAt: new Date().toISOString(),
             })
             actions.push({
@@ -441,4 +467,60 @@ export function getEngineState(): {
     dailyPnlQuote: realizedToday(trades),
     config: resolveEngineConfig((db.settings as Record<string, unknown>).demoTrading),
   }
+}
+
+export interface DemoPerformance {
+  totalTrades: number
+  winRate: number
+  profitFactor: number
+  avgProfitLossPerTrade: number
+  avgProfit: number
+  avgLoss: number
+  sharpeRatio: number
+  maxDrawdown: number
+  totalFeesQuote: number
+}
+
+/** Performance metrics over the demo engine's own closed trades (fee-net P/L). */
+export function summarizeDemoTrades(trades: Array<TradeLogEntry>): DemoPerformance {
+  const empty: DemoPerformance = {
+    totalTrades: 0, winRate: 0, profitFactor: 0, avgProfitLossPerTrade: 0,
+    avgProfit: 0, avgLoss: 0, sharpeRatio: 0, maxDrawdown: 0, totalFeesQuote: 0,
+  }
+  if (trades.length === 0) return empty
+  const pnls = trades.map((t) => t.pnlQuote)
+  const wins = pnls.filter((p) => p > 0)
+  const losses = pnls.filter((p) => p < 0)
+  const grossProfit = wins.reduce((sum, p) => sum + p, 0)
+  const grossLoss = Math.abs(losses.reduce((sum, p) => sum + p, 0))
+  const totalPnl = pnls.reduce((sum, p) => sum + p, 0)
+  const mean = totalPnl / pnls.length
+  const variance = pnls.reduce((sum, p) => sum + (p - mean) ** 2, 0) / pnls.length
+  const std = Math.sqrt(variance)
+  let cumulative = 0
+  let peak = 0
+  let maxDrawdown = 0
+  for (const p of pnls) {
+    cumulative += p
+    if (cumulative > peak) peak = cumulative
+    const drawdown = peak - cumulative
+    if (drawdown > maxDrawdown) maxDrawdown = drawdown
+  }
+  return {
+    totalTrades: pnls.length,
+    winRate: wins.length / pnls.length,
+    profitFactor: grossLoss !== 0 ? grossProfit / grossLoss : 0,
+    avgProfitLossPerTrade: mean,
+    avgProfit: wins.length ? grossProfit / wins.length : 0,
+    avgLoss: losses.length ? losses.reduce((sum, p) => sum + p, 0) / losses.length : 0,
+    sharpeRatio: std !== 0 ? mean / std : 0,
+    maxDrawdown,
+    totalFeesQuote: trades.reduce((sum, t) => sum + (t.feesQuote || 0), 0),
+  }
+}
+
+/** Reads the demo trade log from the store and summarizes it. */
+export function demoTradingPerformance(): DemoPerformance {
+  const rows = readFinanceStore().strategy_results as Array<SRRow>
+  return summarizeDemoTrades(loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE))
 }

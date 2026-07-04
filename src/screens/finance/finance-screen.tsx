@@ -36,6 +36,17 @@ type FinancePayload = {
     predictionAccuracy: number
     totalTrades: number
   }
+  demoPerformance: {
+    totalTrades: number
+    winRate: number
+    profitFactor: number
+    avgProfitLossPerTrade: number
+    avgProfit: number
+    avgLoss: number
+    sharpeRatio: number
+    maxDrawdown: number
+    totalFeesQuote: number
+  }
   alerts: Array<{ level: 'info' | 'warning' | 'critical'; title: string; detail: string }>
   settings: Record<string, unknown>
   data: {
@@ -250,13 +261,13 @@ function TradingControls({ summary, onPayload }: { summary: FinancePayload['summ
   )
 }
 
-function PerformancePanel({ perf }: { perf: FinancePayload['tradingPerformance'] }) {
+function PerformancePanel({ perf }: { perf: FinancePayload['demoPerformance'] }) {
   if (perf.totalTrades === 0) {
     return (
       <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
         <h2 className="text-lg font-semibold">Strategy performance</h2>
         <p className="mt-2 text-sm text-[var(--theme-muted)]">
-          No closed trades yet — win rate, profit factor, and P/L appear here once the engine completes trades.
+          No closed demo trades yet — win rate, profit factor, and fee-net P/L appear here once the engine completes trades.
         </p>
       </section>
     )
@@ -280,7 +291,7 @@ function PerformancePanel({ perf }: { perf: FinancePayload['tradingPerformance']
         <StatCard label="Avg win" value={usdt(perf.avgProfit)} tone="good" />
         <StatCard label="Avg loss" value={usdt(perf.avgLoss)} tone="danger" />
         <StatCard label="Max drawdown" value={usdt(perf.maxDrawdown)} tone={perf.maxDrawdown > 0 ? 'warn' : 'neutral'} />
-        <StatCard label="Prediction accuracy" value={pct(perf.predictionAccuracy)} tone="neutral" />
+        <StatCard label="Fees paid" value={usdt(perf.totalFeesQuote)} tone="neutral" />
       </div>
     </section>
   )
@@ -367,7 +378,7 @@ export function FinanceScreen() {
 
       <TradingControls summary={summary} onPayload={setPayload} />
 
-      <PerformancePanel perf={payload.tradingPerformance} />
+      <PerformancePanel perf={payload.demoPerformance} />
 
       <section className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
