@@ -15,6 +15,9 @@
  * emergency kill switch is off. All execution goes through BinanceDemoClient,
  * which is hard-locked to the demo host, so this can never touch real money.
  */
+import { spawnSync } from 'node:child_process'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
 import {
   BinanceDemoClient,
   createDemoClientFromEnv,
@@ -257,6 +260,62 @@ export interface RunCycleOptions {
   force?: boolean
 }
 
+// Trade alerts: push a Telegram digest when a cycle actually does something.
+// Disable with HERMES_DEMO_TRADE_ALERTS=off. Never throws — alerting must not
+// break a trading cycle.
+const TRADE_ALERTS_ENABLED = process.env.HERMES_DEMO_TRADE_ALERTS !== 'off'
+const ALERT_TARGET = 'telegram:2130622225'
+let _hermesBin: string | null = null
+function hermesBin(): string {
+  if (_hermesBin) return _hermesBin
+  const home = os.homedir()
+  const candidates = [
+    `${home}/.local/bin/hermes`,
+    `${home}/.hermes/hermes-agent/venv/bin/hermes`,
+    `${home}/.hermes/node/bin/hermes`,
+  ]
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        _hermesBin = candidate
+        return candidate
+      }
+    } catch {
+      /* skip */
+    }
+  }
+  try {
+    _hermesBin = spawnSync('which', ['hermes'], { encoding: 'utf-8' }).stdout.trim() || 'hermes'
+  } catch {
+    _hermesBin = 'hermes'
+  }
+  return _hermesBin
+}
+function sendTradeAlert(message: string): void {
+  if (!TRADE_ALERTS_ENABLED) return
+  try {
+    spawnSync(hermesBin(), ['send', '--to', ALERT_TARGET, '-q', message], { encoding: 'utf-8', timeout: 15_000 })
+  } catch {
+    /* non-fatal */
+  }
+}
+
+/** Builds a Telegram digest from a cycle's actions; empty string = nothing worth sending. */
+function tradeAlertDigest(actions: Array<CycleAction>): string {
+  const lines: Array<string> = []
+  for (const a of actions) {
+    if (a.action === 'OPEN') {
+      lines.push(`🟢 BOUGHT ${a.symbol} @ ${a.price?.toFixed(2) ?? '?'} (${a.strategyId})`)
+    } else if (a.action === 'CLOSE') {
+      const pnl = a.pnlQuote !== undefined ? `${a.pnlQuote >= 0 ? '+' : ''}${a.pnlQuote.toFixed(2)} USDT` : ''
+      lines.push(`🔴 SOLD ${a.symbol} @ ${a.price?.toFixed(2) ?? '?'} · ${pnl} · ${a.reason}`)
+    } else if (a.action === 'BLOCKED' && a.reason.includes('_halt')) {
+      lines.push(`⚠️ HALTED ${a.symbol}: ${a.reason}`)
+    }
+  }
+  return lines.length ? `⚙️ Demo trading (testnet)\n${lines.join('\n')}` : ''
+}
+
 export async function runTradingCycle(options: RunCycleOptions = {}): Promise<CycleResult> {
   const ranAt = new Date().toISOString()
   const db = readFinanceStore()
@@ -437,6 +496,8 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
   }
 
   persist({ scores, positions, trades, blocks })
+  const digest = tradeAlertDigest(actions)
+  if (digest) sendTradeAlert(digest)
   return {
     ran: true,
     actions,
