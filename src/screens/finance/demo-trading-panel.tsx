@@ -50,6 +50,13 @@ interface LiveMonitor {
   equityQuote: number
   monitoring: Array<MonitorSymbol>
 }
+interface EngineConfigView {
+  symbols: Array<string>
+  quotePerTrade: number
+  stopLossPct: number
+  takeProfitPct: number
+  guardian: { maxOpenPositions: number }
+}
 interface EngineState {
   ok: boolean
   scores: Array<StrategyScore>
@@ -58,6 +65,14 @@ interface EngineState {
   guardianBlocks: Array<GuardianBlock>
   dailyPnlQuote: number
   monitor?: LiveMonitor
+  config?: EngineConfigView
+}
+interface SettingsForm {
+  tp: string
+  sl: string
+  size: string
+  maxPos: string
+  symbols: string
 }
 
 const money = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}`
@@ -125,6 +140,52 @@ export function DemoTradingPanel() {
       setRunning(false)
     }
   }, [load])
+
+  const cfg = state?.config
+  const [form, setForm] = useState<SettingsForm | null>(null)
+  const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    if (cfg && form === null) {
+      setForm({
+        tp: (cfg.takeProfitPct * 100).toString(),
+        sl: (cfg.stopLossPct * 100).toString(),
+        size: cfg.quotePerTrade.toString(),
+        maxPos: cfg.guardian.maxOpenPositions.toString(),
+        symbols: cfg.symbols.join(', '),
+      })
+    }
+  }, [cfg, form])
+
+  const saveSettings = useCallback(async () => {
+    if (!form) return
+    setSaving(true)
+    setNote(null)
+    try {
+      const config: Record<string, unknown> = {}
+      const tp = parseFloat(form.tp)
+      if (Number.isFinite(tp)) config.takeProfitPct = tp / 100
+      const sl = parseFloat(form.sl)
+      if (Number.isFinite(sl)) config.stopLossPct = sl / 100
+      const size = parseFloat(form.size)
+      if (Number.isFinite(size)) config.quotePerTrade = size
+      const maxPos = parseInt(form.maxPos, 10)
+      if (Number.isFinite(maxPos)) config.maxOpenPositions = maxPos
+      const symbols = form.symbols.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+      if (symbols.length) config.symbols = symbols
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'set_demo_config', config }),
+      })
+      const data = await res.json()
+      setNote(data.ok ? 'Engine settings saved — applies from the next cycle.' : data.error || 'Save failed')
+      await load()
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }, [form, load])
 
   const scores = state?.scores ?? []
   const activeScores = scores.filter((s) => s.trades > 0 || s.score !== 0)
@@ -342,6 +403,73 @@ export function DemoTradingPanel() {
           )}
         </div>
       </div>
+
+      {cfg && form && (
+        <div className="mt-5 border-t border-[var(--theme-border)]/50 pt-4">
+          <h3 className="text-sm font-semibold text-[var(--theme-text)]">Engine settings</h3>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <label className="text-xs text-[var(--theme-muted)]">
+              Take-profit %
+              <input
+                type="number"
+                step="0.1"
+                value={form.tp}
+                onChange={(e) => setForm({ ...form, tp: e.target.value })}
+                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-black/20 px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
+              />
+            </label>
+            <label className="text-xs text-[var(--theme-muted)]">
+              Stop-loss %
+              <input
+                type="number"
+                step="0.1"
+                value={form.sl}
+                onChange={(e) => setForm({ ...form, sl: e.target.value })}
+                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-black/20 px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
+              />
+            </label>
+            <label className="text-xs text-[var(--theme-muted)]">
+              Trade size (USDT)
+              <input
+                type="number"
+                step="1"
+                value={form.size}
+                onChange={(e) => setForm({ ...form, size: e.target.value })}
+                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-black/20 px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
+              />
+            </label>
+            <label className="text-xs text-[var(--theme-muted)]">
+              Max positions
+              <input
+                type="number"
+                step="1"
+                value={form.maxPos}
+                onChange={(e) => setForm({ ...form, maxPos: e.target.value })}
+                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-black/20 px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
+              />
+            </label>
+            <label className="col-span-2 text-xs text-[var(--theme-muted)] sm:col-span-4">
+              Watchlist (comma-separated, e.g. BTCUSDT, ETHUSDT)
+              <input
+                value={form.symbols}
+                onChange={(e) => setForm({ ...form, symbols: e.target.value })}
+                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-black/20 px-2 py-1 text-sm text-[var(--theme-text)]"
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={saveSettings}
+            disabled={saving}
+            className="mt-3 rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save settings'}
+          </button>
+          <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
+            Applies from the next cycle. Take-profit / stop-loss are % moves from entry; trade size is USDT per buy.
+          </p>
+        </div>
+      )}
     </section>
   )
 }

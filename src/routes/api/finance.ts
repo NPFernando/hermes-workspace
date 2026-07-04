@@ -185,6 +185,49 @@ export const Route = createFileRoute('/api/finance')({
             appendAuditLog('kill_switch_set', { engaged, source: 'finance_api' })
             return json(financePayload())
           }
+          if (action === 'set_demo_config') {
+            // Update the demo engine's tunable knobs (settings.demoTrading), merged
+            // over defaults by resolveEngineConfig. Values are range-validated; anything
+            // out of range is ignored rather than applied.
+            const cfg = body.config && typeof body.config === 'object' ? (body.config as JsonRecord) : {}
+            const inRange = (value: unknown, min: number, max: number): number | undefined =>
+              typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : undefined
+            const db = readFinanceStore()
+            const settings = db.settings as Record<string, unknown>
+            const dt = (settings.demoTrading && typeof settings.demoTrading === 'object'
+              ? { ...(settings.demoTrading as Record<string, unknown>) }
+              : {}) as Record<string, unknown>
+
+            const tp = inRange(cfg.takeProfitPct, 0.0005, 0.5)
+            const sl = inRange(cfg.stopLossPct, 0.0005, 0.5)
+            const qpt = inRange(cfg.quotePerTrade, 1, 100000)
+            const maxOpen = inRange(cfg.maxOpenPositions, 1, 50)
+            if (tp !== undefined) dt.takeProfitPct = tp
+            if (sl !== undefined) dt.stopLossPct = sl
+            if (qpt !== undefined) dt.quotePerTrade = qpt
+            if (Array.isArray(cfg.symbols)) {
+              const syms = cfg.symbols
+                .filter((s): s is string => typeof s === 'string')
+                .map((s) => s.trim().toUpperCase())
+                .filter((s) => /^[A-Z0-9]{5,20}$/.test(s))
+              if (syms.length > 0) dt.symbols = Array.from(new Set(syms))
+            }
+            if (maxOpen !== undefined) {
+              const guardian = (dt.guardian && typeof dt.guardian === 'object' ? { ...(dt.guardian as Record<string, unknown>) } : {}) as Record<string, unknown>
+              guardian.maxOpenPositions = Math.floor(maxOpen)
+              dt.guardian = guardian
+            }
+            settings.demoTrading = dt
+            writeFinanceStore(db)
+            appendAuditLog('demo_config_updated', {
+              takeProfitPct: dt.takeProfitPct,
+              stopLossPct: dt.stopLossPct,
+              quotePerTrade: dt.quotePerTrade,
+              symbols: dt.symbols,
+              maxOpenPositions: (dt.guardian as Record<string, unknown> | undefined)?.maxOpenPositions,
+            })
+            return json(financePayload())
+          }
           return json({ ok: false, error: `Unsupported finance action: ${action}` }, { status: 400 })
         } catch (error) {
           appendAuditLog('finance_api_error', { action, error: safeErrorMessage(error) })
