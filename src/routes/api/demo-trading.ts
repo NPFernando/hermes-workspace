@@ -11,7 +11,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { requireJsonContentType, safeErrorMessage } from '../../server/rate-limit'
-import { getEngineState, runTradingCycle } from '../../server/demo-trading-engine'
+import { getEngineState, getLiveMonitor, runTradingCycle } from '../../server/demo-trading-engine'
 
 export const Route = createFileRoute('/api/demo-trading')({
   server: {
@@ -21,7 +21,8 @@ export const Route = createFileRoute('/api/demo-trading')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         try {
-          return json({ ok: true, ...getEngineState() })
+          const monitor = await getLiveMonitor()
+          return json({ ok: true, ...getEngineState(), monitor })
         } catch (err) {
           return json({ ok: false, error: safeErrorMessage(err) }, { status: 500 })
         }

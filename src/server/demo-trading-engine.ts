@@ -524,3 +524,95 @@ export function demoTradingPerformance(): DemoPerformance {
   const rows = readFinanceStore().strategy_results as Array<SRRow>
   return summarizeDemoTrades(loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE))
 }
+
+export interface MonitorSymbol {
+  symbol: string
+  price: number
+  signal: 'BUY' | 'SELL' | 'HOLD'
+  /** Weighted council net (conviction proxy); needs to clear the threshold to act. */
+  net: number
+  held: boolean
+  unrealizedPnlQuote: number
+}
+
+export interface LiveMonitor {
+  clientAvailable: boolean
+  quoteBalance: number
+  deployedQuote: number
+  openUnrealizedPnlQuote: number
+  equityQuote: number
+  monitoring: Array<MonitorSymbol>
+}
+
+/**
+ * Read-only live snapshot for the monitoring UI: current testnet balance, what
+ * each watched symbol is doing right now (price + council signal), and open
+ * position mark-to-market. Places no orders and ignores the trading-mode gate —
+ * it just observes, so it works before the engine is armed too.
+ */
+export async function getLiveMonitor(): Promise<LiveMonitor> {
+  const db = readFinanceStore()
+  const config = resolveEngineConfig((db.settings as Record<string, unknown>).demoTrading)
+  const rows = db.strategy_results as Array<SRRow>
+  const positions = loadOfKind<OpenPosition>(rows, SR_KIND_POSITION)
+  const scores = loadScores(rows)
+  const deployedQuote = positions.reduce((sum, p) => sum + p.entryQuote, 0)
+
+  const client = createDemoClientFromEnv().client
+  if (!client) {
+    return { clientAvailable: false, quoteBalance: 0, deployedQuote, openUnrealizedPnlQuote: 0, equityQuote: deployedQuote, monitoring: [] }
+  }
+
+  let quoteBalance = 0
+  try {
+    const acct = await client.getAccount()
+    quoteBalance = acct.balances.find((b) => b.asset === 'USDT')?.free ?? 0
+  } catch {
+    /* balance read failed — leave 0 */
+  }
+
+  const monitoring: Array<MonitorSymbol> = []
+  for (const symbol of config.symbols) {
+    let price = 0
+    let signal: 'BUY' | 'SELL' | 'HOLD' = 'HOLD'
+    let net = 0
+    try {
+      const candles = await client.getKlines(symbol, config.interval, 100)
+      price = candles.length ? candles[candles.length - 1].close : await client.getPrice(symbol)
+      const members = STRATEGIES.filter((s) => config.enabledStrategies.includes(s.id)).map((s) => ({
+        strategyId: s.id,
+        decision: s.evaluate(candles),
+        score: scores.get(s.id)?.score ?? 0,
+      }))
+      const vote = councilVote(members, config.councilThreshold)
+      signal = vote.signal
+      net = vote.net
+    } catch {
+      /* market data failed for this symbol — leave defaults */
+    }
+    const pos = positions.find((p) => p.symbol === symbol)
+    monitoring.push({
+      symbol,
+      price,
+      signal,
+      net,
+      held: Boolean(pos),
+      unrealizedPnlQuote: pos && price > 0 ? price * pos.quantity - pos.entryQuote : 0,
+    })
+  }
+
+  const openUnrealizedPnlQuote = monitoring.reduce((sum, m) => sum + (m.held ? m.unrealizedPnlQuote : 0), 0)
+  const positionsMarkValue = positions.reduce((sum, p) => {
+    const m = monitoring.find((x) => x.symbol === p.symbol)
+    return sum + (m && m.price > 0 ? m.price * p.quantity : p.entryQuote)
+  }, 0)
+
+  return {
+    clientAvailable: true,
+    quoteBalance,
+    deployedQuote,
+    openUnrealizedPnlQuote,
+    equityQuote: quoteBalance + positionsMarkValue,
+    monitoring,
+  }
+}
