@@ -30,6 +30,22 @@ export const DECISIONS = [
   'BLOCKED',
 ] as const
 
+// Helper functions for date boundaries
+function startOfDay(date: Date = new Date()): string {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+}
+
+function startOfWeek(date: Date = new Date()): string {
+  const d = new Date(date)
+  const day = d.getDay() // 0 Sunday, 1 Monday, ...
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1) // adjust to Monday
+  d.setDate(diff)
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+}
+
 export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number] | string
 export type TradingMode = (typeof TRADING_MODES)[number]
 export type TradingDecision = (typeof DECISIONS)[number]
@@ -323,6 +339,17 @@ export type TradingSignal = {
   source: string
 }
 
+export type RiskState = {
+  dailyRealizedLoss: number   // accumulated realized loss (>=0)
+  dailyUnrealizedLoss: number // accumulated unrealized loss (>=0)
+  weeklyRealizedLoss: number
+  weeklyUnrealizedLoss: number
+  dailyBreached: boolean
+  weeklyBreached: boolean
+  lastResetDay: string  // ISO date string of start of day
+  lastResetWeek: string // ISO date string of start of week (Monday)
+}
+
 export type FinanceSettings = {
   baseCurrency: 'LKR'
   reportingCurrencies: Array<CurrencyCode>
@@ -331,9 +358,10 @@ export type FinanceSettings = {
   emergencyKillSwitch: boolean
   monitoringActive: boolean   // for live_monitored mode
   autonomousTradingEnabled: boolean   // for live_auto_trade mode
-  binanceWithdrawalsAllowed: false
-  leverageEnabled: false
-  futuresEnabled: false
+  binanceWithdrawalsAllowed: boolean
+  ibkrWithdrawalsAllowed: boolean
+  leverageEnabled: boolean
+  futuresEnabled: boolean
   riskControls: {
     maxPositionSizeLkr: number
     maxExposurePerAssetPct: number
@@ -381,6 +409,7 @@ export type FinanceSettings = {
   audit_logs: Array<Record<string, unknown>>
   error_logs: Array<Record<string, unknown>>
   trading_signals: Array<TradingSignal>
+  riskState: RiskState
 }
 
 type AddPayload = Record<string, unknown>
@@ -399,6 +428,7 @@ function defaultSettings(): FinanceSettings {
     monitoringActive: false,
     autonomousTradingEnabled: false,
     binanceWithdrawalsAllowed: false,
+    ibkrWithdrawalsAllowed: false,
     leverageEnabled: false,
     futuresEnabled: false,
     riskControls: {
@@ -412,7 +442,7 @@ function defaultSettings(): FinanceSettings {
       maxOpenPositions: 5,
       requireStopLoss: true,
       requireTakeProfitOrExitCondition: true,
-    },
+    }
   }
 }
 
@@ -454,6 +484,16 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     audit_logs: [],
     error_logs: [],
     trading_signals: [],
+    riskState: {
+      dailyRealizedLoss: 0,
+      dailyUnrealizedLoss: 0,
+      weeklyRealizedLoss: 0,
+      weeklyUnrealizedLoss: 0,
+      dailyBreached: false,
+      weeklyBreached: false,
+      lastResetDay: startOfDay(),
+      lastResetWeek: startOfWeek(),
+    }
   }
 }
 
@@ -1369,6 +1409,7 @@ export function tradingPerformanceSummary(db: FinanceDatabase) {
       avgProfit: 0,
       avgLoss: 0,
       avgProfitLossPerTrade: 0,
+      profitFactor: 0,
       sharpeRatio: 0,
       maxDrawdown: 0,
       predictionAccuracy: 0,
@@ -1385,6 +1426,9 @@ export function tradingPerformanceSummary(db: FinanceDatabase) {
   const avgProfit = profits.length > 0 ? totalProfit / profits.length : 0;
   const avgLoss = losses.length > 0 ? totalLoss / losses.length : 0; // will be negative
   const avgProfitLossPerTrade = totalNet / trades.length;
+  // Profit factor: gross profit / gross loss (gross loss as a positive magnitude)
+  const grossLoss = Math.abs(totalLoss);
+  const profitFactor = grossLoss !== 0 ? totalProfit / grossLoss : 0;
 
   // Sharpe ratio: using profitLoss as return, risk-free rate = 0
   const returns = trades.map(t => t.profitLoss);
@@ -1436,6 +1480,7 @@ export function tradingPerformanceSummary(db: FinanceDatabase) {
     avgProfit,
     avgLoss,
     avgProfitLossPerTrade,
+    profitFactor,
     sharpeRatio,
     maxDrawdown,
     predictionAccuracy,

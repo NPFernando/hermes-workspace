@@ -148,7 +148,10 @@ export const Route = createFileRoute('/api/finance')({
             }
             db.settings.tradingMode = requestedMode as typeof db.settings.tradingMode
             db.settings.liveTradingEnabled = requestedMode === 'live_manual_approval' || requestedMode === 'live_auto_trade' || requestedMode === 'live_monitored'
-            db.settings.emergencyKillSwitch = requestedMode !== 'live_auto_trade'
+            // NOTE: the emergency kill switch is an INDEPENDENT master cutoff — a mode
+            // change must never arm or disarm it. Use `set_kill_switch` for that. This
+            // keeps "select a mode" and "disarm the safety cutoff" as two deliberate,
+            // separately-audited human actions instead of one being a side effect of the other.
             writeFinanceStore(db)
             appendAuditLog('trading_mode_changed', { requestedMode, liveTradingEnabled: db.settings.liveTradingEnabled })
             return json(financePayload())
@@ -160,6 +163,24 @@ export const Route = createFileRoute('/api/finance')({
             db.settings.emergencyKillSwitch = true
             writeFinanceStore(db)
             appendAuditLog('emergency_stop', { source: 'finance_api' })
+            return json(financePayload())
+          }
+          if (action === 'set_kill_switch') {
+            // Independent master cutoff. `engaged: true` = cutoff ON (all trading halted, safe).
+            // DISARMING (engaged=false) is the dangerous direction — it requires an explicit
+            // confirmation phrase and is intended to be a deliberate human action from the UI.
+            const engaged = body.engaged !== false // default to engaged (fail-safe)
+            const db = readFinanceStore()
+            if (!engaged && body.approval !== 'I_UNDERSTAND_DISABLE_SAFETY_CUTOFF') {
+              appendAuditLog('kill_switch_disarm_blocked', { reason: 'missing explicit confirmation phrase' })
+              return json(
+                { ok: false, error: 'Disarming the safety cutoff requires the explicit confirmation phrase.' },
+                { status: 400 },
+              )
+            }
+            db.settings.emergencyKillSwitch = engaged
+            writeFinanceStore(db)
+            appendAuditLog('kill_switch_set', { engaged, source: 'finance_api' })
             return json(financePayload())
           }
           return json({ ok: false, error: `Unsupported finance action: ${action}` }, { status: 400 })
