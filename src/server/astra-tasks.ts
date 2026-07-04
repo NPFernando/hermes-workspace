@@ -365,6 +365,13 @@ export function clearStuckTasks(): number {
   return cleared
 }
 
+// Master switch for the task autopilot (automatic planning + execution dispatch).
+// Set HERMES_TASK_AUTOPILOT=off in the environment to stop the server from
+// dispatching agents to plan/execute board tasks on a timer. Board summaries,
+// stuck-task cleanup, and manual/API-triggered execution are unaffected.
+// Takes effect on server restart (env is read at process start).
+const TASK_AUTOPILOT_ENABLED = process.env.HERMES_TASK_AUTOPILOT !== 'off'
+
 // Periodic stuck-task sweep: every 10 minutes while the server is running.
 setInterval(clearStuckTasks, 10 * 60 * 1000)
 
@@ -373,6 +380,7 @@ setInterval(clearStuckTasks, 10 * 60 * 1000)
 // backlog manually, etc.). Only touches tasks no agent has reviewed yet —
 // tasks already in the pipeline are left alone.
 setInterval(() => {
+  if (!TASK_AUTOPILOT_ENABLED) return
   try { runAgentDeployBackground('auto') } catch { /* non-fatal */ }
 }, 15 * 60 * 1000)
 
@@ -591,6 +599,7 @@ export function drainReadyReview(opts: { limit?: number; ignoreDelay?: boolean }
 }
 
 setInterval(() => {
+  if (!TASK_AUTOPILOT_ENABLED) return
   try {
     const { queued, titles } = drainReadyReview()
     if (queued === 0) return
