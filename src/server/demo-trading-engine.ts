@@ -15,7 +15,7 @@
  * emergency kill switch is off. All execution goes through BinanceDemoClient,
  * which is hard-locked to the demo host, so this can never touch real money.
  */
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import {
@@ -293,8 +293,18 @@ function hermesBin(): string {
 }
 function sendTradeAlert(message: string): void {
   if (!TRADE_ALERTS_ENABLED) return
+  // Never send (or spawn) during tests, and never block the trading cycle on it:
+  // fire-and-forget a detached child so a slow/hung `hermes send` can't stall trading.
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') return
   try {
-    spawnSync(hermesBin(), ['send', '--to', ALERT_TARGET, '-q', message], { encoding: 'utf-8', timeout: 15_000 })
+    const child = spawn(hermesBin(), ['send', '--to', ALERT_TARGET, '-q', message], {
+      stdio: 'ignore',
+      detached: true,
+    })
+    child.on('error', () => {
+      /* non-fatal */
+    })
+    child.unref()
   } catch {
     /* non-fatal */
   }
@@ -370,6 +380,12 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
     appendAuditLog('demo_guardian_block', { symbol, strategyId, blocks: verdictBlocks })
   }
 
+  // Crash-safety: persist the store immediately after each order. A mid-cycle
+  // crash/restart then orphans at most the one in-flight order instead of the
+  // whole cycle's state — otherwise real exchange positions go unrecorded and
+  // the next cycle can double-enter.
+  const checkpoint = () => persist({ scores, positions, trades, blocks })
+
   for (const symbol of config.symbols) {
     let candles: Array<Candle>
     let price: number
@@ -435,6 +451,7 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
           positions = positions.filter((p) => p.id !== pos.id)
           actions.push({ symbol, strategyId: pos.strategyId, action: 'CLOSE', reason, price: order.avgPrice || price, pnlQuote })
           appendAuditLog('demo_trade_close', { symbol, strategyId: pos.strategyId, pnlQuote, reason })
+          checkpoint()
         } catch (err) {
           actions.push({ symbol, strategyId: pos.strategyId, action: 'SKIP', reason: `close failed: ${(err as Error).message}` })
         }
@@ -485,6 +502,7 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
               price: order.avgPrice || price,
             })
             appendAuditLog('demo_trade_open', { symbol, strategyId: vote.leadStrategyId, quote: verdict.approvedQuote, vote: vote.net })
+            checkpoint()
           }
         } catch (err) {
           actions.push({ symbol, strategyId: vote.leadStrategyId, action: 'SKIP', reason: `open failed: ${(err as Error).message}` })
