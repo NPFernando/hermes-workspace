@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router';
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { safeErrorMessage } from '../../server/rate-limit'
@@ -12,8 +12,21 @@ import {
   financeSummary,
   maskSensitive,
   readFinanceStore,
+  tradingPerformanceSummary,
   writeFinanceStore,
 } from '../../server/finance-store'
+import {
+  addBinanceCandles,
+  addMarketPrice,
+  fetchBinanceKlines,
+  fetchBinanceTickerPrice,
+} from '../../server/binance-market.service'
+import {
+  addIBKRCandles,
+  addIBKRLMarketPrice,
+  fetchIBKRTicker,
+  getIBKRCandles,
+} from '../../server/ibkr-market.service'
 
 type JsonRecord = Record<string, unknown>
 
@@ -63,6 +76,7 @@ function financePayload() {
       },
     },
     summary: financeSummary(db),
+    tradingPerformance: tradingPerformanceSummary(db),
     alerts: financeAlerts(db),
     settings: db.settings,
     data: maskSensitive(db),
@@ -87,16 +101,53 @@ export const Route = createFileRoute('/api/finance')({
             addFinanceRecord(kind, payload)
             return json(financePayload())
           }
+          if (action === 'fetch_market_price') {
+            // Read-only market data: public Binance ticker or simulated IBKR paper price.
+            // Does not place orders and is independent of the live-trading gate.
+            const symbol = typeof body.symbol === 'string' ? body.symbol.trim() : ''
+            if (!symbol) {
+              return json({ ok: false, error: 'symbol is required' }, { status: 400 })
+            }
+            const platform = body.platform === 'ibkr' ? 'ibkr' : 'binance'
+            if (platform === 'ibkr') {
+              const ticker = await fetchIBKRTicker(symbol)
+              addIBKRLMarketPrice(symbol, ticker.price, ticker.bid, ticker.ask, undefined)
+            } else {
+              const ticker = await fetchBinanceTickerPrice(symbol)
+              addMarketPrice(symbol, ticker.price, ticker.bid, ticker.ask, undefined)
+            }
+            return json(financePayload())
+          }
+          if (action === 'fetch_candles') {
+            // Read-only historical OHLCV: public Binance klines or simulated IBKR bars.
+            const symbol = typeof body.symbol === 'string' ? body.symbol.trim() : ''
+            if (!symbol) {
+              return json({ ok: false, error: 'symbol is required' }, { status: 400 })
+            }
+            const platform = body.platform === 'ibkr' ? 'ibkr' : 'binance'
+            const requestedLimit = typeof body.limit === 'number' && Number.isFinite(body.limit) ? body.limit : 100
+            const limit = Math.max(1, Math.min(Math.floor(requestedLimit), 500))
+            if (platform === 'ibkr') {
+              const interval = typeof body.interval === 'string' && body.interval.trim() ? body.interval.trim() : '1 day'
+              const bars = await getIBKRCandles(symbol, interval, limit)
+              addIBKRCandles(symbol, interval, bars)
+              return json(financePayload())
+            }
+            const interval = typeof body.interval === 'string' && body.interval.trim() ? body.interval.trim() : '1h'
+            const klines = await fetchBinanceKlines(symbol, interval, limit)
+            addBinanceCandles(symbol, interval, klines)
+            return json(financePayload())
+          }
           if (action === 'set_trading_mode') {
             const requestedMode = typeof body.mode === 'string' ? body.mode : 'observe_only'
             const db = readFinanceStore()
-            const liveModes = ['live_manual_approval', 'live_auto_trade']
+            const liveModes = ['live_manual_approval', 'live_auto_trade', 'live_monitored']
             if (liveModes.includes(requestedMode) && body.approval !== 'I_APPROVE_LIVE_TRADING') {
               appendAuditLog('trading_mode_change_blocked', { requestedMode, reason: 'missing explicit approval phrase' })
               return json({ ok: false, error: 'Explicit approval phrase required before enabling live trading.' }, { status: 400 })
             }
             db.settings.tradingMode = requestedMode as typeof db.settings.tradingMode
-            db.settings.liveTradingEnabled = requestedMode === 'live_manual_approval' || requestedMode === 'live_auto_trade'
+            db.settings.liveTradingEnabled = requestedMode === 'live_manual_approval' || requestedMode === 'live_auto_trade' || requestedMode === 'live_monitored'
             db.settings.emergencyKillSwitch = requestedMode !== 'live_auto_trade'
             writeFinanceStore(db)
             appendAuditLog('trading_mode_changed', { requestedMode, liveTradingEnabled: db.settings.liveTradingEnabled })

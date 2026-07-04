@@ -18,6 +18,9 @@ export interface GuardianConfig {
   maxOpenPositions: number
   perTradeQuoteCap: number
   maxDailyLossQuote: number
+  maxWeeklyLossQuote: number
+  /** Halt new entries when open positions are collectively down this much unrealized (quote). */
+  maxOpenDrawdownQuote: number
   lossStreakLimit: number
   cooldownMinutes: number
   minQuoteBalance: number
@@ -27,6 +30,8 @@ export const DEFAULT_GUARDIAN_CONFIG: GuardianConfig = {
   maxOpenPositions: 4,
   perTradeQuoteCap: 50,
   maxDailyLossQuote: 100,
+  maxWeeklyLossQuote: 500,
+  maxOpenDrawdownQuote: 150,
   lossStreakLimit: 3,
   cooldownMinutes: 240,
   minQuoteBalance: 500,
@@ -44,6 +49,10 @@ export interface GuardianContext {
   quoteBalance: number
   /** Realized PnL today (negative = loss). */
   dailyPnlQuote: number
+  /** Realized PnL this week (negative = loss). */
+  weeklyPnlQuote: number
+  /** Mark-to-market PnL of all currently open positions (negative = unrealized loss). */
+  openUnrealizedPnlQuote: number
   /** Consecutive losses for the proposing strategy. */
   strategyLossStreak: number
   /** ISO timestamp until which the proposing strategy is cooling down. */
@@ -85,6 +94,20 @@ export function checkOrderProposal(
     })
   }
 
+  if (ctx.weeklyPnlQuote <= -config.maxWeeklyLossQuote) {
+    blocks.push({
+      rule: 'weekly_loss_halt',
+      detail: `realized ${ctx.weeklyPnlQuote.toFixed(2)} this week breaches -${config.maxWeeklyLossQuote} limit — halted until next week`,
+    })
+  }
+
+  if (ctx.openUnrealizedPnlQuote <= -config.maxOpenDrawdownQuote) {
+    blocks.push({
+      rule: 'open_drawdown_halt',
+      detail: `open positions down ${ctx.openUnrealizedPnlQuote.toFixed(2)} unrealized, breaches -${config.maxOpenDrawdownQuote} limit — no new entries until the drawdown recovers`,
+    })
+  }
+
   if (ctx.strategyCooldownUntil && new Date(ctx.strategyCooldownUntil) > now) {
     blocks.push({
       rule: 'loss_streak_cooldown',
@@ -112,4 +135,31 @@ export function cooldownUntil(config: GuardianConfig, from: Date = new Date()): 
 export function dayKey(date: Date | string = new Date()): string {
   const d = typeof date === 'string' ? new Date(date) : date
   return d.toISOString().slice(0, 10)
+}
+
+/** UTC ISO week key (YYYY-Www) used to bucket realized PnL for the weekly halt. */
+export function weekKey(date: Date | string = new Date()): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const { year, week } = isoWeekParts(d)
+  return `${year}-W${String(week).padStart(2, '0')}`
+}
+
+/**
+ * Returns the ISO-8601 week-year and week number (1-53) for a date, in UTC.
+ * Both are derived from the Thursday of the date's ISO week — the Thursday
+ * defines the ISO week-year, so the label year and the week number must come
+ * from the *same* Thursday. Deriving the year from the original date instead
+ * breaks across the New Year boundary (e.g. 2027-01-01 belongs to 2026-W53),
+ * which would let realizedWeekly under-count losses straddling Jan 1.
+ * jan4 is built in UTC so week boundaries don't shift by the host TZ offset.
+ */
+function isoWeekParts(date: Date): { year: number; week: number } {
+  const thursday = new Date(date.valueOf())
+  const dayNr = (date.getUTCDay() + 6) % 7 // Mon=0 … Sun=6
+  thursday.setUTCDate(thursday.getUTCDate() - dayNr + 3)
+  const isoYear = thursday.getUTCFullYear()
+  const jan4 = new Date(Date.UTC(isoYear, 0, 4))
+  const dayDiff = (thursday.valueOf() - jan4.valueOf()) / 86400000
+  const week = 1 + Math.ceil(dayDiff / 7)
+  return { year: isoYear, week }
 }

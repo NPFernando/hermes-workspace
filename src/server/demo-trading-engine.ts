@@ -35,6 +35,7 @@ import {
   checkOrderProposal,
   cooldownUntil,
   dayKey,
+  weekKey,
   type GuardianBlock,
   type GuardianConfig,
 } from './trading-guardian'
@@ -171,6 +172,38 @@ function realizedToday(trades: Array<TradeLogEntry>, now = new Date()): number {
     .reduce((sum, t) => sum + t.pnlQuote, 0)
 }
 
+function realizedWeekly(trades: Array<TradeLogEntry>, now = new Date()): number {
+  const thisWeek = weekKey(now)
+  return trades
+    .filter((t) => weekKey(t.closedAt) === thisWeek)
+    .reduce((sum, t) => sum + t.pnlQuote, 0)
+}
+
+/**
+ * Mark-to-market unrealized PnL of all open positions (negative = net loss).
+ * NOTE: if a position's live price can't be fetched we fall back to its entry
+ * price (~0 contribution). That is NOT conservative — it under-counts that
+ * position's loss, so the open-drawdown halt can under-fire. Acceptable here
+ * because the demo client's getPrice effectively never fails; revisit before
+ * wiring this to a live price feed.
+ */
+async function openUnrealizedQuote(
+  positions: Array<OpenPosition>,
+  client: BinanceDemoClient,
+): Promise<number> {
+  let total = 0
+  for (const pos of positions) {
+    let mark = pos.entryPrice
+    try {
+      mark = await client.getPrice(pos.symbol)
+    } catch {
+      // keep entryPrice fallback (see note above)
+    }
+    total += mark * pos.quantity - pos.entryQuote
+  }
+  return total
+}
+
 /** Engine config = defaults ⊕ finance settings.demoTrading ⊕ per-call overrides. */
 export function resolveEngineConfig(
   settingsOverride: unknown,
@@ -238,6 +271,12 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
   } catch (err) {
     return bail(`account read failed: ${(err as Error).message}`)
   }
+
+  // Cycle-start mark-to-market of open positions. Computed once and reused for
+  // every entry check this cycle (like realized PnL) — a conservative snapshot,
+  // since entries opened mid-cycle start at ~0 unrealized and exits only reduce
+  // the drawdown.
+  const openUnrealizedPnlQuote = await openUnrealizedQuote(positions, client)
 
   const actions: Array<CycleAction> = []
 
@@ -329,6 +368,8 @@ export async function runTradingCycle(options: RunCycleOptions = {}): Promise<Cy
           openPositions: positions.length,
           quoteBalance,
           dailyPnlQuote: realizedToday(trades),
+          weeklyPnlQuote: realizedWeekly(trades),
+          openUnrealizedPnlQuote,
           strategyLossStreak: leadScore.lossStreak ?? 0,
           strategyCooldownUntil: leadScore.cooldownUntil,
         },
