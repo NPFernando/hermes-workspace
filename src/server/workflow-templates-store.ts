@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -131,6 +132,11 @@ export function writeWorkflowTemplates(
     'utf-8',
   )
   renameSync(tmpPath, STORE_PATH)
+  try {
+    chmodSync(STORE_PATH, 0o600)
+  } catch {
+    // best-effort — non-fatal on Windows or permission-restricted filesystems
+  }
   return cleanTemplates
 }
 
