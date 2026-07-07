@@ -24,7 +24,9 @@ interface ModelLiveness {
 }
 interface ModelUsageRow {
   model: string
+  billing: 'sub' | 'free' | 'paid'
   sessions: number
+  billedCostUsd: number
   estCostUsd: number
   tokens: number
 }
@@ -120,7 +122,7 @@ export function OpsCostScreen() {
     cost?.remaining != null && cost.avgDaily30d != null && cost.avgDaily30d > 0.005
       ? cost.remaining / cost.avgDaily30d
       : null
-  const maxCost = Math.max(0.0001, ...(modelUsage7d ?? []).map((r) => r.estCostUsd))
+  const maxCost = Math.max(0.0001, ...(modelUsage7d ?? []).map((r) => r.billedCostUsd))
   const opsJobs = (cronJobs ?? []).filter((j) =>
     /cost|rollup|scoreboard|post-mortem|discovery|escalation|readiness|pg sync/i.test(j.name),
   )
@@ -152,13 +154,13 @@ export function OpsCostScreen() {
       </div>
 
       {/* Per-model costs (single-series magnitude → table with inline accent bars) */}
-      <Panel title="Per-model cost — last 7 days (gateway sessions, HARP estimates)">
+      <Panel title="Per-model cost — last 7 days (billed; subscription/free estimates are phantom)">
         {modelUsage7d?.length ? (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-[var(--theme-muted)]">
                 <th className="pb-2 font-normal">Model</th>
-                <th className="pb-2 font-normal text-right">Est. cost</th>
+                <th className="pb-2 font-normal text-right">Billed</th>
                 <th className="pb-2 font-normal text-right">Sessions</th>
                 <th className="pb-2 font-normal text-right">Tokens</th>
                 <th className="pb-2 pl-3 font-normal" aria-hidden />
@@ -166,14 +168,24 @@ export function OpsCostScreen() {
             </thead>
             <tbody>
               {modelUsage7d.map((r) => (
-                <tr key={r.model} className="border-t border-[var(--theme-border,rgba(128,128,128,0.15))]">
+                <tr
+                  key={`${r.model}|${r.billing}`}
+                  className="border-t border-[var(--theme-border,rgba(128,128,128,0.15))]"
+                >
                   <td className="py-1.5 pr-2 text-[var(--theme-text)]">
                     {r.model.split('/').pop()}
-                    {r.model.includes(':free') ? (
-                      <span className="ml-1.5 text-xs text-[var(--theme-muted)]">free</span>
+                    <span className="ml-1.5 text-xs text-[var(--theme-muted)]">
+                      {r.billing === 'sub' ? '🎫 subscription' : r.billing === 'free' ? 'free' : ''}
+                    </span>
+                  </td>
+                  <td className="py-1.5 text-right tabular-nums text-[var(--theme-text)]">
+                    {money(r.billedCostUsd)}
+                    {r.billing !== 'paid' && r.estCostUsd > 0.005 ? (
+                      <span className="ml-1 text-xs text-[var(--theme-muted)]">
+                        (est {money(r.estCostUsd)})
+                      </span>
                     ) : null}
                   </td>
-                  <td className="py-1.5 text-right tabular-nums text-[var(--theme-text)]">{money(r.estCostUsd)}</td>
                   <td className="py-1.5 text-right tabular-nums text-[var(--theme-muted)]">{r.sessions}</td>
                   <td className="py-1.5 text-right tabular-nums text-[var(--theme-muted)]">
                     {(r.tokens / 1000).toFixed(0)}k
@@ -181,7 +193,7 @@ export function OpsCostScreen() {
                   <td className="py-1.5 pl-3" style={{ width: '30%' }}>
                     <div
                       className="h-2 rounded-[4px] bg-accent-500"
-                      style={{ width: `${Math.max(2, (r.estCostUsd / maxCost) * 100)}%` }}
+                      style={{ width: `${Math.max(2, (r.billedCostUsd / maxCost) * 100)}%` }}
                       aria-hidden
                     />
                   </td>
@@ -192,6 +204,10 @@ export function OpsCostScreen() {
         ) : (
           <p className="text-sm text-[var(--theme-muted)]">No session data available.</p>
         )}
+        <p className="mt-2 text-xs text-[var(--theme-muted)]">
+          🎫 Codex subscription is flat-rate — its per-token estimates are not billed. Free-tier
+          estimates are likewise phantom. OpenRouter credits above are ground truth.
+        </p>
       </Panel>
 
       <div className="grid gap-4 md:grid-cols-2">

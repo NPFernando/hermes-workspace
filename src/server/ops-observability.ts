@@ -180,27 +180,48 @@ async function getModelLiveness(): Promise<ModelLiveness | null> {
 
 export interface ModelUsageRow {
   model: string
+  /** 'sub' = Codex subscription (flat-rate), 'free' = :free tier, 'paid' = per-call billed */
+  billing: 'sub' | 'free' | 'paid'
   sessions: number
+  /** Real billable cost: $0 for subscription/free rows (their estimates are phantom). */
+  billedCostUsd: number
+  /** Raw HARP estimate — phantom for sub/free rows, kept for reference. */
   estCostUsd: number
   tokens: number
 }
 
 async function getSessionModelCosts(days = 7): Promise<Array<ModelUsageRow> | null> {
   const rows = await sqliteJson<
-    Array<{ model: string | null; sessions: number; cost: number | null; toks: number | null }>
+    Array<{
+      model: string | null
+      bill: string
+      sessions: number
+      billed: number | null
+      est: number | null
+      toks: number | null
+    }>
   >(
     join(HERMES_HOME, 'state.db'),
-    `SELECT COALESCE(model,'(unknown)') AS model, COUNT(*) AS sessions,
-            ROUND(SUM(COALESCE(actual_cost_usd, estimated_cost_usd, 0)), 4) AS cost,
+    `SELECT COALESCE(model,'(unknown)') AS model,
+            CASE WHEN billing_provider='openai-codex' THEN 'sub'
+                 WHEN COALESCE(model,'') LIKE '%:free%' THEN 'free'
+                 ELSE 'paid' END AS bill,
+            COUNT(*) AS sessions,
+            ROUND(SUM(CASE WHEN billing_provider='openai-codex'
+                             OR COALESCE(model,'') LIKE '%:free%' THEN 0
+                           ELSE COALESCE(actual_cost_usd, estimated_cost_usd, 0) END), 4) AS billed,
+            ROUND(SUM(COALESCE(actual_cost_usd, estimated_cost_usd, 0)), 4) AS est,
             SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)) AS toks
      FROM sessions WHERE started_at >= strftime('%s','now','-${Math.max(1, Math.floor(days))} days')
-     GROUP BY model ORDER BY cost DESC, sessions DESC LIMIT 10`,
+     GROUP BY model, bill ORDER BY billed DESC, sessions DESC LIMIT 10`,
   )
   if (!rows) return null
   return rows.map((r) => ({
     model: r.model ?? '(unknown)',
+    billing: r.bill === 'sub' || r.bill === 'free' ? r.bill : 'paid',
     sessions: r.sessions,
-    estCostUsd: r.cost ?? 0,
+    billedCostUsd: r.billed ?? 0,
+    estCostUsd: r.est ?? 0,
     tokens: r.toks ?? 0,
   }))
 }
