@@ -1,5 +1,6 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  Analytics01Icon,
   ArrowDown01Icon,
   ArrowLeft01Icon,
   ArrowRight01Icon,
@@ -601,6 +602,7 @@ function ChatSidebarComponent({
   const isResearchActive = pathname.startsWith('/research')
   const isFinanceActive = pathname.startsWith('/finance')
   const isVtCapitalActive = pathname.startsWith('/vt-capital')
+  const isOpsCostActive = pathname.startsWith('/ops-cost')
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
   )
@@ -877,6 +879,13 @@ function ChatSidebarComponent({
       icon: UserGroupIcon,
       label: 'Swarm',
       active: isSwarmActive,
+    },
+    {
+      kind: 'link',
+      to: '/ops-cost',
+      icon: Analytics01Icon,
+      label: 'Cost & Routing',
+      active: isOpsCostActive,
     },
     ...(echoStudioEnabled
       ? [
