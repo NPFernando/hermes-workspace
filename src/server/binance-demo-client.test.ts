@@ -2,9 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   BinanceDemoClient,
+  BinanceLiveClient,
   DemoEnvironmentError,
   assertDemoBaseUrl,
+  assertLiveBaseUrl,
   createDemoClientFromEnv,
+  createLiveClientFromEnv,
 } from './binance-demo-client'
 
 describe('assertDemoBaseUrl', () => {
@@ -99,5 +102,58 @@ describe('createDemoClientFromEnv', () => {
     } as unknown as NodeJS.ProcessEnv)
     expect(client).toBeNull()
     expect(reason).toMatch(/production key/)
+  })
+})
+
+
+describe('assertLiveBaseUrl', () => {
+  it('accepts only the approved production host', () => {
+    expect(assertLiveBaseUrl('https://api.binance.com/api')).toBe('api.binance.com')
+  })
+
+  it('refuses demo, market-data, and unknown hosts', () => {
+    expect(() => assertLiveBaseUrl('https://testnet.binance.vision')).toThrow(DemoEnvironmentError)
+    expect(() => assertLiveBaseUrl('https://data-api.binance.vision')).toThrow(DemoEnvironmentError)
+    expect(() => assertLiveBaseUrl('https://api1.binance.com')).toThrow(DemoEnvironmentError)
+  })
+})
+
+describe('BinanceLiveClient construction guards', () => {
+  const base = { apiKey: 'live-key', apiSecret: 'live-secret', baseUrl: 'https://api.binance.com/api' }
+
+  it('builds against the approved live host', () => {
+    expect(new BinanceLiveClient(base).host).toBe('api.binance.com')
+  })
+
+  it('throws when pointed at testnet', () => {
+    expect(() => new BinanceLiveClient({ ...base, baseUrl: 'https://testnet.binance.vision' })).toThrow(
+      DemoEnvironmentError,
+    )
+  })
+
+  it('throws when live key collides with the testnet key', () => {
+    expect(() => new BinanceLiveClient({ ...base, apiKey: 'same', testnetApiKey: 'same' })).toThrow(/testnet key/)
+  })
+})
+
+describe('createLiveClientFromEnv', () => {
+  it('requires an explicit live-trading env approval', () => {
+    const { client, reason } = createLiveClientFromEnv({
+      BINANCE_API_KEY: 'live',
+      BINANCE_API_SECRET: 'secret',
+    } as unknown as NodeJS.ProcessEnv)
+    expect(client).toBeNull()
+    expect(reason).toMatch(/approval/)
+  })
+
+  it('builds from production vars after approval', () => {
+    const { client } = createLiveClientFromEnv({
+      BINANCE_API_KEY: 'live',
+      BINANCE_API_SECRET: 'secret',
+      BINANCE_BASE_URL: 'https://api.binance.com/api',
+      BINANCE_ALLOW_LIVE_TRADING: 'I_APPROVE_BINANCE_LIVE_TRADING',
+      BINANCE_TESTNET_API_KEY: 'testnet',
+    } as unknown as NodeJS.ProcessEnv)
+    expect(client?.host).toBe('api.binance.com')
   })
 })

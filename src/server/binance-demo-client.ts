@@ -1,20 +1,13 @@
 /**
- * Signed Binance SPOT client — HARD-LOCKED to the demo/testnet environment.
+ * Signed Binance SPOT clients.
  *
- * Safety contract (defense in depth so a real order can never leave this file):
- *  1. The base URL is validated against an allowlist of official demo hosts.
- *     Anything else (api.binance.com et al.) throws at construction.
- *  2. Credentials are read ONLY from BINANCE_TESTNET_* — the production
- *     BINANCE_API_KEY/SECRET are never touched here.
- *  3. If the demo key/secret happen to equal the production ones, construction
- *     throws (guards against a copy-paste that would sign real requests).
- *  4. Order endpoints re-assert the demo host immediately before sending.
- *
- * Ref: https://developers.binance.com/legacy-docs/binance-spot-api-docs/demo-mode/general-info
+ * BinanceDemoClient remains hard-locked to the Binance demo/testnet hosts.
+ * BinanceLiveClient is separate and only builds against the approved production
+ * host after explicit environment approval. Keeping the clients separate avoids
+ * turning a testnet URL change into a real-money order path.
  */
 import crypto from 'node:crypto'
 
-// Official Binance demo/testnet spot hosts. Production hosts must never appear.
 const ALLOWED_DEMO_HOSTS = new Set([
   'demo-api.binance.com',
   'testnet.binance.vision',
@@ -29,8 +22,13 @@ const PRODUCTION_HOSTS = new Set([
   'data-api.binance.vision',
 ])
 
+const ALLOWED_LIVE_HOSTS = new Set([
+  'api.binance.com',
+])
+
 export type OrderSide = 'BUY' | 'SELL'
 export type OrderType = 'MARKET' | 'LIMIT'
+export type BinanceExecutionEnvironment = 'paper' | 'testnet' | 'live'
 
 export interface DemoBalance {
   asset: string
@@ -58,6 +56,42 @@ export interface DemoOrderResult {
   avgPrice: number
 }
 
+export type BinanceAccount = DemoAccount
+export type BinanceOrderResult = DemoOrderResult
+
+export interface BinanceOrderInput {
+  symbol: string
+  side: OrderSide
+  type: OrderType
+  quantity?: number
+  quoteOrderQty?: number
+  price?: number
+}
+
+export interface BinanceExecutionClient {
+  readonly host: string
+  readonly environment: BinanceExecutionEnvironment
+  ping: () => Promise<boolean>
+  getPrice: (symbol: string) => Promise<number>
+  getKlines: (
+    symbol: string,
+    interval?: string,
+    limit?: number,
+  ) => Promise<
+    Array<{
+      openTime: number
+      open: number
+      high: number
+      low: number
+      close: number
+      volume: number
+    }>
+  >
+  getAccount: () => Promise<BinanceAccount>
+  placeOrder: (input: BinanceOrderInput) => Promise<BinanceOrderResult>
+  testOrder?: (input: BinanceOrderInput) => Promise<void>
+}
+
 export class DemoEnvironmentError extends Error {
   constructor(message: string) {
     super(message)
@@ -65,18 +99,25 @@ export class DemoEnvironmentError extends Error {
   }
 }
 
-/** Extract and validate the host of a base URL, or throw. */
-export function assertDemoBaseUrl(baseUrl: string): string {
-  let host: string
+function normalizedBase(baseUrl: string): string {
+  return baseUrl.replace(/\/+$/, '').replace(/\/api$/, '')
+}
+
+function hostOf(baseUrl: string): string {
   try {
-    host = new URL(baseUrl).host.toLowerCase()
+    return new URL(baseUrl).host.toLowerCase()
   } catch {
     throw new DemoEnvironmentError(`Invalid Binance base URL: ${baseUrl}`)
   }
+}
+
+/** Extract and validate the host of a demo/testnet base URL, or throw. */
+export function assertDemoBaseUrl(baseUrl: string): string {
+  const host = hostOf(baseUrl)
   if (PRODUCTION_HOSTS.has(host)) {
     throw new DemoEnvironmentError(
       `Refusing to build a demo trading client against production host "${host}". ` +
-        `Execution is restricted to the Binance demo environment.`,
+        'Execution is restricted to the Binance demo environment.',
     )
   }
   if (!ALLOWED_DEMO_HOSTS.has(host)) {
@@ -88,42 +129,60 @@ export function assertDemoBaseUrl(baseUrl: string): string {
   return host
 }
 
-export interface DemoClientConfig {
-  apiKey: string
-  apiSecret: string
-  baseUrl: string
-  /** Production creds, passed only so we can refuse if they collide. */
-  productionApiKey?: string
-  recvWindow?: number
-  fetchImpl?: typeof fetch
+/** Extract and validate the host of a live Binance base URL, or throw. */
+export function assertLiveBaseUrl(baseUrl: string): string {
+  const host = hostOf(baseUrl)
+  if (ALLOWED_DEMO_HOSTS.has(host) || host === 'data-api.binance.vision') {
+    throw new DemoEnvironmentError(
+      `Refusing to build a live trading client against non-production host "${host}".`,
+    )
+  }
+  if (!ALLOWED_LIVE_HOSTS.has(host)) {
+    throw new DemoEnvironmentError(
+      `Host "${host}" is not an approved Binance live host (${[...ALLOWED_LIVE_HOSTS].join(', ')}).`,
+    )
+  }
+  return host
 }
 
-export class BinanceDemoClient {
+function orderParams(input: BinanceOrderInput): Record<string, string | number> {
+  const params: Record<string, string | number> = {
+    symbol: input.symbol,
+    side: input.side,
+    type: input.type,
+  }
+  if (input.type === 'LIMIT') {
+    if (input.price == null || input.quantity == null) {
+      throw new DemoEnvironmentError('LIMIT order requires price and quantity.')
+    }
+    params.timeInForce = 'GTC'
+    params.price = input.price
+    params.quantity = input.quantity
+  } else {
+    if (input.quoteOrderQty != null) params.quoteOrderQty = input.quoteOrderQty
+    else if (input.quantity != null) params.quantity = input.quantity
+    else throw new DemoEnvironmentError('MARKET order requires quantity or quoteOrderQty.')
+  }
+  return params
+}
+
+abstract class SignedBinanceClient implements BinanceExecutionClient {
   private readonly apiKey: string
   private readonly apiSecret: string
   private readonly base: string
   private readonly recvWindow: number
   private readonly fetchImpl: typeof fetch
   readonly host: string
+  abstract readonly environment: BinanceExecutionEnvironment
+  protected abstract assertBaseUrl(baseUrl: string): string
+  protected abstract errorPrefix(): string
 
-  constructor(config: DemoClientConfig) {
+  constructor(config: { apiKey: string; apiSecret: string; baseUrl: string; recvWindow?: number; fetchImpl?: typeof fetch }) {
     if (!config.apiKey || !config.apiSecret) {
-      throw new DemoEnvironmentError('Demo API key and secret are required.')
+      throw new DemoEnvironmentError('Binance API key and secret are required.')
     }
-    if (
-      config.productionApiKey &&
-      config.apiKey.trim() === config.productionApiKey.trim()
-    ) {
-      throw new DemoEnvironmentError(
-        'Demo API key equals the production key — refusing to sign requests. ' +
-          'Set BINANCE_TESTNET_API_KEY to your demo credentials.',
-      )
-    }
-    this.host = assertDemoBaseUrl(config.baseUrl)
-    // Normalize to the scheme+host root: request paths already include the
-    // "/api/v3/..." prefix, so a base ending in "/api" (as in .env) would
-    // otherwise double up to "/api/api/v3/...".
-    this.base = config.baseUrl.replace(/\/+$/, '').replace(/\/api$/, '')
+    this.host = this.assertBaseUrl(config.baseUrl)
+    this.base = normalizedBase(config.baseUrl)
     this.apiKey = config.apiKey.trim()
     this.apiSecret = config.apiSecret.trim()
     this.recvWindow = config.recvWindow ?? 10_000
@@ -139,8 +198,7 @@ export class BinanceDemoClient {
     path: string,
     params: Record<string, string | number> = {},
   ): Promise<any> {
-    // Re-assert the demo host right before any signed call leaves the process.
-    assertDemoBaseUrl(this.base)
+    this.assertBaseUrl(this.base)
     const timestamp = Date.now()
     const search = new URLSearchParams({
       ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
@@ -157,37 +215,35 @@ export class BinanceDemoClient {
     })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const code = (body as any)?.code
-      const msg = (body as any)?.msg || res.statusText
-      throw new DemoEnvironmentError(`Binance demo ${path} failed (${res.status}${code ? ` code ${code}` : ''}): ${msg}`)
+      const code = (body)?.code
+      const msg = (body)?.msg || res.statusText
+      throw new DemoEnvironmentError(`${this.errorPrefix()} ${path} failed (${res.status}${code ? ` code ${code}` : ''}): ${msg}`)
     }
     return body
   }
 
   async ping(): Promise<boolean> {
-    assertDemoBaseUrl(this.base)
+    this.assertBaseUrl(this.base)
     const res = await this.fetchImpl(`${this.base}/api/v3/ping`, {
       signal: AbortSignal.timeout(10_000),
     })
     return res.ok
   }
 
-  /** Unsigned: latest price for a symbol on the demo environment. */
   async getPrice(symbol: string): Promise<number> {
-    assertDemoBaseUrl(this.base)
+    this.assertBaseUrl(this.base)
     const res = await this.fetchImpl(`${this.base}/api/v3/ticker/price?symbol=${symbol}`, {
       signal: AbortSignal.timeout(10_000),
     })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) throw new DemoEnvironmentError(`price ${symbol} failed (${res.status})`)
-    return parseFloat((body as any).price)
+    return parseFloat((body).price)
   }
 
-  /** Unsigned: recent candles for strategy evaluation. */
   async getKlines(symbol: string, interval = '1h', limit = 100): Promise<Array<{
     openTime: number; open: number; high: number; low: number; close: number; volume: number
   }>> {
-    assertDemoBaseUrl(this.base)
+    this.assertBaseUrl(this.base)
     const url = `${this.base}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
     const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(12_000) })
     const rows = await res.json().catch(() => [])
@@ -202,7 +258,7 @@ export class BinanceDemoClient {
     }))
   }
 
-  async getAccount(): Promise<DemoAccount> {
+  async getAccount(): Promise<BinanceAccount> {
     const raw = await this.signedRequest('GET', '/api/v3/account')
     return {
       accountType: raw.accountType,
@@ -218,34 +274,12 @@ export class BinanceDemoClient {
     }
   }
 
-  /** Place a spot order on the demo environment. */
-  async placeOrder(input: {
-    symbol: string
-    side: OrderSide
-    type: OrderType
-    quantity?: number
-    quoteOrderQty?: number
-    price?: number
-  }): Promise<DemoOrderResult> {
-    const params: Record<string, string | number> = {
-      symbol: input.symbol,
-      side: input.side,
-      type: input.type,
-    }
-    if (input.type === 'LIMIT') {
-      if (input.price == null || input.quantity == null) {
-        throw new DemoEnvironmentError('LIMIT order requires price and quantity.')
-      }
-      params.timeInForce = 'GTC'
-      params.price = input.price
-      params.quantity = input.quantity
-    } else {
-      // MARKET: either base quantity or quote spend.
-      if (input.quoteOrderQty != null) params.quoteOrderQty = input.quoteOrderQty
-      else if (input.quantity != null) params.quantity = input.quantity
-      else throw new DemoEnvironmentError('MARKET order requires quantity or quoteOrderQty.')
-    }
-    const raw = await this.signedRequest('POST', '/api/v3/order', params)
+  async testOrder(input: BinanceOrderInput): Promise<void> {
+    await this.signedRequest('POST', '/api/v3/order/test', orderParams(input))
+  }
+
+  async placeOrder(input: BinanceOrderInput): Promise<BinanceOrderResult> {
+    const raw = await this.signedRequest('POST', '/api/v3/order', orderParams(input))
     const fills = (raw.fills || []).map((f: any) => ({
       price: parseFloat(f.price),
       qty: parseFloat(f.qty),
@@ -273,10 +307,78 @@ export class BinanceDemoClient {
   }
 }
 
+export interface DemoClientConfig {
+  apiKey: string
+  apiSecret: string
+  baseUrl: string
+  /** Production creds, passed only so we can refuse if they collide. */
+  productionApiKey?: string
+  recvWindow?: number
+  fetchImpl?: typeof fetch
+}
+
+export class BinanceDemoClient extends SignedBinanceClient {
+  readonly environment: BinanceExecutionEnvironment = 'testnet'
+
+  constructor(config: DemoClientConfig) {
+    if (
+      config.productionApiKey &&
+      config.apiKey.trim() === config.productionApiKey.trim()
+    ) {
+      throw new DemoEnvironmentError(
+        'Demo API key equals the production key - refusing to sign requests. ' +
+          'Set BINANCE_TESTNET_API_KEY to your demo credentials.',
+      )
+    }
+    super(config)
+  }
+
+  protected assertBaseUrl(baseUrl: string): string {
+    return assertDemoBaseUrl(baseUrl)
+  }
+
+  protected errorPrefix(): string {
+    return 'Binance demo'
+  }
+}
+
+export interface LiveClientConfig {
+  apiKey: string
+  apiSecret: string
+  baseUrl: string
+  testnetApiKey?: string
+  recvWindow?: number
+  fetchImpl?: typeof fetch
+}
+
+export class BinanceLiveClient extends SignedBinanceClient {
+  readonly environment: BinanceExecutionEnvironment = 'live'
+
+  constructor(config: LiveClientConfig) {
+    if (
+      config.testnetApiKey &&
+      config.apiKey.trim() === config.testnetApiKey.trim()
+    ) {
+      throw new DemoEnvironmentError(
+        'Live API key equals the testnet key - refusing to sign production requests.',
+      )
+    }
+    super(config)
+  }
+
+  protected assertBaseUrl(baseUrl: string): string {
+    return assertLiveBaseUrl(baseUrl)
+  }
+
+  protected errorPrefix(): string {
+    return 'Binance live'
+  }
+}
+
 /**
  * Build a demo client from environment variables, or return null (with a
  * reason) when demo credentials are absent/misconfigured. Never throws for
- * missing config — callers degrade gracefully.
+ * missing config - callers degrade gracefully.
  */
 export function createDemoClientFromEnv(
   env: NodeJS.ProcessEnv = process.env,
@@ -293,6 +395,31 @@ export function createDemoClientFromEnv(
       apiSecret,
       baseUrl,
       productionApiKey: env.BINANCE_API_KEY,
+    })
+    return { client }
+  } catch (err) {
+    return { client: null, reason: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export function createLiveClientFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): { client: BinanceLiveClient | null; reason?: string } {
+  const apiKey = env.BINANCE_API_KEY?.trim()
+  const apiSecret = env.BINANCE_API_SECRET?.trim()
+  const baseUrl = env.BINANCE_BASE_URL?.trim() || 'https://api.binance.com'
+  if (!apiKey || !apiSecret) {
+    return { client: null, reason: 'BINANCE_API_KEY / BINANCE_API_SECRET not set' }
+  }
+  if (env.BINANCE_ALLOW_LIVE_TRADING !== 'I_APPROVE_BINANCE_LIVE_TRADING') {
+    return { client: null, reason: 'BINANCE_ALLOW_LIVE_TRADING approval is not set' }
+  }
+  try {
+    const client = new BinanceLiveClient({
+      apiKey,
+      apiSecret,
+      baseUrl,
+      testnetApiKey: env.BINANCE_TESTNET_API_KEY,
     })
     return { client }
   } catch (err) {
