@@ -18,6 +18,7 @@ import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ResearchRouteImport } from './routes/research'
 import { Route as ProfilesRouteImport } from './routes/profiles'
+import { Route as OpsCostRouteImport } from './routes/ops-cost'
 import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as McpRouteImport } from './routes/mcp'
@@ -45,6 +46,7 @@ import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-p
 import { Route as ApiUserSettingsRouteImport } from './routes/api/user-settings'
 import { Route as ApiUserProfileRouteImport } from './routes/api/user-profile'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
+import { Route as ApiTradingEngineRouteImport } from './routes/api/trading-engine'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
@@ -115,6 +117,7 @@ import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPersonalitySwarmRouteImport } from './routes/api/personality-swarm'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiOrchestrateRouteImport } from './routes/api/orchestrate'
+import { Route as ApiOpsObservabilityRouteImport } from './routes/api/ops-observability'
 import { Route as ApiOpenrouterCreditsRouteImport } from './routes/api/openrouter-credits'
 import { Route as ApiOdysseusBootstrapRouteImport } from './routes/api/odysseus-bootstrap'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
@@ -137,6 +140,9 @@ import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
 import { Route as ApiDownloadApkRouteImport } from './routes/api/download-apk'
+import { Route as ApiDemoTradingRebalanceRouteImport } from './routes/api/demo-trading-rebalance'
+import { Route as ApiDemoTradingLlmRouteImport } from './routes/api/demo-trading-llm'
+import { Route as ApiDemoTradingGridRouteImport } from './routes/api/demo-trading-grid'
 import { Route as ApiDemoTradingRouteImport } from './routes/api/demo-trading'
 import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
@@ -155,6 +161,7 @@ import { Route as ApiClaudeTasksRouteImport } from './routes/api/claude-tasks'
 import { Route as ApiClaudeJobsRouteImport } from './routes/api/claude-jobs'
 import { Route as ApiClaudeConfigRouteImport } from './routes/api/claude-config'
 import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
+import { Route as ApiAutoRefinementRouteImport } from './routes/api/auto-refinement'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
@@ -282,6 +289,11 @@ const ResearchRoute = ResearchRouteImport.update({
 const ProfilesRoute = ProfilesRouteImport.update({
   id: '/profiles',
   path: '/profiles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OpsCostRoute = OpsCostRouteImport.update({
+  id: '/ops-cost',
+  path: '/ops-cost',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OperationsRoute = OperationsRouteImport.update({
@@ -417,6 +429,11 @@ const ApiUserProfileRoute = ApiUserProfileRouteImport.update({
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   id: '/api/transcribe',
   path: '/api/transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTradingEngineRoute = ApiTradingEngineRouteImport.update({
+  id: '/api/trading-engine',
+  path: '/api/trading-engine',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
@@ -770,6 +787,11 @@ const ApiOrchestrateRoute = ApiOrchestrateRouteImport.update({
   path: '/api/orchestrate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOpsObservabilityRoute = ApiOpsObservabilityRouteImport.update({
+  id: '/api/ops-observability',
+  path: '/api/ops-observability',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOpenrouterCreditsRoute = ApiOpenrouterCreditsRouteImport.update({
   id: '/api/openrouter-credits',
   path: '/api/openrouter-credits',
@@ -880,6 +902,21 @@ const ApiDownloadApkRoute = ApiDownloadApkRouteImport.update({
   path: '/api/download-apk',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDemoTradingRebalanceRoute = ApiDemoTradingRebalanceRouteImport.update({
+  id: '/api/demo-trading-rebalance',
+  path: '/api/demo-trading-rebalance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDemoTradingLlmRoute = ApiDemoTradingLlmRouteImport.update({
+  id: '/api/demo-trading-llm',
+  path: '/api/demo-trading-llm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDemoTradingGridRoute = ApiDemoTradingGridRouteImport.update({
+  id: '/api/demo-trading-grid',
+  path: '/api/demo-trading-grid',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDemoTradingRoute = ApiDemoTradingRouteImport.update({
   id: '/api/demo-trading',
   path: '/api/demo-trading',
@@ -968,6 +1005,11 @@ const ApiClaudeConfigRoute = ApiClaudeConfigRouteImport.update({
 const ApiChatEventsRoute = ApiChatEventsRouteImport.update({
   id: '/api/chat-events',
   path: '/api/chat-events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAutoRefinementRoute = ApiAutoRefinementRouteImport.update({
+  id: '/api/auto-refinement',
+  path: '/api/auto-refinement',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthCheckRoute = ApiAuthCheckRouteImport.update({
@@ -1410,6 +1452,7 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
+  '/ops-cost': typeof OpsCostRoute
   '/profiles': typeof ProfilesRoute
   '/research': typeof ResearchRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -1426,6 +1469,7 @@ export interface FileRoutesByFullPath {
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
+  '/api/auto-refinement': typeof ApiAutoRefinementRoute
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/claude-config': typeof ApiClaudeConfigRoute
   '/api/claude-jobs': typeof ApiClaudeJobsRouteWithChildren
@@ -1444,6 +1488,9 @@ export interface FileRoutesByFullPath {
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/demo-trading': typeof ApiDemoTradingRoute
+  '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
+  '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
+  '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
@@ -1466,6 +1513,7 @@ export interface FileRoutesByFullPath {
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
   '/api/openrouter-credits': typeof ApiOpenrouterCreditsRoute
+  '/api/ops-observability': typeof ApiOpsObservabilityRoute
   '/api/orchestrate': typeof ApiOrchestrateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/personality-swarm': typeof ApiPersonalitySwarmRoute
@@ -1536,6 +1584,7 @@ export interface FileRoutesByFullPath {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/trading-engine': typeof ApiTradingEngineRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/user-profile': typeof ApiUserProfileRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
@@ -1641,6 +1690,7 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
+  '/ops-cost': typeof OpsCostRoute
   '/profiles': typeof ProfilesRoute
   '/research': typeof ResearchRoute
   '/skills': typeof SkillsRoute
@@ -1656,6 +1706,7 @@ export interface FileRoutesByTo {
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
+  '/api/auto-refinement': typeof ApiAutoRefinementRoute
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/claude-config': typeof ApiClaudeConfigRoute
   '/api/claude-jobs': typeof ApiClaudeJobsRouteWithChildren
@@ -1674,6 +1725,9 @@ export interface FileRoutesByTo {
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/demo-trading': typeof ApiDemoTradingRoute
+  '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
+  '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
+  '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
@@ -1696,6 +1750,7 @@ export interface FileRoutesByTo {
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
   '/api/openrouter-credits': typeof ApiOpenrouterCreditsRoute
+  '/api/ops-observability': typeof ApiOpsObservabilityRoute
   '/api/orchestrate': typeof ApiOrchestrateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/personality-swarm': typeof ApiPersonalitySwarmRoute
@@ -1766,6 +1821,7 @@ export interface FileRoutesByTo {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/trading-engine': typeof ApiTradingEngineRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/user-profile': typeof ApiUserProfileRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
@@ -1872,6 +1928,7 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
+  '/ops-cost': typeof OpsCostRoute
   '/profiles': typeof ProfilesRoute
   '/research': typeof ResearchRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -1888,6 +1945,7 @@ export interface FileRoutesById {
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
+  '/api/auto-refinement': typeof ApiAutoRefinementRoute
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/claude-config': typeof ApiClaudeConfigRoute
   '/api/claude-jobs': typeof ApiClaudeJobsRouteWithChildren
@@ -1906,6 +1964,9 @@ export interface FileRoutesById {
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/demo-trading': typeof ApiDemoTradingRoute
+  '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
+  '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
+  '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
@@ -1928,6 +1989,7 @@ export interface FileRoutesById {
   '/api/models': typeof ApiModelsRoute
   '/api/odysseus-bootstrap': typeof ApiOdysseusBootstrapRoute
   '/api/openrouter-credits': typeof ApiOpenrouterCreditsRoute
+  '/api/ops-observability': typeof ApiOpsObservabilityRoute
   '/api/orchestrate': typeof ApiOrchestrateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/personality-swarm': typeof ApiPersonalitySwarmRoute
@@ -1998,6 +2060,7 @@ export interface FileRoutesById {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/trading-engine': typeof ApiTradingEngineRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/user-profile': typeof ApiUserProfileRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
@@ -2105,6 +2168,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/memory'
     | '/operations'
+    | '/ops-cost'
     | '/profiles'
     | '/research'
     | '/settings'
@@ -2121,6 +2185,7 @@ export interface FileRouteTypes {
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
+    | '/api/auto-refinement'
     | '/api/chat-events'
     | '/api/claude-config'
     | '/api/claude-jobs'
@@ -2139,6 +2204,9 @@ export interface FileRouteTypes {
     | '/api/crew-status'
     | '/api/debug-analyze'
     | '/api/demo-trading'
+    | '/api/demo-trading-grid'
+    | '/api/demo-trading-llm'
+    | '/api/demo-trading-rebalance'
     | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
@@ -2161,6 +2229,7 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/odysseus-bootstrap'
     | '/api/openrouter-credits'
+    | '/api/ops-observability'
     | '/api/orchestrate'
     | '/api/paths'
     | '/api/personality-swarm'
@@ -2231,6 +2300,7 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/trading-engine'
     | '/api/transcribe'
     | '/api/user-profile'
     | '/api/user-settings'
@@ -2336,6 +2406,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/memory'
     | '/operations'
+    | '/ops-cost'
     | '/profiles'
     | '/research'
     | '/skills'
@@ -2351,6 +2422,7 @@ export interface FileRouteTypes {
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
+    | '/api/auto-refinement'
     | '/api/chat-events'
     | '/api/claude-config'
     | '/api/claude-jobs'
@@ -2369,6 +2441,9 @@ export interface FileRouteTypes {
     | '/api/crew-status'
     | '/api/debug-analyze'
     | '/api/demo-trading'
+    | '/api/demo-trading-grid'
+    | '/api/demo-trading-llm'
+    | '/api/demo-trading-rebalance'
     | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
@@ -2391,6 +2466,7 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/odysseus-bootstrap'
     | '/api/openrouter-credits'
+    | '/api/ops-observability'
     | '/api/orchestrate'
     | '/api/paths'
     | '/api/personality-swarm'
@@ -2461,6 +2537,7 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/trading-engine'
     | '/api/transcribe'
     | '/api/user-profile'
     | '/api/user-settings'
@@ -2566,6 +2643,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/memory'
     | '/operations'
+    | '/ops-cost'
     | '/profiles'
     | '/research'
     | '/settings'
@@ -2582,6 +2660,7 @@ export interface FileRouteTypes {
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
+    | '/api/auto-refinement'
     | '/api/chat-events'
     | '/api/claude-config'
     | '/api/claude-jobs'
@@ -2600,6 +2679,9 @@ export interface FileRouteTypes {
     | '/api/crew-status'
     | '/api/debug-analyze'
     | '/api/demo-trading'
+    | '/api/demo-trading-grid'
+    | '/api/demo-trading-llm'
+    | '/api/demo-trading-rebalance'
     | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
@@ -2622,6 +2704,7 @@ export interface FileRouteTypes {
     | '/api/models'
     | '/api/odysseus-bootstrap'
     | '/api/openrouter-credits'
+    | '/api/ops-observability'
     | '/api/orchestrate'
     | '/api/paths'
     | '/api/personality-swarm'
@@ -2692,6 +2775,7 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/trading-engine'
     | '/api/transcribe'
     | '/api/user-profile'
     | '/api/user-settings'
@@ -2798,6 +2882,7 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   MemoryRoute: typeof MemoryRoute
   OperationsRoute: typeof OperationsRoute
+  OpsCostRoute: typeof OpsCostRoute
   ProfilesRoute: typeof ProfilesRoute
   ResearchRoute: typeof ResearchRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -2814,6 +2899,7 @@ export interface RootRouteChildren {
   ApiArtifactsRoute: typeof ApiArtifactsRouteWithChildren
   ApiAuthRoute: typeof ApiAuthRouteWithChildren
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
+  ApiAutoRefinementRoute: typeof ApiAutoRefinementRoute
   ApiChatEventsRoute: typeof ApiChatEventsRoute
   ApiClaudeConfigRoute: typeof ApiClaudeConfigRoute
   ApiClaudeJobsRoute: typeof ApiClaudeJobsRouteWithChildren
@@ -2832,6 +2918,9 @@ export interface RootRouteChildren {
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
   ApiDebugAnalyzeRoute: typeof ApiDebugAnalyzeRoute
   ApiDemoTradingRoute: typeof ApiDemoTradingRoute
+  ApiDemoTradingGridRoute: typeof ApiDemoTradingGridRoute
+  ApiDemoTradingLlmRoute: typeof ApiDemoTradingLlmRoute
+  ApiDemoTradingRebalanceRoute: typeof ApiDemoTradingRebalanceRoute
   ApiDownloadApkRoute: typeof ApiDownloadApkRoute
   ApiEnvResetRoute: typeof ApiEnvResetRoute
   ApiEventsRoute: typeof ApiEventsRoute
@@ -2854,6 +2943,7 @@ export interface RootRouteChildren {
   ApiModelsRoute: typeof ApiModelsRoute
   ApiOdysseusBootstrapRoute: typeof ApiOdysseusBootstrapRoute
   ApiOpenrouterCreditsRoute: typeof ApiOpenrouterCreditsRoute
+  ApiOpsObservabilityRoute: typeof ApiOpsObservabilityRoute
   ApiOrchestrateRoute: typeof ApiOrchestrateRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPersonalitySwarmRoute: typeof ApiPersonalitySwarmRoute
@@ -2924,6 +3014,7 @@ export interface RootRouteChildren {
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
+  ApiTradingEngineRoute: typeof ApiTradingEngineRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiUserProfileRoute: typeof ApiUserProfileRoute
   ApiUserSettingsRoute: typeof ApiUserSettingsRoute
@@ -3039,6 +3130,13 @@ declare module '@tanstack/react-router' {
       path: '/profiles'
       fullPath: '/profiles'
       preLoaderRoute: typeof ProfilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ops-cost': {
+      id: '/ops-cost'
+      path: '/ops-cost'
+      fullPath: '/ops-cost'
+      preLoaderRoute: typeof OpsCostRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/operations': {
@@ -3228,6 +3326,13 @@ declare module '@tanstack/react-router' {
       path: '/api/transcribe'
       fullPath: '/api/transcribe'
       preLoaderRoute: typeof ApiTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/trading-engine': {
+      id: '/api/trading-engine'
+      path: '/api/trading-engine'
+      fullPath: '/api/trading-engine'
+      preLoaderRoute: typeof ApiTradingEngineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/terminal-stream': {
@@ -3720,6 +3825,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOrchestrateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/ops-observability': {
+      id: '/api/ops-observability'
+      path: '/api/ops-observability'
+      fullPath: '/api/ops-observability'
+      preLoaderRoute: typeof ApiOpsObservabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/openrouter-credits': {
       id: '/api/openrouter-credits'
       path: '/api/openrouter-credits'
@@ -3874,6 +3986,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDownloadApkRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/demo-trading-rebalance': {
+      id: '/api/demo-trading-rebalance'
+      path: '/api/demo-trading-rebalance'
+      fullPath: '/api/demo-trading-rebalance'
+      preLoaderRoute: typeof ApiDemoTradingRebalanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/demo-trading-llm': {
+      id: '/api/demo-trading-llm'
+      path: '/api/demo-trading-llm'
+      fullPath: '/api/demo-trading-llm'
+      preLoaderRoute: typeof ApiDemoTradingLlmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/demo-trading-grid': {
+      id: '/api/demo-trading-grid'
+      path: '/api/demo-trading-grid'
+      fullPath: '/api/demo-trading-grid'
+      preLoaderRoute: typeof ApiDemoTradingGridRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/demo-trading': {
       id: '/api/demo-trading'
       path: '/api/demo-trading'
@@ -3998,6 +4131,13 @@ declare module '@tanstack/react-router' {
       path: '/api/chat-events'
       fullPath: '/api/chat-events'
       preLoaderRoute: typeof ApiChatEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auto-refinement': {
+      id: '/api/auto-refinement'
+      path: '/api/auto-refinement'
+      fullPath: '/api/auto-refinement'
+      preLoaderRoute: typeof ApiAutoRefinementRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth-check': {
@@ -4852,6 +4992,7 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   MemoryRoute: MemoryRoute,
   OperationsRoute: OperationsRoute,
+  OpsCostRoute: OpsCostRoute,
   ProfilesRoute: ProfilesRoute,
   ResearchRoute: ResearchRoute,
   SettingsRoute: SettingsRouteWithChildren,
@@ -4868,6 +5009,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiArtifactsRoute: ApiArtifactsRouteWithChildren,
   ApiAuthRoute: ApiAuthRouteWithChildren,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
+  ApiAutoRefinementRoute: ApiAutoRefinementRoute,
   ApiChatEventsRoute: ApiChatEventsRoute,
   ApiClaudeConfigRoute: ApiClaudeConfigRoute,
   ApiClaudeJobsRoute: ApiClaudeJobsRouteWithChildren,
@@ -4886,6 +5028,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCrewStatusRoute: ApiCrewStatusRoute,
   ApiDebugAnalyzeRoute: ApiDebugAnalyzeRoute,
   ApiDemoTradingRoute: ApiDemoTradingRoute,
+  ApiDemoTradingGridRoute: ApiDemoTradingGridRoute,
+  ApiDemoTradingLlmRoute: ApiDemoTradingLlmRoute,
+  ApiDemoTradingRebalanceRoute: ApiDemoTradingRebalanceRoute,
   ApiDownloadApkRoute: ApiDownloadApkRoute,
   ApiEnvResetRoute: ApiEnvResetRoute,
   ApiEventsRoute: ApiEventsRoute,
@@ -4908,6 +5053,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiModelsRoute: ApiModelsRoute,
   ApiOdysseusBootstrapRoute: ApiOdysseusBootstrapRoute,
   ApiOpenrouterCreditsRoute: ApiOpenrouterCreditsRoute,
+  ApiOpsObservabilityRoute: ApiOpsObservabilityRoute,
   ApiOrchestrateRoute: ApiOrchestrateRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPersonalitySwarmRoute: ApiPersonalitySwarmRoute,
@@ -4978,6 +5124,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
+  ApiTradingEngineRoute: ApiTradingEngineRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiUserProfileRoute: ApiUserProfileRoute,
   ApiUserSettingsRoute: ApiUserSettingsRoute,
