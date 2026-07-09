@@ -45,6 +45,45 @@ interface OpsCronJob {
   lastRunAt: string | null
   nextRunAt: string | null
 }
+interface FinanceStorageMonitorSummary {
+  statePath: string
+  lastCheckedAt: string | null
+  lastHealthyAt: string | null
+  lastAlertAt: string | null
+  consecutiveFailures: number
+  lastStatus: string | null
+  lastWarnings: Array<string>
+  lastSelfHealAttempts: number
+  lastSelfHealSucceeded: boolean | null
+  heartbeatAgeMs: number | null
+  stale: boolean
+}
+interface FinanceStorageSmokeCronSummary {
+  jobId: string
+  name: string
+  schedule: string
+  enabled: boolean
+  state: string | null
+  lastStatus: string | null
+  lastRunAt: string | null
+  lastError: string | null
+  lastDeliveryError: string | null
+  nextRunAt: string | null
+  completedRuns: number | null
+  deliver: string | null
+  latestOutputPath: string | null
+  latestOutputAt: string | null
+  latestOutputStatus: string | null
+  recentOutputs: Array<FinanceStorageSmokeCronOutput>
+  recentFailureCount: number
+}
+interface FinanceStorageSmokeCronOutput {
+  path: string
+  outputAt: string
+  runTime: string | null
+  status: string | null
+  failed: boolean
+}
 interface OpsPayload {
   ok: boolean
   error?: string
@@ -54,26 +93,65 @@ interface OpsPayload {
   modelUsage7d: Array<ModelUsageRow> | null
   escalation: EscalationStats | null
   cronJobs: Array<OpsCronJob> | null
+  financeStorageMonitor: FinanceStorageMonitorSummary | null
+  financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
 }
 
 function money(v: number | null | undefined): string {
-  return v == null ? '—' : `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return v == null
+    ? '—'
+    : `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function StatTile({
+  label,
+  value,
+  hint,
+}: {
+  label: string
+  value: string
+  hint?: string
+}) {
   return (
     <div className="rounded-xl border border-[var(--theme-border,rgba(128,128,128,0.2))] bg-[var(--theme-panel)] p-4">
-      <div className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums text-[var(--theme-text)]">{value}</div>
-      {hint ? <div className="mt-1 text-xs text-[var(--theme-muted)]">{hint}</div> : null}
+      <div className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
+        {label}
+      </div>
+      <div className="mt-1 text-2xl font-semibold tabular-nums text-[var(--theme-text)]">
+        {value}
+      </div>
+      {hint ? (
+        <div className="mt-1 text-xs text-[var(--theme-muted)]">{hint}</div>
+      ) : null}
     </div>
   )
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+function minutesAgo(ms: number | null): string {
+  if (ms == null) return 'unknown'
+  if (ms < 60_000) return 'under 1 min ago'
+  const minutes = Math.round(ms / 60_000)
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  return `${hours}h ago`
+}
+
+function shortFileName(path: string): string {
+  return path.split('/').pop() || path
+}
+
+function Panel({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
   return (
     <section className="rounded-xl border border-[var(--theme-border,rgba(128,128,128,0.2))] bg-[var(--theme-panel)] p-4">
-      <h2 className="mb-3 text-sm font-semibold text-[var(--theme-text)]">{title}</h2>
+      <h2 className="mb-3 text-sm font-semibold text-[var(--theme-text)]">
+        {title}
+      </h2>
       {children}
     </section>
   )
@@ -83,7 +161,9 @@ export function OpsCostScreen() {
   const opsQuery = useQuery({
     queryKey: ['ops-observability'],
     queryFn: async () => {
-      const res = await fetch('/api/ops-observability', { headers: { Accept: 'application/json' } })
+      const res = await fetch('/api/ops-observability', {
+        headers: { Accept: 'application/json' },
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return (await res.json()) as OpsPayload
     },
@@ -117,23 +197,54 @@ export function OpsCostScreen() {
     )
   }
 
-  const { cost, liveness, modelUsage7d, escalation, cronJobs } = opsQuery.data
+  const {
+    cost,
+    liveness,
+    modelUsage7d,
+    escalation,
+    cronJobs,
+    financeStorageMonitor,
+    financeStorageSmokeCron,
+  } = opsQuery.data
   const runwayDays =
-    cost?.remaining != null && cost.avgDaily30d != null && cost.avgDaily30d > 0.005
+    cost?.remaining != null &&
+    cost.avgDaily30d != null &&
+    cost.avgDaily30d > 0.005
       ? cost.remaining / cost.avgDaily30d
       : null
-  const maxCost = Math.max(0.0001, ...(modelUsage7d ?? []).map((r) => r.billedCostUsd))
-  const opsJobs = (cronJobs ?? []).filter((j) =>
-    /cost|rollup|scoreboard|post-mortem|discovery|escalation|readiness|pg sync/i.test(j.name),
+  const maxCost = Math.max(
+    0.0001,
+    ...(modelUsage7d ?? []).map((r) => r.billedCostUsd),
   )
+  const opsJobs = (cronJobs ?? []).filter((j) =>
+    /cost|rollup|scoreboard|post-mortem|discovery|escalation|readiness|pg sync|finance storage monitor smoke/i.test(
+      j.name,
+    ),
+  )
+  const visibleSmokeOutputs = financeStorageSmokeCron
+    ? Array.from(
+        new Map(
+          [
+            ...financeStorageSmokeCron.recentOutputs.slice(0, 6),
+            ...financeStorageSmokeCron.recentOutputs.filter(
+              (output) => output.failed,
+            ),
+          ].map((output) => [output.path, output]),
+        ).values(),
+      )
+    : []
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 overflow-y-auto p-4">
       <header>
-        <h1 className="text-lg font-semibold text-[var(--theme-text)]">Cost &amp; Routing Observability</h1>
+        <h1 className="text-lg font-semibold text-[var(--theme-text)]">
+          Cost &amp; Routing Observability
+        </h1>
         <p className="text-xs text-[var(--theme-muted)]">
           OpenRouter spend · model liveness · escalation shadow · ops job health
-          {cost?.latestSnapshotAt ? ` · snapshot ${new Date(cost.latestSnapshotAt).toLocaleString()}` : ''}
+          {cost?.latestSnapshotAt
+            ? ` · snapshot ${new Date(cost.latestSnapshotAt).toLocaleString()}`
+            : ''}
         </p>
       </header>
 
@@ -144,12 +255,20 @@ export function OpsCostScreen() {
         <StatTile
           label="Credits remaining"
           value={money(cost?.remaining)}
-          hint={cost?.totalUsed != null ? `used ${money(cost.totalUsed)} total` : undefined}
+          hint={
+            cost?.totalUsed != null
+              ? `used ${money(cost.totalUsed)} total`
+              : undefined
+          }
         />
         <StatTile
           label="Runway"
           value={runwayDays == null ? '∞' : `${Math.round(runwayDays)}d`}
-          hint={cost?.avgDaily30d != null ? `at ${money(cost.avgDaily30d)}/day 30d avg` : 'at current burn'}
+          hint={
+            cost?.avgDaily30d != null
+              ? `at ${money(cost.avgDaily30d)}/day 30d avg`
+              : 'at current burn'
+          }
         />
       </div>
 
@@ -175,7 +294,11 @@ export function OpsCostScreen() {
                   <td className="py-1.5 pr-2 text-[var(--theme-text)]">
                     {r.model.split('/').pop()}
                     <span className="ml-1.5 text-xs text-[var(--theme-muted)]">
-                      {r.billing === 'sub' ? '🎫 subscription' : r.billing === 'free' ? 'free' : ''}
+                      {r.billing === 'sub'
+                        ? '🎫 subscription'
+                        : r.billing === 'free'
+                          ? 'free'
+                          : ''}
                     </span>
                   </td>
                   <td className="py-1.5 text-right tabular-nums text-[var(--theme-text)]">
@@ -186,14 +309,18 @@ export function OpsCostScreen() {
                       </span>
                     ) : null}
                   </td>
-                  <td className="py-1.5 text-right tabular-nums text-[var(--theme-muted)]">{r.sessions}</td>
+                  <td className="py-1.5 text-right tabular-nums text-[var(--theme-muted)]">
+                    {r.sessions}
+                  </td>
                   <td className="py-1.5 text-right tabular-nums text-[var(--theme-muted)]">
                     {(r.tokens / 1000).toFixed(0)}k
                   </td>
                   <td className="py-1.5 pl-3" style={{ width: '30%' }}>
                     <div
                       className="h-2 rounded-[4px] bg-accent-500"
-                      style={{ width: `${Math.max(2, (r.billedCostUsd / maxCost) * 100)}%` }}
+                      style={{
+                        width: `${Math.max(2, (r.billedCostUsd / maxCost) * 100)}%`,
+                      }}
                       aria-hidden
                     />
                   </td>
@@ -202,15 +329,18 @@ export function OpsCostScreen() {
             </tbody>
           </table>
         ) : (
-          <p className="text-sm text-[var(--theme-muted)]">No session data available.</p>
+          <p className="text-sm text-[var(--theme-muted)]">
+            No session data available.
+          </p>
         )}
         <p className="mt-2 text-xs text-[var(--theme-muted)]">
-          🎫 Codex subscription is flat-rate — its per-token estimates are not billed. Free-tier
-          estimates are likewise phantom. OpenRouter credits above are ground truth.
+          🎫 Codex subscription is flat-rate — its per-token estimates are not
+          billed. Free-tier estimates are likewise phantom. OpenRouter credits
+          above are ground truth.
         </p>
       </Panel>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         {/* Model liveness */}
         <Panel title="Free-model liveness (router auto-skips stale)">
           {liveness ? (
@@ -225,17 +355,24 @@ export function OpsCostScreen() {
                 <ul className="space-y-1">
                   {liveness.staleFreeModels.map((m) => (
                     <li key={m.modelId} className="text-[var(--theme-muted)]">
-                      ⚰️ <span className="text-[var(--theme-text)]">{m.modelId}</span> — delisted (
-                      {Math.round(m.hoursBehind / 24)}d behind)
+                      ⚰️{' '}
+                      <span className="text-[var(--theme-text)]">
+                        {m.modelId}
+                      </span>{' '}
+                      — delisted ({Math.round(m.hoursBehind / 24)}d behind)
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-[var(--theme-muted)]">No delisted models detected.</p>
+                <p className="text-[var(--theme-muted)]">
+                  No delisted models detected.
+                </p>
               )}
             </div>
           ) : (
-            <p className="text-sm text-[var(--theme-muted)]">Postgres harp unavailable.</p>
+            <p className="text-sm text-[var(--theme-muted)]">
+              Postgres harp unavailable.
+            </p>
           )}
         </Panel>
 
@@ -245,17 +382,154 @@ export function OpsCostScreen() {
             <div className="space-y-1 text-sm">
               <p className="text-2xl font-semibold tabular-nums text-[var(--theme-text)]">
                 {escalation.ratePct}%
-                <span className="ml-2 text-sm font-normal text-[var(--theme-muted)]">would escalate</span>
+                <span className="ml-2 text-sm font-normal text-[var(--theme-muted)]">
+                  would escalate
+                </span>
               </p>
               <p className="text-[var(--theme-muted)]">
-                {escalation.wouldEscalate} of {escalation.measured} live delegations measured
+                {escalation.wouldEscalate} of {escalation.measured} live
+                delegations measured
                 {escalation.lastMeasurementAt
                   ? ` · last ${new Date(escalation.lastMeasurementAt).toLocaleDateString()}`
                   : ''}
               </p>
             </div>
           ) : (
-            <p className="text-sm text-[var(--theme-muted)]">No escalation measurements yet.</p>
+            <p className="text-sm text-[var(--theme-muted)]">
+              No escalation measurements yet.
+            </p>
+          )}
+        </Panel>
+
+        {/* Finance storage monitor */}
+        <Panel title="Finance storage mirror">
+          {financeStorageMonitor ? (
+            <div className="space-y-2 text-sm">
+              <p className="text-2xl font-semibold tabular-nums text-[var(--theme-text)]">
+                {financeStorageMonitor.lastStatus ?? 'unknown'}
+              </p>
+              <p className="text-[var(--theme-muted)]">
+                Heartbeat {minutesAgo(financeStorageMonitor.heartbeatAgeMs)}
+                {financeStorageMonitor.stale ? ' · stale' : ''}
+              </p>
+              <p className="text-[var(--theme-muted)]">
+                Failures: {financeStorageMonitor.consecutiveFailures}
+                {financeStorageMonitor.lastHealthyAt
+                  ? ` · healthy ${new Date(financeStorageMonitor.lastHealthyAt).toLocaleString()}`
+                  : ''}
+              </p>
+              <p className="text-[var(--theme-muted)]">
+                Self-heal:{' '}
+                {financeStorageMonitor.lastSelfHealSucceeded == null
+                  ? 'not needed'
+                  : financeStorageMonitor.lastSelfHealSucceeded
+                    ? 'resolved'
+                    : 'unresolved'}{' '}
+                after {financeStorageMonitor.lastSelfHealAttempts} attempt(s)
+              </p>
+              {financeStorageMonitor.lastWarnings.length > 0 ? (
+                <ul className="space-y-1 text-[var(--theme-muted)]">
+                  {financeStorageMonitor.lastWarnings
+                    .slice(0, 3)
+                    .map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                </ul>
+              ) : (
+                <p className="text-[var(--theme-muted)]">No mirror warnings.</p>
+              )}
+              <div className="border-t border-[var(--theme-border,rgba(128,128,128,0.15))] pt-2">
+                <p className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
+                  Smoke cron
+                </p>
+                {financeStorageSmokeCron ? (
+                  <div className="mt-1 space-y-1">
+                    <p className="text-[var(--theme-text)]">
+                      {financeStorageSmokeCron.enabled ? 'Enabled' : 'Paused'} ·{' '}
+                      {financeStorageSmokeCron.lastStatus ?? 'not yet run'}
+                    </p>
+                    <p className="text-[var(--theme-muted)]">
+                      Schedule{' '}
+                      <span className="font-mono">
+                        {financeStorageSmokeCron.schedule || 'unknown'}
+                      </span>
+                      {financeStorageSmokeCron.completedRuns != null
+                        ? ` · ${financeStorageSmokeCron.completedRuns} run(s)`
+                        : ''}
+                    </p>
+                    <p className="text-[var(--theme-muted)]">
+                      Last:{' '}
+                      {financeStorageSmokeCron.lastRunAt
+                        ? new Date(
+                            financeStorageSmokeCron.lastRunAt,
+                          ).toLocaleString()
+                        : 'none'}{' '}
+                      · Next:{' '}
+                      {financeStorageSmokeCron.nextRunAt
+                        ? new Date(
+                            financeStorageSmokeCron.nextRunAt,
+                          ).toLocaleString()
+                        : 'none'}
+                    </p>
+                    {financeStorageSmokeCron.latestOutputStatus ? (
+                      <p className="text-[var(--theme-muted)]">
+                        Artifact: {financeStorageSmokeCron.latestOutputStatus}
+                      </p>
+                    ) : null}
+                    {financeStorageSmokeCron.recentOutputs.length > 0 ? (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-[var(--theme-muted)]">
+                          Recent artifacts:{' '}
+                          {financeStorageSmokeCron.recentFailureCount > 0
+                            ? `${financeStorageSmokeCron.recentFailureCount} failure(s) in last ${financeStorageSmokeCron.recentOutputs.length}`
+                            : `last ${financeStorageSmokeCron.recentOutputs.length} clean`}
+                        </p>
+                        <ul className="space-y-1 text-xs">
+                          {visibleSmokeOutputs.map((output) => (
+                            <li
+                              key={output.path}
+                              className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[var(--theme-muted)]"
+                            >
+                              <span
+                                className={
+                                  output.failed
+                                    ? 'font-medium text-[var(--theme-text)]'
+                                    : 'text-[var(--theme-muted)]'
+                                }
+                              >
+                                {output.failed ? 'failed' : 'ok'}
+                              </span>
+                              <span>
+                                {output.runTime ??
+                                  new Date(output.outputAt).toLocaleString()}
+                              </span>
+                              <span className="font-mono">
+                                {shortFileName(output.path)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {financeStorageSmokeCron.lastError ||
+                    financeStorageSmokeCron.lastDeliveryError ? (
+                      <p className="text-[var(--theme-text)]">
+                        {financeStorageSmokeCron.lastError ??
+                          financeStorageSmokeCron.lastDeliveryError}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-[var(--theme-muted)]">
+                    Smoke cron job not registered.
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--theme-muted)]">
+              No finance monitor heartbeat yet.
+            </p>
           )}
         </Panel>
       </div>
@@ -274,18 +548,31 @@ export function OpsCostScreen() {
             </thead>
             <tbody>
               {opsJobs.map((j) => (
-                <tr key={j.id} className="border-t border-[var(--theme-border,rgba(128,128,128,0.15))]">
-                  <td className="py-1.5 pr-2 text-[var(--theme-text)]">{j.name}</td>
-                  <td className="py-1.5 pr-2 font-mono text-xs text-[var(--theme-muted)]">{j.schedule}</td>
+                <tr
+                  key={j.id}
+                  className="border-t border-[var(--theme-border,rgba(128,128,128,0.15))]"
+                >
+                  <td className="py-1.5 pr-2 text-[var(--theme-text)]">
+                    {j.name}
+                  </td>
+                  <td className="py-1.5 pr-2 font-mono text-xs text-[var(--theme-muted)]">
+                    {j.schedule}
+                  </td>
                   <td className="py-1.5 pr-2">
                     {!j.enabled ? (
-                      <span className="text-[var(--theme-muted)]">⏸ paused</span>
+                      <span className="text-[var(--theme-muted)]">
+                        ⏸ paused
+                      </span>
                     ) : j.lastStatus === 'ok' ? (
                       <span className="text-[var(--theme-text)]">✅ ok</span>
                     ) : j.lastStatus == null ? (
-                      <span className="text-[var(--theme-muted)]">🕐 not yet run</span>
+                      <span className="text-[var(--theme-muted)]">
+                        🕐 not yet run
+                      </span>
                     ) : (
-                      <span className="text-[var(--theme-text)]">❌ {j.lastStatus}</span>
+                      <span className="text-[var(--theme-text)]">
+                        ❌ {j.lastStatus}
+                      </span>
                     )}
                   </td>
                   <td className="py-1.5 text-xs text-[var(--theme-muted)]">
@@ -296,7 +583,9 @@ export function OpsCostScreen() {
             </tbody>
           </table>
         ) : (
-          <p className="text-sm text-[var(--theme-muted)]">No ops cron jobs found.</p>
+          <p className="text-sm text-[var(--theme-muted)]">
+            No ops cron jobs found.
+          </p>
         )}
       </Panel>
     </div>

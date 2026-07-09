@@ -377,24 +377,46 @@ function getOpenRouterCreditsSummary(): string {
     .replace(/"user_id"\s*:\s*"[^"]+"/g, '"user_id":"REDACTED"')
 }
 
-function getRuntimeCooldowns(dbPath: string): Array<HarpHealthAttempt> {
-  if (!fs.existsSync(dbPath)) return []
+interface RuntimeCooldownResult {
+  source: string
+  cooldowns: Array<HarpHealthAttempt>
+}
+
+// Reads live cooldown state Postgres-first (the HARP store went PG-primary on
+// this machine 2026-07-08; the SQLite file is frozen and stale), falling back
+// to the SQLite path so the feature still works on stock installs.
+function getRuntimeCooldowns(dbPath: string): RuntimeCooldownResult {
   const script = `
-import json, sqlite3, sys
+import json, os, sys
 from datetime import datetime, timezone
-path = sys.argv[1]
 now = datetime.now(timezone.utc).isoformat()
-con = sqlite3.connect(path)
-con.row_factory = sqlite3.Row
-rows = con.execute("""
+sql = """
   select model_id, attempts, successes, failures, rate_limit_count,
          cooldown_until, cooldown_reason, last_failure_at, last_success_at
   from model_runtime_state
   where cooldown_until is not null and cooldown_until != '' and cooldown_until > ?
   order by cooldown_until desc
   limit 20
-""", (now,)).fetchall()
-print(json.dumps([dict(row) for row in rows]))
+"""
+rows, source = [], "none"
+try:
+    sys.path.insert(0, "/srv/projects/_hermes-control/scripts")
+    import harp_pg
+    with harp_pg.connect() as con:
+        cur = con.cursor()
+        cur.execute(sql, (now,))
+        cols = [d[0] for d in cur.description]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        source = "postgres"
+except Exception:
+    import sqlite3
+    path = sys.argv[1]
+    if os.path.exists(path):
+        con = sqlite3.connect(path)
+        con.row_factory = sqlite3.Row
+        rows = [dict(r) for r in con.execute(sql, (now,)).fetchall()]
+        source = "sqlite"
+print(json.dumps({"source": source, "rows": rows}, default=str))
 `
   try {
     const raw = execFileSync('python3', ['-c', script, dbPath], {
@@ -402,8 +424,10 @@ print(json.dumps([dict(row) for row in rows]))
       timeout: 8_000,
       maxBuffer: 128 * 1024,
     })
-    const rows = JSON.parse(raw) as Array<Record<string, unknown>>
-    return rows.map((row) => ({
+    const parsed = JSON.parse(raw) as { source?: unknown; rows?: Array<Record<string, unknown>> }
+    const source = String(parsed.source ?? 'none')
+    const rows = parsed.rows ?? []
+    return { source, cooldowns: rows.map((row) => ({
       modelId: String(row.model_id ?? ''),
       attempts: Number(row.attempts ?? 0),
       successes: Number(row.successes ?? 0),
@@ -413,9 +437,9 @@ print(json.dumps([dict(row) for row in rows]))
       cooldownReason: typeof row.cooldown_reason === 'string' ? row.cooldown_reason : null,
       lastFailureAt: typeof row.last_failure_at === 'string' ? row.last_failure_at : null,
       lastSuccessAt: typeof row.last_success_at === 'string' ? row.last_success_at : null,
-    })).filter((row) => row.modelId.length > 0)
+    })).filter((row) => row.modelId.length > 0) }
   } catch {
-    return []
+    return { source: 'none', cooldowns: [] }
   }
 }
 
@@ -479,12 +503,12 @@ function getRouteHealth(cooldowns: Array<HarpHealthAttempt>): Pick<HarpHealthVie
 }
 
 function getHarpHealthView(): HarpHealthView {
-  const dbPath = path.join(os.homedir(), '.hermes', 'harp-routing-state.db')
-  const cooldowns = getRuntimeCooldowns(dbPath)
+  const sqlitePath = path.join(os.homedir(), '.hermes', 'harp-routing-state.db')
+  const { source, cooldowns } = getRuntimeCooldowns(sqlitePath)
   const routeHealth = getRouteHealth(cooldowns)
   return {
     generatedAt: new Date().toISOString(),
-    dbPath,
+    dbPath: source === 'postgres' ? 'postgresql://127.0.0.1:5432/harp (model_runtime_state)' : sqlitePath,
     ...routeHealth,
     cooldowns,
     openrouterCredits: getOpenRouterCreditsSummary(),
