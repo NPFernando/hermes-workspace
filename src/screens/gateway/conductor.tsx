@@ -37,6 +37,7 @@ import {
   getLastAssistantMessage,
   getShortModelName,
 } from './conductor/shared'
+import { saveAsTemplateRemote } from './lib/workflow-templates'
 import type { CSSProperties } from 'react'
 import type { AgentWorkingRow } from './components/agents-working-panel'
 import type { GatewaySession } from '@/lib/gateway-api'
@@ -205,6 +206,7 @@ export function Conductor() {
   const [historyCostExpanded, setHistoryCostExpanded] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [saveTemplateStatus, setSaveTemplateStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [directoryBrowserOpen, setDirectoryBrowserOpen] = useState(false)
   const [directoryBrowserPath, setDirectoryBrowserPath] = useState('~')
   const [directoryBrowserEntries, setDirectoryBrowserEntries] = useState<Array<FileBrowserEntry>>([])
@@ -350,6 +352,31 @@ export function Conductor() {
     setContinueDraft('')
     setContinueModalOpen(false)
     await conductor.sendMission(combinedPrompt)
+  }
+
+  const handleSaveCurrentMissionAsTemplate = async () => {
+    if (!conductor.goal.trim() || saveTemplateStatus === 'saving') return
+    setSaveTemplateStatus('saving')
+    try {
+      const taskTemplates = conductor.tasks
+        .filter((task) => task.title.trim())
+        .map((task) => ({
+          title: task.title.trim(),
+          ...(task.output?.trim() ? { description: truncateContinuationText(task.output, 180) } : {}),
+        }))
+
+      await saveAsTemplateRemote({
+        name: conductor.goal.trim().slice(0, 64),
+        description: completeSummary ? truncateContinuationText(completeSummary, 180) : 'Saved from a completed Conductor mission',
+        icon: '🎛️',
+        goal: conductor.goal.trim(),
+        tags: ['conductor', 'mission'],
+        tasks: taskTemplates.length > 0 ? taskTemplates : [{ title: 'Run the saved Conductor mission' }],
+      })
+      setSaveTemplateStatus('saved')
+    } catch {
+      setSaveTemplateStatus('error')
+    }
   }
 
   const updateSettings = (patch: Partial<typeof conductor.conductorSettings>) => {
@@ -592,7 +619,10 @@ export function Conductor() {
   }, [conductor.tasks, selectedTaskId])
 
   useEffect(() => {
-    if (phase !== 'complete') return
+    if (phase !== 'complete') {
+      setSaveTemplateStatus('idle')
+      return
+    }
     setCompleteCostExpanded(true)
   }, [phase, conductor.completedAt])
 
@@ -1448,6 +1478,22 @@ export function Conductor() {
                   </p>
                 </div>
                 <div className="flex gap-2">
+                  {!conductor.streamError ? (
+                    <Button
+                      type="button"
+                      onClick={() => void handleSaveCurrentMissionAsTemplate()}
+                      disabled={saveTemplateStatus === 'saving' || saveTemplateStatus === 'saved'}
+                      className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 text-[var(--theme-text)] hover:border-[var(--theme-accent)] hover:text-[var(--theme-accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {saveTemplateStatus === 'saving'
+                        ? 'Saving...'
+                        : saveTemplateStatus === 'saved'
+                          ? 'Saved Template'
+                          : saveTemplateStatus === 'error'
+                            ? 'Retry Save'
+                            : 'Save Template'}
+                    </Button>
+                  ) : null}
                   {!completePhaseProjectPath || !previewState.ready ? (
                     <Button
                       type="button"
