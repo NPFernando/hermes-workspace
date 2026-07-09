@@ -10,7 +10,6 @@ import {
 } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import Skeleton from "../../components/Skeleton.tsx";
 import {
   deriveFriendlyIdFromKey,
   isMissingAuth,
@@ -2966,12 +2965,6 @@ export function ChatScreen({
     open: (artifacts: Array<InlineArtifact>, index: number) =>
       setArtifactPanelState({ artifacts, activeIndex: index }),
   }
-    const [showSkeleton, setShowSkeleton] = useState(true);
-    useEffect(() => {
-      const timer = setTimeout(() => setShowSkeleton(false), 2000);
-      return () => clearTimeout(timer);
-    }, []);
-
   return (
     <ArtifactPanelContext.Provider value={artifactPanelContextValue}>
     <div
@@ -2980,7 +2973,6 @@ export function ChatScreen({
         compact ? 'h-full flex-1 min-h-0' : 'h-full',
       )}
     >
-    {showSkeleton && <Skeleton className="absolute inset-0" />}
     <KeyboardShortcuts />
       <div
         className={cn(
@@ -3122,6 +3114,16 @@ export function ChatScreen({
                 <ChatEmptyState
                   compact={compact}
                   runtimeModel={runtimeModelLabel}
+                  recentSessions={sessions}
+                  onOpenSession={(key) => {
+                    void navigate({
+                      to: '/chat/$sessionKey',
+                      params: { sessionKey: key },
+                    })
+                  }}
+                  onStartBlank={() => {
+                    composerHandleRef.current?.setValue('')
+                  }}
                   onSuggestionClick={(prompt) => {
                     composerHandleRef.current?.setValue(prompt + ' ')
                   }}

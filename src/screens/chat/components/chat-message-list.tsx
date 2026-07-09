@@ -1929,22 +1929,22 @@ function ChatMessageListComponent({
               </div>
             ) : null}
             {loading && displayEntries.length === 0 ? (
-              <div className="flex flex-col gap-4 skeleton-shimmer">
-                <div className="flex gap-3">
-                  <div className="size-6 rounded-full bg-[var(--theme-card2)]" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-[var(--theme-card2)] rounded w-3/4" />
-                    <div className="h-4 bg-[var(--theme-card2)] rounded w-1/2" />
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <div className="size-6 rounded-full bg-[var(--theme-card2)]" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-[var(--theme-card2)] rounded w-2/3" />
-                    <div className="h-4 bg-[var(--theme-card2)] rounded w-5/6" />
-                    <div className="h-4 bg-[var(--theme-card2)] rounded w-1/3" />
-                  </div>
-                </div>
+              <div className="mx-auto mt-12 flex w-full max-w-md items-center gap-3 rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3 text-left shadow-sm">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-accent)]">
+                  <HugeiconsIcon
+                    icon={Robot01Icon}
+                    size={18}
+                    strokeWidth={1.5}
+                  />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-[var(--theme-text)]">
+                    Preparing session
+                  </span>
+                  <span className="mt-1 block h-2 w-full overflow-hidden rounded-full bg-[var(--theme-card2)]">
+                    <span className="skeleton-shimmer block h-full w-2/3 rounded-full" />
+                  </span>
+                </span>
               </div>
             ) : empty && !notice && !isMessageSearchActive ? (
               (emptyState ?? <div aria-hidden></div>)

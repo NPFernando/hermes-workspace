@@ -1,7 +1,6 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { isMac } from '@/lib/platform'
 import { useNavigate } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -12,11 +11,13 @@ import {
   CommandLineIcon,
   File01Icon,
   McpServerIcon,
+  PencilEdit02Icon,
   PuzzleIcon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
 import type React from 'react'
 import type { SessionMeta } from '@/screens/chat/types'
+import { isMac } from '@/lib/platform'
 import {
   Command,
   CommandDialog,
@@ -46,7 +47,7 @@ type HugeiconsIconProps = React.ComponentProps<typeof HugeiconsIcon>
 
 type CommandAction = {
   id: string
-  group: 'Screens' | 'Recent Sessions' | 'Slash Commands'
+  group: 'Actions' | 'Screens' | 'Recent Sessions' | 'Slash Commands'
   label: string
   keywords: string
   shortcut?: string
@@ -59,6 +60,7 @@ type ScoredAction = CommandAction & {
 }
 
 const SCREEN_GROUP_ORDER = [
+  'Actions',
   'Screens',
   'Recent Sessions',
   'Slash Commands',
@@ -232,6 +234,25 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
     [navigate],
   )
 
+  const sessionActions = useMemo<Array<CommandAction>>(
+    () => [
+      {
+        id: 'action-new-session',
+        group: 'Actions',
+        label: 'New Session',
+        keywords: 'start fresh chat conversation compose',
+        shortcut: 'Open',
+        icon: PencilEdit02Icon,
+        onSelect: () =>
+          void navigate({
+            to: '/chat/$sessionKey',
+            params: { sessionKey: 'new' },
+          }),
+      },
+    ],
+    [navigate],
+  )
+
   const recentSessionActions = useMemo<Array<CommandAction>>(
     () =>
       [...sessions]
@@ -323,8 +344,13 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
   )
 
   const actions = useMemo(
-    () => [...screenActions, ...recentSessionActions, ...slashCommandActions],
-    [recentSessionActions, screenActions, slashCommandActions],
+    () => [
+      ...sessionActions,
+      ...screenActions,
+      ...recentSessionActions,
+      ...slashCommandActions,
+    ],
+    [recentSessionActions, screenActions, sessionActions, slashCommandActions],
   )
 
   const filteredActions = useMemo<Array<ScoredAction>>(() => {
