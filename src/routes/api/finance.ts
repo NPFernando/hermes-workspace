@@ -1,14 +1,17 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { safeErrorMessage } from '../../server/rate-limit'
 import {
   FINANCE_AUDIT_PATH,
   FINANCE_DATA_PATH,
+  TRADING_MODES,
   addFinanceRecord,
   appendAuditLog,
   ensureFinanceStore,
   financeAlerts,
+  financeStorageAlerts,
+  financeStorageStatus,
   financeSummary,
   maskSensitive,
   readFinanceStore,
@@ -22,19 +25,31 @@ import {
   fetchBinanceTickerPrice,
 } from '../../server/binance-market.service'
 import {
-  addIBKRCandles,
-  addIBKRLMarketPrice,
-  fetchIBKRTicker,
-  getIBKRCandles,
-} from '../../server/ibkr-market.service'
-import { demoTradingPerformance } from '../../server/demo-trading-engine'
+  applyLearningCandidate,
+  applyRecommendedSafeguards,
+  applyStrategyOverrideRecommendations,
+  decisionQualityReport,
+  demoTradingPerformance,
+  learningReport,
+  marketLearningReport,
+  runLearningCycle,
+  safeguardHistory,
+  setStrategyOverride,
+  strategyCatalog,
+  strategyOverrideState,
+} from '../../server/demo-trading-engine'
+import { startFinanceStorageMonitor } from '../../server/finance-storage-monitor'
 
 type JsonRecord = Record<string, unknown>
+
+startFinanceStorageMonitor()
 
 async function parseJsonBody(request: Request): Promise<JsonRecord> {
   try {
     const body = (await request.json()) as unknown
-    return body && typeof body === 'object' && !Array.isArray(body) ? (body as JsonRecord) : {}
+    return body && typeof body === 'object' && !Array.isArray(body)
+      ? (body as JsonRecord)
+      : {}
   } catch {
     return {}
   }
@@ -44,15 +59,44 @@ function unauthorized() {
   return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 }
 
+function binanceSymbolFromBody(body: JsonRecord): string {
+  const symbol =
+    typeof body.symbol === 'string' ? body.symbol.trim().toUpperCase() : ''
+  if (!symbol) throw new Error('symbol is required')
+  if (!/^[A-Z0-9]{5,20}$/.test(symbol))
+    throw new Error('symbol must be a Binance spot symbol such as BTCUSDT')
+  if (body.platform === 'ibkr') {
+    appendAuditLog('ibkr_future_feature_redirected', {
+      requestedPlatform: 'ibkr',
+      activeProvider: 'binance',
+      symbol,
+    })
+  }
+  return symbol
+}
+
+function isLiveMode(mode: string): boolean {
+  return (
+    mode === 'live_manual_approval' ||
+    mode === 'live_auto_trade' ||
+    mode === 'live_monitored'
+  )
+}
+
 function financePayload() {
   const db = ensureFinanceStore()
+  const storage = financeStorageStatus({ selfHeal: true })
+  const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
   return {
     ok: true,
     checkedAt: Date.now(),
+    storage,
     paths: {
       database: FINANCE_DATA_PATH,
+      postgresDatabase: storage.postgres.database,
       auditLog: FINANCE_AUDIT_PATH,
-      secretStorage: 'external secret manager / environment references only; API keys are not stored here',
+      secretStorage:
+        'external secret manager / environment references only; API keys are not stored here',
     },
     security: {
       secretsStoredInPlainText: false,
@@ -65,13 +109,18 @@ function financePayload() {
     connectors: {
       binance: {
         publicMarketData: true,
+        paperTradingSupported: true,
         spotTestnetSupported: true,
-        liveTradingEnabled: false,
+        gatedLiveSpotSupported: true,
+        liveTradingEnabled: db.settings.liveTradingEnabled,
+        paperShadowEnabled: db.settings.paperShadowEnabled,
         withdrawalsAllowed: false,
         futuresEnabled: false,
       },
       ibkr: {
-        paperTradingSupported: true,
+        status: 'future_feature',
+        active: false,
+        blocksImplementation: false,
         liveTradingEnabled: false,
         requiresContractVerification: true,
       },
@@ -79,7 +128,13 @@ function financePayload() {
     summary: financeSummary(db),
     tradingPerformance: tradingPerformanceSummary(db),
     demoPerformance: demoTradingPerformance(),
-    alerts: financeAlerts(db),
+    decisionQuality: decisionQualityReport(),
+    learning: learningReport(),
+    marketLearning: marketLearningReport(),
+    safeguardHistory: safeguardHistory(),
+    strategyCatalog: strategyCatalog(),
+    strategyOverrides: strategyOverrideState(),
+    alerts,
     settings: db.settings,
     data: maskSensitive(db),
   }
@@ -95,72 +150,202 @@ export const Route = createFileRoute('/api/finance')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) return unauthorized()
         const body = await parseJsonBody(request)
-        const action = typeof body.action === 'string' ? body.action : 'add_record'
+        const action =
+          typeof body.action === 'string' ? body.action : 'add_record'
         try {
           if (action === 'add_record') {
             const kind = typeof body.kind === 'string' ? body.kind : ''
-            const payload = body.payload && typeof body.payload === 'object' ? (body.payload as JsonRecord) : {}
+            const payload =
+              body.payload && typeof body.payload === 'object'
+                ? (body.payload as JsonRecord)
+                : {}
             addFinanceRecord(kind, payload)
             return json(financePayload())
           }
           if (action === 'fetch_market_price') {
-            // Read-only market data: public Binance ticker or simulated IBKR paper price.
-            // Does not place orders and is independent of the live-trading gate.
-            const symbol = typeof body.symbol === 'string' ? body.symbol.trim() : ''
-            if (!symbol) {
-              return json({ ok: false, error: 'symbol is required' }, { status: 400 })
-            }
-            const platform = body.platform === 'ibkr' ? 'ibkr' : 'binance'
-            if (platform === 'ibkr') {
-              const ticker = await fetchIBKRTicker(symbol)
-              addIBKRLMarketPrice(symbol, ticker.price, ticker.bid, ticker.ask, undefined)
-            } else {
-              const ticker = await fetchBinanceTickerPrice(symbol)
-              addMarketPrice(symbol, ticker.price, ticker.bid, ticker.ask, undefined)
-            }
+            // Read-only market data: Binance is the active provider. IBKR is a future feature.
+            const symbol = binanceSymbolFromBody(body)
+            const ticker = await fetchBinanceTickerPrice(symbol)
+            addMarketPrice(
+              symbol,
+              ticker.price,
+              ticker.bid,
+              ticker.ask,
+              undefined,
+              'binance',
+              'binance-public-api',
+            )
             return json(financePayload())
           }
           if (action === 'fetch_candles') {
-            // Read-only historical OHLCV: public Binance klines or simulated IBKR bars.
-            const symbol = typeof body.symbol === 'string' ? body.symbol.trim() : ''
-            if (!symbol) {
-              return json({ ok: false, error: 'symbol is required' }, { status: 400 })
-            }
-            const platform = body.platform === 'ibkr' ? 'ibkr' : 'binance'
-            const requestedLimit = typeof body.limit === 'number' && Number.isFinite(body.limit) ? body.limit : 100
+            // Read-only historical OHLCV from Binance public klines.
+            const symbol = binanceSymbolFromBody(body)
+            const requestedLimit =
+              typeof body.limit === 'number' && Number.isFinite(body.limit)
+                ? body.limit
+                : 100
             const limit = Math.max(1, Math.min(Math.floor(requestedLimit), 500))
-            if (platform === 'ibkr') {
-              const interval = typeof body.interval === 'string' && body.interval.trim() ? body.interval.trim() : '1 day'
-              const bars = await getIBKRCandles(symbol, interval, limit)
-              addIBKRCandles(symbol, interval, bars)
-              return json(financePayload())
-            }
-            const interval = typeof body.interval === 'string' && body.interval.trim() ? body.interval.trim() : '1h'
+            const interval =
+              typeof body.interval === 'string' && body.interval.trim()
+                ? body.interval.trim()
+                : '1h'
             const klines = await fetchBinanceKlines(symbol, interval, limit)
-            addBinanceCandles(symbol, interval, klines)
+            addBinanceCandles(
+              symbol,
+              interval,
+              klines,
+              'binance',
+              'binance-public-api',
+            )
             return json(financePayload())
           }
           if (action === 'set_trading_mode') {
-            const requestedMode = typeof body.mode === 'string' ? body.mode : 'observe_only'
-            const db = readFinanceStore()
-            const liveModes = ['live_manual_approval', 'live_auto_trade', 'live_monitored']
-            if (liveModes.includes(requestedMode) && body.approval !== 'I_APPROVE_LIVE_TRADING') {
-              appendAuditLog('trading_mode_change_blocked', { requestedMode, reason: 'missing explicit approval phrase' })
-              return json({ ok: false, error: 'Explicit approval phrase required before enabling live trading.' }, { status: 400 })
+            const requestedMode =
+              typeof body.mode === 'string' ? body.mode : 'observe_only'
+            if (
+              !(TRADING_MODES as ReadonlyArray<string>).includes(requestedMode)
+            ) {
+              return json(
+                {
+                  ok: false,
+                  error: `Unsupported trading mode: ${requestedMode}`,
+                },
+                { status: 400 },
+              )
             }
-            db.settings.tradingMode = requestedMode as typeof db.settings.tradingMode
-            db.settings.liveTradingEnabled = requestedMode === 'live_manual_approval' || requestedMode === 'live_auto_trade' || requestedMode === 'live_monitored'
+            const db = readFinanceStore()
+            if (
+              isLiveMode(requestedMode) &&
+              body.approval !== 'I_APPROVE_LIVE_TRADING' &&
+              !db.settings.liveBinanceApprovedAt
+            ) {
+              appendAuditLog('trading_mode_change_blocked', {
+                requestedMode,
+                reason: 'missing explicit approval phrase',
+              })
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Explicit approval phrase required before enabling live trading.',
+                },
+                { status: 400 },
+              )
+            }
+            db.settings.tradingMode =
+              requestedMode as typeof db.settings.tradingMode
+            db.settings.executionAccount =
+              requestedMode === 'paper_trade'
+                ? 'paper'
+                : requestedMode === 'testnet_execute'
+                  ? 'binance_testnet'
+                  : isLiveMode(requestedMode)
+                    ? 'binance_live'
+                    : requestedMode === 'observe_only'
+                      ? 'paper'
+                      : db.settings.executionAccount
+            db.settings.liveTradingEnabled = isLiveMode(requestedMode)
             // NOTE: the emergency kill switch is an INDEPENDENT master cutoff — a mode
             // change must never arm or disarm it. Use `set_kill_switch` for that. This
             // keeps "select a mode" and "disarm the safety cutoff" as two deliberate,
             // separately-audited human actions instead of one being a side effect of the other.
             writeFinanceStore(db)
-            appendAuditLog('trading_mode_changed', { requestedMode, liveTradingEnabled: db.settings.liveTradingEnabled })
+            appendAuditLog('trading_mode_changed', {
+              requestedMode,
+              liveTradingEnabled: db.settings.liveTradingEnabled,
+              executionAccount: db.settings.executionAccount,
+            })
+            return json(financePayload())
+          }
+          if (action === 'set_execution_account') {
+            const account =
+              typeof body.account === 'string' ? body.account : 'paper'
+            const db = readFinanceStore()
+            if (account === 'paper') {
+              db.settings.executionAccount = 'paper'
+              db.settings.tradingMode = 'paper_trade'
+              db.settings.liveTradingEnabled = false
+            } else if (account === 'binance_testnet') {
+              db.settings.executionAccount = 'binance_testnet'
+              db.settings.tradingMode = 'testnet_execute'
+              db.settings.liveTradingEnabled = false
+            } else if (account === 'binance_live') {
+              if (
+                body.approval !== 'I_APPROVE_LIVE_TRADING' &&
+                !db.settings.liveBinanceApprovedAt
+              ) {
+                appendAuditLog('execution_account_change_blocked', {
+                  account,
+                  reason: 'missing live approval',
+                })
+                return json(
+                  {
+                    ok: false,
+                    error:
+                      'Live Binance account selection requires explicit approval.',
+                  },
+                  { status: 400 },
+                )
+              }
+              db.settings.executionAccount = 'binance_live'
+              db.settings.tradingMode = 'live_manual_approval'
+              db.settings.liveTradingEnabled = true
+            } else {
+              return json(
+                {
+                  ok: false,
+                  error: `Unsupported execution account: ${account}`,
+                },
+                { status: 400 },
+              )
+            }
+            writeFinanceStore(db)
+            appendAuditLog('execution_account_changed', {
+              account: db.settings.executionAccount,
+              tradingMode: db.settings.tradingMode,
+            })
+            return json(financePayload())
+          }
+          if (action === 'arm_live_binance') {
+            if (body.approval !== 'I_APPROVE_BINANCE_LIVE_TRADING') {
+              appendAuditLog('live_binance_arm_blocked', {
+                reason: 'missing explicit approval phrase',
+              })
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Arming Binance live trading requires the explicit approval phrase.',
+                },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            const approvedAt = new Date().toISOString()
+            db.settings.primaryTradingProvider = 'binance'
+            db.settings.executionAccount = 'binance_live'
+            db.settings.tradingMode = 'live_manual_approval'
+            db.settings.liveTradingEnabled = true
+            db.settings.paperShadowEnabled = true
+            db.settings.livePerOrderCapUsdt =
+              typeof body.livePerOrderCapUsdt === 'number' &&
+              Number.isFinite(body.livePerOrderCapUsdt)
+                ? Math.max(1, Math.min(body.livePerOrderCapUsdt, 50))
+                : db.settings.livePerOrderCapUsdt || 10
+            db.settings.liveBinanceApprovedAt = approvedAt
+            db.settings.liveBinanceApprovalId = `live_binance_${Date.now()}`
+            writeFinanceStore(db)
+            appendAuditLog('live_binance_armed', {
+              approvedAt,
+              livePerOrderCapUsdt: db.settings.livePerOrderCapUsdt,
+              paperShadowEnabled: true,
+            })
             return json(financePayload())
           }
           if (action === 'emergency_stop') {
             const db = readFinanceStore()
             db.settings.tradingMode = 'observe_only'
+            db.settings.executionAccount = 'paper'
             db.settings.liveTradingEnabled = false
             db.settings.emergencyKillSwitch = true
             writeFinanceStore(db)
@@ -173,38 +358,74 @@ export const Route = createFileRoute('/api/finance')({
             // confirmation phrase and is intended to be a deliberate human action from the UI.
             const engaged = body.engaged !== false // default to engaged (fail-safe)
             const db = readFinanceStore()
-            if (!engaged && body.approval !== 'I_UNDERSTAND_DISABLE_SAFETY_CUTOFF') {
-              appendAuditLog('kill_switch_disarm_blocked', { reason: 'missing explicit confirmation phrase' })
+            if (
+              !engaged &&
+              body.approval !== 'I_UNDERSTAND_DISABLE_SAFETY_CUTOFF'
+            ) {
+              appendAuditLog('kill_switch_disarm_blocked', {
+                reason: 'missing explicit confirmation phrase',
+              })
               return json(
-                { ok: false, error: 'Disarming the safety cutoff requires the explicit confirmation phrase.' },
+                {
+                  ok: false,
+                  error:
+                    'Disarming the safety cutoff requires the explicit confirmation phrase.',
+                },
                 { status: 400 },
               )
             }
             db.settings.emergencyKillSwitch = engaged
             writeFinanceStore(db)
-            appendAuditLog('kill_switch_set', { engaged, source: 'finance_api' })
+            appendAuditLog('kill_switch_set', {
+              engaged,
+              source: 'finance_api',
+            })
             return json(financePayload())
           }
-          if (action === 'set_demo_config') {
+          if (action === 'set_demo_config' || action === 'set_engine_config') {
             // Update the demo engine's tunable knobs (settings.demoTrading), merged
             // over defaults by resolveEngineConfig. Values are range-validated; anything
             // out of range is ignored rather than applied.
-            const cfg = body.config && typeof body.config === 'object' ? (body.config as JsonRecord) : {}
-            const inRange = (value: unknown, min: number, max: number): number | undefined =>
-              typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : undefined
+            const cfg =
+              body.config && typeof body.config === 'object'
+                ? (body.config as JsonRecord)
+                : {}
+            const inRange = (
+              value: unknown,
+              min: number,
+              max: number,
+            ): number | undefined =>
+              typeof value === 'number' &&
+              Number.isFinite(value) &&
+              value >= min &&
+              value <= max
+                ? value
+                : undefined
             const db = readFinanceStore()
             const settings = db.settings as Record<string, unknown>
-            const dt = (settings.demoTrading && typeof settings.demoTrading === 'object'
-              ? { ...(settings.demoTrading as Record<string, unknown>) }
-              : {}) as Record<string, unknown>
+            const dt = (
+              settings.demoTrading && typeof settings.demoTrading === 'object'
+                ? { ...(settings.demoTrading as Record<string, unknown>) }
+                : {}
+            ) as Record<string, unknown>
 
             const tp = inRange(cfg.takeProfitPct, 0.0005, 0.5)
             const sl = inRange(cfg.stopLossPct, 0.0005, 0.5)
             const qpt = inRange(cfg.quotePerTrade, 1, 100000)
             const maxOpen = inRange(cfg.maxOpenPositions, 1, 50)
+            // 0 = off for all three; upper bounds mirror what the offline
+            // backtest harness actually validated (regime up to SMA300,
+            // max hold up to 7 days).
+            const regimeSma = inRange(cfg.regimeSmaPeriod, 0, 300)
+            const trailingStop = inRange(cfg.trailingStopPct, 0, 0.5)
+            const maxHold = inRange(cfg.maxHoldMinutes, 0, 10080)
             if (tp !== undefined) dt.takeProfitPct = tp
             if (sl !== undefined) dt.stopLossPct = sl
             if (qpt !== undefined) dt.quotePerTrade = qpt
+            if (regimeSma !== undefined)
+              dt.regimeSmaPeriod = Math.floor(regimeSma)
+            if (trailingStop !== undefined) dt.trailingStopPct = trailingStop
+            if (maxHold !== undefined) dt.maxHoldMinutes = Math.floor(maxHold)
             if (Array.isArray(cfg.symbols)) {
               const syms = cfg.symbols
                 .filter((s): s is string => typeof s === 'string')
@@ -213,25 +434,241 @@ export const Route = createFileRoute('/api/finance')({
               if (syms.length > 0) dt.symbols = Array.from(new Set(syms))
             }
             if (maxOpen !== undefined) {
-              const guardian = (dt.guardian && typeof dt.guardian === 'object' ? { ...(dt.guardian as Record<string, unknown>) } : {}) as Record<string, unknown>
+              const guardian = (
+                dt.guardian && typeof dt.guardian === 'object'
+                  ? { ...(dt.guardian as Record<string, unknown>) }
+                  : {}
+              ) as Record<string, unknown>
               guardian.maxOpenPositions = Math.floor(maxOpen)
               dt.guardian = guardian
             }
+            // learningPolicy.autoApplyModes: only 'paper_trade' and
+            // 'testnet_execute' are ever accepted here — the learning-loop's
+            // candidate generation is structurally risk-reducing-only
+            // (quotePerTrade patches are Math.min-clamped, strategyOverrides
+            // can only be 'disabled'/'reduce_size'), so widening which modes
+            // may auto-apply doesn't widen what it's allowed to do.
+            if (
+              cfg.learningPolicy &&
+              typeof cfg.learningPolicy === 'object' &&
+              !Array.isArray(cfg.learningPolicy)
+            ) {
+              const lp = cfg.learningPolicy as JsonRecord
+              if (Array.isArray(lp.autoApplyModes)) {
+                const modes = lp.autoApplyModes.filter(
+                  (m): m is 'paper_trade' | 'testnet_execute' =>
+                    m === 'paper_trade' || m === 'testnet_execute',
+                )
+                if (modes.length > 0) {
+                  const existingPolicy = (
+                    dt.learningPolicy &&
+                    typeof dt.learningPolicy === 'object'
+                      ? { ...(dt.learningPolicy as Record<string, unknown>) }
+                      : {}
+                  ) as Record<string, unknown>
+                  existingPolicy.autoApplyModes = Array.from(new Set(modes))
+                  dt.learningPolicy = existingPolicy
+                }
+              }
+            }
             settings.demoTrading = dt
+            // autoRefinement.enabled: a top-level settings key (not nested
+            // under demoTrading, since it spans the grid/rebalance/llm
+            // engines too, not just the council) — gates whether
+            // src/server/auto-refinement.ts's candidates get applied live or
+            // only recorded as proposals. Off by default; every candidate it
+            // can generate is risk/cost-reducing-only by construction.
+            if (typeof cfg.autoRefinementEnabled === 'boolean') {
+              const existingRefinement = (
+                settings.autoRefinement &&
+                typeof settings.autoRefinement === 'object'
+                  ? { ...(settings.autoRefinement as Record<string, unknown>) }
+                  : {}
+              ) as Record<string, unknown>
+              existingRefinement.enabled = cfg.autoRefinementEnabled
+              settings.autoRefinement = existingRefinement
+            }
             writeFinanceStore(db)
-            appendAuditLog('demo_config_updated', {
+            appendAuditLog('engine_config_updated', {
               takeProfitPct: dt.takeProfitPct,
               stopLossPct: dt.stopLossPct,
               quotePerTrade: dt.quotePerTrade,
               symbols: dt.symbols,
-              maxOpenPositions: (dt.guardian as Record<string, unknown> | undefined)?.maxOpenPositions,
+              maxOpenPositions: (
+                dt.guardian as Record<string, unknown> | undefined
+              )?.maxOpenPositions,
+              regimeSmaPeriod: dt.regimeSmaPeriod,
+              trailingStopPct: dt.trailingStopPct,
+              maxHoldMinutes: dt.maxHoldMinutes,
+              learningPolicyAutoApplyModes: (
+                dt.learningPolicy as Record<string, unknown> | undefined
+              )?.autoApplyModes,
+              autoRefinementEnabled: (
+                settings.autoRefinement as Record<string, unknown> | undefined
+              )?.enabled,
             })
             return json(financePayload())
           }
-          return json({ ok: false, error: `Unsupported finance action: ${action}` }, { status: 400 })
+          if (action === 'set_grid_config') {
+            // Tunable knobs for the independent paper-only grid engine
+            // (settings.demoTradingGrid, resolved by resolveGridEngineConfig
+            // in grid-paper-engine.ts). Wholly separate from the council's
+            // settings.demoTrading — never read or written by this branch.
+            const cfg =
+              body.config && typeof body.config === 'object'
+                ? (body.config as JsonRecord)
+                : {}
+            const inRange = (
+              value: unknown,
+              min: number,
+              max: number,
+            ): number | undefined =>
+              typeof value === 'number' &&
+              Number.isFinite(value) &&
+              value >= min &&
+              value <= max
+                ? value
+                : undefined
+            const db = readFinanceStore()
+            const settings = db.settings as Record<string, unknown>
+            const gc = (
+              settings.demoTradingGrid && typeof settings.demoTradingGrid === 'object'
+                ? { ...(settings.demoTradingGrid as Record<string, unknown>) }
+                : {}
+            ) as Record<string, unknown>
+
+            const gridCount = inRange(cfg.gridCount, 2, 100)
+            const quotePerGrid = inRange(cfg.quotePerGrid, 1, 100000)
+            const rangeLookbackCandles = inRange(cfg.rangeLookbackCandles, 10, 1000)
+            const upperStopPct = inRange(cfg.upperStopPct, 0, 5)
+            const lowerStopPct = inRange(cfg.lowerStopPct, 0, 1)
+            const efficiencyLookbackCandles = inRange(cfg.efficiencyLookbackCandles, 2, 1000)
+            const maxEfficiencyRatio = inRange(cfg.maxEfficiencyRatio, 0, 1)
+            if (gridCount !== undefined) gc.gridCount = Math.floor(gridCount)
+            if (quotePerGrid !== undefined) gc.quotePerGrid = quotePerGrid
+            if (rangeLookbackCandles !== undefined)
+              gc.rangeLookbackCandles = Math.floor(rangeLookbackCandles)
+            if (upperStopPct !== undefined) gc.upperStopPct = upperStopPct
+            if (lowerStopPct !== undefined) gc.lowerStopPct = lowerStopPct
+            if (efficiencyLookbackCandles !== undefined)
+              gc.efficiencyLookbackCandles = Math.floor(efficiencyLookbackCandles)
+            if (maxEfficiencyRatio !== undefined) gc.maxEfficiencyRatio = maxEfficiencyRatio
+            if (cfg.spacing === 'arithmetic' || cfg.spacing === 'geometric')
+              gc.spacing = cfg.spacing
+            if (typeof cfg.autoRecenter === 'boolean') gc.autoRecenter = cfg.autoRecenter
+            if (typeof cfg.efficiencyGate === 'boolean') gc.efficiencyGate = cfg.efficiencyGate
+            if (Array.isArray(cfg.symbols)) {
+              const syms = cfg.symbols
+                .filter((s): s is string => typeof s === 'string')
+                .map((s) => s.trim().toUpperCase())
+                .filter((s) => /^[A-Z0-9]{5,20}$/.test(s))
+              if (syms.length > 0) gc.symbols = Array.from(new Set(syms))
+            }
+            settings.demoTradingGrid = gc
+            writeFinanceStore(db)
+            appendAuditLog('grid_config_updated', gc)
+            return json(financePayload())
+          }
+          if (action === 'set_rebalance_config') {
+            // Only `enabled` is exposed here — the rebalancing bot shares
+            // the council's global settings.tradingMode (already
+            // testnet_execute in production), so without its own flag,
+            // deploying the code plus a cron tick would arm it with no
+            // distinct sign-off step. See RebalanceConfig.enabled's docstring
+            // in rebalance-engine.ts. Off by default.
+            const cfg =
+              body.config && typeof body.config === 'object'
+                ? (body.config as JsonRecord)
+                : {}
+            const db = readFinanceStore()
+            const settings = db.settings as Record<string, unknown>
+            const rc = (
+              settings.demoTradingRebalance &&
+              typeof settings.demoTradingRebalance === 'object'
+                ? { ...(settings.demoTradingRebalance as Record<string, unknown>) }
+                : {}
+            ) as Record<string, unknown>
+            if (typeof cfg.enabled === 'boolean') rc.enabled = cfg.enabled
+            settings.demoTradingRebalance = rc
+            writeFinanceStore(db)
+            appendAuditLog('rebalance_config_updated', { enabled: rc.enabled })
+            return json(financePayload())
+          }
+          if (action === 'set_llm_config') {
+            // Only `enabled` is exposed here — same rationale as
+            // set_rebalance_config above (this engine also shares the
+            // council's global settings.tradingMode). Off by default.
+            const cfg =
+              body.config && typeof body.config === 'object'
+                ? (body.config as JsonRecord)
+                : {}
+            const db = readFinanceStore()
+            const settings = db.settings as Record<string, unknown>
+            const lc = (
+              settings.demoTradingLlm && typeof settings.demoTradingLlm === 'object'
+                ? { ...(settings.demoTradingLlm as Record<string, unknown>) }
+                : {}
+            ) as Record<string, unknown>
+            if (typeof cfg.enabled === 'boolean') lc.enabled = cfg.enabled
+            settings.demoTradingLlm = lc
+            writeFinanceStore(db)
+            appendAuditLog('llm_config_updated', { enabled: lc.enabled })
+            return json(financePayload())
+          }
+          if (action === 'apply_recommended_safeguards') {
+            const applied = applyRecommendedSafeguards()
+            return json({
+              ...financePayload(),
+              appliedSafeguards: applied.applied,
+            })
+          }
+          if (action === 'run_learning_cycle') {
+            const learning = runLearningCycle()
+            return json({ ...financePayload(), learningCycle: learning })
+          }
+          if (action === 'apply_learning_candidate') {
+            const candidateId =
+              typeof body.candidateId === 'string' ? body.candidateId : ''
+            const result = applyLearningCandidate(candidateId)
+            return json({
+              ...financePayload(),
+              learningCandidateResult: result,
+            })
+          }
+          if (action === 'set_strategy_override') {
+            const result = setStrategyOverride({
+              strategyId:
+                typeof body.strategyId === 'string' ? body.strategyId : '',
+              overrideAction: body.overrideAction,
+              multiplier: body.multiplier,
+              reason: body.reason,
+              reviewAt: body.reviewAt,
+              expiresAt: body.expiresAt,
+              reviewAfterDays: body.reviewAfterDays,
+              expiresAfterDays: body.expiresAfterDays,
+            })
+            return json({ ...financePayload(), strategyOverrideResult: result })
+          }
+          if (action === 'apply_strategy_override_recommendations') {
+            const applied = applyStrategyOverrideRecommendations()
+            return json({
+              ...financePayload(),
+              strategyOverrideRecommendationResult: applied.result,
+            })
+          }
+          return json(
+            { ok: false, error: `Unsupported finance action: ${action}` },
+            { status: 400 },
+          )
         } catch (error) {
-          appendAuditLog('finance_api_error', { action, error: safeErrorMessage(error) })
-          return json({ ok: false, error: safeErrorMessage(error) }, { status: 400 })
+          appendAuditLog('finance_api_error', {
+            action,
+            error: safeErrorMessage(error),
+          })
+          return json(
+            { ok: false, error: safeErrorMessage(error) },
+            { status: 400 },
+          )
         }
       },
     },

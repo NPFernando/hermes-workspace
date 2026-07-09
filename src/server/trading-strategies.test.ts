@@ -1,22 +1,50 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  accumulationDistributionLine,
   applyTradeOutcome,
+  atr,
   breakoutStrategy,
+  chaikinVolumeStrategy,
   councilVote,
   ema,
   emptyScore,
+  keltnerChannelStrategy,
   macdMomentumStrategy,
+  regimeAllowsLong,
   rsi,
   rsiReversionStrategy,
   scaledQuoteSize,
   sma,
   smaCrossoverStrategy,
+  trendPullbackStrategy,
+  trueRange,
   type Candle,
 } from './trading-strategies'
 
 const candlesFromCloses = (closes: Array<number>): Array<Candle> =>
-  closes.map((c, i) => ({ openTime: i, open: c, high: c, low: c, close: c, volume: 1 }))
+  closes.map((c, i) => ({
+    openTime: i,
+    open: c,
+    high: c,
+    low: c,
+    close: c,
+    volume: 1,
+  }))
+
+const candleLike = (
+  openTime: number,
+  close: number,
+  high: number,
+  low: number,
+): Candle => ({
+  openTime,
+  open: close,
+  high,
+  low,
+  close,
+  volume: 1,
+})
 
 describe('indicators', () => {
   it('sma averages the trailing window', () => {
@@ -27,6 +55,26 @@ describe('indicators', () => {
   it('rsi is 100 when only gains', () => {
     expect(rsi([1, 2, 3, 4, 5, 6], 5)).toBe(100)
   })
+
+  it('true range captures gaps from the previous close', () => {
+    expect(
+      trueRange(
+        { openTime: 1, open: 110, high: 112, low: 109, close: 111, volume: 1 },
+        100,
+      ),
+    ).toBe(12)
+  })
+
+  it('atr averages trailing true ranges', () => {
+    const candles = [
+      candleLike(0, 100, 102, 98),
+      candleLike(1, 103, 106, 101), // TR 6
+      candleLike(2, 104, 105, 100), // TR 5
+      candleLike(3, 111, 112, 110), // TR 8
+    ]
+    expect(atr(candles, 3)).toBeCloseTo((6 + 5 + 8) / 3, 6)
+    expect(atr(candles.slice(0, 3), 3)).toBeNull()
+  })
 })
 
 describe('smaCrossoverStrategy', () => {
@@ -36,27 +84,104 @@ describe('smaCrossoverStrategy', () => {
       ...Array.from({ length: 20 }, (_, i) => 100 - i),
       120, // spike up
     ]
-    const d = smaCrossoverStrategy.evaluate(candlesFromCloses(closes), { fast: 3, slow: 8 })
+    const d = smaCrossoverStrategy.evaluate(candlesFromCloses(closes), {
+      fast: 3,
+      slow: 8,
+    })
     expect(d.signal).toBe('BUY')
     expect(d.confidence).toBeGreaterThan(0)
   })
 
   it('holds without enough candles', () => {
-    expect(smaCrossoverStrategy.evaluate(candlesFromCloses([1, 2, 3])).signal).toBe('HOLD')
+    expect(
+      smaCrossoverStrategy.evaluate(candlesFromCloses([1, 2, 3])).signal,
+    ).toBe('HOLD')
+  })
+
+  it('gives a fresh cross enough confidence to matter in the council', () => {
+    const closes = [...Array.from({ length: 20 }, (_, i) => 100 - i), 120]
+    const d = smaCrossoverStrategy.evaluate(candlesFromCloses(closes), {
+      fast: 3,
+      slow: 8,
+    })
+    expect(d.signal).toBe('BUY')
+    // Base 0.35 + velocity: must clear the near-zero confidence the old
+    // spread-at-cross formula produced (which kept it at 0 trades for a year).
+    expect(d.confidence).toBeGreaterThanOrEqual(0.35)
+  })
+
+  it('grades a sharp cross above a grazing cross', () => {
+    const sharp = smaCrossoverStrategy.evaluate(
+      candlesFromCloses([
+        ...Array.from({ length: 20 }, (_, i) => 100 - i),
+        130,
+      ]),
+      { fast: 3, slow: 8 },
+    )
+    // Gentle drift then a tiny pop: crosses, but with low velocity (stays under the cap).
+    const grazing = smaCrossoverStrategy.evaluate(
+      candlesFromCloses([
+        ...Array.from({ length: 20 }, (_, i) => 100 - i * 0.02),
+        99.87,
+      ]),
+      { fast: 3, slow: 8 },
+    )
+    expect(sharp.signal).toBe('BUY')
+    expect(grazing.signal).toBe('BUY')
+    expect(sharp.confidence).toBeGreaterThan(grazing.confidence)
   })
 })
 
 describe('rsiReversionStrategy', () => {
   it('signals BUY when oversold', () => {
     const closes = Array.from({ length: 20 }, (_, i) => 100 - i * 2) // steady decline
-    const d = rsiReversionStrategy.evaluate(candlesFromCloses(closes), { period: 14 })
+    const d = rsiReversionStrategy.evaluate(candlesFromCloses(closes), {
+      period: 14,
+    })
     expect(d.signal).toBe('BUY')
   })
 
   it('signals SELL when overbought', () => {
     const closes = Array.from({ length: 20 }, (_, i) => 100 + i * 2) // steady rise
-    const d = rsiReversionStrategy.evaluate(candlesFromCloses(closes), { period: 14 })
+    const d = rsiReversionStrategy.evaluate(candlesFromCloses(closes), {
+      period: 14,
+    })
     expect(d.signal).toBe('SELL')
+  })
+
+  it('mutes the overbought SELL when price rides well above the trend SMA', () => {
+    // 60 candles rising 1%/candle: overbought RSI, price far above SMA(50).
+    const closes = Array.from({ length: 60 }, (_, i) => 100 * 1.01 ** i)
+    const d = rsiReversionStrategy.evaluate(candlesFromCloses(closes), {
+      period: 14,
+    })
+    expect(d.signal).toBe('HOLD')
+    expect(d.reason).toContain('muted')
+  })
+
+  it('mutes the oversold BUY when price sits well below the trend SMA', () => {
+    const closes = Array.from({ length: 60 }, (_, i) => 100 * 0.99 ** i)
+    const d = rsiReversionStrategy.evaluate(candlesFromCloses(closes), {
+      period: 14,
+    })
+    expect(d.signal).toBe('HOLD')
+    expect(d.reason).toContain('muted')
+  })
+
+  it('still counter-votes in a range and when the filter is disabled', () => {
+    // Flat range then a small pop: overbought but price within 2% of SMA(50) → SELL stands.
+    const range = [...Array.from({ length: 57 }, () => 100), 100.5, 101, 101.5]
+    const inRange = rsiReversionStrategy.evaluate(candlesFromCloses(range), {
+      period: 14,
+    })
+    expect(inRange.signal).toBe('SELL')
+    // Strong uptrend but trendPeriod: 0 disables the filter → SELL again.
+    const trend = Array.from({ length: 60 }, (_, i) => 100 * 1.01 ** i)
+    const noFilter = rsiReversionStrategy.evaluate(candlesFromCloses(trend), {
+      period: 14,
+      trendPeriod: 0,
+    })
+    expect(noFilter.signal).toBe('SELL')
   })
 })
 
@@ -100,8 +225,51 @@ describe('new strategies', () => {
 
   it('breakout signals BUY when price breaks the prior high', () => {
     const closes = [...Array.from({ length: 21 }, () => 100), 110]
-    const candles = closes.map((c, i) => ({ openTime: i, open: c, high: c, low: c, close: c, volume: 1 }))
-    expect(breakoutStrategy.evaluate(candles, { lookback: 20 }).signal).toBe('BUY')
+    const candles = closes.map((c, i) => ({
+      openTime: i,
+      open: c,
+      high: c,
+      low: c,
+      close: c,
+      volume: 1,
+    }))
+    expect(breakoutStrategy.evaluate(candles, { lookback: 20 }).signal).toBe(
+      'BUY',
+    )
+  })
+
+  it('trend pullback buys recovery from a shallow pullback inside an uptrend', () => {
+    const closes = [
+      ...Array.from({ length: 80 }, (_, i) => 100 + i),
+      170,
+      168,
+      169,
+      171,
+      174,
+    ]
+    const d = trendPullbackStrategy.evaluate(candlesFromCloses(closes))
+    expect(d.signal).toBe('BUY')
+    expect(d.confidence).toBeGreaterThanOrEqual(0.35)
+  })
+
+  it('trend pullback sells when price loses the long trend SMA', () => {
+    const closes = [...Array.from({ length: 80 }, (_, i) => 100 + i), 120]
+    const d = trendPullbackStrategy.evaluate(candlesFromCloses(closes))
+    expect(d.signal).toBe('SELL')
+    expect(d.reason).toContain('below trend SMA')
+  })
+
+  it('trend pullback holds instead of chasing an extended recovery', () => {
+    const closes = [
+      ...Array.from({ length: 80 }, (_, i) => 100 + i),
+      170,
+      168,
+      169,
+      171,
+      190,
+    ]
+    const d = trendPullbackStrategy.evaluate(candlesFromCloses(closes))
+    expect(d.signal).toBe('HOLD')
   })
 
   it('ema tracks toward recent values', () => {
@@ -109,29 +277,185 @@ describe('new strategies', () => {
   })
 })
 
+function ohlcv(
+  openTime: number,
+  vals: { high: number; low: number; close: number; volume: number },
+): Candle {
+  return {
+    openTime,
+    open: vals.close,
+    high: vals.high,
+    low: vals.low,
+    close: vals.close,
+    volume: vals.volume,
+  }
+}
+
+describe('accumulationDistributionLine', () => {
+  it('accumulates money-flow-volume per candle, weighted by where close landed in the range', () => {
+    const candles = [
+      ohlcv(0, { high: 10, low: 0, close: 10, volume: 5 }), // close at high → MFM=1 → +5
+      ohlcv(1, { high: 10, low: 0, close: 0, volume: 3 }), // close at low → MFM=-1 → -3
+    ]
+    const adl = accumulationDistributionLine(candles)
+    expect(adl).toEqual([5, 2])
+  })
+
+  it('treats a zero-range candle as contributing nothing (no divide-by-zero)', () => {
+    const candles = [ohlcv(0, { high: 5, low: 5, close: 5, volume: 100 })]
+    expect(accumulationDistributionLine(candles)).toEqual([0])
+  })
+})
+
+describe('chaikinVolumeStrategy', () => {
+  it('buys on a sharp accumulation burst after a distribution baseline', () => {
+    const candles: Array<Candle> = []
+    for (let i = 0; i < 25; i++) {
+      // Close near the low of each bar — distribution.
+      candles.push(ohlcv(i, { high: 100, low: 90, close: 91, volume: 10 }))
+    }
+    for (let i = 25; i < 28; i++) {
+      // Sharp, high-volume close-near-high burst — accumulation.
+      candles.push(ohlcv(i, { high: 100, low: 90, close: 99, volume: 30 }))
+    }
+    const d = chaikinVolumeStrategy.evaluate(candles)
+    expect(d.signal).toBe('BUY')
+    expect(d.reason).toContain('above zero')
+  })
+
+  it('sells on a sharp distribution burst after an accumulation baseline', () => {
+    const candles: Array<Candle> = []
+    for (let i = 0; i < 25; i++) {
+      candles.push(ohlcv(i, { high: 100, low: 90, close: 99, volume: 10 }))
+    }
+    for (let i = 25; i < 28; i++) {
+      candles.push(ohlcv(i, { high: 100, low: 90, close: 91, volume: 30 }))
+    }
+    const d = chaikinVolumeStrategy.evaluate(candles)
+    expect(d.signal).toBe('SELL')
+    expect(d.reason).toContain('below zero')
+  })
+
+  it('holds when the close sits near the middle of the range throughout', () => {
+    const candles: Array<Candle> = Array.from({ length: 28 }, (_, i) =>
+      ohlcv(i, { high: 100, low: 90, close: 95, volume: 10 }),
+    )
+    expect(chaikinVolumeStrategy.evaluate(candles).signal).toBe('HOLD')
+  })
+
+  it('holds below minCandles regardless of the pattern', () => {
+    const candles: Array<Candle> = Array.from({ length: 10 }, (_, i) =>
+      ohlcv(i, { high: 100, low: 90, close: 99, volume: 30 }),
+    )
+    expect(chaikinVolumeStrategy.evaluate(candles).signal).toBe('HOLD')
+  })
+})
+
+describe('keltnerChannelStrategy', () => {
+  it('buys when close breaks above the ATR-scaled upper band', () => {
+    const candles: Array<Candle> = []
+    for (let i = 0; i < 20; i++)
+      candles.push(ohlcv(i, { high: 101, low: 99, close: 100, volume: 1 }))
+    candles.push(ohlcv(20, { high: 116, low: 114, close: 115, volume: 1 }))
+    const d = keltnerChannelStrategy.evaluate(candles)
+    expect(d.signal).toBe('BUY')
+    expect(d.reason).toContain('upper band')
+  })
+
+  it('sells when close breaks below the ATR-scaled lower band', () => {
+    const candles: Array<Candle> = []
+    for (let i = 0; i < 20; i++)
+      candles.push(ohlcv(i, { high: 101, low: 99, close: 100, volume: 1 }))
+    candles.push(ohlcv(20, { high: 86, low: 84, close: 85, volume: 1 }))
+    const d = keltnerChannelStrategy.evaluate(candles)
+    expect(d.signal).toBe('SELL')
+    expect(d.reason).toContain('lower band')
+  })
+
+  it('holds while price stays inside the band', () => {
+    const candles: Array<Candle> = Array.from({ length: 21 }, (_, i) =>
+      ohlcv(i, { high: 101, low: 99, close: 100, volume: 1 }),
+    )
+    expect(keltnerChannelStrategy.evaluate(candles).signal).toBe('HOLD')
+  })
+
+  it('holds below minCandles regardless of price action', () => {
+    const candles: Array<Candle> = [
+      ohlcv(0, { high: 101, low: 99, close: 100, volume: 1 }),
+      ohlcv(1, { high: 116, low: 114, close: 115, volume: 1 }),
+    ]
+    expect(keltnerChannelStrategy.evaluate(candles).signal).toBe('HOLD')
+  })
+})
+
+describe('regimeAllowsLong', () => {
+  it('fails open when disabled or without enough history', () => {
+    expect(regimeAllowsLong([100, 90], 0)).toBe(true)
+    expect(regimeAllowsLong([100, 90], 5)).toBe(true)
+  })
+
+  it('blocks long entries below the long SMA and allows them above it', () => {
+    expect(regimeAllowsLong([100, 100, 100, 80], 4)).toBe(false)
+    expect(regimeAllowsLong([100, 100, 100, 110], 4)).toBe(true)
+  })
+})
+
 describe('councilVote', () => {
   it('returns BUY when weighted votes exceed threshold', () => {
-    const v = councilVote([
-      { strategyId: 'a', decision: { signal: 'BUY', confidence: 1, reason: 'up' }, score: 5 },
-      { strategyId: 'b', decision: { signal: 'BUY', confidence: 0.8, reason: 'up2' }, score: 0 },
-    ], 0.6)
+    const v = councilVote(
+      [
+        {
+          strategyId: 'a',
+          decision: { signal: 'BUY', confidence: 1, reason: 'up' },
+          score: 5,
+        },
+        {
+          strategyId: 'b',
+          decision: { signal: 'BUY', confidence: 0.8, reason: 'up2' },
+          score: 0,
+        },
+      ],
+      0.6,
+    )
     expect(v.signal).toBe('BUY')
     expect(v.leadStrategyId).toBe('a')
   })
 
   it('returns HOLD when votes cancel out', () => {
-    const v = councilVote([
-      { strategyId: 'a', decision: { signal: 'BUY', confidence: 1, reason: 'up' }, score: 0 },
-      { strategyId: 'b', decision: { signal: 'SELL', confidence: 1, reason: 'down' }, score: 0 },
-    ], 0.6)
+    const v = councilVote(
+      [
+        {
+          strategyId: 'a',
+          decision: { signal: 'BUY', confidence: 1, reason: 'up' },
+          score: 0,
+        },
+        {
+          strategyId: 'b',
+          decision: { signal: 'SELL', confidence: 1, reason: 'down' },
+          score: 0,
+        },
+      ],
+      0.6,
+    )
     expect(v.signal).toBe('HOLD')
   })
 
   it('weights proven strategies more heavily', () => {
-    const v = councilVote([
-      { strategyId: 'proven', decision: { signal: 'BUY', confidence: 1, reason: 'up' }, score: 8 },
-      { strategyId: 'weak', decision: { signal: 'SELL', confidence: 1, reason: 'down' }, score: -4 },
-    ], 0.6)
+    const v = councilVote(
+      [
+        {
+          strategyId: 'proven',
+          decision: { signal: 'BUY', confidence: 1, reason: 'up' },
+          score: 8,
+        },
+        {
+          strategyId: 'weak',
+          decision: { signal: 'SELL', confidence: 1, reason: 'down' },
+          score: -4,
+        },
+      ],
+      0.6,
+    )
     expect(v.signal).toBe('BUY')
     expect(v.leadStrategyId).toBe('proven')
   })

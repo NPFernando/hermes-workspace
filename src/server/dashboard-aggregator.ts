@@ -31,6 +31,10 @@ export type DashboardOverview = {
   insights: Array<DashboardInsight>
   /** Aggregated triage list: failed crons + platform errors + log errors. */
   incidents: Array<DashboardIncident>
+  /** Finance JSON/Postgres mirror monitor state, when available. */
+  financeStorageMonitor: DashboardFinanceStorageMonitorSection | null
+  /** Finance smoke cron artifact history, when available. */
+  financeStorageSmokeCron: DashboardFinanceStorageSmokeCronSection | null
 }
 
 export type DashboardSkillsUsageSection = {
@@ -54,10 +58,56 @@ export type DashboardInsight = {
 export type DashboardIncident = {
   id: string
   severity: 'info' | 'warn' | 'error'
-  source: 'cron' | 'kanban' | 'platform' | 'log' | 'config' | 'gateway'
+  source:
+    | 'cron'
+    | 'kanban'
+    | 'platform'
+    | 'log'
+    | 'config'
+    | 'gateway'
+    | 'finance'
   label: string
   detail: string
   href: string | null
+}
+
+export type DashboardFinanceStorageMonitorSection = {
+  lastCheckedAt: string | null
+  lastHealthyAt: string | null
+  lastAlertAt: string | null
+  consecutiveFailures: number
+  lastStatus: string | null
+  lastWarnings: Array<string>
+  lastSelfHealAttempts: number
+  lastSelfHealSucceeded: boolean | null
+  heartbeatAgeMs: number | null
+  stale: boolean
+}
+
+export type DashboardFinanceStorageSmokeCronSection = {
+  jobId: string
+  name: string
+  schedule: string
+  enabled: boolean
+  state: string | null
+  lastStatus: string | null
+  lastRunAt: string | null
+  lastError: string | null
+  lastDeliveryError: string | null
+  nextRunAt: string | null
+  completedRuns: number | null
+  deliver: string | null
+  latestOutputPath: string | null
+  latestOutputAt: string | null
+  latestOutputStatus: string | null
+  recentOutputs: Array<{
+    path: string
+    outputAt: string
+    runTime: string | null
+    status: string | null
+    failed: boolean
+  }>
+  recentFailureCount: number
 }
 
 export type DashboardLogsSection = {
@@ -174,7 +224,13 @@ export type DashboardAnalyticsSection = {
   totalSessions: number
   /** API call count over the window. */
   totalApiCalls: number
-  topModels: Array<{ id: string; tokens: number; calls: number; cost: number; sessions: number }>
+  topModels: Array<{
+    id: string
+    tokens: number
+    calls: number
+    cost: number
+    sessions: number
+  }>
   /**
    * Per-day rollup for sparklines. ISO date string + tokens + sessions
    * + cost per day. Always returned, even when empty.
@@ -227,6 +283,10 @@ export type BuildOverviewOptions = {
   achievementsLimit?: number
   /** How many log tail lines to surface. Default 24. */
   logsLimit?: number
+  /** Local Finance storage monitor state, supplied by the live route. */
+  financeStorageMonitor?: DashboardFinanceStorageMonitorSection | null
+  /** Local Finance smoke cron artifact state, supplied by the live route. */
+  financeStorageSmokeCron?: DashboardFinanceStorageSmokeCronSection | null
 }
 
 const DEFAULT_OPTIONS = {
@@ -344,7 +404,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
   let jobs: Array<Record<string, unknown>> = []
   if (Array.isArray(raw)) {
     jobs = raw as Array<Record<string, unknown>>
-  } else if (raw && typeof raw === 'object') {
+  } else if (typeof raw === 'object') {
     const r = raw as Record<string, unknown>
     if (Array.isArray(r.jobs)) jobs = r.jobs as Array<Record<string, unknown>>
   }
@@ -356,7 +416,6 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
   let nextRunMs: number | null = null
   const recentFailures: DashboardCronSection['recentFailures'] = []
   for (const job of jobs) {
-    if (!job || typeof job !== 'object') continue
     const j = job
     const state = readString(j.state || j.status).toLowerCase()
     if (state === 'paused') paused += 1
@@ -366,7 +425,7 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       typeof j.last_error === 'string'
         ? j.last_error
         : typeof j.last_delivery_error === 'string'
-          ? (j.last_delivery_error)
+          ? j.last_delivery_error
           : null
     const isFailure =
       lastStatus === 'failed' ||
@@ -376,16 +435,13 @@ function normalizeCron(raw: unknown): DashboardCronSection | null {
       failed += 1
       const id = readString(j.id) || readString(j.name) || 'unknown'
       const name = readString(j.name) || id
-      const lastRunAt =
-        typeof j.last_run_at === 'string' ? j.last_run_at : null
+      const lastRunAt = typeof j.last_run_at === 'string' ? j.last_run_at : null
       recentFailures.push({ id, name, lastError, lastRunAt })
     }
     const candidates = [
       typeof j.next_run_at === 'string' ? Date.parse(j.next_run_at) : NaN,
       typeof j.next_run === 'string' ? Date.parse(j.next_run) : NaN,
-      typeof j.next_run_at === 'number'
-        ? (j.next_run_at) * 1000
-        : NaN,
+      typeof j.next_run_at === 'number' ? j.next_run_at * 1000 : NaN,
     ].filter((v) => Number.isFinite(v))
     for (const ts of candidates) {
       if (nextRunMs === null || ts < nextRunMs) nextRunMs = ts
@@ -419,7 +475,9 @@ function normalizeKanban(raw: unknown): DashboardKanbanSection | null {
     topBlocked: [],
   }
 
-  const bucketFor = (status: string): keyof Pick<
+  const bucketFor = (
+    status: string,
+  ): keyof Pick<
     DashboardKanbanSection,
     'triage' | 'todo' | 'ready' | 'running' | 'blocked' | 'done' | 'other'
   > => {
@@ -427,7 +485,8 @@ function normalizeKanban(raw: unknown): DashboardKanbanSection | null {
     if (s === 'triage') return 'triage'
     if (s === 'todo' || s === 'queued') return 'todo'
     if (s === 'ready') return 'ready'
-    if (s === 'running' || s === 'claimed' || s === 'in_progress') return 'running'
+    if (s === 'running' || s === 'claimed' || s === 'in_progress')
+      return 'running'
     if (s === 'blocked') return 'blocked'
     if (s === 'done' || s === 'completed' || s === 'complete') return 'done'
     return 'other'
@@ -472,8 +531,7 @@ function normalizeAchievementUnlock(
     category: readString(r.category) || 'General',
     icon: readString(r.icon) || 'Star',
     tier: typeof r.tier === 'string' ? r.tier : null,
-    unlockedAt:
-      typeof r.unlocked_at === 'number' ? (r.unlocked_at) : null,
+    unlockedAt: typeof r.unlocked_at === 'number' ? r.unlocked_at : null,
   }
 }
 
@@ -486,9 +544,7 @@ function normalizeAchievements(
   if (recentArr.length === 0 && (!all || typeof all !== 'object')) return null
   const recentUnlocks = recentArr
     .map(normalizeAchievementUnlock)
-    .filter(
-      (entry): entry is DashboardAchievementUnlock => entry !== null,
-    )
+    .filter((entry): entry is DashboardAchievementUnlock => entry !== null)
     .slice(0, limit)
 
   let totalUnlocked = 0
@@ -546,14 +602,13 @@ function normalizeSkillsUsage(
         skill,
         totalCount: readNumber(e.total_count),
         percentage: readNumber(e.percentage),
-        lastUsedAt:
-          typeof e.last_used_at === 'number'
-            ? (e.last_used_at)
-            : null,
+        lastUsedAt: typeof e.last_used_at === 'number' ? e.last_used_at : null,
       }
     })
     .filter(
-      (e): e is {
+      (
+        e,
+      ): e is {
         skill: string
         totalCount: number
         percentage: number
@@ -562,10 +617,7 @@ function normalizeSkillsUsage(
     )
     .sort((a, b) => b.totalCount - a.totalCount)
     .slice(0, 5)
-  if (
-    !summary &&
-    topSkills.length === 0
-  ) {
+  if (!summary && topSkills.length === 0) {
     return null
   }
   return {
@@ -598,9 +650,7 @@ function normalizeAnalytics(
     totalsRaw?.total_output ?? r.total_output ?? r.output_tokens,
   )
   const cacheReadTokens = readNumber(
-    totalsRaw?.total_cache_read ??
-      r.total_cache_read ??
-      r.cache_read_tokens,
+    totalsRaw?.total_cache_read ?? r.total_cache_read ?? r.cache_read_tokens,
   )
   const reasoningTokens = readNumber(
     totalsRaw?.total_reasoning ?? r.total_reasoning ?? r.reasoning_tokens,
@@ -628,9 +678,7 @@ function normalizeAnalytics(
   // reasoning are exposed separately for the rich UI.
   const fallbackTotal = readNumber(r.total_tokens)
   const totalTokens =
-    inputTokens + outputTokens > 0
-      ? inputTokens + outputTokens
-      : fallbackTotal
+    inputTokens + outputTokens > 0 ? inputTokens + outputTokens : fallbackTotal
 
   const modelsRaw = Array.isArray(r.by_model)
     ? r.by_model
@@ -649,14 +697,19 @@ function normalizeAnalytics(
       const tokensOut = readNumber(e.output_tokens)
       return {
         id,
-        tokens: tokensIn + tokensOut > 0 ? tokensIn + tokensOut : readNumber(e.tokens),
+        tokens:
+          tokensIn + tokensOut > 0
+            ? tokensIn + tokensOut
+            : readNumber(e.tokens),
         calls: readNumber(e.api_calls ?? e.calls ?? e.requests),
         cost: readNumber(e.estimated_cost ?? e.cost),
         sessions: readNumber(e.sessions),
       }
     })
     .filter(
-      (entry): entry is {
+      (
+        entry,
+      ): entry is {
         id: string
         tokens: number
         calls: number
@@ -686,7 +739,9 @@ function normalizeAnalytics(
       }
     })
     .filter(
-      (entry): entry is {
+      (
+        entry,
+      ): entry is {
         day: string
         inputTokens: number
         outputTokens: number
@@ -873,16 +928,12 @@ function computeInsights(
   // glance.
   const ops: Array<string> = []
   if (cron && cron.failed > 0) {
-    ops.push(
-      `${cron.failed} failed cron job${cron.failed === 1 ? '' : 's'}`,
-    )
+    ops.push(`${cron.failed} failed cron job${cron.failed === 1 ? '' : 's'}`)
   }
   if (cron && cron.nextRunAt) {
     const nextMs = Date.parse(cron.nextRunAt)
     if (Number.isFinite(nextMs) && nextMs - Date.now() < -7 * 86_400_000) {
-      ops.push(
-        `${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`,
-      )
+      ops.push(`${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`)
     }
   }
   if (
@@ -927,6 +978,8 @@ function computeIncidents(
   cron: DashboardCronSection | null,
   logs: DashboardLogsSection | null,
   kanban: DashboardKanbanSection | null,
+  financeStorageMonitor: DashboardFinanceStorageMonitorSection | null,
+  financeStorageSmokeCron: DashboardFinanceStorageSmokeCronSection | null,
 ): Array<DashboardIncident> {
   const out: Array<DashboardIncident> = []
   // Cron failures
@@ -976,8 +1029,64 @@ function computeIncidents(
       severity: 'warn',
       source: 'kanban',
       label: `${kanban.blocked} kanban task${kanban.blocked === 1 ? '' : 's'} blocked`,
-      detail: kanban.topBlocked.map((t) => t.title).join(' · ') || 'blocked cards need attention',
+      detail:
+        kanban.topBlocked.map((t) => t.title).join(' · ') ||
+        'blocked cards need attention',
       href: '/swarm2',
+    })
+  }
+  // Finance storage mirror health
+  if (financeStorageMonitor) {
+    const statusName = financeStorageMonitor.lastStatus ?? 'unknown'
+    const hasWarnings = financeStorageMonitor.lastWarnings.length > 0
+    const unhealthy =
+      financeStorageMonitor.stale ||
+      financeStorageMonitor.consecutiveFailures > 0 ||
+      (statusName !== 'healthy' && statusName !== 'json_primary')
+    if (unhealthy) {
+      const severity: DashboardIncident['severity'] =
+        financeStorageMonitor.stale ||
+        financeStorageMonitor.consecutiveFailures >= 3 ||
+        statusName === 'postgres_unavailable'
+          ? 'error'
+          : 'warn'
+      const detail = financeStorageMonitor.stale
+        ? financeStorageMonitor.lastCheckedAt
+          ? `last storage monitor heartbeat was ${Math.round((financeStorageMonitor.heartbeatAgeMs ?? 0) / 60_000)} min ago`
+          : 'storage monitor has not checked in yet'
+        : hasWarnings
+          ? financeStorageMonitor.lastWarnings.slice(0, 2).join(' ')
+          : `${financeStorageMonitor.consecutiveFailures} consecutive unhealthy heartbeat${financeStorageMonitor.consecutiveFailures === 1 ? '' : 's'}`
+      out.push({
+        id: 'finance-storage-monitor',
+        severity,
+        source: 'finance',
+        label: `Finance storage mirror ${statusName}`,
+        detail,
+        href: '/finance',
+      })
+    }
+  }
+  if (
+    financeStorageSmokeCron &&
+    financeStorageSmokeCron.recentFailureCount > 0
+  ) {
+    const failedOutput = financeStorageSmokeCron.recentOutputs.find(
+      (output) => output.failed,
+    )
+    const latestFailed = financeStorageSmokeCron.latestOutputStatus === 'failed'
+    out.push({
+      id: 'finance-storage-smoke-cron',
+      severity: latestFailed ? 'error' : 'warn',
+      source: 'finance',
+      label:
+        financeStorageSmokeCron.recentFailureCount === 1
+          ? 'Finance storage smoke recent failure'
+          : `${financeStorageSmokeCron.recentFailureCount} Finance storage smoke recent failures`,
+      detail: failedOutput?.runTime
+        ? `latest failed smoke artifact at ${failedOutput.runTime}`
+        : `failed smoke artifact in last ${financeStorageSmokeCron.recentOutputs.length} runs`,
+      href: '/ops-cost',
     })
   }
   // Platform errors
@@ -1131,7 +1240,17 @@ export async function buildDashboardOverview(
   const logs = normalizeLogs(logsRaw, logsLimit)
   const skillsUsage = normalizeSkillsUsage(analyticsRaw)
   const insights = computeInsights(analytics, cron, status, skillsUsage, kanban)
-  const incidents = computeIncidents(status, platforms, cron, logs, kanban)
+  const financeStorageMonitor = opts.financeStorageMonitor ?? null
+  const financeStorageSmokeCron = opts.financeStorageSmokeCron ?? null
+  const incidents = computeIncidents(
+    status,
+    platforms,
+    cron,
+    logs,
+    kanban,
+    financeStorageMonitor,
+    financeStorageSmokeCron,
+  )
 
   return {
     status,
@@ -1149,5 +1268,7 @@ export async function buildDashboardOverview(
     skillsUsage,
     insights,
     incidents,
+    financeStorageMonitor,
+    financeStorageSmokeCron,
   }
 }

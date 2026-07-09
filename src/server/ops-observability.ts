@@ -7,6 +7,7 @@
  *  - Gateway session store ~/.hermes/state.db (SQLite): per-model cost/token usage.
  *  - ~/.hermes/sister-escalations.jsonl: sister escalation shadow measurements.
  *  - ~/.hermes/cron/jobs.json: ops cron job health.
+ *  - ~/.hermes/finance/storage-monitor.json: Finance JSON/Postgres mirror health.
  *
  * No new npm deps: queries shell out to the psql / sqlite3 CLIs (child_process is
  * already used by 20+ server modules). Each section is independently try/caught so
@@ -14,19 +15,28 @@
  */
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+import {
+  FINANCE_STORAGE_MONITOR_STATE_PATH,
+  readFinanceStorageMonitorState,
+} from './finance-storage-monitor'
 
 const execFileAsync = promisify(execFile)
 
 const HERMES_HOME =
-  process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? join(homedir(), '.hermes')
+  process.env.HERMES_HOME ??
+  process.env.CLAUDE_HOME ??
+  join(homedir(), '.hermes')
 
 const PSQL_CANDIDATES = [
   '/home/ubuntu/.pg0/installation/18.1.0/bin/psql',
   'psql', // PATH fallback
 ]
+
+const FINANCE_STORAGE_HEARTBEAT_STALE_MS = 30 * 60_000
+const FINANCE_STORAGE_SMOKE_CRON_JOB_ID = 'finance-storage-monitor-smoke'
 
 /** Read HERMES_PG_* connection settings from process.env, falling back to ~/.hermes/.env. */
 function pgConn(): { url: string } | null {
@@ -51,7 +61,9 @@ function pgConn(): { url: string } | null {
     }
   }
   if (!password) return null
-  return { url: `postgresql://${user}:${encodeURIComponent(password)}@${host}:${port}/harp` }
+  return {
+    url: `postgresql://${user}:${encodeURIComponent(password)}@${host}:${port}/harp`,
+  }
 }
 
 /** Run a SQL query against the Postgres harp db; the query must return ONE row/col of JSON. */
@@ -131,12 +143,15 @@ async function getCostSummary(): Promise<CostSummary | null> {
     ) t`)
   if (!row || row.usage_now == null) return null
   const burn = (then: number | null) =>
-    then == null ? null : Math.max(0, Math.round((row.usage_now! - then) * 10000) / 10000)
+    then == null
+      ? null
+      : Math.max(0, Math.round((row.usage_now! - then) * 10000) / 10000)
   const burn30 = burn(row.usage_30d)
   return {
     burn24h: burn(row.usage_24h),
     burn7d: burn(row.usage_7d),
-    avgDaily30d: burn30 == null ? null : Math.round((burn30 / 30) * 10000) / 10000,
+    avgDaily30d:
+      burn30 == null ? null : Math.round((burn30 / 30) * 10000) / 10000,
     remaining: row.remaining,
     totalUsed: row.usage_now,
     latestSnapshotAt: row.latest,
@@ -152,7 +167,11 @@ export interface ModelLiveness {
 }
 
 async function getModelLiveness(): Promise<ModelLiveness | null> {
-  type Row = { freshest: string | null; stale: Array<{ model_id: string; hrs: number }> | null; live_free: number }
+  type Row = {
+    freshest: string | null
+    stale: Array<{ model_id: string; hrs: number }> | null
+    live_free: number
+  }
   const row = await pgJson<Row>(`
     SELECT row_to_json(t) FROM (
       WITH mx AS (SELECT max(last_seen_at::timestamptz) AS m FROM models)
@@ -171,7 +190,10 @@ async function getModelLiveness(): Promise<ModelLiveness | null> {
   if (!row) return null
   return {
     freshestSeenAt: row.freshest,
-    staleFreeModels: (row.stale ?? []).map((s) => ({ modelId: s.model_id, hoursBehind: s.hrs })),
+    staleFreeModels: (row.stale ?? []).map((s) => ({
+      modelId: s.model_id,
+      hoursBehind: s.hrs,
+    })),
     liveFreeCount: row.live_free,
   }
 }
@@ -190,7 +212,9 @@ export interface ModelUsageRow {
   tokens: number
 }
 
-async function getSessionModelCosts(days = 7): Promise<Array<ModelUsageRow> | null> {
+async function getSessionModelCosts(
+  days = 7,
+): Promise<Array<ModelUsageRow> | null> {
   const rows = await sqliteJson<
     Array<{
       model: string | null
@@ -245,7 +269,11 @@ function getEscalationStats(): EscalationStats | null {
     for (const line of readFileSync(path, 'utf8').split('\n')) {
       if (!line.trim()) continue
       try {
-        const r = JSON.parse(line) as { mode?: string; would_escalate?: boolean; at?: string }
+        const r = JSON.parse(line) as {
+          mode?: string
+          would_escalate?: boolean
+          at?: string
+        }
         if (r.mode !== 'shadow-live') continue
         measured += 1
         if (r.would_escalate) would += 1
@@ -277,24 +305,202 @@ export interface OpsCronJob {
   nextRunAt: string | null
 }
 
-function getOpsCronJobs(): Array<OpsCronJob> | null {
-  const path = join(HERMES_HOME, 'cron', 'jobs.json')
+type CronJobRecord = Record<string, unknown>
+
+function readString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function readCronJobsFile(path: string): Array<CronJobRecord> | null {
   if (!existsSync(path)) return null
   try {
     const data = JSON.parse(readFileSync(path, 'utf8')) as {
-      jobs?: Array<Record<string, unknown>>
+      jobs?: Array<CronJobRecord>
     }
-    return (data.jobs ?? []).map((j) => ({
-      id: String(j.id ?? ''),
-      name: String(j.name ?? ''),
-      schedule: String((j.schedule as { expr?: string } | undefined)?.expr ?? ''),
-      enabled: Boolean(j.enabled),
-      lastStatus: (j.last_status as string | null) ?? null,
-      lastRunAt: (j.last_run_at as string | null) ?? null,
-      nextRunAt: (j.next_run_at as string | null) ?? null,
-    }))
+    return Array.isArray(data.jobs) ? data.jobs : []
   } catch {
     return null
+  }
+}
+
+function getOpsCronJobs(): Array<OpsCronJob> | null {
+  const path = join(HERMES_HOME, 'cron', 'jobs.json')
+  const jobs = readCronJobsFile(path)
+  if (!jobs) return null
+  return jobs.map((j) => ({
+    id: String(j.id ?? ''),
+    name: String(j.name ?? ''),
+    schedule: String((j.schedule as { expr?: string } | undefined)?.expr ?? ''),
+    enabled: Boolean(j.enabled),
+    lastStatus: readString(j.last_status),
+    lastRunAt: readString(j.last_run_at),
+    nextRunAt: readString(j.next_run_at),
+  }))
+}
+
+export interface FinanceStorageSmokeCronSummary {
+  jobId: string
+  name: string
+  schedule: string
+  enabled: boolean
+  state: string | null
+  lastStatus: string | null
+  lastRunAt: string | null
+  lastError: string | null
+  lastDeliveryError: string | null
+  nextRunAt: string | null
+  completedRuns: number | null
+  deliver: string | null
+  latestOutputPath: string | null
+  latestOutputAt: string | null
+  latestOutputStatus: string | null
+  recentOutputs: Array<FinanceStorageSmokeCronOutput>
+  recentFailureCount: number
+}
+
+export interface FinanceStorageSmokeCronOutput {
+  path: string
+  outputAt: string
+  runTime: string | null
+  status: string | null
+  failed: boolean
+}
+
+function readCronOutputArtifacts(
+  outputDir: string,
+  limit: number,
+): Array<FinanceStorageSmokeCronOutput> {
+  if (!existsSync(outputDir)) return []
+  try {
+    return readdirSync(outputDir)
+      .map((fileName) => {
+        const path = join(outputDir, fileName)
+        const stat = statSync(path)
+        return stat.isFile() ? { path, mtimeMs: stat.mtimeMs } : null
+      })
+      .filter((entry): entry is { path: string; mtimeMs: number } =>
+        Boolean(entry),
+      )
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)
+      .slice(0, Math.max(1, limit))
+      .map((entry) => {
+        const body = readFileSync(entry.path, 'utf8')
+        const statusMatch = body.match(/^\*\*Status:\*\*\s*(.+)$/m)
+        const runTimeMatch = body.match(/^\*\*Run Time:\*\*\s*(.+)$/m)
+        const failed = /\bfinance-storage-monitor-smoke FAILED\b/.test(body)
+        return {
+          path: entry.path,
+          outputAt: new Date(entry.mtimeMs).toISOString(),
+          runTime: runTimeMatch?.[1]?.trim() ?? null,
+          status: failed ? 'failed' : (statusMatch?.[1]?.trim() ?? null),
+          failed,
+        }
+      })
+  } catch {
+    return []
+  }
+}
+
+export function getFinanceStorageSmokeCronSummary(
+  options: {
+    jobsPath?: string
+    outputDir?: string
+    jobId?: string
+    recentOutputLimit?: number
+  } = {},
+): FinanceStorageSmokeCronSummary | null {
+  const jobId = options.jobId ?? FINANCE_STORAGE_SMOKE_CRON_JOB_ID
+  const jobsPath = options.jobsPath ?? join(HERMES_HOME, 'cron', 'jobs.json')
+  const jobs = readCronJobsFile(jobsPath)
+  if (!jobs) return null
+  const job = jobs.find((candidate) => readString(candidate.id) === jobId)
+  if (!job) return null
+  const schedule = job.schedule as { expr?: string; display?: string } | null
+  const repeat = job.repeat as { completed?: unknown } | null
+  const completed =
+    typeof repeat?.completed === 'number' && Number.isFinite(repeat.completed)
+      ? repeat.completed
+      : null
+  const recentOutputs = readCronOutputArtifacts(
+    options.outputDir ?? join(HERMES_HOME, 'cron', 'output', jobId),
+    options.recentOutputLimit ?? 12,
+  )
+  const latestOutput = recentOutputs.at(0) ?? null
+  return {
+    jobId,
+    name: readString(job.name) ?? jobId,
+    schedule: readString(schedule?.expr) ?? readString(schedule?.display) ?? '',
+    enabled: Boolean(job.enabled),
+    state: readString(job.state),
+    lastStatus: readString(job.last_status),
+    lastRunAt: readString(job.last_run_at),
+    lastError: readString(job.last_error),
+    lastDeliveryError: readString(job.last_delivery_error),
+    nextRunAt: readString(job.next_run_at),
+    completedRuns: completed,
+    deliver: readString(job.deliver),
+    latestOutputPath: latestOutput?.path ?? null,
+    latestOutputAt: latestOutput?.outputAt ?? null,
+    latestOutputStatus: latestOutput?.status ?? null,
+    recentOutputs,
+    recentFailureCount: recentOutputs.filter((output) => output.failed).length,
+  }
+}
+
+// ── Section: Finance storage mirror monitor ────────────────────────────────
+
+export interface FinanceStorageMonitorSummary {
+  statePath: string
+  lastCheckedAt: string | null
+  lastHealthyAt: string | null
+  lastAlertAt: string | null
+  consecutiveFailures: number
+  lastStatus: string | null
+  lastWarnings: Array<string>
+  lastSelfHealAttempts: number
+  lastSelfHealSucceeded: boolean | null
+  heartbeatAgeMs: number | null
+  stale: boolean
+}
+
+function parseTimestampMs(value: string | null): number | null {
+  if (!value) return null
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+export function getFinanceStorageMonitorSummary(
+  options: {
+    statePath?: string
+    now?: Date
+    staleAfterMs?: number
+  } = {},
+): FinanceStorageMonitorSummary | null {
+  const statePath = options.statePath ?? FINANCE_STORAGE_MONITOR_STATE_PATH
+  if (!existsSync(statePath)) return null
+  const state = readFinanceStorageMonitorState(statePath)
+  const checkedMs = parseTimestampMs(state.lastCheckedAt)
+  const nowMs = (options.now ?? new Date()).getTime()
+  const heartbeatAgeMs =
+    checkedMs === null ? null : Math.max(0, nowMs - checkedMs)
+  const staleAfterMs =
+    typeof options.staleAfterMs === 'number' &&
+    Number.isFinite(options.staleAfterMs) &&
+    options.staleAfterMs > 0
+      ? options.staleAfterMs
+      : FINANCE_STORAGE_HEARTBEAT_STALE_MS
+  return {
+    statePath,
+    lastCheckedAt: state.lastCheckedAt,
+    lastHealthyAt: state.lastHealthyAt,
+    lastAlertAt: state.lastAlertAt,
+    consecutiveFailures: state.consecutiveFailures,
+    lastStatus: state.lastStatus,
+    lastWarnings: state.lastWarnings,
+    lastSelfHealAttempts: state.lastSelfHealAttempts,
+    lastSelfHealSucceeded: state.lastSelfHealSucceeded,
+    heartbeatAgeMs,
+    stale: heartbeatAgeMs === null || heartbeatAgeMs > staleAfterMs,
   }
 }
 
@@ -307,6 +513,8 @@ export interface OpsObservability {
   modelUsage7d: Array<ModelUsageRow> | null
   escalation: EscalationStats | null
   cronJobs: Array<OpsCronJob> | null
+  financeStorageMonitor: FinanceStorageMonitorSummary | null
+  financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
 }
 
 export async function getOpsObservability(): Promise<OpsObservability> {
@@ -322,5 +530,7 @@ export async function getOpsObservability(): Promise<OpsObservability> {
     modelUsage7d,
     escalation: getEscalationStats(),
     cronJobs: getOpsCronJobs(),
+    financeStorageMonitor: getFinanceStorageMonitorSummary(),
+    financeStorageSmokeCron: getFinanceStorageSmokeCronSummary(),
   }
 }

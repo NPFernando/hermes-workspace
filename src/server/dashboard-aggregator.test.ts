@@ -135,6 +135,130 @@ describe('buildDashboardOverview', () => {
     expect(cronIncident?.detail).toBe('connection refused')
   })
 
+  it('surfaces degraded Finance storage monitor state as a dashboard incident', async () => {
+    const fetcher = makeFetcher({})
+    const overview = await buildDashboardOverview({
+      fetcher,
+      financeStorageMonitor: {
+        lastCheckedAt: '2026-07-08T00:00:00.000Z',
+        lastHealthyAt: '2026-07-07T23:50:00.000Z',
+        lastAlertAt: null,
+        consecutiveFailures: 3,
+        lastStatus: 'postgres_behind',
+        lastWarnings: ['Postgres mirror is 45s behind JSON finance storage.'],
+        lastSelfHealAttempts: 2,
+        lastSelfHealSucceeded: false,
+        heartbeatAgeMs: 5 * 60_000,
+        stale: false,
+      },
+    })
+
+    expect(overview.financeStorageMonitor?.lastStatus).toBe('postgres_behind')
+    expect(
+      overview.incidents.find((i) => i.id === 'finance-storage-monitor'),
+    ).toMatchObject({
+      severity: 'error',
+      source: 'finance',
+      label: 'Finance storage mirror postgres_behind',
+      detail: 'Postgres mirror is 45s behind JSON finance storage.',
+      href: '/finance',
+    })
+  })
+
+  it('surfaces recent Finance smoke cron failures as dashboard incidents', async () => {
+    const fetcher = makeFetcher({})
+    const overview = await buildDashboardOverview({
+      fetcher,
+      financeStorageSmokeCron: {
+        jobId: 'finance-storage-monitor-smoke',
+        name: 'Finance Storage Monitor Smoke',
+        schedule: '27 * * * *',
+        enabled: true,
+        state: 'scheduled',
+        lastStatus: 'ok',
+        lastRunAt: '2026-07-08T11:27:52.000+05:30',
+        lastError: null,
+        lastDeliveryError: null,
+        nextRunAt: '2026-07-08T12:27:00+05:30',
+        completedRuns: 8,
+        deliver: 'telegram:2130622225',
+        latestOutputPath:
+          '/home/ubuntu/.hermes/cron/output/finance-storage-monitor-smoke/2026-07-08_11-27-52.md',
+        latestOutputAt: '2026-07-08T05:57:52.000Z',
+        latestOutputStatus: 'silent (empty output)',
+        recentFailureCount: 1,
+        recentOutputs: [
+          {
+            path: '/home/ubuntu/.hermes/cron/output/finance-storage-monitor-smoke/2026-07-08_11-27-52.md',
+            outputAt: '2026-07-08T05:57:52.000Z',
+            runTime: '2026-07-08 11:27:52',
+            status: 'silent (empty output)',
+            failed: false,
+          },
+          {
+            path: '/home/ubuntu/.hermes/cron/output/finance-storage-monitor-smoke/2026-07-08_06-27-46.md',
+            outputAt: '2026-07-08T00:57:46.000Z',
+            runTime: '2026-07-08 06:27:46',
+            status: 'failed',
+            failed: true,
+          },
+        ],
+      },
+    })
+
+    expect(overview.financeStorageSmokeCron?.recentFailureCount).toBe(1)
+    expect(
+      overview.incidents.find((i) => i.id === 'finance-storage-smoke-cron'),
+    ).toMatchObject({
+      severity: 'warn',
+      source: 'finance',
+      label: 'Finance storage smoke recent failure',
+      detail: 'latest failed smoke artifact at 2026-07-08 06:27:46',
+      href: '/ops-cost',
+    })
+  })
+
+  it('clears Finance smoke cron dashboard incidents when recent failures age out', async () => {
+    const fetcher = makeFetcher({})
+    const overview = await buildDashboardOverview({
+      fetcher,
+      financeStorageSmokeCron: {
+        jobId: 'finance-storage-monitor-smoke',
+        name: 'Finance Storage Monitor Smoke',
+        schedule: '27 * * * *',
+        enabled: true,
+        state: 'scheduled',
+        lastStatus: 'ok',
+        lastRunAt: '2026-07-08T18:27:00.000+05:30',
+        lastError: null,
+        lastDeliveryError: null,
+        nextRunAt: '2026-07-08T19:27:00+05:30',
+        completedRuns: 14,
+        deliver: 'telegram:2130622225',
+        latestOutputPath:
+          '/home/ubuntu/.hermes/cron/output/finance-storage-monitor-smoke/2026-07-08_18-27-00.md',
+        latestOutputAt: '2026-07-08T12:57:00.000Z',
+        latestOutputStatus: 'silent (empty output)',
+        recentFailureCount: 0,
+        recentOutputs: Array.from({ length: 12 }).map((_, i) => {
+          const hour = 18 - i
+          return {
+            path: `/home/ubuntu/.hermes/cron/output/finance-storage-monitor-smoke/2026-07-08_${String(hour).padStart(2, '0')}-27-00.md`,
+            outputAt: `2026-07-08T${String(hour).padStart(2, '0')}:57:00.000Z`,
+            runTime: `2026-07-08 ${String(hour).padStart(2, '0')}:27:00`,
+            status: 'silent (empty output)',
+            failed: false,
+          }
+        }),
+      },
+    })
+
+    expect(overview.financeStorageSmokeCron?.recentFailureCount).toBe(0)
+    expect(
+      overview.incidents.find((i) => i.id === 'finance-storage-smoke-cron'),
+    ).toBeUndefined()
+  })
+
   it('uses /health/detailed active_agents over /api/status active_sessions', async () => {
     const fetcher = makeFetcher({
       '/api/status': {

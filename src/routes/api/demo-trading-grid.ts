@@ -1,11 +1,11 @@
 /**
- * Binance trading engine API.
+ * Paper-mode grid trading API — fully separate from /api/demo-trading (the
+ * council/guardian engine). No real orders, no API keys; reads public
+ * market data only. See src/server/grid-paper-engine.ts for why this is an
+ * independent module rather than an extension of the council engine.
  *
- *  GET  /api/demo-trading            → engine state (scores + open positions)
- *  POST /api/demo-trading {action}   → "run_cycle" triggers one trading cycle
- *
- * Execution can run in paper, Binance testnet, or gated Binance live mode. The POST
- * "run_cycle" honours finance trading gates; force never bypasses live safety.
+ *  GET  /api/demo-trading-grid            → grid state + recent trades
+ *  POST /api/demo-trading-grid {action}   → "run_cycle" advances the grid
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
@@ -15,14 +15,11 @@ import {
   safeErrorMessage,
 } from '../../server/rate-limit'
 import {
-  decisionQualityReport,
-  getEngineState,
-  getLiveMonitor,
-  marketLearningReport,
-  runTradingCycle,
-} from '../../server/demo-trading-engine'
+  getGridEngineState,
+  runGridPaperCycle,
+} from '../../server/grid-paper-engine'
 
-export const Route = createFileRoute('/api/demo-trading')({
+export const Route = createFileRoute('/api/demo-trading-grid')({
   server: {
     handlers: {
       GET: async ({ request }) => {
@@ -30,14 +27,7 @@ export const Route = createFileRoute('/api/demo-trading')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         try {
-          const monitor = await getLiveMonitor()
-          return json({
-            ok: true,
-            ...getEngineState(),
-            monitor,
-            learning: decisionQualityReport(),
-            marketLearning: marketLearningReport(),
-          })
+          return json({ ok: true, ...getGridEngineState() })
         } catch (err) {
           return json(
             { ok: false, error: safeErrorMessage(err) },
@@ -54,8 +44,6 @@ export const Route = createFileRoute('/api/demo-trading')({
         try {
           const body = (await request.json().catch(() => ({}))) as {
             action?: string
-            force?: boolean
-            config?: Record<string, unknown>
           }
           if (body.action !== 'run_cycle') {
             return json(
@@ -66,10 +54,7 @@ export const Route = createFileRoute('/api/demo-trading')({
               { status: 400 },
             )
           }
-          const result = await runTradingCycle({
-            force: body.force === true,
-            config: body.config as never,
-          })
+          const result = await runGridPaperCycle()
           return json({ ok: true, result })
         } catch (err) {
           return json(

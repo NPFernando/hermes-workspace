@@ -2,6 +2,12 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import {
+  appendFinanceAuditPostgres,
+  financePostgresStatus,
+  readFinancePostgresStore,
+  writeFinancePostgresStore,
+} from './finance-postgres-store'
 
 export const FINANCE_SCHEMA_VERSION = 1
 export const FINANCE_DATA_DIR = path.join(os.homedir(), '.hermes', 'finance')
@@ -71,7 +77,15 @@ export type PlanStatus =
 export type FinanceAccount = {
   id: string
   name: string
-  type: 'bank' | 'cash' | 'card' | 'crypto_wallet' | 'broker' | 'foreign_currency' | 'loan' | 'other'
+  type:
+    | 'bank'
+    | 'cash'
+    | 'card'
+    | 'crypto_wallet'
+    | 'broker'
+    | 'foreign_currency'
+    | 'loan'
+    | 'other'
   currency: CurrencyCode
   balance: number
   maskedIdentifier?: string
@@ -250,7 +264,12 @@ export type TradingPlan = {
   finalRecommendation: string
   status: PlanStatus
   userApprovalStatus: 'not_required' | 'pending' | 'approved' | 'rejected'
-  executionStatus: 'not_executable' | 'blocked' | 'pending' | 'executed' | 'failed'
+  executionStatus:
+    | 'not_executable'
+    | 'blocked'
+    | 'pending'
+    | 'executed'
+    | 'failed'
   actualOutcome?: string
   profitLoss?: number
   strategyUsed?: string
@@ -323,8 +342,8 @@ export type TradingSignal = {
   id: string
   symbol: string
   action: 'buy' | 'sell' | 'hold'
-  strength: number  // 0-100
-  confidence: number  // 0-100
+  strength: number // 0-100
+  confidence: number // 0-100
   priceTarget: number
   stopLoss: number
   takeProfit?: number
@@ -340,13 +359,13 @@ export type TradingSignal = {
 }
 
 export type RiskState = {
-  dailyRealizedLoss: number   // accumulated realized loss (>=0)
+  dailyRealizedLoss: number // accumulated realized loss (>=0)
   dailyUnrealizedLoss: number // accumulated unrealized loss (>=0)
   weeklyRealizedLoss: number
   weeklyUnrealizedLoss: number
   dailyBreached: boolean
   weeklyBreached: boolean
-  lastResetDay: string  // ISO date string of start of day
+  lastResetDay: string // ISO date string of start of day
   lastResetWeek: string // ISO date string of start of week (Monday)
 }
 
@@ -356,8 +375,15 @@ export type FinanceSettings = {
   tradingMode: TradingMode
   liveTradingEnabled: boolean
   emergencyKillSwitch: boolean
-  monitoringActive: boolean   // for live_monitored mode
-  autonomousTradingEnabled: boolean   // for live_auto_trade mode
+  monitoringActive: boolean // for live_monitored mode
+  autonomousTradingEnabled: boolean // for live_auto_trade mode
+  primaryTradingProvider: 'binance'
+  ibkrStatus: 'future_feature'
+  executionAccount: 'paper' | 'binance_testnet' | 'binance_live'
+  paperShadowEnabled: boolean
+  livePerOrderCapUsdt: number
+  liveBinanceApprovedAt?: string | null
+  liveBinanceApprovalId?: string | null
   binanceWithdrawalsAllowed: boolean
   ibkrWithdrawalsAllowed: boolean
   leverageEnabled: boolean
@@ -376,7 +402,7 @@ export type FinanceSettings = {
   }
 }
 
-  export type FinanceDatabase = {
+export type FinanceDatabase = {
   schemaVersion: number
   createdAt: string
   updatedAt: string
@@ -412,6 +438,33 @@ export type FinanceSettings = {
   riskState: RiskState
 }
 
+export type FinanceStorageHealthStatus =
+  | 'healthy'
+  | 'json_primary'
+  | 'postgres_unavailable'
+  | 'postgres_behind'
+  | 'mirror_mismatch'
+
+export type FinanceStorageHealth = {
+  status: FinanceStorageHealthStatus
+  warnings: Array<string>
+  jsonUpdatedAt: string | null
+  postgresUpdatedAt: string | null
+  postgresLagMs: number
+  isPostgresBehindJson: boolean
+  selfHeal: {
+    attempted: boolean
+    attempts: number
+    succeeded: boolean
+    lastAttemptAt: string | null
+  }
+  rowCounts: {
+    json: Record<string, number>
+    postgres: Record<string, number>
+    lagging: Record<string, { json: number; postgres: number }>
+  }
+}
+
 type AddPayload = Record<string, unknown>
 
 function nowIso(): string {
@@ -427,6 +480,13 @@ function defaultSettings(): FinanceSettings {
     emergencyKillSwitch: true,
     monitoringActive: false,
     autonomousTradingEnabled: false,
+    primaryTradingProvider: 'binance',
+    ibkrStatus: 'future_feature',
+    executionAccount: 'paper',
+    paperShadowEnabled: true,
+    livePerOrderCapUsdt: 10,
+    liveBinanceApprovedAt: null,
+    liveBinanceApprovalId: null,
     binanceWithdrawalsAllowed: false,
     ibkrWithdrawalsAllowed: false,
     leverageEnabled: false,
@@ -442,7 +502,7 @@ function defaultSettings(): FinanceSettings {
       maxOpenPositions: 5,
       requireStopLoss: true,
       requireTakeProfitOrExitCondition: true,
-    }
+    },
   }
 }
 
@@ -462,8 +522,22 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     exchange_rates: [],
     investment_accounts: [],
     trading_platforms: [
-      { id: 'binance', name: 'Binance', mode: 'observe_only', source: 'system', createdAt, updatedAt: createdAt },
-      { id: 'ibkr', name: 'Interactive Brokers', mode: 'observe_only', source: 'system', createdAt, updatedAt: createdAt },
+      {
+        id: 'binance',
+        name: 'Binance',
+        mode: 'observe_only',
+        source: 'system',
+        createdAt,
+        updatedAt: createdAt,
+      },
+      {
+        id: 'ibkr',
+        name: 'Interactive Brokers',
+        mode: 'future_feature',
+        source: 'system',
+        createdAt,
+        updatedAt: createdAt,
+      },
     ],
     api_connections: [],
     assets: [],
@@ -493,30 +567,181 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
       weeklyBreached: false,
       lastResetDay: startOfDay(),
       lastResetWeek: startOfWeek(),
-    }
+    },
   }
 }
 
 export function ensureFinanceStore(): FinanceDatabase {
   fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
-  if (!fs.existsSync(FINANCE_DATA_PATH)) {
-    const db = createEmptyFinanceDatabase()
-    writeFinanceStore(db)
-    appendAuditLog('database_initialized', { schemaVersion: db.schemaVersion })
-    return db
-  }
   return readFinanceStore()
 }
 
 export function readFinanceStore(): FinanceDatabase {
+  const jsonDb = readFinanceJsonStore()
+  const pgDb = readFinancePostgresStore()
+  if (pgDb && shouldPreferPostgresStore(pgDb, jsonDb)) {
+    const migrated = migrateFinanceStore(pgDb)
+    writeFinanceJsonStore(migrated)
+    return migrated
+  }
+  if (jsonDb) {
+    const migrated = migrateFinanceStore(jsonDb)
+    writeFinancePostgresStore(migrated)
+    return migrated
+  }
+  const db = createEmptyFinanceDatabase()
+  writeFinanceStore(db)
+  appendAuditLog('database_recreated_after_read_failure', {})
+  return db
+}
+
+function writeFinanceJsonStore(db: FinanceDatabase): void {
+  fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+  fs.writeFileSync(FINANCE_DATA_PATH, `${JSON.stringify(db, null, 2)}\n`, {
+    mode: 0o600,
+  })
+}
+
+function readFinanceJsonStore(): FinanceDatabase | null {
   try {
-    const parsed = JSON.parse(fs.readFileSync(FINANCE_DATA_PATH, 'utf8')) as FinanceDatabase
-    return migrateFinanceStore(parsed)
+    return JSON.parse(
+      fs.readFileSync(FINANCE_DATA_PATH, 'utf8'),
+    ) as FinanceDatabase
   } catch {
-    const db = createEmptyFinanceDatabase()
-    writeFinanceStore(db)
-    appendAuditLog('database_recreated_after_read_failure', {})
-    return db
+    return null
+  }
+}
+
+function updatedAtMs(db: FinanceDatabase): number {
+  const value = Date.parse(db.updatedAt)
+  return Number.isFinite(value) ? value : 0
+}
+
+const STORAGE_HEALTH_COLLECTIONS = [
+  'finance_accounts',
+  'income_records',
+  'expense_records',
+  'savings_goals',
+  'tax_records',
+  'market_prices',
+  'historical_candles',
+  'trading_plans',
+  'trade_orders',
+  'trade_executions',
+  'strategy_results',
+] as const
+
+export function financeCollectionCounts(
+  db: FinanceDatabase | null,
+): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const key of STORAGE_HEALTH_COLLECTIONS) {
+    const value = db?.[key]
+    counts[key] = Array.isArray(value) ? value.length : 0
+  }
+  return counts
+}
+
+function financeDataWeight(db: FinanceDatabase): number {
+  return Object.values(financeCollectionCounts(db)).reduce(
+    (sum, count) => sum + count,
+    0,
+  )
+}
+
+function shouldPreferPostgresStore(
+  pgDb: FinanceDatabase,
+  jsonDb: FinanceDatabase | null,
+): boolean {
+  if (!jsonDb) return true
+  const pgUpdated = updatedAtMs(pgDb)
+  const jsonUpdated = updatedAtMs(jsonDb)
+  if (pgUpdated !== jsonUpdated) return pgUpdated > jsonUpdated
+  return financeDataWeight(pgDb) >= financeDataWeight(jsonDb)
+}
+
+export function buildFinanceStorageHealth(input: {
+  jsonDb: FinanceDatabase | null
+  postgresDb: FinanceDatabase | null
+  postgres: {
+    enabled: boolean
+    available: boolean
+    snapshotAvailable: boolean
+    reason?: string
+    lastWriteError?: string
+  }
+  selfHeal?: FinanceStorageHealth['selfHeal']
+}): FinanceStorageHealth {
+  const jsonUpdatedAt = input.jsonDb?.updatedAt ?? null
+  const postgresUpdatedAt = input.postgresDb?.updatedAt ?? null
+  const jsonUpdatedMs = input.jsonDb ? updatedAtMs(input.jsonDb) : 0
+  const postgresUpdatedMs = input.postgresDb ? updatedAtMs(input.postgresDb) : 0
+  const postgresLagMs =
+    jsonUpdatedMs > postgresUpdatedMs ? jsonUpdatedMs - postgresUpdatedMs : 0
+  const jsonCounts = financeCollectionCounts(input.jsonDb)
+  const postgresCounts = financeCollectionCounts(input.postgresDb)
+  const lagging: Record<string, { json: number; postgres: number }> = {}
+  for (const key of STORAGE_HEALTH_COLLECTIONS) {
+    if (jsonCounts[key] > postgresCounts[key]) {
+      lagging[key] = { json: jsonCounts[key], postgres: postgresCounts[key] }
+    }
+  }
+
+  const warnings: Array<string> = []
+  let status: FinanceStorageHealthStatus = 'healthy'
+
+  if (!input.postgres.enabled) {
+    status = 'json_primary'
+  } else if (!input.postgres.available) {
+    status = 'postgres_unavailable'
+    warnings.push(
+      input.postgres.reason
+        ? `Postgres mirror unavailable: ${input.postgres.reason}.`
+        : 'Postgres mirror unavailable; using JSON fallback.',
+    )
+  } else if (!input.postgres.snapshotAvailable || !input.postgresDb) {
+    status = 'postgres_unavailable'
+    warnings.push('Postgres mirror has no finance snapshot yet.')
+  } else if (postgresLagMs > 0) {
+    status = 'postgres_behind'
+    warnings.push(
+      `Postgres mirror is ${Math.ceil(postgresLagMs / 1000)}s behind JSON finance storage.`,
+    )
+  } else if (Object.keys(lagging).length > 0) {
+    status = 'mirror_mismatch'
+    const summary = Object.entries(lagging)
+      .slice(0, 3)
+      .map(([key, counts]) => `${key} ${counts.postgres}/${counts.json}`)
+      .join(', ')
+    warnings.push(
+      `Postgres mirror has fewer rows than JSON storage (${summary}).`,
+    )
+  }
+  if (input.postgres.lastWriteError) {
+    warnings.push(
+      `Last Postgres mirror write failed: ${input.postgres.lastWriteError}.`,
+    )
+  }
+
+  return {
+    status,
+    warnings,
+    jsonUpdatedAt,
+    postgresUpdatedAt,
+    postgresLagMs,
+    isPostgresBehindJson:
+      status === 'postgres_behind' || status === 'mirror_mismatch',
+    selfHeal: input.selfHeal ?? {
+      attempted: false,
+      attempts: 0,
+      succeeded: false,
+      lastAttemptAt: null,
+    },
+    rowCounts: {
+      json: jsonCounts,
+      postgres: postgresCounts,
+      lagging,
+    },
   }
 }
 
@@ -533,22 +758,130 @@ function migrateFinanceStore(db: FinanceDatabase): FinanceDatabase {
 export function writeFinanceStore(db: FinanceDatabase): void {
   fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
   const updated = { ...db, updatedAt: nowIso() }
-  fs.writeFileSync(FINANCE_DATA_PATH, `${JSON.stringify(updated, null, 2)}\n`, { mode: 0o600 })
+  writeFinanceJsonStore(updated)
+  writeFinancePostgresStore(updated)
 }
 
-export function appendAuditLog(action: string, details: Record<string, unknown>): void {
+export function appendAuditLog(
+  action: string,
+  details: Record<string, unknown>,
+): void {
   fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
   const entry = {
     id: randomUUID(),
     action,
-    details: maskSensitive(details),
+    details: maskSensitive(details) as Record<string, unknown>,
     source: 'hermes-finance',
     createdAt: nowIso(),
   }
-  fs.appendFileSync(FINANCE_AUDIT_PATH, `${JSON.stringify(entry)}\n`, { mode: 0o600 })
+  fs.appendFileSync(FINANCE_AUDIT_PATH, `${JSON.stringify(entry)}\n`, {
+    mode: 0o600,
+  })
+  appendFinanceAuditPostgres(entry)
 }
 
-export function addFinanceRecord(kind: string, payload: AddPayload): FinanceDatabase {
+function storageHealthNeedsSelfHeal(health: FinanceStorageHealth): boolean {
+  return (
+    health.status === 'postgres_behind' ||
+    health.status === 'mirror_mismatch' ||
+    health.status === 'postgres_unavailable'
+  )
+}
+
+export function financeStorageStatus(
+  options: { selfHeal?: boolean; selfHealRetries?: number } = {},
+) {
+  let pg = financePostgresStatus()
+  const jsonDb = readFinanceJsonStore()
+  let postgresDb = readFinancePostgresStore()
+  let selfHeal: FinanceStorageHealth['selfHeal'] = {
+    attempted: false,
+    attempts: 0,
+    succeeded: false,
+    lastAttemptAt: null,
+  }
+  let health = buildFinanceStorageHealth({
+    jsonDb,
+    postgresDb,
+    postgres: pg,
+    selfHeal,
+  })
+
+  if (
+    options.selfHeal &&
+    jsonDb &&
+    pg.enabled &&
+    pg.available &&
+    storageHealthNeedsSelfHeal(health)
+  ) {
+    const retries = Math.max(1, Math.min(options.selfHealRetries ?? 2, 5))
+    for (let attempt = 1; attempt <= retries; attempt += 1) {
+      selfHeal = {
+        attempted: true,
+        attempts: attempt,
+        succeeded: false,
+        lastAttemptAt: nowIso(),
+      }
+      const ok = writeFinancePostgresStore(jsonDb)
+      pg = financePostgresStatus()
+      postgresDb = readFinancePostgresStore()
+      health = buildFinanceStorageHealth({
+        jsonDb,
+        postgresDb,
+        postgres: pg,
+        selfHeal: { ...selfHeal, succeeded: ok },
+      })
+      if (ok && !storageHealthNeedsSelfHeal(health)) break
+    }
+    const healed = !storageHealthNeedsSelfHeal(health)
+    appendAuditLog(
+      healed
+        ? 'finance_postgres_mirror_self_healed'
+        : 'finance_postgres_mirror_self_heal_failed',
+      {
+        attempts: selfHeal.attempts,
+        status: health.status,
+        warnings: health.warnings,
+      },
+    )
+  }
+
+  return {
+    active:
+      pg.available && pg.snapshotAvailable && !health.isPostgresBehindJson
+        ? 'postgres'
+        : 'json',
+    fallback: 'json',
+    jsonPath: FINANCE_DATA_PATH,
+    auditPath: FINANCE_AUDIT_PATH,
+    postgres: pg,
+    health,
+  }
+}
+
+export function financeStorageAlerts(health: FinanceStorageHealth): Array<{
+  level: 'info' | 'warning' | 'critical'
+  title: string
+  detail: string
+}> {
+  if (health.warnings.length === 0) return []
+  return [
+    {
+      level: health.status === 'postgres_unavailable' ? 'critical' : 'warning',
+      title: 'Finance storage mirror unhealthy',
+      detail: `${health.warnings.join(' ')}${
+        health.selfHeal.attempted
+          ? ` Self-heal ${health.selfHeal.succeeded ? 'succeeded' : 'did not resolve it'} after ${health.selfHeal.attempts} attempt(s).`
+          : ''
+      }`,
+    },
+  ]
+}
+
+export function addFinanceRecord(
+  kind: string,
+  payload: AddPayload,
+): FinanceDatabase {
   const db = ensureFinanceStore()
   const createdAt = nowIso()
   const base = {
@@ -561,13 +894,21 @@ export function addFinanceRecord(kind: string, payload: AddPayload): FinanceData
   if (kind === 'income') {
     db.income_records.push({
       ...base,
-      dateReceived: stringField(payload, 'dateReceived', createdAt.slice(0, 10)),
+      dateReceived: stringField(
+        payload,
+        'dateReceived',
+        createdAt.slice(0, 10),
+      ),
       sourceName: stringField(payload, 'sourceName', 'Unspecified income'),
       incomeType: stringField(payload, 'incomeType', 'Other income'),
       originalCurrency: stringField(payload, 'originalCurrency', 'LKR'),
       originalAmount: numberField(payload, 'originalAmount', 0),
       exchangeRateUsed: numberField(payload, 'exchangeRateUsed', 1),
-      convertedLkrAmount: numberField(payload, 'convertedLkrAmount', numberField(payload, 'originalAmount', 0)),
+      convertedLkrAmount: numberField(
+        payload,
+        'convertedLkrAmount',
+        numberField(payload, 'originalAmount', 0),
+      ),
       accountId: optionalString(payload, 'accountId'),
       taxable: booleanField(payload, 'taxable', true),
       notes: optionalString(payload, 'notes'),
@@ -583,10 +924,18 @@ export function addFinanceRecord(kind: string, payload: AddPayload): FinanceData
       accountId: optionalString(payload, 'accountId'),
       currency: stringField(payload, 'currency', 'LKR'),
       amount: numberField(payload, 'amount', 0),
-      convertedLkrAmount: numberField(payload, 'convertedLkrAmount', numberField(payload, 'amount', 0)),
+      convertedLkrAmount: numberField(
+        payload,
+        'convertedLkrAmount',
+        numberField(payload, 'amount', 0),
+      ),
       recurring: booleanField(payload, 'recurring', false),
       workRelated: booleanField(payload, 'workRelated', false),
-      taxDeductiblePossible: booleanField(payload, 'taxDeductiblePossible', false),
+      taxDeductiblePossible: booleanField(
+        payload,
+        'taxDeductiblePossible',
+        false,
+      ),
       notes: optionalString(payload, 'notes'),
       documentRef: optionalString(payload, 'documentRef'),
     })
@@ -616,11 +965,19 @@ export function addFinanceRecord(kind: string, payload: AddPayload): FinanceData
   } else if (kind === 'tax') {
     db.tax_records.push({
       ...base,
-      taxYear: stringField(payload, 'taxYear', new Date().getFullYear().toString()),
+      taxYear: stringField(
+        payload,
+        'taxYear',
+        new Date().getFullYear().toString(),
+      ),
       incomeType: stringField(payload, 'incomeType', 'Other income'),
       amount: numberField(payload, 'amount', 0),
       currency: stringField(payload, 'currency', 'LKR'),
-      convertedLkrAmount: numberField(payload, 'convertedLkrAmount', numberField(payload, 'amount', 0)),
+      convertedLkrAmount: numberField(
+        payload,
+        'convertedLkrAmount',
+        numberField(payload, 'amount', 0),
+      ),
       exchangeRateSource: stringField(payload, 'exchangeRateSource', 'manual'),
       deductionCategory: optionalString(payload, 'deductionCategory'),
       estimatedTaxableAmount: numberField(payload, 'estimatedTaxableAmount', 0),
@@ -649,43 +1006,71 @@ export function addFinanceRecord(kind: string, payload: AddPayload): FinanceData
   return db
 }
 
-export function updateFinanceRecord(kind: string, id: string, payload: AddPayload): FinanceDatabase {
+export function updateFinanceRecord(
+  kind: string,
+  id: string,
+  payload: AddPayload,
+): FinanceDatabase {
   const db = ensureFinanceStore()
   let updated = false
   if (kind === 'income') {
-    const index = db.income_records.findIndex(r => r.id === id)
+    const index = db.income_records.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.income_records[index] = { ...db.income_records[index], ...payload, updatedAt: nowIso() }
+      db.income_records[index] = {
+        ...db.income_records[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'expense') {
-    const index = db.expense_records.findIndex(r => r.id === id)
+    const index = db.expense_records.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.expense_records[index] = { ...db.expense_records[index], ...payload, updatedAt: nowIso() }
+      db.expense_records[index] = {
+        ...db.expense_records[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'account') {
-    const index = db.finance_accounts.findIndex(r => r.id === id)
+    const index = db.finance_accounts.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.finance_accounts[index] = { ...db.finance_accounts[index], ...payload, updatedAt: nowIso() }
+      db.finance_accounts[index] = {
+        ...db.finance_accounts[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'goal') {
-    const index = db.savings_goals.findIndex(r => r.id === id)
+    const index = db.savings_goals.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.savings_goals[index] = { ...db.savings_goals[index], ...payload, updatedAt: nowIso() }
+      db.savings_goals[index] = {
+        ...db.savings_goals[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'tax') {
-    const index = db.tax_records.findIndex(r => r.id === id)
+    const index = db.tax_records.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.tax_records[index] = { ...db.tax_records[index], ...payload, updatedAt: nowIso() }
+      db.tax_records[index] = {
+        ...db.tax_records[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'budget_category') {
-    const index = db.budget_categories.findIndex(r => r.id === id)
+    const index = db.budget_categories.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.budget_categories[index] = { ...db.budget_categories[index], ...payload, updatedAt: nowIso() }
+      db.budget_categories[index] = {
+        ...db.budget_categories[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else {
@@ -713,8 +1098,14 @@ export function createTradingPlan(
     updatedAt: createdAt,
   }
   const riskLevel = riskLevelField(payload, 'riskLevel', 'blocked')
-  const decision = decisionField(payload, 'decision', riskLevel === 'blocked' ? 'BLOCKED' : 'HOLD')
-  const hasExit = payload.takeProfit != null || stringField(payload, 'expectedHoldingPeriod', '') !== ''
+  const decision = decisionField(
+    payload,
+    'decision',
+    riskLevel === 'blocked' ? 'BLOCKED' : 'HOLD',
+  )
+  const hasExit =
+    payload.takeProfit != null ||
+    stringField(payload, 'expectedHoldingPeriod', '') !== ''
   const blockers = validateTradeSafety({
     decision,
     riskLevel,
@@ -729,7 +1120,9 @@ export function createTradingPlan(
     symbol: stringField(payload, 'symbol', 'UNSPECIFIED'),
     assetType: stringField(payload, 'assetType', 'other'),
     decision: blocked ? 'BLOCKED' : decision,
-    reason: blocked ? `Blocked by safety controls: ${blockers.join('; ')}` : stringField(payload, 'reason', 'Manual plan'),
+    reason: blocked
+      ? `Blocked by safety controls: ${blockers.join('; ')}`
+      : stringField(payload, 'reason', 'Manual plan'),
     riskLevel: blocked ? 'blocked' : riskLevel,
     riskScore: numberField(payload, 'riskScore', 100),
     confidenceScore: numberField(payload, 'confidenceScore', 0),
@@ -744,7 +1137,9 @@ export function createTradingPlan(
     newsReviewed: stringArray(payload.newsReviewed),
     expectedOutcome: optionalString(payload, 'expectedOutcome'),
     alternativeOption: optionalString(payload, 'alternativeOption'),
-    finalRecommendation: blocked ? 'Do not execute.' : stringField(payload, 'finalRecommendation', 'Monitor only.'),
+    finalRecommendation: blocked
+      ? 'Do not execute.'
+      : stringField(payload, 'finalRecommendation', 'Monitor only.'),
     status: blocked ? 'blocked' : planStatus(payload.status),
     userApprovalStatus: 'pending',
     executionStatus: blocked ? 'blocked' : 'not_executable',
@@ -755,15 +1150,27 @@ export function createTradingPlan(
   }
 }
 
-export function createVirtualAccount(payload: AddPayload, base?: { id: string; source: string; createdAt: string; updatedAt: string }): VirtualAccount {
+export function createVirtualAccount(
+  payload: AddPayload,
+  base?: { id: string; source: string; createdAt: string; updatedAt: string },
+): VirtualAccount {
   const createdAt = nowIso()
-  const recordBase = base ?? { id: randomUUID(), source: 'manual', createdAt, updatedAt: createdAt }
+  const recordBase = base ?? {
+    id: randomUUID(),
+    source: 'manual',
+    createdAt,
+    updatedAt: createdAt,
+  }
   return {
     ...recordBase,
     platform: stringField(payload, 'platform', 'manual'),
     currency: stringField(payload, 'currency', 'LKR'),
     balance: numberField(payload, 'balance', 10000),
-    initialBalance: numberField(payload, 'initialBalance', numberField(payload, 'balance', 10000)),
+    initialBalance: numberField(
+      payload,
+      'initialBalance',
+      numberField(payload, 'balance', 10000),
+    ),
     lockedAmount: optionalNumber(payload, 'lockedAmount') ?? 0,
     totalTrades: numberField(payload, 'totalTrades', 0),
     winningTrades: numberField(payload, 'winningTrades', 0),
@@ -774,9 +1181,17 @@ export function createVirtualAccount(payload: AddPayload, base?: { id: string; s
   }
 }
 
-export function createTradeOrder(payload: AddPayload, base?: { id: string; source: string; createdAt: string; updatedAt: string }): TradeOrder {
+export function createTradeOrder(
+  payload: AddPayload,
+  base?: { id: string; source: string; createdAt: string; updatedAt: string },
+): TradeOrder {
   const createdAt = nowIso()
-  const recordBase = base ?? { id: randomUUID(), source: 'manual', createdAt, updatedAt: createdAt }
+  const recordBase = base ?? {
+    id: randomUUID(),
+    source: 'manual',
+    createdAt,
+    updatedAt: createdAt,
+  }
   return {
     ...recordBase,
     planId: stringField(payload, 'planId', ''),
@@ -784,16 +1199,31 @@ export function createTradeOrder(payload: AddPayload, base?: { id: string; sourc
     symbol: stringField(payload, 'symbol', 'UNSPECIFIED'),
     side: stringField(payload, 'side', 'buy') as 'buy' | 'sell',
     quantity: numberField(payload, 'quantity', 0),
-    orderType: stringField(payload, 'orderType', 'market') as 'market' | 'limit' | 'stop_limit',
-    ...(optionalNumber(payload, 'price') !== undefined ? { price: optionalNumber(payload, 'price') } : {}),
+    orderType: stringField(payload, 'orderType', 'market') as
+      | 'market'
+      | 'limit'
+      | 'stop_limit',
+    ...(optionalNumber(payload, 'price') !== undefined
+      ? { price: optionalNumber(payload, 'price') }
+      : {}),
     status: 'pending',
-    ...(optionalString(payload, 'brokerOrderId') !== undefined ? { brokerOrderId: optionalString(payload, 'brokerOrderId') } : {}),
+    ...(optionalString(payload, 'brokerOrderId') !== undefined
+      ? { brokerOrderId: optionalString(payload, 'brokerOrderId') }
+      : {}),
   }
 }
 
-export function createTradeExecution(payload: AddPayload, base?: { id: string; source: string; createdAt: string; updatedAt: string }): TradeExecution {
+export function createTradeExecution(
+  payload: AddPayload,
+  base?: { id: string; source: string; createdAt: string; updatedAt: string },
+): TradeExecution {
   const createdAt = nowIso()
-  const recordBase = base ?? { id: randomUUID(), source: 'manual', createdAt, updatedAt: createdAt }
+  const recordBase = base ?? {
+    id: randomUUID(),
+    source: 'manual',
+    createdAt,
+    updatedAt: createdAt,
+  }
   return {
     ...recordBase,
     orderId: stringField(payload, 'orderId', ''),
@@ -808,9 +1238,17 @@ export function createTradeExecution(payload: AddPayload, base?: { id: string; s
   }
 }
 
-export function createTradingSignal(payload: AddPayload, base?: { id: string; source: string; createdAt: string; updatedAt: string }): TradingSignal {
+export function createTradingSignal(
+  payload: AddPayload,
+  base?: { id: string; source: string; createdAt: string; updatedAt: string },
+): TradingSignal {
   const createdAt = nowIso()
-  const recordBase = base ?? { id: randomUUID(), source: 'manual', createdAt, updatedAt: createdAt }
+  const recordBase = base ?? {
+    id: randomUUID(),
+    source: 'manual',
+    createdAt,
+    updatedAt: createdAt,
+  }
   return {
     ...recordBase,
     symbol: stringField(payload, 'symbol', 'UNSPECIFIED'),
@@ -819,27 +1257,51 @@ export function createTradingSignal(payload: AddPayload, base?: { id: string; so
     confidence: numberField(payload, 'confidence', 50),
     priceTarget: numberField(payload, 'priceTarget', 0),
     stopLoss: numberField(payload, 'stopLoss', 0),
-    reasoning: stringField(payload, 'reasoning', 'No specific reasoning provided'),
-    indicators: payload.indicators ? (payload.indicators as Record<string, number>) : {},
+    reasoning: stringField(
+      payload,
+      'reasoning',
+      'No specific reasoning provided',
+    ),
+    indicators: payload.indicators
+      ? (payload.indicators as Record<string, number>)
+      : {},
     timestamp: stringField(payload, 'timestamp', nowIso()),
   }
 }
 
 export function financeSummary(db: FinanceDatabase) {
-  const totalIncomeLkr = db.income_records.reduce((sum, row) => sum + row.convertedLkrAmount, 0)
-  const totalExpensesLkr = db.expense_records.reduce((sum, row) => sum + row.convertedLkrAmount, 0)
+  const totalIncomeLkr = db.income_records.reduce(
+    (sum, row) => sum + row.convertedLkrAmount,
+    0,
+  )
+  const totalExpensesLkr = db.expense_records.reduce(
+    (sum, row) => sum + row.convertedLkrAmount,
+    0,
+  )
   const netSavingsLkr = totalIncomeLkr - totalExpensesLkr
-  const savingsRate = totalIncomeLkr > 0 ? (netSavingsLkr / totalIncomeLkr) * 100 : 0
-  const cashBalanceLkr = db.finance_accounts.reduce((sum, row) => sum + (row.currency === 'LKR' ? row.balance : 0), 0)
+  const savingsRate =
+    totalIncomeLkr > 0 ? (netSavingsLkr / totalIncomeLkr) * 100 : 0
+  const cashBalanceLkr = db.finance_accounts.reduce(
+    (sum, row) => sum + (row.currency === 'LKR' ? row.balance : 0),
+    0,
+  )
   const taxReserveLkr = db.savings_goals
     .filter((goal) => goal.name.toLowerCase().includes('tax'))
     .reduce((sum, goal) => sum + goal.currentAmount, 0)
   const debtLkr = db.finance_accounts
     .filter((account) => account.type === 'loan' || account.type === 'card')
     .reduce((sum, row) => sum + Math.abs(row.balance), 0)
-  const netWorthLkr = cashBalanceLkr + db.savings_goals.reduce((sum, goal) => sum + goal.currentAmount, 0) - debtLkr
-  const openPlans = db.trading_plans.filter((plan) => !['cancelled', 'expired', 'failed', 'blocked'].includes(plan.status)).length
-  const blockedPlans = db.trading_plans.filter((plan) => plan.status === 'blocked' || plan.decision === 'BLOCKED').length
+  const netWorthLkr =
+    cashBalanceLkr +
+    db.savings_goals.reduce((sum, goal) => sum + goal.currentAmount, 0) -
+    debtLkr
+  const openPlans = db.trading_plans.filter(
+    (plan) =>
+      !['cancelled', 'expired', 'failed', 'blocked'].includes(plan.status),
+  ).length
+  const blockedPlans = db.trading_plans.filter(
+    (plan) => plan.status === 'blocked' || plan.decision === 'BLOCKED',
+  ).length
   return {
     totalIncomeLkr,
     totalExpensesLkr,
@@ -857,43 +1319,88 @@ export function financeSummary(db: FinanceDatabase) {
     tradingMode: db.settings.tradingMode,
     liveTradingEnabled: db.settings.liveTradingEnabled,
     emergencyKillSwitch: db.settings.emergencyKillSwitch,
+    primaryTradingProvider: db.settings.primaryTradingProvider,
+    executionAccount: db.settings.executionAccount,
+    paperShadowEnabled: db.settings.paperShadowEnabled,
+    livePerOrderCapUsdt: db.settings.livePerOrderCapUsdt,
+    liveBinanceApproved: Boolean(db.settings.liveBinanceApprovedAt),
+    ibkrStatus: db.settings.ibkrStatus,
   }
 }
 
-export function financeAlerts(db: FinanceDatabase): Array<{ level: 'info' | 'warning' | 'critical'; title: string; detail: string }> {
+export function financeAlerts(db: FinanceDatabase): Array<{
+  level: 'info' | 'warning' | 'critical'
+  title: string
+  detail: string
+}> {
   const summary = financeSummary(db)
-  const alerts: Array<{ level: 'info' | 'warning' | 'critical'; title: string; detail: string }> = []
-  if (summary.totalExpensesLkr > summary.totalIncomeLkr && summary.totalIncomeLkr > 0) {
-    alerts.push({ level: 'warning', title: 'Expenses exceed income', detail: 'Current tracked expenses are higher than tracked income.' })
+  const alerts: Array<{
+    level: 'info' | 'warning' | 'critical'
+    title: string
+    detail: string
+  }> = []
+  if (
+    summary.totalExpensesLkr > summary.totalIncomeLkr &&
+    summary.totalIncomeLkr > 0
+  ) {
+    alerts.push({
+      level: 'warning',
+      title: 'Expenses exceed income',
+      detail: 'Current tracked expenses are higher than tracked income.',
+    })
   }
   for (const account of db.finance_accounts) {
     if (account.type !== 'loan' && account.balance < 5_000) {
-      alerts.push({ level: 'warning', title: 'Low balance', detail: `${account.name} is below LKR 5,000.` })
+      alerts.push({
+        level: 'warning',
+        title: 'Low balance',
+        detail: `${account.name} is below LKR 5,000.`,
+      })
     }
   }
   for (const plan of db.trading_plans) {
     if (plan.riskLevel === 'blocked' || plan.decision === 'BLOCKED') {
-      alerts.push({ level: 'critical', title: 'Trading plan blocked', detail: `${plan.platform}:${plan.symbol} failed safety controls.` })
+      alerts.push({
+        level: 'critical',
+        title: 'Trading plan blocked',
+        detail: `${plan.platform}:${plan.symbol} failed safety controls.`,
+      })
     }
   }
   if (db.settings.emergencyKillSwitch) {
-    alerts.push({ level: 'info', title: 'Emergency kill switch active', detail: 'Real order execution is disabled.' })
+    alerts.push({
+      level: 'info',
+      title: 'Emergency kill switch active',
+      detail: 'Real order execution is disabled.',
+    })
   }
   return alerts
 }
 
-export function executeTradingPlan(planId: string, useTestnet: boolean = false): { order: TradeOrder; execution: TradeExecution; updatedAccount: VirtualAccount } {
+export function executeTradingPlan(
+  planId: string,
+  useTestnet: boolean = false,
+): {
+  order: TradeOrder
+  execution: TradeExecution
+  updatedAccount: VirtualAccount
+} {
   const db = ensureFinanceStore()
 
   // Find the trading plan
-  const plan = db.trading_plans.find(p => p.id === planId)
+  const plan = db.trading_plans.find((p) => p.id === planId)
   if (!plan) {
     throw new Error(`Trading plan not found: ${planId}`)
   }
 
   // Check if plan is executable
-  if (plan.executionStatus !== 'pending' && plan.userApprovalStatus !== 'approved') {
-    throw new Error(`Trading plan is not executable. Status: ${plan.executionStatus}`)
+  if (
+    plan.executionStatus !== 'pending' &&
+    plan.userApprovalStatus !== 'approved'
+  ) {
+    throw new Error(
+      `Trading plan is not executable. Status: ${plan.executionStatus}`,
+    )
   }
 
   // Check if trading mode allows execution
@@ -916,7 +1423,9 @@ export function executeTradingPlan(planId: string, useTestnet: boolean = false):
         throw new Error('Live trading is not enabled')
       }
       if (!db.settings.autonomousTradingEnabled) {
-        throw new Error('Autonomous trading must be enabled for live_auto_trade mode')
+        throw new Error(
+          'Autonomous trading must be enabled for live_auto_trade mode',
+        )
       }
       break
     case 'live_monitored':
@@ -941,10 +1450,16 @@ export function executeTradingPlan(planId: string, useTestnet: boolean = false):
     planId: plan.id,
     platform: plan.platform,
     symbol: plan.symbol,
-    side: plan.decision === 'BUY_NOW' || plan.decision === 'PLAN_BUY_LATER' ? 'buy' : 'sell',
+    side:
+      plan.decision === 'BUY_NOW' || plan.decision === 'PLAN_BUY_LATER'
+        ? 'buy'
+        : 'sell',
     quantity: plan.positionSize ?? 0,
     orderType: 'market',
-    price: plan.decision === 'BUY_NOW' || plan.decision === 'PLAN_BUY_LATER' ? (plan.suggestedEntryPrice ?? 0) : (plan.suggestedExitPrice ?? 0),
+    price:
+      plan.decision === 'BUY_NOW' || plan.decision === 'PLAN_BUY_LATER'
+        ? (plan.suggestedEntryPrice ?? 0)
+        : (plan.suggestedExitPrice ?? 0),
   }
 
   const order = createTradeOrder(orderPayload)
@@ -952,7 +1467,7 @@ export function executeTradingPlan(planId: string, useTestnet: boolean = false):
 
   // Simulate execution (in real implementation, this would call exchange API)
   // For paper trading, we use the suggested price or current market price
-  const executionPrice = order.price ?? (Math.random() * 100 + 50) // Mock price
+  const executionPrice = order.price ?? Math.random() * 100 + 50 // Mock price
 
   const executionPayload: any = {
     orderId: order.id,
@@ -976,7 +1491,9 @@ export function executeTradingPlan(planId: string, useTestnet: boolean = false):
   plan.profitLoss = 0 // Will be calculated when position is closed
 
   // Update or create virtual account
-  let account = db.virtual_accounts.find(acc => acc.platform === plan.platform && acc.currency === 'LKR')
+  let account = db.virtual_accounts.find(
+    (acc) => acc.platform === plan.platform && acc.currency === 'LKR',
+  )
   if (!account) {
     const accountPayload: any = {
       platform: plan.platform,
@@ -1022,12 +1539,21 @@ export function executeTradingPlan(planId: string, useTestnet: boolean = false):
   plan.profitLoss = account.totalPnl
 
   writeFinanceStore(db)
-  appendAuditLog('trade_executed', { planId, orderId: order.id, executionId: execution.id, platform: plan.platform, symbol: plan.symbol })
+  appendAuditLog('trade_executed', {
+    planId,
+    orderId: order.id,
+    executionId: execution.id,
+    platform: plan.platform,
+    symbol: plan.symbol,
+  })
 
   return { order, execution, updatedAccount: account }
 }
 
-export function generateTradingSignal(symbol: string, marketData: Record<string, any> = {}): TradingSignal {
+export function generateTradingSignal(
+  symbol: string,
+  marketData: Record<string, any> = {},
+): TradingSignal {
   // This is a simplified decision engine
   // In a real implementation, this would use technical analysis, ML models, etc.
 
@@ -1078,7 +1604,9 @@ export function generateTradingSignal(symbol: string, marketData: Record<string,
   return createTradingSignal(signalPayload)
 }
 
-export function updateVirtualAccountPrices(prices: Record<string, number>): void {
+export function updateVirtualAccountPrices(
+  prices: Record<string, number>,
+): void {
   const db = ensureFinanceStore()
 
   // Update unrealized P&L for all virtual accounts based on current prices
@@ -1097,11 +1625,16 @@ export function updateVirtualAccountPrices(prices: Record<string, number>): void
   writeFinanceStore(db)
 }
 
-export function createPaperTradingAccount(platform: 'binance' | 'ibkr' = 'binance', initialBalance: number = 10000): VirtualAccount {
+export function createPaperTradingAccount(
+  platform: 'binance' | 'binance_shadow' = 'binance',
+  initialBalance: number = 10000,
+): VirtualAccount {
   const db = ensureFinanceStore()
 
   // Check if account already exists for this platform
-  let account = db.virtual_accounts.find(acc => acc.platform === platform && acc.currency === 'LKR')
+  let account = db.virtual_accounts.find(
+    (acc) => acc.platform === platform && acc.currency === 'LKR',
+  )
 
   if (!account) {
     const accountPayload: any = {
@@ -1113,15 +1646,27 @@ export function createPaperTradingAccount(platform: 'binance' | 'ibkr' = 'binanc
     account = createVirtualAccount(accountPayload)
     db.virtual_accounts.push(account)
     writeFinanceStore(db)
-    appendAuditLog('paper_trading_account_created', { platform, initialBalance })
+    appendAuditLog('paper_trading_account_created', {
+      platform,
+      initialBalance,
+    })
   }
 
   return account
 }
 
-export function getPaperTradingBalance(platform: 'binance' | 'ibkr' = 'binance'): { balance: number; initialBalance: number; totalPnl: number; totalPnlPercentage: number } | null {
+export function getPaperTradingBalance(
+  platform: 'binance' | 'binance_shadow' = 'binance',
+): {
+  balance: number
+  initialBalance: number
+  totalPnl: number
+  totalPnlPercentage: number
+} | null {
   const db = ensureFinanceStore()
-  const account = db.virtual_accounts.find(acc => acc.platform === platform && acc.currency === 'LKR')
+  const account = db.virtual_accounts.find(
+    (acc) => acc.platform === platform && acc.currency === 'LKR',
+  )
 
   if (!account) {
     return null
@@ -1158,15 +1703,29 @@ function validateTradeSafety(input: {
 }): Array<string> {
   const blockers: Array<string> = []
   if (input.riskLevel === 'blocked') blockers.push('risk is blocked or missing')
-  if (['BUY_NOW', 'PLAN_BUY_LATER', 'SELL_NOW', 'PLAN_SELL_LATER', 'REDUCE_POSITION'].includes(input.decision)) {
+  if (
+    [
+      'BUY_NOW',
+      'PLAN_BUY_LATER',
+      'SELL_NOW',
+      'PLAN_SELL_LATER',
+      'REDUCE_POSITION',
+    ].includes(input.decision)
+  ) {
     if (!Number.isFinite(input.stopLoss)) blockers.push('stop-loss is required')
-    if (!input.hasExit) blockers.push('take-profit or exit condition is required')
-    if (!Number.isFinite(input.positionSize) || input.positionSize <= 0) blockers.push('position size is required')
+    if (!input.hasExit)
+      blockers.push('take-profit or exit condition is required')
+    if (!Number.isFinite(input.positionSize) || input.positionSize <= 0)
+      blockers.push('position size is required')
   }
   return blockers
 }
 
-function stringField(payload: AddPayload, key: string, fallback: string): string {
+function stringField(
+  payload: AddPayload,
+  key: string,
+  fallback: string,
+): string {
   const value = payload[key]
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
 }
@@ -1176,10 +1735,19 @@ function optionalString(payload: AddPayload, key: string): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
-function numberField(payload: AddPayload, key: string, fallback: number): number {
+function numberField(
+  payload: AddPayload,
+  key: string,
+  fallback: number,
+): number {
   const value = payload[key]
   if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value)
+  if (
+    typeof value === 'string' &&
+    value.trim() &&
+    Number.isFinite(Number(value))
+  )
+    return Number(value)
   return fallback
 }
 
@@ -1188,52 +1756,112 @@ function optionalNumber(payload: AddPayload, key: string): number | undefined {
   return Number.isFinite(value) ? value : undefined
 }
 
-function booleanField(payload: AddPayload, key: string, fallback: boolean): boolean {
+function booleanField(
+  payload: AddPayload,
+  key: string,
+  fallback: boolean,
+): boolean {
   const value = payload[key]
   return typeof value === 'boolean' ? value : fallback
 }
 
 function stringArray(value: unknown): Array<string> {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : []
 }
 
 function accountType(value: unknown): FinanceAccount['type'] {
-  const allowed: Array<FinanceAccount['type']> = ['bank', 'cash', 'card', 'crypto_wallet', 'broker', 'foreign_currency', 'loan', 'other']
-  return allowed.includes(value as FinanceAccount['type']) ? (value as FinanceAccount['type']) : 'other'
+  const allowed: Array<FinanceAccount['type']> = [
+    'bank',
+    'cash',
+    'card',
+    'crypto_wallet',
+    'broker',
+    'foreign_currency',
+    'loan',
+    'other',
+  ]
+  return allowed.includes(value as FinanceAccount['type'])
+    ? (value as FinanceAccount['type'])
+    : 'other'
 }
 
 function goalStatus(value: unknown): GoalStatus {
-  const allowed: Array<GoalStatus> = ['active', 'completed', 'paused', 'cancelled', 'behind_schedule', 'ahead_of_schedule']
-  return allowed.includes(value as GoalStatus) ? (value as GoalStatus) : 'active'
+  const allowed: Array<GoalStatus> = [
+    'active',
+    'completed',
+    'paused',
+    'cancelled',
+    'behind_schedule',
+    'ahead_of_schedule',
+  ]
+  return allowed.includes(value as GoalStatus)
+    ? (value as GoalStatus)
+    : 'active'
 }
 
 function planStatus(value: unknown): PlanStatus {
-  const allowed: Array<PlanStatus> = ['draft', 'waiting_for_condition', 'ready_for_approval', 'approved', 'executed', 'cancelled', 'expired', 'failed', 'blocked']
+  const allowed: Array<PlanStatus> = [
+    'draft',
+    'waiting_for_condition',
+    'ready_for_approval',
+    'approved',
+    'executed',
+    'cancelled',
+    'expired',
+    'failed',
+    'blocked',
+  ]
   return allowed.includes(value as PlanStatus) ? (value as PlanStatus) : 'draft'
 }
 
-function riskLevelField(payload: AddPayload, key: string, fallback: RiskLevel): RiskLevel {
+function riskLevelField(
+  payload: AddPayload,
+  key: string,
+  fallback: RiskLevel,
+): RiskLevel {
   const value = payload[key]
-  const allowed: Array<RiskLevel> = ['low_risk', 'medium_risk', 'high_risk', 'blocked']
+  const allowed: Array<RiskLevel> = [
+    'low_risk',
+    'medium_risk',
+    'high_risk',
+    'blocked',
+  ]
   return allowed.includes(value as RiskLevel) ? (value as RiskLevel) : fallback
 }
 
-function decisionField(payload: AddPayload, key: string, fallback: TradingDecision): TradingDecision {
+function decisionField(
+  payload: AddPayload,
+  key: string,
+  fallback: TradingDecision,
+): TradingDecision {
   const value = payload[key]
-  return DECISIONS.includes(value as TradingDecision) ? (value as TradingDecision) : fallback
+  return DECISIONS.includes(value as TradingDecision)
+    ? (value as TradingDecision)
+    : fallback
 }
-
 
 function parseDate(dateString: string): { year: number; month: number } | null {
   const match = dateString.match(/^(\d{4})-(\d{2})-\d{2}$/)
   if (!match) return null
   return {
     year: parseInt(match[1], 10),
-    month: parseInt(match[2], 10)
+    month: parseInt(match[2], 10),
   }
 }
 
-export function getMonthlySummary(db: FinanceDatabase, year?: number, month?: number): Array<{ year: number; month: number; income: number; expense: number; savings: number }> {
+export function getMonthlySummary(
+  db: FinanceDatabase,
+  year?: number,
+  month?: number,
+): Array<{
+  year: number
+  month: number
+  income: number
+  expense: number
+  savings: number
+}> {
   const incomeMap = new Map<string, number>()
   const expenseMap = new Map<string, number>()
 
@@ -1257,7 +1885,13 @@ export function getMonthlySummary(db: FinanceDatabase, year?: number, month?: nu
     expenseMap.set(key, current + exp.convertedLkrAmount)
   }
 
-  const result: Array<{ year: number; month: number; income: number; expense: number; savings: number }> = []
+  const result: Array<{
+    year: number
+    month: number
+    income: number
+    expense: number
+    savings: number
+  }> = []
   const allKeys = new Set([...incomeMap.keys(), ...expenseMap.keys()])
   for (const key of allKeys) {
     const [y, m] = key.split('-').map(Number)
@@ -1268,7 +1902,7 @@ export function getMonthlySummary(db: FinanceDatabase, year?: number, month?: nu
       month: m,
       income,
       expense,
-      savings: income - expense
+      savings: income - expense,
     })
   }
 
@@ -1281,14 +1915,19 @@ export function getMonthlySummary(db: FinanceDatabase, year?: number, month?: nu
   return result
 }
 
-export function getBudgetVsActual(db: FinanceDatabase, category: string, year: number, month: number): { budget: number; actual: number; variance: number } | null {
+export function getBudgetVsActual(
+  db: FinanceDatabase,
+  category: string,
+  year: number,
+  month: number,
+): { budget: number; actual: number; variance: number } | null {
   // Format month as MM with leading zero
   const monthStr = month.toString().padStart(2, '0')
   const monthKey = `${year}-${monthStr}`
-  
+
   // Find the budget category for the given category, year, month
   const budgetEntry = db.budget_categories.find(
-    b => b.category === category && b.month === monthKey
+    (b) => b.category === category && b.month === monthKey,
   )
   if (!budgetEntry) return null
 
@@ -1297,7 +1936,11 @@ export function getBudgetVsActual(db: FinanceDatabase, category: string, year: n
   for (const exp of db.expense_records) {
     const dateInfo = parseDate(exp.date)
     if (!dateInfo) continue
-    if (dateInfo.year === year && dateInfo.month === month && exp.category === category) {
+    if (
+      dateInfo.year === year &&
+      dateInfo.month === month &&
+      exp.category === category
+    ) {
       actual += exp.convertedLkrAmount
     }
   }
@@ -1305,38 +1948,51 @@ export function getBudgetVsActual(db: FinanceDatabase, category: string, year: n
   return {
     budget: budgetEntry.budgetAmount,
     actual,
-    variance: budgetEntry.budgetAmount - actual
+    variance: budgetEntry.budgetAmount - actual,
   }
 }
 
-export function updateExchangeRate(base: string, target: string, rate: number, date?: string): FinanceDatabase {
+export function updateExchangeRate(
+  base: string,
+  target: string,
+  rate: number,
+  date?: string,
+): FinanceDatabase {
   const db = ensureFinanceStore()
   const dateStr = date ?? new Date().toISOString().split('T')[0]
-  const rateRecord = { base, target, rate, date: dateStr, updatedAt: new Date().toISOString() }
-  
+  const rateRecord = {
+    base,
+    target,
+    rate,
+    date: dateStr,
+    updatedAt: new Date().toISOString(),
+  }
+
   db.exchange_rates.push(rateRecord)
   writeFinanceStore(db)
   appendAuditLog('exchange_rate_updated', { base, target, rate, date: dateStr })
   return db
 }
 
-export function getExchangeRate(base: string, target: string, date?: string): number | undefined {
+export function getExchangeRate(
+  base: string,
+  target: string,
+  date?: string,
+): number | undefined {
   // Filter rates for the base and target, then take the one with the latest date
   const db = ensureFinanceStore()
-  let relevant = db.exchange_rates
-    .filter((r: any) => 
-      r.base === base && 
-      r.target === target && 
-      typeof r.rate === 'number'
-    );
+  let relevant = db.exchange_rates.filter(
+    (r: any) =>
+      r.base === base && r.target === target && typeof r.rate === 'number',
+  )
 
   // If a date is provided, only consider rates on or before that date
   if (date !== undefined) {
-    const targetDate = new Date(date).getTime();
+    const targetDate = new Date(date).getTime()
     relevant = relevant.filter((r: any) => {
-      const rDate = new Date(r.date || 0).getTime();
-      return rDate <= targetDate;
-    });
+      const rDate = new Date(r.date || 0).getTime()
+      return rDate <= targetDate
+    })
   }
 
   // Sort by date descending (latest first)
@@ -1344,7 +2000,7 @@ export function getExchangeRate(base: string, target: string, date?: string): nu
     const dateA = new Date(a.date || 0).getTime()
     const dateB = new Date(b.date || 0).getTime()
     return dateB - dateA
-  });
+  })
 
   if (relevant.length === 0) return undefined
   return relevant[0].rate as number
@@ -1354,7 +2010,7 @@ export function convertCurrency(
   amount: number,
   fromCurrency: CurrencyCode,
   toCurrency: CurrencyCode,
-  date?: string
+  date?: string,
 ): number | undefined {
   if (fromCurrency === toCurrency) {
     return amount
@@ -1384,24 +2040,28 @@ export function convertCurrency(
   return undefined
 }
 
-
-
 export function tradingPerformanceSummary(db: FinanceDatabase) {
   // Get all executed trading plans with profitLoss
   const trades = db.trading_plans
-    .flatMap(plan => {
-      if (plan.executionStatus !== 'executed' || typeof plan.profitLoss !== 'number') return []
-      return [{
-        id: plan.id,
-        profitLoss: plan.profitLoss,
-        decision: plan.decision,
-        expectedOutcome: plan.expectedOutcome ?? '',
-        actualOutcome: plan.actualOutcome ?? '',
-        date: new Date(plan.updatedAt), // or plan.createdAt? We'll use updatedAt as the time when the plan was last updated (should be after execution)
-        symbol: plan.symbol,
-      }]
+    .flatMap((plan) => {
+      if (
+        plan.executionStatus !== 'executed' ||
+        typeof plan.profitLoss !== 'number'
+      )
+        return []
+      return [
+        {
+          id: plan.id,
+          profitLoss: plan.profitLoss,
+          decision: plan.decision,
+          expectedOutcome: plan.expectedOutcome ?? '',
+          actualOutcome: plan.actualOutcome ?? '',
+          date: new Date(plan.updatedAt), // or plan.createdAt? We'll use updatedAt as the time when the plan was last updated (should be after execution)
+          symbol: plan.symbol,
+        },
+      ]
     })
-    .sort((a, b) => a.date.getTime() - b.date.getTime()); // ascending chronological
+    .sort((a, b) => a.date.getTime() - b.date.getTime()) // ascending chronological
 
   if (trades.length === 0) {
     return {
@@ -1414,66 +2074,76 @@ export function tradingPerformanceSummary(db: FinanceDatabase) {
       maxDrawdown: 0,
       predictionAccuracy: 0,
       totalTrades: 0,
-    };
+    }
   }
 
-  const profits = trades.filter(t => t.profitLoss > 0).map(t => t.profitLoss);
-  const losses = trades.filter(t => t.profitLoss < 0).map(t => t.profitLoss);
-  const totalProfit = profits.reduce((sum, p) => sum + p, 0);
-  const totalLoss = losses.reduce((sum, l) => sum + l, 0); // negative number
-  const totalNet = totalProfit + totalLoss;
-  const winRate = profits.length / trades.length;
-  const avgProfit = profits.length > 0 ? totalProfit / profits.length : 0;
-  const avgLoss = losses.length > 0 ? totalLoss / losses.length : 0; // will be negative
-  const avgProfitLossPerTrade = totalNet / trades.length;
+  const profits = trades
+    .filter((t) => t.profitLoss > 0)
+    .map((t) => t.profitLoss)
+  const losses = trades.filter((t) => t.profitLoss < 0).map((t) => t.profitLoss)
+  const totalProfit = profits.reduce((sum, p) => sum + p, 0)
+  const totalLoss = losses.reduce((sum, l) => sum + l, 0) // negative number
+  const totalNet = totalProfit + totalLoss
+  const winRate = profits.length / trades.length
+  const avgProfit = profits.length > 0 ? totalProfit / profits.length : 0
+  const avgLoss = losses.length > 0 ? totalLoss / losses.length : 0 // will be negative
+  const avgProfitLossPerTrade = totalNet / trades.length
   // Profit factor: gross profit / gross loss (gross loss as a positive magnitude)
-  const grossLoss = Math.abs(totalLoss);
-  const profitFactor = grossLoss !== 0 ? totalProfit / grossLoss : 0;
+  const grossLoss = Math.abs(totalLoss)
+  const profitFactor =
+    grossLoss !== 0 ? totalProfit / grossLoss : totalProfit > 0 ? 999 : 0
 
   // Sharpe ratio: using profitLoss as return, risk-free rate = 0
-  const returns = trades.map(t => t.profitLoss);
-  const meanReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
-  const variance = returns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / returns.length;
-  const stdDev = Math.sqrt(variance);
-  const sharpeRatio = stdDev !== 0 ? meanReturn / stdDev : 0;
+  const returns = trades.map((t) => t.profitLoss)
+  const meanReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length
+  const variance =
+    returns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) /
+    returns.length
+  const stdDev = Math.sqrt(variance)
+  const sharpeRatio = stdDev !== 0 ? meanReturn / stdDev : 0
 
   // Max drawdown: compute cumulative sum and track peak
-  let cumulative = 0;
-  let peak = 0;
-  let maxDrawdown = 0;
+  let cumulative = 0
+  let peak = 0
+  let maxDrawdown = 0
   for (const t of trades) {
-    cumulative += t.profitLoss;
+    cumulative += t.profitLoss
     if (cumulative > peak) {
-      peak = cumulative;
+      peak = cumulative
     }
-    const drawdown = peak - cumulative; // positive when below peak
+    const drawdown = peak - cumulative // positive when below peak
     if (drawdown > maxDrawdown) {
-      maxDrawdown = drawdown;
+      maxDrawdown = drawdown
     }
   }
   // maxDrawdown is the largest peak-to-trough decline (positive number)
 
   // Prediction accuracy: compare expectedOutcome with actual profit/loss sign
-  let correctPredictions = 0;
+  let correctPredictions = 0
   for (const t of trades) {
-    const expected = t.expectedOutcome.toLowerCase();
-    const profit = t.profitLoss;
-    let correct = false;
+    const expected = t.expectedOutcome.toLowerCase()
+    const profit = t.profitLoss
+    let correct = false
     if (expected.includes('profit') && profit > 0) {
-      correct = true;
+      correct = true
     } else if (expected.includes('loss') && profit < 0) {
-      correct = true;
-    } else if (expected.includes('break even') || expected.includes('break-even') || expected.includes('breakeven')) {
-      if (Math.abs(profit) < 1e-9) { // approximately zero
-        correct = true;
+      correct = true
+    } else if (
+      expected.includes('break even') ||
+      expected.includes('break-even') ||
+      expected.includes('breakeven')
+    ) {
+      if (Math.abs(profit) < 1e-9) {
+        // approximately zero
+        correct = true
       }
     }
     // If expectedOutcome is empty, we cannot judge; we'll treat as incorrect.
     if (correct) {
-      correctPredictions++;
+      correctPredictions++
     }
   }
-  const predictionAccuracy = correctPredictions / trades.length;
+  const predictionAccuracy = correctPredictions / trades.length
 
   return {
     winRate,
@@ -1485,6 +2155,5 @@ export function tradingPerformanceSummary(db: FinanceDatabase) {
     maxDrawdown,
     predictionAccuracy,
     totalTrades: trades.length,
-  };
+  }
 }
-

@@ -1,12 +1,3 @@
-/**
- * Binance trading engine API.
- *
- *  GET  /api/demo-trading            → engine state (scores + open positions)
- *  POST /api/demo-trading {action}   → "run_cycle" triggers one trading cycle
- *
- * Execution can run in paper, Binance testnet, or gated Binance live mode. The POST
- * "run_cycle" honours finance trading gates; force never bypasses live safety.
- */
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -18,11 +9,12 @@ import {
   decisionQualityReport,
   getEngineState,
   getLiveMonitor,
+  learningReport,
   marketLearningReport,
   runTradingCycle,
 } from '../../server/demo-trading-engine'
 
-export const Route = createFileRoute('/api/demo-trading')({
+export const Route = createFileRoute('/api/trading-engine')({
   server: {
     handlers: {
       GET: async ({ request }) => {
@@ -36,6 +28,7 @@ export const Route = createFileRoute('/api/demo-trading')({
             ...getEngineState(),
             monitor,
             learning: decisionQualityReport(),
+            engineLearning: learningReport(),
             marketLearning: marketLearningReport(),
           })
         } catch (err) {
