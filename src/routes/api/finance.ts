@@ -24,6 +24,7 @@ import {
   fetchBinanceKlines,
   fetchBinanceTickerPrice,
 } from '../../server/binance-market.service'
+import { STRATEGIES } from '../../server/trading-strategies'
 import {
   applyLearningCandidate,
   applyRecommendedSafeguards,
@@ -443,6 +444,18 @@ export const Route = createFileRoute('/api/finance')({
                 .filter((s) => /^[A-Z0-9]{5,20}$/.test(s))
               if (syms.length > 0) dt.symbols = Array.from(new Set(syms))
             }
+            // enabledStrategies: explicit allow-list against STRATEGIES ids only.
+            // Left unset, resolveEngineConfig() defaults to *every* id in
+            // STRATEGIES — meaning a newly added strategy silently joins live
+            // council voting on the next deploy. Setting this here locks the
+            // roster until someone deliberately opts a new strategy in.
+            if (Array.isArray(cfg.enabledStrategies)) {
+              const validIds = new Set(STRATEGIES.map((s) => s.id))
+              const ids = cfg.enabledStrategies.filter(
+                (s): s is string => typeof s === 'string' && validIds.has(s),
+              )
+              if (ids.length > 0) dt.enabledStrategies = Array.from(new Set(ids))
+            }
             if (maxOpen !== undefined) {
               const guardian = (
                 dt.guardian && typeof dt.guardian === 'object'
@@ -504,6 +517,7 @@ export const Route = createFileRoute('/api/finance')({
               stopLossPct: dt.stopLossPct,
               quotePerTrade: dt.quotePerTrade,
               symbols: dt.symbols,
+              enabledStrategies: dt.enabledStrategies,
               maxOpenPositions: (
                 dt.guardian as Record<string, unknown> | undefined
               )?.maxOpenPositions,
