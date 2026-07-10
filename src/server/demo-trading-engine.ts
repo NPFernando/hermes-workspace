@@ -48,10 +48,16 @@ import {
   weekKey,
 } from './trading-guardian'
 import {
+  applyBucketOutcome,
+  bucketVeto,
+  buildEntryFeatureVector,
+} from './trading-pattern-veto'
+import {
   appendAuditLog,
   readFinanceStore,
   writeFinanceStore,
 } from './finance-store'
+import type { BucketStats, EntryFeatureVector } from './trading-pattern-veto'
 import type { Candle, CouncilMember, StrategyScore } from './trading-strategies'
 import type { GuardianBlock, GuardianConfig } from './trading-guardian'
 import type {
@@ -68,6 +74,7 @@ const SR_KIND_TRADE = 'demo_trade_log'
 const SR_KIND_BLOCK = 'demo_guardian_block'
 const SR_KIND_SHADOW_DECISION = 'paper_shadow_decision'
 const SR_KIND_LEARNING_CANDIDATE = 'learning_candidate'
+const SR_KIND_PATTERN_VETO_STATS = 'demo_pattern_veto_stats'
 const TRADE_LOG_CAP = 200
 const BLOCK_LOG_CAP = 50
 const SAFEGUARD_HISTORY_CAP = 25
@@ -137,6 +144,15 @@ export interface EngineConfig {
   kellySizingEnabled: boolean
   kellySizingMinClosedTrades: number
   kellySizingMaxFraction: number
+  /**
+   * "Ump-lite" pattern-bucket veto (off by default). Entry-time features are
+   * always logged onto opened/closed trades regardless of this flag, so
+   * evidence accrues even while disabled — only the veto ITSELF is gated.
+   * See trading-pattern-veto.ts.
+   */
+  patternVetoEnabled: boolean
+  patternVetoMinSamples: number
+  patternVetoLossRateThreshold: number
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -158,6 +174,9 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   kellySizingEnabled: false,
   kellySizingMinClosedTrades: 30,
   kellySizingMaxFraction: 0.25,
+  patternVetoEnabled: false,
+  patternVetoMinSamples: 20,
+  patternVetoLossRateThreshold: 0.65,
   councilThreshold: 0.6,
   maxHoldMinutes: 0,
   guardian: DEFAULT_GUARDIAN_CONFIG,
@@ -185,6 +204,8 @@ interface OpenPosition {
   executionMode?: PersistedExecutionMode
   groupId?: string
   shadowOfGroupId?: string
+  /** Entry-time feature vector for the pattern-bucket veto (Ump-lite); logged unconditionally, only gates entries when patternVetoEnabled. */
+  patternFeatures?: EntryFeatureVector
 }
 
 type PositionAtrExits = Pick<
@@ -211,6 +232,8 @@ export interface TradeLogEntry {
   executionMode?: PersistedExecutionMode
   groupId?: string
   shadowOfGroupId?: string
+  /** Carried from the opening position so pattern-veto stats can be folded in at close. */
+  patternFeatures?: EntryFeatureVector
 }
 
 export interface CycleAction {
@@ -339,6 +362,7 @@ interface PersistInput {
   positions: Array<OpenPosition>
   trades: Array<TradeLogEntry>
   blocks: Array<SRRow>
+  patternVetoStats: Record<string, BucketStats>
 }
 
 function persist(input: PersistInput): void {
@@ -348,7 +372,8 @@ function persist(input: PersistInput): void {
       r.kind !== SR_KIND_SCORE &&
       r.kind !== SR_KIND_POSITION &&
       r.kind !== SR_KIND_TRADE &&
-      r.kind !== SR_KIND_BLOCK,
+      r.kind !== SR_KIND_BLOCK &&
+      r.kind !== SR_KIND_PATTERN_VETO_STATS,
   )
   db.strategy_results = [
     ...others,
@@ -358,6 +383,10 @@ function persist(input: PersistInput): void {
       .slice(-TRADE_LOG_CAP)
       .map((t) => ({ kind: SR_KIND_TRADE, ...t })),
     ...input.blocks.slice(-BLOCK_LOG_CAP),
+    ...Object.values(input.patternVetoStats).map((s) => ({
+      kind: SR_KIND_PATTERN_VETO_STATS,
+      ...s,
+    })),
   ]
   db.updatedAt = new Date().toISOString()
   writeFinanceStore(db)
@@ -1249,6 +1278,9 @@ async function runTradingCycleInner(
   let positions = loadOfKind<OpenPosition>(rows, SR_KIND_POSITION)
   const trades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE)
   const blocks = rows.filter((r) => r.kind === SR_KIND_BLOCK)
+  let patternVetoStats: Record<string, BucketStats> = Object.fromEntries(
+    loadOfKind<BucketStats>(rows, SR_KIND_PATTERN_VETO_STATS).map((s) => [s.key, s]),
+  )
   const activeTrades = executionMode
     ? realizedTradesForMode(trades, executionMode)
     : []
@@ -1426,7 +1458,7 @@ async function runTradingCycleInner(
   }
 
   // Crash-safety: persist the store immediately after each order or shadow decision.
-  const checkpoint = () => persist({ scores, positions, trades, blocks })
+  const checkpoint = () => persist({ scores, positions, trades, blocks, patternVetoStats })
 
   for (const symbol of config.symbols) {
     let candles: Array<Candle>
@@ -1630,6 +1662,14 @@ async function runTradingCycleInner(
             }
           }
           scores.set(pos.strategyId, nextScore)
+          // Unconditional — evidence accrues regardless of patternVetoEnabled.
+          if (pos.patternFeatures) {
+            patternVetoStats = applyBucketOutcome(
+              patternVetoStats,
+              pos.patternFeatures,
+              pnlQuote,
+            )
+          }
 
           if (paperShadow) {
             positions = closeShadowPosition({
@@ -1656,6 +1696,7 @@ async function runTradingCycleInner(
             closedAt: new Date().toISOString(),
             executionMode,
             groupId,
+            patternFeatures: pos.patternFeatures,
           })
           positions = positions.filter((p) => p.id !== pos.id)
           actions.push({
@@ -1747,6 +1788,30 @@ async function runTradingCycleInner(
           `${symbol} market quality ${marketQuality.status}: ${marketQuality.blockers.join('; ')}`,
         )
         continue
+      }
+      // Always computed (evidence accrues via the opened position below even
+      // while disabled) — only the veto itself is gated on patternVetoEnabled.
+      const patternFeatures = buildEntryFeatureVector(
+        vote.leadStrategyId,
+        candles,
+        config.atrPeriod,
+      )
+      if (config.patternVetoEnabled) {
+        const veto = bucketVeto(
+          patternVetoStats,
+          patternFeatures,
+          config.patternVetoMinSamples,
+          config.patternVetoLossRateThreshold,
+        )
+        if (veto.blocked) {
+          recordQualityBlock(
+            symbol,
+            vote.leadStrategyId,
+            'pattern_bucket_veto',
+            veto.detail!,
+          )
+          continue
+        }
       }
       const strategyMultiplier =
         (leadQuality?.recommendation === 'reduce_size' ? 0.5 : 1) *
@@ -1857,6 +1922,7 @@ async function runTradingCycleInner(
               openedAt: new Date().toISOString(),
               executionMode,
               groupId,
+              patternFeatures,
             })
             actions.push({
               symbol,
@@ -1899,7 +1965,7 @@ async function runTradingCycleInner(
     }
   }
 
-  persist({ scores, positions, trades, blocks })
+  persist({ scores, positions, trades, blocks, patternVetoStats })
   let learning: LearningCycleResult | undefined
   if (mode === 'paper_trade' || mode === 'testnet_execute') {
     try {

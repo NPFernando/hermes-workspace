@@ -406,6 +406,65 @@ describe('runTradingCycle open → close → score', () => {
     expect(withKellyEntryQuote).toBeCloseTo(baselineEntryQuote, 6)
   })
 
+  it('blocks an entry whose pattern bucket has a proven-bad loss rate, only when patternVetoEnabled', async () => {
+    await setMode('testnet_execute')
+    const { buildEntryFeatureVector, bucketKey } = await import(
+      './trading-pattern-veto'
+    )
+    const store = await import('./finance-store')
+
+    // Compute the exact bucket this fixture/strategy will land in, and seed
+    // it as a proven-bad bucket (25 trades, 80% loss rate).
+    const features = buildEntryFeatureVector('rsi_reversion', steadyDowntrend(), 14)
+    const key = bucketKey(features)
+    const db = store.readFinanceStore()
+    db.strategy_results = [
+      ...db.strategy_results,
+      { kind: 'demo_pattern_veto_stats', key, trades: 25, losses: 20, lossRate: 0.8 },
+    ]
+    store.writeFinanceStore(db)
+
+    const { runTradingCycle, getEngineState } =
+      await import('./demo-trading-engine')
+
+    const blocked = await runTradingCycle({
+      client: fakeClient() as never,
+      config: {
+        symbols: ['BTCUSDT'],
+        enabledStrategies: ['rsi_reversion'],
+        patternVetoEnabled: true,
+      },
+    })
+    expect(
+      blocked.actions.some(
+        (a) => a.action === 'BLOCKED' && a.reason.startsWith('pattern_bucket_veto'),
+      ),
+    ).toBe(true)
+    expect(getEngineState().positions).toHaveLength(0)
+
+    // Same seeded bad bucket, but the flag defaults off — must not block.
+    const allowed = await runTradingCycle({
+      client: fakeClient() as never,
+      config: { symbols: ['ETHUSDT'], enabledStrategies: ['rsi_reversion'] },
+    })
+    expect(allowed.actions.some((a) => a.action === 'OPEN')).toBe(true)
+  })
+
+  it('logs entry-pattern features onto opened positions unconditionally (evidence accrues even while disabled)', async () => {
+    await setMode('testnet_execute')
+    const { runTradingCycle, getEngineState } =
+      await import('./demo-trading-engine')
+    const r = await runTradingCycle({
+      client: fakeClient() as never,
+      config: { symbols: ['BTCUSDT'], enabledStrategies: ['rsi_reversion'] },
+    })
+    expect(r.actions.some((a) => a.action === 'OPEN')).toBe(true)
+    const pos = getEngineState().positions[0] as unknown as {
+      patternFeatures?: { strategyId: string }
+    }
+    expect(pos.patternFeatures?.strategyId).toBe('rsi_reversion')
+  })
+
   it('opens a position on a BUY signal, then closes with profit and scores it', async () => {
     await setMode('testnet_execute')
     const { runTradingCycle, getEngineState } =
