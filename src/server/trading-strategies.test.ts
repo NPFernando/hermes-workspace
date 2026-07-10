@@ -4,6 +4,7 @@ import {
   accumulationDistributionLine,
   applyTradeOutcome,
   atr,
+  atrSizeMultiplier,
   breakoutStrategy,
   chaikinVolumeStrategy,
   councilVote,
@@ -465,6 +466,31 @@ describe('scaledQuoteSize', () => {
   it('scales up for proven strategies and down for poor ones', () => {
     expect(scaledQuoteSize(25, 5)).toBeGreaterThan(25)
     expect(scaledQuoteSize(25, -5)).toBeLessThan(25)
+  })
+})
+
+describe('atrSizeMultiplier', () => {
+  it('is a no-op (1x) when disabled or missing inputs', () => {
+    expect(atrSizeMultiplier(2, 100, 0)).toBe(1) // baselineAtrPct 0 = off
+    expect(atrSizeMultiplier(null, 100, 0.02)).toBe(1) // no ATR value yet
+    expect(atrSizeMultiplier(2, 0, 0.02)).toBe(1) // invalid price
+  })
+
+  it('returns 1x when current volatility matches the baseline', () => {
+    // atr/price = 2/100 = 2%, baseline = 2% -> ratio 1
+    expect(atrSizeMultiplier(2, 100, 0.02)).toBeCloseTo(1, 8)
+  })
+
+  it('scales size down (floored) in higher-than-baseline volatility', () => {
+    // atr/price = 8/100 = 8%, baseline 2% -> raw ratio 0.25, right at the floor
+    expect(atrSizeMultiplier(8, 100, 0.02, 0.25, 1.5)).toBeCloseTo(0.25, 8)
+    // even more volatile still floors at 0.25, never goes negative/lower
+    expect(atrSizeMultiplier(20, 100, 0.02, 0.25, 1.5)).toBeCloseTo(0.25, 8)
+  })
+
+  it('scales size up (capped) in calmer-than-baseline volatility', () => {
+    // atr/price = 0.5/100 = 0.5%, baseline 2% -> raw ratio 4, capped at 1.5
+    expect(atrSizeMultiplier(0.5, 100, 0.02, 0.25, 1.5)).toBeCloseTo(1.5, 8)
   })
 })
 

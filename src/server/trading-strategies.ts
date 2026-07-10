@@ -675,3 +675,25 @@ export function councilVote(
 export function scaledQuoteSize(baseQuote: number, leadScore: number): number {
   return Math.round(baseQuote * strategyWeight(leadScore) * 100) / 100
 }
+
+/**
+ * Inverse-volatility position-size multiplier (concept from bbfamily/abu's
+ * ABuAtrPosition, reimplemented clean-room). `baselineAtrPct` is the "normal"
+ * ATR/price ratio the base quote size was calibrated for — calmer-than-
+ * baseline conditions scale size up (capped at `maxMultiplier`), more
+ * volatile conditions scale it down (floored at `minMultiplier`). Returns 1
+ * (no-op) whenever there isn't enough information to size confidently, so
+ * callers can leave this wired in with `baselineAtrPct: 0` to disable it.
+ */
+export function atrSizeMultiplier(
+  atrValue: number | null,
+  price: number,
+  baselineAtrPct: number,
+  minMultiplier = 0.25,
+  maxMultiplier = 1.5,
+): number {
+  if (atrValue == null || price <= 0 || baselineAtrPct <= 0) return 1
+  const atrPct = atrValue / price
+  if (atrPct <= 0) return 1
+  return Math.max(minMultiplier, Math.min(maxMultiplier, baselineAtrPct / atrPct))
+}

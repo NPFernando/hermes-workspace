@@ -29,6 +29,7 @@ import {
   STRATEGIES,
   applyTradeOutcome,
   atr,
+  atrSizeMultiplier,
   councilVote,
   emptyScore,
   getStrategy,
@@ -125,6 +126,13 @@ export interface BacktestConfig {
   slippageBps: number
   /** Skip new entries on a bar that gapped down more than this fraction from the prior close (0 = off). */
   gapDownGuardPct: number
+  /**
+   * Inverse-volatility position sizing (0 = off), mirrors the live engine's
+   * atrSizeBaselinePct — independent of the atrStopMultiple/etc. exit fields.
+   */
+  atrSizeBaselinePct: number
+  atrSizeMinMultiplier: number
+  atrSizeMaxMultiplier: number
 }
 
 export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
@@ -149,6 +157,9 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   marketRegimeSmaPeriod: 0,
   slippageBps: 0,
   gapDownGuardPct: 0,
+  atrSizeBaselinePct: 0,
+  atrSizeMinMultiplier: 0.25,
+  atrSizeMaxMultiplier: 1.5,
 }
 
 export interface BacktestTrade {
@@ -799,9 +810,19 @@ export function runBacktest(
           scores.get(
             scoreKey(vote.leadStrategyId, symbol, config.scoreScope),
           ) ?? emptyScore(vote.leadStrategyId)
+        const sizeAtrMult =
+          config.atrSizeBaselinePct > 0
+            ? atrSizeMultiplier(
+                atr(window, config.atrPeriod),
+                price,
+                config.atrSizeBaselinePct,
+                config.atrSizeMinMultiplier,
+                config.atrSizeMaxMultiplier,
+              )
+            : 1
         const proposedQuote = Math.max(
           1,
-          scaledQuoteSize(config.quotePerTrade, leadScore.score),
+          scaledQuoteSize(config.quotePerTrade, leadScore.score) * sizeAtrMult,
         )
         const openUnrealized = positions.reduce(
           (sum, p) =>

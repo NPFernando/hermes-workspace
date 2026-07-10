@@ -32,6 +32,7 @@ import {
   STRATEGIES,
   applyTradeOutcome,
   atr,
+  atrSizeMultiplier,
   councilVote,
   emptyScore,
   getStrategy,
@@ -113,6 +114,16 @@ export interface EngineConfig {
   /** Force-close a position after this many minutes if SL/TP/trailing haven't fired (0 = off). */
   maxHoldMinutes: number
   guardian: GuardianConfig
+  /**
+   * Inverse-volatility position sizing (0 = off). The "normal" ATR/price
+   * ratio quotePerTrade was calibrated for — size scales down in
+   * higher-than-baseline volatility and up in calmer conditions, bounded by
+   * atrSizeMinMultiplier/atrSizeMaxMultiplier. Independent of the dormant
+   * atrStopMultiple/atrTakeProfitMultiple/atrTrailingMultiple exit fields.
+   */
+  atrSizeBaselinePct: number
+  atrSizeMinMultiplier: number
+  atrSizeMaxMultiplier: number
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -128,6 +139,9 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   atrStopMultiple: 0,
   atrTakeProfitMultiple: 0,
   atrTrailingMultiple: 0,
+  atrSizeBaselinePct: 0,
+  atrSizeMinMultiplier: 0.25,
+  atrSizeMaxMultiplier: 1.5,
   councilThreshold: 0.6,
   maxHoldMinutes: 0,
   guardian: DEFAULT_GUARDIAN_CONFIG,
@@ -1721,12 +1735,23 @@ async function runTradingCycleInner(
       const strategyMultiplier =
         (leadQuality?.recommendation === 'reduce_size' ? 0.5 : 1) *
         (leadOverride?.mode === 'reduce_size' ? leadOverride.multiplier : 1)
+      const atrSizeMult =
+        config.atrSizeBaselinePct > 0
+          ? atrSizeMultiplier(
+              atr(candles, config.atrPeriod),
+              price,
+              config.atrSizeBaselinePct,
+              config.atrSizeMinMultiplier,
+              config.atrSizeMaxMultiplier,
+            )
+          : 1
       const proposedQuote = Math.max(
         1,
         Math.round(
           scaledQuoteSize(config.quotePerTrade, leadScore.score) *
             qualitySizeMultiplier *
             strategyMultiplier *
+            atrSizeMult *
             100,
         ) / 100,
       )

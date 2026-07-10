@@ -700,3 +700,24 @@ describe('backtest slippage + gap-down guard integration', () => {
     expect(stops.length).toBeGreaterThan(0)
   })
 })
+
+describe('backtest ATR position sizing', () => {
+  it('is a no-op at the default (0 = off)', () => {
+    const withField: BacktestConfig = { ...config, atrSizeBaselinePct: 0 }
+    const a = runBacktest({ BTCUSDT: rampSeries() }, '1h', config)
+    const b = runBacktest({ BTCUSDT: rampSeries() }, '1h', withField)
+    expect(b.trades.map((t) => t.entryQuote)).toEqual(a.trades.map((t) => t.entryQuote))
+  })
+
+  it('shrinks entry size when the baseline is set far below actual volatility', () => {
+    const baseline = runBacktest({ BTCUSDT: rampSeries() }, '1h', config)
+    const shrunk = runBacktest({ BTCUSDT: rampSeries() }, '1h', {
+      ...config,
+      atrSizeBaselinePct: 0.0005, // ramp's real ATR/price is far above this -> floors
+      atrSizeMinMultiplier: 0.25,
+    })
+    expect(baseline.trades.length).toBeGreaterThan(0)
+    expect(shrunk.trades.length).toBeGreaterThan(0)
+    expect(shrunk.trades[0].entryQuote).toBeCloseTo(baseline.trades[0].entryQuote * 0.25, 6)
+  })
+})

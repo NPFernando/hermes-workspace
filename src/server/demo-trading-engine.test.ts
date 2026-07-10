@@ -356,6 +356,26 @@ describe('runTradingCycle gating', () => {
 })
 
 describe('runTradingCycle open → close → score', () => {
+  it('shrinks position size when atrSizeBaselinePct is set below actual volatility', async () => {
+    await setMode('testnet_execute')
+    const { runTradingCycle, getEngineState } =
+      await import('./demo-trading-engine')
+
+    // steadyDowntrend's ~0.35/candle step gives ATR/price ≈ 0.35% — set the
+    // "normal" baseline far below that so the multiplier floors at 0.25x.
+    const cfg = {
+      symbols: ['BTCUSDT'],
+      enabledStrategies: ['rsi_reversion'],
+      atrSizeBaselinePct: 0.0005,
+    }
+    const r1 = await runTradingCycle({ client: fakeClient() as never, config: cfg })
+    expect(r1.actions.some((a) => a.action === 'OPEN')).toBe(true)
+    const pos = getEngineState().positions[0]
+    expect(pos).toBeTruthy()
+    // Base quotePerTrade defaults to 25; floored 0.25x multiplier -> ~6.25.
+    expect(pos!.entryQuote).toBeLessThan(10)
+  })
+
   it('opens a position on a BUY signal, then closes with profit and scores it', async () => {
     await setMode('testnet_execute')
     const { runTradingCycle, getEngineState } =
