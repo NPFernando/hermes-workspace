@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   accumulationDistributionLine,
+  adx,
   applyTradeOutcome,
   atr,
   atrSizeMultiplier,
@@ -10,6 +11,7 @@ import {
   councilVote,
   ema,
   emptyScore,
+  fibExtensionTarget,
   keltnerChannelStrategy,
   kellyFraction,
   macdMomentumStrategy,
@@ -19,6 +21,7 @@ import {
   scaledQuoteSize,
   sma,
   smaCrossoverStrategy,
+  trendIsStrong,
   trendPullbackStrategy,
   trueRange,
   type Candle,
@@ -76,6 +79,84 @@ describe('indicators', () => {
     ]
     expect(atr(candles, 3)).toBeCloseTo((6 + 5 + 8) / 3, 6)
     expect(atr(candles.slice(0, 3), 3)).toBeNull()
+  })
+
+  it('adx is 100 for a pure one-directional trend (zero -DM)', () => {
+    // Every step: only +DM contributes (down move is always negative, so
+    // minusDM stays 0) -> |plusDI - minusDI| / diSum reduces to exactly 1.
+    const candles = [
+      candleLike(0, 100, 100, 95),
+      candleLike(1, 108, 110, 104),
+      candleLike(2, 116, 118, 112),
+      candleLike(3, 124, 126, 120),
+    ]
+    expect(adx(candles, 3)).toBeCloseTo(100, 6)
+  })
+
+  it('adx is 0 for a flat (zero true-range) series', () => {
+    const candles = [
+      candleLike(0, 100, 100, 100),
+      candleLike(1, 100, 100, 100),
+      candleLike(2, 100, 100, 100),
+      candleLike(3, 100, 100, 100),
+    ]
+    expect(adx(candles, 3)).toBe(0)
+  })
+
+  it('adx returns null with insufficient candles', () => {
+    const candles = [candleLike(0, 100, 102, 98), candleLike(1, 103, 106, 101)]
+    expect(adx(candles, 3)).toBeNull()
+  })
+})
+
+describe('trendIsStrong', () => {
+  const strongTrend = [
+    candleLike(0, 100, 100, 95),
+    candleLike(1, 108, 110, 104),
+    candleLike(2, 116, 118, 112),
+    candleLike(3, 124, 126, 120),
+  ]
+  const flat = [
+    candleLike(0, 100, 100, 100),
+    candleLike(1, 100, 100, 100),
+    candleLike(2, 100, 100, 100),
+    candleLike(3, 100, 100, 100),
+  ]
+
+  it('fails open when disabled or without enough history', () => {
+    expect(trendIsStrong(strongTrend, 0, 25)).toBe(true) // period disabled
+    expect(trendIsStrong(strongTrend, 3, 0)).toBe(true) // threshold disabled
+    expect(trendIsStrong(strongTrend.slice(0, 1), 3, 25)).toBe(true) // insufficient data
+  })
+
+  it('allows entry when ADX clears the threshold, blocks when it does not', () => {
+    expect(trendIsStrong(strongTrend, 3, 25)).toBe(true) // adx=100
+    expect(trendIsStrong(flat, 3, 25)).toBe(false) // adx=0
+  })
+})
+
+describe('fibExtensionTarget', () => {
+  const window = [
+    candleLike(0, 100, 110, 90), // swing range = 20
+    candleLike(1, 105, 108, 95),
+  ]
+
+  it('projects entryPrice + swingRange * ratio for a long, minus for a short', () => {
+    expect(fibExtensionTarget('long', 100, window, 2, 1.618)).toBeCloseTo(100 + 20 * 1.618, 6)
+    expect(fibExtensionTarget('short', 100, window, 2, 1.618)).toBeCloseTo(100 - 20 * 1.618, 6)
+  })
+
+  it('defaults extensionRatio to 1.618', () => {
+    expect(fibExtensionTarget('long', 100, window, 2)).toBeCloseTo(100 + 20 * 1.618, 6)
+  })
+
+  it('returns null with insufficient lookback candles', () => {
+    expect(fibExtensionTarget('long', 100, window, 5)).toBeNull()
+  })
+
+  it('returns null when the swing range is zero (flat window)', () => {
+    const flatWindow = [candleLike(0, 100, 100, 100), candleLike(1, 100, 100, 100)]
+    expect(fibExtensionTarget('long', 100, flatWindow, 2)).toBeNull()
   })
 })
 

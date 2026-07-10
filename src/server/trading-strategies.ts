@@ -69,6 +69,48 @@ export function atr(candles: Array<Candle>, period: number): number | null {
   return sum / roundedPeriod
 }
 
+/**
+ * Simplified single-pass ADX (Average Directional Index) — same trailing-
+ * average style as atr()/rsi() above, not the textbook double-smoothed
+ * Wilder ADX (which needs ~2x the candle history for little practical
+ * difference at our timeframes). Higher = stronger trend, regardless of
+ * direction; does not itself say which way the trend runs.
+ */
+export function adx(candles: Array<Candle>, period: number): number | null {
+  const roundedPeriod = Math.round(period)
+  if (roundedPeriod <= 0 || candles.length < roundedPeriod + 1) return null
+  let sumPlusDM = 0
+  let sumMinusDM = 0
+  let sumTR = 0
+  for (let i = candles.length - roundedPeriod; i < candles.length; i++) {
+    const upMove = candles[i].high - candles[i - 1].high
+    const downMove = candles[i - 1].low - candles[i].low
+    if (upMove > downMove && upMove > 0) sumPlusDM += upMove
+    if (downMove > upMove && downMove > 0) sumMinusDM += downMove
+    sumTR += trueRange(candles[i], candles[i - 1].close)
+  }
+  if (sumTR <= 0) return 0
+  const plusDI = (100 * sumPlusDM) / sumTR
+  const minusDI = (100 * sumMinusDM) / sumTR
+  const diSum = plusDI + minusDI
+  return diSum <= 0 ? 0 : (100 * Math.abs(plusDI - minusDI)) / diSum
+}
+
+/**
+ * Trend-STRENGTH gate (distinct from regimeAllowsLong's trend-DIRECTION
+ * gate below) — fails open (true) when disabled or data is insufficient,
+ * same convention as regimeAllowsLong.
+ */
+export function trendIsStrong(
+  candles: Array<Candle>,
+  period: number,
+  threshold: number,
+): boolean {
+  if (period <= 0 || threshold <= 0) return true
+  const value = adx(candles, period)
+  return value == null ? true : value >= threshold
+}
+
 /** Wilder's RSI over `period` closes. Returns null if insufficient data. */
 export function rsi(closes: Array<number>, period: number): number | null {
   if (closes.length < period + 1) return null
@@ -411,6 +453,30 @@ export function regimeAllowsLong(
   const long = sma(closes, period)
   if (long == null) return true
   return closes[closes.length - 1] >= long
+}
+
+/**
+ * Fibonacci-extension take-profit target: entry price plus (long) or minus
+ * (short) the most recent swing's high-low range, scaled by extensionRatio
+ * (161.8% is the standard convention). Simplified — a single swing window,
+ * not a 3-point A-B-C retracement pattern. Shared by both engines, same
+ * reuse pattern as atr()/rsi()/regimeAllowsLong() above.
+ */
+export function fibExtensionTarget(
+  side: 'long' | 'short',
+  entryPrice: number,
+  candles: Array<Candle>,
+  lookback: number,
+  extensionRatio = 1.618,
+): number | null {
+  if (lookback <= 0 || candles.length < lookback) return null
+  const window = candles.slice(-lookback)
+  const swingRange =
+    Math.max(...window.map((c) => c.high)) - Math.min(...window.map((c) => c.low))
+  if (swingRange <= 0) return null
+  return side === 'long'
+    ? entryPrice + swingRange * extensionRatio
+    : entryPrice - swingRange * extensionRatio
 }
 
 /**

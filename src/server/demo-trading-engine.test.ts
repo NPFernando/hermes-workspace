@@ -478,6 +478,76 @@ describe('runTradingCycle open → close → score', () => {
     expect(pos.patternFeatures?.strategyId).toBe('rsi_reversion')
   })
 
+  it('blocks an entry whose ADX trend strength is below the configured threshold', async () => {
+    await setMode('testnet_execute')
+    const { runTradingCycle, getEngineState } =
+      await import('./demo-trading-engine')
+    // adxThreshold set far above any real 0-100 ADX value -> always blocks,
+    // regardless of the fixture's actual trend strength — isolates the gate
+    // mechanism itself rather than requiring a hand-tuned choppy fixture.
+    const r = await runTradingCycle({
+      client: fakeClient() as never,
+      config: {
+        symbols: ['BTCUSDT'],
+        enabledStrategies: ['rsi_reversion'],
+        adxThreshold: 999,
+      },
+    })
+    expect(
+      r.actions.some(
+        (a) => a.action === 'BLOCKED' && a.reason.startsWith('adx_trend_weak'),
+      ),
+    ).toBe(true)
+    expect(getEngineState().positions).toHaveLength(0)
+  })
+
+  it('leaves entries unaffected when adxThreshold is 0 (the default)', async () => {
+    await setMode('testnet_execute')
+    const { runTradingCycle } = await import('./demo-trading-engine')
+    const r = await runTradingCycle({
+      client: fakeClient() as never,
+      config: { symbols: ['BTCUSDT'], enabledStrategies: ['rsi_reversion'] },
+    })
+    expect(r.actions.some((a) => a.action === 'OPEN')).toBe(true)
+  })
+
+  it('computes a Fibonacci-extension take-profit price when fibTakeProfitEnabled', async () => {
+    await setMode('testnet_execute')
+    const { runTradingCycle, getEngineState } =
+      await import('./demo-trading-engine')
+    const r = await runTradingCycle({
+      client: fakeClient() as never,
+      config: {
+        symbols: ['BTCUSDT'],
+        enabledStrategies: ['rsi_reversion'],
+        fibTakeProfitEnabled: true,
+        fibSwingLookback: 20,
+      },
+    })
+    expect(r.actions.some((a) => a.action === 'OPEN')).toBe(true)
+    const pos = getEngineState().positions[0] as unknown as {
+      fibTakeProfitPrice?: number | null
+      entryPrice: number
+    }
+    expect(pos.fibTakeProfitPrice).not.toBeNull()
+    expect(pos.fibTakeProfitPrice).toBeGreaterThan(pos.entryPrice)
+  })
+
+  it('leaves fibTakeProfitPrice null when fibTakeProfitEnabled is false (the default)', async () => {
+    await setMode('testnet_execute')
+    const { runTradingCycle, getEngineState } =
+      await import('./demo-trading-engine')
+    const r = await runTradingCycle({
+      client: fakeClient() as never,
+      config: { symbols: ['BTCUSDT'], enabledStrategies: ['rsi_reversion'] },
+    })
+    expect(r.actions.some((a) => a.action === 'OPEN')).toBe(true)
+    const pos = getEngineState().positions[0] as unknown as {
+      fibTakeProfitPrice?: number | null
+    }
+    expect(pos.fibTakeProfitPrice ?? null).toBeNull()
+  })
+
   it('opens a position on a BUY signal, then closes with profit and scores it', async () => {
     await setMode('testnet_execute')
     const { runTradingCycle, getEngineState } =

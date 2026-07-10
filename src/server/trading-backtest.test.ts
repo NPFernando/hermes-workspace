@@ -721,3 +721,37 @@ describe('backtest ATR position sizing', () => {
     expect(shrunk.trades[0].entryQuote).toBeCloseTo(baseline.trades[0].entryQuote * 0.25, 6)
   })
 })
+
+describe('backtest ADX trend-strength gate', () => {
+  it('is a no-op at the default (adxThreshold: 0)', () => {
+    const a = runBacktest({ BTCUSDT: rampSeries() }, '1h', config)
+    const b = runBacktest({ BTCUSDT: rampSeries() }, '1h', { ...config, adxThreshold: 0 })
+    expect(b.trades.map((t) => t.entryPrice)).toEqual(a.trades.map((t) => t.entryPrice))
+  })
+
+  it('blocks every entry when the threshold is set above any real ADX value', () => {
+    const baseline = runBacktest({ BTCUSDT: rampSeries() }, '1h', config)
+    const blocked = runBacktest({ BTCUSDT: rampSeries() }, '1h', { ...config, adxThreshold: 999 })
+    expect(baseline.trades.length).toBeGreaterThan(0)
+    expect(blocked.trades.length).toBe(0)
+    expect(blocked.guardianBlocks.adx_trend_weak).toBeGreaterThan(0)
+  })
+})
+
+describe('backtest Fibonacci-extension take-profit', () => {
+  it('is a no-op at the default (fibTakeProfitEnabled: false)', () => {
+    const a = runBacktest({ BTCUSDT: rampSeries() }, '1h', config)
+    const b = runBacktest({ BTCUSDT: rampSeries() }, '1h', { ...config, fibTakeProfitEnabled: false })
+    expect(b.trades.map((t) => t.entryPrice)).toEqual(a.trades.map((t) => t.entryPrice))
+  })
+
+  it('exits at a fib-target when enabled with a tight extension ratio', () => {
+    const report = runBacktest({ BTCUSDT: rampSeries() }, '1h', {
+      ...config,
+      fibTakeProfitEnabled: true,
+      fibSwingLookback: 20,
+      fibExtensionRatio: 0.05, // tight enough that the sustained ramp clears it quickly
+    })
+    expect(report.trades.some((t) => t.reason.startsWith('fib-target'))).toBe(true)
+  })
+})

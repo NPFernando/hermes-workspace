@@ -32,10 +32,12 @@ import {
   atrSizeMultiplier,
   councilVote,
   emptyScore,
+  fibExtensionTarget,
   getStrategy,
   regimeAllowsLong,
   scaledQuoteSize,
   sma,
+  trendIsStrong,
 } from './trading-strategies'
 import {
   DEFAULT_GUARDIAN_CONFIG,
@@ -133,6 +135,20 @@ export interface BacktestConfig {
   atrSizeBaselinePct: number
   atrSizeMinMultiplier: number
   atrSizeMaxMultiplier: number
+  /**
+   * ADX trend-STRENGTH gate on BUY entries (0 = off), distinct from
+   * regimeSmaPeriod's trend-DIRECTION gate above — mirrors the live engine.
+   */
+  adxPeriod: number
+  adxThreshold: number
+  /**
+   * Fibonacci-extension take-profit (off by default), mirrors the live
+   * engine's fibTakeProfitEnabled — a third take-profit type alongside
+   * fixed-% and ATR-multiple; ATR still wins if both are configured.
+   */
+  fibTakeProfitEnabled: boolean
+  fibSwingLookback: number
+  fibExtensionRatio: number
 }
 
 export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
@@ -160,6 +176,11 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   atrSizeBaselinePct: 0,
   atrSizeMinMultiplier: 0.25,
   atrSizeMaxMultiplier: 1.5,
+  adxPeriod: 14,
+  adxThreshold: 0,
+  fibTakeProfitEnabled: false,
+  fibSwingLookback: 20,
+  fibExtensionRatio: 1.618,
 }
 
 export interface BacktestTrade {
@@ -196,6 +217,8 @@ interface SimPosition {
   atrStopPrice: number | null
   atrTakeProfitPrice: number | null
   atrTrailDistance: number | null
+  /** Fibonacci-extension take-profit; only set when fibTakeProfitEnabled and ATR isn't already handling the take-profit. */
+  fibTakeProfitPrice: number | null
 }
 
 export interface StrategyReport extends StrategyScore {
@@ -730,10 +753,18 @@ export function runBacktest(
           (pos.side === 'long'
             ? price >= pos.atrTakeProfitPrice
             : price <= pos.atrTakeProfitPrice)
-        // Trailing mode replaces the fixed/ATR take-profit: winners run.
+        const hitFibTarget =
+          !trailing &&
+          pos.atrTakeProfitPrice == null &&
+          pos.fibTakeProfitPrice != null &&
+          (pos.side === 'long'
+            ? price >= pos.fibTakeProfitPrice
+            : price <= pos.fibTakeProfitPrice)
+        // Trailing mode replaces the fixed/ATR/fib take-profit: winners run.
         const hitFixedTarget =
           !trailing &&
           pos.atrTakeProfitPrice == null &&
+          pos.fibTakeProfitPrice == null &&
           movePct >= config.takeProfitPct
         const exitSignal = exitSignalForSide(pos.side)
         const ownerExit = ownerDecision?.signal === exitSignal
@@ -744,6 +775,7 @@ export function runBacktest(
           hitAtrTrail ||
           hitPctTrail ||
           hitAtrTarget ||
+          hitFibTarget ||
           hitFixedTarget ||
           ownerExit ||
           councilExit
@@ -758,11 +790,13 @@ export function runBacktest(
                   ? `trailing-stop ${(movePct * 100).toFixed(2)}% (${pos.side === 'long' ? 'peak' : 'trough'} ${(pos.side === 'long' ? pos.highWaterPrice : pos.lowWaterPrice).toFixed(2)})`
                   : hitAtrTarget
                     ? `atr-target ${(movePct * 100).toFixed(2)}% (ATR ${pos.atrAtEntry?.toFixed(2) ?? '?'})`
-                    : hitFixedTarget
-                      ? `take-profit ${(movePct * 100).toFixed(2)}%`
-                      : ownerExit
-                        ? `strategy exit: ${ownerDecision.reason}`
-                        : `council exit (net ${vote.net.toFixed(2)})`
+                    : hitFibTarget
+                      ? `fib-target ${(movePct * 100).toFixed(2)}%`
+                      : hitFixedTarget
+                        ? `take-profit ${(movePct * 100).toFixed(2)}%`
+                        : ownerExit
+                          ? `strategy exit: ${ownerDecision.reason}`
+                          : `council exit (net ${vote.net.toFixed(2)})`
           closePosition(pos, price, reason, now)
         }
       }
@@ -784,6 +818,10 @@ export function runBacktest(
         ) {
           guardianBlocks.regime_below_long_sma =
             (guardianBlocks.regime_below_long_sma || 0) + 1
+          continue
+        }
+        if (!trendIsStrong(window, config.adxPeriod, config.adxThreshold)) {
+          guardianBlocks.adx_trend_weak = (guardianBlocks.adx_trend_weak || 0) + 1
           continue
         }
         if (
@@ -863,6 +901,12 @@ export function runBacktest(
           const entryFee = spent * config.feeRatePerSide
           const quantity = spent / entryFillPrice
           const entryAtr = atr(window, config.atrPeriod)
+          const entryAtrTakeProfitPrice = atrTakeProfitPrice(
+            entrySide,
+            entryFillPrice,
+            entryAtr,
+            config.atrTakeProfitMultiple,
+          )
           quoteBalance -= spent
           positions.push({
             side: entrySide,
@@ -882,15 +926,21 @@ export function runBacktest(
               entryAtr,
               config.atrStopMultiple,
             ),
-            atrTakeProfitPrice: atrTakeProfitPrice(
-              entrySide,
-              entryFillPrice,
-              entryAtr,
-              config.atrTakeProfitMultiple,
-            ),
+            atrTakeProfitPrice: entryAtrTakeProfitPrice,
             atrTrailDistance:
               entryAtr != null && config.atrTrailingMultiple > 0
                 ? entryAtr * config.atrTrailingMultiple
+                : null,
+            // ATR still wins if both happen to be configured.
+            fibTakeProfitPrice:
+              entryAtrTakeProfitPrice == null && config.fibTakeProfitEnabled
+                ? fibExtensionTarget(
+                    entrySide,
+                    entryFillPrice,
+                    window,
+                    config.fibSwingLookback,
+                    config.fibExtensionRatio,
+                  )
                 : null,
           })
         }

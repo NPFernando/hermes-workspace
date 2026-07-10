@@ -35,10 +35,12 @@ import {
   atrSizeMultiplier,
   councilVote,
   emptyScore,
+  fibExtensionTarget,
   getStrategy,
   kellyFraction,
   regimeAllowsLong,
   scaledQuoteSize,
+  trendIsStrong,
 } from './trading-strategies'
 import {
   DEFAULT_GUARDIAN_CONFIG,
@@ -154,6 +156,24 @@ export interface EngineConfig {
   patternVetoEnabled: boolean
   patternVetoMinSamples: number
   patternVetoLossRateThreshold: number
+  /**
+   * ADX trend-STRENGTH gate on BUY entries (adxThreshold 0 = off), distinct
+   * from regimeSmaPeriod's trend-DIRECTION gate above — both can be active
+   * at once. Fails open on short warm-up windows, same convention as the
+   * regime gate.
+   */
+  adxPeriod: number
+  adxThreshold: number
+  /**
+   * Fibonacci-extension take-profit (off by default) — entry price plus/minus
+   * the most recent fibSwingLookback-candle swing range, scaled by
+   * fibExtensionRatio. A third take-profit type alongside the fixed-%
+   * (takeProfitPct) and ATR-multiple (atrTakeProfitMultiple) options above;
+   * ATR still wins if both happen to be configured (see atrExitPlan()).
+   */
+  fibTakeProfitEnabled: boolean
+  fibSwingLookback: number
+  fibExtensionRatio: number
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -178,6 +198,11 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   patternVetoEnabled: false,
   patternVetoMinSamples: 20,
   patternVetoLossRateThreshold: 0.65,
+  adxPeriod: 14,
+  adxThreshold: 0,
+  fibTakeProfitEnabled: false,
+  fibSwingLookback: 20,
+  fibExtensionRatio: 1.618,
   councilThreshold: 0.6,
   maxHoldMinutes: 0,
   guardian: DEFAULT_GUARDIAN_CONFIG,
@@ -201,6 +226,8 @@ interface OpenPosition {
   atrStopPrice?: number | null
   atrTakeProfitPrice?: number | null
   atrTrailDistance?: number | null
+  /** Fibonacci-extension take-profit price, computed at entry only when fibTakeProfitEnabled (and ATR isn't already handling the take-profit). */
+  fibTakeProfitPrice?: number | null
   openedAt: string
   executionMode?: PersistedExecutionMode
   groupId?: string
@@ -211,7 +238,11 @@ interface OpenPosition {
 
 type PositionAtrExits = Pick<
   OpenPosition,
-  'atrAtEntry' | 'atrStopPrice' | 'atrTakeProfitPrice' | 'atrTrailDistance'
+  | 'atrAtEntry'
+  | 'atrStopPrice'
+  | 'atrTakeProfitPrice'
+  | 'atrTrailDistance'
+  | 'fibTakeProfitPrice'
 >
 
 export interface TradeLogEntry {
@@ -560,19 +591,32 @@ function atrExitPlan(
   config: EngineConfig,
 ): PositionAtrExits {
   const entryAtr = atr(candles, config.atrPeriod)
+  const atrTakeProfitPrice =
+    entryAtr != null && config.atrTakeProfitMultiple > 0
+      ? entryPrice + entryAtr * config.atrTakeProfitMultiple
+      : null
   return {
     atrAtEntry: entryAtr,
     atrStopPrice:
       entryAtr != null && config.atrStopMultiple > 0
         ? entryPrice - entryAtr * config.atrStopMultiple
         : null,
-    atrTakeProfitPrice:
-      entryAtr != null && config.atrTakeProfitMultiple > 0
-        ? entryPrice + entryAtr * config.atrTakeProfitMultiple
-        : null,
+    atrTakeProfitPrice,
     atrTrailDistance:
       entryAtr != null && config.atrTrailingMultiple > 0
         ? entryAtr * config.atrTrailingMultiple
+        : null,
+    // ATR still wins if both happen to be configured — Fib is only computed
+    // as a fallback when the ATR take-profit isn't already set.
+    fibTakeProfitPrice:
+      atrTakeProfitPrice == null && config.fibTakeProfitEnabled
+        ? fibExtensionTarget(
+            'long',
+            entryPrice,
+            candles,
+            config.fibSwingLookback,
+            config.fibExtensionRatio,
+          )
         : null,
   }
 }
@@ -1567,9 +1611,15 @@ async function runTradingCycleInner(
         !trailing &&
         pos.atrTakeProfitPrice != null &&
         price >= pos.atrTakeProfitPrice
+      const hitFibTarget =
+        !trailing &&
+        pos.atrTakeProfitPrice == null &&
+        pos.fibTakeProfitPrice != null &&
+        price >= pos.fibTakeProfitPrice
       const hitFixedTarget =
         !trailing &&
         pos.atrTakeProfitPrice == null &&
+        pos.fibTakeProfitPrice == null &&
         changePct >= config.takeProfitPct
       const ownerExit = ownerDecision?.signal === 'SELL'
       const councilExit = vote.signal === 'SELL'
@@ -1583,6 +1633,7 @@ async function runTradingCycleInner(
         hitAtrTrail ||
         hitPctTrail ||
         hitAtrTarget ||
+        hitFibTarget ||
         hitFixedTarget ||
         ownerExit ||
         councilExit ||
@@ -1598,13 +1649,15 @@ async function runTradingCycleInner(
                 ? `trailing-stop ${(changePct * 100).toFixed(2)}% (peak ${highWaterPrice.toFixed(2)})`
                 : hitAtrTarget
                   ? `atr-target ${(changePct * 100).toFixed(2)}% (ATR ${pos.atrAtEntry?.toFixed(2) ?? '?'})`
-                  : hitFixedTarget
-                    ? `take-profit ${(changePct * 100).toFixed(2)}%`
-                    : ownerExit
-                      ? `strategy exit: ${ownerDecision.reason}`
-                      : councilExit
-                        ? `council exit (net ${vote.net.toFixed(2)})`
-                        : `max-hold-expired (${heldMinutes.toFixed(0)}m >= ${config.maxHoldMinutes}m)`
+                  : hitFibTarget
+                    ? `fib-target ${(changePct * 100).toFixed(2)}%`
+                    : hitFixedTarget
+                      ? `take-profit ${(changePct * 100).toFixed(2)}%`
+                      : ownerExit
+                        ? `strategy exit: ${ownerDecision.reason}`
+                        : councilExit
+                          ? `council exit (net ${vote.net.toFixed(2)})`
+                          : `max-hold-expired (${heldMinutes.toFixed(0)}m >= ${config.maxHoldMinutes}m)`
         const groupId = pos.groupId ?? newGroupId(symbol)
         const orderInput: BinanceOrderInput = {
           symbol,
@@ -1775,6 +1828,15 @@ async function runTradingCycleInner(
           vote.leadStrategyId,
           'regime_below_long_sma',
           `${symbol} close is below the configured SMA(${config.regimeSmaPeriod}) regime gate`,
+        )
+        continue
+      }
+      if (!trendIsStrong(candles, config.adxPeriod, config.adxThreshold)) {
+        recordQualityBlock(
+          symbol,
+          vote.leadStrategyId,
+          'adx_trend_weak',
+          `${symbol} ADX(${config.adxPeriod}) is below the configured strength threshold ${config.adxThreshold}`,
         )
         continue
       }
