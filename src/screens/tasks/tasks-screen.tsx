@@ -815,9 +815,10 @@ export function TasksScreen() {
               <button
                 type="button"
                 aria-label="Open timed-out task analysis"
+                title="Open (non-done) tasks with at least one timeout in their history — many have since succeeded on retry; click for a breakdown"
                 onClick={() => setShowTimeoutAnalysis(true)}
                 className="text-amber-500 hover:text-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 rounded-sm transition-colors"
-              >⏱ {stats.timedOut}</button></>
+              >⏱ {stats.timedOut} timed-out</button></>
             )}
             {stats.overdue > 0 && <><span className="opacity-30">·</span><span className="text-red-400">{stats.overdue} overdue</span></>}
             <span className="opacity-30">·</span>
