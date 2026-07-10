@@ -484,19 +484,57 @@ export async function runGridPaperCycle(
   }
 }
 
+export interface GridPerformance {
+  totalTrades: number
+  wins: number
+  losses: number
+  winRate: number
+  totalPnlQuote: number
+  totalFeesQuote: number
+}
+
+/** Aggregate stats over ALL closed grid trades (not just the last-50 slice kept for display). */
+export function summarizeGridTrades(
+  trades: Array<GridPaperTrade>,
+): GridPerformance {
+  if (trades.length === 0) {
+    return {
+      totalTrades: 0,
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+      totalPnlQuote: 0,
+      totalFeesQuote: 0,
+    }
+  }
+  const wins = trades.filter((t) => t.pnlQuote > 0).length
+  const losses = trades.filter((t) => t.pnlQuote < 0).length
+  return {
+    totalTrades: trades.length,
+    wins,
+    losses,
+    winRate: wins / trades.length,
+    totalPnlQuote: trades.reduce((sum, t) => sum + t.pnlQuote, 0),
+    totalFeesQuote: trades.reduce((sum, t) => sum + t.feesQuote, 0),
+  }
+}
+
 export function getGridEngineState(): {
   config: GridEngineConfig
   states: Array<GridSymbolState>
   trades: Array<GridPaperTrade>
+  performance: GridPerformance
 } {
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const rows = db.strategy_results
+  const allTrades = rows.filter(
+    (r) => r.kind === SR_KIND_GRID_TRADE,
+  ) as unknown as Array<GridPaperTrade>
   return {
     config: resolveGridEngineConfig(settings.demoTradingGrid),
     states: rows.filter((r) => r.kind === SR_KIND_GRID_STATE) as unknown as Array<GridSymbolState>,
-    trades: (rows.filter((r) => r.kind === SR_KIND_GRID_TRADE) as unknown as Array<GridPaperTrade>)
-      .slice(-50)
-      .reverse(),
+    trades: [...allTrades].slice(-50).reverse(),
+    performance: summarizeGridTrades(allTrades),
   }
 }
