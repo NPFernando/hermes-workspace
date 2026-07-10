@@ -134,6 +134,19 @@ describe('runLlmSignalCycle gating', () => {
     expect(result.reason).toContain('disabled')
   })
 
+  it('does not run when the connectivity breaker is tripped', async () => {
+    await setMode('testnet_execute')
+    const { recordConnectivityOutcome } = await import('./connectivity-breaker')
+    const CRED_FAILURE = 'Binance demo /api/v3/order failed (401): Unauthorized'
+    recordConnectivityOutcome(CRED_FAILURE)
+    recordConnectivityOutcome(CRED_FAILURE)
+    recordConnectivityOutcome(CRED_FAILURE)
+    const { runLlmSignalCycle } = await import('./llm-signal-engine')
+    const result = await runLlmSignalCycle()
+    expect(result.ran).toBe(false)
+    expect(result.reason).toContain('connectivity breaker')
+  })
+
   it('serializes overlapping cycles — the second is rejected as busy', async () => {
     await setMode('testnet_execute')
     await enableEngine()

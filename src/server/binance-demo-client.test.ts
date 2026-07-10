@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import * as os from 'node:os'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 import {
   BinanceDemoClient,
@@ -52,28 +55,44 @@ describe('BinanceDemoClient construction guards', () => {
 
 describe('BinanceDemoClient requests hit the normalized demo base', () => {
   it('strips a trailing /api so paths do not double up', async () => {
-    const fetchImpl = vi.fn(async (url: string) => {
-      // server time then account
-      if (url.includes('/api/v3/account')) {
-        return new Response(
-          JSON.stringify({ accountType: 'SPOT', canTrade: true, balances: [{ asset: 'USDT', free: '5000', locked: '0' }] }),
-          { status: 200 },
-        )
-      }
-      return new Response('{}', { status: 200 })
-    }) as unknown as typeof fetch
-    const client = new BinanceDemoClient({
-      apiKey: 'k',
-      apiSecret: 's',
-      baseUrl: 'https://demo-api.binance.com/api',
-      fetchImpl,
-    })
-    const acct = await client.getAccount()
-    expect(acct.balances[0]).toEqual({ asset: 'USDT', free: 5000, locked: 0 })
-    const calledUrl = (fetchImpl as any).mock.calls[0][0] as string
-    expect(calledUrl).toContain('https://demo-api.binance.com/api/v3/account')
-    expect(calledUrl).not.toContain('/api/api/')
-    expect(calledUrl).toContain('signature=')
+    // signedRequest now records connectivity-breaker outcomes (reads/writes
+    // the finance store) — isolate HOME + reset modules so this never
+    // touches the real ~/.hermes, matching demo-trading-engine.test.ts's
+    // pattern (finance-store.ts resolves its path from os.homedir() at
+    // module load, so a plain top-of-file import is evaluated too early).
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'binance-demo-client-'))
+    const realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+    try {
+      const { BinanceDemoClient: FreshBinanceDemoClient } = await import('./binance-demo-client')
+      const fetchImpl = vi.fn(async (url: string) => {
+        // server time then account
+        if (url.includes('/api/v3/account')) {
+          return new Response(
+            JSON.stringify({ accountType: 'SPOT', canTrade: true, balances: [{ asset: 'USDT', free: '5000', locked: '0' }] }),
+            { status: 200 },
+          )
+        }
+        return new Response('{}', { status: 200 })
+      }) as unknown as typeof fetch
+      const client = new FreshBinanceDemoClient({
+        apiKey: 'k',
+        apiSecret: 's',
+        baseUrl: 'https://demo-api.binance.com/api',
+        fetchImpl,
+      })
+      const acct = await client.getAccount()
+      expect(acct.balances[0]).toEqual({ asset: 'USDT', free: 5000, locked: 0 })
+      const calledUrl = (fetchImpl as any).mock.calls[0][0] as string
+      expect(calledUrl).toContain('https://demo-api.binance.com/api/v3/account')
+      expect(calledUrl).not.toContain('/api/api/')
+      expect(calledUrl).toContain('signature=')
+    } finally {
+      if (realHome === undefined) delete process.env.HOME
+      else process.env.HOME = realHome
+      fs.rmSync(tmp, { recursive: true, force: true })
+    }
   })
 })
 

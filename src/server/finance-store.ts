@@ -8,6 +8,7 @@ import {
   readFinancePostgresStore,
   writeFinancePostgresStore,
 } from './finance-postgres-store'
+import type { ConnectivityBreakerState } from './connectivity-breaker'
 
 export const FINANCE_SCHEMA_VERSION = 1
 export const FINANCE_DATA_DIR = path.join(os.homedir(), '.hermes', 'finance')
@@ -436,6 +437,7 @@ export type FinanceDatabase = {
   error_logs: Array<Record<string, unknown>>
   trading_signals: Array<TradingSignal>
   riskState: RiskState
+  connectivityBreaker: ConnectivityBreakerState
 }
 
 export type FinanceStorageHealthStatus =
@@ -567,6 +569,13 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
       weeklyBreached: false,
       lastResetDay: startOfDay(),
       lastResetWeek: startOfWeek(),
+    },
+    connectivityBreaker: {
+      consecutiveCredentialFailures: 0,
+      firstFailureAt: null,
+      tripped: false,
+      trippedAt: null,
+      trippedReason: null,
     },
   }
 }

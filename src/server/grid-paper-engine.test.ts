@@ -203,6 +203,20 @@ describe('advanceSymbolState — efficiency gate persists across calls', () => {
 })
 
 describe('runGridPaperCycle — I/O + lock', () => {
+  it('does not run when the connectivity breaker is tripped — this engine\'s first-ever global gate', async () => {
+    const { recordConnectivityOutcome } = await import('./connectivity-breaker')
+    const CRED_FAILURE = 'Binance demo /api/v3/order failed (401): Unauthorized'
+    recordConnectivityOutcome(CRED_FAILURE)
+    recordConnectivityOutcome(CRED_FAILURE)
+    recordConnectivityOutcome(CRED_FAILURE)
+    const { runGridPaperCycle } = await import('./grid-paper-engine')
+    const fetchKlines = vi.fn()
+    const result = await runGridPaperCycle({ fetchKlines })
+    expect(result.ran).toBe(false)
+    expect(result.reason).toBe('connectivity breaker tripped')
+    expect(fetchKlines).not.toHaveBeenCalled()
+  })
+
   it('serializes overlapping cycles — the second is rejected as busy', async () => {
     const { runGridPaperCycle } = await import('./grid-paper-engine')
     const candles: Array<Candle> = []

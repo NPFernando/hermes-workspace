@@ -21,6 +21,7 @@
 import { randomUUID } from 'node:crypto'
 import { fetchBinanceKlines } from './binance-market.service'
 import { readFinanceStore, writeFinanceStore } from './finance-store'
+import { isConnectivityBreakerTripped } from './connectivity-breaker'
 import type { Candle } from './trading-strategies'
 
 export type GridSpacing = 'arithmetic' | 'geometric'
@@ -427,6 +428,14 @@ export interface GridCycleOptions {
 }
 
 async function runGridPaperCycleInner(options: GridCycleOptions): Promise<GridCycleResult> {
+  // First global gate this paper-only engine has ever had — previously ran
+  // regardless of emergencyKillSwitch/tradingMode. A tripped connectivity
+  // breaker means repeated invalid-credential errors elsewhere (this engine
+  // itself only reads public market data, never signs a request) — halting
+  // here too avoids burning cycles while the underlying key problem exists.
+  if (isConnectivityBreakerTripped()) {
+    return { ran: false, reason: 'connectivity breaker tripped', trades: [], symbolsProcessed: 0 }
+  }
   const fetchKlines = options.fetchKlines ?? fetchBinanceKlines
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>

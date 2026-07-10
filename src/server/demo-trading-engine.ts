@@ -47,6 +47,7 @@ import {
   dayKey,
   weekKey,
 } from './trading-guardian'
+import { isConnectivityBreakerTripped } from './connectivity-breaker'
 import {
   applyBucketOutcome,
   bucketVeto,
@@ -1302,6 +1303,9 @@ async function runTradingCycleInner(
 
   if (db.settings.emergencyKillSwitch)
     return bail('emergency kill switch is active')
+  if (isConnectivityBreakerTripped()) {
+    return bail('connectivity breaker tripped — repeated invalid-credential errors, needs manual reset')
+  }
   if (!executionMode) {
     return bail(
       `tradingMode is "${db.settings.tradingMode}", not paper_trade, testnet_execute, or approved Binance live`,

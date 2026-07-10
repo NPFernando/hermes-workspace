@@ -39,6 +39,7 @@ import {
   strategyOverrideState,
 } from '../../server/demo-trading-engine'
 import { startFinanceStorageMonitor } from '../../server/finance-storage-monitor'
+import { resetConnectivityBreaker } from '../../server/connectivity-breaker'
 
 type JsonRecord = Record<string, unknown>
 
@@ -136,6 +137,7 @@ function financePayload() {
     strategyOverrides: strategyOverrideState(),
     alerts,
     settings: db.settings,
+    connectivityBreaker: db.connectivityBreaker,
     data: maskSensitive(db),
   }
 }
@@ -380,6 +382,14 @@ export const Route = createFileRoute('/api/finance')({
               engaged,
               source: 'finance_api',
             })
+            return json(financePayload())
+          }
+          if (action === 'reset_connectivity_breaker') {
+            // Manual-only, same as the kill switch's general philosophy —
+            // no auto-recovery, a human should verify the underlying
+            // credential problem is actually fixed before trading resumes.
+            resetConnectivityBreaker()
+            appendAuditLog('connectivity_breaker_reset', { source: 'finance_api' })
             return json(financePayload())
           }
           if (action === 'set_demo_config' || action === 'set_engine_config') {

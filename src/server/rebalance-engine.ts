@@ -15,6 +15,7 @@
 import { randomUUID } from 'node:crypto'
 import { createDemoClientFromEnv } from './binance-demo-client'
 import { appendAuditLog, readFinanceStore, writeFinanceStore } from './finance-store'
+import { isConnectivityBreakerTripped } from './connectivity-breaker'
 import { recordResearchRun } from './research-store'
 import type { BinanceExecutionClient } from './binance-demo-client'
 
@@ -157,6 +158,9 @@ function executionModeAllowed(
   config: RebalanceConfig,
 ): { allowed: boolean; reason?: string } {
   if (settings.emergencyKillSwitch) return { allowed: false, reason: 'emergency kill switch is active' }
+  if (isConnectivityBreakerTripped()) {
+    return { allowed: false, reason: 'connectivity breaker tripped — repeated invalid-credential errors, needs manual reset' }
+  }
   if (settings.tradingMode !== 'testnet_execute') {
     return {
       allowed: false,

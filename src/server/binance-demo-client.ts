@@ -7,6 +7,7 @@
  * turning a testnet URL change into a real-money order path.
  */
 import crypto from 'node:crypto'
+import { recordConnectivityOutcome } from './connectivity-breaker'
 
 const ALLOWED_DEMO_HOSTS = new Set([
   'demo-api.binance.com',
@@ -217,8 +218,11 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
     if (!res.ok) {
       const code = (body)?.code
       const msg = (body)?.msg || res.statusText
-      throw new DemoEnvironmentError(`${this.errorPrefix()} ${path} failed (${res.status}${code ? ` code ${code}` : ''}): ${msg}`)
+      const errorMessage = `${this.errorPrefix()} ${path} failed (${res.status}${code ? ` code ${code}` : ''}): ${msg}`
+      recordConnectivityOutcome(errorMessage)
+      throw new DemoEnvironmentError(errorMessage)
     }
+    recordConnectivityOutcome(null)
     return body
   }
 

@@ -168,6 +168,20 @@ describe('runRebalanceCycle gating', () => {
     expect(result.reason).toContain('disabled')
   })
 
+  it('does not run when the connectivity breaker is tripped', async () => {
+    await setMode('testnet_execute')
+    await enableEngine()
+    const { recordConnectivityOutcome } = await import('./connectivity-breaker')
+    const CRED_FAILURE = 'Binance demo /api/v3/order failed (401): Unauthorized'
+    recordConnectivityOutcome(CRED_FAILURE)
+    recordConnectivityOutcome(CRED_FAILURE)
+    recordConnectivityOutcome(CRED_FAILURE)
+    const { runRebalanceCycle } = await import('./rebalance-engine')
+    const result = await runRebalanceCycle()
+    expect(result.ran).toBe(false)
+    expect(result.reason).toContain('connectivity breaker')
+  })
+
   it('executes trades once enabled, in testnet_execute, and drift exceeds the threshold', async () => {
     await setMode('testnet_execute')
     await enableEngine()

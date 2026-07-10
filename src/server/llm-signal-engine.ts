@@ -26,6 +26,7 @@ import * as path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { createDemoClientFromEnv } from './binance-demo-client'
 import { appendAuditLog, readFinanceStore, writeFinanceStore } from './finance-store'
+import { isConnectivityBreakerTripped } from './connectivity-breaker'
 import { recordLlmDecision } from './research-store'
 import { atr, rsi, sma } from './trading-strategies'
 import type { BinanceExecutionClient } from './binance-demo-client'
@@ -273,6 +274,9 @@ function executionModeAllowed(
   config: LlmSignalConfig,
 ): { allowed: boolean; reason?: string } {
   if (settings.emergencyKillSwitch) return { allowed: false, reason: 'emergency kill switch is active' }
+  if (isConnectivityBreakerTripped()) {
+    return { allowed: false, reason: 'connectivity breaker tripped — repeated invalid-credential errors, needs manual reset' }
+  }
   if (settings.tradingMode !== 'testnet_execute') {
     return { allowed: false, reason: `tradingMode is "${String(settings.tradingMode)}", not testnet_execute` }
   }

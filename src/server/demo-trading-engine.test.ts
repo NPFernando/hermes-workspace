@@ -188,6 +188,19 @@ describe('runTradingCycle gating', () => {
     expect(res.reason).toMatch(/kill switch/)
   })
 
+  it('halts when the connectivity breaker is tripped', async () => {
+    await setMode('testnet_execute')
+    const { recordConnectivityOutcome } = await import('./connectivity-breaker')
+    const CRED_FAILURE = 'Binance demo /api/v3/order failed (401): Unauthorized'
+    recordConnectivityOutcome(CRED_FAILURE)
+    recordConnectivityOutcome(CRED_FAILURE)
+    recordConnectivityOutcome(CRED_FAILURE)
+    const { runTradingCycle } = await import('./demo-trading-engine')
+    const res = await runTradingCycle({ client: fakeClient() as never })
+    expect(res.ran).toBe(false)
+    expect(res.reason).toMatch(/connectivity breaker/)
+  })
+
   it('force runs regardless of mode', async () => {
     await setMode('observe_only')
     const { runTradingCycle } = await import('./demo-trading-engine')
