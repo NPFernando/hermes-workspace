@@ -641,6 +641,11 @@ function runPsql(
         encoding: 'utf8',
         input: sql,
         timeout: 20_000,
+        // Default 1MB stdout buffer is too small for a full finance-store
+        // snapshot read (grows with market_prices/historical_candles/
+        // strategy_results); undersizing this fails silently as ENOBUFS,
+        // not a distinguishable Postgres error.
+        maxBuffer: 64 * 1024 * 1024,
       },
     )
     if (
