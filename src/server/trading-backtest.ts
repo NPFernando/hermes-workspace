@@ -121,6 +121,10 @@ export interface BacktestConfig {
    * weight and cooldown state.
    */
   scoreScope: BacktestScoreScope
+  /** Fill-price penalty in basis points, applied to both entries and exits (0 = off). */
+  slippageBps: number
+  /** Skip new entries on a bar that gapped down more than this fraction from the prior close (0 = off). */
+  gapDownGuardPct: number
 }
 
 export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
@@ -143,6 +147,8 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   tradeDirection: 'long',
   marketRegimeSymbol: '',
   marketRegimeSmaPeriod: 0,
+  slippageBps: 0,
+  gapDownGuardPct: 0,
 }
 
 export interface BacktestTrade {
@@ -523,6 +529,37 @@ export function buildWalkForwardWindows(
   })
 }
 
+/**
+ * Trade-direction-aware fill penalty: buys fill worse (higher), sells fill
+ * worse (lower). Models the gap between a backtest's nominal signal price
+ * and what a real order would actually fill at. 0 = off (default), which
+ * reproduces today's zero-slippage fills exactly.
+ */
+export function applyFillSlippage(
+  nominalPrice: number,
+  side: 'buy' | 'sell',
+  slippageBps: number,
+): number {
+  if (slippageBps <= 0) return nominalPrice
+  const factor = slippageBps / 10_000
+  return side === 'buy' ? nominalPrice * (1 + factor) : nominalPrice * (1 - factor)
+}
+
+/**
+ * True when this bar gapped down from the prior close by more than the guard
+ * threshold — a stand-in for "the order couldn't have filled at the nominal
+ * price because the market gapped past it overnight." Entries only; a
+ * stop-loss must always be allowed to fire, so this is never applied to exits.
+ */
+export function gapDownGuardTriggered(
+  candleOpen: number,
+  previousClose: number | undefined,
+  gapDownGuardPct: number,
+): boolean {
+  if (gapDownGuardPct <= 0 || !previousClose || previousClose <= 0) return false
+  return (previousClose - candleOpen) / previousClose > gapDownGuardPct
+}
+
 export function runBacktest(
   candlesBySymbol: Record<string, Array<Candle>>,
   interval: string,
@@ -574,7 +611,11 @@ export function runBacktest(
   ) => {
     // Mirrors the live close: gross exit value minus the round-trip fees
     // (entry fee was carried on the position, settled here in quote terms).
-    const exitQuote = pos.quantity * price
+    // Slippage affects the fill price only — the trigger comparisons above
+    // that decided to close already ran against the nominal candle price.
+    const exitFillSide = pos.side === 'long' ? 'sell' : 'buy'
+    const exitFillPrice = applyFillSlippage(price, exitFillSide, config.slippageBps)
+    const exitQuote = pos.quantity * exitFillPrice
     const exitFee = exitQuote * config.feeRatePerSide
     const feesQuote = pos.entryFeeQuote + exitFee
     const pnlQuote =
@@ -600,7 +641,7 @@ export function runBacktest(
       symbol: pos.symbol,
       strategyId: pos.strategyId,
       entryPrice: pos.entryPrice,
-      exitPrice: price,
+      exitPrice: exitFillPrice,
       quantity: pos.quantity,
       entryQuote: pos.entryQuote,
       exitQuote,
@@ -622,6 +663,7 @@ export function runBacktest(
 
       const candle = series[i]
       const price = candle.close
+      const previousClose = lastClose[symbol]
       lastClose[symbol] = price
       const now = new Date(candle.openTime + 1) // decision time ≈ candle close
       const window = series.slice(Math.max(0, i + 1 - config.windowSize), i + 1)
@@ -718,6 +760,10 @@ export function runBacktest(
       const stillHeld = positions.some((p) => p.symbol === symbol)
       const entrySide = entrySideForSignal(vote.signal, config.tradeDirection)
       if (!stillHeld && entrySide != null && vote.leadStrategyId) {
+        if (gapDownGuardTriggered(candle.open, previousClose, config.gapDownGuardPct)) {
+          guardianBlocks.gap_down_guard = (guardianBlocks.gap_down_guard || 0) + 1
+          continue
+        }
         const regimeCloses = series
           .slice(Math.max(0, i + 1 - config.regimeSmaPeriod), i + 1)
           .map((c) => c.close)
@@ -786,33 +832,38 @@ export function runBacktest(
           }
         } else {
           // Gross fill like the live engine's executedQty; the entry fee is
-          // carried on the position and settled at close.
+          // carried on the position and settled at close. Slippage is applied
+          // to the actual fill (quantity bought, and the entry anchor used
+          // for stop/target geometry) — mirrors how the live engine anchors
+          // stops to the real fill price, not a hypothetical unslipped one.
+          const entryFillSide = entrySide === 'long' ? 'buy' : 'sell'
+          const entryFillPrice = applyFillSlippage(price, entryFillSide, config.slippageBps)
           const spent = verdict.approvedQuote
           const entryFee = spent * config.feeRatePerSide
-          const quantity = spent / price
+          const quantity = spent / entryFillPrice
           const entryAtr = atr(window, config.atrPeriod)
           quoteBalance -= spent
           positions.push({
             side: entrySide,
             symbol,
             strategyId: vote.leadStrategyId,
-            entryPrice: price,
+            entryPrice: entryFillPrice,
             quantity,
             entryQuote: spent,
             entryFeeQuote: entryFee,
             openedAt: now.toISOString(),
-            highWaterPrice: price,
-            lowWaterPrice: price,
+            highWaterPrice: entryFillPrice,
+            lowWaterPrice: entryFillPrice,
             atrAtEntry: entryAtr,
             atrStopPrice: atrStopPrice(
               entrySide,
-              price,
+              entryFillPrice,
               entryAtr,
               config.atrStopMultiple,
             ),
             atrTakeProfitPrice: atrTakeProfitPrice(
               entrySide,
-              price,
+              entryFillPrice,
               entryAtr,
               config.atrTakeProfitMultiple,
             ),

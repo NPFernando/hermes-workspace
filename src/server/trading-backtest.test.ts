@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_BACKTEST_CONFIG,
+  applyFillSlippage,
   buildWalkForwardWindows,
   computeRiskAdjustedMetrics,
+  gapDownGuardTriggered,
   runBacktest,
   splitCandlesByIndex,
 } from './trading-backtest'
@@ -601,5 +603,100 @@ describe('runBacktest', () => {
     expect(carried.trades[0].entryQuote).toBeGreaterThan(
       fresh.trades[0].entryQuote,
     )
+  })
+})
+
+describe('applyFillSlippage', () => {
+  it('is a no-op at 0 bps', () => {
+    expect(applyFillSlippage(100, 'buy', 0)).toBe(100)
+    expect(applyFillSlippage(100, 'sell', 0)).toBe(100)
+  })
+
+  it('fills buys worse (higher) and sells worse (lower)', () => {
+    expect(applyFillSlippage(100, 'buy', 50)).toBeCloseTo(100.5, 8)
+    expect(applyFillSlippage(100, 'sell', 50)).toBeCloseTo(99.5, 8)
+  })
+})
+
+describe('gapDownGuardTriggered', () => {
+  it('is off at 0 pct regardless of gap size', () => {
+    expect(gapDownGuardTriggered(80, 100, 0)).toBe(false)
+  })
+
+  it('does not trigger without a prior close to compare against', () => {
+    expect(gapDownGuardTriggered(80, undefined, 0.07)).toBe(false)
+  })
+
+  it('triggers only once the gap exceeds the threshold', () => {
+    expect(gapDownGuardTriggered(96, 100, 0.07)).toBe(false) // 4% gap
+    expect(gapDownGuardTriggered(90, 100, 0.07)).toBe(true) // 10% gap
+  })
+})
+
+describe('backtest slippage + gap-down guard integration', () => {
+  /** 25 flat warmup candles, then one breakout bar whose OPEN can be gapped independently of its close. */
+  function breakoutSeriesWithGap(gapOpen: number): Array<Candle> {
+    const flat = Array.from({ length: 25 }, (_, i) => candle(i, 100))
+    const breakoutBar: Candle = {
+      openTime: T0 + 25 * HOUR,
+      open: gapOpen,
+      high: 115,
+      low: Math.min(gapOpen, 99) - 1,
+      close: 112,
+      volume: 100,
+    }
+    return [...flat, breakoutBar]
+  }
+
+  const breakoutOnly: BacktestConfig = { ...config, enabledStrategies: ['breakout'] }
+
+  it('applies slippage to both entry and exit fills, reducing pnl vs an unslipped run', () => {
+    // A series that ends right on the breakout bar opens exactly one trade,
+    // immediately realized at "end of backtest" on the same close (fills use
+    // candle.close, not open) — this isolates the fill-price effect from any
+    // knock-on change to exit timing (anchoring stops/targets to the real
+    // fill price, as this phase intentionally does, can otherwise shift when
+    // later trades open/close).
+    const series = breakoutSeriesWithGap(100)
+    const baseline = runBacktest({ BTCUSDT: series }, '1h', breakoutOnly)
+    const slipped = runBacktest({ BTCUSDT: series }, '1h', {
+      ...breakoutOnly,
+      slippageBps: 50,
+    })
+    expect(baseline.trades).toHaveLength(1)
+    expect(slipped.trades).toHaveLength(1)
+    expect(slipped.trades[0].entryPrice).toBeCloseTo(applyFillSlippage(112, 'buy', 50), 8)
+    expect(slipped.trades[0].exitPrice).toBeCloseTo(applyFillSlippage(112, 'sell', 50), 8)
+    expect(slipped.trades[0].entryPrice).toBeGreaterThan(baseline.trades[0].entryPrice)
+    expect(slipped.trades[0].exitPrice).toBeLessThan(baseline.trades[0].exitPrice)
+    expect(slipped.totalPnlQuote).toBeLessThan(baseline.totalPnlQuote)
+  })
+
+  it('blocks a new entry on a bar that gapped down past the guard threshold', () => {
+    const report = runBacktest({ BTCUSDT: breakoutSeriesWithGap(90) }, '1h', {
+      ...breakoutOnly,
+      gapDownGuardPct: 0.07, // prior close 100 -> 10% gap trips it
+    })
+    expect(report.trades.length).toBe(0)
+    expect(report.guardianBlocks.gap_down_guard).toBeGreaterThan(0)
+  })
+
+  it('still opens the same entry when the guard is off (default) despite the gap', () => {
+    const report = runBacktest({ BTCUSDT: breakoutSeriesWithGap(90) }, '1h', breakoutOnly)
+    expect(report.trades.length + 1).toBeGreaterThan(1) // opened (may still be open at report end, realized on close-out)
+    expect(report.guardianBlocks.gap_down_guard ?? 0).toBe(0)
+  })
+
+  it('never blocks an exit — an existing position still stops out on a gapped-down bar', () => {
+    const flat = Array.from({ length: 25 }, (_, i) => candle(i, 100))
+    const openBar: Candle = { openTime: T0 + 25 * HOUR, open: 100, high: 115, low: 99, close: 112, volume: 100 }
+    // Gaps down ~20% from the prior close (112) and breaches the 2% stop-loss.
+    const crashBar: Candle = { openTime: T0 + 26 * HOUR, open: 90, high: 91, low: 84, close: 85, volume: 100 }
+    const report = runBacktest({ BTCUSDT: [...flat, openBar, crashBar] }, '1h', {
+      ...breakoutOnly,
+      gapDownGuardPct: 0.07,
+    })
+    const stops = report.trades.filter((t) => t.reason.startsWith('stop-loss'))
+    expect(stops.length).toBeGreaterThan(0)
   })
 })
