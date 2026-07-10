@@ -51,6 +51,10 @@ import {
 } from './trading-guardian'
 import { isConnectivityBreakerTripped } from './connectivity-breaker'
 import {
+  fetchTopTraderLongShortRatio,
+  longShortSentimentDecision,
+} from './long-short-sentiment'
+import {
   applyBucketOutcome,
   bucketVeto,
   buildEntryFeatureVector,
@@ -78,8 +82,10 @@ const SR_KIND_BLOCK = 'demo_guardian_block'
 const SR_KIND_SHADOW_DECISION = 'paper_shadow_decision'
 const SR_KIND_LEARNING_CANDIDATE = 'learning_candidate'
 const SR_KIND_PATTERN_VETO_STATS = 'demo_pattern_veto_stats'
+const SR_KIND_LONG_SHORT_OBSERVATION = 'demo_long_short_observation'
 const TRADE_LOG_CAP = 200
 const BLOCK_LOG_CAP = 50
+const LONG_SHORT_OBSERVATION_CAP = 5000 // ~30+ days at one observation/symbol/cycle, enough for a future backtest
 const SAFEGUARD_HISTORY_CAP = 25
 const STRATEGY_OVERRIDE_HISTORY_CAP = 50
 const LEARNING_CANDIDATE_CAP = 50
@@ -174,6 +180,14 @@ export interface EngineConfig {
   fibTakeProfitEnabled: boolean
   fibSwingLookback: number
   fibExtensionRatio: number
+  /**
+   * Top-trader long/short-ratio sentiment (off by default) — an extra
+   * council-vote member sourced from Binance's public futures market data
+   * (read-only, no auth, no order-placement capability), not a candle
+   * strategy. See long-short-sentiment.ts.
+   */
+  longShortSentimentEnabled: boolean
+  longShortSentimentPeriod: string
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -203,6 +217,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   fibTakeProfitEnabled: false,
   fibSwingLookback: 20,
   fibExtensionRatio: 1.618,
+  longShortSentimentEnabled: false,
+  longShortSentimentPeriod: '1h',
   councilThreshold: 0.6,
   maxHoldMinutes: 0,
   guardian: DEFAULT_GUARDIAN_CONFIG,
@@ -395,6 +411,7 @@ interface PersistInput {
   trades: Array<TradeLogEntry>
   blocks: Array<SRRow>
   patternVetoStats: Record<string, BucketStats>
+  sentimentObservations: Array<SRRow>
 }
 
 function persist(input: PersistInput): void {
@@ -405,7 +422,8 @@ function persist(input: PersistInput): void {
       r.kind !== SR_KIND_POSITION &&
       r.kind !== SR_KIND_TRADE &&
       r.kind !== SR_KIND_BLOCK &&
-      r.kind !== SR_KIND_PATTERN_VETO_STATS,
+      r.kind !== SR_KIND_PATTERN_VETO_STATS &&
+      r.kind !== SR_KIND_LONG_SHORT_OBSERVATION,
   )
   db.strategy_results = [
     ...others,
@@ -419,6 +437,7 @@ function persist(input: PersistInput): void {
       kind: SR_KIND_PATTERN_VETO_STATS,
       ...s,
     })),
+    ...input.sentimentObservations.slice(-LONG_SHORT_OBSERVATION_CAP),
   ]
   db.updatedAt = new Date().toISOString()
   writeFinanceStore(db)
@@ -1326,6 +1345,9 @@ async function runTradingCycleInner(
   let patternVetoStats: Record<string, BucketStats> = Object.fromEntries(
     loadOfKind<BucketStats>(rows, SR_KIND_PATTERN_VETO_STATS).map((s) => [s.key, s]),
   )
+  const sentimentObservations = rows.filter(
+    (r) => r.kind === SR_KIND_LONG_SHORT_OBSERVATION,
+  )
   const activeTrades = executionMode
     ? realizedTradesForMode(trades, executionMode)
     : []
@@ -1505,8 +1527,27 @@ async function runTradingCycleInner(
     })
   }
 
+  // Logs every fetched long/short-ratio observation regardless of whether it
+  // changed the vote — building up history for a future backtest (Binance
+  // only retains ~30 days of this via its API, so we accumulate our own).
+  const appendSentimentObservation = (
+    point: { longShortRatio: number; longAccount: number; shortAccount: number; timestamp: number } | null,
+    obsSymbol: string,
+  ) => {
+    if (point == null) return
+    sentimentObservations.push({
+      kind: SR_KIND_LONG_SHORT_OBSERVATION,
+      symbol: obsSymbol,
+      longShortRatio: point.longShortRatio,
+      longAccount: point.longAccount,
+      shortAccount: point.shortAccount,
+      timestamp: point.timestamp,
+      observedAt: new Date().toISOString(),
+    })
+  }
+
   // Crash-safety: persist the store immediately after each order or shadow decision.
-  const checkpoint = () => persist({ scores, positions, trades, blocks, patternVetoStats })
+  const checkpoint = () => persist({ scores, positions, trades, blocks, patternVetoStats, sentimentObservations })
 
   for (const symbol of config.symbols) {
     let candles: Array<Candle>
@@ -1582,6 +1623,25 @@ async function runTradingCycleInner(
         decision: s.evaluate(candles),
         score: scores.get(s.id)?.score ?? 0,
       }))
+    if (config.longShortSentimentEnabled) {
+      try {
+        const points = await fetchTopTraderLongShortRatio(
+          symbol,
+          config.longShortSentimentPeriod,
+          1,
+        )
+        const latest = points.length > 0 ? points[0] : undefined
+        appendSentimentObservation(latest ?? null, symbol)
+        members.push({
+          strategyId: 'long_short_sentiment',
+          decision: longShortSentimentDecision(latest ? latest.longShortRatio : null),
+          score: scores.get('long_short_sentiment')?.score ?? 0,
+        })
+      } catch {
+        // Network hiccup on a read-only sentiment fetch must never break a
+        // trading cycle — just skip this cycle's sentiment vote.
+      }
+    }
     const vote = councilVote(members, config.councilThreshold)
 
     // 1. Manage existing positions (exits first).
@@ -2031,7 +2091,7 @@ async function runTradingCycleInner(
     }
   }
 
-  persist({ scores, positions, trades, blocks, patternVetoStats })
+  persist({ scores, positions, trades, blocks, patternVetoStats, sentimentObservations })
   let learning: LearningCycleResult | undefined
   if (mode === 'paper_trade' || mode === 'testnet_execute') {
     try {

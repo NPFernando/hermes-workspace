@@ -3,6 +3,14 @@ import * as os from 'node:os'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
+// fetchTopTraderLongShortRatio makes a real network call — mock just that
+// export so tests never hit fapi.binance.com; longShortSentimentDecision
+// (pure, no network) stays real.
+vi.mock('./long-short-sentiment', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./long-short-sentiment')>()
+  return { ...actual, fetchTopTraderLongShortRatio: vi.fn() }
+})
+
 // The finance store resolves its path from os.homedir() (which honours $HOME
 // on POSIX) at module load, so point HOME at a temp dir and reset modules so
 // the store re-evaluates against it — never touch the real ~/.hermes/finance.
@@ -546,6 +554,55 @@ describe('runTradingCycle open → close → score', () => {
       fibTakeProfitPrice?: number | null
     }
     expect(pos.fibTakeProfitPrice ?? null).toBeNull()
+  })
+
+  it('does not fetch long/short sentiment when longShortSentimentEnabled is false (the default)', async () => {
+    await setMode('testnet_execute')
+    const { fetchTopTraderLongShortRatio } = await import('./long-short-sentiment')
+    const { runTradingCycle } = await import('./demo-trading-engine')
+    await runTradingCycle({
+      client: fakeClient() as never,
+      config: { symbols: ['BTCUSDT'], enabledStrategies: ['rsi_reversion'] },
+    })
+    expect(fetchTopTraderLongShortRatio).not.toHaveBeenCalled()
+  })
+
+  it('lets a strong long/short-sentiment signal lead the vote and open a position under its own id', async () => {
+    await setMode('testnet_execute')
+    const { fetchTopTraderLongShortRatio } = await import('./long-short-sentiment')
+    vi.mocked(fetchTopTraderLongShortRatio).mockResolvedValue([
+      { symbol: 'BTCUSDT', longShortRatio: 2.5, longAccount: 0.71, shortAccount: 0.29, timestamp: Date.now() },
+    ])
+    const { runTradingCycle, getEngineState } = await import('./demo-trading-engine')
+    // No strategies enabled -> the sentiment member is the only voice, so a
+    // strong (capped-confidence) BUY from it alone should clear the council
+    // threshold and open a position under its own strategyId.
+    const r = await runTradingCycle({
+      client: fakeClient() as never,
+      config: {
+        symbols: ['BTCUSDT'],
+        enabledStrategies: [],
+        longShortSentimentEnabled: true,
+      },
+    })
+    expect(r.actions.some((a) => a.action === 'OPEN' && a.strategyId === 'long_short_sentiment')).toBe(true)
+    expect(getEngineState().positions[0]?.strategyId).toBe('long_short_sentiment')
+  })
+
+  it('completes the cycle normally when the sentiment fetch fails (never breaks the cycle)', async () => {
+    await setMode('testnet_execute')
+    const { fetchTopTraderLongShortRatio } = await import('./long-short-sentiment')
+    vi.mocked(fetchTopTraderLongShortRatio).mockRejectedValue(new Error('network error'))
+    const { runTradingCycle } = await import('./demo-trading-engine')
+    const r = await runTradingCycle({
+      client: fakeClient() as never,
+      config: {
+        symbols: ['BTCUSDT'],
+        enabledStrategies: ['rsi_reversion'],
+        longShortSentimentEnabled: true,
+      },
+    })
+    expect(r.ran).toBe(true)
   })
 
   it('opens a position on a BUY signal, then closes with profit and scores it', async () => {
