@@ -565,6 +565,14 @@ export interface StrategyScore {
   /** ISO timestamp while the strategy sits out after a loss streak. */
   cooldownUntil?: string | null
   updatedAt: string
+  /**
+   * Running average magnitude of winning/losing trades (quote currency).
+   * Optional — older persisted scores predate this field; treat missing as
+   * 0 and let it build up going forward (see applyTradeOutcome). Feeds
+   * kellyFraction(); nothing reads these until kellySizingEnabled is on.
+   */
+  avgWinQuote?: number
+  avgLossQuote?: number
 }
 
 export function emptyScore(strategyId: string): StrategyScore {
@@ -580,6 +588,8 @@ export function emptyScore(strategyId: string): StrategyScore {
     lossStreak: 0,
     cooldownUntil: null,
     updatedAt: new Date().toISOString(),
+    avgWinQuote: 0,
+    avgLossQuote: 0,
   }
 }
 
@@ -601,6 +611,16 @@ export function applyTradeOutcome(
   const roi = entryQuote > 0 ? pnlQuote / entryQuote : 0
   const delta = Math.max(-1, Math.min(1, roi * 10))
   const nextScore = score.score + delta
+  // Incremental running averages of win/loss magnitude, for kellyFraction().
+  // Missing on older persisted scores — treat as 0 and let it build forward.
+  const prevAvgWin = score.avgWinQuote ?? 0
+  const prevAvgLoss = score.avgLossQuote ?? 0
+  const avgWinQuote =
+    pnlQuote > 0 ? prevAvgWin + (pnlQuote - prevAvgWin) / wins : prevAvgWin
+  const avgLossQuote =
+    pnlQuote < 0
+      ? prevAvgLoss + (-pnlQuote - prevAvgLoss) / losses
+      : prevAvgLoss
   return {
     strategyId: score.strategyId,
     trades,
@@ -613,7 +633,27 @@ export function applyTradeOutcome(
     lossStreak: pnlQuote < 0 ? score.lossStreak + 1 : 0,
     cooldownUntil: pnlQuote < 0 ? (score.cooldownUntil ?? null) : null,
     updatedAt: new Date().toISOString(),
+    avgWinQuote,
+    avgLossQuote,
   }
+}
+
+/**
+ * Kelly-criterion bet fraction (concept from bbfamily/abu's ABuKellyPosition,
+ * reimplemented clean-room): winRate - lossRate/payoffRatio, clamped to
+ * [0, maxFraction]. avgLossQuote is a magnitude (pass positive); a strategy
+ * with no edge or missing loss data safely returns 0, never a negative bet.
+ */
+export function kellyFraction(
+  winRate: number,
+  avgWinQuote: number,
+  avgLossQuote: number,
+  maxFraction = 0.25,
+): number {
+  if (avgLossQuote <= 0 || winRate <= 0 || winRate >= 1) return 0
+  const payoffRatio = avgWinQuote / avgLossQuote
+  const raw = winRate - (1 - winRate) / payoffRatio
+  return Math.max(0, Math.min(maxFraction, raw))
 }
 
 // ── Council vote (VT-Capital council concept) ───────────────────────────────

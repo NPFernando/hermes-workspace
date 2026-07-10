@@ -36,6 +36,7 @@ import {
   councilVote,
   emptyScore,
   getStrategy,
+  kellyFraction,
   regimeAllowsLong,
   scaledQuoteSize,
 } from './trading-strategies'
@@ -124,6 +125,18 @@ export interface EngineConfig {
   atrSizeBaselinePct: number
   atrSizeMinMultiplier: number
   atrSizeMaxMultiplier: number
+  /**
+   * Kelly-criterion sizing scaffolding — off by default and inert (1x, no
+   * change) until BOTH kellySizingEnabled is true AND the lead strategy has
+   * at least kellySizingMinClosedTrades closed trades to trust its
+   * win-rate/payoff inputs. Deliberately conservative: this v1 only ever
+   * shrinks size relative to quotePerTrade (kellyFraction / maxFraction),
+   * never grows it, matching this codebase's existing "new levers only
+   * reduce risk" convention (see auto-refinement.ts).
+   */
+  kellySizingEnabled: boolean
+  kellySizingMinClosedTrades: number
+  kellySizingMaxFraction: number
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -142,6 +155,9 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   atrSizeBaselinePct: 0,
   atrSizeMinMultiplier: 0.25,
   atrSizeMaxMultiplier: 1.5,
+  kellySizingEnabled: false,
+  kellySizingMinClosedTrades: 30,
+  kellySizingMaxFraction: 0.25,
   councilThreshold: 0.6,
   maxHoldMinutes: 0,
   guardian: DEFAULT_GUARDIAN_CONFIG,
@@ -1745,6 +1761,23 @@ async function runTradingCycleInner(
               config.atrSizeMaxMultiplier,
             )
           : 1
+      // Kelly scaffolding: inert (1x) until enabled AND the lead strategy has
+      // enough closed trades to trust its win-rate/payoff inputs. v1 only
+      // ever shrinks (kellyFrac / maxFraction, capped at 1), never grows.
+      const kellySizeMult =
+        config.kellySizingEnabled &&
+        config.kellySizingMaxFraction > 0 &&
+        leadScore.trades >= config.kellySizingMinClosedTrades
+          ? Math.min(
+              1,
+              kellyFraction(
+                leadScore.winRate,
+                leadScore.avgWinQuote ?? 0,
+                leadScore.avgLossQuote ?? 0,
+                config.kellySizingMaxFraction,
+              ) / config.kellySizingMaxFraction,
+            )
+          : 1
       const proposedQuote = Math.max(
         1,
         Math.round(
@@ -1752,6 +1785,7 @@ async function runTradingCycleInner(
             qualitySizeMultiplier *
             strategyMultiplier *
             atrSizeMult *
+            kellySizeMult *
             100,
         ) / 100,
       )

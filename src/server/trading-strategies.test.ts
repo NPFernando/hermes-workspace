@@ -11,6 +11,7 @@ import {
   ema,
   emptyScore,
   keltnerChannelStrategy,
+  kellyFraction,
   macdMomentumStrategy,
   regimeAllowsLong,
   rsi,
@@ -502,5 +503,46 @@ describe('applyTradeOutcome loss streak', () => {
     expect(s.lossStreak).toBe(2)
     s = applyTradeOutcome(s, 5, 100)
     expect(s.lossStreak).toBe(0)
+  })
+})
+
+describe('applyTradeOutcome avgWinQuote/avgLossQuote', () => {
+  it('tracks separate running averages for wins and losses', () => {
+    let s = emptyScore('x')
+    s = applyTradeOutcome(s, 10, 100) // win
+    s = applyTradeOutcome(s, 30, 100) // win
+    s = applyTradeOutcome(s, -5, 100) // loss
+    s = applyTradeOutcome(s, -15, 100) // loss
+    expect(s.avgWinQuote).toBeCloseTo(20, 8) // (10+30)/2
+    expect(s.avgLossQuote).toBeCloseTo(10, 8) // (5+15)/2, stored as a positive magnitude
+  })
+
+  it('defaults missing avgWinQuote/avgLossQuote on older persisted scores to 0 and builds forward', () => {
+    const legacy = { ...emptyScore('x') } as Record<string, unknown>
+    delete legacy.avgWinQuote
+    delete legacy.avgLossQuote
+    const next = applyTradeOutcome(legacy as ReturnType<typeof emptyScore>, 40, 100)
+    expect(next.avgWinQuote).toBeCloseTo(40, 8)
+    expect(next.avgLossQuote).toBeCloseTo(0, 8)
+  })
+})
+
+describe('kellyFraction', () => {
+  it('computes the Kelly bet fraction, capped at maxFraction', () => {
+    // winRate 0.6, payoff 100/50=2 -> 0.6 - 0.4/2 = 0.4, capped at 0.25
+    expect(kellyFraction(0.6, 100, 50, 0.25)).toBeCloseTo(0.25, 8)
+    // same edge, higher cap -> the uncapped 0.4
+    expect(kellyFraction(0.6, 100, 50, 0.5)).toBeCloseTo(0.4, 8)
+  })
+
+  it('returns 0 (never negative) when there is no edge', () => {
+    // winRate 0.3, payoff 1 -> 0.3 - 0.7/1 = negative -> floored at 0
+    expect(kellyFraction(0.3, 50, 50, 0.25)).toBe(0)
+  })
+
+  it('returns 0 on invalid/degenerate inputs', () => {
+    expect(kellyFraction(0.6, 100, 0, 0.25)).toBe(0) // no loss data yet
+    expect(kellyFraction(0, 100, 50, 0.25)).toBe(0) // never won
+    expect(kellyFraction(1, 100, 50, 0.25)).toBe(0) // never lost (1 - winRate) singularity guard
   })
 })

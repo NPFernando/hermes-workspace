@@ -376,6 +376,36 @@ describe('runTradingCycle open → close → score', () => {
     expect(pos!.entryQuote).toBeLessThan(10)
   })
 
+  it('leaves sizing unchanged when kellySizingEnabled is on but the strategy has no trade history yet', async () => {
+    await setMode('testnet_execute')
+    const { runTradingCycle, getEngineState } =
+      await import('./demo-trading-engine')
+    // rsi_reversion's score is global (not per-symbol), so opening on two
+    // different symbols in the same test — neither closed yet, so trades
+    // stays 0 for both — isolates the kelly flag as the only variable.
+    const baseline = await runTradingCycle({
+      client: fakeClient() as never,
+      config: { symbols: ['BTCUSDT'], enabledStrategies: ['rsi_reversion'] },
+    })
+    expect(baseline.actions.some((a) => a.action === 'OPEN')).toBe(true)
+    const baselineEntryQuote = getEngineState().positions[0]!.entryQuote
+
+    const withKelly = await runTradingCycle({
+      client: fakeClient() as never,
+      config: {
+        symbols: ['ETHUSDT'],
+        enabledStrategies: ['rsi_reversion'],
+        kellySizingEnabled: true, // trades is still 0 -> below the 30-trade gate
+      },
+    })
+    expect(withKelly.actions.some((a) => a.action === 'OPEN')).toBe(true)
+    const withKellyEntryQuote = getEngineState().positions.find(
+      (p) => p.symbol === 'ETHUSDT',
+    )!.entryQuote
+
+    expect(withKellyEntryQuote).toBeCloseTo(baselineEntryQuote, 6)
+  })
+
   it('opens a position on a BUY signal, then closes with profit and scores it', async () => {
     await setMode('testnet_execute')
     const { runTradingCycle, getEngineState } =
