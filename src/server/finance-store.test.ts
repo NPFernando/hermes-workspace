@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildFinanceStorageHealth,
+  budgetVsActualSummary,
   createEmptyFinanceDatabase,
   createTradingPlan,
   financeAlerts,
@@ -158,5 +159,160 @@ describe('finance-store', () => {
     })
     expect(alert.detail).toContain('Postgres mirror is 30s behind')
     expect(alert.detail).toContain('Self-heal did not resolve it')
+  })
+
+  it('excludes categories with no budget set for the requested month', () => {
+    const db = createEmptyFinanceDatabase()
+    db.expense_records.push({
+      id: 'expense-1',
+      date: '2026-07-05',
+      vendor: 'Cargills',
+      category: 'Groceries',
+      currency: 'LKR',
+      amount: 5_000,
+      convertedLkrAmount: 5_000,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-07-05T00:00:00.000Z',
+      updatedAt: '2026-07-05T00:00:00.000Z',
+    })
+
+    expect(budgetVsActualSummary(db, '2026-07')).toEqual([])
+  })
+
+  it('reports 0% used and not over budget when no expenses have been logged', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push({
+      id: 'budget-1',
+      month: '2026-07',
+      category: 'Groceries',
+      currency: 'LKR',
+      budgetAmount: 20_000,
+      source: 'test',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    })
+
+    expect(budgetVsActualSummary(db, '2026-07')).toEqual([
+      {
+        category: 'Groceries',
+        month: '2026-07',
+        currency: 'LKR',
+        budget: 20_000,
+        actual: 0,
+        variance: 20_000,
+        percentUsed: 0,
+        overBudget: false,
+      },
+    ])
+  })
+
+  it('computes percentUsed and variance when spending is under budget', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push({
+      id: 'budget-1',
+      month: '2026-07',
+      category: 'Groceries',
+      currency: 'LKR',
+      budgetAmount: 20_000,
+      source: 'test',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    })
+    db.expense_records.push({
+      id: 'expense-1',
+      date: '2026-07-05',
+      vendor: 'Cargills',
+      category: 'Groceries',
+      currency: 'LKR',
+      amount: 15_000,
+      convertedLkrAmount: 15_000,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-07-05T00:00:00.000Z',
+      updatedAt: '2026-07-05T00:00:00.000Z',
+    })
+
+    const [result] = budgetVsActualSummary(db, '2026-07')
+    expect(result).toMatchObject({
+      category: 'Groceries',
+      budget: 20_000,
+      actual: 15_000,
+      variance: 5_000,
+      percentUsed: 75,
+      overBudget: false,
+    })
+  })
+
+  it('flags overBudget with a negative variance once spending exceeds budget', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push({
+      id: 'budget-1',
+      month: '2026-07',
+      category: 'Groceries',
+      currency: 'LKR',
+      budgetAmount: 20_000,
+      source: 'test',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    })
+    db.expense_records.push({
+      id: 'expense-1',
+      date: '2026-07-05',
+      vendor: 'Cargills',
+      category: 'Groceries',
+      currency: 'LKR',
+      amount: 25_000,
+      convertedLkrAmount: 25_000,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-07-05T00:00:00.000Z',
+      updatedAt: '2026-07-05T00:00:00.000Z',
+    })
+
+    const [result] = budgetVsActualSummary(db, '2026-07')
+    expect(result).toMatchObject({
+      budget: 20_000,
+      actual: 25_000,
+      variance: -5_000,
+      percentUsed: 125,
+      overBudget: true,
+    })
+  })
+
+  it('de-duplicates a category submitted twice for the same month (form double-submit)', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push(
+      {
+        id: 'budget-1',
+        month: '2026-07',
+        category: 'Groceries',
+        currency: 'LKR',
+        budgetAmount: 20_000,
+        source: 'test',
+        createdAt: '2026-07-01T00:00:00.000Z',
+        updatedAt: '2026-07-01T00:00:00.000Z',
+      },
+      {
+        id: 'budget-2',
+        month: '2026-07',
+        category: 'Groceries',
+        currency: 'LKR',
+        budgetAmount: 99_999,
+        source: 'test',
+        createdAt: '2026-07-01T00:00:01.000Z',
+        updatedAt: '2026-07-01T00:00:01.000Z',
+      },
+    )
+
+    const results = budgetVsActualSummary(db, '2026-07')
+    expect(results).toHaveLength(1)
+    expect(results[0]).toMatchObject({ category: 'Groceries', budget: 20_000 })
   })
 })

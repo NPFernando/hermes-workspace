@@ -996,6 +996,14 @@ export function addFinanceRecord(
       notes: optionalString(payload, 'notes'),
       supportingDocument: optionalString(payload, 'supportingDocument'),
     })
+  } else if (kind === 'budget_category') {
+    db.budget_categories.push({
+      ...base,
+      month: stringField(payload, 'month', nowIso().slice(0, 7)),
+      category: stringField(payload, 'category', 'Other'),
+      currency: stringField(payload, 'currency', 'LKR'),
+      budgetAmount: numberField(payload, 'budgetAmount', 0),
+    })
   } else if (kind === 'trading_plan') {
     db.trading_plans.push(createTradingPlan(payload, base))
   } else if (kind === 'virtual_account') {
@@ -1959,6 +1967,50 @@ export function getBudgetVsActual(
     actual,
     variance: budgetEntry.budgetAmount - actual,
   }
+}
+
+export function budgetVsActualSummary(
+  db: FinanceDatabase,
+  monthKey?: string,
+): Array<{
+  category: string
+  month: string
+  currency: CurrencyCode
+  budget: number
+  actual: number
+  variance: number
+  percentUsed: number
+  overBudget: boolean
+}> {
+  const month = monthKey ?? nowIso().slice(0, 7)
+  const [year, monthNum] = month.split('-').map(Number)
+  // De-duplicate by category: if the same category/month was submitted more
+  // than once, getBudgetVsActual's find() always resolves to the first
+  // matching entry — mirror that here so a form double-submit doesn't
+  // produce two rows for the same category.
+  const seenCategories = new Set<string>()
+  return db.budget_categories
+    .filter((b) => {
+      if (b.month !== month) return false
+      if (seenCategories.has(b.category)) return false
+      seenCategories.add(b.category)
+      return true
+    })
+    .map((b) => {
+      const result = getBudgetVsActual(db, b.category, year, monthNum)
+      const budget = result?.budget ?? b.budgetAmount
+      const actual = result?.actual ?? 0
+      return {
+        category: b.category,
+        month: b.month,
+        currency: b.currency,
+        budget,
+        actual,
+        variance: result?.variance ?? budget,
+        percentUsed: budget > 0 ? (actual / budget) * 100 : 0,
+        overBudget: actual > budget,
+      }
+    })
 }
 
 export function updateExchangeRate(
