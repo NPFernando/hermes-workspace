@@ -43,6 +43,18 @@ import {
 import { startFinanceStorageMonitor } from '../../server/finance-storage-monitor'
 import { resetConnectivityBreaker } from '../../server/connectivity-breaker'
 
+const VALID_LONG_SHORT_PERIODS = new Set([
+  '5m',
+  '15m',
+  '30m',
+  '1h',
+  '2h',
+  '4h',
+  '6h',
+  '12h',
+  '1d',
+])
+
 type JsonRecord = Record<string, unknown>
 
 startFinanceStorageMonitor()
@@ -458,6 +470,53 @@ export const Route = createFileRoute('/api/finance')({
               )
               if (ids.length > 0) dt.enabledStrategies = Array.from(new Set(ids))
             }
+            // Signal features built 2026-07-10/11: each is its own independent,
+            // off-by-default lever (see docs/trading-engine.md for the backtest
+            // evidence behind each one before arming).
+            const atrBaseline = inRange(cfg.atrSizeBaselinePct, 0, 0.1)
+            const atrMin = inRange(cfg.atrSizeMinMultiplier, 0.1, 1)
+            const atrMax = inRange(cfg.atrSizeMaxMultiplier, 1, 3)
+            const kellyMinTrades = inRange(cfg.kellySizingMinClosedTrades, 5, 200)
+            const kellyMaxFraction = inRange(cfg.kellySizingMaxFraction, 0, 1)
+            const vetoMinSamples = inRange(cfg.patternVetoMinSamples, 5, 200)
+            const vetoLossThreshold = inRange(
+              cfg.patternVetoLossRateThreshold,
+              0,
+              1,
+            )
+            const adxPeriod = inRange(cfg.adxPeriod, 2, 100)
+            const adxThreshold = inRange(cfg.adxThreshold, 0, 100)
+            const fibLookback = inRange(cfg.fibSwingLookback, 5, 200)
+            const fibRatio = inRange(cfg.fibExtensionRatio, 1, 3)
+            if (atrBaseline !== undefined) dt.atrSizeBaselinePct = atrBaseline
+            if (atrMin !== undefined) dt.atrSizeMinMultiplier = atrMin
+            if (atrMax !== undefined) dt.atrSizeMaxMultiplier = atrMax
+            if (typeof cfg.kellySizingEnabled === 'boolean')
+              dt.kellySizingEnabled = cfg.kellySizingEnabled
+            if (kellyMinTrades !== undefined)
+              dt.kellySizingMinClosedTrades = Math.floor(kellyMinTrades)
+            if (kellyMaxFraction !== undefined)
+              dt.kellySizingMaxFraction = kellyMaxFraction
+            if (typeof cfg.patternVetoEnabled === 'boolean')
+              dt.patternVetoEnabled = cfg.patternVetoEnabled
+            if (vetoMinSamples !== undefined)
+              dt.patternVetoMinSamples = Math.floor(vetoMinSamples)
+            if (vetoLossThreshold !== undefined)
+              dt.patternVetoLossRateThreshold = vetoLossThreshold
+            if (adxPeriod !== undefined) dt.adxPeriod = Math.floor(adxPeriod)
+            if (adxThreshold !== undefined) dt.adxThreshold = adxThreshold
+            if (typeof cfg.fibTakeProfitEnabled === 'boolean')
+              dt.fibTakeProfitEnabled = cfg.fibTakeProfitEnabled
+            if (fibLookback !== undefined)
+              dt.fibSwingLookback = Math.floor(fibLookback)
+            if (fibRatio !== undefined) dt.fibExtensionRatio = fibRatio
+            if (typeof cfg.longShortSentimentEnabled === 'boolean')
+              dt.longShortSentimentEnabled = cfg.longShortSentimentEnabled
+            if (
+              typeof cfg.longShortSentimentPeriod === 'string' &&
+              VALID_LONG_SHORT_PERIODS.has(cfg.longShortSentimentPeriod)
+            )
+              dt.longShortSentimentPeriod = cfg.longShortSentimentPeriod
             if (maxOpen !== undefined) {
               const guardian = (
                 dt.guardian && typeof dt.guardian === 'object'
@@ -520,6 +579,12 @@ export const Route = createFileRoute('/api/finance')({
               quotePerTrade: dt.quotePerTrade,
               symbols: dt.symbols,
               enabledStrategies: dt.enabledStrategies,
+              atrSizeBaselinePct: dt.atrSizeBaselinePct,
+              kellySizingEnabled: dt.kellySizingEnabled,
+              patternVetoEnabled: dt.patternVetoEnabled,
+              adxThreshold: dt.adxThreshold,
+              fibTakeProfitEnabled: dt.fibTakeProfitEnabled,
+              longShortSentimentEnabled: dt.longShortSentimentEnabled,
               maxOpenPositions: (
                 dt.guardian as Record<string, unknown> | undefined
               )?.maxOpenPositions,

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Area, AreaChart, ResponsiveContainer } from 'recharts'
 import { DemoTradingPanel } from './demo-trading-panel'
 import { GridTradingPanel } from './grid-trading-panel'
 
@@ -959,6 +960,240 @@ function StrategyOverridePanel({
             )}
           </tbody>
         </table>
+      </div>
+    </section>
+  )
+}
+
+function toggleTone(enabled: boolean): 'good' | 'neutral' {
+  return enabled ? 'good' : 'neutral'
+}
+
+function SignalSettingsPanel({
+  demoTrading,
+  onPayload,
+}: {
+  demoTrading: Record<string, unknown>
+  onPayload: (p: FinancePayload) => void
+}) {
+  const [busy, setBusy] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const atrSizeBaselinePct =
+    typeof demoTrading.atrSizeBaselinePct === 'number'
+      ? demoTrading.atrSizeBaselinePct
+      : 0
+  const kellySizingEnabled = demoTrading.kellySizingEnabled === true
+  const patternVetoEnabled = demoTrading.patternVetoEnabled === true
+  const adxThreshold =
+    typeof demoTrading.adxThreshold === 'number' ? demoTrading.adxThreshold : 0
+  const fibTakeProfitEnabled = demoTrading.fibTakeProfitEnabled === true
+  const longShortSentimentEnabled =
+    demoTrading.longShortSentimentEnabled === true
+
+  const [atrInput, setAtrInput] = useState(String(atrSizeBaselinePct * 100))
+  const [adxInput, setAdxInput] = useState(String(adxThreshold))
+
+  async function post(body: Record<string, unknown>, busyKey: string) {
+    setBusy(busyKey)
+    setErr(null)
+    try {
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = (await res.json()) as FinancePayload & { error?: string }
+      if (!res.ok || data.ok === false)
+        throw new Error(data.error || `HTTP ${res.status}`)
+      onPayload(data)
+    } catch (nextError) {
+      setErr(nextError instanceof Error ? nextError.message : 'Request failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  function setConfig(config: Record<string, unknown>, busyKey: string) {
+    void post({ action: 'set_demo_config', config }, busyKey)
+  }
+
+  const buttonClass =
+    'rounded-xl border px-3 py-1.5 text-xs font-medium transition disabled:opacity-40'
+  const toneClass = (tone: 'good' | 'neutral') =>
+    tone === 'good'
+      ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25'
+      : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-text)] hover:bg-black/20'
+  const inputClass =
+    'w-20 rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
+
+  return (
+    <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+      <div>
+        <h2 className="text-lg font-semibold">Signal settings</h2>
+        <p className="text-xs text-[var(--theme-muted)]">
+          Optional council-engine levers built and backtested this session.
+          Each is independent and off by default — read the caption before
+          turning one on.
+        </p>
+      </div>
+
+      {err && <p className="mt-3 text-xs text-red-300">{err}</p>}
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+          <h3 className="text-sm font-semibold">ATR-based position sizing</h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            Only the 1% baseline improved backtest P&amp;L (-40→-29 quote)
+            and drawdown (53%→46%); 2%/4% made both worse.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              value={atrInput}
+              onChange={(e) => setAtrInput(e.target.value)}
+              className={inputClass}
+            />
+            <span className="text-xs text-[var(--theme-muted)]">% baseline</span>
+            <button
+              type="button"
+              disabled={busy === 'atr'}
+              onClick={() =>
+                setConfig(
+                  { atrSizeBaselinePct: (Number(atrInput) || 0) / 100 },
+                  'atr',
+                )
+              }
+              className={`${buttonClass} ${toneClass(toggleTone(atrSizeBaselinePct > 0))}`}
+            >
+              {busy === 'atr' ? '...' : 'Save'}
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+          <h3 className="text-sm font-semibold">Kelly-criterion sizing</h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            Safe to enable — self-gates behind 30 closed trades per strategy
+            before it changes anything; only ever shrinks size.
+          </p>
+          <div className="mt-2">
+            <button
+              type="button"
+              disabled={busy === 'kelly'}
+              onClick={() =>
+                setConfig(
+                  { kellySizingEnabled: !kellySizingEnabled },
+                  'kelly',
+                )
+              }
+              className={`${buttonClass} ${toneClass(toggleTone(kellySizingEnabled))}`}
+            >
+              {busy === 'kelly' ? '...' : kellySizingEnabled ? 'Enabled' : 'Disabled'}
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+          <h3 className="text-sm font-semibold">Pattern-bucket veto</h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            Safe to enable — self-gates behind 20 samples in a strategy/RSI/
+            volatility bucket with a 65%+ loss rate before it blocks anything.
+          </p>
+          <div className="mt-2">
+            <button
+              type="button"
+              disabled={busy === 'veto'}
+              onClick={() =>
+                setConfig(
+                  { patternVetoEnabled: !patternVetoEnabled },
+                  'veto',
+                )
+              }
+              className={`${buttonClass} ${toneClass(toggleTone(patternVetoEnabled))}`}
+            >
+              {busy === 'veto' ? '...' : patternVetoEnabled ? 'Enabled' : 'Disabled'}
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+          <h3 className="text-sm font-semibold">ADX trend-strength gate</h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            Caution: one backtest showed threshold 25 flip -40→+15 quote, but
+            it's non-monotonic (30 dropped to -18) — no walk-forward done.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              value={adxInput}
+              onChange={(e) => setAdxInput(e.target.value)}
+              className={inputClass}
+            />
+            <span className="text-xs text-[var(--theme-muted)]">
+              threshold (0=off)
+            </span>
+            <button
+              type="button"
+              disabled={busy === 'adx'}
+              onClick={() =>
+                setConfig({ adxThreshold: Number(adxInput) || 0 }, 'adx')
+              }
+              className={`${buttonClass} ${toneClass(toggleTone(adxThreshold > 0))}`}
+            >
+              {busy === 'adx' ? '...' : 'Save'}
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+          <h3 className="text-sm font-semibold">Fibonacci-extension take-profit</h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            Roughly halves losses vs. the fixed-% take-profit in backtest, but
+            stays net-negative overall — an improvement, not a standalone edge.
+          </p>
+          <div className="mt-2">
+            <button
+              type="button"
+              disabled={busy === 'fib'}
+              onClick={() =>
+                setConfig(
+                  { fibTakeProfitEnabled: !fibTakeProfitEnabled },
+                  'fib',
+                )
+              }
+              className={`${buttonClass} ${toneClass(toggleTone(fibTakeProfitEnabled))}`}
+            >
+              {busy === 'fib' ? '...' : fibTakeProfitEnabled ? 'Enabled' : 'Disabled'}
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+          <h3 className="text-sm font-semibold">Long/short sentiment</h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            No backtest possible yet (Binance only retains ~30 days) — a live,
+            unvalidated bet, not a proven signal.
+          </p>
+          <div className="mt-2">
+            <button
+              type="button"
+              disabled={busy === 'sentiment'}
+              onClick={() =>
+                setConfig(
+                  { longShortSentimentEnabled: !longShortSentimentEnabled },
+                  'sentiment',
+                )
+              }
+              className={`${buttonClass} ${toneClass(toggleTone(longShortSentimentEnabled))}`}
+            >
+              {busy === 'sentiment'
+                ? '...'
+                : longShortSentimentEnabled
+                  ? 'Enabled'
+                  : 'Disabled'}
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   )
@@ -2254,6 +2489,167 @@ function BudgetPanel({
   )
 }
 
+const LIVE_PRICE_HISTORY_LIMIT = 60
+const LIVE_PRICE_RECONNECT_DELAY_MS = 5000
+
+interface LivePriceState {
+  price: number
+  changePercent: number
+  history: Array<{ t: number; price: number }>
+}
+
+const LIVE_PRICE_FLUSH_INTERVAL_MS = 1000
+
+function LivePriceTicker({ symbols }: { symbols: Array<string> }) {
+  const [prices, setPrices] = useState<Map<string, LivePriceState>>(new Map())
+  const [connected, setConnected] = useState(false)
+  // Binance can fire @ticker updates several times a second per symbol —
+  // buffer incoming ticks in a ref and flush to React state on a fixed
+  // interval so the UI re-renders at most once a second, not on every frame.
+  const bufferRef = useRef<Map<string, LivePriceState>>(new Map())
+  const dirtyRef = useRef(false)
+
+  useEffect(() => {
+    if (symbols.length === 0) return
+    let socket: WebSocket | null = null
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let stopped = false
+
+    function connect() {
+      const streams = symbols.map((s) => `${s.toLowerCase()}@ticker`).join('/')
+      socket = new WebSocket(
+        `wss://stream.binance.com:9443/stream?streams=${streams}`,
+      )
+      socket.onopen = () => setConnected(true)
+      socket.onclose = () => {
+        setConnected(false)
+        if (!stopped)
+          reconnectTimer = setTimeout(connect, LIVE_PRICE_RECONNECT_DELAY_MS)
+      }
+      socket.onerror = () => {
+        socket?.close()
+      }
+      socket.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data as string) as {
+            data?: { s?: string; c?: string; P?: string }
+          }
+          const d = parsed.data
+          if (!d?.s || !d.c) return
+          const symbol = d.s
+          const price = Number(d.c)
+          const changePercent = Number(d.P ?? 0)
+          if (!Number.isFinite(price)) return
+          const existing = bufferRef.current.get(symbol)
+          const history = [
+            ...(existing?.history ?? []),
+            { t: Date.now(), price },
+          ].slice(-LIVE_PRICE_HISTORY_LIMIT)
+          bufferRef.current.set(symbol, { price, changePercent, history })
+          dirtyRef.current = true
+        } catch {
+          // malformed frame — skip, never crash the ticker
+        }
+      }
+    }
+
+    connect()
+    const flushTimer = setInterval(() => {
+      if (!dirtyRef.current) return
+      dirtyRef.current = false
+      setPrices(new Map(bufferRef.current))
+    }, LIVE_PRICE_FLUSH_INTERVAL_MS)
+
+    return () => {
+      stopped = true
+      clearInterval(flushTimer)
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      socket?.close()
+    }
+  }, [symbols])
+
+  if (symbols.length === 0) return null
+
+  return (
+    <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Live prices</h2>
+        <span
+          className={`rounded-full border px-2.5 py-1 text-xs ${
+            connected
+              ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'
+              : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]'
+          }`}
+        >
+          {connected ? 'Live' : 'Connecting...'}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-[var(--theme-muted)]">
+        Direct from Binance's public market stream, for your own monitoring —
+        the engine itself still runs on its own 5/15-minute cycle.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {symbols.map((symbol) => {
+          const state = prices.get(symbol)
+          const changeTone =
+            state && state.changePercent > 0
+              ? 'text-emerald-300'
+              : state && state.changePercent < 0
+                ? 'text-red-300'
+                : 'text-[var(--theme-muted)]'
+          return (
+            <div
+              key={symbol}
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">{symbol}</span>
+                <span className={`text-xs ${changeTone}`}>
+                  {state
+                    ? `${state.changePercent > 0 ? '+' : ''}${state.changePercent.toFixed(2)}%`
+                    : '...'}
+                </span>
+              </div>
+              <div className="mt-1 text-lg font-semibold">
+                {state ? formatUsdt(state.price) : '...'}
+              </div>
+              <div className="mt-2 h-10 w-full">
+                {state && state.history.length > 1 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={state.history}>
+                      <defs>
+                        <linearGradient
+                          id={`spark-${symbol}`}
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop offset="0%" stopColor="#34d399" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <Area
+                        type="monotone"
+                        dataKey="price"
+                        stroke="#34d399"
+                        strokeWidth={1.5}
+                        fill={`url(#spark-${symbol})`}
+                        isAnimationActive={false}
+                        dot={false}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : null}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 export function FinanceScreen() {
   const [payload, setPayload] = useState<FinancePayload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -2344,6 +2740,19 @@ export function FinanceScreen() {
         </div>
       </section>
 
+      <LivePriceTicker
+        symbols={
+          Array.isArray(
+            (payload.settings.demoTrading as Record<string, unknown> | undefined)
+              ?.symbols,
+          )
+            ? ((
+                payload.settings.demoTrading as Record<string, unknown>
+              ).symbols as Array<string>)
+            : []
+        }
+      />
+
       <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total income"
@@ -2409,6 +2818,13 @@ export function FinanceScreen() {
       <StrategyOverridePanel
         catalog={payload.strategyCatalog}
         state={payload.strategyOverrides}
+        onPayload={setPayload}
+      />
+
+      <SignalSettingsPanel
+        demoTrading={
+          (payload.settings.demoTrading as Record<string, unknown> | undefined) ?? {}
+        }
         onPayload={setPayload}
       />
 
