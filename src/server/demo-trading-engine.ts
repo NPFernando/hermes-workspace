@@ -22,6 +22,7 @@ import * as os from 'node:os'
 import {
   createDemoClientFromEnv,
   createLiveClientFromEnv,
+  floorToStep,
 } from './binance-demo-client'
 import {
   fetchBinanceKlines,
@@ -72,6 +73,7 @@ import type {
   BinanceExecutionEnvironment,
   BinanceOrderInput,
   BinanceOrderResult,
+  SymbolFilters,
 } from './binance-demo-client'
 import type { FinanceDatabase } from './finance-store'
 
@@ -85,6 +87,11 @@ const SR_KIND_PATTERN_VETO_STATS = 'demo_pattern_veto_stats'
 const SR_KIND_LONG_SHORT_OBSERVATION = 'demo_long_short_observation'
 const TRADE_LOG_CAP = 200
 const BLOCK_LOG_CAP = 50
+// Close-failure escalation: alert once at 3 consecutive failed close attempts,
+// force a book-close at 12 (~1 hour of 5-minute cycles). A silently retried
+// close held 3 positions hostage for 4 days before this existed (2026-07-12).
+const CLOSE_FAILURE_ALERT_THRESHOLD = 3
+const CLOSE_FAILURE_FORCE_LIMIT = 12
 const LONG_SHORT_OBSERVATION_CAP = 5000 // ~30+ days at one observation/symbol/cycle, enough for a future backtest
 const SAFEGUARD_HISTORY_CAP = 25
 const STRATEGY_OVERRIDE_HISTORY_CAP = 50
@@ -250,6 +257,8 @@ interface OpenPosition {
   shadowOfGroupId?: string
   /** Entry-time feature vector for the pattern-bucket veto (Ump-lite); logged unconditionally, only gates entries when patternVetoEnabled. */
   patternFeatures?: EntryFeatureVector
+  /** Consecutive failed close attempts; alerts at 3, force book-close at 12 (~1h of 5-min cycles). Reset on any successful cycle exit. */
+  closeFailureCount?: number
 }
 
 type PositionAtrExits = Pick<
@@ -501,6 +510,34 @@ function orderFeeQuote(
     if (fill.commissionAsset === 'USDT') return sum + fill.commission
     return sum + fill.commission * (fill.price || fallbackPrice)
   }, 0)
+}
+
+/**
+ * Base asset of a spot symbol (e.g. SOLUSDT -> SOL). The engine's symbols are
+ * validated Binance spot pairs quoted in USDT; anything else falls back to ''
+ * so callers treat the fee sum as unknown rather than guessing.
+ */
+export function baseAssetOf(symbol: string): string {
+  const normalized = symbol.trim().toUpperCase()
+  return normalized.endsWith('USDT') ? normalized.slice(0, -4) : ''
+}
+
+/**
+ * Sum of buy-side commissions taken in the BASE asset. Binance deducts the
+ * MARKET-BUY fee from the received asset itself (unless paid in BNB), so the
+ * account is credited executedQty minus this — selling the gross executedQty
+ * later fails with insufficient balance. See 2026-07-12 stuck-position bug.
+ */
+export function orderBaseFee(
+  fills: Array<{ commission: number; commissionAsset: string }>,
+  baseAsset: string,
+): number {
+  if (!baseAsset) return 0
+  return fills.reduce(
+    (sum, fill) =>
+      fill.commissionAsset === baseAsset ? sum + fill.commission : sum,
+    0,
+  )
 }
 
 function executionModeOfPosition(
@@ -1719,11 +1756,78 @@ async function runTradingCycleInner(
                           ? `council exit (net ${vote.net.toFixed(2)})`
                           : `max-hold-expired (${heldMinutes.toFixed(0)}m >= ${config.maxHoldMinutes}m)`
         const groupId = pos.groupId ?? newGroupId(symbol)
-        const orderInput: BinanceOrderInput = {
-          symbol,
-          side: 'SELL',
-          type: 'MARKET',
-          quantity: pos.quantity,
+        const forceBookClose = (forceReason: string) => {
+          const exitQuote = price * pos.quantity
+          const feesQuote = pos.entryFeeQuote
+          const pnlQuote = exitQuote - pos.entryQuote - feesQuote
+          let nextScore = applyTradeOutcome(
+            scores.get(pos.strategyId) ?? emptyScore(pos.strategyId),
+            pnlQuote,
+            pos.entryQuote,
+          )
+          if (nextScore.lossStreak >= config.guardian.lossStreakLimit) {
+            nextScore = {
+              ...nextScore,
+              cooldownUntil: cooldownUntil(config.guardian),
+            }
+          }
+          scores.set(pos.strategyId, nextScore)
+          if (pos.patternFeatures) {
+            patternVetoStats = applyBucketOutcome(
+              patternVetoStats,
+              pos.patternFeatures,
+              pnlQuote,
+            )
+          }
+          if (paperShadow) {
+            positions = closeShadowPosition({
+              positions,
+              trades,
+              groupId,
+              price,
+              reason: forceReason,
+            })
+          }
+          trades.push({
+            id: `trade_${symbol}_${Date.now()}`,
+            symbol,
+            strategyId: pos.strategyId,
+            entryPrice: pos.entryPrice,
+            exitPrice: price,
+            quantity: pos.quantity,
+            entryQuote: pos.entryQuote,
+            exitQuote,
+            pnlQuote,
+            feesQuote,
+            reason: forceReason,
+            openedAt: pos.openedAt,
+            closedAt: new Date().toISOString(),
+            executionMode,
+            groupId,
+            patternFeatures: pos.patternFeatures,
+          })
+          positions = positions.filter((p) => p.id !== pos.id)
+          actions.push({
+            symbol,
+            strategyId: pos.strategyId,
+            action: 'CLOSE',
+            reason: forceReason,
+            price,
+            pnlQuote,
+          })
+          appendAuditLog('binance_trade_force_closed', {
+            symbol,
+            strategyId: pos.strategyId,
+            pnlQuote,
+            reason: forceReason,
+            closeFailureCount: pos.closeFailureCount ?? 0,
+            executionMode,
+          })
+          sendTradeAlert(
+            `⚠️ ${symbol} position force book-closed (${forceReason}). ` +
+              'The real balance may still hold this asset — check the testnet account.',
+          )
+          checkpoint()
         }
         try {
           if (paperShadow) {
@@ -1736,9 +1840,63 @@ async function runTradingCycleInner(
               reason,
             })
           }
+
+          // Best-effort clamp to what the account can actually sell: the
+          // MARKET-BUY commission was taken in the base asset, so free
+          // balance sits slightly below the recorded quantity, and selling
+          // the gross amount fails forever (2026-07-12 stuck-position bug).
+          let sellQuantity = pos.quantity
+          let filters: SymbolFilters | null = null
+          if (executionMode !== 'paper') {
+            try {
+              const base = baseAssetOf(symbol)
+              if (base) {
+                const account = await client.getAccount()
+                const free = account.balances.find(
+                  (b) => b.asset === base,
+                )?.free
+                if (typeof free === 'number' && free > 0 && free < sellQuantity)
+                  sellQuantity = free
+              }
+              if (client.getSymbolFilters) {
+                filters = await client.getSymbolFilters(symbol)
+                if (filters.stepSize > 0)
+                  sellQuantity = floorToStep(sellQuantity, filters.stepSize)
+              }
+            } catch {
+              // Clamp is best-effort; on any lookup failure fall back to the
+              // recorded quantity rather than adding a new failure mode.
+            }
+          }
+
+          const unsellableDust =
+            filters != null &&
+            (sellQuantity <= 0 ||
+              (filters.minQty > 0 && sellQuantity < filters.minQty) ||
+              (filters.minNotional > 0 &&
+                sellQuantity * price < filters.minNotional))
+          if (
+            unsellableDust ||
+            (pos.closeFailureCount ?? 0) >= CLOSE_FAILURE_FORCE_LIMIT
+          ) {
+            forceBookClose(
+              unsellableDust
+                ? `force-closed-unsellable (dust ${sellQuantity} below exchange minimums; wanted: ${reason})`
+                : `force-closed-unsellable (${pos.closeFailureCount} failed close attempts; wanted: ${reason})`,
+            )
+            continue
+          }
+
+          const orderInput: BinanceOrderInput = {
+            symbol,
+            side: 'SELL',
+            type: 'MARKET',
+            quantity: sellQuantity,
+          }
           await preflightLiveOrder(client, orderInput)
           const order = await client.placeOrder(orderInput)
           if (order.executedQty <= 0) {
+            pos.closeFailureCount = (pos.closeFailureCount ?? 0) + 1
             actions.push({
               symbol,
               strategyId: pos.strategyId,
@@ -1748,20 +1906,22 @@ async function runTradingCycleInner(
             appendAuditLog('binance_sell_unfilled', {
               symbol,
               strategyId: pos.strategyId,
-              requested: pos.quantity,
+              requested: sellQuantity,
+              closeFailureCount: pos.closeFailureCount,
               executionMode,
             })
+            checkpoint()
             continue
           }
-          if (order.executedQty < pos.quantity) {
+          if (order.executedQty < sellQuantity) {
             appendAuditLog('binance_partial_sell', {
               symbol,
-              requested: pos.quantity,
+              requested: sellQuantity,
               filled: order.executedQty,
               executionMode,
             })
           }
-          const exitQuote = order.cummulativeQuoteQty || price * pos.quantity
+          const exitQuote = order.cummulativeQuoteQty || price * sellQuantity
           const feesQuote =
             pos.entryFeeQuote +
             orderFeeQuote(order.fills, order.avgPrice || price)
@@ -1833,12 +1993,32 @@ async function runTradingCycleInner(
           })
           checkpoint()
         } catch (err) {
+          // A failed close means the position is retained and retried every
+          // cycle — that must never be silent again (three positions sat
+          // stuck for 4 days pre-2026-07-12 because SKIPs went nowhere).
+          const failureCount = (pos.closeFailureCount ?? 0) + 1
+          pos.closeFailureCount = failureCount
+          const message = (err as Error).message
           actions.push({
             symbol,
             strategyId: pos.strategyId,
             action: 'SKIP',
-            reason: `close failed: ${(err as Error).message}`,
+            reason: `close failed: ${message}`,
           })
+          appendAuditLog('binance_close_failed', {
+            symbol,
+            strategyId: pos.strategyId,
+            error: message,
+            closeFailureCount: failureCount,
+            executionMode,
+          })
+          if (failureCount === CLOSE_FAILURE_ALERT_THRESHOLD) {
+            sendTradeAlert(
+              `🔴 ${symbol} close has failed ${failureCount}× in a row (${message}). ` +
+                `Retrying every cycle; will force book-close at ${CLOSE_FAILURE_FORCE_LIMIT}.`,
+            )
+          }
+          checkpoint()
         }
       }
     }
@@ -2035,12 +2215,18 @@ async function runTradingCycleInner(
             const spent = order.cummulativeQuoteQty || approvedQuote
             const fillPrice = order.avgPrice || price
             quoteBalance -= spent
+            // Net of buy-side base-asset commission: the account is credited
+            // executedQty minus fees taken in the base asset, and selling the
+            // gross amount later fails with insufficient balance.
+            const netQuantity =
+              order.executedQty -
+              orderBaseFee(order.fills, baseAssetOf(symbol))
             positions.push({
               id: `pos_${symbol}_${Date.now()}`,
               symbol,
               strategyId: vote.leadStrategyId,
               entryPrice: fillPrice,
-              quantity: order.executedQty,
+              quantity: netQuantity > 0 ? netQuantity : order.executedQty,
               entryQuote: spent,
               entryFeeQuote: orderFeeQuote(order.fills, fillPrice),
               highWaterPrice: fillPrice,

@@ -11,6 +11,7 @@ import {
   assertLiveBaseUrl,
   createDemoClientFromEnv,
   createLiveClientFromEnv,
+  floorToStep,
 } from './binance-demo-client'
 
 describe('assertDemoBaseUrl', () => {
@@ -93,6 +94,87 @@ describe('BinanceDemoClient requests hit the normalized demo base', () => {
       else process.env.HOME = realHome
       fs.rmSync(tmp, { recursive: true, force: true })
     }
+  })
+})
+
+describe('floorToStep', () => {
+  it('floors to an exact multiple of the step, decimal-safe', () => {
+    // 0.07992 / 0.0001 = 799.199999... under naive FP — must still floor to 799 steps.
+    expect(floorToStep(0.07992, 0.0001)).toBe(0.0799)
+    expect(floorToStep(0.25, 0.001)).toBe(0.25)
+    expect(floorToStep(5.643, 0.1)).toBe(5.6)
+  })
+
+  it('does not round up a value sitting just under a step boundary', () => {
+    expect(floorToStep(0.0999999, 0.1)).toBe(0)
+    expect(floorToStep(0.19999, 0.1)).toBe(0.1)
+  })
+
+  it('returns 0 for degenerate inputs', () => {
+    expect(floorToStep(0, 0.001)).toBe(0)
+    expect(floorToStep(-1, 0.001)).toBe(0)
+    expect(floorToStep(1, 0)).toBe(0)
+    expect(floorToStep(Number.NaN, 0.001)).toBe(0)
+  })
+})
+
+describe('getSymbolFilters', () => {
+  it('parses LOT_SIZE and NOTIONAL filters and caches per symbol', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          symbols: [
+            {
+              symbol: 'SOLUSDT',
+              filters: [
+                { filterType: 'LOT_SIZE', minQty: '0.01000000', maxQty: '9000', stepSize: '0.01000000' },
+                { filterType: 'NOTIONAL', minNotional: '5.00000000' },
+              ],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    ) as unknown as typeof fetch
+    const client = new BinanceDemoClient({
+      apiKey: 'k',
+      apiSecret: 's',
+      baseUrl: 'https://demo-api.binance.com',
+      fetchImpl,
+    })
+    const filters = await client.getSymbolFilters('SOLUSDT')
+    expect(filters).toEqual({ stepSize: 0.01, minQty: 0.01, minNotional: 5 })
+    // Second call served from cache — no extra fetch.
+    await client.getSymbolFilters('SOLUSDT')
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    const calledUrl = (fetchImpl as any).mock.calls[0][0] as string
+    expect(calledUrl).toContain('/api/v3/exchangeInfo?symbol=SOLUSDT')
+  })
+
+  it('falls back to zeros when filters are missing and throws on HTTP failure', async () => {
+    const okEmpty = vi.fn(async () =>
+      new Response(JSON.stringify({ symbols: [{ symbol: 'X', filters: [] }] }), { status: 200 }),
+    ) as unknown as typeof fetch
+    const emptyClient = new BinanceDemoClient({
+      apiKey: 'k',
+      apiSecret: 's',
+      baseUrl: 'https://demo-api.binance.com',
+      fetchImpl: okEmpty,
+    })
+    expect(await emptyClient.getSymbolFilters('XUSDT')).toEqual({
+      stepSize: 0,
+      minQty: 0,
+      minNotional: 0,
+    })
+
+    const failing = vi.fn(async () => new Response('{}', { status: 500 })) as unknown as typeof fetch
+    const failingClient = new BinanceDemoClient({
+      apiKey: 'k',
+      apiSecret: 's',
+      baseUrl: 'https://demo-api.binance.com',
+      fetchImpl: failing,
+    })
+    await expect(failingClient.getSymbolFilters('SOLUSDT')).rejects.toThrow('exchangeInfo')
   })
 })
 

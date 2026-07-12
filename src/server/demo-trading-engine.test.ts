@@ -721,6 +721,202 @@ describe('runTradingCycle open → close → score', () => {
     expect(getEngineState().positions).toHaveLength(0)
   })
 
+  it('derives the base asset and sums only base-asset commissions', async () => {
+    const { baseAssetOf, orderBaseFee } = await import('./demo-trading-engine')
+    expect(baseAssetOf('SOLUSDT')).toBe('SOL')
+    expect(baseAssetOf('btcusdt')).toBe('BTC')
+    expect(baseAssetOf('BTCEUR')).toBe('')
+    const fills = [
+      { commission: 0.0001, commissionAsset: 'SOL' },
+      { commission: 0.05, commissionAsset: 'BNB' },
+      { commission: 0.0002, commissionAsset: 'SOL' },
+    ]
+    expect(orderBaseFee(fills, 'SOL')).toBeCloseTo(0.0003, 10)
+    expect(orderBaseFee(fills, '')).toBe(0)
+  })
+
+  it('stores net quantity at entry when the buy fee is taken in the base asset', async () => {
+    await setMode('testnet_execute')
+    const { getEngineState, runTradingCycle } =
+      await import('./demo-trading-engine')
+    const r1 = await runTradingCycle({
+      client: fakeClient({
+        getKlines: async () => breakoutCandles(),
+        placeOrder: async (o: any) => ({
+          symbol: o.symbol,
+          orderId: 1,
+          status: 'FILLED',
+          side: o.side,
+          type: o.type,
+          executedQty: 0.25,
+          cummulativeQuoteQty: 25,
+          fills: [
+            { price: 100, qty: 0.25, commission: 0.00025, commissionAsset: 'BTC' },
+          ],
+          transactTime: Date.now(),
+          avgPrice: 100,
+        }),
+      }) as never,
+      config: { symbols: ['BTCUSDT'], enabledStrategies: ['breakout'] },
+    })
+    expect(r1.actions.some((a) => a.action === 'OPEN')).toBe(true)
+    // Binance credited 0.25 − 0.00025 BTC; selling the gross 0.25 would fail.
+    expect(getEngineState().positions[0]?.quantity).toBeCloseTo(0.24975, 10)
+  })
+
+  it('clamps the sell to the free balance and floors to the lot step', async () => {
+    await setMode('testnet_execute')
+    const { getEngineState, runTradingCycle } =
+      await import('./demo-trading-engine')
+    const cfg = { symbols: ['BTCUSDT'], enabledStrategies: ['breakout'] }
+    const r1 = await runTradingCycle({
+      client: fakeClient({ getKlines: async () => breakoutCandles() }) as never,
+      config: cfg,
+    })
+    expect(r1.actions.some((a) => a.action === 'OPEN')).toBe(true)
+    // Recorded quantity is 0.25 (no fills in the default fake), but the
+    // account only holds 0.2499 BTC — the legacy-position situation.
+    const sellOrders: Array<any> = []
+    const r2 = await runTradingCycle({
+      client: fakeClient({
+        getKlines: async () => flatCandles(120), // +20% → take-profit fires
+        getAccount: async () => ({
+          accountType: 'SPOT',
+          canTrade: true,
+          balances: [
+            { asset: 'USDT', free: 5000, locked: 0 },
+            { asset: 'BTC', free: 0.2499, locked: 0 },
+          ],
+        }),
+        getSymbolFilters: async () => ({
+          stepSize: 0.001,
+          minQty: 0.001,
+          minNotional: 5,
+        }),
+        placeOrder: async (o: any) => {
+          if (o.side === 'SELL') sellOrders.push(o)
+          return {
+            symbol: o.symbol,
+            orderId: 2,
+            status: 'FILLED',
+            side: o.side,
+            type: o.type,
+            executedQty: o.side === 'SELL' ? o.quantity : 0.25,
+            cummulativeQuoteQty: o.side === 'SELL' ? o.quantity * 120 : 25,
+            fills: [],
+            transactTime: Date.now(),
+            avgPrice: 120,
+          }
+        },
+      }) as never,
+      config: cfg,
+    })
+    expect(r2.actions.some((a) => a.action === 'CLOSE')).toBe(true)
+    expect(sellOrders).toHaveLength(1)
+    expect(sellOrders[0].quantity).toBeCloseTo(0.249, 10)
+    expect(getEngineState().positions).toHaveLength(0)
+  })
+
+  it('counts consecutive close failures instead of failing silently', async () => {
+    await setMode('testnet_execute')
+    const { getEngineState, runTradingCycle } =
+      await import('./demo-trading-engine')
+    const cfg = { symbols: ['BTCUSDT'], enabledStrategies: ['breakout'] }
+    await runTradingCycle({
+      client: fakeClient({ getKlines: async () => breakoutCandles() }) as never,
+      config: cfg,
+    })
+    const failingSellClient = () =>
+      fakeClient({
+        getKlines: async () => flatCandles(120),
+        placeOrder: async (o: any) => {
+          if (o.side === 'SELL')
+            throw new Error('Account has insufficient balance for requested action.')
+          return {
+            symbol: o.symbol, orderId: 3, status: 'FILLED', side: o.side,
+            type: o.type, executedQty: 0.25, cummulativeQuoteQty: 25,
+            fills: [], transactTime: Date.now(), avgPrice: 100,
+          }
+        },
+      }) as never
+    const r2 = await runTradingCycle({ client: failingSellClient(), config: cfg })
+    expect(r2.actions.some((a) => a.reason?.includes('close failed'))).toBe(true)
+    expect(getEngineState().positions[0]?.closeFailureCount).toBe(1)
+    await runTradingCycle({ client: failingSellClient(), config: cfg })
+    expect(getEngineState().positions[0]?.closeFailureCount).toBe(2)
+  })
+
+  it('force book-closes after the failure limit so the cap is never held hostage', async () => {
+    await setMode('testnet_execute')
+    const { getEngineState, runTradingCycle } =
+      await import('./demo-trading-engine')
+    const store = await import('./finance-store')
+    const cfg = { symbols: ['BTCUSDT'], enabledStrategies: ['breakout'] }
+    await runTradingCycle({
+      client: fakeClient({ getKlines: async () => breakoutCandles() }) as never,
+      config: cfg,
+    })
+    const db = store.readFinanceStore()
+    for (const r of db.strategy_results as Array<any>) {
+      if (r.kind === 'demo_open_position') r.closeFailureCount = 12
+    }
+    store.writeFinanceStore(db)
+    const sellOrders: Array<any> = []
+    const r2 = await runTradingCycle({
+      client: fakeClient({
+        getKlines: async () => flatCandles(120),
+        placeOrder: async (o: any) => {
+          if (o.side === 'SELL') sellOrders.push(o)
+          return {
+            symbol: o.symbol, orderId: 4, status: 'FILLED', side: o.side,
+            type: o.type, executedQty: 0.25, cummulativeQuoteQty: 30,
+            fills: [], transactTime: Date.now(), avgPrice: 120,
+          }
+        },
+      }) as never,
+      config: cfg,
+    })
+    const close = r2.actions.find((a) => a.action === 'CLOSE')
+    expect(close?.reason).toContain('force-closed-unsellable')
+    expect(sellOrders).toHaveLength(0)
+    expect(getEngineState().positions).toHaveLength(0)
+  })
+
+  it('force book-closes dust below exchange minimums instead of retrying forever', async () => {
+    await setMode('testnet_execute')
+    const { getEngineState, runTradingCycle } =
+      await import('./demo-trading-engine')
+    const cfg = { symbols: ['BTCUSDT'], enabledStrategies: ['breakout'] }
+    await runTradingCycle({
+      client: fakeClient({ getKlines: async () => breakoutCandles() }) as never,
+      config: cfg,
+    })
+    const sellOrders: Array<any> = []
+    const r2 = await runTradingCycle({
+      client: fakeClient({
+        getKlines: async () => flatCandles(120),
+        getSymbolFilters: async () => ({
+          stepSize: 0.001,
+          minQty: 0.5, // recorded 0.25 is below the exchange minimum — unsellable
+          minNotional: 5,
+        }),
+        placeOrder: async (o: any) => {
+          if (o.side === 'SELL') sellOrders.push(o)
+          return {
+            symbol: o.symbol, orderId: 5, status: 'FILLED', side: o.side,
+            type: o.type, executedQty: 0.25, cummulativeQuoteQty: 30,
+            fills: [], transactTime: Date.now(), avgPrice: 120,
+          }
+        },
+      }) as never,
+      config: cfg,
+    })
+    const close = r2.actions.find((a) => a.action === 'CLOSE')
+    expect(close?.reason).toContain('dust')
+    expect(sellOrders).toHaveLength(0)
+    expect(getEngineState().positions).toHaveLength(0)
+  })
+
   it('lets a fixed take-profit fire ahead of an expired max-hold window', async () => {
     await setMode('testnet_execute')
     const { runTradingCycle } = await import('./demo-trading-engine')

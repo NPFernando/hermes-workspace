@@ -69,6 +69,24 @@ export interface BinanceOrderInput {
   price?: number
 }
 
+export interface SymbolFilters {
+  stepSize: number
+  minQty: number
+  minNotional: number
+}
+
+/**
+ * Floor a quantity to the symbol's LOT_SIZE step, decimal-safe. Binance
+ * rejects SELL quantities that aren't an exact multiple of stepSize, and
+ * naive floating-point division (0.07992 / 0.0001) can land a hair under
+ * the true step count — the epsilon guards against that.
+ */
+export function floorToStep(quantity: number, stepSize: number): number {
+  if (!(stepSize > 0) || !Number.isFinite(quantity) || quantity <= 0) return 0
+  const steps = Math.floor(quantity / stepSize + 1e-9)
+  return parseFloat((steps * stepSize).toFixed(8))
+}
+
 export interface BinanceExecutionClient {
   readonly host: string
   readonly environment: BinanceExecutionEnvironment
@@ -91,6 +109,8 @@ export interface BinanceExecutionClient {
   getAccount: () => Promise<BinanceAccount>
   placeOrder: (input: BinanceOrderInput) => Promise<BinanceOrderResult>
   testOrder?: (input: BinanceOrderInput) => Promise<void>
+  /** LOT_SIZE/NOTIONAL exchange filters; optional so paper/test fakes can omit it. */
+  getSymbolFilters?: (symbol: string) => Promise<SymbolFilters>
 }
 
 export class DemoEnvironmentError extends Error {
@@ -260,6 +280,33 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
       close: parseFloat(r[4]),
       volume: parseFloat(r[5]),
     }))
+  }
+
+  private readonly symbolFiltersCache = new Map<string, SymbolFilters>()
+
+  async getSymbolFilters(symbol: string): Promise<SymbolFilters> {
+    const cached = this.symbolFiltersCache.get(symbol)
+    if (cached) return cached
+    this.assertBaseUrl(this.base)
+    const url = `${this.base}/api/v3/exchangeInfo?symbol=${encodeURIComponent(symbol)}`
+    const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(12_000) })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new DemoEnvironmentError(`exchangeInfo ${symbol} failed (${res.status})`)
+    }
+    const info = (body).symbols?.[0]
+    const filters: Array<any> = info?.filters || []
+    const lotSize = filters.find((f) => f.filterType === 'LOT_SIZE')
+    const notional = filters.find(
+      (f) => f.filterType === 'NOTIONAL' || f.filterType === 'MIN_NOTIONAL',
+    )
+    const parsed: SymbolFilters = {
+      stepSize: parseFloat(lotSize?.stepSize ?? '0') || 0,
+      minQty: parseFloat(lotSize?.minQty ?? '0') || 0,
+      minNotional: parseFloat(notional?.minNotional ?? '0') || 0,
+    }
+    this.symbolFiltersCache.set(symbol, parsed)
+    return parsed
   }
 
   async getAccount(): Promise<BinanceAccount> {
