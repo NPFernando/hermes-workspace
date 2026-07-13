@@ -647,6 +647,17 @@ export const Route = createFileRoute('/api/finance')({
             const rearmOutside = inRange(cfg.rearmOutsideRangeCandles, 0, 1000)
             if (rearmOutside !== undefined)
               gc.rearmOutsideRangeCandles = Math.floor(rearmOutside)
+            // Grid execution mode: 'paper' (default) or 'testnet_execute'
+            // (mirror paper fills as real testnet orders). Only these two
+            // literals are ever accepted — there is deliberately no live
+            // mode for the grid engine.
+            if (cfg.executionMode === 'paper' || cfg.executionMode === 'testnet_execute')
+              gc.executionMode = cfg.executionMode
+            const gridDailyLoss = inRange(cfg.maxDailyLossQuote, 0, 100000)
+            if (gridDailyLoss !== undefined) gc.maxDailyLossQuote = gridDailyLoss
+            const gridOrderBudget = inRange(cfg.maxRealOrdersPerCycle, 1, 200)
+            if (gridOrderBudget !== undefined)
+              gc.maxRealOrdersPerCycle = Math.floor(gridOrderBudget)
             if (cfg.spacing === 'arithmetic' || cfg.spacing === 'geometric')
               gc.spacing = cfg.spacing
             if (typeof cfg.autoRecenter === 'boolean') gc.autoRecenter = cfg.autoRecenter

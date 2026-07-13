@@ -334,3 +334,202 @@ describe('runGridPaperCycle — I/O + lock', () => {
     expect(btc?.lastProcessedOpenTime).toBe(candles[candles.length - 1].openTime)
   })
 })
+
+describe('runGridPaperCycle — testnet execution mirror', () => {
+  // Grid settings that arm from a 5-candle window and trade BTC only, so the
+  // fixtures stay small. Written into settings.demoTradingGrid the same way
+  // set_grid_config would.
+  const tightGrid = (extra: Record<string, unknown> = {}) => ({
+    symbols: ['BTCUSDT'],
+    rangeLookbackCandles: 5,
+    gridCount: 3,
+    spacing: 'arithmetic',
+    efficiencyGate: false,
+    ...extra,
+  })
+
+  async function seedSettings(
+    gridConfig: Record<string, unknown>,
+    settings: Record<string, unknown> = {},
+  ) {
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    Object.assign(db.settings, settings)
+    ;(db.settings as Record<string, unknown>).demoTradingGrid = gridConfig
+    store.writeFinanceStore(db)
+  }
+
+  // Warmup range 90–110, then a dip that fills the 90 level (one BUY event),
+  // then a rally through 100 that sells it (one SELL event).
+  function buyThenSellCandles(): Array<Candle> {
+    const candles: Array<Candle> = []
+    for (let i = 0; i < 5; i++)
+      candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    candles.push(candle(5, { open: 92, high: 95, low: 85, close: 90 }))
+    candles.push(candle(6, { open: 98, high: 105, low: 95, close: 100 }))
+    return candles
+  }
+
+  function fakeGridClient(overrides: Partial<any> = {}) {
+    return {
+      host: 'demo-api.binance.com',
+      environment: 'testnet' as const,
+      ping: async () => true,
+      getPrice: async () => 100,
+      getKlines: async () => [],
+      getAccount: async () => ({
+        accountType: 'SPOT',
+        canTrade: true,
+        balances: [
+          { asset: 'USDT', free: 5000, locked: 0 },
+          { asset: 'BTC', free: 1, locked: 0 },
+        ],
+      }),
+      placeOrder: vi.fn(async (o: any) => ({
+        symbol: o.symbol,
+        orderId: Math.floor(Math.random() * 1e6),
+        status: 'FILLED',
+        side: o.side,
+        type: o.type,
+        executedQty: o.side === 'BUY' ? 0.055 : (o.quantity ?? 0.055),
+        cummulativeQuoteQty: o.side === 'BUY' ? (o.quoteOrderQty ?? 5) : 5.5,
+        fills: [],
+        transactTime: Date.now(),
+        avgPrice: o.side === 'BUY' ? 90 : 100,
+      })),
+      ...overrides,
+    }
+  }
+
+  it('places no real orders when executionMode is unset (paper default)', async () => {
+    await seedSettings(tightGrid(), { tradingMode: 'testnet_execute' })
+    const { runGridPaperCycle } = await import('./grid-paper-engine')
+    const client = fakeGridClient()
+    const result = await runGridPaperCycle({
+      fetchKlines: vi.fn().mockResolvedValue(buyThenSellCandles()),
+      client: client as never,
+    })
+    expect(result.ran).toBe(true)
+    expect(result.trades.length).toBeGreaterThan(0) // paper traded normally
+    expect(result.realFills).toHaveLength(0)
+    expect(client.placeOrder).not.toHaveBeenCalled()
+  })
+
+  it('mirrors paper fills as real testnet orders when armed, sells before buys', async () => {
+    await seedSettings(tightGrid({ executionMode: 'testnet_execute' }), {
+      tradingMode: 'testnet_execute',
+      emergencyKillSwitch: false,
+    })
+    const { runGridPaperCycle } = await import('./grid-paper-engine')
+    const client = fakeGridClient()
+    const result = await runGridPaperCycle({
+      fetchKlines: vi.fn().mockResolvedValue(buyThenSellCandles()),
+      client: client as never,
+    })
+    expect(result.ran).toBe(true)
+    // Bar 5 buys level 90; bar 6 sells it at 100 AND re-buys the swept 100
+    // level — 3 paper fills, all mirrored.
+    expect(result.realFills.length).toBe(3)
+    const calls = (client.placeOrder as any).mock.calls.map((c: any) => c[0])
+    expect(calls[0].side).toBe('SELL') // risk-reducing side first
+    expect(calls[1].side).toBe('BUY')
+    expect(calls[2].side).toBe('BUY')
+    expect(calls[1].quoteOrderQty).toBe(DEFAULT_GRID_ENGINE_CONFIG.quotePerGrid)
+    // Real fills persisted under their own kind.
+    const store = await import('./finance-store')
+    const rows = store.readFinanceStore().strategy_results as Array<any>
+    expect(rows.filter((r) => r.kind === 'demo_grid_real_fill')).toHaveLength(3)
+  })
+
+  it('keeps paper authoritative when the kill switch blocks mirroring', async () => {
+    await seedSettings(tightGrid({ executionMode: 'testnet_execute' }), {
+      tradingMode: 'testnet_execute',
+      emergencyKillSwitch: true,
+    })
+    const { runGridPaperCycle } = await import('./grid-paper-engine')
+    const client = fakeGridClient()
+    const result = await runGridPaperCycle({
+      fetchKlines: vi.fn().mockResolvedValue(buyThenSellCandles()),
+      client: client as never,
+    })
+    expect(result.ran).toBe(true)
+    expect(result.trades.length).toBeGreaterThan(0)
+    expect(result.realFills).toHaveLength(0)
+    expect(client.placeOrder).not.toHaveBeenCalled()
+  })
+
+  it('survives real-order failures without breaking the paper cycle', async () => {
+    await seedSettings(tightGrid({ executionMode: 'testnet_execute' }), {
+      tradingMode: 'testnet_execute',
+      emergencyKillSwitch: false,
+    })
+    const { runGridPaperCycle } = await import('./grid-paper-engine')
+    const client = fakeGridClient({
+      placeOrder: vi.fn(async () => {
+        throw new Error('Account has insufficient balance for requested action.')
+      }),
+    })
+    const result = await runGridPaperCycle({
+      fetchKlines: vi.fn().mockResolvedValue(buyThenSellCandles()),
+      client: client as never,
+    })
+    expect(result.ran).toBe(true)
+    expect(result.trades.length).toBeGreaterThan(0)
+    expect(result.realFills).toHaveLength(0)
+  })
+
+  it('respects the per-cycle order budget (excess skipped, paper intact)', async () => {
+    await seedSettings(
+      tightGrid({ executionMode: 'testnet_execute', maxRealOrdersPerCycle: 1 }),
+      { tradingMode: 'testnet_execute', emergencyKillSwitch: false },
+    )
+    const { runGridPaperCycle } = await import('./grid-paper-engine')
+    const client = fakeGridClient()
+    const result = await runGridPaperCycle({
+      fetchKlines: vi.fn().mockResolvedValue(buyThenSellCandles()),
+      client: client as never,
+    })
+    expect(result.ran).toBe(true)
+    expect(result.realFills).toHaveLength(1)
+    expect(result.realFills[0].side).toBe('SELL') // budget went to the sell
+    expect(client.placeOrder).toHaveBeenCalledTimes(1)
+  })
+
+  it('pauses mirroring for the day once the daily-loss cap is breached', async () => {
+    await seedSettings(
+      tightGrid({ executionMode: 'testnet_execute', maxDailyLossQuote: 10 }),
+      { tradingMode: 'testnet_execute', emergencyKillSwitch: false },
+    )
+    // Seed a big realized loss for today under the grid-trade kind.
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    ;(db.strategy_results as Array<any>).push({
+      kind: 'demo_grid_trade',
+      id: 'seed-loss',
+      symbol: 'BTCUSDT',
+      levelIndex: 0,
+      entryPrice: 100,
+      exitPrice: 80,
+      quantity: 1,
+      entryQuote: 100,
+      exitQuote: 80,
+      pnlQuote: -20,
+      feesQuote: 0.2,
+      reason: 'stop-liquidation',
+      openedAt: new Date().toISOString(),
+      closedAt: new Date().toISOString(),
+    })
+    store.writeFinanceStore(db)
+
+    const { runGridPaperCycle } = await import('./grid-paper-engine')
+    const client = fakeGridClient()
+    const result = await runGridPaperCycle({
+      fetchKlines: vi.fn().mockResolvedValue(buyThenSellCandles()),
+      client: client as never,
+    })
+    expect(result.ran).toBe(true)
+    expect(result.trades.length).toBeGreaterThan(0) // paper unaffected
+    expect(result.realFills).toHaveLength(0)
+    expect(client.placeOrder).not.toHaveBeenCalled()
+  })
+})

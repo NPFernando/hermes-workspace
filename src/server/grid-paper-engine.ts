@@ -13,15 +13,29 @@
  * (`settings.demoTradingGrid`), its own finance-store kinds, zero shared
  * mutable state with the council engine's 5-minute cycle.
  *
- * Paper-only: reads public market data (fetchBinanceKlines), places no real
- * orders, needs no API keys. Config defaults match the blind-tested
- * candidate from the offline research (efficiency-ratio gate only — the
- * range-width chop gate was tested and found to hurt results when combined).
+ * Paper-first: reads public market data (fetchBinanceKlines) and simulates
+ * fills; paper accounting is always authoritative. With
+ * `executionMode: 'testnet_execute'` (off by default) each paper fill is
+ * additionally mirrored as a real MARKET order on the hard-locked Binance
+ * testnet — gated by tradingMode, the kill switch, a per-cycle order budget,
+ * and a daily realized-loss cap, and a real-order failure can never break
+ * the paper cycle. Config defaults match the blind-tested candidate from
+ * the offline research (efficiency-ratio gate only — the range-width chop
+ * gate was tested and found to hurt results when combined).
  */
 import { randomUUID } from 'node:crypto'
+import { spawn, spawnSync } from 'node:child_process'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
 import { fetchBinanceKlines } from './binance-market.service'
-import { readFinanceStore, writeFinanceStore } from './finance-store'
+import {
+  appendAuditLog,
+  readFinanceStore,
+  writeFinanceStore,
+} from './finance-store'
 import { isConnectivityBreakerTripped } from './connectivity-breaker'
+import { createDemoClientFromEnv, floorToStep } from './binance-demo-client'
+import type { BinanceExecutionClient } from './binance-demo-client'
 import type { Candle } from './trading-strategies'
 
 export type GridSpacing = 'arithmetic' | 'geometric'
@@ -49,6 +63,18 @@ export interface GridEngineConfig {
    * 2026-07-13; N=6 was WORSE than baseline, so don't arm small values.
    */
   rearmOutsideRangeCandles: number
+  /**
+   * 'paper' (default) = simulate only, no keys needed. 'testnet_execute' =
+   * additionally mirror each paper fill as a real MARKET order on the
+   * hard-locked Binance testnet. Paper stays authoritative either way; the
+   * real orders are an execution shadow, and every gate (tradingMode,
+   * kill switch, order budget, daily-loss cap) applies only to them.
+   */
+  executionMode: 'paper' | 'testnet_execute'
+  /** Pause real-order mirroring for the rest of the day once today's realized grid P&L is below −this. 0 = no cap. */
+  maxDailyLossQuote: number
+  /** Real orders mirrored per cycle at most; excess paper fills are skipped (audit-logged), paper stays authoritative. */
+  maxRealOrdersPerCycle: number
 }
 
 export const DEFAULT_GRID_ENGINE_CONFIG: GridEngineConfig = {
@@ -67,6 +93,9 @@ export const DEFAULT_GRID_ENGINE_CONFIG: GridEngineConfig = {
   maxEfficiencyRatio: 0.25,
   fetchCandleLimit: 500,
   rearmOutsideRangeCandles: 0,
+  executionMode: 'paper',
+  maxDailyLossQuote: 25,
+  maxRealOrdersPerCycle: 12,
 }
 
 export function resolveGridEngineConfig(settingsOverride: unknown): GridEngineConfig {
@@ -79,7 +108,9 @@ export function resolveGridEngineConfig(settingsOverride: unknown): GridEngineCo
 
 const SR_KIND_GRID_STATE = 'demo_grid_state'
 const SR_KIND_GRID_TRADE = 'demo_grid_trade'
+const SR_KIND_GRID_REAL_FILL = 'demo_grid_real_fill'
 const GRID_TRADE_LOG_CAP = 500
+const GRID_REAL_FILL_LOG_CAP = 500
 
 interface GridLevelState {
   price: number
@@ -124,6 +155,32 @@ export interface GridPaperTrade {
     | 'range-idle-rearm'
   openedAt: string
   closedAt: string
+}
+
+/** A paper BUY fill emitted by advanceSymbolState so the testnet mirror can replicate it. */
+export interface GridBuyEvent {
+  symbol: string
+  levelIndex: number
+  price: number
+  quoteAmount: number
+  at: string
+}
+
+/** One mirrored real order on the Binance testnet (paper stays authoritative). */
+export interface GridRealFill {
+  kind: typeof SR_KIND_GRID_REAL_FILL
+  id: string
+  symbol: string
+  side: 'BUY' | 'SELL'
+  levelIndex: number
+  /** Price the paper fill happened at (level/liquidation price). */
+  paperPrice: number
+  /** Actual average fill price of the real MARKET order. */
+  realPrice: number
+  realQty: number
+  quoteAmount: number
+  orderId: number
+  at: string
 }
 
 // ── pure math helpers (mirrors grid-backtest.ts; reimplemented, not shared) ──
@@ -250,8 +307,13 @@ export function advanceSymbolState(
   persisted: GridSymbolState | undefined,
   candles: Array<Candle>,
   config: GridEngineConfig,
-): { state: GridSymbolState; trades: Array<GridPaperTrade> } {
+): {
+  state: GridSymbolState
+  trades: Array<GridPaperTrade>
+  buys: Array<GridBuyEvent>
+} {
   const trades: Array<GridPaperTrade> = []
+  const buys: Array<GridBuyEvent> = []
   const now = new Date().toISOString()
 
   let armed = persisted?.armed ?? false
@@ -299,6 +361,7 @@ export function advanceSymbolState(
         outsideRangeStreak,
       },
       trades,
+      buys,
     }
   }
 
@@ -430,6 +493,13 @@ export function advanceSymbolState(
         level.entryQuote = config.quotePerGrid
         level.entryFeeQuote = config.quotePerGrid * config.feeRatePerSide
         level.openedAt = at
+        buys.push({
+          symbol,
+          levelIndex: li,
+          price: level.price,
+          quoteAmount: config.quotePerGrid,
+          at,
+        })
       }
     }
   }
@@ -449,7 +519,241 @@ export function advanceSymbolState(
       outsideRangeStreak,
     },
     trades,
+    buys,
   }
+}
+
+// ── testnet execution mirror (only active when executionMode: 'testnet_execute') ──
+
+// Same never-throws, never-blocks alert pattern as demo-trading-engine.ts's
+// sendTradeAlert (module-private there; this engine is deliberately isolated).
+const GRID_ALERTS_ENABLED = process.env.HERMES_DEMO_TRADE_ALERTS !== 'off'
+const GRID_ALERT_TARGET = 'telegram:2130622225'
+let _gridHermesBin: string | null = null
+function gridHermesBin(): string {
+  if (_gridHermesBin) return _gridHermesBin
+  const home = os.homedir()
+  const candidates = [
+    `${home}/.local/bin/hermes`,
+    `${home}/.hermes/hermes-agent/venv/bin/hermes`,
+    `${home}/.hermes/node/bin/hermes`,
+  ]
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        _gridHermesBin = candidate
+        return candidate
+      }
+    } catch {
+      /* skip */
+    }
+  }
+  try {
+    _gridHermesBin =
+      spawnSync('which', ['hermes'], { encoding: 'utf-8' }).stdout.trim() ||
+      'hermes'
+  } catch {
+    _gridHermesBin = 'hermes'
+  }
+  return _gridHermesBin
+}
+function sendGridAlert(message: string): void {
+  if (!GRID_ALERTS_ENABLED) return
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') return
+  try {
+    const child = spawn(
+      gridHermesBin(),
+      ['send', '--to', GRID_ALERT_TARGET, '-q', message],
+      { stdio: 'ignore', detached: true },
+    )
+    child.on('error', () => {
+      /* non-fatal */
+    })
+    child.unref()
+  } catch {
+    /* non-fatal */
+  }
+}
+
+function baseAssetOfSymbol(symbol: string): string {
+  const normalized = symbol.trim().toUpperCase()
+  return normalized.endsWith('USDT') ? normalized.slice(0, -4) : ''
+}
+
+function todaysRealizedPnl(trades: Array<GridPaperTrade>): number {
+  const today = new Date().toISOString().slice(0, 10)
+  return trades
+    .filter((t) => t.closedAt.slice(0, 10) === today)
+    .reduce((sum, t) => sum + t.pnlQuote, 0)
+}
+
+/**
+ * Mirrors this cycle's paper fills as real MARKET orders on the Binance
+ * testnet. Paper accounting is authoritative; every real-order failure is
+ * audit-logged + alerted and never breaks the cycle. Sells run before buys
+ * (they free balance and reduce risk) inside a per-cycle order budget.
+ */
+async function mirrorRealOrders(input: {
+  config: GridEngineConfig
+  settings: Record<string, unknown>
+  buys: Array<GridBuyEvent>
+  sells: Array<GridPaperTrade>
+  allTradesIncludingNew: Array<GridPaperTrade>
+  client?: BinanceExecutionClient
+}): Promise<Array<GridRealFill>> {
+  const { config, settings } = input
+  const skip = (reason: string): Array<GridRealFill> => {
+    appendAuditLog('grid_real_mirror_skipped', {
+      reason,
+      buys: input.buys.length,
+      sells: input.sells.length,
+    })
+    return []
+  }
+  if (input.buys.length === 0 && input.sells.length === 0) return []
+  if (settings.tradingMode !== 'testnet_execute')
+    return skip(`tradingMode is ${String(settings.tradingMode)}`)
+  if (settings.emergencyKillSwitch === true) return skip('kill switch engaged')
+  if (config.maxDailyLossQuote > 0) {
+    const todayPnl = todaysRealizedPnl(input.allTradesIncludingNew)
+    if (todayPnl < -config.maxDailyLossQuote) {
+      sendGridAlert(
+        `⚠️ Grid testnet mirroring paused for today: realized ${todayPnl.toFixed(2)} USDT ` +
+          `is below the −${config.maxDailyLossQuote} daily-loss cap. Paper cycle continues.`,
+      )
+      return skip(`daily loss cap (${todayPnl.toFixed(2)} USDT today)`)
+    }
+  }
+  let client = input.client
+  if (!client) {
+    const built = createDemoClientFromEnv()
+    if (!built.client) return skip(`no testnet client: ${built.reason ?? 'unknown'}`)
+    client = built.client
+  }
+
+  const realFills: Array<GridRealFill> = []
+  let budget = config.maxRealOrdersPerCycle > 0 ? config.maxRealOrdersPerCycle : Infinity
+  const overBudget: Array<string> = []
+
+  // Sells first: they free balance for the buys and reduce exposure.
+  for (const sell of input.sells) {
+    if (budget <= 0) {
+      overBudget.push(`SELL ${sell.symbol} level ${sell.levelIndex}`)
+      continue
+    }
+    try {
+      let quantity = sell.quantity
+      try {
+        const base = baseAssetOfSymbol(sell.symbol)
+        if (base) {
+          const account = await client.getAccount()
+          const free = account.balances.find((b) => b.asset === base)?.free
+          if (typeof free === 'number' && free > 0 && free < quantity)
+            quantity = free
+        }
+        if (client.getSymbolFilters) {
+          const filters = await client.getSymbolFilters(sell.symbol)
+          if (filters.stepSize > 0) quantity = floorToStep(quantity, filters.stepSize)
+          if (
+            quantity <= 0 ||
+            (filters.minQty > 0 && quantity < filters.minQty) ||
+            (filters.minNotional > 0 && quantity * sell.exitPrice < filters.minNotional)
+          ) {
+            appendAuditLog('grid_real_sell_dust_skipped', {
+              symbol: sell.symbol,
+              levelIndex: sell.levelIndex,
+              paperQuantity: sell.quantity,
+              clampedQuantity: quantity,
+            })
+            continue
+          }
+        }
+      } catch {
+        // Clamp is best-effort — fall back to the paper quantity.
+      }
+      budget--
+      const order = await client.placeOrder({
+        symbol: sell.symbol,
+        side: 'SELL',
+        type: 'MARKET',
+        quantity,
+      })
+      realFills.push({
+        kind: SR_KIND_GRID_REAL_FILL,
+        id: randomUUID(),
+        symbol: sell.symbol,
+        side: 'SELL',
+        levelIndex: sell.levelIndex,
+        paperPrice: sell.exitPrice,
+        realPrice: order.avgPrice || sell.exitPrice,
+        realQty: order.executedQty,
+        quoteAmount: order.cummulativeQuoteQty,
+        orderId: order.orderId,
+        at: new Date().toISOString(),
+      })
+    } catch (err) {
+      appendAuditLog('grid_real_order_failed', {
+        side: 'SELL',
+        symbol: sell.symbol,
+        levelIndex: sell.levelIndex,
+        error: (err as Error).message,
+      })
+      sendGridAlert(
+        `🔴 Grid testnet SELL failed for ${sell.symbol} (level ${sell.levelIndex}): ${(err as Error).message}. Paper state unaffected.`,
+      )
+    }
+  }
+
+  for (const buy of input.buys) {
+    if (budget <= 0) {
+      overBudget.push(`BUY ${buy.symbol} level ${buy.levelIndex}`)
+      continue
+    }
+    try {
+      budget--
+      const order = await client.placeOrder({
+        symbol: buy.symbol,
+        side: 'BUY',
+        type: 'MARKET',
+        quoteOrderQty: buy.quoteAmount,
+      })
+      realFills.push({
+        kind: SR_KIND_GRID_REAL_FILL,
+        id: randomUUID(),
+        symbol: buy.symbol,
+        side: 'BUY',
+        levelIndex: buy.levelIndex,
+        paperPrice: buy.price,
+        realPrice: order.avgPrice || buy.price,
+        realQty: order.executedQty,
+        quoteAmount: order.cummulativeQuoteQty || buy.quoteAmount,
+        orderId: order.orderId,
+        at: new Date().toISOString(),
+      })
+    } catch (err) {
+      appendAuditLog('grid_real_order_failed', {
+        side: 'BUY',
+        symbol: buy.symbol,
+        levelIndex: buy.levelIndex,
+        error: (err as Error).message,
+      })
+      sendGridAlert(
+        `🔴 Grid testnet BUY failed for ${buy.symbol} (level ${buy.levelIndex}): ${(err as Error).message}. Paper state unaffected.`,
+      )
+    }
+  }
+
+  if (overBudget.length > 0) {
+    appendAuditLog('grid_real_orders_over_budget', {
+      budget: config.maxRealOrdersPerCycle,
+      skipped: overBudget,
+    })
+    sendGridAlert(
+      `⚠️ Grid testnet mirror skipped ${overBudget.length} order(s) over the ` +
+        `${config.maxRealOrdersPerCycle}/cycle budget — real inventory now trails paper. Check the grid panel.`,
+    )
+  }
+  return realFills
 }
 
 // ── cycle orchestration (I/O + persistence + lock) ──────────────────────────
@@ -461,11 +765,15 @@ export interface GridCycleResult {
   reason?: string
   trades: Array<GridPaperTrade>
   symbolsProcessed: number
+  /** Real testnet orders mirrored this cycle (always [] in paper mode). */
+  realFills: Array<GridRealFill>
 }
 
 export interface GridCycleOptions {
   /** Injectable for tests — defaults to the real public-API fetch. */
   fetchKlines?: typeof fetchBinanceKlines
+  /** Injectable for tests — defaults to createDemoClientFromEnv() when executionMode is testnet_execute. */
+  client?: BinanceExecutionClient
 }
 
 async function runGridPaperCycleInner(options: GridCycleOptions): Promise<GridCycleResult> {
@@ -475,7 +783,13 @@ async function runGridPaperCycleInner(options: GridCycleOptions): Promise<GridCy
   // itself only reads public market data, never signs a request) — halting
   // here too avoids burning cycles while the underlying key problem exists.
   if (isConnectivityBreakerTripped()) {
-    return { ran: false, reason: 'connectivity breaker tripped', trades: [], symbolsProcessed: 0 }
+    return {
+      ran: false,
+      reason: 'connectivity breaker tripped',
+      trades: [],
+      symbolsProcessed: 0,
+      realFills: [],
+    }
   }
   const fetchKlines = options.fetchKlines ?? fetchBinanceKlines
   const db = readFinanceStore()
@@ -490,41 +804,73 @@ async function runGridPaperCycleInner(options: GridCycleOptions): Promise<GridCy
   const existingTrades = rows.filter(
     (r) => r.kind === SR_KIND_GRID_TRADE,
   ) as unknown as Array<GridPaperTrade>
+  const existingRealFills = rows.filter(
+    (r) => r.kind === SR_KIND_GRID_REAL_FILL,
+  ) as unknown as Array<GridRealFill>
 
   const newStates: Array<GridSymbolState> = []
   const allNewTrades: Array<GridPaperTrade> = []
+  const allNewBuys: Array<GridBuyEvent> = []
 
   for (const symbol of config.symbols) {
     const candles = await fetchKlines(symbol, config.interval, config.fetchCandleLimit)
     const persisted = existingBySymbol.get(symbol)
-    const { state, trades } = advanceSymbolState(symbol, persisted, candles, config)
+    const { state, trades, buys } = advanceSymbolState(symbol, persisted, candles, config)
     newStates.push(state)
     allNewTrades.push(...trades)
+    allNewBuys.push(...buys)
+  }
+
+  // Testnet execution mirror — strictly after the paper accounting, which
+  // stays authoritative. Any real-order failure alerts + audit-logs inside
+  // and never propagates back into the paper cycle.
+  let newRealFills: Array<GridRealFill> = []
+  if (config.executionMode === 'testnet_execute') {
+    newRealFills = await mirrorRealOrders({
+      config,
+      settings,
+      buys: allNewBuys,
+      sells: allNewTrades,
+      allTradesIncludingNew: [...existingTrades, ...allNewTrades],
+      client: options.client,
+    })
   }
 
   // Replace only our own kinds — everything else (including every council
   // row) passes through untouched, mirroring demo-trading-engine.ts's
   // persist() pattern exactly.
   const others = rows.filter(
-    (r) => r.kind !== SR_KIND_GRID_STATE && r.kind !== SR_KIND_GRID_TRADE,
+    (r) =>
+      r.kind !== SR_KIND_GRID_STATE &&
+      r.kind !== SR_KIND_GRID_TRADE &&
+      r.kind !== SR_KIND_GRID_REAL_FILL,
   )
   const mergedTrades = [...existingTrades, ...allNewTrades].slice(-GRID_TRADE_LOG_CAP)
+  const mergedRealFills = [...existingRealFills, ...newRealFills].slice(
+    -GRID_REAL_FILL_LOG_CAP,
+  )
   db.strategy_results = [
     ...others,
     ...newStates.map((s) => ({ ...s })),
     ...mergedTrades.map((t) => ({ ...t })),
+    ...mergedRealFills.map((f) => ({ ...f })),
   ]
   db.updatedAt = new Date().toISOString()
   writeFinanceStore(db)
 
-  return { ran: true, trades: allNewTrades, symbolsProcessed: config.symbols.length }
+  return {
+    ran: true,
+    trades: allNewTrades,
+    symbolsProcessed: config.symbols.length,
+    realFills: newRealFills,
+  }
 }
 
 export async function runGridPaperCycle(
   options: GridCycleOptions = {},
 ): Promise<GridCycleResult> {
   if (gridCycleInProgress) {
-    return { ran: false, reason: 'busy', trades: [], symbolsProcessed: 0 }
+    return { ran: false, reason: 'busy', trades: [], symbolsProcessed: 0, realFills: [] }
   }
   gridCycleInProgress = true
   try {
