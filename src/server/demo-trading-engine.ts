@@ -442,9 +442,14 @@ function persist(input: PersistInput): void {
       .slice(-TRADE_LOG_CAP)
       .map((t) => ({ kind: SR_KIND_TRADE, ...t })),
     ...input.blocks.slice(-BLOCK_LOG_CAP),
+    // Each bucket carries a deterministic id derived from its key: rows
+    // without one collide in the Postgres mirror, whose synthetic fallback id
+    // (kind + strategyId + timestamp) is identical for every id-less bucket —
+    // two buckets broke the whole mirror transaction on 2026-07-13.
     ...Object.values(input.patternVetoStats).map((s) => ({
       kind: SR_KIND_PATTERN_VETO_STATS,
       ...s,
+      id: `pattern_veto:${s.key}`,
     })),
     ...input.sentimentObservations.slice(-LONG_SHORT_OBSERVATION_CAP),
   ]

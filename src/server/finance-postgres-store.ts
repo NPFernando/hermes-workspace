@@ -412,6 +412,10 @@ function strategyResultRows(
         stableId(row, 'strategy_results', index, [
           firstText(row, ['kind']),
           strategyId,
+          // Bucket-style kinds (e.g. pattern-veto stats) are distinguished by
+          // a `key` field; without it here every id-less bucket collapsed to
+          // the same synthetic id and broke the whole mirror transaction.
+          firstText(row, ['key']),
           firstText(row, ['at', 'updatedAt', 'updated_at']),
         ]),
       ),
