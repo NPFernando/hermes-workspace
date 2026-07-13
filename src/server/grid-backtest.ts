@@ -65,6 +65,15 @@ export interface GridBacktestConfig {
   efficiencyLookbackCandles: number
   /** Efficiency ratio above this (0..1) = "trending too directionally". */
   maxEfficiencyRatio: number
+  /**
+   * 0 = off. When the close sits outside [lower, upper] for this many
+   * consecutive candles without tripping the stop bands, liquidate whatever
+   * is still held and re-arm from the current window. Targets the dead zone
+   * between "price left the range" and the ±30%/−15% stop bands, where the
+   * live grid otherwise idles earning nothing (observed 2026-07-12: BTC ~1%
+   * above its upper bound, daily P&L decayed +2.96 → +0.04).
+   */
+  rearmOutsideRangeCandles: number
 }
 
 export const DEFAULT_GRID_BACKTEST_CONFIG: GridBacktestConfig = {
@@ -83,6 +92,7 @@ export const DEFAULT_GRID_BACKTEST_CONFIG: GridBacktestConfig = {
   efficiencyGate: false,
   efficiencyLookbackCandles: 50,
   maxEfficiencyRatio: 0.3,
+  rearmOutsideRangeCandles: 0,
 }
 
 export interface GridTrade {
@@ -95,7 +105,11 @@ export interface GridTrade {
   exitQuote: number
   pnlQuote: number
   feesQuote: number
-  reason: 'grid-fill' | 'stop-liquidation' | 'chop-pause-liquidation'
+  reason:
+    | 'grid-fill'
+    | 'stop-liquidation'
+    | 'chop-pause-liquidation'
+    | 'range-idle-rearm'
   openedAt: string
   closedAt: string
 }
@@ -235,6 +249,7 @@ function runSymbolGrid(
   let upper = 0
   let armed = false
   let pausedForChop = false
+  let outsideRangeStreak = 0
   // Distinguishes "stopped out, waiting for a manual re-arm" from "still
   // warming up" — without this, the initial-warmup branch below would
   // silently re-arm a halted (autoRecenter: false) grid on the very next bar.
@@ -246,6 +261,7 @@ function runSymbolGrid(
     lower = range.lower
     upper = range.upper
     levels = initLevels(buildLevels(lower, upper, config.spacing, config.gridCount))
+    outsideRangeStreak = 0
     return levels.length > 1
   }
 
@@ -336,6 +352,22 @@ function runSymbolGrid(
     if (pausedForChop) {
       equityContribution.push({ at, equity: realizedPnl })
       continue
+    }
+
+    // Idle-range re-arm: price left [lower, upper] but hasn't tripped the
+    // stop bands — the dead zone where the grid can sit earning nothing for
+    // days. After N consecutive outside closes, cut whatever is still held
+    // and recentre on the current window. Trading resumes next bar
+    // (arm-and-skip, same as every other re-arm path).
+    if (config.rearmOutsideRangeCandles > 0) {
+      const outside = candle.close > upper || candle.close < lower
+      outsideRangeStreak = outside ? outsideRangeStreak + 1 : 0
+      if (outsideRangeStreak >= config.rearmOutsideRangeCandles) {
+        liquidateAll(candle.close, at, 'range-idle-rearm')
+        armed = arm(i)
+        equityContribution.push({ at, equity: realizedPnl })
+        continue
+      }
     }
 
     // 1. Sells first: any held level whose target (next level up) was swept this bar.

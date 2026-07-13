@@ -208,6 +208,51 @@ describe('runGridBacktest', () => {
     ).toBe(true)
   })
 
+  it('re-arms after price idles outside the range without tripping the stops', () => {
+    const candles: Array<Candle> = []
+    // Warmup range 90–110 (levels 90/100/110 with gridCount 3).
+    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    // Fill the 90 level, closing just below the range (dead zone: outside
+    // [90,110] but nowhere near the 50% stop bands).
+    candles.push(candle(5, { open: 92, high: 95, low: 85, close: 88 }))
+    // Two more closes outside — streak reaches 3 on bar 7.
+    candles.push(flat(6, 88, 1))
+    candles.push(flat(7, 88, 1))
+    // Post-re-arm: new range spans ~85–110; a dip then a rally should produce
+    // a fresh profitable grid fill, proving the grid resumed earning.
+    candles.push(candle(8, { open: 88, high: 89, low: 84, close: 86 }))
+    candles.push(candle(9, { open: 86, high: 99, low: 86, close: 98 }))
+
+    const config = cfg({
+      rangeLookbackCandles: 5,
+      gridCount: 3,
+      spacing: 'arithmetic',
+      upperStopPct: 0.5,
+      lowerStopPct: 0.5,
+      autoRecenter: true,
+      rearmOutsideRangeCandles: 3,
+    })
+    const report = runGridBacktest({ BTCUSDT: candles }, config)
+
+    const rearms = report.trades.filter((t) => t.reason === 'range-idle-rearm')
+    expect(rearms).toHaveLength(1)
+    expect(rearms[0].entryPrice).toBe(90)
+    expect(rearms[0].exitPrice).toBe(88)
+    expect(rearms[0].pnlQuote).toBeLessThan(0) // cut the bag, honestly
+    const postRearmFills = report.trades.filter(
+      (t) => t.reason === 'grid-fill' && t.closedAt > rearms[0].closedAt,
+    )
+    expect(postRearmFills.length).toBeGreaterThan(0)
+
+    // Control: with the rule off, nothing re-arms and no fresh fill happens.
+    const control = runGridBacktest(
+      { BTCUSDT: candles },
+      { ...config, rearmOutsideRangeCandles: 0 },
+    )
+    expect(control.trades.filter((t) => t.reason === 'range-idle-rearm')).toHaveLength(0)
+    expect(control.trades.filter((t) => t.reason === 'grid-fill')).toHaveLength(0)
+  })
+
   it('measures max drawdown against account equity, not the raw PnL curve', () => {
     const candles: Array<Candle> = []
     for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))

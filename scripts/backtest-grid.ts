@@ -14,7 +14,7 @@
  *     [--auto-recenter] [--chop-gate] [--chop-lookback 50]
  *     [--chop-max-range-pct 15] [--efficiency-gate] [--efficiency-lookback 50]
  *     [--max-efficiency-ratio 30] [--split-pct 70]
- *     [--folds 4] [--fold-train-pct 70]
+ *     [--folds 4] [--fold-train-pct 70] [--rearm-outside 0]
  */
 import * as fs from 'node:fs'
 import * as os from 'node:os'
@@ -221,6 +221,7 @@ function main() {
       ),
     ),
     maxEfficiencyRatio: Number(arg('max-efficiency-ratio', '30')) / 100,
+    rearmOutsideRangeCandles: Number(arg('rearm-outside', '0')),
   }
 
   const candlesBySymbol: Record<string, Array<Candle>> = {}
