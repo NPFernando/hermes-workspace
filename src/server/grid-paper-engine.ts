@@ -42,6 +42,13 @@ export interface GridEngineConfig {
   maxEfficiencyRatio: number
   /** Trailing candles fetched per cycle; must exceed rangeLookback + efficiencyLookback. */
   fetchCandleLimit: number
+  /**
+   * 0 = off. Re-arm after this many consecutive closes outside [lower, upper]
+   * without a stop/chop trigger — the dead zone where the grid otherwise
+   * idles. N=24 (one day at 1h candles) validated on both backtest windows
+   * 2026-07-13; N=6 was WORSE than baseline, so don't arm small values.
+   */
+  rearmOutsideRangeCandles: number
 }
 
 export const DEFAULT_GRID_ENGINE_CONFIG: GridEngineConfig = {
@@ -59,6 +66,7 @@ export const DEFAULT_GRID_ENGINE_CONFIG: GridEngineConfig = {
   efficiencyLookbackCandles: 100,
   maxEfficiencyRatio: 0.25,
   fetchCandleLimit: 500,
+  rearmOutsideRangeCandles: 0,
 }
 
 export function resolveGridEngineConfig(settingsOverride: unknown): GridEngineConfig {
@@ -93,6 +101,8 @@ export interface GridSymbolState {
   levels: Array<GridLevelState>
   lastProcessedOpenTime: number
   updatedAt: string
+  /** Consecutive closes outside [lower, upper]; drives rearmOutsideRangeCandles. */
+  outsideRangeStreak?: number
 }
 
 export interface GridPaperTrade {
@@ -107,7 +117,11 @@ export interface GridPaperTrade {
   exitQuote: number
   pnlQuote: number
   feesQuote: number
-  reason: 'grid-fill' | 'stop-liquidation' | 'chop-pause-liquidation'
+  reason:
+    | 'grid-fill'
+    | 'stop-liquidation'
+    | 'chop-pause-liquidation'
+    | 'range-idle-rearm'
   openedAt: string
   closedAt: string
 }
@@ -245,6 +259,7 @@ export function advanceSymbolState(
   let pausedForChop = persisted?.pausedForChop ?? false
   let lower = persisted?.lower ?? 0
   let upper = persisted?.upper ?? 0
+  let outsideRangeStreak = persisted?.outsideRangeStreak ?? 0
   let levels: Array<GridLevelState> = persisted?.levels
     ? persisted.levels.map((l) => ({ ...l }))
     : []
@@ -281,6 +296,7 @@ export function advanceSymbolState(
         levels,
         lastProcessedOpenTime,
         updatedAt: now,
+        outsideRangeStreak,
       },
       trades,
     }
@@ -299,6 +315,7 @@ export function advanceSymbolState(
           lower = armResult.lower
           upper = armResult.upper
           levels = armResult.levels
+          outsideRangeStreak = 0
         }
       }
       continue
@@ -322,6 +339,7 @@ export function advanceSymbolState(
         lower = armResult.lower
         upper = armResult.upper
         levels = armResult.levels
+        outsideRangeStreak = 0
       }
       continue
     }
@@ -340,6 +358,7 @@ export function advanceSymbolState(
           lower = armResult.lower
           upper = armResult.upper
           levels = armResult.levels
+          outsideRangeStreak = 0
         }
       } else {
         halted = true
@@ -348,6 +367,27 @@ export function advanceSymbolState(
     }
 
     if (pausedForChop) continue
+
+    // Idle-range re-arm (mirrors grid-backtest.ts, N=24 validated 2026-07-13):
+    // price left [lower, upper] but hasn't tripped the stop bands — the dead
+    // zone where the grid can idle for days. After N consecutive outside
+    // closes, cut whatever is still held and recentre on the current window.
+    if (config.rearmOutsideRangeCandles > 0) {
+      const outside = candle.close > upper || candle.close < lower
+      outsideRangeStreak = outside ? outsideRangeStreak + 1 : 0
+      if (outsideRangeStreak >= config.rearmOutsideRangeCandles) {
+        liquidateAll(levels, candle.close, at, 'range-idle-rearm', symbol, config, trades)
+        const armResult = armFrom(candles, i, config)
+        armed = !!armResult
+        if (armResult) {
+          lower = armResult.lower
+          upper = armResult.upper
+          levels = armResult.levels
+        }
+        outsideRangeStreak = 0
+        continue
+      }
+    }
 
     // Sells first: any held level whose target (next level up) was swept this bar.
     for (let li = 0; li < levels.length - 1; li++) {
@@ -406,6 +446,7 @@ export function advanceSymbolState(
       levels,
       lastProcessedOpenTime,
       updatedAt: now,
+      outsideRangeStreak,
     },
     trades,
   }

@@ -644,6 +644,9 @@ export const Route = createFileRoute('/api/finance')({
             if (efficiencyLookbackCandles !== undefined)
               gc.efficiencyLookbackCandles = Math.floor(efficiencyLookbackCandles)
             if (maxEfficiencyRatio !== undefined) gc.maxEfficiencyRatio = maxEfficiencyRatio
+            const rearmOutside = inRange(cfg.rearmOutsideRangeCandles, 0, 1000)
+            if (rearmOutside !== undefined)
+              gc.rearmOutsideRangeCandles = Math.floor(rearmOutside)
             if (cfg.spacing === 'arithmetic' || cfg.spacing === 'geometric')
               gc.spacing = cfg.spacing
             if (typeof cfg.autoRecenter === 'boolean') gc.autoRecenter = cfg.autoRecenter

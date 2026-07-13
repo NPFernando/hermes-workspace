@@ -202,6 +202,87 @@ describe('advanceSymbolState — efficiency gate persists across calls', () => {
   })
 })
 
+describe('advanceSymbolState — idle-range re-arm', () => {
+  const seededHeld = (): GridSymbolState => ({
+    kind: 'demo_grid_state',
+    symbol: 'BTCUSDT',
+    armed: true,
+    halted: false,
+    pausedForChop: false,
+    lower: 90,
+    upper: 110,
+    levels: [
+      {
+        price: 90,
+        held: true,
+        entryPrice: 90,
+        entryQuote: 5,
+        entryFeeQuote: 0.005,
+        openedAt: new Date(BASE + 4 * HOUR).toISOString(),
+      },
+      { price: 100, held: false, entryPrice: 0, entryQuote: 0, entryFeeQuote: 0, openedAt: '' },
+      { price: 110, held: false, entryPrice: 0, entryQuote: 0, entryFeeQuote: 0, openedAt: '' },
+    ],
+    lastProcessedOpenTime: BASE + 4 * HOUR,
+    updatedAt: new Date(0).toISOString(),
+  })
+
+  it('re-arms after N outside closes, with the streak persisting across calls', () => {
+    const config = cfg({
+      rangeLookbackCandles: 5,
+      gridCount: 3,
+      spacing: 'arithmetic',
+      efficiencyGate: false,
+      upperStopPct: 0.5,
+      lowerStopPct: 0.5,
+      autoRecenter: true,
+      rearmOutsideRangeCandles: 3,
+    })
+    // Closes at 88 — below the 90 lower bound, nowhere near the 50% stops,
+    // and never touching the 100 sell target, so the bag just sits.
+    const candles: Array<Candle> = []
+    for (let i = 5; i < 10; i++) candles.push(flat(i, 88, 1))
+
+    // First cycle sees only two outside closes — streak persists, no re-arm yet.
+    const first = advanceSymbolState('BTCUSDT', seededHeld(), candles.slice(0, 2), config)
+    expect(first.trades).toHaveLength(0)
+    expect(first.state.outsideRangeStreak).toBe(2)
+    expect(first.state.levels[0].held).toBe(true)
+
+    // Second cycle adds the third outside close — the re-arm fires.
+    const second = advanceSymbolState('BTCUSDT', first.state, candles, config)
+    const rearms = second.trades.filter((t) => t.reason === 'range-idle-rearm')
+    expect(rearms).toHaveLength(1)
+    expect(rearms[0].entryPrice).toBe(90)
+    expect(rearms[0].exitPrice).toBe(88)
+    expect(rearms[0].pnlQuote).toBeLessThan(0) // the bag is cut honestly
+    expect(second.state.outsideRangeStreak).toBe(0)
+    // Re-armed range recentres onto the recent window (upper pulled down
+    // toward the 88-close regime instead of the stale 110).
+    expect(second.state.armed).toBe(true)
+    expect(second.state.upper).toBeLessThan(110)
+  })
+
+  it('is a no-op when rearmOutsideRangeCandles is 0 (default)', () => {
+    const config = cfg({
+      rangeLookbackCandles: 5,
+      gridCount: 3,
+      spacing: 'arithmetic',
+      efficiencyGate: false,
+      upperStopPct: 0.5,
+      lowerStopPct: 0.5,
+      autoRecenter: true,
+    })
+    const candles: Array<Candle> = []
+    for (let i = 5; i < 15; i++) candles.push(flat(i, 88, 1))
+    const result = advanceSymbolState('BTCUSDT', seededHeld(), candles, config)
+    expect(result.trades).toHaveLength(0)
+    expect(result.state.levels[0].held).toBe(true)
+    expect(result.state.lower).toBe(90)
+    expect(result.state.upper).toBe(110)
+  })
+})
+
 describe('runGridPaperCycle — I/O + lock', () => {
   it('does not run when the connectivity breaker is tripped — this engine\'s first-ever global gate', async () => {
     const { recordConnectivityOutcome } = await import('./connectivity-breaker')
