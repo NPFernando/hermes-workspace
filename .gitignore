@@ -203,3 +203,4 @@ test-paper-trading-cycle.*
 testCurrencyConversion*
 *.backup
 *.bak
+graphify-out/
