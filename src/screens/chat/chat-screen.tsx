@@ -86,6 +86,7 @@ import type {
   ThinkingLevel,
 } from './components/chat-composer'
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
+import { useWorkspaceApprovalPoller, resolveWorkspaceApproval } from './hooks/use-workspace-approvals'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import type {AgentActivity} from '@/stores/chat-activity-store';
 import type {ArtifactPanelState} from './contexts/artifact-panel-context';
@@ -876,6 +877,24 @@ export function ChatScreen({
     return () => window.clearInterval(id)
   }, [])
 
+  // Poll workspace-level approvals (server-side store) and merge into
+  // the existing gateway-level localStorage approvals.
+  useWorkspaceApprovalPoller(
+    resolvedSessionKey,
+    (approval) => {
+      // Handle new workspace approval — add to gateway store
+      addApproval({
+        agentId: approval.agentId,
+        agentName: approval.agentName,
+        action: approval.action,
+        context: approval.context,
+        source: 'gateway',
+        gatewayApprovalId: approval.gatewayApprovalId,
+      })
+    },
+    setPendingApprovals,
+  )
+
   const resolvePendingApproval = useCallback(
     async (approval: ApprovalRequest, status: 'approved' | 'denied') => {
       const nextApprovals = loadApprovals().map((entry) => {
@@ -892,6 +911,13 @@ export function ChatScreen({
       )
       if (!approval.gatewayApprovalId) return
 
+      // Try workspace-level resolution first (new API)
+      await resolveWorkspaceApproval(
+        approval.gatewayApprovalId,
+        status === 'approved' ? 'approved' : 'rejected',
+      )
+
+      // Fallback: existing gateway endpoint
       const endpoint =
         status === 'approved'
           ? `/api/approvals/${approval.gatewayApprovalId}/approve`
