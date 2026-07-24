@@ -71,6 +71,7 @@ import { Route as ApiTasksCreateFromTgRouteImport } from './routes/api/tasks-cre
 import { Route as ApiTasksCompletionTrendRouteImport } from './routes/api/tasks-completion-trend'
 import { Route as ApiTasksCompletionCheckRouteImport } from './routes/api/tasks-completion-check'
 import { Route as ApiTasksClarifyNudgeRouteImport } from './routes/api/tasks-clarify-nudge'
+import { Route as ApiTasksBlockersRouteImport } from './routes/api/tasks-blockers'
 import { Route as ApiTasksBatchExecuteRouteImport } from './routes/api/tasks-batch-execute'
 import { Route as ApiTasksAstraReviewRouteImport } from './routes/api/tasks-astra-review'
 import { Route as ApiTasksAskAstraRouteImport } from './routes/api/tasks-ask-astra'
@@ -555,6 +556,11 @@ const ApiTasksCompletionCheckRoute = ApiTasksCompletionCheckRouteImport.update({
 const ApiTasksClarifyNudgeRoute = ApiTasksClarifyNudgeRouteImport.update({
   id: '/api/tasks-clarify-nudge',
   path: '/api/tasks-clarify-nudge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTasksBlockersRoute = ApiTasksBlockersRouteImport.update({
+  id: '/api/tasks-blockers',
+  path: '/api/tasks-blockers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTasksBatchExecuteRoute = ApiTasksBatchExecuteRouteImport.update({
@@ -1567,6 +1573,7 @@ export interface FileRoutesByFullPath {
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
   '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
+  '/api/tasks-blockers': typeof ApiTasksBlockersRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-completion-trend': typeof ApiTasksCompletionTrendRoute
@@ -1805,6 +1812,7 @@ export interface FileRoutesByTo {
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
   '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
+  '/api/tasks-blockers': typeof ApiTasksBlockersRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-completion-trend': typeof ApiTasksCompletionTrendRoute
@@ -2045,6 +2053,7 @@ export interface FileRoutesById {
   '/api/tasks-ask-astra': typeof ApiTasksAskAstraRoute
   '/api/tasks-astra-review': typeof ApiTasksAstraReviewRoute
   '/api/tasks-batch-execute': typeof ApiTasksBatchExecuteRoute
+  '/api/tasks-blockers': typeof ApiTasksBlockersRoute
   '/api/tasks-clarify-nudge': typeof ApiTasksClarifyNudgeRoute
   '/api/tasks-completion-check': typeof ApiTasksCompletionCheckRoute
   '/api/tasks-completion-trend': typeof ApiTasksCompletionTrendRoute
@@ -2286,6 +2295,7 @@ export interface FileRouteTypes {
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
     | '/api/tasks-batch-execute'
+    | '/api/tasks-blockers'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
     | '/api/tasks-completion-trend'
@@ -2524,6 +2534,7 @@ export interface FileRouteTypes {
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
     | '/api/tasks-batch-execute'
+    | '/api/tasks-blockers'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
     | '/api/tasks-completion-trend'
@@ -2763,6 +2774,7 @@ export interface FileRouteTypes {
     | '/api/tasks-ask-astra'
     | '/api/tasks-astra-review'
     | '/api/tasks-batch-execute'
+    | '/api/tasks-blockers'
     | '/api/tasks-clarify-nudge'
     | '/api/tasks-completion-check'
     | '/api/tasks-completion-trend'
@@ -3003,6 +3015,7 @@ export interface RootRouteChildren {
   ApiTasksAskAstraRoute: typeof ApiTasksAskAstraRoute
   ApiTasksAstraReviewRoute: typeof ApiTasksAstraReviewRoute
   ApiTasksBatchExecuteRoute: typeof ApiTasksBatchExecuteRoute
+  ApiTasksBlockersRoute: typeof ApiTasksBlockersRoute
   ApiTasksClarifyNudgeRoute: typeof ApiTasksClarifyNudgeRoute
   ApiTasksCompletionCheckRoute: typeof ApiTasksCompletionCheckRoute
   ApiTasksCompletionTrendRoute: typeof ApiTasksCompletionTrendRoute
@@ -3514,6 +3527,13 @@ declare module '@tanstack/react-router' {
       path: '/api/tasks-clarify-nudge'
       fullPath: '/api/tasks-clarify-nudge'
       preLoaderRoute: typeof ApiTasksClarifyNudgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-blockers': {
+      id: '/api/tasks-blockers'
+      path: '/api/tasks-blockers'
+      fullPath: '/api/tasks-blockers'
+      preLoaderRoute: typeof ApiTasksBlockersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tasks-batch-execute': {
@@ -5121,6 +5141,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTasksAskAstraRoute: ApiTasksAskAstraRoute,
   ApiTasksAstraReviewRoute: ApiTasksAstraReviewRoute,
   ApiTasksBatchExecuteRoute: ApiTasksBatchExecuteRoute,
+  ApiTasksBlockersRoute: ApiTasksBlockersRoute,
   ApiTasksClarifyNudgeRoute: ApiTasksClarifyNudgeRoute,
   ApiTasksCompletionCheckRoute: ApiTasksCompletionCheckRoute,
   ApiTasksCompletionTrendRoute: ApiTasksCompletionTrendRoute,

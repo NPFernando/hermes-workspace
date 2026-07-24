@@ -3060,3 +3060,105 @@ export function batchExecuteBackground(limit = 5, taskIds?: Array<string>): { st
 
   return { started: batch.length, remaining }
 }
+
+// ── Blocker auto-resume ────────────────────────────────────────────────────
+// When a task moves to 'done', check if any blocked tasks that depend on it
+// can now be auto-resumed. This runs synchronously — no LLM needed.
+
+export function runBlockerAutoResume(): { unblocked: number; checks: number } {
+  const allTasks = listTasks({ includeDone: true })
+  const taskMap = new Map(allTasks.map((t) => [t.id, t]))
+
+  const dependencyBlocked = allTasks.filter(
+    (t) => t.column === 'blocked' && t.blocker_type === 'dependency' && Array.isArray(t.depends_on) && t.depends_on.length > 0,
+  )
+
+  if (dependencyBlocked.length === 0) return { unblocked: 0, checks: 0 }
+
+  let unblocked = 0
+
+  for (const task of dependencyBlocked) {
+    const deps = task.depends_on ?? []
+    const allDone = deps.every((depId) => {
+      const dep = taskMap.get(depId)
+      return dep?.column === 'done'
+    })
+
+    if (!allDone) continue
+
+    // Auto-unblock: move to todo, clear blocker fields
+    updateTask(task.id, {
+      column: 'todo',
+      blocker_type: undefined,
+      blocker_reason: undefined,
+      blocked_since: undefined,
+      resolved_by_task: undefined,
+      agent_history: [
+        ...(task.agent_history ?? []),
+        {
+          id: crypto.randomUUID(),
+          by: 'astra',
+          byEmoji: '🌟',
+          action: 'auto_resumed',
+          note: 'All dependencies completed — auto-unblocked',
+          at: new Date().toISOString(),
+        },
+      ],
+    })
+
+    unblocked++
+  }
+
+  return { unblocked, checks: dependencyBlocked.length }
+}
+
+// ── Trigger auto-resume after task completion ──────────────────────────────
+// Call this whenever a task moves to 'done' to cascade auto-resume.
+// The caller is responsible for only calling this when appropriate.
+
+export function maybeAutoResumeAfterCompletion(completedTaskId: string): { unblocked: number } {
+  // Find tasks that depend on the completed task
+  const allTasks = listTasks({ includeDone: true })
+  const taskMap = new Map(allTasks.map((t) => [t.id, t]))
+
+  const dependents = allTasks.filter(
+    (t) =>
+      t.column === 'blocked' &&
+      t.blocker_type === 'dependency' &&
+      Array.isArray(t.depends_on) &&
+      t.depends_on.includes(completedTaskId),
+  )
+
+  if (dependents.length === 0) return { unblocked: 0 }
+
+  let unblocked = 0
+  for (const task of dependents) {
+    const deps = task.depends_on ?? []
+    const allDone = deps.every((depId) => taskMap.get(depId)?.column === 'done')
+
+    if (!allDone) continue
+
+    updateTask(task.id, {
+      column: 'todo',
+      blocker_type: undefined,
+      blocker_reason: undefined,
+      blocked_since: undefined,
+      resolved_by_task: undefined,
+      agent_history: [
+        ...(task.agent_history ?? []),
+        {
+          id: crypto.randomUUID(),
+          by: 'astra',
+          byEmoji: '🌟',
+          action: 'auto_resumed',
+          note: `Dependency "${completedTaskId}" completed — auto-unblocked`,
+          at: new Date().toISOString(),
+        },
+      ],
+    })
+
+    unblocked++
+  }
+
+  return { unblocked }
+}

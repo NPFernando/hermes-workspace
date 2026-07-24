@@ -30,6 +30,7 @@ import { SisterRebalanceModal } from './panels/sister-rebalance-modal'
 import { TagsBrowserPanel } from './panels/tags-browser-panel'
 import { ActivityPanel } from './panels/activity-panel'
 import { TaskDetailPanel } from './panels/task-detail-panel'
+import { BlockerPanel } from './panels/blocker-panel'
 import type { VirtualRow } from './virtual-task-list'
 import type { ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority, UpdateTaskInput } from '@/lib/tasks-api'
 import { TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip'
@@ -145,15 +146,17 @@ export function TasksScreen() {
   // Column hide/collapse + subtask visibility: see use-task-filters.ts
 
   // Unified panel state — only one slide-over open at a time
-  const [activePanel, setActivePanel] = useState<'activity' | 'tags' | 'sisterLoad' | 'rebalance' | null>(null)
+  const [activePanel, setActivePanel] = useState<'activity' | 'tags' | 'sisterLoad' | 'rebalance' | 'blockers' | null>(null)
   const showActivity = activePanel === 'activity'
   const showTagsPanel = activePanel === 'tags'
   const showSisterLoad = activePanel === 'sisterLoad'
   const showRebalance = activePanel === 'rebalance'
+  const showBlockers = activePanel === 'blockers'
   const setShowActivity = (v: boolean | ((p: boolean) => boolean)) => setActivePanel(prev => { const cur = prev === 'activity'; const next = typeof v === 'function' ? v(cur) : v; if (next) return 'activity'; if (cur) return null; return prev })
   const setShowTagsPanel = (v: boolean | ((p: boolean) => boolean)) => setActivePanel(prev => { const cur = prev === 'tags'; const next = typeof v === 'function' ? v(cur) : v; if (next) return 'tags'; if (cur) return null; return prev })
   const setShowSisterLoad = (v: boolean | ((p: boolean) => boolean)) => setActivePanel(prev => { const cur = prev === 'sisterLoad'; const next = typeof v === 'function' ? v(cur) : v; if (next) return 'sisterLoad'; if (cur) return null; return prev })
   const setShowRebalance = (v: boolean | ((p: boolean) => boolean)) => setActivePanel(prev => { const cur = prev === 'rebalance'; const next = typeof v === 'function' ? v(cur) : v; if (next) return 'rebalance'; if (cur) return null; return prev })
+  const setShowBlockers = (v: boolean | ((p: boolean) => boolean)) => setActivePanel(prev => { const cur = prev === 'blockers'; const next = typeof v === 'function' ? v(cur) : v; if (next) return 'blockers'; if (cur) return null; return prev })
   // Activity panel
   const [activityTab, setActivityTab] = useState<'inbox' | 'feed'>('inbox')
   const [inboxReplies, setInboxReplies] = useState<Record<string, string>>({})
@@ -932,6 +935,19 @@ export function TasksScreen() {
           >
             ⚑ Activity
             {activityCount > 0 && <span className={cn('text-[9px] px-1 rounded-full font-bold', showActivity ? 'bg-amber-500/20 text-amber-400' : 'bg-[var(--theme-accent)]/20 text-[var(--theme-accent)]')}>{activityCount}</span>}
+          </button>
+
+          {/* 🔒 Blockers panel */}
+          <button
+            type="button"
+            onClick={() => setShowBlockers(v => !v)}
+            className={cn(
+              'relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors',
+              showBlockers ? 'border-red-500/50 bg-red-500/10 text-red-400' : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+            )}
+            title="Blocked tasks and credential collection"
+          >
+            🔒 Blockers
           </button>
 
           {/* 🎛️ View dropdown */}
@@ -2298,6 +2314,11 @@ export function TasksScreen() {
             finally { setTaggingSelected(false) }
           }}
         />
+      )}
+
+      {/* Blockers panel */}
+      {showBlockers && (
+        <BlockerPanel />
       )}
 
       {/* Sister rebalance modal */}
