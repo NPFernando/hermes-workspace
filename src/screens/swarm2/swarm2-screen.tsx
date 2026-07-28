@@ -17,6 +17,7 @@ import {
   MessageMultiple01Icon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
+import { SisterMissionModal } from './sister-mission-modal'
 import { OperationalWorkerCard } from './operational-worker-card'
 import { Swarm2OrchestratorCard } from './swarm2-orchestrator-card'
 import { Swarm2Wires } from './swarm2-wires'
@@ -610,7 +611,7 @@ function progressForRuntime(runtime: RuntimeEntry | undefined): number {
   if (runtime.checkpointStatus === 'done' || runtime.checkpointStatus === 'handoff') return 100
   if (runtime.checkpointStatus === 'blocked' || runtime.checkpointStatus === 'needs_input') return 100
   if (!runtime.currentTask?.trim()) return 0
-  const text = `${runtime.phase ?? ''} ${runtime.currentTask ?? ''}`.toLowerCase()
+  const text = `${runtime.phase ?? ''} ${runtime.currentTask}`.toLowerCase()
   if (text.includes('review')) return 72
   if (text.includes('test') || text.includes('qa')) return 78
   if (text.includes('implement') || text.includes('build') || text.includes('patch')) return 64
@@ -1002,6 +1003,7 @@ export function Swarm2Screen() {
   const [routerSeed, setRouterSeed] = useState<{ key: number; prompt: string; mode: 'auto' | 'manual' | 'broadcast' } | null>(null)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [addSwarmOpen, setAddSwarmOpen] = useState(false)
+  const [sisterModalOpen, setSisterModalOpen] = useState(false)
   const [addSwarmSaving, setAddSwarmSaving] = useState(false)
   const [addSwarmError, setAddSwarmError] = useState<string | null>(null)
   const modelsQuery = useQuery({
@@ -1588,6 +1590,13 @@ export function Swarm2Screen() {
                 <HugeiconsIcon icon={MessageMultiple01Icon} size={13} />
                 Add Swarm
               </button>
+              <button
+                type="button"
+                onClick={() => setSisterModalOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-2 text-sm font-medium text-[var(--theme-text)] shadow-sm hover:bg-[var(--theme-card2)]"
+              >
+                👯 Route to Sister
+              </button>
             </div>
           </div>
         </header>
@@ -1750,6 +1759,20 @@ export function Swarm2Screen() {
           </div>
         </div>
       ) : null}
+
+      <SisterMissionModal
+        open={sisterModalOpen}
+        onClose={() => setSisterModalOpen(false)}
+        onSelect={(sister, prompt) => {
+          setSisterModalOpen(false)
+          setRouterSeed({
+            key: Date.now(),
+            prompt: `[Route to ${sister.name}] ${sister.emoji} ${prompt}`,
+            mode: 'manual',
+          })
+          setRouterOpen(true)
+        }}
+      />
 
       <RouterChat
         members={members}
