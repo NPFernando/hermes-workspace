@@ -13,7 +13,7 @@
 export type WorkSummaryResult = {
   status: string
   note: string
-  actionLabel: 'completed' | 'blocked' | 'attempted'
+  actionLabel: 'completed' | 'blocked' | 'attempted' | 'timed_out'
   newColumn: 'review' | 'blocked' | null
 }
 
@@ -30,8 +30,22 @@ export type WorkSummaryResult = {
 export function parseWorkSummary(
   output: string,
   stderr: string,
-  exitCode: number,
+  exitCode: number | null,
 ): WorkSummaryResult {
+  // spawnSync sets `.status` to null when it kills the process itself after
+  // its own timeout elapses (Node's documented signal-kill behavior) — that
+  // path never produces a real exit code, so it's classified separately
+  // rather than falling into the generic "hermes exited with code null"
+  // blocked-status message below.
+  if (exitCode === null) {
+    return {
+      status: 'timed_out',
+      note: 'Execution timed out after 20 min with no result.',
+      actionLabel: 'timed_out',
+      newColumn: 'blocked',
+    }
+  }
+
   let status = 'partial'
   let summary = ''
   let next = ''
@@ -97,6 +111,14 @@ export function parseWorkSummary(
  */
 export const PARSE_WORK_SUMMARY_SRC = `
 function parseWorkSummary(output, stderr, exitCode) {
+  if (exitCode === null) {
+    return {
+      status: 'timed_out',
+      note: 'Execution timed out after 20 min with no result.',
+      actionLabel: 'timed_out',
+      newColumn: 'blocked',
+    };
+  }
   let status = 'partial', summary = '', next = '', question = '';
   const block = output.match(/<WORK_SUMMARY>([\\s\\S]*?)<\\/WORK_SUMMARY>/)?.[1] ?? '';
   const src   = block || (output.match(/^STATUS:/im) ? output : '');

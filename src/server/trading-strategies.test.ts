@@ -664,7 +664,7 @@ describe('applyTradeOutcome avgWinQuote/avgLossQuote', () => {
     const legacy = { ...emptyScore('x') } as Record<string, unknown>
     delete legacy.avgWinQuote
     delete legacy.avgLossQuote
-    const next = applyTradeOutcome(legacy as ReturnType<typeof emptyScore>, 40, 100)
+    const next = applyTradeOutcome(legacy as unknown as ReturnType<typeof emptyScore>, 40, 100)
     expect(next.avgWinQuote).toBeCloseTo(40, 8)
     expect(next.avgLossQuote).toBeCloseTo(0, 8)
   })

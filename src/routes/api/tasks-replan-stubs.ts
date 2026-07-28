@@ -3,6 +3,25 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { listTasks, updateTask } from '../../server/tasks-store'
 
+export function isStubReviewTask(task: { column: string; agent_state?: string | null; agent_history?: Array<{ action: string; note?: string }> }): boolean {
+  if (task.agent_state) return false
+  const history = task.agent_history ?? []
+  // Find the last planned action in history (assuming chronological order)
+  let lastPlannedIndex = -1
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].action === 'planned') {
+      lastPlannedIndex = i
+      break
+    }
+  }
+  // If no planned action found, not a stub
+  if (lastPlannedIndex === -1) return false
+  // If there are any actions after the last planned action, something happened after the plan -> not a stub
+  if (lastPlannedIndex < history.length - 1) return false
+  const note = (history[lastPlannedIndex].note ?? '') 
+  return note.includes('Plan unavailable') || note.length < 80
+}
+
 // POST /api/tasks-replan-stubs
 // Moves review tasks with stub plans (<80 chars or "Plan unavailable") back to todo
 // so the deploy sweep re-plans them with a real plan.
@@ -12,13 +31,7 @@ export const Route = createFileRoute('/api/tasks-replan-stubs')({
     handlers: {
       POST: async () => {
         const now = new Date().toISOString()
-        const stubs = listTasks({ column: 'review' }).filter((t) => {
-          if (t.agent_state) return false
-          const planned = (t.agent_history ?? []).filter((h) => h.action === 'planned')
-          if (planned.length === 0) return true
-          const note = planned[planned.length - 1].note ?? ''
-          return note.includes('Plan unavailable') || note.length < 80
-        })
+        const stubs = listTasks({ column: 'review' }).filter(isStubReviewTask)
 
         for (const t of stubs) {
           await updateTask(t.id, {
@@ -38,17 +51,6 @@ export const Route = createFileRoute('/api/tasks-replan-stubs')({
         }
 
         return json({ ok: true, moved: stubs.length, titles: stubs.slice(0, 10).map((t) => t.title.slice(0, 60)) })
-      },
-
-      GET: async () => {
-        const stubs = listTasks({ column: 'review' }).filter((t) => {
-          if (t.agent_state) return false
-          const planned = (t.agent_history ?? []).filter((h) => h.action === 'planned')
-          if (planned.length === 0) return true
-          const note = planned[planned.length - 1].note ?? ''
-          return note.includes('Plan unavailable') || note.length < 80
-        })
-        return json({ ok: true, count: stubs.length })
       },
     },
   },

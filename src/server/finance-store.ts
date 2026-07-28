@@ -401,6 +401,21 @@ export type FinanceSettings = {
     requireStopLoss: boolean
     requireTakeProfitOrExitCondition: boolean
   }
+  /**
+   * Per-engine tunable config blobs, each resolved against its own engine's
+   * defaults at read time (resolveGridEngineConfig, EngineConfig in
+   * demo-trading-engine.ts, etc.) — loosely typed here rather than importing
+   * each engine's config type, since those engines already import from this
+   * file (finance-store.ts is a low-level module; importing back from them
+   * would be circular). Application code already reads/writes these through
+   * an `as Record<string, unknown>` cast — this just gives that same shape
+   * a name so tests can construct/type them without their own casts.
+   */
+  demoTrading?: Record<string, unknown>
+  demoTradingGrid?: Record<string, unknown>
+  demoTradingLlm?: Record<string, unknown>
+  demoTradingRebalance?: Record<string, unknown>
+  autoRefinement?: Record<string, unknown>
 }
 
 export type FinanceDatabase = {

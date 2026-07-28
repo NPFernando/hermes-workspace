@@ -33,9 +33,15 @@ function makeRequest(url: string): Request {
 
 async function callGet(url: string): Promise<Response> {
   const request = makeRequest(url)
-  const handler = Route.options.server?.handlers?.GET
+  // Same double-cast-through-unknown pattern as -mcp.test.ts: TanStack
+  // Router's route-options type is a complex generic union the test doesn't
+  // need — this names just the shape actually used here.
+  const route = Route as unknown as {
+    options: { server?: { handlers?: { GET?: (ctx: { request: Request }) => Promise<Response> } } }
+  }
+  const handler = route.options.server?.handlers?.GET
   if (!handler) throw new Error('No GET handler')
-  return handler({ request } as Parameters<typeof handler>[0])
+  return handler({ request })
 }
 
 beforeEach(() => {
