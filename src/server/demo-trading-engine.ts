@@ -613,7 +613,11 @@ class PaperBinanceClient implements BinanceExecutionClient {
   readonly environment: BinanceExecutionEnvironment = 'paper'
 
   ping(): Promise<boolean> {
-    return Promise.resolve(true)
+    return Promise.resolve(true);
+  }
+
+  buildUserDataStreamSubscribeParams(): Record<string, unknown> {
+    return {};
   }
 
   async getPrice(symbol: string): Promise<number> {
@@ -1395,19 +1399,26 @@ async function runTradingCycleInner(
     : []
   const dailyPnlQuote = realizedToday(activeTrades)
 
-  const bail = (reason: string): CycleResult => ({
-    ran: false,
-    reason,
-    actions: [],
-    scores: [...scores.values()],
-    openPositions: executionMode
-      ? activePositionsForMode(positions, executionMode).length
-      : 0,
-    dailyPnlQuote,
-    ranAt,
-    executionMode: executionMode ?? undefined,
-    marketWarmup: cycleContext.marketWarmup,
-  })
+  const bail = (reason: string): CycleResult => {
+    appendAuditLog('demo_trading_cycle_bailed', {
+      reason,
+      tradingMode: db.settings.tradingMode,
+      executionMode: executionMode ?? undefined,
+    })
+    return {
+      ran: false,
+      reason,
+      actions: [],
+      scores: [...scores.values()],
+      openPositions: executionMode
+        ? activePositionsForMode(positions, executionMode).length
+        : 0,
+      dailyPnlQuote,
+      ranAt,
+      executionMode: executionMode ?? undefined,
+      marketWarmup: cycleContext.marketWarmup,
+    }
+  }
 
   if (db.settings.emergencyKillSwitch)
     return bail('emergency kill switch is active')
