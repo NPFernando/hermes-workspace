@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { cn } from '@/lib/utils'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
 import type { JobProfileOption } from '@/lib/jobs-api'
+import { cn } from '@/lib/utils'
 
 const SCHEDULE_PRESETS = [
   { label: 'Every 15m', value: 'every 15m' },
@@ -153,9 +153,7 @@ export function CreateJobDialog({
             onSubmit={handleFormSubmit}
             className="relative z-10 flex max-h-[85vh] w-[min(720px,96vw)] flex-col overflow-hidden rounded-2xl border shadow-2xl bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]"
           >
-            <div
-              className="flex items-start justify-between gap-4 border-b px-5 py-4 border-[var(--theme-border)]"
-            >
+            <div className="flex items-start justify-between gap-4 border-b px-5 py-4 border-[var(--theme-border)]">
               <div>
                 <h2 className="text-lg font-semibold">Create Job</h2>
                 <p className="mt-1 text-sm text-[var(--theme-muted)]">
@@ -361,11 +359,11 @@ export function CreateJobDialog({
                         }))
                       }
                       className={cn(
-                      'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                      form.repeatMode === 'unlimited'
-                        ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-white'
-                        : 'bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]',
-                    )}
+                        'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                        form.repeatMode === 'unlimited'
+                          ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-white'
+                          : 'bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]',
+                      )}
                     >
                       Unlimited
                     </button>
@@ -378,11 +376,11 @@ export function CreateJobDialog({
                         }))
                       }
                       className={cn(
-                      'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                      form.repeatMode === 'limited'
-                        ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-white'
-                        : 'bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]',
-                    )}
+                        'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                        form.repeatMode === 'limited'
+                          ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-white'
+                          : 'bg-[var(--theme-card)] border-[var(--theme-border)] text-[var(--theme-text)]',
+                      )}
                     >
                       Set count
                     </button>
@@ -406,9 +404,7 @@ export function CreateJobDialog({
               </section>
             </div>
 
-            <div
-              className="flex items-center justify-end gap-2 border-t px-5 py-4 border-[var(--theme-border)]"
-            >
+            <div className="flex items-center justify-end gap-2 border-t px-5 py-4 border-[var(--theme-border)]">
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}

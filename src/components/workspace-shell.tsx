@@ -31,13 +31,6 @@ import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
-// Lazy: ChatPanel statically imports ChatScreen and with it the whole chat
-// markdown pipeline (~500 KB minified). Keeping it out of the eager entry
-// means non-chat routes stop paying for chat at first paint; the panel
-// chunk loads in the background right after mount.
-const ChatPanel = lazy(() =>
-  import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
-)
 import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
@@ -50,6 +43,13 @@ import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
+// Lazy: ChatPanel statically imports ChatScreen and with it the whole chat
+// markdown pipeline (~500 KB minified). Keeping it out of the eager entry
+// means non-chat routes stop paying for chat at first paint; the panel
+// chunk loads in the background right after mount.
+const ChatPanel = lazy(() =>
+  import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
+)
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 
 const TerminalWorkspace = lazy(() =>
@@ -201,7 +201,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     if (pathname.startsWith('/command')) return 'Command Center'
     if (pathname.startsWith('/operations')) return 'Operations'
     if (pathname.startsWith('/agents')) return 'Agent Team'
-    if (pathname.startsWith('/swarm2') || pathname === '/swarm' || pathname.startsWith('/swarm/')) return 'Swarm'
+    if (
+      pathname.startsWith('/swarm2') ||
+      pathname === '/swarm' ||
+      pathname.startsWith('/swarm/')
+    )
+      return 'Swarm'
     if (pathname.startsWith('/echo-studio')) return 'Echo Studio'
     if (pathname.startsWith('/memory')) return 'Memory'
     if (pathname.startsWith('/skills')) return 'Skills'
@@ -356,7 +361,11 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const shellStyle: React.CSSProperties & Record<'--titlebar-h', string> = {
     height: 'var(--vvh, 100dvh)',
     // Electron: native titlebar. TWA/standalone: status bar safe area. Web: none.
-    paddingTop: isElectron ? 40 : isStandalone ? 'env(safe-area-inset-top, 0px)' : 0,
+    paddingTop: isElectron
+      ? 40
+      : isStandalone
+        ? 'env(safe-area-inset-top, 0px)'
+        : 0,
     '--titlebar-h': isElectron ? '40px' : '0px',
   }
 
@@ -383,9 +392,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             <div className="w-[78px] shrink-0" />
             {/* Centered title */}
             <div className="flex-1 text-center">
-              <span
-                className="text-[13px] font-medium select-none text-[var(--theme-accent)]"
-              >
+              <span className="text-[13px] font-medium select-none text-[var(--theme-accent)]">
                 Hermes
               </span>
             </div>
@@ -430,7 +437,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
               isMobile && !isOnChatRoute
                 ? 'pb-[calc(var(--tabbar-h,80px)+0.5rem)]'
-                : !isMobile && !isOnChatRoute && settings.showSystemMetricsFooter
+                : !isMobile &&
+                    !isOnChatRoute &&
+                    settings.showSystemMetricsFooter
                   ? 'pb-7'
                   : '',
             ].join(' ')}
@@ -480,9 +489,10 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 .filter(Boolean)
                 .join(' ')}
             >
-              {isMobile && !isOnChatRoute && !isOnTerminalRoute && mobilePageTitle && (
-                <MobilePageHeader title={mobilePageTitle} />
-              )}
+              {isMobile &&
+                !isOnChatRoute &&
+                !isOnTerminalRoute &&
+                mobilePageTitle && <MobilePageHeader title={mobilePageTitle} />}
               {children}
             </div>
           </main>

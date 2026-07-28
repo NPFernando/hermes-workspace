@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ActivityEntry, ClarificationQuestion, ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority } from '@/lib/tasks-api'
-import {
-  DialogContent,
-  DialogRoot,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { useTaskExecLog } from './use-task-exec-log'
+import type {
+  ActivityEntry,
+  ClarificationQuestion,
+  ClaudeTask,
+  CreateTaskInput,
+  TaskAssignee,
+  TaskColumn,
+  TaskPriority,
+} from '@/lib/tasks-api'
+import { DialogContent, DialogRoot, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { COLUMN_LABELS, COLUMN_ORDER, relativeTime } from '@/lib/tasks-api'
-import { useTaskExecLog } from './use-task-exec-log'
 
 type Props = {
   open: boolean
@@ -54,13 +58,14 @@ function ClarificationPanel({
   const [submitting, setSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const serverAnswered = questions.filter(q => q.answer)
-  const pending = questions.filter(q => !q.answer)
+  const serverAnswered = questions.filter((q) => q.answer)
+  const pending = questions.filter((q) => !q.answer)
   const currentQ = pending.at(currentIdx) ?? null
   const isLast = currentIdx === pending.length - 1
 
   const currentValue = currentQ ? (localAnswers[currentQ.id] ?? '') : ''
-  const currentIsValid = currentValue.trim() !== '' && currentValue !== CUSTOM_SENTINEL
+  const currentIsValid =
+    currentValue.trim() !== '' && currentValue !== CUSTOM_SENTINEL
 
   // Focus textarea whenever the current question changes (if it has no options)
   useEffect(() => {
@@ -68,20 +73,22 @@ function ClarificationPanel({
   }, [currentIdx])
 
   function advance() {
-    setCurrentIdx(i => Math.min(i + 1, pending.length - 1))
+    setCurrentIdx((i) => Math.min(i + 1, pending.length - 1))
   }
 
   // Go back to pendingIdx, clearing that question's answer and all after it
   function goBackTo(pendingIdx: number) {
     setCurrentIdx(pendingIdx)
-    setLocalAnswers(prev => {
+    setLocalAnswers((prev) => {
       const next = { ...prev }
-      for (let i = pendingIdx; i < pending.length; i++) delete next[pending[i].id]
+      for (let i = pendingIdx; i < pending.length; i++)
+        delete next[pending[i].id]
       return next
     })
-    setCustomTexts(prev => {
+    setCustomTexts((prev) => {
       const next = { ...prev }
-      for (let i = pendingIdx; i < pending.length; i++) delete next[pending[i].id]
+      for (let i = pendingIdx; i < pending.length; i++)
+        delete next[pending[i].id]
       return next
     })
   }
@@ -89,17 +96,20 @@ function ClarificationPanel({
   function pickOption(qId: string, opt: string) {
     if (opt === CUSTOM_SENTINEL) {
       // Switch to custom mode — keep whatever the user typed before
-      setLocalAnswers(prev => ({ ...prev, [qId]: customTexts[qId] || CUSTOM_SENTINEL }))
+      setLocalAnswers((prev) => ({
+        ...prev,
+        [qId]: customTexts[qId] || CUSTOM_SENTINEL,
+      }))
     } else {
-      setLocalAnswers(prev => ({ ...prev, [qId]: opt }))
+      setLocalAnswers((prev) => ({ ...prev, [qId]: opt }))
       // Auto-advance after a brief visual flash (not on last question)
       if (!isLast) setTimeout(advance, 180)
     }
   }
 
   function setCustomText(qId: string, text: string) {
-    setCustomTexts(prev => ({ ...prev, [qId]: text }))
-    setLocalAnswers(prev => ({ ...prev, [qId]: text || CUSTOM_SENTINEL }))
+    setCustomTexts((prev) => ({ ...prev, [qId]: text }))
+    setLocalAnswers((prev) => ({ ...prev, [qId]: text || CUSTOM_SENTINEL }))
   }
 
   async function handleSubmit() {
@@ -123,7 +133,11 @@ function ClarificationPanel({
   const currentOptions = currentQ.options ?? []
   const hasOptions = currentOptions.length > 0
   const selectedOpt = hasOptions
-    ? (currentOptions.includes(currentValue) ? currentValue : currentValue ? CUSTOM_SENTINEL : '')
+    ? currentOptions.includes(currentValue)
+      ? currentValue
+      : currentValue
+        ? CUSTOM_SENTINEL
+        : ''
     : ''
   const isCustomMode = selectedOpt === CUSTOM_SENTINEL
 
@@ -133,7 +147,6 @@ function ClarificationPanel({
 
   return (
     <div className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3 space-y-3 mt-3">
-
       {/* Answered thread — compact read-only */}
       {hasThread && (
         <div className="space-y-1 pb-2 border-b border-amber-400/15">
@@ -141,14 +154,20 @@ function ClarificationPanel({
             <div key={q.id} className="flex gap-1.5 text-[11px]">
               <span className="text-amber-400/40 shrink-0 w-4">{i + 1}.</span>
               <span className="text-amber-400/50 truncate">{q.question}</span>
-              <span className="text-[var(--theme-muted)] ml-auto shrink-0 max-w-[45%] truncate">→ {q.answer}</span>
+              <span className="text-[var(--theme-muted)] ml-auto shrink-0 max-w-[45%] truncate">
+                → {q.answer}
+              </span>
             </div>
           ))}
           {locallyAnswered.map((q, i) => (
             <div key={q.id} className="flex gap-1.5 text-[11px] items-center">
-              <span className="text-amber-400/50 shrink-0 w-4">{serverAnswered.length + i + 1}.</span>
+              <span className="text-amber-400/50 shrink-0 w-4">
+                {serverAnswered.length + i + 1}.
+              </span>
               <span className="text-amber-400/60 truncate">{q.question}</span>
-              <span className="text-[var(--theme-muted)] ml-auto shrink-0 max-w-[40%] truncate">→ {localAnswers[q.id]}</span>
+              <span className="text-[var(--theme-muted)] ml-auto shrink-0 max-w-[40%] truncate">
+                → {localAnswers[q.id]}
+              </span>
               <button
                 type="button"
                 onClick={() => goBackTo(i)}
@@ -165,7 +184,8 @@ function ClarificationPanel({
       {/* Progress */}
       <div className="flex items-center gap-2">
         <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wide">
-          Question {serverAnswered.length + currentIdx + 1} of {questions.length}
+          Question {serverAnswered.length + currentIdx + 1} of{' '}
+          {questions.length}
         </span>
         {pending.length > 1 && (
           <div className="ml-auto flex items-center gap-1">
@@ -174,7 +194,11 @@ function ClarificationPanel({
                 key={i}
                 className={cn(
                   'inline-block w-1.5 h-1.5 rounded-full transition-colors duration-200',
-                  i < currentIdx ? 'bg-amber-500' : i === currentIdx ? 'bg-amber-400' : 'bg-amber-400/20',
+                  i < currentIdx
+                    ? 'bg-amber-500'
+                    : i === currentIdx
+                      ? 'bg-amber-400'
+                      : 'bg-amber-400/20',
                 )}
               />
             ))}
@@ -183,12 +207,14 @@ function ClarificationPanel({
       </div>
 
       {/* Current question text */}
-      <p className="text-sm font-medium text-[var(--theme-text)]">{currentQ.question}</p>
+      <p className="text-sm font-medium text-[var(--theme-text)]">
+        {currentQ.question}
+      </p>
 
       {/* Option buttons */}
       {hasOptions && (
         <div className="flex flex-wrap gap-1.5">
-          {currentOptions.map(opt => (
+          {currentOptions.map((opt) => (
             <button
               key={opt}
               type="button"
@@ -223,14 +249,27 @@ function ClarificationPanel({
         <textarea
           ref={textareaRef}
           rows={2}
-          className={cn(inputClass, 'resize-none border-amber-400/20 focus:ring-amber-400/40 text-xs py-1.5')}
-          placeholder={hasOptions ? 'Enter your custom answer…' : isLast ? 'Your answer… (Enter to submit)' : 'Your answer… (Enter to continue)'}
+          className={cn(
+            inputClass,
+            'resize-none border-amber-400/20 focus:ring-amber-400/40 text-xs py-1.5',
+          )}
+          placeholder={
+            hasOptions
+              ? 'Enter your custom answer…'
+              : isLast
+                ? 'Your answer… (Enter to submit)'
+                : 'Your answer… (Enter to continue)'
+          }
           value={hasOptions ? (customTexts[currentQ.id] ?? '') : currentValue}
-          onChange={e => {
+          onChange={(e) => {
             if (hasOptions) setCustomText(currentQ.id, e.target.value)
-            else setLocalAnswers(prev => ({ ...prev, [currentQ.id]: e.target.value }))
+            else
+              setLocalAnswers((prev) => ({
+                ...prev,
+                [currentQ.id]: e.target.value,
+              }))
           }}
-          onKeyDown={e => {
+          onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && currentIsValid) {
               e.preventDefault()
               if (isLast) void handleSubmit()
@@ -253,14 +292,21 @@ function ClarificationPanel({
         </Button>
       ) : (
         <div className="flex items-center justify-between">
-          {hasOptions && !isCustomMode
-            ? <span className="text-[10px] text-amber-400/40">Select an option to continue</span>
-            : <span className="text-[10px] text-amber-400/40">Enter to continue</span>
-          }
+          {hasOptions && !isCustomMode ? (
+            <span className="text-[10px] text-amber-400/40">
+              Select an option to continue
+            </span>
+          ) : (
+            <span className="text-[10px] text-amber-400/40">
+              Enter to continue
+            </span>
+          )}
           {(!hasOptions || isCustomMode) && (
             <button
               type="button"
-              onClick={() => { if (currentIsValid) advance() }}
+              onClick={() => {
+                if (currentIsValid) advance()
+              }}
               disabled={!currentIsValid}
               className="text-[10px] text-amber-400/60 hover:text-amber-400 disabled:opacity-30 transition-colors"
             >
@@ -291,7 +337,10 @@ function ExecLogTail({ taskId }: { taskId: string }) {
         {show ? '▲ hide log' : '▼ view log'}
       </button>
       {show && (
-        <pre className="mt-1 max-h-36 overflow-y-auto text-[10px] leading-relaxed text-violet-300/70 whitespace-pre-wrap break-all" style={{ scrollbarWidth: 'thin' }}>
+        <pre
+          className="mt-1 max-h-36 overflow-y-auto text-[10px] leading-relaxed text-violet-300/70 whitespace-pre-wrap break-all"
+          style={{ scrollbarWidth: 'thin' }}
+        >
           {log}
         </pre>
       )}
@@ -299,7 +348,27 @@ function ExecLogTail({ taskId }: { taskId: string }) {
   )
 }
 
-export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTags, defaultTitle, defaultDescription, defaultPriority, defaultAssignee, assignees, onSubmit, isSubmitting, onComment, onClarify, onExecute, isExecuting, onBreakdown, isBreakingDown, onOpenSession }: Props) {
+export function TaskDialog({
+  open,
+  onOpenChange,
+  task,
+  defaultColumn,
+  defaultTags,
+  defaultTitle,
+  defaultDescription,
+  defaultPriority,
+  defaultAssignee,
+  assignees,
+  onSubmit,
+  isSubmitting,
+  onComment,
+  onClarify,
+  onExecute,
+  isExecuting,
+  onBreakdown,
+  isBreakingDown,
+  onOpenSession,
+}: Props) {
   const isEdit = Boolean(task)
 
   const [title, setTitle] = useState('')
@@ -332,7 +401,16 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
       setDueDate('')
     }
     setCommentText('')
-  }, [task, open, defaultColumn, defaultTags, defaultTitle, defaultDescription, defaultPriority, defaultAssignee])
+  }, [
+    task,
+    open,
+    defaultColumn,
+    defaultTags,
+    defaultTitle,
+    defaultDescription,
+    defaultPriority,
+    defaultAssignee,
+  ])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -343,7 +421,10 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
       column,
       priority,
       assignee: assignee || null,
-      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+      tags: tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean),
       due_date: dueDate || null,
     })
   }
@@ -392,7 +473,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
               <input
                 className={inputClass}
                 value={title}
-                onChange={e => setTitle(e.target.value)}
+                onChange={(e) => setTitle(e.target.value)}
                 placeholder="What needs to be done?"
                 required
                 autoFocus
@@ -405,7 +486,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                 className={cn(inputClass, 'resize-none')}
                 rows={3}
                 value={description}
-                onChange={e => setDescription(e.target.value)}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional details..."
               />
             </div>
@@ -417,10 +498,12 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                   className={inputClass}
                   style={{ colorScheme: 'dark' }}
                   value={column}
-                  onChange={e => setColumn(e.target.value as TaskColumn)}
+                  onChange={(e) => setColumn(e.target.value as TaskColumn)}
                 >
-                  {COLUMN_ORDER.map(col => (
-                    <option key={col} value={col}>{COLUMN_LABELS[col]}</option>
+                  {COLUMN_ORDER.map((col) => (
+                    <option key={col} value={col}>
+                      {COLUMN_LABELS[col]}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -430,7 +513,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                   className={inputClass}
                   style={{ colorScheme: 'dark' }}
                   value={priority}
-                  onChange={e => setPriority(e.target.value as TaskPriority)}
+                  onChange={(e) => setPriority(e.target.value as TaskPriority)}
                 >
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
@@ -446,15 +529,18 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                   className={inputClass}
                   style={{ colorScheme: 'dark' }}
                   value={assignee}
-                  onChange={e => setAssignee(e.target.value)}
+                  onChange={(e) => setAssignee(e.target.value)}
                 >
                   <option value="">Unassigned</option>
                   {assignees.map(({ id, label }) => (
-                    <option key={id} value={id}>{label}</option>
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
                   ))}
                 </select>
                 <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
-                  Assignee is separate from status. Dragging a card changes its column only.
+                  Assignee is separate from status. Dragging a card changes its
+                  column only.
                 </p>
               </div>
               <div>
@@ -464,7 +550,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                   className={inputClass}
                   style={{ colorScheme: 'dark' }}
                   value={dueDate}
-                  onChange={e => setDueDate(e.target.value)}
+                  onChange={(e) => setDueDate(e.target.value)}
                 />
               </div>
             </div>
@@ -474,7 +560,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
               <input
                 className={inputClass}
                 value={tags}
-                onChange={e => setTags(e.target.value)}
+                onChange={(e) => setTags(e.target.value)}
                 placeholder="frontend, bug, research"
               />
             </div>
@@ -496,7 +582,11 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                     size="sm"
                     onClick={() => void onBreakdown()}
                     disabled={isBreakingDown}
-                    className={isBreakingDown ? 'bg-violet-700 text-white opacity-70' : 'bg-violet-500 text-white'}
+                    className={
+                      isBreakingDown
+                        ? 'bg-violet-700 text-white opacity-70'
+                        : 'bg-violet-500 text-white'
+                    }
                   >
                     {isBreakingDown ? '⏳ Breaking down…' : '✦ Break Down'}
                   </Button>
@@ -507,9 +597,13 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                     size="sm"
                     onClick={() => void onExecute()}
                     disabled={isExecuting || task?.agent_state === 'working'}
-                    className={`bg-amber-500 text-white ${(isExecuting || task?.agent_state === 'working') ? 'opacity-70' : ''}`}
+                    className={`bg-amber-500 text-white ${isExecuting || task?.agent_state === 'working' ? 'opacity-70' : ''}`}
                   >
-                    {isExecuting ? '⏳ Executing…' : task?.agent_state === 'working' ? '● Working…' : '🚀 Execute'}
+                    {isExecuting
+                      ? '⏳ Executing…'
+                      : task?.agent_state === 'working'
+                        ? '● Working…'
+                        : '🚀 Execute'}
                   </Button>
                 )}
                 <Button
@@ -518,7 +612,11 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                   disabled={isSubmitting || !title.trim()}
                   className="bg-[var(--theme-accent)] text-white"
                 >
-                  {isSubmitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Task'}
+                  {isSubmitting
+                    ? 'Saving...'
+                    : isEdit
+                      ? 'Save Changes'
+                      : 'Create Task'}
                 </Button>
               </div>
             </div>
@@ -528,9 +626,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
           {isEdit && (
             <div className="border-t mt-4 pt-4 border-[var(--theme-border)]">
               <div className="flex items-center justify-between mb-3">
-                <h4
-                  className="text-[10px] font-semibold uppercase tracking-widest text-[var(--theme-muted)]"
-                >
+                <h4 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--theme-muted)]">
                   Agent Activity
                 </h4>
                 {task?.session_id && onOpenSession && (
@@ -545,22 +641,32 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
               </div>
 
               {/* Waiting for user input banner — only shown when no structured questions */}
-              {task?.agent_state === 'waiting_for_input' && !task?.clarification_questions?.length && (
-                <div className="flex items-center gap-2 mb-3 rounded-md border border-amber-300/25 bg-amber-400/8 px-2.5 py-2">
-                  <span className="text-base shrink-0">💬</span>
-                  <span className="text-xs font-medium text-amber-500">
-                    Astra is waiting for your reply — answer below to continue.
-                  </span>
-                </div>
-              )}
+              {task?.agent_state === 'waiting_for_input' &&
+                !task.clarification_questions?.length && (
+                  <div className="flex items-center gap-2 mb-3 rounded-md border border-amber-300/25 bg-amber-400/8 px-2.5 py-2">
+                    <span className="text-base shrink-0">💬</span>
+                    <span className="text-xs font-medium text-amber-500">
+                      Astra is waiting for your reply — answer below to
+                      continue.
+                    </span>
+                  </div>
+                )}
 
               {/* Live "currently working" pulse + execution log tail */}
-              {(isExecuting || (task?.agent_state && task.agent_state !== 'waiting_for_input')) && (
+              {(isExecuting ||
+                (task?.agent_state &&
+                  task.agent_state !== 'waiting_for_input')) && (
                 <div className="mb-3 rounded-md border border-violet-400/20 bg-violet-400/8 px-2.5 py-2">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full animate-ping shrink-0 bg-violet-400" />
                     <span className="text-xs animate-pulse text-violet-400">
-                      {isExecuting ? 'Sending task to agent…' : task?.agent_state === 'reviewing' ? 'Astra reviewing…' : task?.agent_state === 'delegating' ? 'Delegating to specialist…' : 'Agent working on this task…'}
+                      {isExecuting
+                        ? 'Sending task to agent…'
+                        : task?.agent_state === 'reviewing'
+                          ? 'Astra reviewing…'
+                          : task?.agent_state === 'delegating'
+                            ? 'Delegating to specialist…'
+                            : 'Agent working on this task…'}
                     </span>
                   </div>
                   {task?.id && task.agent_state === 'working' && (
@@ -569,7 +675,11 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                 </div>
               )}
 
-              <div ref={activityScrollRef} className="max-h-52 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+              <div
+                ref={activityScrollRef}
+                className="max-h-52 overflow-y-auto pr-1"
+                style={{ scrollbarWidth: 'thin' }}
+              >
                 {history.length === 0 ? (
                   <p className="text-xs italic text-[var(--theme-muted)]">
                     {isExecuting || task?.agent_state
@@ -584,24 +694,52 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
                         <div
                           key={entry.id}
                           className="flex gap-2 text-xs rounded-md"
-                          style={isQuestion ? { background: '#f59e0b0d', border: '1px solid #f59e0b33', padding: '6px 8px' } : undefined}
+                          style={
+                            isQuestion
+                              ? {
+                                  background: '#f59e0b0d',
+                                  border: '1px solid #f59e0b33',
+                                  padding: '6px 8px',
+                                }
+                              : undefined
+                          }
                         >
-                          <span className="shrink-0 text-base leading-none mt-0.5">{entry.byEmoji}</span>
+                          <span className="shrink-0 text-base leading-none mt-0.5">
+                            {entry.byEmoji}
+                          </span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1 flex-wrap">
-                              <span className={isQuestion ? 'text-amber-500 font-medium capitalize' : 'font-medium capitalize text-[var(--theme-text)]'}>
+                              <span
+                                className={
+                                  isQuestion
+                                    ? 'text-amber-500 font-medium capitalize'
+                                    : 'font-medium capitalize text-[var(--theme-text)]'
+                                }
+                              >
                                 {entry.by}
                               </span>
-                              <span className="text-[var(--theme-muted)]">·</span>
-                              <span className={isQuestion ? 'text-amber-500 capitalize' : 'text-[var(--theme-muted)] capitalize'}>
+                              <span className="text-[var(--theme-muted)]">
+                                ·
+                              </span>
+                              <span
+                                className={
+                                  isQuestion
+                                    ? 'text-amber-500 capitalize'
+                                    : 'text-[var(--theme-muted)] capitalize'
+                                }
+                              >
                                 {isQuestion ? 'asked' : entry.action}
                               </span>
-                              <span className="text-[var(--theme-muted)]">·</span>
+                              <span className="text-[var(--theme-muted)]">
+                                ·
+                              </span>
                               <span className="text-[var(--theme-muted)]">
                                 {relativeTime(entry.at)}
                               </span>
                             </div>
-                            <p className={`mt-0.5 leading-relaxed ${isQuestion ? 'text-amber-500' : 'text-[var(--theme-muted)]'}`}>
+                            <p
+                              className={`mt-0.5 leading-relaxed ${isQuestion ? 'text-amber-500' : 'text-[var(--theme-muted)]'}`}
+                            >
                               {entry.note}
                             </p>
                           </div>
@@ -613,40 +751,51 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
               </div>
 
               {/* Structured clarification Q&A — shown when agent asks targeted questions */}
-              {task?.waiting_for_user && task.clarification_questions && task.clarification_questions.length > 0 && onClarify && (
-                <ClarificationPanel
-                  questions={task.clarification_questions}
-                  inputClass={inputClass}
-                  onSubmit={(answers) => onClarify(task.id, answers)}
-                />
-              )}
+              {task?.waiting_for_user &&
+                task.clarification_questions &&
+                task.clarification_questions.length > 0 &&
+                onClarify && (
+                  <ClarificationPanel
+                    questions={task.clarification_questions}
+                    inputClass={inputClass}
+                    onSubmit={(answers) => onClarify(task.id, answers)}
+                  />
+                )}
 
               {/* Freeform comment / reply input — hidden during structured clarification */}
-              {onComment && !(task?.waiting_for_user && task?.clarification_questions?.length) && (
-                <div className="flex gap-2 mt-3">
-                  <input
-                    className={cn(inputClass, 'text-xs py-1.5')}
-                    placeholder={task?.agent_state === 'waiting_for_input' ? 'Reply to Astra… (Enter to send and resume)' : 'Ask a question or add a note… (Enter to send)'}
-                    value={commentText}
-                    onChange={e => setCommentText(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        void handlePostComment()
+              {onComment &&
+                !(
+                  task?.waiting_for_user &&
+                  task.clarification_questions?.length
+                ) && (
+                  <div className="flex gap-2 mt-3">
+                    <input
+                      className={cn(inputClass, 'text-xs py-1.5')}
+                      placeholder={
+                        task?.agent_state === 'waiting_for_input'
+                          ? 'Reply to Astra… (Enter to send and resume)'
+                          : 'Ask a question or add a note… (Enter to send)'
                       }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => void handlePostComment()}
-                    disabled={!commentText.trim() || commentSending}
-                    className="bg-[var(--theme-accent)] text-white shrink-0"
-                  >
-                    {commentSending ? 'Sending…' : 'Send'}
-                  </Button>
-                </div>
-              )}
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          void handlePostComment()
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void handlePostComment()}
+                      disabled={!commentText.trim() || commentSending}
+                      className="bg-[var(--theme-accent)] text-white shrink-0"
+                    >
+                      {commentSending ? 'Sending…' : 'Send'}
+                    </Button>
+                  </div>
+                )}
             </div>
           )}
         </div>

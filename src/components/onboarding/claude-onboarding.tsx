@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import {
+  ONBOARDING_COMPLETE_EVENT,
+  ONBOARDING_KEY,
+} from './onboarding-constants'
 import { cn } from '@/lib/utils'
 import { ProviderLogo } from '@/components/provider-logo'
 
@@ -30,8 +34,10 @@ function stripProviderPrefix(model: string): string {
   return model
 }
 
-export { ONBOARDING_COMPLETE_EVENT, ONBOARDING_KEY } from './onboarding-constants'
-import { ONBOARDING_COMPLETE_EVENT, ONBOARDING_KEY } from './onboarding-constants'
+export {
+  ONBOARDING_COMPLETE_EVENT,
+  ONBOARDING_KEY,
+} from './onboarding-constants'
 
 function dispatchOnboardingCompletionChanged(completed: boolean) {
   if (typeof window === 'undefined') return
@@ -152,7 +158,9 @@ export function ClaudeOnboarding() {
   >('idle')
   const [testMessage, setTestMessage] = useState('')
   const [configuredModel, setConfiguredModel] = useState('')
-  const [discoveredProviders, setDiscoveredProviders] = useState<Array<{ id: string; name?: string; configured?: boolean }>>([])
+  const [discoveredProviders, setDiscoveredProviders] = useState<
+    Array<{ id: string; name?: string; configured?: boolean }>
+  >([])
 
   const [oauthStep, setOauthStep] = useState<
     'idle' | 'loading' | 'waiting' | 'success' | 'error'
@@ -530,8 +538,9 @@ export function ClaudeOnboarding() {
               />
               <h2 className="text-xl font-bold">Welcome to Hermes Workspace</h2>
               <p className="text-sm" style={mutedStyle}>
-                Works with any OpenAI-compatible backend. Hermes Agent gateway APIs
-                unlock sessions, memory, skills, and other extras automatically.
+                Works with any OpenAI-compatible backend. Hermes Agent gateway
+                APIs unlock sessions, memory, skills, and other extras
+                automatically.
               </p>
               <button
                 onClick={() => {
@@ -600,9 +609,9 @@ export function ClaudeOnboarding() {
                     </p>
                     <p className="mt-2" style={mutedStyle}>
                       Use any backend that exposes{' '}
-                      <code>/v1/chat/completions</code>. If you point Hermes Agent
-                      Workspace at a Hermes Agent gateway, enhanced features unlock
-                      automatically.
+                      <code>/v1/chat/completions</code>. If you point Hermes
+                      Agent Workspace at a Hermes Agent gateway, enhanced
+                      features unlock automatically.
                     </p>
                     <div
                       className="mt-3 rounded-lg px-3 py-2 font-mono text-[11px]"
@@ -680,7 +689,9 @@ export function ClaudeOnboarding() {
                         id: p.id,
                         name: p.name || p.id,
                         logo: '/providers/openai.png',
-                        desc: p.configured ? 'Configured provider' : 'Custom provider',
+                        desc: p.configured
+                          ? 'Configured provider'
+                          : 'Custom provider',
                         authType: 'custom' as const,
                       })),
                   ]
@@ -695,7 +706,9 @@ export function ClaudeOnboarding() {
                       }}
                       className={cn(
                         'flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all',
-                        selectedProvider === p.id ? 'ring-2 ring-accent-500' : '',
+                        selectedProvider === p.id
+                          ? 'ring-2 ring-accent-500'
+                          : '',
                       )}
                       style={cardStyle}
                     >
@@ -976,8 +989,8 @@ export function ClaudeOnboarding() {
               <div className="text-4xl">🧪</div>
               <h2 className="text-lg font-bold">Test Chat</h2>
               <p className="text-sm" style={mutedStyle}>
-                Verify that core chat works first. Enhanced Hermes Agent features are
-                optional and appear automatically when supported.
+                Verify that core chat works first. Enhanced Hermes Agent
+                features are optional and appear automatically when supported.
               </p>
 
               <div

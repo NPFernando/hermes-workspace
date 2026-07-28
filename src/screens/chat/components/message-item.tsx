@@ -12,7 +12,13 @@ import {
   shouldAutoExpandHermesActivityCard,
 } from './streaming-activity-ui'
 import { TuiActivityCard } from './tui-activity-card'
-import type { ChatAttachment, ChatMessage, SelectionCardContent, ToolCallContent } from '../types'
+import { readStringArg } from './tool-arg-utils'
+import type {
+  ChatAttachment,
+  ChatMessage,
+  SelectionCardContent,
+  ToolCallContent,
+} from '../types'
 import type { ToolPart } from '@/components/prompt-kit/tool'
 import { AssistantAvatar, UserAvatar } from '@/components/avatars'
 import { CodeBlock } from '@/components/prompt-kit/code-block'
@@ -38,7 +44,6 @@ import {
 import { cn } from '@/lib/utils'
 import { CHAT_SUBMIT_SELECTION_EVENT } from '@/screens/chat/chat-events'
 import { useArtifactPanel } from '@/screens/chat/contexts/artifact-panel-context'
-import { readStringArg } from './tool-arg-utils'
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
@@ -190,7 +195,9 @@ function InteractiveSelectionCard({ card }: { card: SelectionCardContent }) {
           {card.title || 'Choose an option'}
         </div>
         {card.body ? (
-          <div className="mt-1 text-xs text-[var(--theme-muted)]">{card.body}</div>
+          <div className="mt-1 text-xs text-[var(--theme-muted)]">
+            {card.body}
+          </div>
         ) : null}
       </div>
       <div className="space-y-1.5 p-2">
@@ -1147,9 +1154,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
       )}
       {/* Expanded content — args while running, result when done */}
       {expanded && (
-        <div
-          className="border-t border-[var(--theme-border)]"
-        >
+        <div className="border-t border-[var(--theme-border)]">
           {/* Show args (input) */}
           {toolCall.args != null &&
             typeof toolCall.args === 'object' &&
@@ -1166,9 +1171,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
             )}
           {/* Show result when done */}
           {isDone && result && (
-            <div
-              className="px-2.5 py-1.5 border-t border-[var(--theme-border)]"
-            >
+            <div className="px-2.5 py-1.5 border-t border-[var(--theme-border)]">
               <div className="text-[9px] uppercase tracking-widest opacity-40 mb-0.5">
                 Output
               </div>
@@ -1202,9 +1205,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
           )}
           {/* Running indicator when expanded */}
           {isRunning && (
-            <div
-              className="px-2.5 py-1.5 text-[10px] text-[var(--theme-muted)] border-t border-[var(--theme-border)]"
-            >
+            <div className="px-2.5 py-1.5 text-[10px] text-[var(--theme-muted)] border-t border-[var(--theme-border)]">
               <span>
                 {verb}
                 {dots}
@@ -1222,10 +1223,18 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
   )
 }
 
-function AgentWorkSummary({ toolSections }: { toolSections: Array<InlineToolSection> }) {
+function AgentWorkSummary({
+  toolSections,
+}: {
+  toolSections: Array<InlineToolSection>
+}) {
   if (toolSections.length === 0) return null
-  const toolNames = [...new Set(toolSections.map((s) => s.type.replace(/_/g, ' ')))]
-  const errorCount = toolSections.filter((s) => s.state === 'output-error').length
+  const toolNames = [
+    ...new Set(toolSections.map((s) => s.type.replace(/_/g, ' '))),
+  ]
+  const errorCount = toolSections.filter(
+    (s) => s.state === 'output-error',
+  ).length
 
   return (
     <details className="group/agentwork w-full max-w-[var(--chat-content-max-width)]">
@@ -1235,13 +1244,19 @@ function AgentWorkSummary({ toolSections }: { toolSections: Array<InlineToolSect
           Agent Work
           <span className="ml-1.5 font-normal opacity-60">
             · {toolSections.length} tool{toolSections.length !== 1 ? 's' : ''}
-            {errorCount > 0 ? ` · ${errorCount} error${errorCount !== 1 ? 's' : ''}` : ''}
+            {errorCount > 0
+              ? ` · ${errorCount} error${errorCount !== 1 ? 's' : ''}`
+              : ''}
           </span>
         </span>
-        <span className="shrink-0 text-[10px] opacity-50 transition-transform group-open/agentwork:rotate-180">▾</span>
+        <span className="shrink-0 text-[10px] opacity-50 transition-transform group-open/agentwork:rotate-180">
+          ▾
+        </span>
       </summary>
       <div className="mt-1 rounded-lg border border-[var(--theme-border)]/40 bg-[var(--theme-panel)]/30 px-3 py-2/10">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-[var(--theme-muted)] mb-1">Tools used</div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-[var(--theme-muted)] mb-1">
+          Tools used
+        </div>
         <div className="flex flex-wrap gap-1">
           {toolNames.map((name) => (
             <span
@@ -1386,7 +1401,9 @@ function MarkdownDocumentCard({
           <div className="truncate text-sm font-medium text-[var(--theme-text)]">
             {title}
           </div>
-          <div className="text-[11px] text-[var(--theme-muted)]">Markdown document</div>
+          <div className="text-[11px] text-[var(--theme-muted)]">
+            Markdown document
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {hasContent ? (
@@ -1495,7 +1512,9 @@ type InlineArtifactParseResult = {
   artifacts: Array<InlineArtifact>
 }
 
-function parseArtifactAttributes(rawAttributes: string): Record<string, string> {
+function parseArtifactAttributes(
+  rawAttributes: string,
+): Record<string, string> {
   const attributes: Record<string, string> = {}
   const attributeRegex = /(\w+)=(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g
 
@@ -1547,7 +1566,13 @@ function artifactLanguage(type: string): string {
   return type
 }
 
-function ArtifactPreviewBody({ artifact, onExpand }: { artifact: InlineArtifact; onExpand?: () => void }) {
+function ArtifactPreviewBody({
+  artifact,
+  onExpand,
+}: {
+  artifact: InlineArtifact
+  onExpand?: () => void
+}) {
   if (artifact.type === 'html' || artifact.type === 'svg') {
     return (
       <iframe
@@ -1565,9 +1590,7 @@ function ArtifactPreviewBody({ artifact, onExpand }: { artifact: InlineArtifact;
 
   if (artifact.type === 'markdown' || artifact.type === 'md') {
     return (
-      <div
-        className="max-h-[60vh] overflow-auto rounded-lg border p-4 border-[var(--theme-border)]"
-      >
+      <div className="max-h-[60vh] overflow-auto rounded-lg border p-4 border-[var(--theme-border)]">
         <Markdown className="text-sm">{artifact.content}</Markdown>
       </div>
     )
@@ -1610,14 +1633,17 @@ function InlineArtifactCard({
         className="rounded-xl border p-3"
         style={{
           borderColor: 'var(--chat-assistant-border)',
-          background: 'color-mix(in srgb, var(--chat-assistant-bg) 85%, white 15%)',
+          background:
+            'color-mix(in srgb, var(--chat-assistant-bg) 85%, white 15%)',
         }}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span aria-hidden="true">🧩</span>
-              <span className="truncate text-sm font-semibold">{artifact.title}</span>
+              <span className="truncate text-sm font-semibold">
+                {artifact.title}
+              </span>
               <span
                 className="rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
                 style={{
@@ -1641,8 +1667,12 @@ function InlineArtifactCard({
         <DialogContent className="w-[min(1100px,96vw)] max-h-[92vh]">
           <div className="flex items-center justify-between gap-3 border-b px-4 py-3 border-[var(--theme-border)]">
             <div className="min-w-0">
-              <DialogTitle className="truncate text-base">{artifact.title}</DialogTitle>
-              <div className="text-xs uppercase tracking-wide opacity-70">{artifact.type}</div>
+              <DialogTitle className="truncate text-base">
+                {artifact.title}
+              </DialogTitle>
+              <div className="text-xs uppercase tracking-wide opacity-70">
+                {artifact.type}
+              </div>
             </div>
             <DialogClose>Close</DialogClose>
           </div>
@@ -1766,9 +1796,12 @@ function InlineToolSectionItem({
     toolSection.input && Object.keys(toolSection.input).length > 0
   const hasOutputData = !!(toolSection.outputText || toolSection.errorText)
   const isArtifact = toolSection.type.startsWith('artifact:')
-  const artifactKind = isArtifact ? toolSection.type.slice('artifact:'.length) : null
+  const artifactKind = isArtifact
+    ? toolSection.type.slice('artifact:'.length)
+    : null
   const artifactTitle =
-    typeof toolSection.input?.title === 'string' && toolSection.input.title.trim()
+    typeof toolSection.input?.title === 'string' &&
+    toolSection.input.title.trim()
       ? toolSection.input.title.trim()
       : 'Artifact'
   const artifactPath =
@@ -1790,14 +1823,18 @@ function InlineToolSectionItem({
         style={{
           background: 'color-mix(in srgb, var(--theme-card2) 76%, transparent)',
           borderColor: 'var(--theme-border)',
-          boxShadow: isRunning ? '0 0 0 1px color-mix(in srgb, var(--theme-accent) 18%, transparent)' : undefined,
+          boxShadow: isRunning
+            ? '0 0 0 1px color-mix(in srgb, var(--theme-accent) 18%, transparent)'
+            : undefined,
         }}
         onClick={() => setOpen((v) => !v)}
         role="button"
         tabIndex={0}
       >
         <div className="flex items-center gap-2 px-3 py-2">
-          <span className="text-sm leading-none shrink-0 opacity-80">{icon}</span>
+          <span className="text-sm leading-none shrink-0 opacity-80">
+            {icon}
+          </span>
           <span className="font-medium text-[12px] text-[var(--theme-text)]">
             {toolDisplayLabel}
           </span>
@@ -1847,7 +1884,9 @@ function InlineToolSectionItem({
               <div className="flex items-start justify-between gap-3 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm" aria-hidden="true">📄</span>
+                    <span className="text-sm" aria-hidden="true">
+                      📄
+                    </span>
                     <span className="truncate text-sm font-semibold text-[var(--theme-text)]">
                       {artifactTitle}
                     </span>
@@ -1908,9 +1947,7 @@ function InlineToolSectionItem({
                 Input
               </div>
               {toolSection.type === 'exec' && headerArg ? (
-                <pre
-                  className="overflow-x-auto whitespace-pre-wrap break-words rounded px-2 py-1 text-[10px] font-mono text-amber-500 bg-[var(--code-bg,var(--theme-card))]"
-                >
+                <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded px-2 py-1 text-[10px] font-mono text-amber-500 bg-[var(--code-bg,var(--theme-card))]">
                   $ {headerArg}
                 </pre>
               ) : (
@@ -1933,9 +1970,7 @@ function InlineToolSectionItem({
                 <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5 font-sans">
                   Error
                 </div>
-                <pre
-                  className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono text-red-400 bg-[var(--code-bg,var(--theme-card))]"
-                >
+                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono text-red-400 bg-[var(--code-bg,var(--theme-card))]">
                   {displayedOutputText}
                 </pre>
               </div>
@@ -2038,9 +2073,7 @@ function ToolCallGroup({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono micro-label">
-                Tool calls
-              </span>
+              <span className="font-mono micro-label">Tool calls</span>
               <span className="rounded-md border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-[var(--theme-muted)]">
                 {summary.countLabel}
               </span>
@@ -2207,7 +2240,13 @@ function MessageItemComponent({
     (code: string, language: string) => {
       if (!artifactPanelForExpand) return
       artifactPanelForExpand.open(
-        [{ type: language || 'text', title: language ? `${language} snippet` : 'Code', content: code }],
+        [
+          {
+            type: language || 'text',
+            title: language ? `${language} snippet` : 'Code',
+            content: code,
+          },
+        ],
         0,
       )
     },
@@ -2609,7 +2648,6 @@ function MessageItemComponent({
     }
   }, [isUser, finalToolSections.length, hasText, effectiveIsStreaming, message])
 
-
   if (execNotification) {
     const isSuccess = execNotification.ok ?? execNotification.exitCode === 0
     const statusIcon = isSuccess ? '✓' : '✗'
@@ -2670,7 +2708,9 @@ function MessageItemComponent({
       }
       className={cn(
         'group relative flex flex-col',
-        hasText || hasAttachments || hasSelectionCards ? 'gap-0.5 md:gap-1' : 'gap-0',
+        hasText || hasAttachments || hasSelectionCards
+          ? 'gap-0.5 md:gap-1'
+          : 'gap-0',
         wrapperClassName,
         isUser ? 'items-end' : 'items-start',
         !isUser && isNew && 'animate-[message-fade-in_0.4s_ease-out]',
@@ -2759,7 +2799,7 @@ function MessageItemComponent({
           <div
             data-chat-message-bubble={isUser ? 'user' : 'assistant'}
             className={cn(
-                'chat-message-bubble break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
+              'chat-message-bubble break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
               isUser
                 ? 'chat-message-bubble-user text-white rounded-2xl rounded-br-[2px]'
                 : 'chat-message-bubble-assistant border rounded-2xl rounded-bl-[2px]',
@@ -2866,7 +2906,10 @@ function MessageItemComponent({
               <div className="flex flex-col gap-2">
                 {selectionCards.map((card, index) => (
                   <InteractiveSelectionCard
-                    key={card.id || `${wrapperDataMessageId ?? 'selection'}-${index}`}
+                    key={
+                      card.id ||
+                      `${wrapperDataMessageId ?? 'selection'}-${index}`
+                    }
                     card={card}
                   />
                 ))}
@@ -2903,21 +2946,25 @@ function MessageItemComponent({
                         'text-[var(--theme-text)] bg-transparent w-full text-pretty transition-all duration-100',
                         effectiveIsStreaming && 'chat-streaming-content',
                       )}
-                      onCodeExpand={artifactPanelForExpand ? handleCodeExpand : undefined}
+                      onCodeExpand={
+                        artifactPanelForExpand ? handleCodeExpand : undefined
+                      }
                     >
                       {parsedInlineArtifacts.cleanedText}
                     </MessageContent>
                   ) : null}
                   {parsedInlineArtifacts.artifacts.length > 0 ? (
                     <div className="mt-3 flex flex-col gap-3">
-                      {parsedInlineArtifacts.artifacts.map((artifact, index) => (
-                        <InlineArtifactCard
-                          key={`${artifact.title}-${artifact.type}-${index}`}
-                          artifact={artifact}
-                          allArtifacts={parsedInlineArtifacts.artifacts}
-                          artifactIndex={index}
-                        />
-                      ))}
+                      {parsedInlineArtifacts.artifacts.map(
+                        (artifact, index) => (
+                          <InlineArtifactCard
+                            key={`${artifact.title}-${artifact.type}-${index}`}
+                            artifact={artifact}
+                            allArtifacts={parsedInlineArtifacts.artifacts}
+                            artifactIndex={index}
+                          />
+                        ),
+                      )}
                     </div>
                   ) : null}
                   {effectiveIsStreaming && parsedInlineArtifacts.cleanedText ? (

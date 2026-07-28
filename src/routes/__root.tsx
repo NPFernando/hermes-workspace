@@ -11,19 +11,11 @@ import appCss from '../styles.css?url'
 import { getRootSurfaceState } from './-root-layout-state'
 import type { AuthStatus } from '@/lib/claude-auth'
 import { SearchModal } from '@/components/search/search-modal'
-const UsageMeter = lazy(() =>
-  import('@/components/usage-meter').then((m) => ({ default: m.UsageMeter })),
-)
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import KeyboardShortcuts from '@/components/KeyboardShortcuts'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { Toaster } from '@/components/ui/toast'
-const OnboardingTour = lazy(() =>
-  import('@/components/onboarding/onboarding-tour').then((m) => ({
-    default: m.OnboardingTour,
-  })),
-)
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { NotificationHub } from '@/components/notification-hub'
 import {
@@ -37,15 +29,24 @@ import {
   ONBOARDING_COMPLETE_EVENT,
   ONBOARDING_KEY,
 } from '@/components/onboarding/onboarding-constants'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { LoginScreen } from '@/components/auth/login-screen'
+import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
+import { safeErrorMessage } from '@/lib/error-utils'
+
+const UsageMeter = lazy(() =>
+  import('@/components/usage-meter').then((m) => ({ default: m.UsageMeter })),
+)
+const OnboardingTour = lazy(() =>
+  import('@/components/onboarding/onboarding-tour').then((m) => ({
+    default: m.OnboardingTour,
+  })),
+)
 const ClaudeOnboarding = lazy(() =>
   import('@/components/onboarding/claude-onboarding').then((m) => ({
     default: m.ClaudeOnboarding,
   })),
 )
-import { ErrorBoundary } from '@/components/error-boundary'
-import { LoginScreen } from '@/components/auth/login-screen'
-import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
-import { safeErrorMessage } from '@/lib/error-utils'
 
 const APP_CSP = [
   "default-src 'self'",
