@@ -463,6 +463,77 @@ export function regimeAllowsLong(
 }
 
 /**
+ * Rolling realized-volatility percentile: stdev of log returns over
+ * `volPeriod` candles, ranked (count-below/total, no sort needed since we
+ * only need the rank of the final value) against its own trailing
+ * `baselineLookback` history of that same rolling stdev. Mirrors the classic
+ * "expanding-window volatility percentile" turbulence classifier (calm vs.
+ * turbulent regime), but bounded to a rolling window rather than truly
+ * expanding-forever, matching this codebase's existing rolling-percentile
+ * convention. Returns null (fails open) until both windows are warmed.
+ */
+export function realizedVolPercentile(
+  candles: Array<Candle>,
+  volPeriod: number,
+  baselineLookback: number,
+): number | null {
+  if (volPeriod <= 1 || baselineLookback <= 0) return null
+  const closes = candles.map((c) => c.close)
+  if (closes.length < volPeriod + baselineLookback + 1) return null
+
+  const rollingVol = (endExclusive: number): number | null => {
+    const start = endExclusive - volPeriod
+    if (start < 1) return null
+    let sum = 0
+    const returns: Array<number> = []
+    for (let i = start; i < endExclusive; i++) {
+      const r = Math.log(closes[i] / closes[i - 1])
+      returns.push(r)
+      sum += r
+    }
+    const mean = sum / returns.length
+    const variance =
+      returns.reduce((s, r) => s + (r - mean) ** 2, 0) / returns.length
+    return Math.sqrt(variance)
+  }
+
+  const current = rollingVol(closes.length)
+  if (current == null) return null
+
+  let below = 0
+  let total = 0
+  for (
+    let end = closes.length - baselineLookback;
+    end < closes.length;
+    end++
+  ) {
+    const v = rollingVol(end)
+    if (v == null) continue
+    total++
+    if (v < current) below++
+  }
+  return total > 0 ? below / total : null
+}
+
+/**
+ * Council-level turbulence gate: blocks new entries when realizedVolPercentile
+ * is above `maxPercentile` (0..1). Fails open (allows entry) when disabled
+ * (period/lookback <= 0) or the windows aren't warmed yet — same convention
+ * as regimeAllowsLong/trendIsStrong above.
+ */
+export function volatilityRegimeAllowsEntry(
+  candles: Array<Candle>,
+  volPeriod: number,
+  baselineLookback: number,
+  maxPercentile: number,
+): boolean {
+  if (volPeriod <= 0 || baselineLookback <= 0) return true
+  const pct = realizedVolPercentile(candles, volPeriod, baselineLookback)
+  if (pct == null) return true
+  return pct <= maxPercentile
+}
+
+/**
  * Fibonacci-extension take-profit target: entry price plus (long) or minus
  * (short) the most recent swing's high-low range, scaled by extensionRatio
  * (161.8% is the standard convention). Simplified — a single swing window,

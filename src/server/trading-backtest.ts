@@ -38,6 +38,7 @@ import {
   scaledQuoteSize,
   sma,
   trendIsStrong,
+  volatilityRegimeAllowsEntry,
 } from './trading-strategies'
 import {
   DEFAULT_GUARDIAN_CONFIG,
@@ -142,6 +143,16 @@ export interface BacktestConfig {
   adxPeriod: number
   adxThreshold: number
   /**
+   * Realized-volatility turbulence gate on BUY/SELL entries (baselineLookback
+   * = 0 disables) — blocks new entries when rolling realized volatility ranks
+   * above maxPercentile within its own trailing history. Distinct from both
+   * regimeSmaPeriod (direction) and adxThreshold (trend strength): this reads
+   * pure volatility magnitude, not trend.
+   */
+  volRegimePeriod: number
+  volRegimeBaselineLookback: number
+  volRegimeMaxPercentile: number
+  /**
    * Fibonacci-extension take-profit (off by default), mirrors the live
    * engine's fibTakeProfitEnabled — a third take-profit type alongside
    * fixed-% and ATR-multiple; ATR still wins if both are configured.
@@ -178,6 +189,9 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   atrSizeMaxMultiplier: 1.5,
   adxPeriod: 14,
   adxThreshold: 0,
+  volRegimePeriod: 20,
+  volRegimeBaselineLookback: 0,
+  volRegimeMaxPercentile: 0.75,
   fibTakeProfitEnabled: false,
   fibSwingLookback: 20,
   fibExtensionRatio: 1.618,
@@ -822,6 +836,26 @@ export function runBacktest(
         }
         if (!trendIsStrong(window, config.adxPeriod, config.adxThreshold)) {
           guardianBlocks.adx_trend_weak = (guardianBlocks.adx_trend_weak || 0) + 1
+          continue
+        }
+        // Own slice, not the shared (windowSize-capped) `window`: needs
+        // volRegimePeriod + volRegimeBaselineLookback + 1 candles, which
+        // regularly exceeds windowSize's default of 100 — same reason
+        // regimeCloses above doesn't reuse `window` either.
+        const volRegimeWindow = series.slice(
+          Math.max(0, i + 1 - (config.volRegimePeriod + config.volRegimeBaselineLookback + 1)),
+          i + 1,
+        )
+        if (
+          !volatilityRegimeAllowsEntry(
+            volRegimeWindow,
+            config.volRegimePeriod,
+            config.volRegimeBaselineLookback,
+            config.volRegimeMaxPercentile,
+          )
+        ) {
+          guardianBlocks.volatility_regime_turbulent =
+            (guardianBlocks.volatility_regime_turbulent || 0) + 1
           continue
         }
         if (

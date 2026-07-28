@@ -16,6 +16,7 @@
  *     [--market-regime-symbol BTCUSDT] [--market-regime-sma 300]
  *     [--score-scope global|per-symbol] [--split-pct 70]
  *     [--folds 4] [--fold-train-pct 70] [--carry-score]
+ *     [--vol-regime-period 20] [--vol-regime-baseline 0] [--vol-regime-max-pct 75]
  */
 import * as fs from 'node:fs'
 import * as os from 'node:os'
@@ -305,6 +306,21 @@ function main() {
     )
       .split(',')
       .map((s) => s.trim()),
+    volRegimePeriod: Number(
+      arg('vol-regime-period', String(DEFAULT_BACKTEST_CONFIG.volRegimePeriod)),
+    ),
+    volRegimeBaselineLookback: Number(
+      arg(
+        'vol-regime-baseline',
+        String(DEFAULT_BACKTEST_CONFIG.volRegimeBaselineLookback),
+      ),
+    ),
+    volRegimeMaxPercentile: Number(
+      arg(
+        'vol-regime-max-pct',
+        String(DEFAULT_BACKTEST_CONFIG.volRegimeMaxPercentile * 100),
+      ),
+    ) / 100,
   }
 
   const candlesBySymbol: Record<string, Array<Candle>> = {}

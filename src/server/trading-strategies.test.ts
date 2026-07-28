@@ -15,6 +15,7 @@ import {
   keltnerChannelStrategy,
   kellyFraction,
   macdMomentumStrategy,
+  realizedVolPercentile,
   regimeAllowsLong,
   rsi,
   rsiReversionStrategy,
@@ -25,6 +26,7 @@ import {
   trendIsStrong,
   trendPullbackStrategy,
   trueRange,
+  volatilityRegimeAllowsEntry,
   type Candle,
 } from './trading-strategies'
 
@@ -542,6 +544,68 @@ describe('regimeAllowsLong', () => {
   it('blocks long entries below the long SMA and allows them above it', () => {
     expect(regimeAllowsLong([100, 100, 100, 80], 4)).toBe(false)
     expect(regimeAllowsLong([100, 100, 100, 110], 4)).toBe(true)
+  })
+})
+
+describe('realizedVolPercentile / volatilityRegimeAllowsEntry', () => {
+  const volPeriod = 5
+  const baselineLookback = 50
+
+  function candlesWithVol(count: number, dailyStdevPct: number, seedOffset = 0): Array<Candle> {
+    // Deterministic pseudo-random walk (LCG) so tests are reproducible —
+    // alternating sign keeps it oscillating rather than trending, isolating
+    // "volatility magnitude" from "direction" the way this gate is meant to.
+    let price = 100
+    let state = 42 + seedOffset
+    const out: Array<Candle> = []
+    for (let i = 0; i < count; i++) {
+      state = (state * 1103515245 + 12345) & 0x7fffffff
+      const noise = (state / 0x7fffffff - 0.5) * 2 * dailyStdevPct
+      price *= 1 + (i % 2 === 0 ? noise : -noise)
+      out.push({ openTime: i, open: price, high: price, low: price, close: price, volume: 1 })
+    }
+    return out
+  }
+
+  it('fails open when disabled or without enough history', () => {
+    const candles = candlesWithVol(10, 0.01)
+    expect(volatilityRegimeAllowsEntry(candles, 0, baselineLookback, 0.75)).toBe(true)
+    expect(volatilityRegimeAllowsEntry(candles, volPeriod, 0, 0.75)).toBe(true)
+    expect(volatilityRegimeAllowsEntry(candles, volPeriod, baselineLookback, 0.75)).toBe(true)
+  })
+
+  it('ranks a perfectly flat tail at the bottom of a volatile baseline history', () => {
+    const volatileBaseline = candlesWithVol(baselineLookback + volPeriod, 0.02)
+    // Matches the baseline's final close exactly — an artificial jump at the
+    // regime transition would itself register as a (large) return and
+    // contaminate the very first rolling-vol window of the "flat" tail.
+    const flatPrice = volatileBaseline[volatileBaseline.length - 1].close
+    const flatTail: Array<Candle> = Array.from({ length: volPeriod }, (_, i) => ({
+      openTime: volatileBaseline.length + i,
+      open: flatPrice,
+      high: flatPrice,
+      low: flatPrice,
+      close: flatPrice,
+      volume: 1,
+    }))
+    const candles = [...volatileBaseline, ...flatTail]
+    const pct = realizedVolPercentile(candles, volPeriod, baselineLookback)
+    expect(pct).toBe(0)
+  })
+
+  it('blocks entries once realized vol spikes above the baseline percentile', () => {
+    const calm = candlesWithVol(baselineLookback + volPeriod, 0.003)
+    const spike = candlesWithVol(volPeriod, 0.08, 999).map((c, i) => ({
+      ...c,
+      openTime: calm.length + i,
+    }))
+    const candles = [...calm, ...spike]
+    const pct = realizedVolPercentile(candles, volPeriod, baselineLookback)
+    expect(pct).not.toBeNull()
+    expect(pct as number).toBeGreaterThan(0.75)
+    expect(volatilityRegimeAllowsEntry(candles, volPeriod, baselineLookback, 0.75)).toBe(false)
+    // A generous threshold should still allow it through.
+    expect(volatilityRegimeAllowsEntry(candles, volPeriod, baselineLookback, 1)).toBe(true)
   })
 })
 
