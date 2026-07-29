@@ -24,6 +24,19 @@ export interface GuardianConfig {
   lossStreakLimit: number
   cooldownMinutes: number
   minQuoteBalance: number
+  /**
+   * Correlated-symbol exposure cap. Off by default (ships disarmed, same as
+   * the grid engine's absoluteStopFloorEnabled and testnet execution layer)
+   * — symbols like BTC/ETH/SOL move together, so several "independent"
+   * council positions can add up to one large correlated bet that no single
+   * per-trade cap would catch. `correlationBuckets` is a static grouping
+   * (not a computed correlation matrix — cheap, and captures most of the
+   * risk for this symbol set); a symbol not listed in any bucket is treated
+   * as uncorrelated and never blocked by this rule.
+   */
+  correlationBucketsEnabled: boolean
+  correlationBuckets: Record<string, Array<string>>
+  maxBucketExposureQuote: number
 }
 
 export const DEFAULT_GUARDIAN_CONFIG: GuardianConfig = {
@@ -35,6 +48,36 @@ export const DEFAULT_GUARDIAN_CONFIG: GuardianConfig = {
   lossStreakLimit: 3,
   cooldownMinutes: 240,
   minQuoteBalance: 500,
+  correlationBucketsEnabled: false,
+  correlationBuckets: {
+    majors: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'],
+    alts: ['XRPUSDT'],
+  },
+  maxBucketExposureQuote: 100,
+}
+
+/** Bucket name containing `symbol`, or null if it isn't in any configured bucket. */
+function bucketForSymbol(
+  symbol: string,
+  buckets: Record<string, Array<string>>,
+): string | null {
+  for (const [bucket, symbols] of Object.entries(buckets)) {
+    if (symbols.includes(symbol)) return bucket
+  }
+  return null
+}
+
+/** Sum of open-position quote size per correlation bucket, for GuardianContext.bucketExposureQuote. */
+export function bucketExposureQuote<T extends { symbol: string; entryQuote: number }>(
+  positions: Array<T>,
+  buckets: Record<string, Array<string>>,
+): Record<string, number> {
+  const exposure: Record<string, number> = {}
+  for (const position of positions) {
+    const bucket = bucketForSymbol(position.symbol, buckets)
+    if (bucket) exposure[bucket] = (exposure[bucket] ?? 0) + position.entryQuote
+  }
+  return exposure
 }
 
 export interface OrderProposal {
@@ -57,6 +100,8 @@ export interface GuardianContext {
   strategyLossStreak: number
   /** ISO timestamp until which the proposing strategy is cooling down. */
   strategyCooldownUntil?: string | null
+  /** Current open-position quote exposure per correlation bucket (see GuardianConfig.correlationBuckets). */
+  bucketExposureQuote?: Record<string, number>
   now?: Date
 }
 
@@ -116,6 +161,21 @@ export function checkOrderProposal(
   }
 
   const approvedQuote = Math.min(proposal.quoteAmount, config.perTradeQuoteCap)
+
+  if (config.correlationBucketsEnabled) {
+    const bucket = bucketForSymbol(proposal.symbol, config.correlationBuckets)
+    if (bucket) {
+      const currentExposure = ctx.bucketExposureQuote?.[bucket] ?? 0
+      const prospectiveExposure = currentExposure + approvedQuote
+      if (prospectiveExposure > config.maxBucketExposureQuote) {
+        blocks.push({
+          rule: 'bucket_exposure_cap',
+          detail: `${proposal.symbol} (bucket "${bucket}") exposure would reach ${prospectiveExposure.toFixed(2)}, breaching cap ${config.maxBucketExposureQuote} — existing correlated exposure ${currentExposure.toFixed(2)}`,
+        })
+      }
+    }
+  }
+
   if (ctx.quoteBalance - approvedQuote < config.minQuoteBalance) {
     blocks.push({
       rule: 'balance_floor',

@@ -529,13 +529,41 @@ export const Route = createFileRoute('/api/finance')({
               VALID_LONG_SHORT_PERIODS.has(cfg.longShortSentimentPeriod)
             )
               dt.longShortSentimentPeriod = cfg.longShortSentimentPeriod
-            if (maxOpen !== undefined) {
+            const maxBucketExposure = inRange(cfg.guardianMaxBucketExposureQuote, 0, 100000)
+            const guardianCorrelationBuckets =
+              cfg.guardianCorrelationBuckets &&
+              typeof cfg.guardianCorrelationBuckets === 'object' &&
+              !Array.isArray(cfg.guardianCorrelationBuckets)
+                ? Object.entries(cfg.guardianCorrelationBuckets as JsonRecord).reduce<
+                    Record<string, Array<string>>
+                  >((acc, [bucket, symbols]) => {
+                    if (!Array.isArray(symbols)) return acc
+                    const syms = symbols
+                      .filter((s): s is string => typeof s === 'string')
+                      .map((s) => s.trim().toUpperCase())
+                      .filter((s) => /^[A-Z0-9]{5,20}$/.test(s))
+                    if (syms.length > 0) acc[bucket] = syms
+                    return acc
+                  }, {})
+                : undefined
+            if (
+              maxOpen !== undefined ||
+              typeof cfg.guardianCorrelationBucketsEnabled === 'boolean' ||
+              guardianCorrelationBuckets !== undefined ||
+              maxBucketExposure !== undefined
+            ) {
               const guardian = (
                 dt.guardian && typeof dt.guardian === 'object'
                   ? { ...(dt.guardian as Record<string, unknown>) }
                   : {}
               ) as Record<string, unknown>
-              guardian.maxOpenPositions = Math.floor(maxOpen)
+              if (maxOpen !== undefined) guardian.maxOpenPositions = Math.floor(maxOpen)
+              if (typeof cfg.guardianCorrelationBucketsEnabled === 'boolean')
+                guardian.correlationBucketsEnabled = cfg.guardianCorrelationBucketsEnabled
+              if (guardianCorrelationBuckets !== undefined)
+                guardian.correlationBuckets = guardianCorrelationBuckets
+              if (maxBucketExposure !== undefined)
+                guardian.maxBucketExposureQuote = maxBucketExposure
               dt.guardian = guardian
             }
             // learningPolicy.autoApplyModes: only 'paper_trade' and
@@ -600,6 +628,12 @@ export const Route = createFileRoute('/api/finance')({
               maxOpenPositions: (
                 dt.guardian as Record<string, unknown> | undefined
               )?.maxOpenPositions,
+              correlationBucketsEnabled: (
+                dt.guardian as Record<string, unknown> | undefined
+              )?.correlationBucketsEnabled,
+              maxBucketExposureQuote: (
+                dt.guardian as Record<string, unknown> | undefined
+              )?.maxBucketExposureQuote,
               regimeSmaPeriod: dt.regimeSmaPeriod,
               trailingStopPct: dt.trailingStopPct,
               maxHoldMinutes: dt.maxHoldMinutes,

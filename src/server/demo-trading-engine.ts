@@ -45,6 +45,7 @@ import {
 } from './trading-strategies'
 import {
   DEFAULT_GUARDIAN_CONFIG,
+  bucketExposureQuote,
   checkOrderProposal,
   cooldownUntil,
   dayKey,
@@ -2217,6 +2218,9 @@ async function runTradingCycleInner(
           openUnrealizedPnlQuote,
           strategyLossStreak: leadScore.lossStreak,
           strategyCooldownUntil: leadScore.cooldownUntil,
+          bucketExposureQuote: config.guardian.correlationBucketsEnabled
+            ? bucketExposureQuote(activePositions(), config.guardian.correlationBuckets)
+            : undefined,
         },
         config.guardian,
       )

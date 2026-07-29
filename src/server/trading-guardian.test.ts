@@ -88,6 +88,48 @@ describe('checkOrderProposal', () => {
     const v = checkOrderProposal(proposal, { ...baseCtx, quoteBalance: 510 })
     expect(v.blocks.some((b) => b.rule === 'balance_floor')).toBe(true)
   })
+
+  it('ignores bucket exposure when correlationBucketsEnabled is off (default)', () => {
+    const v = checkOrderProposal(proposal, {
+      ...baseCtx,
+      bucketExposureQuote: { majors: 999 },
+    })
+    expect(v.blocks.some((b) => b.rule === 'bucket_exposure_cap')).toBe(false)
+  })
+
+  it('blocks when correlated bucket exposure would breach the cap', () => {
+    const config = {
+      ...DEFAULT_GUARDIAN_CONFIG,
+      correlationBucketsEnabled: true,
+      maxBucketExposureQuote: 40,
+    }
+    // BTCUSDT is in the "majors" bucket; existing exposure 30 + this 25-quote
+    // proposal (capped at perTradeQuoteCap 50) would reach 55, past the 40 cap.
+    const v = checkOrderProposal(proposal, { ...baseCtx, bucketExposureQuote: { majors: 30 } }, config)
+    expect(v.allowed).toBe(false)
+    expect(v.blocks.some((b) => b.rule === 'bucket_exposure_cap')).toBe(true)
+  })
+
+  it('allows bucket exposure under the cap', () => {
+    const config = {
+      ...DEFAULT_GUARDIAN_CONFIG,
+      correlationBucketsEnabled: true,
+      maxBucketExposureQuote: 100,
+    }
+    const v = checkOrderProposal(proposal, { ...baseCtx, bucketExposureQuote: { majors: 30 } }, config)
+    expect(v.blocks.some((b) => b.rule === 'bucket_exposure_cap')).toBe(false)
+  })
+
+  it('never blocks a symbol not listed in any correlation bucket', () => {
+    const config = {
+      ...DEFAULT_GUARDIAN_CONFIG,
+      correlationBucketsEnabled: true,
+      maxBucketExposureQuote: 1,
+      correlationBuckets: { majors: ['ETHUSDT'] },
+    }
+    const v = checkOrderProposal(proposal, { ...baseCtx, bucketExposureQuote: { majors: 999 } }, config)
+    expect(v.blocks.some((b) => b.rule === 'bucket_exposure_cap')).toBe(false)
+  })
 })
 
 describe('helpers', () => {
