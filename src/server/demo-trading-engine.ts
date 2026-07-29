@@ -73,6 +73,7 @@ import {
   parseStrategyBaselines,
   resolveStrategyDecayConfig,
 } from './strategy-decay'
+import type { AlertSeverity } from './alerts'
 import type { StrategyDecayResult } from './strategy-decay'
 import type { BucketStats, EntryFeatureVector } from './trading-pattern-veto'
 import type { Candle, CouncilMember, StrategyScore } from './trading-strategies'
@@ -1348,6 +1349,61 @@ export async function warmupMarketData(
 }
 
 /**
+ * Rules that mean real money is being lost past a configured threshold (or
+ * the account is running low) — these get `critical` severity, matching
+ * connectivity-breaker.ts's precedent of unconditional alert delivery for
+ * "something is actually wrong" events. Everything else (position_cap,
+ * loss_streak_cooldown, bucket_exposure_cap) is routine risk management
+ * doing its job, not itself a problem — stays `warning`.
+ */
+const CRITICAL_GUARDIAN_RULES = new Set([
+  'daily_loss_halt',
+  'weekly_loss_halt',
+  'open_drawdown_halt',
+  'balance_floor',
+])
+
+export function guardianBlockAlertSeverity(
+  verdictBlocks: Array<GuardianBlock>,
+): AlertSeverity {
+  return verdictBlocks.some((b) => CRITICAL_GUARDIAN_RULES.has(b.rule))
+    ? 'critical'
+    : 'warning'
+}
+
+/**
+ * Guardian blocks are checked every cron cycle (20 min); an unchanged
+ * condition (e.g. still sitting at position_cap, or daily_loss_halt still
+ * tripped) would otherwise re-alert every single cycle. Only re-alert when
+ * the exact set of blocking rules for this symbol/strategy changes, or the
+ * same rule set has persisted past the cooldown window — mirrors
+ * decisionQualityReport()'s "audit-log once per cycle, not once per poll"
+ * spam-avoidance principle, applied here to Telegram delivery instead.
+ */
+const GUARDIAN_ALERT_COOLDOWN_MS = 30 * 60_000
+const lastGuardianAlertByKey = new Map<
+  string,
+  { rulesKey: string; at: number }
+>()
+
+export function shouldAlertGuardianBlock(
+  key: string,
+  verdictBlocks: Array<GuardianBlock>,
+  now: number,
+): boolean {
+  const rulesKey = [...new Set(verdictBlocks.map((b) => b.rule))]
+    .sort()
+    .join(',')
+  const last = lastGuardianAlertByKey.get(key)
+  const shouldAlert =
+    !last ||
+    last.rulesKey !== rulesKey ||
+    now - last.at >= GUARDIAN_ALERT_COOLDOWN_MS
+  if (shouldAlert) lastGuardianAlertByKey.set(key, { rulesKey, at: now })
+  return shouldAlert
+}
+
+/**
  * Public entry point. Serializes cycles: every cycle runs in the single workspace
  * server process (the 20-min cron and the manual "Run cycle" button both POST to
  * /api/demo-trading), so an in-process flag prevents two overlapping runs from
@@ -1575,12 +1631,17 @@ async function runTradingCycleInner(
       executionMode,
       blocks: verdictBlocks,
     })
-    sendAlert({
-      severity: 'warning',
-      title: `Guardian blocked ${symbol}/${strategyId}`,
-      detail: verdictBlocks.map((b) => `${b.rule}: ${b.detail}`).join('\n'),
-      source: 'trading-guardian',
-    })
+    const severity = guardianBlockAlertSeverity(verdictBlocks)
+    if (
+      shouldAlertGuardianBlock(`${symbol}:${strategyId}`, verdictBlocks, Date.now())
+    ) {
+      sendAlert({
+        severity,
+        title: `Guardian blocked ${symbol}/${strategyId}`,
+        detail: verdictBlocks.map((b) => `${b.rule}: ${b.detail}`).join('\n'),
+        source: 'trading-guardian',
+      })
+    }
   }
 
   const recordQualityBlock = (
