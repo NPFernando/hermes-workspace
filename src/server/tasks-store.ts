@@ -27,6 +27,17 @@ export type ClarificationQuestion = {
   answered_at?: string
 }
 
+export type BlockerType = 'credential' | 'dependency' | 'execution' | 'input' | 'environment' | null
+
+export type CredentialNeeded = {
+  key: string          // e.g. 'IBKR_ACCOUNT_ID', 'BINANCE_API_KEY'
+  label: string        // human-readable label, e.g. 'IBKR Account ID'
+  description: string  // what this credential is for
+  provided: boolean    // whether it's been provided
+  provided_at?: string // ISO timestamp
+  validated?: boolean  // whether the credential passed validation
+}
+
 export type TaskRecord = {
   id: string
   title: string
@@ -56,6 +67,12 @@ export type TaskRecord = {
   auto_retry_count?: number       // # of times the lifecycle auto-retried a blocked task
   auto_retry_at?: string          // ISO timestamp of last auto-retry
   depends_on?: Array<string>      // task IDs that must be done before this task can be deployed
+  // --- Blocker system fields ---
+  blocker_type?: BlockerType      // why the task is blocked
+  blocker_reason?: string         // human-readable description of the blocker
+  blocked_since?: string          // ISO timestamp when first blocked
+  credentials_needed?: Array<CredentialNeeded>  // structured credential requirements
+  resolved_by_task?: string       // task ID that resolves this blocker (for dependency blockers)
 }
 
 type TaskFile = { tasks: Array<TaskRecord> }
@@ -162,6 +179,12 @@ function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'titl
     ...(task.auto_retry_count != null ? { auto_retry_count: task.auto_retry_count } : {}),
     ...(task.auto_retry_at != null ? { auto_retry_at: task.auto_retry_at } : {}),
     ...(Array.isArray(task.depends_on) && task.depends_on.length > 0 ? { depends_on: task.depends_on } : {}),
+    // Blocker fields — preserve as-is
+    ...(task.blocker_type != null ? { blocker_type: task.blocker_type } : {}),
+    ...(task.blocker_reason != null ? { blocker_reason: task.blocker_reason } : {}),
+    ...(task.blocked_since != null ? { blocked_since: task.blocked_since } : {}),
+    ...(Array.isArray(task.credentials_needed) && task.credentials_needed.length > 0 ? { credentials_needed: task.credentials_needed } : {}),
+    ...(task.resolved_by_task != null ? { resolved_by_task: task.resolved_by_task } : {}),
   }
 }
 
@@ -233,6 +256,22 @@ export function updateTask(taskId: string, updates: UpdateTaskInput): TaskRecord
 
     file.tasks[index] = next
     writeTaskFile({ tasks: file.tasks.map(normalizeTask) })
+
+    // If task just moved to 'done', trigger blocker auto-resume for dependents
+    if (updates.column === 'done' && current.column !== 'done') {
+      setImmediate(() => {
+        try {
+          const { maybeAutoResumeAfterCompletion } = require('./astra-tasks')
+          const result = maybeAutoResumeAfterCompletion(taskId)
+          if (result.unblocked > 0) {
+            console.log(`[tasks] Auto-unblocked ${result.unblocked} task(s) after ${taskId} completed`)
+          }
+        } catch (err) {
+          console.warn('[tasks] Auto-resume check failed (non-critical):', (err as Error).message)
+        }
+      })
+    }
+
     return next
   })
 }

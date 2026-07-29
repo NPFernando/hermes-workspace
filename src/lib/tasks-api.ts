@@ -120,6 +120,17 @@ export type ClarificationQuestion = {
   answered_at?: string
 }
 
+export type BlockerType = 'credential' | 'dependency' | 'execution' | 'input' | 'environment' | null
+
+export type CredentialNeeded = {
+  key: string
+  label: string
+  description: string
+  provided: boolean
+  provided_at?: string
+  validated?: boolean
+}
+
 export type ClaudeTask = {
   id: string
   title: string
@@ -143,6 +154,11 @@ export type ClaudeTask = {
   waiting_for_user?: boolean
   clarification_questions?: Array<ClarificationQuestion>
   depends_on?: Array<string>
+  blocker_type?: BlockerType
+  blocker_reason?: string
+  blocked_since?: string
+  credentials_needed?: Array<CredentialNeeded>
+  resolved_by_task?: string
 }
 
 export type CreateTaskInput = {
@@ -399,4 +415,70 @@ export function isOverdue(task: ClaudeTask): boolean {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return due < today
+}
+
+// --- Blocker System API ---------------------------------------------------
+
+export type BlockerGroup = {
+  type: string
+  label: string
+  icon: string
+  tasks: Array<ClaudeTask>
+}
+
+export type BlockerOverview = {
+  ok: boolean
+  count: number
+  groups: Array<BlockerGroup>
+  resumable: Array<{ id: string; title: string; blocker_type: string | null; blocker_reason: string | null }>
+}
+
+export async function fetchBlockers(): Promise<BlockerOverview> {
+  const res = await fetch('/api/tasks-blockers')
+  if (!res.ok) throw new Error(`Failed to fetch blockers: ${res.status}`)
+  return res.json() as Promise<BlockerOverview>
+}
+
+export async function resolveBlocker(taskId: string): Promise<{ ok: boolean; task: ClaudeTask }> {
+  const res = await fetch('/api/tasks-blockers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'resolve', task_id: taskId }),
+  })
+  if (!res.ok) throw new Error(`Resolve blocker failed: ${res.status}`)
+  return res.json() as Promise<{ ok: boolean; task: ClaudeTask }>
+}
+
+export async function provideCredential(
+  taskId: string,
+  credentialKey: string,
+  credentialValue: string,
+): Promise<{ ok: boolean; all_provided: boolean; task: ClaudeTask }> {
+  const res = await fetch('/api/tasks-blockers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'provide_credential', task_id: taskId, credential_key: credentialKey, credential_value: credentialValue }),
+  })
+  if (!res.ok) throw new Error(`Provide credential failed: ${res.status}`)
+  return res.json() as Promise<{ ok: boolean; all_provided: boolean; task: ClaudeTask }>
+}
+
+export async function validateCredentials(taskId: string): Promise<{ ok: boolean; all_valid: boolean; results: Array<{ key: string; label: string; exists: boolean }> }> {
+  const res = await fetch('/api/tasks-blockers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'validate', task_id: taskId }),
+  })
+  if (!res.ok) throw new Error(`Validate credentials failed: ${res.status}`)
+  return res.json() as Promise<{ ok: boolean; all_valid: boolean; results: Array<{ key: string; label: string; exists: boolean }> }>
+}
+
+export async function autoResumeBlocked(): Promise<{ ok: boolean; unblocked: Array<{ id: string; title: string }> }> {
+  const res = await fetch('/api/tasks-blockers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'auto_resume' }),
+  })
+  if (!res.ok) throw new Error(`Auto-resume failed: ${res.status}`)
+  return res.json() as Promise<{ ok: boolean; unblocked: Array<{ id: string; title: string }> }>
 }
