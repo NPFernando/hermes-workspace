@@ -34,7 +34,8 @@ export function OnboardingWizard() {
     initialize()
   }, [initialize])
 
-  const step = ONBOARDING_STEPS[currentStep]
+  const step = ONBOARDING_STEPS.at(currentStep) ?? ONBOARDING_STEPS.at(0)
+  if (!step) return null
   const isFirstStep = currentStep === 0
   const isLastStep = currentStep === totalSteps - 1
 

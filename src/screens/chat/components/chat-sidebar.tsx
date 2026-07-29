@@ -39,11 +39,6 @@ import { SidebarSessions } from './sidebar/sidebar-sessions'
 import type { ChatOpenSettingsDetail } from '../chat-events'
 import type { SessionMeta } from '../types'
 import { t } from '@/lib/i18n'
-const SettingsDialog = lazy(() =>
-  import('@/components/settings-dialog').then((m) => ({
-    default: m.SettingsDialog,
-  })),
-)
 import {
   TooltipContent,
   TooltipProvider,
@@ -68,6 +63,12 @@ import {
   MenuTrigger,
 } from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+
+const SettingsDialog = lazy(() =>
+  import('@/components/settings-dialog').then((m) => ({
+    default: m.SettingsDialog,
+  })),
+)
 
 type WorkspaceStats = Record<string, unknown>
 
@@ -166,7 +167,7 @@ export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
   }
 }
 
-export async function fetchWorkspaceProjectShortcuts(): Promise<Array<never>> {
+export function fetchWorkspaceProjectShortcuts(): Array<never> {
   return []
 }
 
