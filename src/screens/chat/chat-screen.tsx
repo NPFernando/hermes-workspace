@@ -518,6 +518,8 @@ export function ChatScreen({
   const [artifactPanelState, setArtifactPanelState] = useState<ArtifactPanelState | null>(null)
   const [selectedSisterId, setSelectedSisterId] = useState<string | null>(null)
   const [autoRoutedSisterId, setAutoRoutedSisterId] = useState<string | null>(null)
+  const [sisterRouteReason, setSisterRouteReason] = useState<string | null>(null)
+  const [sisterHandoffStatus, setSisterHandoffStatus] = useState<'idle' | 'routing' | 'failed'>('idle')
   const [isOrchestrating, setIsOrchestrating] = useState(false)
   const [orchestratingSisterIds, setOrchestratingSisterIds] = useState<Array<string>>([])
   const selectedSisterSystemPromptRef = useRef<string | undefined>(undefined)
@@ -534,6 +536,12 @@ export function ChatScreen({
   })
   const sisters: Array<SisterOption> = sistersQuery.data?.sisters ?? []
   const sistersRef = useRef<Array<SisterOption>>([])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const key = `sister-override-${activeFriendlyId || 'new'}`
+    const stored = window.sessionStorage.getItem(key)
+    setSelectedSisterId(stored || null)
+  }, [activeFriendlyId])
   // Keep refs in sync with selected sister state
   useEffect(() => {
     selectedSisterIdRef.current = selectedSisterId
@@ -2172,10 +2180,13 @@ export function ChatScreen({
           if (multiScores.length >= 2) {
             setOrchestratingSisterIds(multiScores.slice(0, 3).map((s) => s.id))
           } else {
-            const { sister_id } = classifyOne(_body)
+            const { sister_id, reason } = classifyOne(_body)
             if (sister_id && sister_id !== 'astra') {
               const routed = sistersRef.current.find((s) => s.id === sister_id)
-              if (routed?.systemPrompt) setAutoRoutedSisterId(sister_id)
+              if (routed?.systemPrompt) {
+                setAutoRoutedSisterId(sister_id)
+                setSisterRouteReason(reason)
+              }
             }
           }
 
@@ -2186,6 +2197,7 @@ export function ChatScreen({
           let orchTimer: ReturnType<typeof setTimeout> | null =
             setTimeout(() => setIsOrchestrating(true), 300)
           try {
+            setSisterHandoffStatus('routing')
             const orchRes = await fetch('/api/orchestrate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -2193,6 +2205,7 @@ export function ChatScreen({
               signal: AbortSignal.timeout(90_000),
             })
             if (orchRes.ok) {
+              setSisterHandoffStatus('idle')
               const orchData = await orchRes.json() as {
                 orchestrated: boolean
                 content?: string
@@ -2221,9 +2234,12 @@ export function ChatScreen({
                   setAutoRoutedSisterId(routedId)
                 }
               }
+            } else {
+              setSisterHandoffStatus('failed')
             }
           } catch {
             // Orchestration timed out or failed — Astra handles it
+            setSisterHandoffStatus('failed')
           } finally {
             if (orchTimer) { clearTimeout(orchTimer); orchTimer = null }
             setIsOrchestrating(false)
@@ -3193,11 +3209,20 @@ export function ChatScreen({
               sisters={sisters}
               selectedId={selectedSisterId}
               autoSelectedId={autoRoutedSisterId}
+              routeReason={sisterRouteReason}
+              routeConfidence={sisterRouteReason ? 'medium' : null}
+              handoffStatus={sisterHandoffStatus}
               orchestrating={isOrchestrating}
               orchestratingSisterIds={orchestratingSisterIds}
               onSelect={(id) => {
+                if (typeof window !== 'undefined') {
+                  const key = `sister-override-${activeFriendlyId || 'new'}`
+                  if (id) window.sessionStorage.setItem(key, id)
+                  else window.sessionStorage.removeItem(key)
+                }
                 setSelectedSisterId(id)
                 setAutoRoutedSisterId(null)
+                setSisterRouteReason(null)
               }}
             />
           )}
@@ -3229,14 +3254,16 @@ export function ChatScreen({
         {!compact && !isFocusMode && (
           artifactPanelState ? (
             <div className="h-full w-[480px] shrink-0">
-              <ArtifactPanel
-                artifacts={artifactPanelState.artifacts}
-                activeIndex={artifactPanelState.activeIndex}
-                onTabChange={(index) =>
-                  setArtifactPanelState((s) => s ? { ...s, activeIndex: index } : null)
-                }
-                onClose={() => setArtifactPanelState(null)}
-              />
+              <Suspense fallback={<div className="h-full bg-[var(--theme-bg)]" />}>
+                <ArtifactPanel
+                  artifacts={artifactPanelState.artifacts}
+                  activeIndex={artifactPanelState.activeIndex}
+                  onTabChange={(index) =>
+                    setArtifactPanelState((s) => s ? { ...s, activeIndex: index } : null)
+                  }
+                  onClose={() => setArtifactPanelState(null)}
+                />
+              </Suspense>
             </div>
           ) : (
             <AgentViewPanel />

@@ -15,6 +15,10 @@ type SisterPickerProps = {
   sisters: Array<SisterOption>
   selectedId: string | null
   autoSelectedId?: string | null
+  routeReason?: string | null
+  routeConfidence?: 'low' | 'medium' | 'high' | null
+  handoffStatus?: 'idle' | 'routing' | 'failed' | null
+  onRetryHandoff?: () => void
   orchestrating?: boolean
   orchestratingSisterIds?: Array<string>
   onSelect: (id: string | null) => void
@@ -49,6 +53,10 @@ export function SisterPicker({
   sisters,
   selectedId,
   autoSelectedId,
+  routeReason,
+  routeConfidence,
+  handoffStatus,
+  onRetryHandoff,
   orchestrating,
   orchestratingSisterIds,
   onSelect,
@@ -69,6 +77,17 @@ export function SisterPicker({
       {orchestrating && !orchestratingSisterIds?.length && (
         <span className="text-xs text-muted-foreground animate-pulse mr-1">🌟 Astra orchestrating…</span>
       )}
+      {autoSelectedId && routeReason ? (
+        <span className="text-[10px] text-muted-foreground" title={routeReason}>
+          {routeConfidence ? `${routeConfidence} confidence · ` : ''}{routeReason}
+        </span>
+      ) : null}
+      {handoffStatus === 'failed' ? (
+        <button type="button" onClick={onRetryHandoff} className="text-[10px] text-amber-600 hover:underline" disabled={!onRetryHandoff}>
+          Handoff failed · retry
+        </button>
+      ) : null}
+      {handoffStatus === 'routing' ? <span className="text-[10px] text-muted-foreground animate-pulse">Routing…</span> : null}
       {visibleSisters.map((s) => {
         const isManual = selectedId === s.id
         const isAuto = !isManual && autoSelectedId === s.id
