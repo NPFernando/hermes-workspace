@@ -17,6 +17,14 @@
  *     [--score-scope global|per-symbol] [--split-pct 70]
  *     [--folds 4] [--fold-train-pct 70] [--carry-score]
  *     [--vol-regime-period 20] [--vol-regime-baseline 0] [--vol-regime-max-pct 75]
+ *     [--save-baselines]
+ *
+ * --save-baselines persists this run's out-of-sample per-strategy
+ * winRate/avgPnlQuote as the live comparison baseline for strategy-decay
+ * detection (src/server/strategy-decay.ts). Opt-in and explicit — review
+ * the printed summary before trusting it as ground truth. Re-run with this
+ * flag after any strategy/config change, or decay detection keeps
+ * comparing live performance against a stale baseline.
  */
 import * as fs from 'node:fs'
 import * as os from 'node:os'
@@ -31,8 +39,35 @@ import type {
   BacktestConfig,
   BacktestReport,
   BacktestTrade,
+  StrategyReport,
 } from '../src/server/trading-backtest'
 import type { Candle } from '../src/server/trading-strategies'
+import { saveStrategyBaselines } from '../src/server/strategy-decay'
+
+/**
+ * Aggregates per-strategy stats across multiple reports (e.g. walk-forward
+ * out-of-sample folds) into a single baseline per strategyId — sums raw
+ * trade/win/pnl counts rather than averaging rates, so the merged winRate
+ * and avgPnlQuote stay correctly weighted by trade count.
+ */
+function aggregateStrategyReports(
+  reports: Array<StrategyReport>,
+): Array<{ strategyId: string; winRate: number; avgPnlQuote: number; trades: number }> {
+  const byId = new Map<string, { wins: number; trades: number; totalPnlQuote: number }>()
+  for (const r of reports) {
+    const acc = byId.get(r.strategyId) ?? { wins: 0, trades: 0, totalPnlQuote: 0 }
+    acc.wins += r.wins
+    acc.trades += r.trades
+    acc.totalPnlQuote += r.totalPnlQuote
+    byId.set(r.strategyId, acc)
+  }
+  return [...byId.entries()].map(([strategyId, acc]) => ({
+    strategyId,
+    winRate: acc.trades > 0 ? acc.wins / acc.trades : 0,
+    avgPnlQuote: acc.trades > 0 ? acc.totalPnlQuote / acc.trades : 0,
+    trades: acc.trades,
+  }))
+}
 
 function arg(name: string, fallback: string): string {
   const idx = process.argv.indexOf(`--${name}`)
@@ -260,6 +295,11 @@ function main() {
     arg('fold-train-pct', splitPct > 0 ? String(splitPct) : '70'),
   )
   const carryScore = hasFlag('carry-score')
+  // Explicit opt-in — baselines feed live strategy-decay detection
+  // (src/server/strategy-decay.ts), so a backtest result should be reviewed
+  // before it's trusted as the comparison point, not saved automatically
+  // on every run.
+  const saveBaselines = hasFlag('save-baselines')
 
   const config: BacktestConfig = {
     ...DEFAULT_BACKTEST_CONFIG,
@@ -386,6 +426,14 @@ function main() {
     )
     printWalkForwardSummary(folds, outOfSampleSummary, foldTrainPct, carryScore)
     console.log(`\nfull walk-forward report: ${outPath}\n`)
+    if (saveBaselines) {
+      const oosStrategyReports = folds.flatMap((f) => f.test.strategyReports)
+      const baselines = aggregateStrategyReports(oosStrategyReports)
+      saveStrategyBaselines(baselines, `backtest-trading:walk-forward-${foldCount}fold`)
+      console.log(
+        `saved ${baselines.length} strategy baseline(s) from out-of-sample folds\n`,
+      )
+    }
     return
   }
 
@@ -412,6 +460,13 @@ function main() {
       `Out-of-sample ${100 - splitPct}%${carryScore ? ' carried-score' : ''}`,
     )
     console.log(`\nfull split report: ${outPath}\n`)
+    if (saveBaselines) {
+      const baselines = aggregateStrategyReports(test.strategyReports)
+      saveStrategyBaselines(baselines, `backtest-trading:split-${splitPct}`)
+      console.log(
+        `saved ${baselines.length} strategy baseline(s) from out-of-sample split\n`,
+      )
+    }
     return
   }
 
@@ -421,6 +476,11 @@ function main() {
   printReport(report)
 
   console.log(`\nfull report: ${outPath}\n`)
+  if (saveBaselines) {
+    const baselines = aggregateStrategyReports(report.strategyReports)
+    saveStrategyBaselines(baselines, 'backtest-trading:single-run')
+    console.log(`saved ${baselines.length} strategy baseline(s)\n`)
+  }
 }
 
 main()

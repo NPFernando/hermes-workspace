@@ -6,7 +6,13 @@
  * complements). Detection is audit-log-only; it never disables a strategy
  * or changes sizing itself, matching this codebase's precedent of flagging
  * risk gaps for explicit review rather than auto-acting on them.
+ *
+ * Baselines are populated deliberately, not automatically on every backtest
+ * run (see saveStrategyBaselines() / scripts/backtest-trading.ts's
+ * --save-baselines flag) — a backtest result should be reviewed before it's
+ * trusted as the live comparison point.
  */
+import { appendAuditLog, readFinanceStore, writeFinanceStore } from './finance-store'
 
 export type StrategyBaseline = {
   strategyId: string
@@ -120,4 +126,47 @@ export function detectStrategyDecay(
     ? `Expectancy flipped non-positive (baseline avg ${baseline.avgPnlQuote.toFixed(4)} -> live ${live.avgPnlQuote.toFixed(4)})`
     : `Win rate dropped ${(winRateDrop * 100).toFixed(1)}pp below baseline (${(baseline.winRate * 100).toFixed(1)}% -> ${(live.winRate * 100).toFixed(1)}%)`
   return { decayed: true, reason, winRateDrop, expectancyFlipped }
+}
+
+/**
+ * Persists validated backtest summaries as live-comparison baselines.
+ * Shared by the save_strategy_baseline API action and
+ * scripts/backtest-trading.ts's --save-baselines flag, so both write
+ * through the exact same path into settings.strategyBaselines
+ * (finance-store.ts) rather than each hand-rolling the merge/write.
+ */
+export function saveStrategyBaselines(
+  reports: Array<{ strategyId: string; winRate: number; avgPnlQuote: number; trades: number }>,
+  source: string,
+): void {
+  if (reports.length === 0) return
+  const db = readFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const baselines = (
+    settings.strategyBaselines && typeof settings.strategyBaselines === 'object'
+      ? { ...(settings.strategyBaselines as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>
+  const computedAt = new Date().toISOString()
+  const saved: Array<StrategyBaseline> = []
+  for (const r of reports) {
+    if (r.trades === 0) continue // no-trade strategies aren't a meaningful baseline
+    const baseline: StrategyBaseline = {
+      strategyId: r.strategyId,
+      winRate: r.winRate,
+      avgPnlQuote: r.avgPnlQuote,
+      trades: r.trades,
+      computedAt,
+    }
+    baselines[r.strategyId] = baseline
+    saved.push(baseline)
+  }
+  if (saved.length === 0) return
+  settings.strategyBaselines = baselines
+  writeFinanceStore(db)
+  appendAuditLog('strategy_baselines_saved', {
+    source,
+    strategyIds: saved.map((b) => b.strategyId),
+    computedAt,
+  })
 }
