@@ -662,6 +662,8 @@ export const Route = createFileRoute('/api/finance')({
               gc.spacing = cfg.spacing
             if (typeof cfg.autoRecenter === 'boolean') gc.autoRecenter = cfg.autoRecenter
             if (typeof cfg.efficiencyGate === 'boolean') gc.efficiencyGate = cfg.efficiencyGate
+            if (typeof cfg.absoluteStopFloorEnabled === 'boolean')
+              gc.absoluteStopFloorEnabled = cfg.absoluteStopFloorEnabled
             if (Array.isArray(cfg.symbols)) {
               const syms = cfg.symbols
                 .filter((s): s is string => typeof s === 'string')
