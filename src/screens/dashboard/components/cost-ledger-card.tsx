@@ -3,7 +3,7 @@ import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { detectNovusOpportunity } from '@/lib/novus-opportunity-detector'
 
 const SUBSCRIPTION_PATTERNS: Array<RegExp> = [
-  /(^|[\s:/\-])codex(\b|[-/])/i,
+  /(^|[\s:/-])codex(\b|[-/])/i,
   /anthropic[-_]?oauth/i,
   /^claude-(opus|sonnet|haiku)/i,
   /minimax/i,

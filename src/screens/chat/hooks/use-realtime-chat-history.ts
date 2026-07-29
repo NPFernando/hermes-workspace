@@ -531,7 +531,6 @@ export function useRealtimeChatHistory({
   const mergedMessages = useMemo(() => {
     if (effectiveSessionKey === 'new') return historyMessages
     return mergeHistoryMessages(effectiveSessionKey, historyMessages)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveSessionKey, historyMessages, mergeHistoryMessages, lastEventAt])
 
   useEffect(() => {

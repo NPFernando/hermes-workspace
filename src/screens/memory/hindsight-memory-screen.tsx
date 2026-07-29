@@ -135,7 +135,7 @@ function opStatusBadge(status: string): string {
 
 function StatusBar({ data, isLoading }: { data: StatusData | undefined; isLoading: boolean }) {
   const healthy =
-    data?.daemon.status === 'healthy' && data?.daemon.database === 'connected'
+    data?.daemon.status === 'healthy' && data.daemon.database === 'connected'
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-2 text-xs">

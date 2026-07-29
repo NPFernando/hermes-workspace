@@ -71,7 +71,7 @@ export function TimeoutAnalysisModal({
                   {e.task.title}
                 </button>
                 {e.note && <p className="text-[10px] text-[var(--theme-muted)] mt-0.5 line-clamp-2">{e.note}</p>}
-                <p className="text-[9px] text-[var(--theme-muted)] opacity-40 mt-0.5 capitalize">{e.task.assignee ?? 'unassigned'} · {e.task.tags?.slice(0,2).join(', ') || 'no tags'}</p>
+                <p className="text-[9px] text-[var(--theme-muted)] opacity-40 mt-0.5 capitalize">{e.task.assignee ?? 'unassigned'} · {e.task.tags.slice(0,2).join(', ') || 'no tags'}</p>
               </div>
             ))}
           </div>
