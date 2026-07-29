@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTaskExecLog } from './use-task-exec-log'
 import type { ActivityEntry, ClarificationQuestion, ClaudeTask, CreateTaskInput, TaskAssignee, TaskColumn, TaskPriority } from '@/lib/tasks-api'
 import {
   DialogContent,
@@ -8,7 +9,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { COLUMN_LABELS, COLUMN_ORDER, relativeTime } from '@/lib/tasks-api'
-import { useTaskExecLog } from './use-task-exec-log'
 
 type Props = {
   open: boolean
@@ -545,7 +545,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
               </div>
 
               {/* Waiting for user input banner — only shown when no structured questions */}
-              {task?.agent_state === 'waiting_for_input' && !task?.clarification_questions?.length && (
+              {task?.agent_state === 'waiting_for_input' && !task.clarification_questions?.length && (
                 <div className="flex items-center gap-2 mb-3 rounded-md border border-amber-300/25 bg-amber-400/8 px-2.5 py-2">
                   <span className="text-base shrink-0">💬</span>
                   <span className="text-xs font-medium text-amber-500">
@@ -622,7 +622,7 @@ export function TaskDialog({ open, onOpenChange, task, defaultColumn, defaultTag
               )}
 
               {/* Freeform comment / reply input — hidden during structured clarification */}
-              {onComment && !(task?.waiting_for_user && task?.clarification_questions?.length) && (
+              {onComment && !(task?.waiting_for_user && task.clarification_questions?.length) && (
                 <div className="flex gap-2 mt-3">
                   <input
                     className={cn(inputClass, 'text-xs py-1.5')}

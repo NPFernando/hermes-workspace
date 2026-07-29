@@ -1,11 +1,11 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Loading03Icon, RefreshIcon, Tick01Icon, LockIcon, KeyIcon, Alert02Icon, Bug01Icon, MessageIcon, Settings01Icon, Link04Icon } from '@hugeicons/core-free-icons'
+import { Alert02Icon, Bug01Icon, KeyIcon, Link04Icon, Loading03Icon, LockIcon, MessageIcon, RefreshIcon, Settings01Icon, Tick01Icon } from '@hugeicons/core-free-icons'
 import type { ClaudeTask } from '@/lib/tasks-api'
-import { fetchBlockers, resolveBlocker, provideCredential, validateCredentials, autoResumeBlocked } from '@/lib/tasks-api'
+import { autoResumeBlocked, fetchBlockers, provideCredential, resolveBlocker, validateCredentials } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
 
@@ -51,7 +51,7 @@ export function BlockerPanel() {
   const [credentialForm, setCredentialForm] = useState<CredentialFormState | null>(null)
 
   // ── Queries ──────────────────────────────────────────────────────────────
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data: blockers, isLoading, error, refetch } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: fetchBlockers,
     refetchInterval: 30_000,
@@ -234,7 +234,7 @@ export function BlockerPanel() {
             {/* Validate button (when all credentials provided) */}
             {task.blocker_type === 'credential' &&
               task.credentials_needed?.every((c) => c.provided) &&
-              !task.credentials_needed?.every((c) => c.validated) && (
+              !task.credentials_needed.every((c) => c.validated) && (
               <button
                 type="button"
                 disabled={isValidating}
@@ -283,7 +283,7 @@ export function BlockerPanel() {
     )
   }
 
-  if (!data || data.count === 0) {
+  if (!blockers || blockers.count === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-8">
         <HugeiconsIcon icon={Tick01Icon} className="w-5 h-5 text-green-400" />
@@ -301,18 +301,18 @@ export function BlockerPanel() {
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={LockIcon} className="w-4 h-4 text-red-400" />
           <span className="text-xs font-semibold text-[var(--theme-text)]">
-            {data.count} Blocker{data.count !== 1 ? 's' : ''}
+            {blockers.count} Blocker{blockers.count !== 1 ? 's' : ''}
           </span>
         </div>
         <div className="flex items-center gap-1">
-          {data.resumable.length > 0 && (
+          {blockers.resumable.length > 0 && (
             <button
               type="button"
               disabled={autoResumeMutation.isPending}
               onClick={() => autoResumeMutation.mutate()}
               className="px-2 py-1 text-[9px] rounded border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20 disabled:opacity-40 transition-colors"
             >
-              {autoResumeMutation.isPending ? '…' : `Resume ${data.resumable.length}`}
+              {autoResumeMutation.isPending ? '…' : `Resume ${blockers.resumable.length}`}
             </button>
           )}
           <button
@@ -328,7 +328,7 @@ export function BlockerPanel() {
 
       {/* Blocker groups */}
       <div className="flex flex-col gap-2">
-        {data.groups.map((group) => (
+        {blockers.groups.map((group) => (
           <div key={group.type} className="flex flex-col gap-1">
             {/* Group header */}
             <button

@@ -6,15 +6,15 @@
  * POST /api/tasks-blockers/provide-credential — supply a credential value
  * POST /api/tasks-blockers/auto-resume — check dependency completion and auto-resume
  */
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
-import { listTasks, updateTask, getTask } from '../../server/tasks-store'
-import type { TaskRecord } from '../../server/tasks-store'
-import { safeErrorMessage } from '../../server/rate-limit'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { createFileRoute } from '@tanstack/react-router'
+import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
+import { getTask, listTasks, updateTask } from '../../server/tasks-store'
+import { safeErrorMessage } from '../../server/rate-limit'
+import type { TaskRecord } from '../../server/tasks-store'
 
 type BlockerGroup = {
   type: string
@@ -138,7 +138,7 @@ function findResumableTasks(): Array<{ task: TaskRecord; pending: Array<string> 
 export const Route = createFileRoute('/api/tasks-blockers')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }

@@ -80,7 +80,7 @@ export const Route = createFileRoute('/api/tasks-unlock-prereq')({
       },
 
       // GET: return info about which tasks are gated on which prereqs
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

@@ -88,10 +88,11 @@ describe('tasks UX copy', () => {
       action: 'planned',
       note: '1. Inspect the target files. 2. Apply the requested code change. 3. Run focused verification and report the result.',
       by: 'astra',
+      byEmoji: '🌟',
       at: '2026-01-01T00:00:00Z',
     }]
-    const stubHistory = [{ id: 'h3', action: 'planned', note: '1. Do the work', by: 'astra', at: '2026-01-01T00:00:00Z' }]
-    const unavailableHistory = [{ id: 'h2', action: 'planned', note: 'Plan unavailable — press Execute to proceed.', by: 'astra', at: '2026-01-01T00:00:00Z' }]
+    const stubHistory = [{ id: 'h3', action: 'planned', note: '1. Do the work', by: 'astra', byEmoji: '🌟', at: '2026-01-01T00:00:00Z' }]
+    const unavailableHistory = [{ id: 'h2', action: 'planned', note: 'Plan unavailable — press Execute to proceed.', by: 'astra', byEmoji: '🌟', at: '2026-01-01T00:00:00Z' }]
 
     expect(countExecutableReviewTasks([
       { column: 'review', agent_state: null, agent_history: plannedHistory },
