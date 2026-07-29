@@ -64,7 +64,7 @@ function extractTextFromMessage(message: unknown): string {
   if (typeof msg.content === 'string') return msg.content
   if (Array.isArray(msg.content)) {
     return (msg.content as Array<Record<string, unknown>>)
-      .filter((block) => block?.type === 'text' && typeof block.text === 'string')
+      .filter((block) => block.type === 'text' && typeof block.text === 'string')
       .map((block) => block.text as string)
       .join('')
   }

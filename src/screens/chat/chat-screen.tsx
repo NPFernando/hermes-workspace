@@ -247,7 +247,7 @@ function exportConversationTranscript(payload: {
       const text = textFromMessage(message).trim()
       const attachments = Array.isArray(message.attachments)
         ? message.attachments
-            .map((attachment) => attachment?.name?.trim())
+            .map((attachment) => attachment.name?.trim())
             .filter((value): value is string => Boolean(value))
         : []
 
@@ -305,11 +305,11 @@ function messageFallbackSignature(message: ChatMessage): string {
     ? message.attachments
         .map((attachment) => {
           const name =
-            typeof attachment?.name === 'string' ? attachment.name : ''
+            typeof attachment.name === 'string' ? attachment.name : ''
           const size =
-            typeof attachment?.size === 'number' ? String(attachment.size) : ''
+            typeof attachment.size === 'number' ? String(attachment.size) : ''
           const type =
-            typeof attachment?.contentType === 'string'
+            typeof attachment.contentType === 'string'
               ? attachment.contentType
               : ''
           return `${name}:${size}:${type}`
@@ -408,11 +408,11 @@ function getMessageAttachmentSignature(message: ChatMessage): string {
 
   return message.attachments
     .map((attachment) => {
-      const name = typeof attachment?.name === 'string' ? attachment.name : ''
+      const name = typeof attachment.name === 'string' ? attachment.name : ''
       const size =
-        typeof attachment?.size === 'number' ? String(attachment.size) : ''
+        typeof attachment.size === 'number' ? String(attachment.size) : ''
       const type =
-        typeof attachment?.contentType === 'string'
+        typeof attachment.contentType === 'string'
           ? attachment.contentType
           : ''
       return `${name}:${size}:${type}`

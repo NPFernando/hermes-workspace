@@ -327,7 +327,7 @@ async function resolveMirroredRuntimeSessionId(
     const sessions = await listSessions(20, 0)
     const candidate = sessions
       .filter((session) => {
-        if (!session?.id || session.id === sessionId) return false
+        if (!session.id || session.id === sessionId) return false
         if (session.source === 'local') return false
 
         const startedAt = Number(session.started_at) || 0
