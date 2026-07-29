@@ -74,6 +74,10 @@ export function SisterPicker({
   return (
     <div className="flex items-center gap-1 px-2 py-1 flex-wrap">
       <span className="text-xs text-muted-foreground mr-1 shrink-0">Agent:</span>
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {handoffStatus === 'routing' ? 'Routing request to the selected agent.' : null}
+        {handoffStatus === 'failed' ? 'Agent handoff failed. Retry is available.' : null}
+      </span>
       {orchestrating && !orchestratingSisterIds?.length && (
         <span className="text-xs text-muted-foreground animate-pulse mr-1">🌟 Astra orchestrating…</span>
       )}
@@ -83,7 +87,7 @@ export function SisterPicker({
         </span>
       ) : null}
       {handoffStatus === 'failed' ? (
-        <button type="button" onClick={onRetryHandoff} className="text-[10px] text-amber-600 hover:underline" disabled={!onRetryHandoff}>
+        <button type="button" onClick={onRetryHandoff} className="text-[10px] text-amber-600 hover:underline" aria-label="Retry failed agent handoff" disabled={!onRetryHandoff}>
           Handoff failed · retry
         </button>
       ) : null}
