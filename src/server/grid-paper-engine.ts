@@ -977,3 +977,26 @@ export function getGridEngineState(): {
     performance: summarizeGridTrades(allTrades),
   }
 }
+
+/**
+ * Currently-held grid levels flattened to {symbol, entryQuote} pairs — the
+ * shape trading-guardian.ts's bucketExposureQuote() already expects. Lets
+ * council-side risk checks see the grid engine's real exposure without this
+ * module gaining any dependency on demo-trading-engine.ts or trading-guardian.ts
+ * (see this file's module doc on staying isolated from the council engine) —
+ * the caller (src/server/exposure-aggregator.ts) is the only thing that
+ * imports both sides.
+ */
+export function heldGridPositions(): Array<{
+  symbol: string
+  entryQuote: number
+}> {
+  const { states } = getGridEngineState()
+  const held: Array<{ symbol: string; entryQuote: number }> = []
+  for (const state of states) {
+    for (const level of state.levels) {
+      if (level.held) held.push({ symbol: state.symbol, entryQuote: level.entryQuote })
+    }
+  }
+  return held
+}

@@ -51,6 +51,7 @@ import {
   dayKey,
   weekKey,
 } from './trading-guardian'
+import { crossEngineBucketExposureQuote } from './exposure-aggregator'
 import { sendAlert } from './alerts'
 import { isConnectivityBreakerTripped } from './connectivity-breaker'
 import {
@@ -2218,8 +2219,15 @@ async function runTradingCycleInner(
           openUnrealizedPnlQuote,
           strategyLossStreak: leadScore.lossStreak,
           strategyCooldownUntil: leadScore.cooldownUntil,
+          // Merges council's own bucket exposure with the grid engine's
+          // current exposure in the same buckets — see exposure-aggregator.ts
+          // for why this is a one-way (council-side-only) fix and what gap
+          // remains.
           bucketExposureQuote: config.guardian.correlationBucketsEnabled
-            ? bucketExposureQuote(activePositions(), config.guardian.correlationBuckets)
+            ? crossEngineBucketExposureQuote(
+                bucketExposureQuote(activePositions(), config.guardian.correlationBuckets),
+                config.guardian.correlationBuckets,
+              )
             : undefined,
         },
         config.guardian,
