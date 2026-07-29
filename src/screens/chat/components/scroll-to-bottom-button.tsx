@@ -26,7 +26,11 @@ function ScrollToBottomButton({
           type="button"
           variant="ghost"
           size="icon-sm"
-          aria-label="Scroll to bottom"
+          aria-label={
+            unreadCount > 0
+              ? `Scroll to bottom (${unreadCount > 99 ? '99 or more' : unreadCount} unread messages)`
+              : 'Scroll to bottom'
+          }
           className={cn(
             'pointer-events-auto relative rounded-full text-white shadow-lg transition-colors hover:opacity-90',
             className,

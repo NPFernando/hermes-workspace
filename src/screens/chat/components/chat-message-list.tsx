@@ -231,7 +231,15 @@ function ResponsePhaseRail({ phase }: { phase: ResponsePhase }) {
   const activeIndex = getResponsePhaseIndex(phase)
 
   return (
-    <div className="mt-2 flex items-center gap-1.5" aria-label="Response progress">
+    <div
+      className="mt-2 flex items-center gap-1.5"
+      role="progressbar"
+      aria-label="Response progress"
+      aria-valuemin={1}
+      aria-valuemax={RESPONSE_PHASES.length}
+      aria-valuenow={activeIndex + 1}
+      aria-valuetext={RESPONSE_PHASES[activeIndex]?.label ?? 'Thinking'}
+    >
       {RESPONSE_PHASES.map((item, index) => {
         const isActive = index === activeIndex
         const isComplete = index < activeIndex
@@ -399,9 +407,11 @@ function ThinkingBubble({
                   )}
                   style={{ opacity: visible ? 1 : 0 }}
                 >
-                  {displayedLabel}{' '}
+                  <span role="status" aria-live="polite" aria-atomic="true">
+                    {displayedLabel}
+                  </span>{' '}
                   {elapsed >= 3 ? (
-                    <span className="text-[10px] opacity-60">
+                    <span className="text-[10px] opacity-60" aria-hidden="true">
                       {elapsedLabel}
                     </span>
                   ) : null}

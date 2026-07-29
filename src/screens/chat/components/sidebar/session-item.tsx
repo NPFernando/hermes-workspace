@@ -164,10 +164,12 @@ function SessionItemComponent({
         } catch {}
         onSelect?.()
       }}
+      aria-current={active ? 'page' : undefined}
+      title={baseTitle}
       className={cn(
         'group inline-flex items-center justify-between',
         'w-full text-left pl-1.5 pr-0.5 h-14 rounded-lg transition-colors duration-0',
-        'select-none',
+        'select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-inset',
         active
           ? 'bg-[var(--theme-hover)] text-[var(--theme-text)]'
           : 'bg-transparent text-[var(--theme-text)] [&:hover:not(:has(button:hover))]:bg-[var(--theme-hover)]',
@@ -202,7 +204,8 @@ function SessionItemComponent({
           }}
           className={cn(
             'ml-2 inline-flex size-7 items-center justify-center rounded-md text-[var(--theme-muted)]',
-            'opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--theme-hover)]',
+            'opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--theme-hover)]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]',
             'aria-expanded:opacity-100 aria-expanded:bg-[var(--theme-hover)]',
           )}
           aria-label="Session options"
