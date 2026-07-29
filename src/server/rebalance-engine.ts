@@ -259,7 +259,11 @@ async function runRebalanceCycleInner(
         })
       } else {
         const price = priceBySymbol[t.symbol]
-        const quantity = price > 0 ? t.notionalQuote / price : 0
+        // See docs/tsconfig-strictness-rollout.md — real Record-lookup
+        // risk the current lax tsconfig (missing noUncheckedIndexedAccess)
+        // doesn't reflect in `price`'s type.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        const quantity = price !== undefined && price > 0 ? t.notionalQuote / price : 0
         if (quantity <= 0) continue
         const order = await client.placeOrder({
           symbol: t.symbol,

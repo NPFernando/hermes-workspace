@@ -242,8 +242,14 @@ export function updateTask(taskId: string, updates: UpdateTaskInput): TaskRecord
     const file = readTaskFile()
     const index = file.tasks.findIndex((task) => task.id === taskId)
     if (index === -1) return null
+    const existing = file.tasks[index]
+    // See docs/tsconfig-strictness-rollout.md — real indexed-access risk
+    // the current lax tsconfig (missing noUncheckedIndexedAccess) doesn't
+    // reflect in `existing`'s type.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (existing === undefined) return null
 
-    const current = normalizeTask(file.tasks[index])
+    const current = normalizeTask(existing)
     const next = normalizeTask({
       ...current,
       ...updates,

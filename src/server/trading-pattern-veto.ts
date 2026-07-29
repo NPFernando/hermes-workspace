@@ -83,8 +83,14 @@ export function atrPctSeries(candles: Array<Candle>, period: number): Array<numb
   for (let i = period; i < candles.length; i++) {
     const slice = candles.slice(0, i + 1)
     const value = atr(slice, period)
-    const price = slice[slice.length - 1].close
-    if (value != null && price > 0) out.push(value / price)
+    const last = slice[slice.length - 1]
+    // Guards real indexed-access-may-be-undefined risk that only the
+    // current lax tsconfig (missing noUncheckedIndexedAccess) hides —
+    // see docs/tsconfig-strictness-rollout.md. eslint flags this as
+    // "no overlap" only because today's types don't reflect that risk.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (last !== undefined && value != null && last.close > 0)
+      out.push(value / last.close)
   }
   return out
 }
@@ -103,6 +109,10 @@ export function volRegimeFromHistory(
   const sorted = [...recentAtrPct].sort((a, b) => a - b)
   const p33 = sorted[Math.floor(sorted.length * 0.33)]
   const p66 = sorted[Math.floor(sorted.length * 0.66)]
+  // See docs/tsconfig-strictness-rollout.md — same lax-tsconfig gap as
+  // atrPctSeries() above.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (p33 === undefined || p66 === undefined) return 'mid'
   if (currentAtrPct <= p33) return 'low'
   if (currentAtrPct >= p66) return 'high'
   return 'mid'

@@ -84,7 +84,7 @@ export async function fetchLatestFearGreed(
   fetchJson: <T>(url: string) => Promise<T> = httpsGetJson,
 ): Promise<FearGreedPoint | null> {
   const points = await fetchFearGreedHistory(1, fetchJson)
-  return points.length > 0 ? points[0] : null
+  return points[0] ?? null
 }
 
 /**

@@ -45,8 +45,8 @@ describe('applyBucketOutcome', () => {
     let stats: Record<string, BucketStats> = {}
     stats = applyBucketOutcome(stats, a, -1)
     stats = applyBucketOutcome(stats, b, -1)
-    expect(stats[bucketKey(a)].trades).toBe(1)
-    expect(stats[bucketKey(b)].trades).toBe(1)
+    expect(stats[bucketKey(a)]?.trades).toBe(1)
+    expect(stats[bucketKey(b)]?.trades).toBe(1)
   })
 })
 

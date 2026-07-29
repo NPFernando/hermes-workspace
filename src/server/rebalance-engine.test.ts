@@ -95,7 +95,7 @@ describe('planRebalance', () => {
 
   it('treats a zero-value portfolio as zero weight everywhere (no divide-by-zero)', () => {
     const { items } = planRebalance({ BTCUSDT: 0 }, 0, { BTCUSDT: 1 })
-    expect(items[0].actualWeight).toBe(0)
+    expect(items[0]?.actualWeight).toBe(0)
   })
 })
 
@@ -120,8 +120,8 @@ describe('buildTradePlan', () => {
       { ...DEFAULT_REBALANCE_CONFIG, maxNotionalPerCycleQuote: 1000, minTradeNotionalQuote: 5 },
     )
     expect(plan.map((p) => p.symbol)).toEqual(['OVER', 'UNDER'])
-    expect(plan[0].side).toBe('SELL')
-    expect(plan[1].side).toBe('BUY')
+    expect(plan[0]?.side).toBe('SELL')
+    expect(plan[1]?.side).toBe('BUY')
   })
 
   it('stops adding trades once the per-cycle notional cap is reached', () => {
