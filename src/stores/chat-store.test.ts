@@ -68,3 +68,24 @@ describe('chat-store history merge ordering', () => {
     ])
   })
 })
+
+describe('chat-store waiting state', () => {
+  it('preserves the first waiting timestamp when a run id is refreshed', () => {
+    const store = useChatStore
+    store.setState({
+      waitingSessionKeys: new Set(),
+      waitingSessionMeta: {},
+    })
+
+    store.getState().setSessionWaiting('waiting-session', 'run-1')
+    const firstSince = store.getState().waitingSessionMeta['waiting-session']?.since
+
+    store.getState().setSessionWaiting('waiting-session', 'run-2')
+
+    expect(store.getState().waitingSessionMeta['waiting-session']).toEqual({
+      since: firstSince,
+      runId: 'run-2',
+    })
+    expect(store.getState().waitingSessionKeys.has('waiting-session')).toBe(true)
+  })
+})

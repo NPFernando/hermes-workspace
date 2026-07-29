@@ -670,8 +670,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setSessionWaiting: (sessionKey, runId) => {
+    const since = (get().waitingSessionMeta[sessionKey] ?? { since: Date.now() }).since
     const meta = {
-      since: get().waitingSessionMeta[sessionKey]?.since ?? Date.now(),
+      since,
       runId: runId ?? null,
     }
     const nextKeys = new Set(get().waitingSessionKeys)
@@ -1063,7 +1064,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // ToolCallPill can render them even after streaming state is cleared.
           // Fast tool runs clear streaming state before React renders — embedding
           // __streamToolCalls ensures pills survive in the history message.
-          const streamToolCallsToEmbed = streaming?.toolCalls?.length
+          const streamToolCallsToEmbed = streaming?.toolCalls.length
             ? streaming.toolCalls
             : undefined
           completeMessage = {
