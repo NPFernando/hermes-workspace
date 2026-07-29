@@ -1,6 +1,8 @@
 // Module-level local model override — set by composer when user picks a local model
 // Avoids prop threading. Reset when switching back to cloud models.
 import {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -68,11 +70,11 @@ import {
   CHAT_RUN_COMMAND_EVENT,
   CHAT_SUBMIT_SELECTION_EVENT,
 } from './chat-events'
-import { ArtifactPanel } from './components/artifact-panel'
 import {
   ArtifactPanelContext
   
 } from './contexts/artifact-panel-context'
+import { resolveWorkspaceApproval, useWorkspaceApprovalPoller } from './hooks/use-workspace-approvals'
 import type { SisterOption } from './components/sister-picker'
 import type {
   ChatRunCommandDetail,
@@ -86,7 +88,6 @@ import type {
   ThinkingLevel,
 } from './components/chat-composer'
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
-import { useWorkspaceApprovalPoller, resolveWorkspaceApproval } from './hooks/use-workspace-approvals'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import type {AgentActivity} from '@/stores/chat-activity-store';
 import type {ArtifactPanelState} from './contexts/artifact-panel-context';
@@ -125,6 +126,12 @@ import { setActiveResearch, useResearchCard } from '@/hooks/use-research-card'
 import { useChatMode } from '@/hooks/use-chat-mode'
 import {  useChatActivityStore } from '@/stores/chat-activity-store'
 import { safeErrorMessage } from '@/lib/error-utils'
+
+const ArtifactPanel = lazy(() =>
+  import('./components/artifact-panel').then((module) => ({
+    default: module.ArtifactPanel,
+  })),
+)
 
 export let _localModelOverride = ''
 export function setLocalModelOverride(model: string) { _localModelOverride = model }

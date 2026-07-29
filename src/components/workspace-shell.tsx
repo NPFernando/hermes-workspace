@@ -25,19 +25,11 @@ import type { AuthStatus } from '@/lib/claude-auth'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
-import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { ChatPanelToggle } from '@/components/chat-panel-toggle'
-// Lazy: ChatPanel statically imports ChatScreen and with it the whole chat
-// markdown pipeline (~500 KB minified). Keeping it out of the eager entry
-// means non-chat routes stop paying for chat at first paint; the panel
-// chunk loads in the background right after mount.
-const ChatPanel = lazy(() =>
-  import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
-)
 import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { MobileHamburgerMenu } from '@/components/mobile-hamburger-menu'
@@ -50,6 +42,19 @@ import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
 import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { CommandPalette } from '@/components/command-palette'
 import { useSettings } from '@/hooks/use-settings'
+// Lazy: ChatPanel statically imports ChatScreen and with it the whole chat
+// markdown pipeline (~500 KB minified). Keeping it out of the eager entry
+// means non-chat routes stop paying for chat at first paint; the panel
+// chunk loads in the background right after mount.
+const ChatPanel = lazy(() =>
+  import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
+)
+const ChatSidebar = lazy(() =>
+  import('@/screens/chat/components/chat-sidebar').then((m) => ({
+    default: m.ChatSidebar,
+  })),
+)
+
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 
 const TerminalWorkspace = lazy(() =>
@@ -403,20 +408,30 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           {/* Persistent sidebar */}
           {!isMobile && !hideChatSidebar && (
             <div className="relative z-30">
-              <ChatSidebar
-                sessions={sessions}
-                activeFriendlyId={activeFriendlyId}
-                creatingSession={creatingSession}
-                onCreateSession={startNewChat}
-                isCollapsed={sidebarCollapsed}
-                onToggleCollapse={toggleSidebar}
-                onSelectSession={handleSelectSession}
-                onActiveSessionDelete={handleActiveSessionDelete}
-                sessionsLoading={sessionsLoading}
-                sessionsFetching={sessionsFetching}
-                sessionsError={sessionsError}
-                onRetrySessions={refetchSessions}
-              />
+              <Suspense
+                fallback={
+                  <div
+                    aria-hidden="true"
+                    className="h-full shrink-0 theme-panel"
+                    style={{ width: sidebarCollapsed ? 48 : 300 }}
+                  />
+                }
+              >
+                <ChatSidebar
+                  sessions={sessions}
+                  activeFriendlyId={activeFriendlyId}
+                  creatingSession={creatingSession}
+                  onCreateSession={startNewChat}
+                  isCollapsed={sidebarCollapsed}
+                  onToggleCollapse={toggleSidebar}
+                  onSelectSession={handleSelectSession}
+                  onActiveSessionDelete={handleActiveSessionDelete}
+                  sessionsLoading={sessionsLoading}
+                  sessionsFetching={sessionsFetching}
+                  sessionsError={sessionsError}
+                  onRetrySessions={refetchSessions}
+                />
+              </Suspense>
             </div>
           )}
 
