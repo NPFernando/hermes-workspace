@@ -125,8 +125,8 @@ function parseExecNotification(text: string): ExecNotification | null {
 
   if (!name) {
     const withoutPrefix = trimmed.replace(/^Exec completed[:\s-]*/i, '').trim()
-    const nameMatch = withoutPrefix.match(/^([^\(\{\[]+?)(?:\s*\(|\s*$)/)
-    if (nameMatch) name = nameMatch[1].trim()
+    const nameMatch = withoutPrefix.match(/^([^{[(]+?)(?:\s*\(|\s*$)/)
+    if (nameMatch) name = nameMatch.at(1)?.trim() ?? ''
   }
 
   if (exitCode === null) {
@@ -165,11 +165,11 @@ function getAttachmentSignature(message: ChatMessage): string {
 
   return message.attachments
     .map((attachment) => {
-      const name = typeof attachment?.name === 'string' ? attachment.name : ''
+      const name = typeof attachment.name === 'string' ? attachment.name : ''
       const size =
-        typeof attachment?.size === 'number' ? String(attachment.size) : ''
+        typeof attachment.size === 'number' ? String(attachment.size) : ''
       const type =
-        typeof attachment?.contentType === 'string'
+        typeof attachment.contentType === 'string'
           ? attachment.contentType
           : ''
       return `${name}:${size}:${type}`
@@ -437,8 +437,8 @@ export function useChatHistory({
     )
     if (optimisticMessages.length === 0) return
 
-    const latestOptimisticMessage =
-      optimisticMessages[optimisticMessages.length - 1]
+    const latestOptimisticMessage = optimisticMessages.at(-1)
+    if (!latestOptimisticMessage) return
 
     persistPendingMessage({
       sessionKey: sessionKeyForHistory,
@@ -474,11 +474,9 @@ export function useChatHistory({
       : rawHistoryMessages
     const last = messages[messages.length - 1]
     const lastId =
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
       last && typeof (last as { id?: string }).id === 'string'
         ? (last as { id?: string }).id
         : ''
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
     const signature = `${messages.length}:${last?.role ?? ''}:${lastId}:${textFromMessage(last ?? { role: 'user', content: [] }).slice(-32)}`
     if (signature === stableHistorySignatureRef.current) {
       return stableHistoryMessagesRef.current
@@ -557,8 +555,8 @@ export function useChatHistory({
     // Only hide messages that are PURELY tool calls (no substantial text)
     // Messages with real text + tool calls are real responses — always show them
     for (let i = 0; i < filtered.length; i++) {
-      const msg = filtered[i]
-      if (msg.role !== 'assistant') continue
+      const msg = filtered.at(i)
+      if (!msg || msg.role !== 'assistant') continue
       const content = Array.isArray(msg.content) ? msg.content : []
       const hasToolCall = content.some(
         (c: any) =>
@@ -691,7 +689,8 @@ function mergeOptimisticHistoryMessages(
     })
 
     if (matchingServerIndex >= 0) {
-      const serverMessage = merged[matchingServerIndex]
+      const serverMessage = merged.at(matchingServerIndex)
+      if (!serverMessage) continue
       const serverHasAttachments =
         Array.isArray(serverMessage.attachments) &&
         serverMessage.attachments.length > 0

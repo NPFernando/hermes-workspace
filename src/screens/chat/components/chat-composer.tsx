@@ -286,7 +286,7 @@ async function fetchModels(): Promise<{
         : []
 
   const models = rawModels
-    .map((entry) => {
+    .map((entry): ClaudeCatalogEntry | null => {
       if (typeof entry === 'string') return entry
       if (!entry || typeof entry !== 'object') return null
       const record = entry as Record<string, unknown>
@@ -298,7 +298,7 @@ async function fetchModels(): Promise<{
       const provider =
         readModelText(record.provider) ||
         readModelText(record.owned_by) ||
-        (id.includes('/') ? id.split('/')[0] : 'hermes-agent')
+        (id.includes('/') ? id.split('/').at(0) ?? 'hermes-agent' : 'hermes-agent')
 
       return {
         ...record,
@@ -1240,7 +1240,8 @@ function ChatComposerComponent({
   const configuredModel = useMemo(() => {
     const models = modelsQuery.data?.models ?? []
     if (!models.length) return ''
-    const first = models[0]
+    const first = models.at(0)
+    if (!first) return ''
     return typeof first === 'string' ? first : first.id || first.name || ''
   }, [modelsQuery.data])
   // Derive the label directly from the store so navigation between sessions

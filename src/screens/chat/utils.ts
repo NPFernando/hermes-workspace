@@ -97,7 +97,7 @@ function cleanUserText(raw: string): string {
     /\[(?:Telegram|Signal|Discord|WhatsApp|iMessage|Slack|GoogleChat)\s[^\]]*\]\s*([\s\S]*)/i,
   )
   if (channelHeaderMatch) {
-    text = channelHeaderMatch[1]
+    text = channelHeaderMatch.at(1) ?? ''
   }
 
   // Remove <media:audio> / <media:image> / <media:video> tags
@@ -280,7 +280,7 @@ export function normalizeSessions(
       preview:
         typeof session.preview === 'string'
           ? cleanUserText(session.preview) || session.preview.trim() || null
-          : session.preview ?? null,
+          : null,
     }
   })
 }

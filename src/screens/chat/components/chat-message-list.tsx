@@ -637,8 +637,9 @@ export function buildDisplayEntries(
     }
 
     if (message.role === 'tool' || message.role === 'toolResult') {
-      if (entries.length > 0 && entries[entries.length - 1].message.role === 'assistant') {
-        entries[entries.length - 1].attachedToolMessages.push(message)
+      const previousEntry = entries.at(-1)
+      if (previousEntry?.message.role === 'assistant') {
+        previousEntry.attachedToolMessages.push(message)
       } else if (pendingAssistantToolMessages.length > 0) {
         pendingAssistantToolMessages.push(message)
       }
@@ -667,7 +668,8 @@ export function getTrailingToolOnlyTurnSummary(
 ): { count: number; toolNames: Array<string>; hasFinalAssistantText: boolean } | null {
   let trailingStart = messages.length
   for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]
+    const msg = messages.at(i)
+    if (!msg) continue
     if (msg.role === 'tool' || msg.role === 'toolResult') {
       trailingStart = i
     } else if (isAssistantToolCallOnlyMessage(msg)) {
@@ -681,8 +683,8 @@ export function getTrailingToolOnlyTurnSummary(
   if (trailingStart === messages.length || trailingStart === 0) {
     return null
   }
-  const lastVisible = messages[trailingStart - 1]
-  if (lastVisible.role !== 'assistant' || isAssistantToolCallOnlyMessage(lastVisible)) {
+  const lastVisible = messages.at(trailingStart - 1)
+  if (!lastVisible || lastVisible.role !== 'assistant' || isAssistantToolCallOnlyMessage(lastVisible)) {
     return null
   }
   const trailing = messages.slice(trailingStart)
@@ -1258,7 +1260,8 @@ function ChatMessageListComponent({
 
   const lastAssistantMessageHasToolSectionsAndText = () => {
     for (let i = visibleEntries.length - 1; i >= 0; i--) {
-      const entry = visibleEntries[i];
+      const entry = visibleEntries.at(i);
+      if (!entry) continue;
       if (entry.message.role === 'assistant') {
         const hasToolSections =
           getToolCallsFromMessage(entry.message).length > 0 ||

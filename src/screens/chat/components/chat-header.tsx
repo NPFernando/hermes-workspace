@@ -33,12 +33,16 @@ function formatMobileSessionTitle(rawTitle: string): string {
     .split(':')
     .map((part) => part.trim())
     .filter(Boolean)
+  const firstPart = parts.at(0)
+  const secondPart = parts.at(1)
   if (
     parts.length >= 2 &&
-    parts[0].toLowerCase() === 'agent' &&
-    parts[1].length > 0
+    firstPart?.toLowerCase() === 'agent' &&
+    secondPart &&
+    secondPart.length > 0
   ) {
-    const candidate = parts[parts.length - 1]
+    const candidate = parts.at(-1)
+    if (!candidate) return 'New Chat'
     if (candidate.toLowerCase() === 'main') return 'Main Chat'
     return `${toTitleCase(candidate)} Chat`
   }

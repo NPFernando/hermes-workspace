@@ -531,7 +531,6 @@ export function useRealtimeChatHistory({
   const mergedMessages = useMemo(() => {
     if (effectiveSessionKey === 'new') return historyMessages
     return mergeHistoryMessages(effectiveSessionKey, historyMessages)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveSessionKey, historyMessages, mergeHistoryMessages, lastEventAt])
 
   useEffect(() => {
@@ -553,8 +552,8 @@ export function useRealtimeChatHistory({
     // Wait 2 seconds after stream ends to allow history to catch up
     if (Date.now() - lastStreamClearTimeRef.current < 2000) return
     // Additionally, ensure the last realtime message is not a streaming message
-    const lastRealtime = realtimeMessages[realtimeMessages.length - 1]
-    if (lastRealtime.__streamingStatus === 'streaming') return
+    const lastRealtime = realtimeMessages.at(-1)
+    if (!lastRealtime || lastRealtime.__streamingStatus === 'streaming') return
     clearRealtimeBuffer(effectiveSessionKey)
   }, [
     clearRealtimeBuffer,
@@ -567,7 +566,8 @@ export function useRealtimeChatHistory({
   useEffect(() => {
     if (!onCompactionStart) return
     if (realtimeMessages.length === 0) return
-    const latest = realtimeMessages[realtimeMessages.length - 1]
+    const latest = realtimeMessages.at(-1)
+    if (!latest) return
 
     const textCandidates = [
       textFromMessage(latest),

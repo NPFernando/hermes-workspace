@@ -27,7 +27,8 @@ function _indexKey(clientId: string, optimisticId: string): string {
 function rebuildClientIdIndex(messages: Array<ChatMessage>): void {
   _clientIdIndex.clear();
   for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i];
+    const msg = messages.at(i);
+    if (!msg) continue;
     const cid = getMessageClientId(msg);
     const oid = getMessageOptimisticId(msg);
     if (cid || oid) {
@@ -269,7 +270,8 @@ function replaceMatchingOptimisticUserMessage(
 
   if (matchIndex === -1) return null
 
-  const existing = messages[matchIndex]
+  const existing = messages.at(matchIndex)
+  if (!existing) return null
   const replacement: ChatMessage = {
     ...existing,
     ...incomingMessage,
@@ -455,15 +457,16 @@ export function updateHistoryMessageByClientIdEverywhere(
   for (const [queryKey, data] of historyQueries) {
     const current = data
     const messages = Array.isArray(current?.messages) ? current.messages : []
-    let changed = false
+    const hasMatchingMessage = messages.some((message) =>
+      isMatchingClientMessage(message, normalizedClientId, optimisticId),
+    )
+    if (!hasMatchingMessage) continue
     const nextMessages = messages.map((message) => {
       if (!isMatchingClientMessage(message, normalizedClientId, optimisticId)) {
         return message
       }
-      changed = true
       return updater(message)
     })
-    if (!changed) continue
     queryClient.setQueryData(queryKey, {
       sessionKey: current?.sessionKey ?? '',
       sessionId: current?.sessionId,
@@ -556,7 +559,8 @@ export function reconcileSessionDraft(
         return sessions
       }
 
-      const source = sessions[sourceIndex]
+      const source = sessions.at(sourceIndex)
+      if (!source) return sessions
       const targetIndex = sessions.findIndex((session, index) => {
         if (index === sourceIndex) return false
         return (

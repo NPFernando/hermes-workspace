@@ -80,6 +80,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
 
   if (!artifact) return null
 
+  const activeArtifact = artifact
   const canToggleSource = artifact.type === 'html' || artifact.type === 'svg' || artifact.type === 'markdown' || artifact.type === 'md'
   const activeContent = isEditing ? editedContent : artifact.content
 
@@ -94,7 +95,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
   }
 
   function handleDownload() {
-    const filename = inferDownloadFilename(artifact.title, artifact.type)
+    const filename = inferDownloadFilename(activeArtifact.title, activeArtifact.type)
     const blob = new Blob([activeContent], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
