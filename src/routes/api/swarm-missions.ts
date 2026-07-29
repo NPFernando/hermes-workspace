@@ -21,7 +21,7 @@ function cleanString(value: unknown): string | null {
 export const Route = createFileRoute('/api/swarm-missions')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

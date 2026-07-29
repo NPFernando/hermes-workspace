@@ -229,7 +229,7 @@ function hasOpenAiCodexAuth(profilePath: string): boolean {
 export const Route = createFileRoute('/api/swarm-health')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }

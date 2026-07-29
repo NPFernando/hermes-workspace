@@ -23,7 +23,7 @@ function validWorkerId(value: unknown): string | null {
 export const Route = createFileRoute('/api/swarm-lifecycle')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         const url = new URL(request.url)
         const requested = validWorkerId(url.searchParams.get('workerId'))
