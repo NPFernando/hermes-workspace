@@ -418,6 +418,9 @@ export type FinanceSettings = {
   autoRefinement?: Record<string, unknown>
   /** Gates non-critical (info/warning) Telegram delivery in alerts.ts. Off by default — critical alerts always send regardless. */
   alertsEnabled?: boolean
+  strategyDecayDetection?: Record<string, unknown>
+  /** Per-strategy validated backtest baselines, keyed by strategyId. See strategy-decay.ts. */
+  strategyBaselines?: Record<string, unknown>
 }
 
 export type FinanceDatabase = {

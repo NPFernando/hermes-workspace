@@ -66,6 +66,12 @@ import {
   readFinanceStore,
   writeFinanceStore,
 } from './finance-store'
+import {
+  detectStrategyDecay,
+  parseStrategyBaselines,
+  resolveStrategyDecayConfig,
+} from './strategy-decay'
+import type { StrategyDecayResult } from './strategy-decay'
 import type { BucketStats, EntryFeatureVector } from './trading-pattern-veto'
 import type { Candle, CouncilMember, StrategyScore } from './trading-strategies'
 import type { GuardianBlock, GuardianConfig } from './trading-guardian'
@@ -1449,6 +1455,24 @@ async function runTradingCycleInner(
   if (executionMode === 'live' && quality.recommendedAdjustments.pauseLive) {
     return bail(`decision quality keeps live paused: ${quality.status}`)
   }
+  // Audit-log only, once per cycle (never once per dashboard poll, since
+  // decisionQualityReport() is also called from read-only API routes) —
+  // this never blocks or disables a strategy, matching the repo's
+  // precedent of flagging risk gaps for explicit review. See
+  // strategy-decay.ts's module doc.
+  for (const strategy of quality.byStrategy) {
+    if (strategy.decay?.decayed) {
+      appendAuditLog('strategy_decay_detected', {
+        strategyId: strategy.strategyId,
+        reason: strategy.decay.reason,
+        winRateDrop: strategy.decay.winRateDrop,
+        expectancyFlipped: strategy.decay.expectancyFlipped,
+        liveTrades: strategy.trades,
+        liveWinRate: strategy.winRate,
+        liveAvgPnlQuote: strategy.avgPnlQuote,
+      })
+    }
+  }
 
   let client = options.client
   if (!client) {
@@ -2460,6 +2484,8 @@ export interface StrategyQuality {
   score: number
   lossStreak: number
   recommendation: StrategyQualityRecommendation
+  /** Live-vs-validated-backtest comparison; null when disabled or no baseline exists. */
+  decay: StrategyDecayResult | null
 }
 
 export interface ShadowComparison {
@@ -2814,6 +2840,12 @@ export function decisionQualityReport(): DecisionQualityReport {
       ) / shadowComparisons.length
     : 0
   const scores = [...loadScores(rows).values()]
+  const decayConfig = resolveStrategyDecayConfig(
+    (db.settings as Record<string, unknown>).strategyDecayDetection,
+  )
+  const strategyBaselines = parseStrategyBaselines(
+    (db.settings as Record<string, unknown>).strategyBaselines,
+  )
   const findings: Array<DecisionQualityFinding> = []
   const closedCount = realTrades.length
   const recentPnlQuote = totalPnl(recentTrades)
@@ -2988,16 +3020,22 @@ export function decisionQualityReport(): DecisionQualityReport {
         (score) =>
           score.trades > 0 || score.score !== 0 || score.lossStreak > 0,
       )
-      .map((score) => ({
-        strategyId: score.strategyId,
-        trades: score.trades,
-        winRate: score.winRate,
-        totalPnlQuote: score.totalPnlQuote,
-        avgPnlQuote: score.avgPnlQuote,
-        score: score.score,
-        lossStreak: score.lossStreak,
-        recommendation: strategyRecommendation(score, config.guardian),
-      }))
+      .map((score) => {
+        const baseline = strategyBaselines.get(score.strategyId)
+        return {
+          strategyId: score.strategyId,
+          trades: score.trades,
+          winRate: score.winRate,
+          totalPnlQuote: score.totalPnlQuote,
+          avgPnlQuote: score.avgPnlQuote,
+          score: score.score,
+          lossStreak: score.lossStreak,
+          recommendation: strategyRecommendation(score, config.guardian),
+          decay: baseline
+            ? detectStrategyDecay(baseline, score, decayConfig)
+            : null,
+        }
+      })
       .sort(
         (a, b) =>
           a.recommendation.localeCompare(b.recommendation) || b.score - a.score,

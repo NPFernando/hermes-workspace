@@ -713,6 +713,97 @@ export const Route = createFileRoute('/api/finance')({
             appendAuditLog('rebalance_config_updated', { enabled: rc.enabled })
             return json(financePayload())
           }
+          if (action === 'set_strategy_decay_config') {
+            // Off by default — mirrors autoRefinementEnabled and the other
+            // engine flags above. Detection only ever audit-logs
+            // ('strategy_decay_detected'); it never disables a strategy or
+            // changes sizing itself. See strategy-decay.ts.
+            const cfg =
+              body.config && typeof body.config === 'object'
+                ? (body.config as JsonRecord)
+                : {}
+            const inRange = (
+              value: unknown,
+              min: number,
+              max: number,
+            ): number | undefined =>
+              typeof value === 'number' &&
+              Number.isFinite(value) &&
+              value >= min &&
+              value <= max
+                ? value
+                : undefined
+            const db = readFinanceStore()
+            const settings = db.settings as Record<string, unknown>
+            const dc = (
+              settings.strategyDecayDetection &&
+              typeof settings.strategyDecayDetection === 'object'
+                ? { ...(settings.strategyDecayDetection as Record<string, unknown>) }
+                : {}
+            ) as Record<string, unknown>
+            if (typeof cfg.enabled === 'boolean') dc.enabled = cfg.enabled
+            const winRateDropThreshold = inRange(cfg.winRateDropThreshold, 0.01, 1)
+            if (winRateDropThreshold !== undefined)
+              dc.winRateDropThreshold = winRateDropThreshold
+            const minTrailingTrades = inRange(cfg.minTrailingTrades, 1, 1000)
+            if (minTrailingTrades !== undefined)
+              dc.minTrailingTrades = Math.floor(minTrailingTrades)
+            settings.strategyDecayDetection = dc
+            writeFinanceStore(db)
+            appendAuditLog('strategy_decay_config_updated', dc)
+            return json(financePayload())
+          }
+          if (action === 'save_strategy_baseline') {
+            // Persists a strategy's validated backtest summary so live
+            // performance can later be compared against it (see
+            // strategy-decay.ts / decisionQualityReport's byStrategy[].decay).
+            // Intentionally written to finance-store settings, NOT the
+            // research-store Postgres schema — research-store is documented
+            // as write-only/analysis-only and is never read back by live
+            // engines; this value IS read back every cycle, so it belongs in
+            // the same operational store as every other engine config.
+            const body2 = body as {
+              strategyId?: unknown
+              winRate?: unknown
+              avgPnlQuote?: unknown
+              trades?: unknown
+            }
+            if (
+              typeof body2.strategyId !== 'string' ||
+              body2.strategyId.length === 0 ||
+              typeof body2.winRate !== 'number' ||
+              !Number.isFinite(body2.winRate) ||
+              typeof body2.avgPnlQuote !== 'number' ||
+              !Number.isFinite(body2.avgPnlQuote) ||
+              typeof body2.trades !== 'number' ||
+              !Number.isFinite(body2.trades)
+            ) {
+              return json(
+                { ok: false, error: 'strategyId, winRate, avgPnlQuote, trades are required' },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            const settings = db.settings as Record<string, unknown>
+            const baselines = (
+              settings.strategyBaselines &&
+              typeof settings.strategyBaselines === 'object'
+                ? { ...(settings.strategyBaselines as Record<string, unknown>) }
+                : {}
+            ) as Record<string, unknown>
+            const baseline = {
+              strategyId: body2.strategyId,
+              winRate: body2.winRate,
+              avgPnlQuote: body2.avgPnlQuote,
+              trades: Math.floor(body2.trades),
+              computedAt: new Date().toISOString(),
+            }
+            baselines[body2.strategyId] = baseline
+            settings.strategyBaselines = baselines
+            writeFinanceStore(db)
+            appendAuditLog('strategy_baseline_saved', baseline)
+            return json(financePayload())
+          }
           if (action === 'set_llm_config') {
             // Only `enabled` is exposed here — same rationale as
             // set_rebalance_config above (this engine also shares the
