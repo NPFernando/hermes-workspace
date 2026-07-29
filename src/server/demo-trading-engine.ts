@@ -50,6 +50,7 @@ import {
   dayKey,
   weekKey,
 } from './trading-guardian'
+import { sendAlert } from './alerts'
 import { isConnectivityBreakerTripped } from './connectivity-breaker'
 import {
   fetchTopTraderLongShortRatio,
@@ -1547,6 +1548,12 @@ async function runTradingCycleInner(
       strategyId,
       executionMode,
       blocks: verdictBlocks,
+    })
+    sendAlert({
+      severity: 'warning',
+      title: `Guardian blocked ${symbol}/${strategyId}`,
+      detail: verdictBlocks.map((b) => `${b.rule}: ${b.detail}`).join('\n'),
+      source: 'trading-guardian',
     })
   }
 

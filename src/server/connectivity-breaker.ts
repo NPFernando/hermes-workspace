@@ -19,13 +19,11 @@
  * (matches this codebase's existing "serious things need deliberate
  * re-arming" convention, e.g. the emergency kill switch).
  */
-import { spawn } from 'node:child_process'
-import { resolveHermesBin } from './hermes-bin'
+import { sendAlert } from './alerts'
 import { readFinanceStore, writeFinanceStore } from './finance-store'
 
 const CONSECUTIVE_FAILURE_THRESHOLD = 3
 const FAILURE_WINDOW_MS = 30 * 60_000 // 30 minutes
-const ALERT_TARGET = 'telegram:2130622225'
 
 export interface ConnectivityBreakerState {
   consecutiveCredentialFailures: number
@@ -56,26 +54,15 @@ export function isCredentialFailureMessage(message: string): boolean {
 }
 
 function sendConnectivityBreakerAlert(reason: string): void {
-  if (process.env.VITEST || process.env.NODE_ENV === 'test') return
-  try {
-    const child = spawn(
-      resolveHermesBin(),
-      [
-        'send',
-        '--to',
-        ALERT_TARGET,
-        '-q',
-        `🔴 Connectivity breaker tripped — all trading engines paused.\n${reason}\nReset via reset_connectivity_breaker once the exchange credentials are verified.`,
-      ],
-      { stdio: 'ignore', detached: true },
-    )
-    child.on('error', () => {
-      /* non-fatal */
-    })
-    child.unref()
-  } catch {
-    /* non-fatal — must never throw back into a trading cycle */
-  }
+  // 'critical' always attempts delivery regardless of settings.alertsEnabled
+  // — see alerts.ts's doc comment. Preserves this alert's pre-existing
+  // unconditional-on-trip behavior.
+  sendAlert({
+    severity: 'critical',
+    title: 'Connectivity breaker tripped — all trading engines paused',
+    detail: `${reason}\nReset via reset_connectivity_breaker once the exchange credentials are verified.`,
+    source: 'connectivity-breaker',
+  })
 }
 
 /**

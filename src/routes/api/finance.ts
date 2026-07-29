@@ -407,6 +407,18 @@ export const Route = createFileRoute('/api/finance')({
             appendAuditLog('connectivity_breaker_reset', { source: 'finance_api' })
             return json(financePayload())
           }
+          if (action === 'set_alerts_config') {
+            // Gates non-critical (info/warning) Telegram delivery in
+            // alerts.ts. Off by default, ships disarmed like every other
+            // new toggle this session — critical alerts (e.g. the
+            // connectivity breaker tripping) always send regardless.
+            const enabled = body.enabled === true
+            const db = readFinanceStore()
+            db.settings.alertsEnabled = enabled
+            writeFinanceStore(db)
+            appendAuditLog('alerts_config_updated', { enabled, source: 'finance_api' })
+            return json(financePayload())
+          }
           if (action === 'set_demo_config' || action === 'set_engine_config') {
             // Update the demo engine's tunable knobs (settings.demoTrading), merged
             // over defaults by resolveEngineConfig. Values are range-validated; anything

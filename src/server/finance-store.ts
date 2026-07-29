@@ -416,6 +416,8 @@ export type FinanceSettings = {
   demoTradingLlm?: Record<string, unknown>
   demoTradingRebalance?: Record<string, unknown>
   autoRefinement?: Record<string, unknown>
+  /** Gates non-critical (info/warning) Telegram delivery in alerts.ts. Off by default — critical alerts always send regardless. */
+  alertsEnabled?: boolean
 }
 
 export type FinanceDatabase = {
