@@ -6,7 +6,7 @@ import { getUserProfile } from '../../server/google-oauth'
 export const Route = createFileRoute('/api/user-profile')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
