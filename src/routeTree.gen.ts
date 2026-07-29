@@ -167,6 +167,7 @@ import { Route as ApiAutoRefinementRouteImport } from './routes/api/auto-refinem
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as ApiApprovalsRouteImport } from './routes/api/approvals'
 import { Route as ApiAppVersionRouteImport } from './routes/api/app-version'
 import { Route as ApiAgentPauseRouteImport } from './routes/api/agent-pause'
 import { Route as ApiAgentDispatchRouteImport } from './routes/api/agent-dispatch'
@@ -238,6 +239,8 @@ import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-pro
 import { Route as ApiClaudeJobsJobIdRouteImport } from './routes/api/claude-jobs.$jobId'
 import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth.google'
 import { Route as ApiArtifactsArtifactIdRouteImport } from './routes/api/artifacts.$artifactId'
+import { Route as ApiApprovalsResolveRouteImport } from './routes/api/approvals.resolve'
+import { Route as ApiApprovalsPendingRouteImport } from './routes/api/approvals.pending'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
 import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
@@ -1039,6 +1042,11 @@ const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   path: '/api/artifacts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiApprovalsRoute = ApiApprovalsRouteImport.update({
+  id: '/api/approvals',
+  path: '/api/approvals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAppVersionRoute = ApiAppVersionRouteImport.update({
   id: '/api/app-version',
   path: '/api/app-version',
@@ -1398,6 +1406,16 @@ const ApiArtifactsArtifactIdRoute = ApiArtifactsArtifactIdRouteImport.update({
   path: '/$artifactId',
   getParentRoute: () => ApiArtifactsRoute,
 } as any)
+const ApiApprovalsResolveRoute = ApiApprovalsResolveRouteImport.update({
+  id: '/resolve',
+  path: '/resolve',
+  getParentRoute: () => ApiApprovalsRoute,
+} as any)
+const ApiApprovalsPendingRoute = ApiApprovalsPendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => ApiApprovalsRoute,
+} as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -1478,6 +1496,7 @@ export interface FileRoutesByFullPath {
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/app-version': typeof ApiAppVersionRoute
+  '/api/approvals': typeof ApiApprovalsRouteWithChildren
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -1611,6 +1630,8 @@ export interface FileRoutesByFullPath {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/approvals/pending': typeof ApiApprovalsPendingRoute
+  '/api/approvals/resolve': typeof ApiApprovalsResolveRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
@@ -1717,6 +1738,7 @@ export interface FileRoutesByTo {
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/app-version': typeof ApiAppVersionRoute
+  '/api/approvals': typeof ApiApprovalsRouteWithChildren
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -1850,6 +1872,8 @@ export interface FileRoutesByTo {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/approvals/pending': typeof ApiApprovalsPendingRoute
+  '/api/approvals/resolve': typeof ApiApprovalsResolveRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
@@ -1958,6 +1982,7 @@ export interface FileRoutesById {
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/app-version': typeof ApiAppVersionRoute
+  '/api/approvals': typeof ApiApprovalsRouteWithChildren
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
@@ -2091,6 +2116,8 @@ export interface FileRoutesById {
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/approvals/pending': typeof ApiApprovalsPendingRoute
+  '/api/approvals/resolve': typeof ApiApprovalsResolveRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
@@ -2200,6 +2227,7 @@ export interface FileRouteTypes {
     | '/api/agent-dispatch'
     | '/api/agent-pause'
     | '/api/app-version'
+    | '/api/approvals'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -2333,6 +2361,8 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/approvals/pending'
+    | '/api/approvals/resolve'
     | '/api/artifacts/$artifactId'
     | '/api/auth/google'
     | '/api/claude-jobs/$jobId'
@@ -2439,6 +2469,7 @@ export interface FileRouteTypes {
     | '/api/agent-dispatch'
     | '/api/agent-pause'
     | '/api/app-version'
+    | '/api/approvals'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -2572,6 +2603,8 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat'
     | '/settings'
+    | '/api/approvals/pending'
+    | '/api/approvals/resolve'
     | '/api/artifacts/$artifactId'
     | '/api/auth/google'
     | '/api/claude-jobs/$jobId'
@@ -2679,6 +2712,7 @@ export interface FileRouteTypes {
     | '/api/agent-dispatch'
     | '/api/agent-pause'
     | '/api/app-version'
+    | '/api/approvals'
     | '/api/artifacts'
     | '/api/auth'
     | '/api/auth-check'
@@ -2812,6 +2846,8 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/approvals/pending'
+    | '/api/approvals/resolve'
     | '/api/artifacts/$artifactId'
     | '/api/auth/google'
     | '/api/claude-jobs/$jobId'
@@ -2920,6 +2956,7 @@ export interface RootRouteChildren {
   ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentPauseRoute: typeof ApiAgentPauseRoute
   ApiAppVersionRoute: typeof ApiAppVersionRoute
+  ApiApprovalsRoute: typeof ApiApprovalsRouteWithChildren
   ApiArtifactsRoute: typeof ApiArtifactsRouteWithChildren
   ApiAuthRoute: typeof ApiAuthRouteWithChildren
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
@@ -4201,6 +4238,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArtifactsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/approvals': {
+      id: '/api/approvals'
+      path: '/api/approvals'
+      fullPath: '/api/approvals'
+      preLoaderRoute: typeof ApiApprovalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/app-version': {
       id: '/api/app-version'
       path: '/api/app-version'
@@ -4698,6 +4742,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArtifactsArtifactIdRouteImport
       parentRoute: typeof ApiArtifactsRoute
     }
+    '/api/approvals/resolve': {
+      id: '/api/approvals/resolve'
+      path: '/resolve'
+      fullPath: '/api/approvals/resolve'
+      preLoaderRoute: typeof ApiApprovalsResolveRouteImport
+      parentRoute: typeof ApiApprovalsRoute
+    }
+    '/api/approvals/pending': {
+      id: '/api/approvals/pending'
+      path: '/pending'
+      fullPath: '/api/approvals/pending'
+      preLoaderRoute: typeof ApiApprovalsPendingRouteImport
+      parentRoute: typeof ApiApprovalsRoute
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -4776,6 +4834,20 @@ const SettingsRouteChildren: SettingsRouteChildren = {
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
+)
+
+interface ApiApprovalsRouteChildren {
+  ApiApprovalsPendingRoute: typeof ApiApprovalsPendingRoute
+  ApiApprovalsResolveRoute: typeof ApiApprovalsResolveRoute
+}
+
+const ApiApprovalsRouteChildren: ApiApprovalsRouteChildren = {
+  ApiApprovalsPendingRoute: ApiApprovalsPendingRoute,
+  ApiApprovalsResolveRoute: ApiApprovalsResolveRoute,
+}
+
+const ApiApprovalsRouteWithChildren = ApiApprovalsRoute._addFileChildren(
+  ApiApprovalsRouteChildren,
 )
 
 interface ApiArtifactsRouteChildren {
@@ -5046,6 +5118,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentPauseRoute: ApiAgentPauseRoute,
   ApiAppVersionRoute: ApiAppVersionRoute,
+  ApiApprovalsRoute: ApiApprovalsRouteWithChildren,
   ApiArtifactsRoute: ApiArtifactsRouteWithChildren,
   ApiAuthRoute: ApiAuthRouteWithChildren,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
