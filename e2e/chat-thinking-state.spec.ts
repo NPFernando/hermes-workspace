@@ -1,27 +1,41 @@
 import { test, expect } from '@playwright/test'
 
+const completedSessionKey =
+  process.env.HERMES_WORKSPACE_E2E_COMPLETED_SESSION?.trim() || ''
+
 test.describe('Chat thinking state #449', () => {
-  test('should not show stale thinking state after page refresh for completed session', async ({ page }) => {
+  test.skip(
+    !completedSessionKey,
+    'Set HERMES_WORKSPACE_E2E_COMPLETED_SESSION to a completed chat session key.',
+  )
+
+  test('should not show stale thinking state after page refresh for completed session', async ({
+    page,
+  }) => {
     // This test simulates the exact bug scenario described in Issue #449:
     // User had a conversation, the stream completed (clearing waiting state),
     // page refreshes, and the assistant briefly shows "thinking" state.
 
-    // Use an existing session that has completed messages
-    const SESSION_PATH = '/chat/20260515_150106_4be3a000'
+    // CI provides a completed session fixture; no production session is baked
+    // into the suite, so the test remains reproducible across environments.
+    const sessionPath = `/chat/${encodeURIComponent(completedSessionKey)}`
 
     // Inject a stale waiting entry for THIS session before the page loads
-    await page.addInitScript((sessionKey) => {
-      window.sessionStorage.setItem(
-        `claude_waiting_${sessionKey}`,
-        JSON.stringify({
-          since: Date.now() - 30000, // 30s ago — within the 120s TTL
-          runId: 'stale-run-id',
-        }),
-      )
-    }, SESSION_PATH.replace('/chat/', ''))
+    await page.addInitScript(
+      (sessionKey) => {
+        window.sessionStorage.setItem(
+          `claude_waiting_${sessionKey}`,
+          JSON.stringify({
+            since: Date.now() - 30000, // 30s ago — within the 120s TTL
+            runId: 'stale-run-id',
+          }),
+        )
+      },
+      completedSessionKey,
+    )
 
     // Navigate directly to the session
-    await page.goto(SESSION_PATH)
+    await page.goto(sessionPath)
     await page.waitForLoadState('load')
 
     // Dismiss the "Hermes updated" modal if present
@@ -44,10 +58,14 @@ test.describe('Chat thinking state #449', () => {
     expect(thinkingCount).toBe(0)
 
     // VERIFY: The stale sessionStorage entry was cleaned up
-    const staleKey = SESSION_PATH.replace('/chat/', '')
-    const hasStaleEntry = await page.evaluate((key) => {
-      return window.sessionStorage.getItem(`claude_waiting_${key}`) !== null
-    }, staleKey)
-    expect(hasStaleEntry).toBe(false)
+    await expect
+      .poll(
+        () =>
+          page.evaluate((key) => {
+            return window.sessionStorage.getItem(`claude_waiting_${key}`)
+          }, completedSessionKey),
+        { timeout: 5_000 },
+      )
+      .toBeNull()
   })
 })
