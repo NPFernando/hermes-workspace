@@ -801,6 +801,135 @@ export const takerImbalanceStrategy: Strategy = {
   },
 }
 
+/**
+ * Aggregates a trailing run of 1h candles into closed 4h bars (real OHLCV
+ * aggregation: open=first, high=max, low=min, close=last, volume=sum),
+ * grouped on Binance's actual 4h UTC boundaries (openTime is always
+ * hour-aligned in our cache, so `floor(openTime / 4h) ` buckets correctly
+ * without needing wall-clock lookups). Drops a trailing partial bucket (an
+ * in-progress 4h bar whose last constituent hour hasn't closed yet) so the
+ * caller never sees a 4h "close" that hasn't actually happened —
+ * unlike `sma(closes, longPeriod)` (the mechanism `trend_pullback` already
+ * uses for its trend filter), which is just a smoothed view of the *same*
+ * 1h series, this produces genuinely different OHLC structure computed from
+ * a coarser timeframe's own swing highs/lows.
+ */
+export function resampleTo4h(candles: Array<Candle>): Array<Candle> {
+  const FOUR_HOURS_MS = 4 * 60 * 60 * 1000
+  const buckets = new Map<number, Array<Candle>>()
+  for (const c of candles) {
+    const bucketKey = Math.floor(c.openTime / FOUR_HOURS_MS)
+    const existing = buckets.get(bucketKey)
+    if (existing) existing.push(c)
+    else buckets.set(bucketKey, [c])
+  }
+  const sortedKeys = [...buckets.keys()].sort((a, b) => a - b)
+  const out: Array<Candle> = []
+  for (const key of sortedKeys) {
+    const group = buckets.get(key)
+    if (group === undefined || group.length < 4) continue // drop partial trailing bucket
+    const first = group[0]
+    const last = group[group.length - 1]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (first === undefined || last === undefined) continue
+    out.push({
+      openTime: first.openTime,
+      open: first.open,
+      high: Math.max(...group.map((g) => g.high)),
+      low: Math.min(...group.map((g) => g.low)),
+      close: last.close,
+      volume: group.reduce((s, g) => s + g.volume, 0),
+    })
+  }
+  return out
+}
+
+/**
+ * EXPERIMENTAL — added 2026-07-30 for backtest research only, unvalidated
+ * for production. Multi-timeframe trend filter: directional bias comes from
+ * a genuinely coarser 4h series (resampleTo4h), not a longer-period SMA on
+ * the same 1h series like trend_pullback uses — different information
+ * (real 4h swing structure vs. a smoothed 1h view). Entry timing stays on
+ * 1h: a shallow pullback to a short SMA that then recovers above a faster
+ * SMA, same recovery mechanics as trend_pullback so this isolates the
+ * timeframe-source variable rather than testing two unrelated ideas at once.
+ */
+export const mtf4hPullbackStrategy: Strategy = {
+  id: 'mtf_4h_pullback',
+  name: 'Multi-Timeframe 4h Trend + 1h Pullback',
+  description:
+    'Directional bias from a resampled 4h SMA regime; entry timing on a 1h pullback/recovery.',
+  minCandles: 4 * 51 + 10,
+  evaluate(candles, params) {
+    const trend4hPeriod = Math.round(params?.trend4hPeriod ?? 50)
+    const pullbackPeriod = Math.round(params?.pullbackPeriod ?? 20)
+    const triggerPeriod = Math.round(params?.triggerPeriod ?? 5)
+    const pullbackLookback = Math.round(params?.pullbackLookback ?? 8)
+    const touchBand = params?.touchBand ?? 0.005
+    const maxExtension = params?.maxExtension ?? 0.03
+
+    const fourH = resampleTo4h(candles)
+    if (fourH.length < trend4hPeriod + 1)
+      return HOLD('not enough closed 4h bars for trend filter')
+    const fourHCloses = fourH.map((c) => c.close)
+    const trend4h = sma(fourHCloses, trend4hPeriod)
+    const lastFourHClose = fourHCloses[fourHCloses.length - 1]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (trend4h == null || lastFourHClose === undefined)
+      return HOLD('4h trend unavailable')
+    if (lastFourHClose < trend4h)
+      return HOLD(`below 4h SMA(${trend4hPeriod}) regime — no long bias`)
+
+    const closes = candles.map((c) => c.close)
+    if (closes.length < Math.max(pullbackPeriod, triggerPeriod) + 2)
+      return HOLD('not enough 1h candles for entry timing')
+    const prevCloses = closes.slice(0, -1)
+    const last = closes[closes.length - 1]
+    const pullbackNow = sma(closes, pullbackPeriod)
+    const triggerNow = sma(closes, triggerPeriod)
+    const triggerPrev = sma(prevCloses, triggerPeriod)
+    // See docs/tsconfig-strictness-rollout.md.
+    /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+    if (
+      last === undefined ||
+      pullbackNow == null ||
+      triggerNow == null ||
+      triggerPrev == null
+    )
+      return HOLD('1h pullback averages unavailable')
+    /* eslint-enable @typescript-eslint/no-unnecessary-condition */
+
+    const recent = closes.slice(
+      Math.max(0, closes.length - 1 - pullbackLookback),
+      -1,
+    )
+    const pulledBack = recent.some(
+      (close) => close <= pullbackNow * (1 + touchBand),
+    )
+    const secondLast = closes[closes.length - 2]
+    const recovered =
+      last > triggerNow &&
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      secondLast !== undefined &&
+      secondLast <= triggerPrev
+    const stillNearPullback = last <= pullbackNow * (1 + maxExtension)
+    if (pulledBack && recovered && stillNearPullback) {
+      const recovery = Math.max(0, (last - triggerNow) / last)
+      const trendStrength = (lastFourHClose - trend4h) / trend4h
+      const trendBoost = Math.min(0.2, trendStrength * 20)
+      const confidence = Math.min(1, 0.35 + recovery * 80 + trendBoost)
+      return {
+        signal: 'BUY',
+        confidence,
+        reason: `1h recovery above SMA(${triggerPeriod}) after pullback, inside 4h SMA(${trend4hPeriod}) uptrend`,
+      }
+    }
+    return HOLD('no qualifying multi-timeframe pullback recovery')
+  },
+}
+
 export const STRATEGIES: Array<Strategy> = [
   smaCrossoverStrategy,
   rsiReversionStrategy,
@@ -810,6 +939,7 @@ export const STRATEGIES: Array<Strategy> = [
   chaikinVolumeStrategy,
   keltnerChannelStrategy,
   takerImbalanceStrategy,
+  mtf4hPullbackStrategy,
 ]
 
 export function getStrategy(id: string): Strategy | undefined {

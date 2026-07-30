@@ -619,6 +619,19 @@ export function runBacktest(
   const strategies = STRATEGIES.filter((s) =>
     config.enabledStrategies.includes(s.id),
   )
+  // The shared per-step window must cover the neediest enabled strategy's
+  // minCandles, not just config.windowSize -- otherwise a strategy whose
+  // minCandles exceeds windowSize (100 by default) silently never clears
+  // its own warmup check and produces zero trades regardless of real signal
+  // quality. Same bug class as the 2026-07-28 volatility-regime gate fix
+  // (see docs/trading-engine.md), which needed its own independently-sized
+  // slice for exactly this reason -- this generalizes that fix to any
+  // future strategy with minCandles > windowSize instead of requiring each
+  // one to special-case its own slice.
+  const effectiveWindowSize = Math.max(
+    config.windowSize,
+    ...strategies.map((s) => s.minCandles),
+  )
 
   // Unified chronological timeline across symbols.
   const timeline = [
@@ -715,7 +728,7 @@ export function runBacktest(
       const previousClose = lastClose[symbol]
       lastClose[symbol] = price
       const now = new Date(candle.openTime + 1) // decision time ≈ candle close
-      const window = series.slice(Math.max(0, i + 1 - config.windowSize), i + 1)
+      const window = series.slice(Math.max(0, i + 1 - effectiveWindowSize), i + 1)
 
       const members: Array<CouncilMember> = strategies.map((s) => ({
         strategyId: s.id,

@@ -15,8 +15,10 @@ import {
   keltnerChannelStrategy,
   kellyFraction,
   macdMomentumStrategy,
+  mtf4hPullbackStrategy,
   realizedVolPercentile,
   regimeAllowsLong,
+  resampleTo4h,
   rsi,
   rsiReversionStrategy,
   scaledQuoteSize,
@@ -751,5 +753,94 @@ describe('kellyFraction', () => {
     expect(kellyFraction(0.6, 100, 0, 0.25)).toBe(0) // no loss data yet
     expect(kellyFraction(0, 100, 50, 0.25)).toBe(0) // never won
     expect(kellyFraction(1, 100, 50, 0.25)).toBe(0) // never lost (1 - winRate) singularity guard
+  })
+})
+
+describe('resampleTo4h', () => {
+  const HOUR = 60 * 60 * 1000
+  const hourlyFrom = (
+    startOpenTime: number,
+    closes: Array<number>,
+  ): Array<Candle> =>
+    closes.map((c, i) => ({
+      openTime: startOpenTime + i * HOUR,
+      open: c,
+      high: c + 1,
+      low: c - 1,
+      close: c,
+      volume: 10,
+    }))
+
+  it('aggregates 4 consecutive hourly candles into one 4h bar with real OHLCV', () => {
+    // openTime 0 is a 4h boundary (0 % (4*HOUR) === 0).
+    const hourly = hourlyFrom(0, [100, 102, 98, 101])
+    const fourH = resampleTo4h(hourly)
+    expect(fourH).toHaveLength(1)
+    expect(fourH[0]).toMatchObject({
+      openTime: 0,
+      open: 100, // first candle's open
+      high: 103, // max of (100+1, 102+1, 98+1, 101+1)
+      low: 97, // min of (100-1, 102-1, 98-1, 101-1)
+      close: 101, // last candle's close
+      volume: 40, // sum of 4x volume=10
+    })
+  })
+
+  it('drops a trailing partial bucket rather than treating it as closed', () => {
+    // 6 hourly candles = one full 4h bucket + 2 leftover hours, no lookahead.
+    const hourly = hourlyFrom(0, [100, 101, 102, 103, 104, 105])
+    const fourH = resampleTo4h(hourly)
+    expect(fourH).toHaveLength(1)
+    expect(fourH[0]?.close).toBe(103)
+  })
+
+  it('buckets on real Binance 4h UTC boundaries, not a sliding window from array start', () => {
+    // Start mid-bucket (openTime = 2h into a 4h window) — the first 2 candles
+    // belong to an already-in-progress bucket that never completes (no data
+    // before it), so only the second full 4h window (candles 3-6) should
+    // resolve into a bar.
+    const hourly = hourlyFrom(2 * HOUR, [1, 2, 3, 4, 5, 6])
+    const fourH = resampleTo4h(hourly)
+    expect(fourH).toHaveLength(1)
+    expect(fourH[0]?.openTime).toBe(4 * HOUR)
+    expect(fourH[0]?.close).toBe(6)
+  })
+
+  it('returns an empty array with fewer than 4 hourly candles', () => {
+    expect(resampleTo4h(hourlyFrom(0, [100, 101]))).toEqual([])
+  })
+})
+
+describe('mtf4hPullbackStrategy', () => {
+  it('holds when there are not enough candles for the 4h trend filter', () => {
+    const hourly = Array.from({ length: 20 }, (_, i) => ({
+      openTime: i * 60 * 60 * 1000,
+      open: 100,
+      high: 101,
+      low: 99,
+      close: 100,
+      volume: 10,
+    }))
+    const decision = mtf4hPullbackStrategy.evaluate(hourly)
+    expect(decision.signal).toBe('HOLD')
+  })
+
+  it('holds when the 4h close is below the 4h SMA regime (no long bias)', () => {
+    const HOUR = 60 * 60 * 1000
+    // A long declining series: 4h closes trend downward, so the last 4h
+    // close should sit below its own trailing SMA — no long bias.
+    const closes = Array.from({ length: 250 }, (_, i) => 200 - i * 0.3)
+    const hourly = closes.map((c, i) => ({
+      openTime: i * HOUR,
+      open: c,
+      high: c + 0.5,
+      low: c - 0.5,
+      close: c,
+      volume: 10,
+    }))
+    const decision = mtf4hPullbackStrategy.evaluate(hourly, {
+      trend4hPeriod: 10,
+    })
+    expect(decision.signal).not.toBe('BUY')
   })
 })
