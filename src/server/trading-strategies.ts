@@ -53,7 +53,15 @@ const HOLD = (reason: string): StrategyDecision => ({
 export function sma(values: Array<number>, period: number): number | null {
   if (values.length < period) return null
   let sum = 0
-  for (let i = values.length - period; i < values.length; i++) sum += values[i]
+  for (let i = values.length - period; i < values.length; i++) {
+    const v = values[i]
+    // See docs/tsconfig-strictness-rollout.md — loop bound guarantees `i` is
+    // in range, but the current lax tsconfig doesn't reflect that in `v`'s
+    // type, so this defends against a risk types today don't show.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (v === undefined) return null
+    sum += v
+  }
   return sum / period
 }
 
@@ -71,7 +79,12 @@ export function atr(candles: Array<Candle>, period: number): number | null {
   if (roundedPeriod <= 0 || candles.length < roundedPeriod + 1) return null
   let sum = 0
   for (let i = candles.length - roundedPeriod; i < candles.length; i++) {
-    sum += trueRange(candles[i], candles[i - 1].close)
+    const candle = candles[i]
+    const prevCandle = candles[i - 1]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (candle === undefined || prevCandle === undefined) return null
+    sum += trueRange(candle, prevCandle.close)
   }
   return sum / roundedPeriod
 }
@@ -90,11 +103,16 @@ export function adx(candles: Array<Candle>, period: number): number | null {
   let sumMinusDM = 0
   let sumTR = 0
   for (let i = candles.length - roundedPeriod; i < candles.length; i++) {
-    const upMove = candles[i].high - candles[i - 1].high
-    const downMove = candles[i - 1].low - candles[i].low
+    const candle = candles[i]
+    const prevCandle = candles[i - 1]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (candle === undefined || prevCandle === undefined) return null
+    const upMove = candle.high - prevCandle.high
+    const downMove = prevCandle.low - candle.low
     if (upMove > downMove && upMove > 0) sumPlusDM += upMove
     if (downMove > upMove && downMove > 0) sumMinusDM += downMove
-    sumTR += trueRange(candles[i], candles[i - 1].close)
+    sumTR += trueRange(candle, prevCandle.close)
   }
   if (sumTR <= 0) return 0
   const plusDI = (100 * sumPlusDM) / sumTR
@@ -124,7 +142,12 @@ export function rsi(closes: Array<number>, period: number): number | null {
   let gain = 0
   let loss = 0
   for (let i = closes.length - period; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1]
+    const current = closes[i]
+    const previous = closes[i - 1]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (current === undefined || previous === undefined) return null
+    const diff = current - previous
     if (diff >= 0) gain += diff
     else loss -= diff
   }
@@ -213,6 +236,9 @@ export const rsiReversionStrategy: Strategy = {
     if (value == null) return HOLD('not enough candles for RSI')
     const trendSma = trendPeriod > 0 ? sma(closes, trendPeriod) : null
     const last = closes[closes.length - 1]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (last === undefined) return HOLD('not enough candles for RSI trend filter')
     const inUptrend = trendSma != null && last > trendSma * (1 + trendBand)
     const inDowntrend = trendSma != null && last < trendSma * (1 - trendBand)
     if (value <= low) {
@@ -249,7 +275,11 @@ export function ema(values: Array<number>, period: number): number | null {
   const k = 2 / (period + 1)
   let value = sma(values.slice(0, period), period)!
   for (let i = period; i < values.length; i++) {
-    value = values[i] * k + value * (1 - k)
+    const v = values[i]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (v === undefined) return null
+    value = v * k + value * (1 - k)
   }
   return value
 }
@@ -289,8 +319,16 @@ export const macdMomentumStrategy: Strategy = {
     const signalPrev = ema(macd.slice(0, -1), signalP)
     const macdNow = macd[macd.length - 1]
     const macdPrev = macd[macd.length - 2]
-    if (signalNow == null || signalPrev == null)
+    // See docs/tsconfig-strictness-rollout.md.
+    /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+    if (
+      signalNow == null ||
+      signalPrev == null ||
+      macdNow === undefined ||
+      macdPrev === undefined
+    )
       return HOLD('signal line unavailable')
+    /* eslint-enable @typescript-eslint/no-unnecessary-condition */
     const price = closes[closes.length - 1]
     const spread = Math.abs(macdNow - signalNow) / (price || 1)
     const confidence = Math.min(1, spread * 400 + 0.15)
@@ -323,6 +361,9 @@ export const breakoutStrategy: Strategy = {
     if (candles.length < lookback + 1) return HOLD('not enough candles')
     const prior = candles.slice(-lookback - 1, -1)
     const last = candles[candles.length - 1]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (last === undefined) return HOLD('not enough candles')
     const priorHigh = Math.max(...prior.map((c) => c.high))
     const priorLow = Math.min(...prior.map((c) => c.low))
     if (last.close > priorHigh) {
@@ -388,7 +429,10 @@ export const trendPullbackStrategy: Strategy = {
     const pullbackNow = sma(closes, pullbackPeriod)
     const triggerNow = sma(closes, triggerPeriod)
     const triggerPrev = sma(prevCloses, triggerPeriod)
+    // See docs/tsconfig-strictness-rollout.md.
+    /* eslint-disable @typescript-eslint/no-unnecessary-condition */
     if (
+      last === undefined ||
       trendNow == null ||
       trendPrev == null ||
       pullbackNow == null ||
@@ -397,6 +441,7 @@ export const trendPullbackStrategy: Strategy = {
     ) {
       return HOLD('trend pullback averages unavailable')
     }
+    /* eslint-enable @typescript-eslint/no-unnecessary-condition */
 
     const trendSlope = (trendNow - trendPrev) / trendPrev
     const aboveTrend = last >= trendNow
@@ -427,8 +472,16 @@ export const trendPullbackStrategy: Strategy = {
     const pulledBack = recent.some(
       (close) => close <= pullbackNow * (1 + touchBand),
     )
+    const secondLast = closes[closes.length - 2]
+    // See docs/tsconfig-strictness-rollout.md. Behavior-identical to the
+    // original `closes[closes.length - 2] <= triggerPrev`: an out-of-range
+    // index made that comparison evaluate false (undefined coerces to NaN),
+    // same as short-circuiting on `secondLast !== undefined` here.
     const recovered =
-      last > triggerNow && closes[closes.length - 2] <= triggerPrev
+      last > triggerNow &&
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      secondLast !== undefined &&
+      secondLast <= triggerPrev
     const stillNearPullback = last <= pullbackNow * (1 + maxExtension)
     if (pulledBack && recovered && stillNearPullback) {
       const recovery = Math.max(0, (last - triggerNow) / last)
@@ -459,7 +512,13 @@ export function regimeAllowsLong(
   if (period <= 0) return true
   const long = sma(closes, period)
   if (long == null) return true
-  return closes[closes.length - 1] >= long
+  const last = closes[closes.length - 1]
+  // See docs/tsconfig-strictness-rollout.md. Behavior-identical to the
+  // original `closes[closes.length - 1] >= long`: an empty array made that
+  // comparison evaluate false (undefined coerces to NaN), same as
+  // short-circuiting on `last === undefined` here.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  return last !== undefined && last >= long
 }
 
 /**
@@ -487,7 +546,12 @@ export function realizedVolPercentile(
     let sum = 0
     const returns: Array<number> = []
     for (let i = start; i < endExclusive; i++) {
-      const r = Math.log(closes[i] / closes[i - 1])
+      const current = closes[i]
+      const previous = closes[i - 1]
+      // See docs/tsconfig-strictness-rollout.md.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (current === undefined || previous === undefined) return null
+      const r = Math.log(current / previous)
       returns.push(r)
       sum += r
     }
@@ -658,6 +722,9 @@ export const keltnerChannelStrategy: Strategy = {
     const upper = center + width * multiplier
     const lower = center - width * multiplier
     const last = candles[candles.length - 1]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (last === undefined) return HOLD('not enough candles')
     if (last.close > upper) {
       const conf = Math.min(1, ((last.close - upper) / upper) * 100 + 0.25)
       return {

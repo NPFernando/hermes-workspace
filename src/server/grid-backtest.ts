@@ -193,8 +193,12 @@ function rangeFromWindow(
   let lower = Infinity
   let upper = -Infinity
   for (let i = start; i <= endIndexInclusive; i++) {
-    lower = Math.min(lower, candles[i].low)
-    upper = Math.max(upper, candles[i].high)
+    const candle = candles[i]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (candle === undefined) return null
+    lower = Math.min(lower, candle.low)
+    upper = Math.max(upper, candle.high)
   }
   return { lower, upper }
 }
@@ -228,10 +232,20 @@ function efficiencyRatio(
 ): number | null {
   const startClose = endIndexInclusive - lookback
   if (startClose < 0) return null
-  const netMove = Math.abs(candles[endIndexInclusive].close - candles[startClose].close)
+  const endCandle = candles[endIndexInclusive]
+  const startCandle = candles[startClose]
+  // See docs/tsconfig-strictness-rollout.md.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (endCandle === undefined || startCandle === undefined) return null
+  const netMove = Math.abs(endCandle.close - startCandle.close)
   let pathLength = 0
   for (let i = startClose + 1; i <= endIndexInclusive; i++) {
-    pathLength += Math.abs(candles[i].close - candles[i - 1].close)
+    const candle = candles[i]
+    const prevCandle = candles[i - 1]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (candle === undefined || prevCandle === undefined) return null
+    pathLength += Math.abs(candle.close - prevCandle.close)
   }
   if (pathLength <= 0) return null
   return netMove / pathLength
