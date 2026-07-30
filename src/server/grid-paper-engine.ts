@@ -230,8 +230,12 @@ function rangeFromWindow(
   let lower = Infinity
   let upper = -Infinity
   for (let i = start; i <= endIndexInclusive; i++) {
-    lower = Math.min(lower, candles[i].low)
-    upper = Math.max(upper, candles[i].high)
+    const candle = candles[i]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (candle === undefined) return null
+    lower = Math.min(lower, candle.low)
+    upper = Math.max(upper, candle.high)
   }
   return { lower, upper }
 }
@@ -243,10 +247,20 @@ function efficiencyRatio(
 ): number | null {
   const startClose = endIndexInclusive - lookback
   if (startClose < 0) return null
-  const netMove = Math.abs(candles[endIndexInclusive].close - candles[startClose].close)
+  const endCandle = candles[endIndexInclusive]
+  const startCandle = candles[startClose]
+  // See docs/tsconfig-strictness-rollout.md.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (endCandle === undefined || startCandle === undefined) return null
+  const netMove = Math.abs(endCandle.close - startCandle.close)
   let pathLength = 0
   for (let i = startClose + 1; i <= endIndexInclusive; i++) {
-    pathLength += Math.abs(candles[i].close - candles[i - 1].close)
+    const candle = candles[i]
+    const prevCandle = candles[i - 1]
+    // See docs/tsconfig-strictness-rollout.md.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (candle === undefined || prevCandle === undefined) return null
+    pathLength += Math.abs(candle.close - prevCandle.close)
   }
   if (pathLength <= 0) return null
   return netMove / pathLength
@@ -390,6 +404,11 @@ export function advanceSymbolState(
 
   for (let i = startIndex; i < candles.length; i++) {
     const candle = candles[i]
+    // See docs/tsconfig-strictness-rollout.md — loop bound guarantees `i` is
+    // in range, but the current lax tsconfig doesn't reflect that in
+    // `candle`'s type.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (candle === undefined) continue
     const at = new Date(candle.openTime).toISOString()
     lastProcessedOpenTime = candle.openTime
 
@@ -497,8 +516,14 @@ export function advanceSymbolState(
     // Sells first: any held level whose target (next level up) was swept this bar.
     for (let li = 0; li < levels.length - 1; li++) {
       const level = levels[li]
+      const nextLevel = levels[li + 1]
+      // See docs/tsconfig-strictness-rollout.md — loop bound (li < length-1)
+      // guarantees both indices are in range, but the current lax tsconfig
+      // doesn't reflect that in the types.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (level === undefined || nextLevel === undefined) continue
       if (!level.held) continue
-      const target = levels[li + 1].price
+      const target = nextLevel.price
       if (candle.low <= target && target <= candle.high) {
         const quantity = level.entryQuote / level.entryPrice
         const exitQuote = quantity * target
@@ -528,6 +553,10 @@ export function advanceSymbolState(
     // Buys: any unheld level (excluding the top ceiling) swept this bar.
     for (let li = 0; li < levels.length - 1; li++) {
       const level = levels[li]
+      // See docs/tsconfig-strictness-rollout.md — loop bound guarantees `li`
+      // is in range, but the current lax tsconfig doesn't reflect that.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (level === undefined) continue
       if (level.held) continue
       if (candle.low <= level.price && level.price <= candle.high) {
         level.held = true

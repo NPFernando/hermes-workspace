@@ -82,12 +82,12 @@ describe('advanceSymbolState — cold start', () => {
     )
 
     expect(state.armed).toBe(true)
-    expect(state.lastProcessedOpenTime).toBe(candles[6].openTime)
+    expect(state.lastProcessedOpenTime).toBe(candles[6]?.openTime)
     const fills = trades.filter((t) => t.reason === 'grid-fill')
     expect(fills).toHaveLength(1)
-    expect(fills[0].entryPrice).toBe(90)
-    expect(fills[0].exitPrice).toBe(100)
-    expect(fills[0].pnlQuote).toBeGreaterThan(0)
+    expect(fills[0]?.entryPrice).toBe(90)
+    expect(fills[0]?.exitPrice).toBe(100)
+    expect(fills[0]?.pnlQuote).toBeGreaterThan(0)
   })
 })
 
@@ -187,7 +187,7 @@ describe('advanceSymbolState — efficiency gate persists across calls', () => {
 
     const firstCycle = advanceSymbolState('BTCUSDT', seeded, candles.slice(0, 4), config)
     expect(firstCycle.state.pausedForChop).toBe(false)
-    expect(firstCycle.state.levels[0].held).toBe(true)
+    expect(firstCycle.state.levels[0]?.held).toBe(true)
 
     // Second cycle sees the full history including the wide swing.
     const secondCycle = advanceSymbolState('BTCUSDT', firstCycle.state, candles, config)
@@ -247,15 +247,15 @@ describe('advanceSymbolState — idle-range re-arm', () => {
     const first = advanceSymbolState('BTCUSDT', seededHeld(), candles.slice(0, 2), config)
     expect(first.trades).toHaveLength(0)
     expect(first.state.outsideRangeStreak).toBe(2)
-    expect(first.state.levels[0].held).toBe(true)
+    expect(first.state.levels[0]?.held).toBe(true)
 
     // Second cycle adds the third outside close — the re-arm fires.
     const second = advanceSymbolState('BTCUSDT', first.state, candles, config)
     const rearms = second.trades.filter((t) => t.reason === 'range-idle-rearm')
     expect(rearms).toHaveLength(1)
-    expect(rearms[0].entryPrice).toBe(90)
-    expect(rearms[0].exitPrice).toBe(88)
-    expect(rearms[0].pnlQuote).toBeLessThan(0) // the bag is cut honestly
+    expect(rearms[0]?.entryPrice).toBe(90)
+    expect(rearms[0]?.exitPrice).toBe(88)
+    expect(rearms[0]?.pnlQuote).toBeLessThan(0) // the bag is cut honestly
     expect(second.state.outsideRangeStreak).toBe(0)
     // Re-armed range recentres onto the recent window (upper pulled down
     // toward the 88-close regime instead of the stale 110).
@@ -277,7 +277,7 @@ describe('advanceSymbolState — idle-range re-arm', () => {
     for (let i = 5; i < 15; i++) candles.push(flat(i, 88, 1))
     const result = advanceSymbolState('BTCUSDT', seededHeld(), candles, config)
     expect(result.trades).toHaveLength(0)
-    expect(result.state.levels[0].held).toBe(true)
+    expect(result.state.levels[0]?.held).toBe(true)
     expect(result.state.lower).toBe(90)
     expect(result.state.upper).toBe(110)
   })
@@ -316,7 +316,7 @@ describe('advanceSymbolState — absolute stop floor', () => {
     const floorTrades = trades.filter((t) => t.reason === 'absolute-floor-liquidation')
     expect(stopTrades).toHaveLength(2)
     expect(floorTrades).toHaveLength(1)
-    expect(floorTrades[0].exitPrice).toBe(79)
+    expect(floorTrades[0]?.exitPrice).toBe(79)
     expect(trades.filter((t) => t.reason === 'grid-fill')).toHaveLength(0)
     expect(state.halted).toBe(true)
     expect(state.armed).toBe(false)
@@ -421,7 +421,7 @@ describe('runGridPaperCycle — I/O + lock', () => {
     const btc = state.states.find((s: GridSymbolState) => s.symbol === 'BTCUSDT')
     expect(btc?.symbol).toBe('BTCUSDT')
     expect(btc?.armed).toBe(false)
-    expect(btc?.lastProcessedOpenTime).toBe(candles[candles.length - 1].openTime)
+    expect(btc?.lastProcessedOpenTime).toBe(candles[candles.length - 1]?.openTime)
   })
 })
 
@@ -581,7 +581,7 @@ describe('runGridPaperCycle — testnet execution mirror', () => {
     })
     expect(result.ran).toBe(true)
     expect(result.realFills).toHaveLength(1)
-    expect(result.realFills[0].side).toBe('SELL') // budget went to the sell
+    expect(result.realFills[0]?.side).toBe('SELL') // budget went to the sell
     expect(client.placeOrder).toHaveBeenCalledTimes(1)
   })
 
