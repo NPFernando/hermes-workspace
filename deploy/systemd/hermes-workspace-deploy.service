@@ -1,0 +1,9 @@
+[Unit]
+Description=Poll origin/main and deploy hermes-workspace if it moved
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/hermes-workspace-live
+ExecStart=/home/ubuntu/hermes-workspace-live/scripts/deploy.sh --quiet-if-unchanged

@@ -1,0 +1,15 @@
+[Unit]
+Description=Periodically check origin/main and auto-deploy hermes-workspace
+
+[Timer]
+# 5 min after boot, then every 5 min. Polling (not a GitHub webhook) is
+# deliberate — see scripts/deploy.sh's --quiet-if-unchanged doc comment
+# for why: no inbound trigger surface from GitHub Actions into this VM
+# to secure. A worst-case 5-minute deploy lag is an acceptable trade-off
+# for that.
+OnBootSec=5min
+OnUnitActiveSec=5min
+Unit=hermes-workspace-deploy.service
+
+[Install]
+WantedBy=timers.target

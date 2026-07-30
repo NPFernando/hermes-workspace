@@ -7,9 +7,20 @@
 # service ran directly out of a dev tree that could be arbitrarily dirty,
 # so merged main was never guaranteed to be live.
 #
-# Usage: ./scripts/deploy.sh
+# Usage: ./scripts/deploy.sh [--quiet-if-unchanged]
+#   --quiet-if-unchanged   Exit 0 with no output if already at origin/main's
+#                           HEAD (skips install/build/restart entirely).
+#                           Used by hermes-workspace-deploy.timer for polling
+#                           auto-deploy — polling (not a GitHub webhook) is
+#                           deliberate: it needs no inbound trigger surface
+#                           from GitHub Actions into this VM to secure.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+QUIET_IF_UNCHANGED=0
+if [ "${1:-}" = "--quiet-if-unchanged" ]; then
+  QUIET_IF_UNCHANGED=1
+fi
 
 if [ -n "$(git status --porcelain)" ]; then
   echo "error: deploy directory has uncommitted changes — this directory should only ever hold a clean checkout of origin/main." >&2
@@ -17,17 +28,20 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
-echo "==> fetching origin/main"
-git fetch origin main
+git fetch origin main --quiet
 
 CURRENT=$(git rev-parse HEAD)
 TARGET=$(git rev-parse origin/main)
 if [ "$CURRENT" = "$TARGET" ]; then
+  if [ "$QUIET_IF_UNCHANGED" = "1" ]; then
+    exit 0
+  fi
   echo "==> already up to date at $CURRENT"
-else
-  echo "==> updating $CURRENT -> $TARGET"
-  git merge --ff-only origin/main
+  exit 0
 fi
+
+echo "==> updating $CURRENT -> $TARGET"
+git merge --ff-only origin/main
 
 echo "==> pnpm install"
 pnpm install --frozen-lockfile

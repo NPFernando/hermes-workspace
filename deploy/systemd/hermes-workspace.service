@@ -1,0 +1,24 @@
+[Unit]
+Description=Hermes Workspace UI (port 3000)
+After=network.target hermes-gateway.service hermes-web.service
+Wants=hermes-gateway.service hermes-web.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/hermes-workspace-live
+EnvironmentFile=/home/ubuntu/hermes-workspace-live/.env
+# Guard against orphaned processes left over from a previous failed restart
+# holding port 3000 (this caused a 5+ hour outage on 2026-07-01: an untracked
+# process squatted the port, all 5 systemd restart attempts hit EADDRINUSE,
+# and the unit was marked failed while the stale process kept serving old assets).
+ExecStartPre=-/usr/bin/fuser -k 3000/tcp
+ExecStartPre=/bin/sleep 1
+ExecStart=/home/ubuntu/.hermes/node/bin/node /home/ubuntu/hermes-workspace-live/server-entry.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
