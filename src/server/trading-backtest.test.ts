@@ -158,7 +158,7 @@ describe('runBacktest', () => {
 
     expect(split.train.BTCUSDT).toHaveLength(7)
     expect(split.test.BTCUSDT).toHaveLength(3)
-    expect(split.test.BTCUSDT[0].openTime).toBe(T0 + 7 * HOUR)
+    expect(split.test.BTCUSDT?.[0]?.openTime).toBe(T0 + 7 * HOUR)
   })
 
   it('builds anchored walk-forward windows without overlapping test folds', () => {
@@ -174,11 +174,11 @@ describe('runBacktest', () => {
     expect(windows).toHaveLength(4)
     expect(windows.map((w) => w.testStartPct)).toEqual([60, 70, 80, 90])
     expect(windows.map((w) => w.testEndPct)).toEqual([70, 80, 90, 100])
-    expect(windows.map((w) => w.train.BTCUSDT.length)).toEqual([60, 70, 80, 90])
-    expect(windows.map((w) => w.test.BTCUSDT.length)).toEqual([10, 10, 10, 10])
-    expect(windows.map((w) => w.train.ETHUSDT.length)).toEqual([48, 56, 64, 72])
-    expect(windows.map((w) => w.test.ETHUSDT.length)).toEqual([8, 8, 8, 8])
-    expect(windows[1].test.BTCUSDT[0].openTime).toBe(T0 + 70 * HOUR)
+    expect(windows.map((w) => w.train.BTCUSDT?.length)).toEqual([60, 70, 80, 90])
+    expect(windows.map((w) => w.test.BTCUSDT?.length)).toEqual([10, 10, 10, 10])
+    expect(windows.map((w) => w.train.ETHUSDT?.length)).toEqual([48, 56, 64, 72])
+    expect(windows.map((w) => w.test.ETHUSDT?.length)).toEqual([8, 8, 8, 8])
+    expect(windows[1]?.test.BTCUSDT?.[0]?.openTime).toBe(T0 + 70 * HOUR)
   })
 
   it('rejects walk-forward fold counts that leave empty test folds', () => {
@@ -533,16 +533,18 @@ describe('runBacktest', () => {
       .map((t) => [Date.parse(t.openedAt), Date.parse(t.closedAt)] as const)
       .sort((a, b) => a[0] - b[0])
     for (let i = 1; i < intervals.length; i++) {
-      expect(intervals[i][0]).toBeGreaterThanOrEqual(intervals[i - 1][1])
+      expect(intervals[i]?.[0] ?? 0).toBeGreaterThanOrEqual(
+        intervals[i - 1]?.[1] ?? 0,
+      )
     }
   })
 
   it('computes buy-and-hold benchmark per symbol', () => {
     const series = rampSeries()
     const report = runBacktest({ BTCUSDT: series }, '1h', config)
-    const expected =
-      ((series[series.length - 1].close - series[0].close) / series[0].close) *
-      100
+    const first = series[0]
+    const last = series[series.length - 1]
+    const expected = ((last?.close ?? 0) - (first?.close ?? 0)) / (first?.close ?? 1) * 100
     expect(report.buyAndHoldReturnPct.BTCUSDT).toBeCloseTo(expected, 8)
   })
 
@@ -556,8 +558,8 @@ describe('runBacktest', () => {
     expect(report.equityCurve.length).toBeGreaterThan(0)
     // Equity curve timestamps are strictly increasing.
     for (let i = 1; i < report.equityCurve.length; i++) {
-      expect(Date.parse(report.equityCurve[i].at)).toBeGreaterThan(
-        Date.parse(report.equityCurve[i - 1].at),
+      expect(Date.parse(report.equityCurve[i]?.at ?? '')).toBeGreaterThan(
+        Date.parse(report.equityCurve[i - 1]?.at ?? ''),
       )
     }
   })
@@ -579,7 +581,7 @@ describe('runBacktest', () => {
     })
 
     expect(global.strategyReports).toHaveLength(1)
-    expect(global.strategyReports[0].symbol).toBeUndefined()
+    expect(global.strategyReports[0]?.symbol).toBeUndefined()
     expect(perSymbol.strategyReports.map((r) => r.symbol).sort()).toEqual([
       'BTCUSDT',
       'ETHUSDT',
@@ -597,11 +599,11 @@ describe('runBacktest', () => {
       { initialScores: train.scoreState },
     )
 
-    expect(train.scoreState.breakout.score).toBeGreaterThan(0)
+    expect(train.scoreState.breakout?.score).toBeGreaterThan(0)
     expect(fresh.trades.length).toBeGreaterThan(0)
     expect(carried.trades.length).toBeGreaterThan(0)
-    expect(carried.trades[0].entryQuote).toBeGreaterThan(
-      fresh.trades[0].entryQuote,
+    expect(carried.trades[0]?.entryQuote).toBeGreaterThan(
+      fresh.trades[0]?.entryQuote ?? 0,
     )
   })
 })
@@ -665,10 +667,10 @@ describe('backtest slippage + gap-down guard integration', () => {
     })
     expect(baseline.trades).toHaveLength(1)
     expect(slipped.trades).toHaveLength(1)
-    expect(slipped.trades[0].entryPrice).toBeCloseTo(applyFillSlippage(112, 'buy', 50), 8)
-    expect(slipped.trades[0].exitPrice).toBeCloseTo(applyFillSlippage(112, 'sell', 50), 8)
-    expect(slipped.trades[0].entryPrice).toBeGreaterThan(baseline.trades[0].entryPrice)
-    expect(slipped.trades[0].exitPrice).toBeLessThan(baseline.trades[0].exitPrice)
+    expect(slipped.trades[0]?.entryPrice).toBeCloseTo(applyFillSlippage(112, 'buy', 50), 8)
+    expect(slipped.trades[0]?.exitPrice).toBeCloseTo(applyFillSlippage(112, 'sell', 50), 8)
+    expect(slipped.trades[0]?.entryPrice).toBeGreaterThan(baseline.trades[0]?.entryPrice ?? 0)
+    expect(slipped.trades[0]?.exitPrice ?? 0).toBeLessThan(baseline.trades[0]?.exitPrice ?? 0)
     expect(slipped.totalPnlQuote).toBeLessThan(baseline.totalPnlQuote)
   })
 
@@ -718,7 +720,10 @@ describe('backtest ATR position sizing', () => {
     })
     expect(baseline.trades.length).toBeGreaterThan(0)
     expect(shrunk.trades.length).toBeGreaterThan(0)
-    expect(shrunk.trades[0].entryQuote).toBeCloseTo(baseline.trades[0].entryQuote * 0.25, 6)
+    expect(shrunk.trades[0]?.entryQuote).toBeCloseTo(
+      (baseline.trades[0]?.entryQuote ?? 0) * 0.25,
+      6,
+    )
   })
 })
 

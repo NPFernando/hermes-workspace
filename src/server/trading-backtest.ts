@@ -308,8 +308,17 @@ export function computeRiskAdjustedMetrics(
   if (equityCurve.length < 2) {
     return { sharpeRatio: null, calmarRatio: null, annualizedReturnPct: null }
   }
-  const firstMs = Date.parse(equityCurve[0].at)
-  const lastMs = Date.parse(equityCurve[equityCurve.length - 1].at)
+  const first = equityCurve[0]
+  const last = equityCurve[equityCurve.length - 1]
+  // See docs/tsconfig-strictness-rollout.md — equityCurve.length >= 2 is
+  // already checked above, so index 0 and length-1 are both in range.
+  /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+  if (first === undefined || last === undefined) {
+    return { sharpeRatio: null, calmarRatio: null, annualizedReturnPct: null }
+  }
+  /* eslint-enable @typescript-eslint/no-unnecessary-condition */
+  const firstMs = Date.parse(first.at)
+  const lastMs = Date.parse(last.at)
   const yearsSpanned = (lastMs - firstMs) / (365 * 86_400_000)
   if (!Number.isFinite(yearsSpanned) || yearsSpanned <= 0) {
     return { sharpeRatio: null, calmarRatio: null, annualizedReturnPct: null }
@@ -317,9 +326,13 @@ export function computeRiskAdjustedMetrics(
 
   const returns: Array<number> = []
   for (let i = 1; i < equityCurve.length; i++) {
-    const prev = equityCurve[i - 1].equity
-    const curr = equityCurve[i].equity
-    if (prev > 0) returns.push((curr - prev) / prev)
+    const prev = equityCurve[i - 1]
+    const curr = equityCurve[i]
+    // See docs/tsconfig-strictness-rollout.md — loop bound (1 <= i < length)
+    // guarantees both indices are in range.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (prev === undefined || curr === undefined) continue
+    if (prev.equity > 0) returns.push((curr.equity - prev.equity) / prev.equity)
   }
 
   let sharpeRatio: number | null = null
@@ -458,6 +471,12 @@ function regimeAllowsSide(
   const average = sma(closes, period)
   if (average == null) return true
   const last = closes[closes.length - 1]
+  // See docs/tsconfig-strictness-rollout.md. Behavior-identical to the
+  // original `closes[closes.length - 1] >= / <= average`: an empty array
+  // made either comparison evaluate false (undefined coerces to NaN), same
+  // as short-circuiting on `last === undefined` here.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (last === undefined) return false
   return side === 'long' ? last >= average : last <= average
 }
 
@@ -468,7 +487,16 @@ function closesUpTo(
 ): Array<number> {
   if (!candles || period <= 0) return []
   let end = 0
-  while (end < candles.length && candles[end].openTime <= openTime) end++
+  // See docs/tsconfig-strictness-rollout.md. Behavior-identical to the
+  // original `end < candles.length && candles[end].openTime <= openTime`:
+  // the length check already short-circuited before candles[end] could be
+  // out of range; this rewrite makes that explicit to the type checker.
+  while (end < candles.length) {
+    const c = candles[end]
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (c === undefined || c.openTime > openTime) break
+    end++
+  }
   return candles.slice(Math.max(0, end - period), end).map((c) => c.close)
 }
 
@@ -541,7 +569,13 @@ function walkForwardBoundaries(
   for (let i = 1; i < folds; i++) {
     const targetPct = initialTrainPct + (remainingPct * i) / folds
     const raw = Math.floor((candleCount * targetPct) / 100)
-    const min = boundaries[i - 1] + 1
+    const prevBoundary = boundaries[i - 1]
+    // See docs/tsconfig-strictness-rollout.md — boundaries starts with 1
+    // element and gains exactly one per iteration, so boundaries[i - 1] is
+    // always the most recently pushed value at this point in the loop.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (prevBoundary === undefined) continue
+    const min = prevBoundary + 1
     const max = candleCount - (folds - i)
     boundaries.push(Math.max(min, Math.min(max, raw)))
   }
@@ -575,8 +609,17 @@ export function buildWalkForwardWindows(
     const test: Record<string, Array<Candle>> = {}
     for (const [symbol, candles] of Object.entries(candlesBySymbol)) {
       const boundaries = boundariesBySymbol[symbol]
+      // See docs/tsconfig-strictness-rollout.md — boundariesBySymbol was
+      // built from the same Object.entries(candlesBySymbol) keys, so every
+      // symbol here has an entry. boundaries has foldCount + 1 elements and
+      // i ranges 0..foldCount-1, so boundaries[i] and boundaries[i + 1] are
+      // both always in range.
+      /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+      if (boundaries === undefined) continue
       const trainEnd = boundaries[i]
       const testEnd = boundaries[i + 1]
+      if (trainEnd === undefined || testEnd === undefined) continue
+      /* eslint-enable @typescript-eslint/no-unnecessary-condition */
       train[symbol] = candles.slice(0, trainEnd)
       test[symbol] = candles.slice(trainEnd, testEnd)
     }
@@ -649,16 +692,23 @@ export function runBacktest(
   )
 
   // Unified chronological timeline across symbols.
+  // See docs/tsconfig-strictness-rollout.md — rewritten via Object.values()
+  // instead of symbols.flatMap((s) => candlesBySymbol[s]) to avoid an
+  // indexed-access lookup entirely (candlesBySymbol[s] is guaranteed defined
+  // since `symbols` was derived from Object.keys(candlesBySymbol), but this
+  // restructure sidesteps needing a guard to say so).
   const timeline = [
     ...new Set(
-      symbols.flatMap((s) => candlesBySymbol[s].map((c) => c.openTime)),
+      Object.values(candlesBySymbol).flatMap((candles) =>
+        candles.map((c) => c.openTime),
+      ),
     ),
   ].sort((a, b) => a - b)
 
   // Per-symbol cursor into its (chronologically sorted) candle array.
   const sorted: Record<string, Array<Candle>> = {}
-  for (const s of symbols) {
-    sorted[s] = [...candlesBySymbol[s]].sort((a, b) => a.openTime - b.openTime)
+  for (const [s, candles] of Object.entries(candlesBySymbol)) {
+    sorted[s] = [...candles].sort((a, b) => a.openTime - b.openTime)
   }
   const cursor: Record<string, number> = Object.fromEntries(
     symbols.map((s) => [s, 0]),
@@ -735,10 +785,23 @@ export function runBacktest(
     for (const symbol of symbols) {
       const series = sorted[symbol]
       const i = cursor[symbol]
-      if (i >= series.length || series[i].openTime !== openTime) continue
+      // See docs/tsconfig-strictness-rollout.md — sorted/cursor were
+      // populated for every symbol in this same `symbols` array above, so
+      // both lookups are guaranteed defined here.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (series === undefined || i === undefined) continue
+      if (i >= series.length) continue
+      const candleAtI = series[i]
+      // See docs/tsconfig-strictness-rollout.md — the bounds check above
+      // (i < series.length) guarantees series[i] is defined; this makes
+      // that explicit to the type checker instead of relying on the
+      // original `i >= series.length || series[i].openTime !== openTime`
+      // short-circuit to prove it implicitly.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (candleAtI === undefined || candleAtI.openTime !== openTime) continue
       cursor[symbol] = i + 1
 
-      const candle = series[i]
+      const candle = candleAtI
       const price = candle.close
       const previousClose = lastClose[symbol]
       lastClose[symbol] = price
@@ -1048,7 +1111,14 @@ export function runBacktest(
   }
 
   // Close whatever is still open at the final price so results are realized.
-  const endTime = new Date(timeline[timeline.length - 1] + 1)
+  // See docs/tsconfig-strictness-rollout.md — if timeline were empty, the
+  // main loop above never ran and `positions` (only ever appended to inside
+  // that loop) is still empty, so this value is never actually read by the
+  // closePosition calls below; the fallback timestamp only exists to keep
+  // the type checker happy for a branch that has no observable effect.
+  const lastOpenTime = timeline[timeline.length - 1]
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const endTime = new Date((lastOpenTime ?? Date.now()) + 1)
   for (const pos of [...positions]) {
     closePosition(
       pos,
@@ -1093,13 +1163,16 @@ export function runBacktest(
   const totalPnlQuote = trades.reduce((s, t) => s + t.pnlQuote, 0)
   const finalEquityQuote = quoteBalance
   const buyAndHoldReturnPct: Record<string, number> = {}
-  for (const s of symbols) {
-    const series = sorted[s]
+  for (const [s, series] of Object.entries(sorted)) {
     if (series.length >= 2) {
+      const firstCandle = series[0]
+      const lastCandle = series[series.length - 1]
+      // See docs/tsconfig-strictness-rollout.md — series.length >= 2 is
+      // already checked above, so index 0 and length-1 are both in range.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (firstCandle === undefined || lastCandle === undefined) continue
       buyAndHoldReturnPct[s] =
-        ((series[series.length - 1].close - series[0].close) /
-          series[0].close) *
-        100
+        ((lastCandle.close - firstCandle.close) / firstCandle.close) * 100
     }
   }
 
@@ -1109,12 +1182,18 @@ export function runBacktest(
     100
   const maxDrawdownPctValue = maxDrawdownPct * 100
 
+  // See docs/tsconfig-strictness-rollout.md — same reasoning as `endTime`
+  // above: an empty timeline means no trades ran, so these are purely
+  // informational report fields with no downstream effect on results.
+  const firstOpenTime = timeline[0]
   return {
     config,
     symbols,
     interval,
-    from: new Date(timeline[0]).toISOString(),
-    to: new Date(timeline[timeline.length - 1]).toISOString(),
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    from: new Date(firstOpenTime ?? Date.now()).toISOString(),
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    to: new Date(lastOpenTime ?? Date.now()).toISOString(),
     candleCount: timeline.length,
     trades,
     strategyReports,
