@@ -30,10 +30,12 @@ import {
   recordBinanceMarketObservation,
 } from './binance-market.service'
 import {
+  HOLD,
   STRATEGIES,
   applyTradeOutcome,
   atr,
   atrSizeMultiplier,
+  classifyVolRegime,
   councilVote,
   emptyScore,
   fibExtensionTarget,
@@ -41,6 +43,7 @@ import {
   kellyFraction,
   regimeAllowsLong,
   scaledQuoteSize,
+  strategyAllowedInRegime,
   trendIsStrong,
 } from './trading-strategies'
 import {
@@ -131,6 +134,19 @@ export interface EngineConfig {
    */
   regimeSmaPeriod: number
   /**
+   * Regime-conditional strategy switching (off by default) — mutes
+   * strategies outside the current volatility regime's family (mean-
+   * reversion in low-vol, momentum in high-vol; see classifyVolRegime/
+   * strategyAllowedInRegime in trading-strategies.ts) to HOLD before the
+   * council vote, rather than gating entries uniformly like regimeSmaPeriod
+   * above. Distinct from the backtest-only volRegimePeriod/
+   * volRegimeMaxPercentile turbulence gate (trading-backtest.ts), which was
+   * never wired into this live engine at all.
+   */
+  regimeSwitchingEnabled: boolean
+  regimeSwitchingVolPeriod: number
+  regimeSwitchingBaselineLookback: number
+  /**
    * Trailing stop as a fraction below the position's high-water price (0 = off).
    * When on, it replaces the fixed take-profit so winners can run.
    */
@@ -215,6 +231,9 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   stopLossPct: 0.02,
   takeProfitPct: 0.03,
   regimeSmaPeriod: 0,
+  regimeSwitchingEnabled: false,
+  regimeSwitchingVolPeriod: 20,
+  regimeSwitchingBaselineLookback: 0,
   trailingStopPct: 0,
   atrPeriod: 14,
   atrStopMultiple: 0,
@@ -1763,11 +1782,24 @@ async function runTradingCycleInner(
         )
       }
     }
+    const regime = config.regimeSwitchingEnabled
+      ? classifyVolRegime(
+          candles,
+          config.regimeSwitchingVolPeriod,
+          config.regimeSwitchingBaselineLookback,
+        )
+      : null
+    if (regime != null) {
+      appendAuditLog('regime_switching_classified', { symbol, regime })
+    }
     const members: Array<CouncilMember> = configuredStrategies
       .filter((s) => overrideByStrategy.get(s.id)?.mode !== 'disabled')
       .map((s) => ({
         strategyId: s.id,
-        decision: s.evaluate(candles),
+        decision:
+          regime != null && !strategyAllowedInRegime(s.id, regime)
+            ? HOLD(`muted: ${regime}-vol regime favors a different strategy family`)
+            : s.evaluate(candles),
         score: scores.get(s.id)?.score ?? 0,
       }))
     if (config.longShortSentimentEnabled) {

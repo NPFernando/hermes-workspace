@@ -44,7 +44,7 @@ export interface Strategy {
   ) => StrategyDecision
 }
 
-const HOLD = (reason: string): StrategyDecision => ({
+export const HOLD = (reason: string): StrategyDecision => ({
   signal: 'HOLD',
   confidence: 0,
   reason,
@@ -595,6 +595,60 @@ export function volatilityRegimeAllowsEntry(
   const pct = realizedVolPercentile(candles, volPeriod, baselineLookback)
   if (pct == null) return true
   return pct <= maxPercentile
+}
+
+export type VolRegime = 'low' | 'high'
+
+/**
+ * Regime-conditional strategy switching (distinct from
+ * volatilityRegimeAllowsEntry above, which is a binary entry FILTER —
+ * blocks/allows any strategy uniformly). This instead classifies the
+ * current window into a two-bucket regime via the same realizedVolPercentile
+ * (median split — deliberately the simplest defensible threshold; no prior
+ * research in this repo pointed at a better one) and only lets strategies
+ * from the "appropriate" family vote, muting the rest to HOLD rather than
+ * blocking the whole cycle. `low`: below-median realized vol, favors
+ * mean-reversion (band-touch/oscillator) strategies. `high`: above-median,
+ * favors momentum/trend-following strategies. Returns null (no regime
+ * opinion, switching should no-op) when the window isn't warmed yet —
+ * same fail-open convention as volatilityRegimeAllowsEntry.
+ */
+export function classifyVolRegime(
+  candles: Array<Candle>,
+  volPeriod: number,
+  baselineLookback: number,
+): VolRegime | null {
+  const pct = realizedVolPercentile(candles, volPeriod, baselineLookback)
+  if (pct == null) return null
+  return pct < 0.5 ? 'low' : 'high'
+}
+
+/** Band-touch / oscillator strategies — designed to fire on reversion toward a mean. */
+export const MEAN_REVERSION_STRATEGY_IDS: ReadonlySet<string> = new Set([
+  'rsi_reversion',
+  'keltner_channel',
+])
+
+/** Trend-following / breakout / order-flow-momentum strategies. */
+export const MOMENTUM_STRATEGY_IDS: ReadonlySet<string> = new Set([
+  'sma_crossover',
+  'macd_momentum',
+  'breakout',
+  'trend_pullback',
+  'mtf_4h_pullback',
+  'taker_imbalance',
+  'chaikin_volume',
+])
+
+/** Whether `strategyId` is in the family assigned to `regime`. Unrecognized ids are never muted (fail open, matches this repo's other regime-gate conventions). */
+export function strategyAllowedInRegime(
+  strategyId: string,
+  regime: VolRegime,
+): boolean {
+  const inMeanReversion = MEAN_REVERSION_STRATEGY_IDS.has(strategyId)
+  const inMomentum = MOMENTUM_STRATEGY_IDS.has(strategyId)
+  if (!inMeanReversion && !inMomentum) return true
+  return regime === 'low' ? inMeanReversion : inMomentum
 }
 
 /**

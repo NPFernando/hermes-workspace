@@ -8,6 +8,7 @@ import {
   atrSizeMultiplier,
   breakoutStrategy,
   chaikinVolumeStrategy,
+  classifyVolRegime,
   councilVote,
   ema,
   emptyScore,
@@ -24,6 +25,7 @@ import {
   scaledQuoteSize,
   sma,
   smaCrossoverStrategy,
+  strategyAllowedInRegime,
   takerImbalanceStrategy,
   trendIsStrong,
   trendPullbackStrategy,
@@ -608,6 +610,53 @@ describe('realizedVolPercentile / volatilityRegimeAllowsEntry', () => {
     expect(volatilityRegimeAllowsEntry(candles, volPeriod, baselineLookback, 0.75)).toBe(false)
     // A generous threshold should still allow it through.
     expect(volatilityRegimeAllowsEntry(candles, volPeriod, baselineLookback, 1)).toBe(true)
+  })
+
+  it('classifyVolRegime returns null (no opinion) without enough history, same fail-open convention', () => {
+    expect(classifyVolRegime([], volPeriod, baselineLookback)).toBeNull()
+  })
+
+  it('classifies a calm tail against a volatile baseline as low regime', () => {
+    const volatileBaseline = candlesWithVol(baselineLookback + volPeriod, 0.02)
+    const flatPrice = volatileBaseline[volatileBaseline.length - 1].close
+    const flatTail: Array<Candle> = Array.from({ length: volPeriod }, (_, i) => ({
+      openTime: volatileBaseline.length + i,
+      open: flatPrice,
+      high: flatPrice,
+      low: flatPrice,
+      close: flatPrice,
+      volume: 1,
+    }))
+    const regime = classifyVolRegime([...volatileBaseline, ...flatTail], volPeriod, baselineLookback)
+    expect(regime).toBe('low')
+  })
+
+  it('classifies a spike against a calm baseline as high regime', () => {
+    const calm = candlesWithVol(baselineLookback + volPeriod, 0.003)
+    const spike = candlesWithVol(volPeriod, 0.08, 999).map((c, i) => ({
+      ...c,
+      openTime: calm.length + i,
+    }))
+    const regime = classifyVolRegime([...calm, ...spike], volPeriod, baselineLookback)
+    expect(regime).toBe('high')
+  })
+})
+
+describe('strategyAllowedInRegime', () => {
+  it('assigns mean-reversion strategies to low regime, momentum to high regime', () => {
+    expect(strategyAllowedInRegime('rsi_reversion', 'low')).toBe(true)
+    expect(strategyAllowedInRegime('rsi_reversion', 'high')).toBe(false)
+    expect(strategyAllowedInRegime('keltner_channel', 'low')).toBe(true)
+    expect(strategyAllowedInRegime('keltner_channel', 'high')).toBe(false)
+    expect(strategyAllowedInRegime('macd_momentum', 'high')).toBe(true)
+    expect(strategyAllowedInRegime('macd_momentum', 'low')).toBe(false)
+    expect(strategyAllowedInRegime('breakout', 'high')).toBe(true)
+    expect(strategyAllowedInRegime('breakout', 'low')).toBe(false)
+  })
+
+  it('never mutes an unrecognized strategy id in either regime', () => {
+    expect(strategyAllowedInRegime('some_future_strategy', 'low')).toBe(true)
+    expect(strategyAllowedInRegime('some_future_strategy', 'high')).toBe(true)
   })
 })
 

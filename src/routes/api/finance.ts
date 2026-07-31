@@ -456,6 +456,27 @@ export const Route = createFileRoute('/api/finance')({
             const regimeSma = inRange(cfg.regimeSmaPeriod, 0, 300)
             const trailingStop = inRange(cfg.trailingStopPct, 0, 0.5)
             const maxHold = inRange(cfg.maxHoldMinutes, 0, 10080)
+            // Regime-conditional strategy switching (off by default) — see
+            // EngineConfig.regimeSwitchingEnabled's doc comment in
+            // demo-trading-engine.ts.
+            const regimeSwitchingVolPeriod = inRange(
+              cfg.regimeSwitchingVolPeriod,
+              2,
+              300,
+            )
+            const regimeSwitchingBaselineLookback = inRange(
+              cfg.regimeSwitchingBaselineLookback,
+              0,
+              1000,
+            )
+            if (typeof cfg.regimeSwitchingEnabled === 'boolean')
+              dt.regimeSwitchingEnabled = cfg.regimeSwitchingEnabled
+            if (regimeSwitchingVolPeriod !== undefined)
+              dt.regimeSwitchingVolPeriod = Math.floor(regimeSwitchingVolPeriod)
+            if (regimeSwitchingBaselineLookback !== undefined)
+              dt.regimeSwitchingBaselineLookback = Math.floor(
+                regimeSwitchingBaselineLookback,
+              )
             if (tp !== undefined) dt.takeProfitPct = tp
             if (sl !== undefined) dt.stopLossPct = sl
             if (qpt !== undefined) dt.quotePerTrade = qpt
@@ -635,6 +656,9 @@ export const Route = createFileRoute('/api/finance')({
                 dt.guardian as Record<string, unknown> | undefined
               )?.maxBucketExposureQuote,
               regimeSmaPeriod: dt.regimeSmaPeriod,
+              regimeSwitchingEnabled: dt.regimeSwitchingEnabled,
+              regimeSwitchingVolPeriod: dt.regimeSwitchingVolPeriod,
+              regimeSwitchingBaselineLookback: dt.regimeSwitchingBaselineLookback,
               trailingStopPct: dt.trailingStopPct,
               maxHoldMinutes: dt.maxHoldMinutes,
               learningPolicyAutoApplyModes: (

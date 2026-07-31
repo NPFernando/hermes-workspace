@@ -26,10 +26,12 @@
  * leak into the live engine's strategy_results scores.
  */
 import {
+  HOLD,
   STRATEGIES,
   applyTradeOutcome,
   atr,
   atrSizeMultiplier,
+  classifyVolRegime,
   councilVote,
   emptyScore,
   fibExtensionTarget,
@@ -37,6 +39,7 @@ import {
   regimeAllowsLong,
   scaledQuoteSize,
   sma,
+  strategyAllowedInRegime,
   trendIsStrong,
   volatilityRegimeAllowsEntry,
 } from './trading-strategies'
@@ -161,6 +164,17 @@ export interface BacktestConfig {
   fibTakeProfitEnabled: boolean
   fibSwingLookback: number
   fibExtensionRatio: number
+  /**
+   * Regime-conditional strategy switching (off by default) — distinct from
+   * volRegimePeriod/volRegimeMaxPercentile above, which uniformly gate
+   * whether ANY strategy may enter. This instead mutes strategies outside
+   * the current regime's family (mean-reversion in low-vol, momentum in
+   * high-vol — see classifyVolRegime/strategyAllowedInRegime in
+   * trading-strategies.ts) to HOLD before the council vote, rather than
+   * blocking the whole cycle. Reuses volRegimePeriod/volRegimeBaselineLookback
+   * for its own classification window sizing.
+   */
+  regimeSwitchingEnabled: boolean
 }
 
 export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
@@ -196,6 +210,7 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   fibTakeProfitEnabled: false,
   fibSwingLookback: 20,
   fibExtensionRatio: 1.618,
+  regimeSwitchingEnabled: false,
 }
 
 export interface BacktestTrade {
@@ -730,9 +745,29 @@ export function runBacktest(
       const now = new Date(candle.openTime + 1) // decision time ≈ candle close
       const window = series.slice(Math.max(0, i + 1 - effectiveWindowSize), i + 1)
 
+      // Same dedicated slice pattern as volRegimeWindow below (own size,
+      // not the shared/capped `window`) — classification needs
+      // volRegimePeriod + volRegimeBaselineLookback + 1 candles.
+      const regime = config.regimeSwitchingEnabled
+        ? classifyVolRegime(
+            series.slice(
+              Math.max(
+                0,
+                i + 1 - (config.volRegimePeriod + config.volRegimeBaselineLookback + 1),
+              ),
+              i + 1,
+            ),
+            config.volRegimePeriod,
+            config.volRegimeBaselineLookback,
+          )
+        : null
+
       const members: Array<CouncilMember> = strategies.map((s) => ({
         strategyId: s.id,
-        decision: s.evaluate(window),
+        decision:
+          regime != null && !strategyAllowedInRegime(s.id, regime)
+            ? HOLD(`muted: ${regime}-vol regime favors a different strategy family`)
+            : s.evaluate(window),
         score:
           scores.get(scoreKey(s.id, symbol, config.scoreScope))?.score ?? 0,
       }))
