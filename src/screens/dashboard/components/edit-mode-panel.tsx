@@ -1,8 +1,5 @@
-import type {DashboardLayout} from '@/screens/dashboard/lib/use-dashboard-layout';
-import {
-  
-  WIDGET_CATALOG
-} from '@/screens/dashboard/lib/use-dashboard-layout'
+import type { DashboardLayout } from '@/screens/dashboard/lib/use-dashboard-layout'
+import { WIDGET_CATALOG } from '@/screens/dashboard/lib/use-dashboard-layout'
 
 /**
  * Edit-mode banner. Renders only when `layout.editMode` is true.
@@ -25,7 +22,8 @@ export function EditModePanel({ layout }: { layout: DashboardLayout }) {
   const rail = WIDGET_CATALOG.filter((w) => w.column === 'rail')
 
   return (
-    <div
+    <section
+      aria-label="Dashboard layout controls"
       className="relative flex flex-col gap-3 overflow-hidden rounded-xl border p-3"
       style={{
         background:
@@ -35,6 +33,9 @@ export function EditModePanel({ layout }: { layout: DashboardLayout }) {
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
+          <span className="sr-only" aria-live="polite">
+            Dashboard layout edit mode. {layout.counts.visible} of {layout.counts.total} widgets shown.
+          </span>
           <span
             className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]"
             style={{
@@ -80,7 +81,7 @@ export function EditModePanel({ layout }: { layout: DashboardLayout }) {
         <Group title="Main column" layout={layout} widgets={main} />
         <Group title="Side rail" layout={layout} widgets={rail} />
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -108,6 +109,8 @@ function Group({
               key={w.id}
               type="button"
               onClick={() => (visible ? layout.hide(w.id) : layout.show(w.id))}
+              aria-pressed={visible}
+              aria-label={`${visible ? 'Hide' : 'Show'} ${w.label}: ${w.description}`}
               className="group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all"
               style={{
                 background: visible

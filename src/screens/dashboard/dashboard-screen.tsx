@@ -883,6 +883,7 @@ export function DashboardScreen() {
           <button
             type="button"
             aria-label={layout.editMode ? 'Done editing layout' : 'Edit layout'}
+            aria-pressed={layout.editMode}
             title={layout.editMode ? 'Done editing layout' : 'Edit layout'}
             onClick={layout.toggleEdit}
             className="inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70"
