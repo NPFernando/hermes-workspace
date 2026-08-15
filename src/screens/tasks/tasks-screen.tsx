@@ -16,6 +16,7 @@ import {
   formatBlockedTaskBreakdownTitle,
   formatCompactTaskColumnActionLabel,
   formatCompactTaskColumnAriaLabel,
+  formatTaskFilterAriaLabel,
   formatTaskFilterSummary,
   formatTaskRefreshStatus,
   formatTaskStatFilterButtonLabel,
@@ -298,11 +299,11 @@ export function TasksScreen() {
 
     // Parse search operators: assignee:X tag:X is:blocked is:timedout is:overdue is:subtask is:active
     let rawQ = searchQuery.trim().toLowerCase()
-    let opAssignee: string | null = null
-    let opTag: string | null = null
+    const opAssignee = [...rawQ.matchAll(/assignee:(\S+)/g)].at(-1)?.[1] ?? null
+    const opTag = [...rawQ.matchAll(/tag:(\S+)/g)].at(-1)?.[1] ?? null
     const opIs: Set<string> = new Set()
-    rawQ = rawQ.replace(/assignee:(\S+)/g, (_, v) => { opAssignee = v; return '' })
-    rawQ = rawQ.replace(/tag:(\S+)/g, (_, v) => { opTag = v; return '' })
+    rawQ = rawQ.replace(/assignee:\S+/g, '')
+    rawQ = rawQ.replace(/tag:\S+/g, '')
     rawQ = rawQ.replace(/is:(\S+)/g, (_, v) => { opIs.add(v); return '' })
     const q = rawQ.trim()
 
@@ -447,7 +448,7 @@ export function TasksScreen() {
   const groupedTodoRows = useMemo<Array<VirtualRow> | null>(() => {
     if (!groupByParent) return null
     const taskColumnsByStatus = tasksByColumn.columns
-    const todoTasks = taskColumnsByStatus['todo'] ?? []
+    const todoTasks = taskColumnsByStatus.todo
     const allById = new Map(tasks.map(t => [t.id, t]))
 
     // Separate tasks with known parent vs ungrouped
@@ -762,7 +763,7 @@ export function TasksScreen() {
     const byAssignee: Record<string, number> = {}
     timedOutEntries.forEach(e => { const a = e.task.assignee ?? 'unassigned'; byAssignee[a] = (byAssignee[a] ?? 0) + 1 })
     const byTag: Record<string, number> = {}
-    timedOutEntries.forEach(e => { const tag = e.task.tags?.[0] ?? 'untagged'; byTag[tag] = (byTag[tag] ?? 0) + 1 })
+    timedOutEntries.forEach(e => { const tag = e.task.tags.at(0) ?? 'untagged'; byTag[tag] = (byTag[tag] ?? 0) + 1 })
     return {
       timedOutEntries,
       topAssignees: Object.entries(byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 8),
@@ -828,7 +829,7 @@ export function TasksScreen() {
             <span>{stats.completion}% done</span>
             {/* Daily goal ring */}
             {(() => {
-              const doneToday = trend?.trend?.find(d => d.date === new Date().toISOString().slice(0, 10))?.count ?? sweepStats?.completed ?? 0
+              const doneToday = trend?.trend.find(d => d.date === new Date().toISOString().slice(0, 10))?.count ?? (sweepStats ? sweepStats.completed : 0)
               if (goalInputOpen) return (
                 <span className="flex items-center gap-1">
                   <input
@@ -1429,6 +1430,8 @@ export function TasksScreen() {
           <button
             type="button"
             onClick={() => setShowFilterPopover(v => !v)}
+            aria-expanded={showFilterPopover}
+            aria-label={showFilterPopover ? 'Close task filters' : 'Open task filters'}
             className={cn(
               'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors whitespace-nowrap',
               showFilterPopover || activeFilterCount > 0
@@ -1448,7 +1451,7 @@ export function TasksScreen() {
                       <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 mb-1.5">Status</p>
                       <div className="flex flex-wrap gap-1.5">
                         {([['Overdue', filterOverdue, () => setFilterOverdue(v => !v)], ['Blocked', filterBlocked, () => setFilterBlocked(v => !v)], ['Timed Out', filterTimedOut, () => setFilterTimedOut(v => !v)], ['Active Agent', filterActiveAgent, () => setFilterActiveAgent(v => !v)], ['In Review', filterInReview, () => setFilterInReview(v => !v)]] as Array<[string, boolean, () => void]>).map(([label, active, toggle]) => (
-                          <button key={label} type="button" onClick={toggle} className="text-[10px] px-2 py-0.5 rounded-full border transition-colors" style={{ borderColor: active ? 'var(--theme-accent)' : 'var(--theme-border)', color: active ? 'var(--theme-accent)' : 'var(--theme-muted)', background: active ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' : 'transparent' }}>{label}</button>
+                          <button key={label} type="button" onClick={toggle} aria-pressed={active} aria-label={formatTaskFilterAriaLabel(label, active)} className="text-[10px] px-2 py-0.5 rounded-full border transition-colors" style={{ borderColor: active ? 'var(--theme-accent)' : 'var(--theme-border)', color: active ? 'var(--theme-accent)' : 'var(--theme-muted)', background: active ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' : 'transparent' }}>{label}</button>
                         ))}
                       </div>
                     </div>
@@ -1457,7 +1460,7 @@ export function TasksScreen() {
                       <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 mb-1.5">Priority</p>
                       <div className="flex gap-1.5">
                         {(['high', 'medium', 'low'] as Array<TaskPriority>).map(p => (
-                          <button key={p} type="button" onClick={() => setPriorityFilter(prev => prev === p ? null : p)} className="text-[10px] px-2.5 py-0.5 rounded-full border transition-colors capitalize" style={{ borderColor: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-border)', color: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-muted)', background: priorityFilter === p ? `${PRIORITY_COLORS[p]}1a` : 'transparent' }}>{p}</button>
+                          <button key={p} type="button" onClick={() => setPriorityFilter(prev => prev === p ? null : p)} aria-pressed={priorityFilter === p} aria-label={formatTaskFilterAriaLabel(`${p} priority`, priorityFilter === p)} className="text-[10px] px-2.5 py-0.5 rounded-full border transition-colors capitalize" style={{ borderColor: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-border)', color: priorityFilter === p ? PRIORITY_COLORS[p] : 'var(--theme-muted)', background: priorityFilter === p ? `${PRIORITY_COLORS[p]}1a` : 'transparent' }}>{p}</button>
                         ))}
                       </div>
                     </div>
@@ -1465,8 +1468,8 @@ export function TasksScreen() {
                     <div>
                       <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 mb-1.5">Age</p>
                       <div className="flex gap-1.5">
-                        {([['fresh', 'Fresh <1d', '#34d399'], ['aging', 'Aging 1-3d', '#f59e0b'], ['stale', 'Stale >3d', '#f87171']] as Array<['fresh'|'aging'|'stale', string, string]>).map(([band, label, color]) => (
-                          <button key={band} type="button" onClick={() => setAgeFilter(prev => prev === band ? null : band)} className="text-[10px] px-2 py-0.5 rounded-full border transition-colors" style={{ borderColor: ageFilter === band ? color : 'var(--theme-border)', color: ageFilter === band ? color : 'var(--theme-muted)', background: ageFilter === band ? `${color}18` : 'transparent' }}>{label}</button>
+                        {([['fresh', 'Fresh <1d', 'fresh age', '#34d399'], ['aging', 'Aging 1-3d', 'aging age', '#f59e0b'], ['stale', 'Stale >3d', 'stale age', '#f87171']] as Array<['fresh'|'aging'|'stale', string, string, string]>).map(([band, label, accessibleLabel, color]) => (
+                          <button key={band} type="button" onClick={() => setAgeFilter(prev => prev === band ? null : band)} aria-pressed={ageFilter === band} aria-label={formatTaskFilterAriaLabel(accessibleLabel, ageFilter === band)} className="text-[10px] px-2 py-0.5 rounded-full border transition-colors" style={{ borderColor: ageFilter === band ? color : 'var(--theme-border)', color: ageFilter === band ? color : 'var(--theme-muted)', background: ageFilter === band ? `${color}18` : 'transparent' }}>{label}</button>
                         ))}
                       </div>
                     </div>
@@ -1476,7 +1479,7 @@ export function TasksScreen() {
                         <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 mb-1.5">Assignee</p>
                         <div className="flex flex-wrap gap-1.5">
                           {stats.sisterChips.map(([name, count]) => (
-                            <button key={name} type="button" onClick={() => setAssigneeFilter(prev => prev === name ? null : name)} className="text-[10px] px-2 py-0.5 rounded-full border transition-colors capitalize" style={{ borderColor: assigneeFilter === name ? 'var(--theme-accent)' : 'var(--theme-border)', color: assigneeFilter === name ? 'var(--theme-accent)' : 'var(--theme-muted)', background: assigneeFilter === name ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' : 'transparent' }}>{name} <span className="opacity-50">{count}</span></button>
+                            <button key={name} type="button" onClick={() => setAssigneeFilter(prev => prev === name ? null : name)} aria-pressed={assigneeFilter === name} aria-label={formatTaskFilterAriaLabel(`${name} assignee`, assigneeFilter === name)} className="text-[10px] px-2 py-0.5 rounded-full border transition-colors capitalize" style={{ borderColor: assigneeFilter === name ? 'var(--theme-accent)' : 'var(--theme-border)', color: assigneeFilter === name ? 'var(--theme-accent)' : 'var(--theme-muted)', background: assigneeFilter === name ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)' : 'transparent' }}>{name} <span className="opacity-50">{count}</span></button>
                           ))}
                         </div>
                       </div>
@@ -1640,7 +1643,7 @@ export function TasksScreen() {
             <span>{isRed ? '🚨' : '⚠️'}</span>
             <span className="flex-1">
               {stalled && `Pipeline stalled — last sweep ${sweepAgoMin}m ago.`}
-              {!stalled && lowSuccess && `Low success rate: ${sweepStats.successRate}% (${sweepStats.timedOutToday ?? 0} timeouts today).`}
+              {!stalled && lowSuccess && `Low success rate: ${sweepStats.successRate}% (${sweepStats.timedOutToday} timeouts today).`}
             </span>
             <button
               onClick={async () => {
