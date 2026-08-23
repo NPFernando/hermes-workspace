@@ -41,6 +41,7 @@ import {
   strategyOverrideState,
 } from '../../server/demo-trading-engine'
 import { startFinanceStorageMonitor } from '../../server/finance-storage-monitor'
+import { fetchAndStoreGoogleNews } from '../../server/finance-news.service'
 import { resetConnectivityBreaker } from '../../server/connectivity-breaker'
 
 const VALID_LONG_SHORT_PERIODS = new Set([
@@ -193,6 +194,13 @@ export const Route = createFileRoute('/api/finance')({
               'binance-public-api',
             )
             return json(financePayload())
+          }
+          if (action === 'fetch_news') {
+            // Public Google News RSS only: research ingestion has no keys and
+            // does not touch trading plans, orders, positions, or execution.
+            const symbol = binanceSymbolFromBody(body)
+            const newsIngestion = await fetchAndStoreGoogleNews(symbol)
+            return json({ ...financePayload(), newsIngestion })
           }
           if (action === 'fetch_candles') {
             // Read-only historical OHLCV from Binance public klines.
