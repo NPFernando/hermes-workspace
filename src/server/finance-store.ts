@@ -907,6 +907,26 @@ export function financeStorageAlerts(health: FinanceStorageHealth): Array<{
   ]
 }
 
+/**
+ * Idempotently persists externally fetched, read-only research records.
+ * News is intentionally isolated from trading plans and execution state.
+ */
+export function storeFinanceNewsItems(items: Array<NewsItem>): number {
+  if (items.length === 0) return 0
+  const db = ensureFinanceStore()
+  const existingIds = new Set(db.news_items.map((item) => item.id))
+  const newItems = items.filter((item) => !existingIds.has(item.id))
+  if (newItems.length === 0) return 0
+  db.news_items.push(...newItems)
+  writeFinanceStore(db)
+  appendAuditLog('news_items_ingested', {
+    count: newItems.length,
+    symbols: Array.from(new Set(newItems.map((item) => item.relatedSymbol))),
+    source: 'google-news-rss',
+  })
+  return newItems.length
+}
+
 export function addFinanceRecord(
   kind: string,
   payload: AddPayload,
