@@ -18,6 +18,7 @@ import { AttentionMarquee } from './components/attention-marquee'
 import { CacheEfficiencyCard } from './components/cache-efficiency-card'
 import { CostLedgerCard } from './components/cost-ledger-card'
 import { EditModePanel } from './components/edit-mode-panel'
+import { FinanceOverviewCard } from './components/finance-overview-card'
 import { HeroMetrics } from './components/hero-metrics'
 import { LogsTailCard } from './components/logs-tail-card'
 import { OperatorTipCard } from './components/operator-tip-card'
@@ -961,6 +962,12 @@ export function DashboardScreen() {
           />
         }
       />
+
+      {layout.isVisible('finance_overview') ? (
+        <WidgetShell id="finance_overview" layout={layout}>
+          <FinanceOverviewCard onOpen={() => navigate({ to: '/finance' })} />
+        </WidgetShell>
+      ) : null}
 
       {/* ── Edit-mode banner (only renders when toggled). ── */}
       <EditModePanel layout={layout} />

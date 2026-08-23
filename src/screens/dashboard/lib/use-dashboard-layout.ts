@@ -24,6 +24,7 @@ export type WidgetId =
   | 'skills_usage'
   | 'achievements'
   | 'mix_rhythm'
+  | 'finance_overview'
 
 export type WidgetMeta = {
   id: WidgetId
@@ -125,6 +126,13 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     label: 'Achievements',
     description: 'Recent unlocks & progress.',
     column: 'rail',
+    hideable: true,
+  },
+  {
+    id: 'finance_overview',
+    label: 'Finance overview',
+    description: 'Net worth, savings rate, and the current controlled-trading mode.',
+    column: 'main',
     hideable: true,
   },
   {
