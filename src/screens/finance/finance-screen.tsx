@@ -2650,10 +2650,58 @@ function LivePriceTicker({ symbols }: { symbols: Array<string> }) {
   )
 }
 
+function PersonalFinanceWorkspace({
+  payload,
+  onPayload,
+}: {
+  payload: FinancePayload
+  onPayload: (payload: FinancePayload) => void
+}) {
+  const { summary } = payload
+  return (
+    <section className="mt-6 space-y-6" aria-label="Personal finance workspace">
+      <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200/80">
+          DollarWise-style personal finance
+        </p>
+        <h2 className="mt-2 text-2xl font-semibold">Money clarity, without trading controls</h2>
+        <p className="mt-2 max-w-3xl text-sm text-[var(--theme-muted)]">
+          Track accounts, spending, budgets, savings goals, and tax records separately from the automated trading workspace.
+        </p>
+      </div>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Net worth" value={formatLkr(summary.netWorthLkr)} />
+        <StatCard label="Cash balance" value={formatLkr(summary.cashBalanceLkr)} />
+        <StatCard label="Net savings" value={formatLkr(summary.netSavingsLkr)} tone={summary.netSavingsLkr >= 0 ? 'good' : 'danger'} />
+        <StatCard label="Savings rate" value={formatPct(summary.savingsRate)} tone={summary.savingsRate >= 20 ? 'good' : 'warn'} />
+        <StatCard label="Total income" value={formatLkr(summary.totalIncomeLkr)} tone="good" />
+        <StatCard label="Total expenses" value={formatLkr(summary.totalExpensesLkr)} tone={summary.totalExpensesLkr > summary.totalIncomeLkr && summary.totalIncomeLkr > 0 ? 'danger' : 'neutral'} />
+        <StatCard label="Tax reserve" value={formatLkr(summary.taxReserveLkr)} />
+        <StatCard label="Tracked accounts" value={String(summary.accountCount)} />
+      </section>
+      <BudgetPanel payload={payload} onPayload={onPayload} />
+      <section className="grid gap-4">
+        <DataTable title="Accounts" rows={payload.data.finance_accounts} columns={['name', 'type', 'currency', 'balance', 'platform']} />
+        <DataTable title="Income records" rows={payload.data.income_records} columns={['dateReceived', 'sourceName', 'incomeType', 'originalCurrency', 'originalAmount', 'convertedLkrAmount', 'taxable']} />
+        <DataTable title="Expense records" rows={payload.data.expense_records} columns={['date', 'vendor', 'category', 'currency', 'amount', 'convertedLkrAmount', 'recurring']} />
+        <DataTable title="Budget categories" rows={payload.data.budget_categories} columns={['month', 'category', 'currency', 'budgetAmount']} />
+        <DataTable title="Savings goals" rows={payload.data.savings_goals} columns={['name', 'targetAmount', 'currentAmount', 'currency', 'targetDate', 'status']} />
+        <DataTable title="Tax records" rows={payload.data.tax_records} columns={['taxYear', 'incomeType', 'convertedLkrAmount', 'taxPaid', 'taxDue', 'requiresConfirmation']} />
+      </section>
+      <p className="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">
+        Tax figures are estimates; confirm them against official sources before filing.
+      </p>
+    </section>
+  )
+}
+
 export function FinanceScreen() {
   const [payload, setPayload] = useState<FinancePayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activeWorkspace, setActiveWorkspace] = useState<'trading' | 'personal'>(
+    'trading',
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -2740,7 +2788,33 @@ export function FinanceScreen() {
         </div>
       </section>
 
-      <LivePriceTicker
+      <div
+        className="mt-6 inline-flex rounded-2xl border border-[var(--theme-border)] bg-black/10 p-1"
+        aria-label="Finance workspace"
+      >
+        {([
+          ['trading', 'Trading workspace'],
+          ['personal', 'Personal finance'],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={activeWorkspace === id}
+            onClick={() => setActiveWorkspace(id)}
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+              activeWorkspace === id
+                ? 'bg-emerald-500/20 text-emerald-100 shadow-sm'
+                : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeWorkspace === 'trading' ? (
+        <>
+          <LivePriceTicker
         symbols={
           Array.isArray(
             (payload.settings.demoTrading as Record<string, unknown> | undefined)
@@ -2795,7 +2869,6 @@ export function FinanceScreen() {
         />
       </section>
 
-      <BudgetPanel payload={payload} onPayload={setPayload} />
 
       <TradingControls summary={summary} onPayload={setPayload} />
 
@@ -2879,66 +2952,6 @@ export function FinanceScreen() {
 
       <section className="mt-6 grid gap-4">
         <DataTable
-          title="Accounts"
-          rows={payload.data.finance_accounts}
-          columns={['name', 'type', 'currency', 'balance', 'platform']}
-        />
-        <DataTable
-          title="Income records"
-          rows={payload.data.income_records}
-          columns={[
-            'dateReceived',
-            'sourceName',
-            'incomeType',
-            'originalCurrency',
-            'originalAmount',
-            'convertedLkrAmount',
-            'taxable',
-          ]}
-        />
-        <DataTable
-          title="Expense records"
-          rows={payload.data.expense_records}
-          columns={[
-            'date',
-            'vendor',
-            'category',
-            'currency',
-            'amount',
-            'convertedLkrAmount',
-            'recurring',
-          ]}
-        />
-        <DataTable
-          title="Budget categories"
-          rows={payload.data.budget_categories}
-          columns={['month', 'category', 'currency', 'budgetAmount']}
-        />
-        <DataTable
-          title="Savings goals"
-          rows={payload.data.savings_goals}
-          columns={[
-            'name',
-            'targetAmount',
-            'currentAmount',
-            'currency',
-            'targetDate',
-            'status',
-          ]}
-        />
-        <DataTable
-          title="Tax records"
-          rows={payload.data.tax_records}
-          columns={[
-            'taxYear',
-            'incomeType',
-            'convertedLkrAmount',
-            'taxPaid',
-            'taxDue',
-            'requiresConfirmation',
-          ]}
-        />
-        <DataTable
           title="Trading plans"
           rows={payload.data.trading_plans}
           columns={[
@@ -3001,6 +3014,10 @@ export function FinanceScreen() {
           in policy.
         </p>
       </section>
+        </>
+      ) : (
+        <PersonalFinanceWorkspace payload={payload} onPayload={setPayload} />
+      )}
     </main>
   )
 }
