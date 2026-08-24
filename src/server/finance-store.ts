@@ -1,7 +1,7 @@
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   appendFinanceAuditPostgres,
   financePostgresStatus,
@@ -236,6 +236,42 @@ export type RiskScore = {
   confidenceScore: number
   blockers: Array<string>
   inputs: Record<string, unknown>
+  formulaVersion?: string
+  inputRefs?: Array<string>
+  observedAt?: string
+  expiresAt?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** A provenance-preserving stored research observation; never an execution input. */
+export type SentimentScore = {
+  id: string
+  symbol: string
+  kind: 'fear_greed' | 'long_short' | 'news_composite'
+  score: number
+  label: 'positive' | 'neutral' | 'negative' | 'mixed' | 'unknown'
+  confidenceScore: number
+  freshness: number
+  inputRefs: Array<string>
+  formulaVersion: string
+  observedAt: string
+  expiresAt: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type IntelligenceRecord = {
+  id: string
+  symbol: string
+  sentimentScoreId: string
+  riskScoreId: string
+  inputRefs: Array<string>
+  formulaVersion: string
+  observedAt: string
+  expiresAt: string
   source: string
   createdAt: string
   updatedAt: string
@@ -442,8 +478,9 @@ export type FinanceDatabase = {
   market_prices: Array<MarketPrice>
   historical_candles: Array<Record<string, unknown>>
   news_items: Array<NewsItem>
-  sentiment_scores: Array<Record<string, unknown>>
+  sentiment_scores: Array<SentimentScore>
   risk_scores: Array<RiskScore>
+  intelligence_records: Array<IntelligenceRecord>
   trading_plans: Array<TradingPlan>
   trade_orders: Array<TradeOrder>
   trade_executions: Array<TradeExecution>
@@ -568,6 +605,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     news_items: [],
     sentiment_scores: [],
     risk_scores: [],
+    intelligence_records: [],
     trading_plans: [],
     trade_orders: [],
     trade_executions: [],
@@ -925,6 +963,63 @@ export function storeFinanceNewsItems(items: Array<NewsItem>): number {
     source: 'google-news-rss',
   })
   return newItems.length
+}
+
+/**
+ * Stores derived research in dedicated intelligence collections only. This does
+ * not create plans/orders, mutate settings, or append an execution audit entry.
+ */
+export function storeIntelligenceRecords(input: {
+  sentiment: SentimentScore
+  risk: RiskScore
+}): {
+  sentiment: SentimentScore
+  risk: RiskScore
+  intelligence: IntelligenceRecord
+  stored: boolean
+} {
+  const db = ensureFinanceStore()
+  const fingerprint = [
+    input.sentiment.symbol,
+    input.sentiment.formulaVersion,
+    input.sentiment.observedAt,
+    ...input.sentiment.inputRefs.slice().sort(),
+  ].join('\n')
+  const id = `intelligence:${createHash('sha256').update(fingerprint).digest('hex').slice(0, 24)}`
+  const existing = db.intelligence_records.find((record) => record.id === id)
+  if (existing) {
+    const sentiment =
+      db.sentiment_scores.find(
+        (score) => score.id === existing.sentimentScoreId,
+      ) ?? input.sentiment
+    const risk =
+      db.risk_scores.find((score) => score.id === existing.riskScoreId) ??
+      input.risk
+    return { sentiment, risk, intelligence: existing, stored: false }
+  }
+  const intelligence: IntelligenceRecord = {
+    id,
+    symbol: input.sentiment.symbol,
+    sentimentScoreId: input.sentiment.id,
+    riskScoreId: input.risk.id,
+    inputRefs: input.sentiment.inputRefs.slice().sort(),
+    formulaVersion: input.sentiment.formulaVersion,
+    observedAt: input.sentiment.observedAt,
+    expiresAt: input.sentiment.expiresAt,
+    source: 'finance-intelligence',
+    createdAt: input.sentiment.createdAt,
+    updatedAt: input.sentiment.updatedAt,
+  }
+  db.sentiment_scores.push(input.sentiment)
+  db.risk_scores.push(input.risk)
+  db.intelligence_records.push(intelligence)
+  writeFinanceStore(db)
+  return {
+    sentiment: input.sentiment,
+    risk: input.risk,
+    intelligence,
+    stored: true,
+  }
 }
 
 export function addFinanceRecord(
