@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
   assessResearchRisk: vi.fn(),
   buildCompositeSentiment: vi.fn(),
   fetchNews: vi.fn(),
+  appendPaperDecisionSnapshot: vi.fn(),
   storeIntelligenceRecords: vi.fn(),
 }))
 vi.mock('../../server/auth-middleware', () => ({
@@ -28,6 +29,9 @@ vi.mock('../../server/finance-intelligence', () => ({
   INTELLIGENCE_FORMULA_VERSION: 'research-v1',
   assessResearchRisk: state.assessResearchRisk,
   buildCompositeSentiment: state.buildCompositeSentiment,
+}))
+vi.mock('../../server/paper-decision-journal', () => ({
+  appendPaperDecisionSnapshot: state.appendPaperDecisionSnapshot,
 }))
 vi.mock('../../server/finance-storage-monitor', () => ({
   startFinanceStorageMonitor: vi.fn(),
@@ -99,6 +103,69 @@ describe('/api/finance fetch_news', () => {
     expect(await response.json()).toMatchObject({
       ok: true, newsIngestion: { fetched: 2, stored: 1 },
     })
+  })
+
+  it('records an authenticated paper research snapshot without touching intelligence storage or execution state', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.readFinanceStore).mockReturnValue({
+      news_items: [{ id: 'news-1' }],
+      sentiment_scores: [{ id: 'fg-1' }],
+    } as any)
+    const composite = {
+      symbol: 'BTCUSDT', score: 20, label: 'positive', confidence: 0.6,
+      freshness: 0.8, sourceIds: ['fg-1', 'news-1'], disagreement: false,
+      blockers: [], formulaVersion: 'research-v1',
+      observedAt: '2026-08-20T12:00:00.000Z', expiresAt: '2026-08-22T12:00:00.000Z',
+    }
+    state.buildCompositeSentiment.mockReturnValueOnce(composite)
+    state.appendPaperDecisionSnapshot.mockReturnValueOnce({
+      appended: true,
+      entry: { id: 'paper-decision:1', side_effects: false },
+    })
+
+    const response = await (await handlers()).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'record_paper_decision', symbol: 'btcusdt', platform: 'ibkr', idempotencyKey: 'click-1',
+        }),
+      }),
+    })
+
+    expect(state.appendPaperDecisionSnapshot).toHaveBeenCalledWith({
+      symbol: 'BTCUSDT', composite, idempotencyKey: 'click-1',
+    })
+    expect(state.storeIntelligenceRecords).not.toHaveBeenCalled()
+    expect(vi.mocked(store.addFinanceRecord)).not.toHaveBeenCalled()
+    expect(vi.mocked(store.appendAuditLog)).not.toHaveBeenCalled()
+    expect(vi.mocked(store.writeFinanceStore)).not.toHaveBeenCalled()
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      paperDecisionJournal: {
+        appended: true, researchOnly: true, entry: { side_effects: false },
+      },
+    })
+  })
+
+  it('rejects an unauthenticated paper journal request before reading research data', async () => {
+    state.authenticated = false
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.readFinanceStore).mockClear()
+    state.appendPaperDecisionSnapshot.mockClear()
+
+    const response = await (await handlers()).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'record_paper_decision', symbol: 'BTCUSDT', idempotencyKey: 'click-2',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(401)
+    expect(vi.mocked(store.readFinanceStore)).not.toHaveBeenCalled()
+    expect(state.appendPaperDecisionSnapshot).not.toHaveBeenCalled()
   })
 
   it('derives and stores research-only intelligence from existing data', async () => {
