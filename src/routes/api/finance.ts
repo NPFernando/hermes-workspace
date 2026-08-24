@@ -16,6 +16,7 @@ import {
   financeSummary,
   maskSensitive,
   readFinanceStore,
+  storeIntelligenceRecords,
   tradingPerformanceSummary,
   writeFinanceStore,
 } from '../../server/finance-store'
@@ -42,6 +43,7 @@ import {
 } from '../../server/demo-trading-engine'
 import { startFinanceStorageMonitor } from '../../server/finance-storage-monitor'
 import { fetchAndStoreGoogleNews } from '../../server/finance-news.service'
+import { INTELLIGENCE_FORMULA_VERSION, assessResearchRisk, buildCompositeSentiment } from '../../server/finance-intelligence'
 import { resetConnectivityBreaker } from '../../server/connectivity-breaker'
 
 const VALID_LONG_SHORT_PERIODS = new Set([
@@ -158,6 +160,32 @@ function financePayload() {
   }
 }
 
+function refreshIntelligence(symbol: string) {
+  const db = readFinanceStore()
+  const now = new Date()
+  const composite = buildCompositeSentiment({ symbol, items: db.news_items, sentimentScores: db.sentiment_scores, now })
+  const risk = assessResearchRisk(composite)
+  const createdAt = now.toISOString()
+  const scoreId = `sentiment:${symbol}:${INTELLIGENCE_FORMULA_VERSION}:${createdAt}`
+  const riskId = `risk:${symbol}:${INTELLIGENCE_FORMULA_VERSION}:${createdAt}`
+  const stored = storeIntelligenceRecords({
+    sentiment: {
+      id: scoreId, symbol, kind: 'news_composite', score: composite.score ?? 0,
+      label: composite.label, confidenceScore: composite.confidence, freshness: composite.freshness,
+      inputRefs: composite.sourceIds, formulaVersion: composite.formulaVersion,
+      observedAt: composite.observedAt, expiresAt: composite.expiresAt, source: 'finance-intelligence',
+      createdAt, updatedAt: createdAt,
+    },
+    risk: {
+      id: riskId, platform: 'research_only', symbol, ...risk,
+      formulaVersion: composite.formulaVersion, inputRefs: composite.sourceIds,
+      observedAt: composite.observedAt, expiresAt: composite.expiresAt, source: 'finance-intelligence',
+      createdAt, updatedAt: createdAt,
+    },
+  })
+  return { composite, stored, researchOnly: true }
+}
+
 export const Route = createFileRoute('/api/finance')({
   server: {
     handlers: {
@@ -201,6 +229,13 @@ export const Route = createFileRoute('/api/finance')({
             const symbol = binanceSymbolFromBody(body)
             const newsIngestion = await fetchAndStoreGoogleNews(symbol)
             return json({ ...financePayload(), newsIngestion })
+          }
+          if (action === 'refresh_intelligence') {
+            // Derives and stores research-only records from already stored
+            // inputs. It never creates plans, orders, positions, or execution.
+            const symbol = binanceSymbolFromBody(body)
+            const intelligence = refreshIntelligence(symbol)
+            return json({ ...financePayload(), intelligence })
           }
           if (action === 'fetch_candles') {
             // Read-only historical OHLCV from Binance public klines.
