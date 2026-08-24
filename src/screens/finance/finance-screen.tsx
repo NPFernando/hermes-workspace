@@ -2664,6 +2664,28 @@ type NewsIngestion = {
   stored: number
 }
 
+type IntelligenceRefresh = {
+  researchOnly: boolean
+  composite: {
+    symbol: string
+    score: number | null
+    label: 'positive' | 'neutral' | 'negative' | 'mixed' | 'unknown'
+    confidence: number
+    freshness: number
+    sourceIds: Array<string>
+    disagreement: boolean
+    blockers: Array<string>
+    observedAt: string
+  }
+  stored: {
+    stored: boolean
+    risk: {
+      riskLevel: string
+      riskScore: number
+    }
+  }
+}
+
 const DEFAULT_NEWS_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
 const BINANCE_SYMBOL_PATTERN = /^[A-Z0-9]{5,20}$/
 
@@ -2905,6 +2927,107 @@ function NewsResearchPanel({
   )
 }
 
+function IntelligenceSummaryPanel({
+  onPayload,
+}: {
+  onPayload: (payload: FinancePayload) => void
+}) {
+  const [symbol, setSymbol] = useState(DEFAULT_NEWS_SYMBOLS[0])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [intelligence, setIntelligence] = useState<IntelligenceRefresh | null>(
+    null,
+  )
+
+  async function refresh() {
+    setBusy(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'refresh_intelligence', symbol }),
+      })
+      const data = (await response.json()) as FinancePayload & {
+        error?: string
+        intelligence?: IntelligenceRefresh
+      }
+      if (!response.ok || data.ok === false)
+        throw new Error(data.error || `HTTP ${response.status}`)
+      onPayload(data)
+      setIntelligence(data.intelligence ?? null)
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : 'Intelligence refresh failed',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const composite = intelligence?.composite
+  return (
+    <section
+      className="mt-6 rounded-3xl border border-violet-400/25 bg-[var(--theme-panel)]/70 p-5"
+      aria-label="Intelligence summary"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-200/80">
+            Research only
+          </p>
+          <h2 className="mt-1 text-lg font-semibold">Intelligence Summary</h2>
+          <p className="mt-1 text-sm text-[var(--theme-muted)]">
+            Derived from stored news. It does not create plans, orders, or executions.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={symbol}
+            onChange={(event) => setSymbol(normalizeBinanceSymbol(event.target.value))}
+            className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-2 text-sm text-[var(--theme-text)]"
+            aria-label="Intelligence symbol"
+          >
+            {DEFAULT_NEWS_SYMBOLS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            disabled={busy}
+            className="rounded-xl bg-violet-500/20 px-4 py-2 text-sm font-semibold text-violet-100 transition-colors hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+      {error && <p className="mt-3 text-sm text-red-200" role="alert">{error}</p>}
+      {composite ? (
+        <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <p>Sentiment: <strong>{composite.label}</strong> ({composite.score ?? 'unavailable'})</p>
+          <p>Confidence: <strong>{Math.round(composite.confidence * 100)}%</strong></p>
+          <p>Freshness: <strong>{Math.round(composite.freshness * 100)}%</strong></p>
+          <p>Research risk: <strong>{intelligence.stored.risk.riskLevel}</strong></p>
+          <p className="sm:col-span-2">Evidence: {composite.sourceIds.length} stored source{composite.sourceIds.length === 1 ? '' : 's'}</p>
+          <p className="sm:col-span-2">Updated: {formatDateTime(composite.observedAt)}</p>
+          {composite.blockers.length > 0 && (
+            <p className="sm:col-span-2 text-amber-100">Caution: {composite.blockers.join('; ')}.</p>
+          )}
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-[var(--theme-muted)]">
+          Refresh to summarize the latest stored research for this symbol.
+        </p>
+      )}
+    </section>
+  )
+}
+
 function PersonalFinanceWorkspace({
   payload,
   onPayload,
@@ -3083,6 +3206,7 @@ export function FinanceScreen() {
       />
 
       <NewsResearchPanel payload={payload} onPayload={setPayload} />
+      <IntelligenceSummaryPanel onPayload={setPayload} />
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
