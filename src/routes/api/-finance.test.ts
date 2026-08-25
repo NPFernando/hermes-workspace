@@ -17,6 +17,8 @@ const state = vi.hoisted(() => ({
   buildCompositeSentiment: vi.fn(),
   fetchNews: vi.fn(),
   appendPaperDecisionSnapshot: vi.fn(),
+  readPaperDecisionJournal: vi.fn<() => Array<unknown>>(() => []),
+  evaluatePaperDecisionQuality: vi.fn<(input: unknown) => unknown>(() => ({ sampleCount: 0, sideEffects: false })),
   storeIntelligenceRecords: vi.fn(),
 }))
 vi.mock('../../server/auth-middleware', () => ({
@@ -32,6 +34,10 @@ vi.mock('../../server/finance-intelligence', () => ({
 }))
 vi.mock('../../server/paper-decision-journal', () => ({
   appendPaperDecisionSnapshot: state.appendPaperDecisionSnapshot,
+  readPaperDecisionJournal: state.readPaperDecisionJournal,
+}))
+vi.mock('../../server/paper-decision-quality', () => ({
+  evaluatePaperDecisionQuality: state.evaluatePaperDecisionQuality,
 }))
 vi.mock('../../server/finance-storage-monitor', () => ({
   startFinanceStorageMonitor: vi.fn(),
@@ -43,7 +49,7 @@ vi.mock('../../server/finance-store', () => ({
   addFinanceRecord: vi.fn(),
   appendAuditLog: vi.fn(),
   budgetVsActualSummary: vi.fn(() => []),
-  ensureFinanceStore: vi.fn(() => ({ settings: {}, connectivityBreaker: {} })),
+  ensureFinanceStore: vi.fn(() => ({ settings: {}, connectivityBreaker: {}, historical_candles: [] })),
   financeAlerts: vi.fn(() => []),
   financeStorageAlerts: vi.fn(() => []),
   financeStorageStatus: vi.fn(() => ({ health: {}, postgres: { database: 'finance' } })),
@@ -78,6 +84,34 @@ async function handlers() {
 }
 
 describe('/api/finance fetch_news', () => {
+  it('exposes read-only paper-decision quality only through the authenticated finance payload', async () => {
+    state.authenticated = true
+    state.readPaperDecisionJournal.mockReturnValueOnce([{ id: 'paper-decision:one' }])
+    state.evaluatePaperDecisionQuality.mockReturnValueOnce({
+      sampleCount: 1,
+      coveredSampleCount: 1,
+      sideEffects: false,
+    })
+    const store = await import('../../server/finance-store')
+
+    const response = await (await handlers()).GET({
+      request: new Request('http://localhost/api/finance'),
+    })
+
+    expect(response.status).toBe(200)
+    expect(state.evaluatePaperDecisionQuality).toHaveBeenCalledWith(expect.objectContaining({
+      decisions: [{ id: 'paper-decision:one' }],
+      historicalCandles: [],
+    }))
+    expect(vi.mocked(store.writeFinanceStore)).not.toHaveBeenCalled()
+    expect(vi.mocked(store.addFinanceRecord)).not.toHaveBeenCalled()
+    expect(vi.mocked(store.appendAuditLog)).not.toHaveBeenCalled()
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      paperDecisionQuality: { sampleCount: 1, coveredSampleCount: 1, sideEffects: false },
+    })
+  })
+
   it('rejects an unauthenticated POST before contacting Google News', async () => {
     state.authenticated = false
     const response = await (await handlers()).POST({
