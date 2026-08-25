@@ -44,7 +44,11 @@ import {
 import { startFinanceStorageMonitor } from '../../server/finance-storage-monitor'
 import { fetchAndStoreGoogleNews } from '../../server/finance-news.service'
 import { INTELLIGENCE_FORMULA_VERSION, assessResearchRisk, buildCompositeSentiment } from '../../server/finance-intelligence'
-import { appendPaperDecisionSnapshot } from '../../server/paper-decision-journal'
+import {
+  appendPaperDecisionSnapshot,
+  readPaperDecisionJournal,
+} from '../../server/paper-decision-journal'
+import { evaluatePaperDecisionQuality } from '../../server/paper-decision-quality'
 import { resetConnectivityBreaker } from '../../server/connectivity-breaker'
 
 const VALID_LONG_SHORT_PERIODS = new Set([
@@ -159,6 +163,11 @@ function financePayload() {
     tradingPerformance: tradingPerformanceSummary(db),
     demoPerformance: demoTradingPerformance(),
     decisionQuality: decisionQualityReport(),
+    paperDecisionQuality: evaluatePaperDecisionQuality({
+      decisions: readPaperDecisionJournal(),
+      historicalCandles: db.historical_candles,
+      evaluatedAt: new Date().toISOString(),
+    }),
     learning: learningReport(),
     marketLearning: marketLearningReport(),
     safeguardHistory: safeguardHistory(),
