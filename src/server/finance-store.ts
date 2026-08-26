@@ -19,6 +19,8 @@ export const FINANCE_SCHEMA_VERSION = 1
 export const FINANCE_DATA_DIR = path.join(os.homedir(), '.hermes', 'finance')
 export const FINANCE_DATA_PATH = path.join(FINANCE_DATA_DIR, 'finance.json')
 export const FINANCE_AUDIT_PATH = path.join(FINANCE_DATA_DIR, 'audit.jsonl')
+/** Original documents/photos from both ingestion paths (upload, Gmail attachments) — referenced by pending_ingestions.sourceRef. */
+export const FINANCE_INGESTION_UPLOAD_DIR = path.join(FINANCE_DATA_DIR, 'ingestion-uploads')
 
 export const SUPPORTED_CURRENCIES = ['LKR', 'AUD', 'USD'] as const
 export const TRADING_MODES = [
@@ -182,6 +184,42 @@ export type TaxRecord = {
   notes?: string
   supportingDocument?: string
   source: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * A record awaiting AI extraction and/or human review before it becomes a
+ * real income/expense record — the "AI proposes, human confirms" queue for
+ * the Gmail-sync and document/camera-upload ingestion paths. Deliberately
+ * separate from addFinanceRecord()'s `kind` union (income/expense/etc.)
+ * since a pending ingestion isn't a real finance record yet.
+ */
+export type PendingIngestionStatus =
+  | 'awaiting_password'
+  | 'awaiting_review'
+  | 'confirmed'
+  | 'rejected'
+
+export type ExtractedTransaction = {
+  kind: 'income' | 'expense'
+  amount: number
+  currency: string
+  vendorOrSource: string
+  date: string
+  category?: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export type PendingIngestion = {
+  id: string
+  status: PendingIngestionStatus
+  source: 'gmail' | 'upload'
+  sourceRef: string
+  passwordHint?: string
+  extracted?: ExtractedTransaction
+  rawPreviewImagePath?: string
+  error?: string
   createdAt: string
   updatedAt: string
 }
@@ -459,6 +497,7 @@ export type FinanceDatabase = {
   budget_categories: Array<BudgetCategory>
   savings_goals: Array<SavingsGoal>
   tax_records: Array<TaxRecord>
+  pending_ingestions: Array<PendingIngestion>
   exchange_rates: Array<Record<string, unknown>>
   investment_accounts: Array<Record<string, unknown>>
   trading_platforms: Array<Record<string, unknown>>
@@ -551,6 +590,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     budget_categories: [],
     savings_goals: [],
     tax_records: [],
+    pending_ingestions: [],
     exchange_rates: [],
     investment_accounts: [],
     trading_platforms: [
@@ -1324,6 +1364,52 @@ export function updateFinanceRecord(
   writeFinanceStore(db)
   appendAuditLog(`record_updated:${kind}`, { id, kind })
   return db
+}
+
+export function listPendingIngestions(): Array<PendingIngestion> {
+  return ensureFinanceStore().pending_ingestions
+}
+
+export function addPendingIngestion(
+  input: Pick<PendingIngestion, 'source' | 'sourceRef'> &
+    Partial<Pick<PendingIngestion, 'status' | 'passwordHint' | 'extracted' | 'rawPreviewImagePath' | 'error'>>,
+): PendingIngestion {
+  const db = ensureFinanceStore()
+  const createdAt = nowIso()
+  const record: PendingIngestion = {
+    id: randomUUID(),
+    status: input.status ?? 'awaiting_review',
+    source: input.source,
+    sourceRef: input.sourceRef,
+    passwordHint: input.passwordHint,
+    extracted: input.extracted,
+    rawPreviewImagePath: input.rawPreviewImagePath,
+    error: input.error,
+    createdAt,
+    updatedAt: createdAt,
+  }
+  db.pending_ingestions.push(record)
+  writeFinanceStore(db)
+  appendAuditLog('pending_ingestion_added', { id: record.id, source: record.source, status: record.status })
+  return record
+}
+
+export function updatePendingIngestion(
+  id: string,
+  patch: Partial<Omit<PendingIngestion, 'id' | 'createdAt'>>,
+): PendingIngestion {
+  const db = ensureFinanceStore()
+  const index = db.pending_ingestions.findIndex((r) => r.id === id)
+  if (index === -1) throw new Error(`Pending ingestion not found: ${id}`)
+  const updated: PendingIngestion = {
+    ...db.pending_ingestions[index],
+    ...patch,
+    updatedAt: nowIso(),
+  }
+  db.pending_ingestions[index] = updated
+  writeFinanceStore(db)
+  appendAuditLog('pending_ingestion_updated', { id, status: updated.status })
+  return updated
 }
 
 export function createTradingPlan(

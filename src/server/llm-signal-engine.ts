@@ -205,7 +205,7 @@ export function selectHarpRoutes(task: string, risk: string): Array<HarpRoute> {
   }
 }
 
-function readOpenRouterKey(): string | null {
+export function readOpenRouterKey(): string | null {
   if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY
   try {
     const envPath = path.join(os.homedir(), '.hermes', '.env')
