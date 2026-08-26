@@ -178,6 +178,7 @@ import { Route as ApiUpdateNaveenStatusRouteImport } from './routes/api/update/n
 import { Route as ApiUpdateNaveenApplyRouteImport } from './routes/api/update/naveen-apply'
 import { Route as ApiUpdateNaveenAiAnalysisRouteImport } from './routes/api/update/naveen-ai-analysis'
 import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
+import { Route as ApiTradingSummaryRouteImport } from './routes/api/trading/summary'
 import { Route as ApiSwarmRuntimeResetRouteImport } from './routes/api/swarm-runtime.reset'
 import { Route as ApiSwarmMemorySearchRouteImport } from './routes/api/swarm-memory/search'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
@@ -1094,6 +1095,11 @@ const ApiUpdateAgentRoute = ApiUpdateAgentRouteImport.update({
   path: '/api/update/agent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTradingSummaryRoute = ApiTradingSummaryRouteImport.update({
+  id: '/api/trading/summary',
+  path: '/api/trading/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSwarmRuntimeResetRoute = ApiSwarmRuntimeResetRouteImport.update({
   id: '/reset',
   path: '/reset',
@@ -1662,6 +1668,7 @@ export interface FileRoutesByFullPath {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
   '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
+  '/api/trading/summary': typeof ApiTradingSummaryRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/naveen-ai-analysis': typeof ApiUpdateNaveenAiAnalysisRoute
   '/api/update/naveen-apply': typeof ApiUpdateNaveenApplyRoute
@@ -1900,6 +1907,7 @@ export interface FileRoutesByTo {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
   '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
+  '/api/trading/summary': typeof ApiTradingSummaryRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/naveen-ai-analysis': typeof ApiUpdateNaveenAiAnalysisRoute
   '/api/update/naveen-apply': typeof ApiUpdateNaveenApplyRoute
@@ -2140,6 +2148,7 @@ export interface FileRoutesById {
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
   '/api/swarm-memory/search': typeof ApiSwarmMemorySearchRoute
   '/api/swarm-runtime/reset': typeof ApiSwarmRuntimeResetRoute
+  '/api/trading/summary': typeof ApiTradingSummaryRoute
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/naveen-ai-analysis': typeof ApiUpdateNaveenAiAnalysisRoute
   '/api/update/naveen-apply': typeof ApiUpdateNaveenApplyRoute
@@ -2381,6 +2390,7 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
     | '/api/swarm-runtime/reset'
+    | '/api/trading/summary'
     | '/api/update/agent'
     | '/api/update/naveen-ai-analysis'
     | '/api/update/naveen-apply'
@@ -2619,6 +2629,7 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
     | '/api/swarm-runtime/reset'
+    | '/api/trading/summary'
     | '/api/update/agent'
     | '/api/update/naveen-ai-analysis'
     | '/api/update/naveen-apply'
@@ -2858,6 +2869,7 @@ export interface FileRouteTypes {
     | '/api/skills/uninstall'
     | '/api/swarm-memory/search'
     | '/api/swarm-runtime/reset'
+    | '/api/trading/summary'
     | '/api/update/agent'
     | '/api/update/naveen-ai-analysis'
     | '/api/update/naveen-apply'
@@ -3070,6 +3082,7 @@ export interface RootRouteChildren {
   ApiProfilesToggleSkillRoute: typeof ApiProfilesToggleSkillRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
   ApiRunsActiveRoute: typeof ApiRunsActiveRoute
+  ApiTradingSummaryRoute: typeof ApiTradingSummaryRoute
   ApiUpdateAgentRoute: typeof ApiUpdateAgentRoute
   ApiUpdateNaveenAiAnalysisRoute: typeof ApiUpdateNaveenAiAnalysisRoute
   ApiUpdateNaveenApplyRoute: typeof ApiUpdateNaveenApplyRoute
@@ -4264,6 +4277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUpdateAgentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/trading/summary': {
+      id: '/api/trading/summary'
+      path: '/api/trading/summary'
+      fullPath: '/api/trading/summary'
+      preLoaderRoute: typeof ApiTradingSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/swarm-runtime/reset': {
       id: '/api/swarm-runtime/reset'
       path: '/reset'
@@ -5189,6 +5209,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesToggleSkillRoute: ApiProfilesToggleSkillRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
   ApiRunsActiveRoute: ApiRunsActiveRoute,
+  ApiTradingSummaryRoute: ApiTradingSummaryRoute,
   ApiUpdateAgentRoute: ApiUpdateAgentRoute,
   ApiUpdateNaveenAiAnalysisRoute: ApiUpdateNaveenAiAnalysisRoute,
   ApiUpdateNaveenApplyRoute: ApiUpdateNaveenApplyRoute,

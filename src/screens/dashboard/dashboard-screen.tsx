@@ -29,6 +29,7 @@ import { SessionsIntelligenceCard } from './components/sessions-intelligence-car
 import { SkillsUsageCard } from './components/skills-usage-card'
 import { TokenMixHourCard } from './components/token-mix-hour-card'
 import { TopModelsCard } from './components/top-models-card'
+import { TradingOverviewCard } from './components/trading-overview-card'
 import { VelocityCard } from './components/velocity-card'
 import { WidgetShell } from './components/widget-shell'
 import { normalizeDashboardSessionsPayload } from './lib/sessions-query'
@@ -965,7 +966,13 @@ export function DashboardScreen() {
 
       {layout.isVisible('finance_overview') ? (
         <WidgetShell id="finance_overview" layout={layout}>
-          <FinanceOverviewCard onOpen={() => navigate({ to: '/finance' })} />
+          <FinanceOverviewCard onOpen={() => navigate({ to: '/personal-finance' })} />
+        </WidgetShell>
+      ) : null}
+
+      {layout.isVisible('trading_overview') ? (
+        <WidgetShell id="trading_overview" layout={layout}>
+          <TradingOverviewCard onOpen={() => navigate({ to: '/trading' })} />
         </WidgetShell>
       ) : null}
 

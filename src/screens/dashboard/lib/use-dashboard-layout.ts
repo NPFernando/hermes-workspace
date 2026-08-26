@@ -25,6 +25,7 @@ export type WidgetId =
   | 'achievements'
   | 'mix_rhythm'
   | 'finance_overview'
+  | 'trading_overview'
 
 export type WidgetMeta = {
   id: WidgetId
@@ -132,6 +133,13 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     id: 'finance_overview',
     label: 'Finance overview',
     description: 'Net worth, savings rate, and the current controlled-trading mode.',
+    column: 'main',
+    hideable: true,
+  },
+  {
+    id: 'trading_overview',
+    label: 'Trading overview',
+    description: "Today's/total P&L, open positions, win rate, and per-engine status.",
     column: 'main',
     hideable: true,
   },

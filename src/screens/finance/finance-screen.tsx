@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Area, AreaChart, ResponsiveContainer } from 'recharts'
+import { TradingSummaryStrip } from '../trading/components/trading-summary-strip'
+import { RebalanceCard } from '../trading/components/rebalance-card'
+import { LlmSignalCard } from '../trading/components/llm-signal-card'
 import { DemoTradingPanel } from './demo-trading-panel'
 import { GridTradingPanel } from './grid-trading-panel'
 import { useFinanceAction } from './hooks/use-finance-action'
@@ -3126,6 +3129,7 @@ export function FinanceScreen({
 
       {activeWorkspace === 'trading' ? (
         <>
+          <TradingSummaryStrip />
           <LivePriceTicker
         symbols={
           Array.isArray(
@@ -3252,6 +3256,8 @@ export function FinanceScreen({
 
       <DemoTradingPanel />
       <GridTradingPanel />
+      <RebalanceCard />
+      <LlmSignalCard />
 
       <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
         <h2 className="text-lg font-semibold">Phased rollout</h2>
