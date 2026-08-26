@@ -227,6 +227,7 @@ import { Route as ApiHindsightDeleteRouteImport } from './routes/api/hindsight/d
 import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-tasks.$taskId'
 import { Route as ApiGatewaySessionsRouteImport } from './routes/api/gateway/sessions'
 import { Route as ApiGatewayAgentsRouteImport } from './routes/api/gateway/agents'
+import { Route as ApiFinanceSummaryRouteImport } from './routes/api/finance/summary'
 import { Route as ApiExternalMemorySearchRouteImport } from './routes/api/external-memory/search'
 import { Route as ApiExternalMemoryProvidersRouteImport } from './routes/api/external-memory/providers'
 import { Route as ApiExternalMemoryCandidatesRouteImport } from './routes/api/external-memory/candidates'
@@ -1339,6 +1340,11 @@ const ApiGatewayAgentsRoute = ApiGatewayAgentsRouteImport.update({
   path: '/api/gateway/agents',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFinanceSummaryRoute = ApiFinanceSummaryRouteImport.update({
+  id: '/summary',
+  path: '/summary',
+  getParentRoute: () => ApiFinanceRoute,
+} as any)
 const ApiExternalMemorySearchRoute = ApiExternalMemorySearchRouteImport.update({
   id: '/api/external-memory/search',
   path: '/api/external-memory/search',
@@ -1606,6 +1612,7 @@ export interface FileRoutesByFullPath {
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
+  '/api/finance/summary': typeof ApiFinanceSummaryRoute
   '/api/gateway/agents': typeof ApiGatewayAgentsRoute
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -1843,6 +1850,7 @@ export interface FileRoutesByTo {
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
+  '/api/finance/summary': typeof ApiFinanceSummaryRoute
   '/api/gateway/agents': typeof ApiGatewayAgentsRoute
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -2082,6 +2090,7 @@ export interface FileRoutesById {
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
+  '/api/finance/summary': typeof ApiFinanceSummaryRoute
   '/api/gateway/agents': typeof ApiGatewayAgentsRoute
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/hermes-tasks/$taskId': typeof ApiHermesTasksTaskIdRoute
@@ -2322,6 +2331,7 @@ export interface FileRouteTypes {
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
+    | '/api/finance/summary'
     | '/api/gateway/agents'
     | '/api/gateway/sessions'
     | '/api/hermes-tasks/$taskId'
@@ -2559,6 +2569,7 @@ export interface FileRouteTypes {
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
+    | '/api/finance/summary'
     | '/api/gateway/agents'
     | '/api/gateway/sessions'
     | '/api/hermes-tasks/$taskId'
@@ -2797,6 +2808,7 @@ export interface FileRouteTypes {
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
+    | '/api/finance/summary'
     | '/api/gateway/agents'
     | '/api/gateway/sessions'
     | '/api/hermes-tasks/$taskId'
@@ -4595,6 +4607,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGatewayAgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/finance/summary': {
+      id: '/api/finance/summary'
+      path: '/summary'
+      fullPath: '/api/finance/summary'
+      preLoaderRoute: typeof ApiFinanceSummaryRouteImport
+      parentRoute: typeof ApiFinanceRoute
+    }
     '/api/external-memory/search': {
       id: '/api/external-memory/search'
       path: '/api/external-memory/search'
@@ -4798,11 +4817,13 @@ const ApiClaudeTasksRouteWithChildren = ApiClaudeTasksRoute._addFileChildren(
 )
 
 interface ApiFinanceRouteChildren {
+  ApiFinanceSummaryRoute: typeof ApiFinanceSummaryRoute
   ApiFinanceReportExpenseRoute: typeof ApiFinanceReportExpenseRoute
   ApiFinanceReportIncomeRoute: typeof ApiFinanceReportIncomeRoute
 }
 
 const ApiFinanceRouteChildren: ApiFinanceRouteChildren = {
+  ApiFinanceSummaryRoute: ApiFinanceSummaryRoute,
   ApiFinanceReportExpenseRoute: ApiFinanceReportExpenseRoute,
   ApiFinanceReportIncomeRoute: ApiFinanceReportIncomeRoute,
 }

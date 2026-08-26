@@ -176,7 +176,10 @@ function financePayload() {
     alerts,
     settings: db.settings,
     connectivityBreaker: db.connectivityBreaker,
-    data: maskSensitive(db),
+    // market_prices/risk_scores are fetched but never rendered anywhere in
+    // the UI (confirmed via grep) — dropped here to shrink this response,
+    // which finance-screen.tsx's polling/refetch cycle re-fetches in full.
+    data: maskSensitive({ ...db, market_prices: [], risk_scores: [] }),
   }
 }
 

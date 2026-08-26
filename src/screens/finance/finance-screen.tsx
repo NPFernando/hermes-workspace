@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Area, AreaChart, ResponsiveContainer } from 'recharts'
 import { DemoTradingPanel } from './demo-trading-panel'
 import { GridTradingPanel } from './grid-trading-panel'
+import { useFinanceAction } from './hooks/use-finance-action'
+import { StatCard } from './components/stat-card'
 
 type DecisionQualityFinding = {
   severity: 'info' | 'warning' | 'critical'
@@ -354,9 +356,7 @@ type FinancePayload = {
     tax_records: Array<Record<string, unknown>>
     trading_plans: Array<Record<string, unknown>>
     assets: Array<Record<string, unknown>>
-    market_prices: Array<Record<string, unknown>>
     news_items: Array<Record<string, unknown>>
-    risk_scores: Array<Record<string, unknown>>
   }
 }
 
@@ -446,33 +446,6 @@ function textValue(row: Record<string, unknown>, key: string): string {
   if (value == null || value === '') return '—'
   if (typeof value === 'number') return value.toLocaleString('en-LK')
   return String(value)
-}
-
-function StatCard({
-  label,
-  value,
-  tone = 'neutral',
-}: {
-  label: string
-  value: string
-  tone?: 'neutral' | 'good' | 'warn' | 'danger'
-}) {
-  const toneClass =
-    tone === 'good'
-      ? 'text-emerald-200 border-emerald-400/25 bg-emerald-500/10'
-      : tone === 'warn'
-        ? 'text-amber-200 border-amber-400/25 bg-amber-500/10'
-        : tone === 'danger'
-          ? 'text-red-200 border-red-400/25 bg-red-500/10'
-          : 'text-[var(--theme-text)] border-[var(--theme-border)] bg-[var(--theme-panel)]/70'
-  return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${toneClass}`}>
-      <div className="text-xs uppercase tracking-[0.22em] text-[var(--theme-muted)]">
-        {label}
-      </div>
-      <div className="mt-2 text-2xl font-semibold">{value}</div>
-    </div>
-  )
 }
 
 function DataTable({
@@ -683,9 +656,10 @@ function StrategyOverridePanel({
   state: FinancePayload['strategyOverrides']
   onPayload: (payload: FinancePayload) => void
 }) {
-  const [busy, setBusy] = useState<string | null>(null)
+  const { run, busy, error } = useFinanceAction<
+    FinancePayload & { strategyOverrideResult?: { message: string } }
+  >(onPayload)
   const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [expiresAfterDays, setExpiresAfterDays] = useState(7)
   const activeByStrategy = useMemo(
     () =>
@@ -724,50 +698,32 @@ function StrategyOverridePanel({
       const confirmed = window.confirm(`Re-enable ${strategyId}?`)
       if (!confirmed) return
     }
-    setBusy(`${strategyId}:${overrideAction}:${multiplier ?? ''}`)
     setMessage(null)
-    setError(null)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'set_strategy_override',
-          strategyId,
-          overrideAction,
-          multiplier,
-          ...(overrideAction === 'clear'
-            ? {}
-            : {
-                reviewAfterDays: Math.max(1, Math.floor(expiresAfterDays / 2)),
-                expiresAfterDays,
-              }),
-          reason:
-            overrideAction === 'disabled'
-              ? 'Manual disable from Finance UI.'
-              : overrideAction === 'reduce_size'
-                ? `Manual ${multiplier?.toFixed(2) ?? '0.50'}x size reduction from Finance UI.`
-                : 'Manual re-enable from Finance UI.',
-        }),
-      })
-      const data = (await res.json()) as FinancePayload & {
-        error?: string
-        strategyOverrideResult?: { message: string }
-      }
-      if (!res.ok || data.ok === false)
-        throw new Error(data.error || `HTTP ${res.status}`)
-      onPayload(data)
+    const data = await run(
+      {
+        action: 'set_strategy_override',
+        strategyId,
+        overrideAction,
+        multiplier,
+        ...(overrideAction === 'clear'
+          ? {}
+          : {
+              reviewAfterDays: Math.max(1, Math.floor(expiresAfterDays / 2)),
+              expiresAfterDays,
+            }),
+        reason:
+          overrideAction === 'disabled'
+            ? 'Manual disable from Finance UI.'
+            : overrideAction === 'reduce_size'
+              ? `Manual ${multiplier?.toFixed(2) ?? '0.50'}x size reduction from Finance UI.`
+              : 'Manual re-enable from Finance UI.',
+      },
+      `${strategyId}:${overrideAction}:${multiplier ?? ''}`,
+    )
+    if (data) {
       setMessage(
         data.strategyOverrideResult?.message ?? 'Strategy override updated.',
       )
-    } catch (nextError) {
-      setError(
-        nextError instanceof Error
-          ? nextError.message
-          : 'Strategy override update failed',
-      )
-    } finally {
-      setBusy(null)
     }
   }
 
@@ -994,8 +950,7 @@ function SignalSettingsPanel({
   demoTrading: Record<string, unknown>
   onPayload: (p: FinancePayload) => void
 }) {
-  const [busy, setBusy] = useState<string | null>(null)
-  const [err, setErr] = useState<string | null>(null)
+  const { run: post, busy, error: err } = useFinanceAction<FinancePayload>(onPayload)
   const atrSizeBaselinePct =
     typeof demoTrading.atrSizeBaselinePct === 'number'
       ? demoTrading.atrSizeBaselinePct
@@ -1010,26 +965,6 @@ function SignalSettingsPanel({
 
   const [atrInput, setAtrInput] = useState(String(atrSizeBaselinePct * 100))
   const [adxInput, setAdxInput] = useState(String(adxThreshold))
-
-  async function post(body: Record<string, unknown>, busyKey: string) {
-    setBusy(busyKey)
-    setErr(null)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = (await res.json()) as FinancePayload & { error?: string }
-      if (!res.ok || data.ok === false)
-        throw new Error(data.error || `HTTP ${res.status}`)
-      onPayload(data)
-    } catch (nextError) {
-      setErr(nextError instanceof Error ? nextError.message : 'Request failed')
-    } finally {
-      setBusy(null)
-    }
-  }
 
   function setConfig(config: Record<string, unknown>, busyKey: string) {
     void post({ action: 'set_demo_config', config }, busyKey)
@@ -1247,28 +1182,7 @@ function TradingControls({
   summary: FinancePayload['summary']
   onPayload: (p: FinancePayload) => void
 }) {
-  const [busy, setBusy] = useState<string | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-
-  async function post(body: Record<string, unknown>, busyKey: string) {
-    setBusy(busyKey)
-    setErr(null)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = (await res.json()) as FinancePayload & { error?: string }
-      if (!res.ok || data.ok === false)
-        throw new Error(data.error || `HTTP ${res.status}`)
-      onPayload(data)
-    } catch (nextError) {
-      setErr(nextError instanceof Error ? nextError.message : 'Request failed')
-    } finally {
-      setBusy(null)
-    }
-  }
+  const { run: post, busy, error: err } = useFinanceAction<FinancePayload>(onPayload)
 
   const cutoffOn = summary.emergencyKillSwitch
 
@@ -1597,9 +1511,20 @@ function DecisionQualityPanel({
   overrides: FinancePayload['strategyOverrides']
   onPayload: (payload: FinancePayload) => void
 }) {
-  const [busy, setBusy] = useState(false)
+  const { run, isBusy: busy, error } = useFinanceAction<
+    FinancePayload & {
+      appliedSafeguards?: {
+        tradingMode: string
+        quotePerTrade: number
+        liveRecommendationDeferred: boolean
+      }
+      strategyOverrideRecommendationResult?: {
+        applied: Array<{ changed: boolean }>
+        skipped: Array<unknown>
+      }
+    }
+  >(onPayload)
   const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const activeOverrideByStrategy = useMemo(
     () =>
       new Map(
@@ -1647,79 +1572,30 @@ function DecisionQualityPanel({
       : 'border-amber-400/30 bg-amber-500/10 text-amber-100'
 
   async function applySafeguards() {
-    setBusy(true)
-    setError(null)
     setMessage(null)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'apply_recommended_safeguards' }),
-      })
-      const data = (await res.json()) as FinancePayload & {
-        error?: string
-        appliedSafeguards?: {
-          tradingMode: string
-          quotePerTrade: number
-          liveRecommendationDeferred: boolean
-        }
-      }
-      if (!res.ok || data.ok === false)
-        throw new Error(data.error || `HTTP ${res.status}`)
-      onPayload(data)
+    const data = await run({ action: 'apply_recommended_safeguards' })
+    if (data) {
       const applied = data.appliedSafeguards
       setMessage(
         applied
           ? `Applied ${applied.tradingMode} with ${applied.quotePerTrade.toFixed(2)} USDT max trade size${applied.liveRecommendationDeferred ? '; live recommendation deferred until explicit live arming' : ''}.`
           : 'Recommended safeguards applied.',
       )
-    } catch (nextError) {
-      setError(
-        nextError instanceof Error
-          ? nextError.message
-          : 'Failed to apply safeguards',
-      )
-    } finally {
-      setBusy(false)
     }
   }
 
   async function applyStrategyRecommendations() {
-    setBusy(true)
-    setError(null)
     setMessage(null)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'apply_strategy_override_recommendations',
-        }),
-      })
-      const data = (await res.json()) as FinancePayload & {
-        error?: string
-        strategyOverrideRecommendationResult?: {
-          applied: Array<{ changed: boolean }>
-          skipped: Array<unknown>
-        }
-      }
-      if (!res.ok || data.ok === false)
-        throw new Error(data.error || `HTTP ${res.status}`)
-      onPayload(data)
+    const data = await run({
+      action: 'apply_strategy_override_recommendations',
+    })
+    if (data) {
       const result = data.strategyOverrideRecommendationResult
       const changed = result?.applied.filter((item) => item.changed).length ?? 0
       const skipped = result?.skipped.length ?? 0
       setMessage(
         `Applied ${changed} strategy override recommendation${changed === 1 ? '' : 's'}; ${skipped} skipped.`,
       )
-    } catch (nextError) {
-      setError(
-        nextError instanceof Error
-          ? nextError.message
-          : 'Failed to apply strategy recommendations',
-      )
-    } finally {
-      setBusy(false)
     }
   }
 
@@ -1955,9 +1831,17 @@ function SelfImprovementPanel({
   summary: FinancePayload['summary']
   onPayload: (payload: FinancePayload) => void
 }) {
-  const [busy, setBusy] = useState<'run' | string | null>(null)
+  const { run, busy, error } = useFinanceAction<
+    FinancePayload & {
+      learningCycle?: LearningCycleResult
+      learningCandidateResult?: {
+        candidate: LearningCandidate | null
+        applied: boolean
+        skippedReason: string | null
+      }
+    }
+  >(onPayload)
   const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const latest = report.latestCandidate
   const paperMode = summary.tradingMode === 'paper_trade'
   const testnetMode = summary.tradingMode === 'testnet_execute'
@@ -2007,22 +1891,9 @@ function SelfImprovementPanel({
     candidate.status === 'proposed' && canApplyInCurrentMode
 
   async function runLearningCycle() {
-    setBusy('run')
-    setError(null)
     setMessage(null)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'run_learning_cycle' }),
-      })
-      const data = (await res.json()) as FinancePayload & {
-        error?: string
-        learningCycle?: LearningCycleResult
-      }
-      if (!res.ok || data.ok === false)
-        throw new Error(data.error || `HTTP ${res.status}`)
-      onPayload(data)
+    const data = await run({ action: 'run_learning_cycle' }, 'run')
+    if (data) {
       const cycle = data.learningCycle
       if (cycle?.appliedCandidate) {
         setMessage(
@@ -2037,55 +1908,22 @@ function SelfImprovementPanel({
       } else {
         setMessage(cycle?.skippedReason ?? 'Learning cycle completed.')
       }
-    } catch (nextError) {
-      setError(
-        nextError instanceof Error
-          ? nextError.message
-          : 'Failed to run learning cycle',
-      )
-    } finally {
-      setBusy(null)
     }
   }
 
   async function applyCandidate(candidateId: string) {
-    setBusy(candidateId)
-    setError(null)
     setMessage(null)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'apply_learning_candidate',
-          candidateId,
-        }),
-      })
-      const data = (await res.json()) as FinancePayload & {
-        error?: string
-        learningCandidateResult?: {
-          candidate: LearningCandidate | null
-          applied: boolean
-          skippedReason: string | null
-        }
-      }
-      if (!res.ok || data.ok === false)
-        throw new Error(data.error || `HTTP ${res.status}`)
-      onPayload(data)
+    const data = await run(
+      { action: 'apply_learning_candidate', candidateId },
+      candidateId,
+    )
+    if (data) {
       const result = data.learningCandidateResult
       setMessage(
         result?.applied && result.candidate
           ? `Applied ${result.candidate.id}: ${patchLabel(result.candidate)}.`
           : (result?.skippedReason ?? 'Learning candidate was not applied.'),
       )
-    } catch (nextError) {
-      setError(
-        nextError instanceof Error
-          ? nextError.message
-          : 'Failed to apply learning candidate',
-      )
-    } finally {
-      setBusy(null)
     }
   }
 
@@ -2367,8 +2205,7 @@ function BudgetPanel({
   onPayload: (p: FinancePayload) => void
 }) {
   const currentMonth = new Date().toISOString().slice(0, 7)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [err, setErr] = useState<string | null>(null)
+  const { run: post, busy, error: err, setError: setErr } = useFinanceAction<FinancePayload>(onPayload)
   const [budgetMonth, setBudgetMonth] = useState(currentMonth)
   const [budgetCategory, setBudgetCategory] = useState('')
   const [budgetAmount, setBudgetAmount] = useState('')
@@ -2381,34 +2218,12 @@ function BudgetPanel({
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCurrency, setExpenseCurrency] = useState('LKR')
 
-  async function post(body: Record<string, unknown>, busyKey: string) {
-    setBusy(busyKey)
-    setErr(null)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = (await res.json()) as FinancePayload & { error?: string }
-      if (!res.ok || data.ok === false)
-        throw new Error(data.error || `HTTP ${res.status}`)
-      onPayload(data)
-      return true
-    } catch (nextError) {
-      setErr(nextError instanceof Error ? nextError.message : 'Request failed')
-      return false
-    } finally {
-      setBusy(null)
-    }
-  }
-
   async function submitBudget() {
     if (!budgetCategory.trim()) {
       setErr('Category is required')
       return
     }
-    const ok = await post(
+    const data = await post(
       {
         action: 'add_record',
         kind: 'budget_category',
@@ -2421,7 +2236,7 @@ function BudgetPanel({
       },
       'budget',
     )
-    if (ok) {
+    if (data) {
       setBudgetCategory('')
       setBudgetAmount('')
     }
@@ -2432,7 +2247,7 @@ function BudgetPanel({
       setErr('Vendor and category are required')
       return
     }
-    const ok = await post(
+    const data = await post(
       {
         action: 'add_record',
         kind: 'expense',
@@ -2446,7 +2261,7 @@ function BudgetPanel({
       },
       'expense',
     )
-    if (ok) {
+    if (data) {
       setExpenseVendor('')
       setExpenseCategory('')
       setExpenseAmount('')
