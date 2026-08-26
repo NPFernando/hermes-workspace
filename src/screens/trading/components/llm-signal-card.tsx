@@ -46,6 +46,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 export function LlmSignalCard() {
   const [data, setData] = useState<LlmResponse | null>(null)
   const [running, setRunning] = useState(false)
+  const [toggling, setToggling] = useState(false)
   const [note, setNote] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -84,6 +85,27 @@ export function LlmSignalCard() {
     }
   }, [load])
 
+  const toggleEnabled = useCallback(async () => {
+    if (!data?.config) return
+    setToggling(true)
+    setNote(null)
+    try {
+      const nextEnabled = !data.config.enabled
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'set_llm_config', config: { enabled: nextEnabled } }),
+      })
+      const result = await res.json()
+      if (result.ok === false) setNote(result.error || 'Failed to update')
+      await load()
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Request failed')
+    } finally {
+      setToggling(false)
+    }
+  }, [data, load])
+
   const config = data?.config
   const positions = data?.positions ?? []
   const trades = data?.trades ?? []
@@ -98,14 +120,28 @@ export function LlmSignalCard() {
             decision includes a plain-language reason below.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={runCycle}
-          disabled={running}
-          className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
-        >
-          {running ? 'Running…' : 'Run one cycle'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void toggleEnabled()}
+            disabled={toggling || !config}
+            className={`rounded-xl border px-4 py-2 text-sm font-medium disabled:opacity-50 ${
+              config?.enabled
+                ? 'border-red-400/30 bg-red-500/15 text-red-100 hover:bg-red-500/25'
+                : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-text)] hover:bg-black/20'
+            }`}
+          >
+            {toggling ? 'Updating…' : config?.enabled ? 'Disable' : 'Enable'}
+          </button>
+          <button
+            type="button"
+            onClick={runCycle}
+            disabled={running}
+            className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+          >
+            {running ? 'Running…' : 'Run one cycle'}
+          </button>
+        </div>
       </div>
       {note && <p className="mt-2 text-xs text-[var(--theme-muted)]">{note}</p>}
 
