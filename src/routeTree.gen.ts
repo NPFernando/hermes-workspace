@@ -135,6 +135,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiHarpConfigRouteImport } from './routes/api/harp-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
+import { Route as ApiFinanceUploadRouteImport } from './routes/api/finance-upload'
 import { Route as ApiFinanceRouteImport } from './routes/api/finance'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
@@ -237,6 +238,7 @@ import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-ta
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
 import { Route as ApiClaudeJobsJobIdRouteImport } from './routes/api/claude-jobs.$jobId'
 import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth.google'
+import { Route as ApiAuthGmailConnectRouteImport } from './routes/api/auth.gmail-connect'
 import { Route as ApiArtifactsArtifactIdRouteImport } from './routes/api/artifacts.$artifactId'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
@@ -879,6 +881,11 @@ const ApiGatewayReprobeRoute = ApiGatewayReprobeRouteImport.update({
   path: '/api/gateway-reprobe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFinanceUploadRoute = ApiFinanceUploadRouteImport.update({
+  id: '/api/finance-upload',
+  path: '/api/finance-upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFinanceRoute = ApiFinanceRouteImport.update({
   id: '/api/finance',
   path: '/api/finance',
@@ -1393,6 +1400,11 @@ const ApiAuthGoogleRoute = ApiAuthGoogleRouteImport.update({
   path: '/google',
   getParentRoute: () => ApiAuthRoute,
 } as any)
+const ApiAuthGmailConnectRoute = ApiAuthGmailConnectRouteImport.update({
+  id: '/gmail-connect',
+  path: '/gmail-connect',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
 const ApiArtifactsArtifactIdRoute = ApiArtifactsArtifactIdRouteImport.update({
   id: '/$artifactId',
   path: '/$artifactId',
@@ -1509,6 +1521,7 @@ export interface FileRoutesByFullPath {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
+  '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
@@ -1610,6 +1623,7 @@ export interface FileRoutesByFullPath {
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
+  '/api/auth/gmail-connect': typeof ApiAuthGmailConnectRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
@@ -1748,6 +1762,7 @@ export interface FileRoutesByTo {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
+  '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
@@ -1849,6 +1864,7 @@ export interface FileRoutesByTo {
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
+  '/api/auth/gmail-connect': typeof ApiAuthGmailConnectRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
@@ -1989,6 +2005,7 @@ export interface FileRoutesById {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
+  '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
@@ -2090,6 +2107,7 @@ export interface FileRoutesById {
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
+  '/api/auth/gmail-connect': typeof ApiAuthGmailConnectRoute
   '/api/auth/google': typeof ApiAuthGoogleRouteWithChildren
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
@@ -2231,6 +2249,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/finance'
+    | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/harp-config'
@@ -2332,6 +2351,7 @@ export interface FileRouteTypes {
     | '/chat/'
     | '/settings/'
     | '/api/artifacts/$artifactId'
+    | '/api/auth/gmail-connect'
     | '/api/auth/google'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
@@ -2470,6 +2490,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/finance'
+    | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/harp-config'
@@ -2571,6 +2592,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/settings'
     | '/api/artifacts/$artifactId'
+    | '/api/auth/gmail-connect'
     | '/api/auth/google'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
@@ -2710,6 +2732,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/finance'
+    | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/harp-config'
@@ -2811,6 +2834,7 @@ export interface FileRouteTypes {
     | '/chat/'
     | '/settings/'
     | '/api/artifacts/$artifactId'
+    | '/api/auth/gmail-connect'
     | '/api/auth/google'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
@@ -2951,6 +2975,7 @@ export interface RootRouteChildren {
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiFinanceRoute: typeof ApiFinanceRouteWithChildren
+  ApiFinanceUploadRoute: typeof ApiFinanceUploadRoute
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHarpConfigRoute: typeof ApiHarpConfigRoute
@@ -3976,6 +4001,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGatewayReprobeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/finance-upload': {
+      id: '/api/finance-upload'
+      path: '/api/finance-upload'
+      fullPath: '/api/finance-upload'
+      preLoaderRoute: typeof ApiFinanceUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/finance': {
       id: '/api/finance'
       path: '/api/finance'
@@ -4690,6 +4722,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthGoogleRouteImport
       parentRoute: typeof ApiAuthRoute
     }
+    '/api/auth/gmail-connect': {
+      id: '/api/auth/gmail-connect'
+      path: '/gmail-connect'
+      fullPath: '/api/auth/gmail-connect'
+      preLoaderRoute: typeof ApiAuthGmailConnectRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
     '/api/artifacts/$artifactId': {
       id: '/api/artifacts/$artifactId'
       path: '/$artifactId'
@@ -4802,10 +4841,12 @@ const ApiAuthGoogleRouteWithChildren = ApiAuthGoogleRoute._addFileChildren(
 )
 
 interface ApiAuthRouteChildren {
+  ApiAuthGmailConnectRoute: typeof ApiAuthGmailConnectRoute
   ApiAuthGoogleRoute: typeof ApiAuthGoogleRouteWithChildren
 }
 
 const ApiAuthRouteChildren: ApiAuthRouteChildren = {
+  ApiAuthGmailConnectRoute: ApiAuthGmailConnectRoute,
   ApiAuthGoogleRoute: ApiAuthGoogleRouteWithChildren,
 }
 
@@ -5078,6 +5119,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiFinanceRoute: ApiFinanceRouteWithChildren,
+  ApiFinanceUploadRoute: ApiFinanceUploadRoute,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHarpConfigRoute: ApiHarpConfigRoute,

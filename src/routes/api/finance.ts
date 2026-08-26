@@ -14,12 +14,17 @@ import {
   financeStorageAlerts,
   financeStorageStatus,
   financeSummary,
+  listPendingIngestions,
   maskSensitive,
   readFinanceStore,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
+  updatePendingIngestion,
   writeFinanceStore,
 } from '../../server/finance-store'
+import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
+import { extractTransactionFromImage } from '../../server/finance-extraction'
+import { syncGmailNow } from '../../server/gmail-ingest'
 import {
   addBinanceCandles,
   addMarketPrice,
@@ -980,6 +985,77 @@ export const Route = createFileRoute('/api/finance')({
             writeFinanceStore(db)
             appendAuditLog('llm_config_updated', { enabled: lc.enabled })
             return json(financePayload())
+          }
+          if (action === 'list_pending_ingestions') {
+            // Unmasked on purpose — financePayload()'s `data` blob runs
+            // through maskSensitive(), which would redact passwordHint
+            // (matches /password/i) even though it's a plain hint the user
+            // needs to read, not a secret.
+            return json({ ok: true, pendingIngestions: listPendingIngestions() })
+          }
+          if (action === 'submit_ingestion_password') {
+            const id = typeof body.id === 'string' ? body.id : ''
+            const password = typeof body.password === 'string' ? body.password : ''
+            if (!id || !password) {
+              return json({ ok: false, error: 'id and password are required.' }, { status: 400 })
+            }
+            const pending = listPendingIngestions().find((p) => p.id === id)
+            if (!pending) return json({ ok: false, error: 'Pending ingestion not found.' }, { status: 404 })
+
+            const normalized = pdfToImages(pending.sourceRef, password)
+            if (!normalized.ok) {
+              const updated = updatePendingIngestion(id, {
+                error: normalized.reason === 'bad_password' ? 'Incorrect password, try again.' : normalized.reason,
+              })
+              return json({ ok: true, pendingIngestion: updated })
+            }
+
+            const previewImagePath = normalized.imagePaths[0]
+            const extraction = await extractTransactionFromImage(previewImagePath)
+            const updated = updatePendingIngestion(id, {
+              status: 'awaiting_review',
+              rawPreviewImagePath: previewImagePath,
+              extracted: extraction.ok ? extraction.data : undefined,
+              error: extraction.ok ? undefined : extraction.reason,
+            })
+            return json({ ok: true, pendingIngestion: updated })
+          }
+          if (action === 'confirm_pending_ingestion') {
+            const id = typeof body.id === 'string' ? body.id : ''
+            const payload =
+              body.payload && typeof body.payload === 'object' ? (body.payload as JsonRecord) : {}
+            const pending = listPendingIngestions().find((p) => p.id === id)
+            if (!pending) return json({ ok: false, error: 'Pending ingestion not found.' }, { status: 404 })
+
+            const kind = typeof payload.kind === 'string' ? payload.kind : pending.extracted?.kind
+            if (kind !== 'income' && kind !== 'expense') {
+              return json({ ok: false, error: 'kind (income|expense) is required.' }, { status: 400 })
+            }
+            addFinanceRecord(kind, {
+              ...payload,
+              source: pending.source,
+              documentRef: pending.sourceRef,
+              ...(kind === 'income'
+                ? { sourceName: payload.vendorOrSource, dateReceived: payload.date }
+                : { vendor: payload.vendorOrSource, date: payload.date }),
+            })
+            const updated = updatePendingIngestion(id, { status: 'confirmed' })
+            return json({ pendingIngestion: updated, ...financePayload() })
+          }
+          if (action === 'reject_pending_ingestion') {
+            const id = typeof body.id === 'string' ? body.id : ''
+            if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
+            const updated = updatePendingIngestion(id, { status: 'rejected' })
+            return json({ ok: true, pendingIngestion: updated })
+          }
+          if (action === 'sync_gmail_now') {
+            try {
+              const result = await syncGmailNow()
+              appendAuditLog('gmail_sync_run', { ...result })
+              return json({ ok: true, result })
+            } catch (error) {
+              return json({ ok: false, error: safeErrorMessage(error) }, { status: 502 })
+            }
           }
           if (action === 'apply_recommended_safeguards') {
             const applied = applyRecommendedSafeguards()
