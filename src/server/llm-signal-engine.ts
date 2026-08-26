@@ -26,7 +26,7 @@ import * as path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { createDemoClientFromEnv } from './binance-demo-client'
 import { appendAuditLog, readFinanceStore, writeFinanceStore } from './finance-store'
-import { isConnectivityBreakerTripped } from './connectivity-breaker'
+import { executionModeAllowed } from './trading-execution-gate'
 import { recordLlmDecision } from './research-store'
 import { atr, rsi, sma } from './trading-strategies'
 import type { BinanceExecutionClient } from './binance-demo-client'
@@ -269,21 +269,6 @@ export async function callWithFallback(
   return null
 }
 
-function executionModeAllowed(
-  settings: Record<string, unknown>,
-  config: LlmSignalConfig,
-): { allowed: boolean; reason?: string } {
-  if (settings.emergencyKillSwitch) return { allowed: false, reason: 'emergency kill switch is active' }
-  if (isConnectivityBreakerTripped()) {
-    return { allowed: false, reason: 'connectivity breaker tripped — repeated invalid-credential errors, needs manual reset' }
-  }
-  if (settings.tradingMode !== 'testnet_execute') {
-    return { allowed: false, reason: `tradingMode is "${String(settings.tradingMode)}", not testnet_execute` }
-  }
-  if (!config.enabled) return { allowed: false, reason: 'llm signal engine is disabled (settings.demoTradingLlm.enabled)' }
-  return { allowed: true }
-}
-
 let llmCycleInProgress = false
 
 export interface LlmCycleResult {
@@ -303,7 +288,11 @@ async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResul
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const config = resolveLlmSignalConfig(settings.demoTradingLlm)
-  const gate = executionModeAllowed(settings, config)
+  const gate = executionModeAllowed(
+    settings,
+    config,
+    'llm signal engine is disabled (settings.demoTradingLlm.enabled)',
+  )
   if (!gate.allowed) return { ran: false, reason: gate.reason };
 
   const rows = db.strategy_results

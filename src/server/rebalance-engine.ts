@@ -15,7 +15,7 @@
 import { randomUUID } from 'node:crypto'
 import { createDemoClientFromEnv } from './binance-demo-client'
 import { appendAuditLog, readFinanceStore, writeFinanceStore } from './finance-store'
-import { isConnectivityBreakerTripped } from './connectivity-breaker'
+import { executionModeAllowed } from './trading-execution-gate'
 import { recordResearchRun } from './research-store'
 import type { BinanceExecutionClient } from './binance-demo-client'
 
@@ -153,24 +153,6 @@ export function buildTradePlan(
   return plan
 }
 
-function executionModeAllowed(
-  settings: Record<string, unknown>,
-  config: RebalanceConfig,
-): { allowed: boolean; reason?: string } {
-  if (settings.emergencyKillSwitch) return { allowed: false, reason: 'emergency kill switch is active' }
-  if (isConnectivityBreakerTripped()) {
-    return { allowed: false, reason: 'connectivity breaker tripped — repeated invalid-credential errors, needs manual reset' }
-  }
-  if (settings.tradingMode !== 'testnet_execute') {
-    return {
-      allowed: false,
-      reason: `tradingMode is "${String(settings.tradingMode)}", not testnet_execute`,
-    }
-  }
-  if (!config.enabled) return { allowed: false, reason: 'rebalance engine is disabled (settings.demoTradingRebalance.enabled)' }
-  return { allowed: true }
-}
-
 let rebalanceCycleInProgress = false
 
 export interface RebalanceCycleResult {
@@ -189,7 +171,11 @@ async function runRebalanceCycleInner(
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const config = resolveRebalanceConfig(settings.demoTradingRebalance)
-  const gate = executionModeAllowed(settings, config)
+  const gate = executionModeAllowed(
+    settings,
+    config,
+    'rebalance engine is disabled (settings.demoTradingRebalance.enabled)',
+  )
   if (!gate.allowed) return { ran: false, reason: gate.reason, trades: [] }
 
   const targetWeights = config.targetWeights ?? equalTargetWeights(config.symbols)
