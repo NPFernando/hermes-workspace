@@ -8,6 +8,8 @@ import {
   readFinancePostgresStore,
   writeFinancePostgresStore,
 } from './finance-postgres-store'
+import { writePersonalFinanceStore } from './personal-finance-store'
+import { writeTradingStore } from './trading-store'
 import type { ConnectivityBreakerState } from './connectivity-breaker'
 
 export const FINANCE_SCHEMA_VERSION = 1
@@ -795,6 +797,42 @@ export function writeFinanceStore(db: FinanceDatabase): void {
   const updated = { ...db, updatedAt: nowIso() }
   writeFinanceJsonStore(updated)
   writeFinancePostgresStore(updated)
+
+  // Phase 5 (dual-write step) of the finance/trading backend split — mirror
+  // into the two split stores in preparation for the eventual read cutover.
+  // Best-effort only: this file (finance-store.ts) and its Postgres mirror
+  // above remain the sole source of truth. Never let a mirror failure
+  // propagate — see each store's own module doc.
+  writePersonalFinanceStore({
+    finance_accounts: updated.finance_accounts,
+    income_records: updated.income_records,
+    expense_records: updated.expense_records,
+    budget_categories: updated.budget_categories,
+    savings_goals: updated.savings_goals,
+    tax_records: updated.tax_records,
+    exchange_rates: updated.exchange_rates,
+    investment_accounts: updated.investment_accounts,
+  })
+  writeTradingStore({
+    assets: updated.assets,
+    market_prices: updated.market_prices,
+    historical_candles: updated.historical_candles,
+    news_items: updated.news_items,
+    sentiment_scores: updated.sentiment_scores,
+    risk_scores: updated.risk_scores,
+    intelligence_records: updated.intelligence_records,
+    trading_plans: updated.trading_plans,
+    trade_orders: updated.trade_orders,
+    trade_executions: updated.trade_executions,
+    virtual_accounts: updated.virtual_accounts,
+    portfolio_positions: updated.portfolio_positions,
+    account_balances: updated.account_balances,
+    strategy_results: updated.strategy_results,
+    prediction_results: updated.prediction_results,
+    trading_signals: updated.trading_signals,
+    riskState: updated.riskState,
+    connectivityBreaker: updated.connectivityBreaker,
+  })
 }
 
 export function appendAuditLog(
