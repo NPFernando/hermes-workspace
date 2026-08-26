@@ -63,4 +63,29 @@ describe('getTradingSummary', () => {
     expect(council?.armState).toBe('paper')
     expect(grid?.armState).toBe('paper')
   })
+
+  it('keeps grid on paper when tradingMode is testnet_execute but its own executionMode is not', async () => {
+    // Regression test: grid has its own independent settings.demoTradingGrid
+    // .executionMode, checked in addition to the global tradingMode by
+    // grid-paper-engine.ts's own gate — this must never show "live" (or
+    // actually arm) just because the global tradingMode flipped for other
+    // engines. Council, which has no such independent flag, correctly does
+    // go live in this same scenario.
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    db.settings.emergencyKillSwitch = false
+    db.settings.tradingMode = 'testnet_execute' as never
+    db.settings.demoTradingGrid = { executionMode: 'paper' } as never
+    store.writeFinanceStore(db)
+
+    const { getTradingSummary } = await import('./trading-summary')
+    const summary = getTradingSummary()
+
+    const grid = summary.engines.find((e) => e.id === 'grid')
+    expect(grid?.armState).toBe('paper')
+    expect(grid?.reason).toMatch(/executionMode/)
+
+    const council = summary.engines.find((e) => e.id === 'council')
+    expect(council?.armState).toBe('live')
+  })
 })
