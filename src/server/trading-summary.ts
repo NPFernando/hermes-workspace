@@ -71,11 +71,26 @@ export function getTradingSummary(): TradingSummary {
     .reduce((sum, t) => sum + (t.pnlQuote ?? 0), 0)
   const llmWins = llmClosedTrades.filter((t) => (t.pnlQuote ?? 0) > 0).length
 
-  function armState(enabled: boolean, requiresTestnet: boolean): { state: TradingEngineArmState; reason: string } {
+  function armState(
+    enabled: boolean,
+    requiresTestnet: boolean,
+    ownExecutionMode?: string,
+  ): { state: TradingEngineArmState; reason: string } {
     if (emergencyKillSwitch) return { state: 'disabled', reason: 'emergency kill switch is active' }
     if (!enabled) return { state: 'disabled', reason: 'disabled in settings' }
     if (requiresTestnet && tradingMode !== 'testnet_execute') {
       return { state: 'gated', reason: `tradingMode is "${tradingMode}", not testnet_execute` }
+    }
+    // Grid has its OWN independent executionMode (settings.demoTradingGrid),
+    // checked in addition to the global tradingMode by
+    // grid-paper-engine.ts's own testnet-mirror gate — deliberately
+    // decoupled so grid can't be silently armed by a global tradingMode
+    // flip meant for other engines. Reflect that here, not just tradingMode.
+    if (ownExecutionMode !== undefined && ownExecutionMode !== 'testnet_execute') {
+      return {
+        state: 'paper',
+        reason: `own executionMode is "${ownExecutionMode}" (independent of the global tradingMode)`,
+      }
     }
     if (tradingMode === 'paper_trade' || tradingMode === 'observe_only') {
       return { state: 'paper', reason: `running in ${tradingMode}` }
@@ -84,7 +99,7 @@ export function getTradingSummary(): TradingSummary {
   }
 
   const councilArm = armState(true, false)
-  const gridArm = armState(true, false)
+  const gridArm = armState(true, false, grid.config.executionMode)
   const rebalanceArm = armState(rebalance.config.enabled, true)
   const llmArm = armState(llm.config.enabled, true)
 
