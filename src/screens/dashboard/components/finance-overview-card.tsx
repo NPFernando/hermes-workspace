@@ -21,7 +21,7 @@ export function FinanceOverviewCard({ onOpen }: { onOpen: () => void }) {
   const query = useQuery({
     queryKey: ['dashboard', 'finance-overview'],
     queryFn: async (): Promise<FinanceSummary> => {
-      const response = await fetch('/api/finance', { cache: 'no-store' })
+      const response = await fetch('/api/finance/summary', { cache: 'no-store' })
       if (!response.ok) throw new Error(`Finance API returned HTTP ${response.status}`)
       const data = (await response.json()) as FinanceResponse
       if (!data.ok || !data.summary) throw new Error('Finance summary unavailable')
