@@ -90,11 +90,18 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     match: (p) => p.startsWith('/jobs'),
   },
   {
-    id: 'finance',
-    label: 'Finance',
+    id: 'trading',
+    label: 'Trading',
     icon: ChartCandleIcon,
-    to: '/finance',
-    match: (p) => p.startsWith('/finance'),
+    to: '/trading',
+    match: (p) => p.startsWith('/trading') || p.startsWith('/finance'),
+  },
+  {
+    id: 'personal-finance',
+    label: 'Personal',
+    icon: ChartCandleIcon,
+    to: '/personal-finance',
+    match: (p) => p.startsWith('/personal-finance'),
   },
   {
     id: 'swarm',

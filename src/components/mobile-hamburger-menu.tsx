@@ -72,11 +72,18 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     match: (p: string) => p.startsWith('/jobs'),
   },
   {
-    id: 'finance',
-    label: 'Finance',
+    id: 'trading',
+    label: 'Trading',
     icon: ChartCandleIcon,
-    to: '/finance',
-    match: (p: string) => p.startsWith('/finance'),
+    to: '/trading',
+    match: (p: string) => p.startsWith('/trading') || p.startsWith('/finance'),
+  },
+  {
+    id: 'personal-finance',
+    label: 'Personal Finance',
+    icon: ChartCandleIcon,
+    to: '/personal-finance',
+    match: (p: string) => p.startsWith('/personal-finance'),
   },
   {
     id: 'command',

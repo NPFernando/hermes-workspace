@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TradingRouteImport } from './routes/trading'
 import { Route as TerminalRouteImport } from './routes/terminal'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as Swarm2RouteImport } from './routes/swarm2'
@@ -17,6 +18,7 @@ import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ResearchRouteImport } from './routes/research'
 import { Route as ProfilesRouteImport } from './routes/profiles'
+import { Route as PersonalFinanceRouteImport } from './routes/personal-finance'
 import { Route as OpsCostRouteImport } from './routes/ops-cost'
 import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as MemoryRouteImport } from './routes/memory'
@@ -244,6 +246,11 @@ import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth.goo
 import { Route as ApiWorkspaceSkillsSkillIdContentRouteImport } from './routes/api/workspace/skills.$skillId.content'
 import { Route as ApiRunsSessionKeyRunIdAbandonRouteImport } from './routes/api/runs/$sessionKey.$runId.abandon'
 
+const TradingRoute = TradingRouteImport.update({
+  id: '/trading',
+  path: '/trading',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
   path: '/terminal',
@@ -282,6 +289,11 @@ const ResearchRoute = ResearchRouteImport.update({
 const ProfilesRoute = ProfilesRouteImport.update({
   id: '/profiles',
   path: '/profiles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PersonalFinanceRoute = PersonalFinanceRouteImport.update({
+  id: '/personal-finance',
+  path: '/personal-finance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OpsCostRoute = OpsCostRouteImport.update({
@@ -1441,6 +1453,7 @@ export interface FileRoutesByFullPath {
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/ops-cost': typeof OpsCostRoute
+  '/personal-finance': typeof PersonalFinanceRoute
   '/profiles': typeof ProfilesRoute
   '/research': typeof ResearchRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -1449,6 +1462,7 @@ export interface FileRoutesByFullPath {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/trading': typeof TradingRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
@@ -1677,6 +1691,7 @@ export interface FileRoutesByTo {
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/ops-cost': typeof OpsCostRoute
+  '/personal-finance': typeof PersonalFinanceRoute
   '/profiles': typeof ProfilesRoute
   '/research': typeof ResearchRoute
   '/skills': typeof SkillsRoute
@@ -1684,6 +1699,7 @@ export interface FileRoutesByTo {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/trading': typeof TradingRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
@@ -1913,6 +1929,7 @@ export interface FileRoutesById {
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/ops-cost': typeof OpsCostRoute
+  '/personal-finance': typeof PersonalFinanceRoute
   '/profiles': typeof ProfilesRoute
   '/research': typeof ResearchRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -1921,6 +1938,7 @@ export interface FileRoutesById {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/trading': typeof TradingRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
@@ -2151,6 +2169,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/operations'
     | '/ops-cost'
+    | '/personal-finance'
     | '/profiles'
     | '/research'
     | '/settings'
@@ -2159,6 +2178,7 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/trading'
     | '/api/agent-bus'
     | '/api/agent-dispatch'
     | '/api/agent-pause'
@@ -2387,6 +2407,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/operations'
     | '/ops-cost'
+    | '/personal-finance'
     | '/profiles'
     | '/research'
     | '/skills'
@@ -2394,6 +2415,7 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/trading'
     | '/api/agent-bus'
     | '/api/agent-dispatch'
     | '/api/agent-pause'
@@ -2622,6 +2644,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/operations'
     | '/ops-cost'
+    | '/personal-finance'
     | '/profiles'
     | '/research'
     | '/settings'
@@ -2630,6 +2653,7 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/trading'
     | '/api/agent-bus'
     | '/api/agent-dispatch'
     | '/api/agent-pause'
@@ -2859,6 +2883,7 @@ export interface RootRouteChildren {
   MemoryRoute: typeof MemoryRoute
   OperationsRoute: typeof OperationsRoute
   OpsCostRoute: typeof OpsCostRoute
+  PersonalFinanceRoute: typeof PersonalFinanceRoute
   ProfilesRoute: typeof ProfilesRoute
   ResearchRoute: typeof ResearchRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -2867,6 +2892,7 @@ export interface RootRouteChildren {
   Swarm2Route: typeof Swarm2Route
   TasksRoute: typeof TasksRoute
   TerminalRoute: typeof TerminalRoute
+  TradingRoute: typeof TradingRoute
   ApiAgentBusRoute: typeof ApiAgentBusRoute
   ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentPauseRoute: typeof ApiAgentPauseRoute
@@ -3043,6 +3069,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/trading': {
+      id: '/trading'
+      path: '/trading'
+      fullPath: '/trading'
+      preLoaderRoute: typeof TradingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/terminal': {
       id: '/terminal'
       path: '/terminal'
@@ -3097,6 +3130,13 @@ declare module '@tanstack/react-router' {
       path: '/profiles'
       fullPath: '/profiles'
       preLoaderRoute: typeof ProfilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/personal-finance': {
+      id: '/personal-finance'
+      path: '/personal-finance'
+      fullPath: '/personal-finance'
+      preLoaderRoute: typeof PersonalFinanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ops-cost': {
@@ -4953,6 +4993,7 @@ const rootRouteChildren: RootRouteChildren = {
   MemoryRoute: MemoryRoute,
   OperationsRoute: OperationsRoute,
   OpsCostRoute: OpsCostRoute,
+  PersonalFinanceRoute: PersonalFinanceRoute,
   ProfilesRoute: ProfilesRoute,
   ResearchRoute: ResearchRoute,
   SettingsRoute: SettingsRouteWithChildren,
@@ -4961,6 +5002,7 @@ const rootRouteChildren: RootRouteChildren = {
   Swarm2Route: Swarm2Route,
   TasksRoute: TasksRoute,
   TerminalRoute: TerminalRoute,
+  TradingRoute: TradingRoute,
   ApiAgentBusRoute: ApiAgentBusRoute,
   ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentPauseRoute: ApiAgentPauseRoute,

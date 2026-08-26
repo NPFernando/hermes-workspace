@@ -612,7 +612,8 @@ function ChatSidebarComponent({
   const isCommandActive = pathname.startsWith('/command')
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
   const isResearchActive = pathname.startsWith('/research')
-  const isFinanceActive = pathname.startsWith('/finance')
+  const isTradingActive = pathname.startsWith('/trading') || pathname.startsWith('/finance')
+  const isPersonalFinanceActive = pathname.startsWith('/personal-finance')
   const isOpsCostActive = pathname.startsWith('/ops-cost')
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
@@ -858,10 +859,17 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
-      to: '/finance',
+      to: '/trading',
       icon: ChartCandleIcon,
-      label: 'Finance',
-      active: isFinanceActive,
+      label: 'Trading',
+      active: isTradingActive,
+    },
+    {
+      kind: 'link',
+      to: '/personal-finance',
+      icon: ChartCandleIcon,
+      label: 'Personal Finance',
+      active: isPersonalFinanceActive,
     },
     {
       kind: 'link',
