@@ -8,8 +8,11 @@ import {
   readFinancePostgresStore,
   writeFinancePostgresStore,
 } from './finance-postgres-store'
-import { writePersonalFinanceStore } from './personal-finance-store'
-import { writeTradingStore } from './trading-store'
+import {
+  readPersonalFinanceStore,
+  writePersonalFinanceStore,
+} from './personal-finance-store'
+import { readTradingStore, writeTradingStore } from './trading-store'
 import type { ConnectivityBreakerState } from './connectivity-breaker'
 
 export const FINANCE_SCHEMA_VERSION = 1
@@ -690,13 +693,78 @@ function mirrorIntoSplitStores(db: FinanceDatabase): void {
 }
 
 function readFinanceJsonStore(): FinanceDatabase | null {
+  let base: FinanceDatabase
   try {
-    return JSON.parse(
+    base = JSON.parse(
       fs.readFileSync(FINANCE_DATA_PATH, 'utf8'),
     ) as FinanceDatabase
   } catch {
     return null
   }
+  return overlaySplitStores(base)
+}
+
+/**
+ * Phase 5 (read cutover step) of the finance/trading backend split.
+ * mirrorIntoSplitStores() writes the split stores from this same base
+ * file's own data on every write, so in the normal case they're never
+ * staler than it — overlay them here so callers gradually source
+ * personal/trading collections from the split files, while settings and
+ * the still-unsplit misc collections (trading_platforms, api_connections,
+ * agent_memory, audit_logs, error_logs) keep coming from this shared base
+ * file (never split — see the plan's own rationale).
+ *
+ * The mirror write is deliberately best-effort and can silently fail (must
+ * never block a real trade write) — if it failed on the most recent write
+ * while the base file succeeded, the split store would hold OLDER data
+ * than the base file for that collection. Guard against serving that stale
+ * data: only overlay a split store if its own updatedAt is not older than
+ * the base file's.
+ */
+function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
+  const baseUpdatedMs = updatedAtMs(base)
+  const personal = readPersonalFinanceStore()
+  const trading = readTradingStore()
+  const personalFresh = personal && Date.parse(personal.updatedAt) >= baseUpdatedMs
+  const tradingFresh = trading && Date.parse(trading.updatedAt) >= baseUpdatedMs
+
+  return {
+    ...base,
+    ...(personalFresh
+      ? {
+          finance_accounts: personal.finance_accounts,
+          income_records: personal.income_records,
+          expense_records: personal.expense_records,
+          budget_categories: personal.budget_categories,
+          savings_goals: personal.savings_goals,
+          tax_records: personal.tax_records,
+          exchange_rates: personal.exchange_rates,
+          investment_accounts: personal.investment_accounts,
+        }
+      : {}),
+    ...(tradingFresh
+      ? {
+          assets: trading.assets,
+          market_prices: trading.market_prices,
+          historical_candles: trading.historical_candles,
+          news_items: trading.news_items,
+          sentiment_scores: trading.sentiment_scores,
+          risk_scores: trading.risk_scores,
+          intelligence_records: trading.intelligence_records,
+          trading_plans: trading.trading_plans,
+          trade_orders: trading.trade_orders,
+          trade_executions: trading.trade_executions,
+          virtual_accounts: trading.virtual_accounts,
+          portfolio_positions: trading.portfolio_positions,
+          account_balances: trading.account_balances,
+          strategy_results: trading.strategy_results,
+          prediction_results: trading.prediction_results,
+          trading_signals: trading.trading_signals,
+          riskState: trading.riskState as RiskState,
+          connectivityBreaker: trading.connectivityBreaker as ConnectivityBreakerState,
+        }
+      : {}),
+  } as FinanceDatabase
 }
 
 function updatedAtMs(db: FinanceDatabase): number {

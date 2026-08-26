@@ -75,3 +75,91 @@ describe('writeFinanceStore dual-write (Phase 5 mirror step)', () => {
     expect(() => store.writeFinanceStore(db)).not.toThrow()
   })
 })
+
+describe('readFinanceStore split-store overlay (Phase 5 read cutover step)', () => {
+  it('round-trips through split stores with no data loss or shape change', async () => {
+    const store = await import('./finance-store')
+
+    const db = store.createEmptyFinanceDatabase()
+    db.income_records.push({
+      id: 'income-1',
+      dateReceived: '2026-06-28',
+      sourceName: 'Salary',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: 100_000,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 100_000,
+      taxable: true,
+      source: 'test',
+      createdAt: '2026-06-28T00:00:00.000Z',
+      updatedAt: '2026-06-28T00:00:00.000Z',
+    })
+    db.strategy_results.push({ id: 'trade-1', kind: 'demo_trade_log', pnlQuote: 12.5 })
+    db.settings.tradingMode = 'paper_trade' as never
+
+    store.writeFinanceStore(db)
+    const readBack = store.readFinanceStore()
+
+    // Every field must round-trip identically — settings/misc from the base
+    // file, personal/trading collections from the overlay, but the caller
+    // (every existing consumer of readFinanceStore) sees no difference.
+    expect(readBack.income_records).toHaveLength(1)
+    expect(readBack.income_records[0]).toMatchObject({ id: 'income-1' })
+    expect(readBack.strategy_results).toHaveLength(1)
+    expect(readBack.strategy_results[0]).toMatchObject({ id: 'trade-1' })
+    expect(readBack.settings.tradingMode).toBe('paper_trade')
+  })
+
+  it('falls back to the base file when a split-store mirror is missing', async () => {
+    const store = await import('./finance-store')
+
+    const db = store.createEmptyFinanceDatabase()
+    db.income_records.push({ id: 'income-1', source: 'test' } as never)
+    store.writeFinanceStore(db)
+
+    // Delete the personal mirror to simulate it never having been written
+    // (e.g. an older deploy, or a permanent mirror failure) — the base file
+    // still has the data, and readFinanceStore must not lose it.
+    fs.rmSync(path.join(tmp, '.hermes', 'finance', 'personal-finance.json'))
+
+    const readBack = store.readFinanceStore()
+    expect(readBack.income_records).toHaveLength(1)
+    expect(readBack.income_records[0]).toMatchObject({ id: 'income-1' })
+  })
+
+  it('does not serve stale mirror data when the mirror lags behind the base file', async () => {
+    const store = await import('./finance-store')
+    const personalStore = await import('./personal-finance-store')
+
+    // Write a real base file (fresh, current timestamp) with one income
+    // record, via the normal write path.
+    const db = store.createEmptyFinanceDatabase()
+    db.income_records.push({ id: 'fresh-income', source: 'fresh' } as never)
+    store.writeFinanceStore(db)
+
+    // Now simulate the mirror having fallen behind: overwrite it directly
+    // with different data and an old updatedAt, as if its last successful
+    // write predates the base file's current content.
+    personalStore.writePersonalFinanceStore({
+      finance_accounts: [],
+      income_records: [{ id: 'stale-income', source: 'stale' }],
+      expense_records: [],
+      budget_categories: [],
+      savings_goals: [],
+      tax_records: [],
+      exchange_rates: [],
+      investment_accounts: [],
+    })
+    const mirrorPath = path.join(tmp, '.hermes', 'finance', 'personal-finance.json')
+    const mirror = JSON.parse(fs.readFileSync(mirrorPath, 'utf-8'))
+    mirror.updatedAt = '2020-01-01T00:00:00.000Z'
+    fs.writeFileSync(mirrorPath, JSON.stringify(mirror))
+
+    // The overlay must detect the mirror is older than the base file and
+    // fall back to the base file's own (fresh) data instead.
+    const readBack = store.readFinanceStore()
+    expect(readBack.income_records).toHaveLength(1)
+    expect(readBack.income_records[0]).toMatchObject({ id: 'fresh-income' })
+  })
+})
