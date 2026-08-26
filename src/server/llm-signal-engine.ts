@@ -193,7 +193,7 @@ export function selectHarpRoutes(task: string, risk: string): Array<HarpRoute> {
   try {
     const result = spawnSync(
       'python3',
-      ['/srv/projects/_hermes-control/scripts/harp-select-route.py', '--task', task, '--risk', risk, '--json'],
+      ['/home/ubuntu/workspace/projects/universal-harp-engine/scripts/harp-select-route.py', '--task', task, '--risk', risk, '--json'],
       { encoding: 'utf-8', timeout: 15_000 },
     )
     if (result.status !== 0 || !result.stdout) return []

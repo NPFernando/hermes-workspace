@@ -10,6 +10,23 @@ type DecisionQualityFinding = {
   evidenceCount?: number
 }
 
+type PaperDecisionQualityReport = {
+  sampleCount: number
+  coveredSampleCount: number
+  abstainedSampleCount: number
+  coverage: number
+  abstentionRate: number
+  directionalHitRate: number | null
+  averageAdverseMovePct: number | null
+  worstAdverseMovePct: number | null
+  calibrationBuckets: Array<{
+    label: string
+    sampleCount: number
+    directionalHitRate: number | null
+  }>
+  sideEffects: false
+}
+
 type DecisionQualityReport = {
   checkedAt: string
   status:
@@ -314,6 +331,7 @@ type FinancePayload = {
     totalFeesQuote: number
   }
   decisionQuality: DecisionQualityReport
+  paperDecisionQuality: PaperDecisionQualityReport
   learning: LearningReport
   safeguardHistory: Array<SafeguardHistoryEntry>
   strategyCatalog: Array<StrategyCatalogEntry>
@@ -1478,6 +1496,93 @@ function PerformancePanel({
           value={usdt(perf.totalFeesQuote)}
           tone="neutral"
         />
+      </div>
+    </section>
+  )
+}
+
+function PaperDecisionQualityPanel({
+  report,
+}: {
+  report: PaperDecisionQualityReport
+}) {
+  const rate = (value: number | null) =>
+    value == null ? '—' : `${(value * 100).toFixed(1)}%`
+  const adverseMove = (value: number | null) =>
+    value == null ? '—' : `${value.toFixed(2)}%`
+  const hasCoverage = report.coveredSampleCount > 0
+  const evidenceMessage =
+    report.sampleCount === 0
+      ? 'No paper decisions have been recorded, so there is no execution activity to evaluate.'
+      : !hasCoverage
+        ? 'No eligible outcomes yet. Decisions remain abstained until the outcome horizon and candles provide coverage.'
+        : report.coveredSampleCount < 5
+          ? 'Evidence is still limited; use these paper-only measurements for observation, not execution changes.'
+          : 'Evidence is observational only and does not authorize or trigger execution.'
+
+  return (
+    <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Paper decision quality</h2>
+          <p className="text-xs text-[var(--theme-muted)]">
+            Read-only directional evidence from the paper decision journal.
+          </p>
+        </div>
+        <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
+          No execution
+        </span>
+      </div>
+
+      <p className="mt-3 rounded-2xl border border-[var(--theme-border)] bg-black/10 p-3 text-sm text-[var(--theme-muted)]">
+        {evidenceMessage}
+      </p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <StatCard
+          label="Sample"
+          value={`${report.coveredSampleCount} covered / ${report.sampleCount}`}
+          tone={hasCoverage ? 'good' : 'warn'}
+        />
+        <StatCard label="Coverage" value={rate(report.coverage)} />
+        <StatCard
+          label="Abstention"
+          value={`${rate(report.abstentionRate)} · ${report.abstainedSampleCount}`}
+          tone={report.abstainedSampleCount > 0 ? 'warn' : 'neutral'}
+        />
+        <StatCard label="Directional hit rate" value={rate(report.directionalHitRate)} />
+        <StatCard
+          label="Average adverse move"
+          value={adverseMove(report.averageAdverseMovePct)}
+          tone={report.averageAdverseMovePct == null ? 'neutral' : 'warn'}
+        />
+        <StatCard
+          label="Worst adverse move"
+          value={adverseMove(report.worstAdverseMovePct)}
+          tone={report.worstAdverseMovePct == null ? 'neutral' : 'danger'}
+        />
+      </div>
+
+      <div className="mt-4">
+        <h3 className="text-sm font-semibold">Calibration by score magnitude</h3>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {report.calibrationBuckets.map((bucket) => (
+            <div
+              key={bucket.label}
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+            >
+              <div className="text-xs text-[var(--theme-muted)]">
+                Score {bucket.label}
+              </div>
+              <div className="mt-1 text-sm font-semibold">
+                {rate(bucket.directionalHitRate)}
+              </div>
+              <div className="mt-1 text-xs text-[var(--theme-muted)]">
+                {bucket.sampleCount} covered samples
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   )
@@ -2650,10 +2755,436 @@ function LivePriceTicker({ symbols }: { symbols: Array<string> }) {
   )
 }
 
+type NewsResearchItem = {
+  id: string
+  sourceName: string
+  sourceUrl: string | null
+  publishDate: string | null
+  relatedSymbol: string
+  summary: string
+}
+
+type NewsIngestion = {
+  fetched: number
+  stored: number
+}
+
+type IntelligenceRefresh = {
+  researchOnly: boolean
+  composite: {
+    symbol: string
+    score: number | null
+    label: 'positive' | 'neutral' | 'negative' | 'mixed' | 'unknown'
+    confidence: number
+    freshness: number
+    sourceIds: Array<string>
+    disagreement: boolean
+    blockers: Array<string>
+    observedAt: string
+  }
+  stored: {
+    stored: boolean
+    risk: {
+      riskLevel: string
+      riskScore: number
+    }
+  }
+}
+
+const DEFAULT_NEWS_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
+const BINANCE_SYMBOL_PATTERN = /^[A-Z0-9]{5,20}$/
+
+function normalizeBinanceSymbol(value: string): string {
+  return value.trim().toUpperCase()
+}
+
+function safeExternalUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' || url.protocol === 'http:'
+      ? url.toString()
+      : null
+  } catch {
+    return null
+  }
+}
+
+function normalizedNewsItem(
+  value: Record<string, unknown>,
+): NewsResearchItem | null {
+  const summary = typeof value.summary === 'string' ? value.summary.trim() : ''
+  const sourceName =
+    typeof value.sourceName === 'string' ? value.sourceName.trim() : ''
+  const relatedSymbol =
+    typeof value.relatedSymbol === 'string'
+      ? normalizeBinanceSymbol(value.relatedSymbol)
+      : ''
+  if (!summary || !sourceName || !BINANCE_SYMBOL_PATTERN.test(relatedSymbol))
+    return null
+  const publishDate =
+    typeof value.publishDate === 'string' ? value.publishDate : null
+  return {
+    id:
+      typeof value.id === 'string'
+        ? value.id
+        : `${relatedSymbol}:${sourceName}:${summary}`,
+    sourceName,
+    sourceUrl: safeExternalUrl(value.sourceUrl),
+    publishDate:
+      publishDate && !Number.isNaN(Date.parse(publishDate))
+        ? publishDate
+        : null,
+    relatedSymbol,
+    summary,
+  }
+}
+
+function formatNewsTime(value: string | null): string {
+  if (!value) return 'Publication time unavailable'
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
+
+function NewsResearchPanel({
+  payload,
+  onPayload,
+}: {
+  payload: FinancePayload
+  onPayload: (payload: FinancePayload) => void
+}) {
+  const configuredSymbols = Array.isArray(
+    (payload.settings.demoTrading as Record<string, unknown> | undefined)
+      ?.symbols,
+  )
+    ? (
+        (payload.settings.demoTrading as Record<string, unknown>)
+          .symbols as Array<unknown>
+      )
+        .filter((value): value is string => typeof value === 'string')
+        .map(normalizeBinanceSymbol)
+        .filter((value) => BINANCE_SYMBOL_PATTERN.test(value))
+    : []
+  const symbols = Array.from(
+    new Set([...configuredSymbols, ...DEFAULT_NEWS_SYMBOLS]),
+  )
+  const [symbolInput, setSymbolInput] = useState(symbols[0] ?? 'BTCUSDT')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<NewsIngestion | null>(null)
+  const symbol = normalizeBinanceSymbol(symbolInput)
+  const isValidSymbol = BINANCE_SYMBOL_PATTERN.test(symbol)
+  const newsItems = payload.data.news_items
+    .map(normalizedNewsItem)
+    .filter(
+      (item): item is NewsResearchItem =>
+        item !== null && item.relatedSymbol === symbol,
+    )
+    .sort(
+      (left, right) =>
+        (right.publishDate ? Date.parse(right.publishDate) : 0) -
+        (left.publishDate ? Date.parse(left.publishDate) : 0),
+    )
+    .slice(0, 6)
+
+  async function fetchNews() {
+    if (!isValidSymbol) {
+      setError(
+        'Enter a Binance spot symbol using 5–20 letters or numbers, for example BTCUSDT.',
+      )
+      return
+    }
+    setBusy(true)
+    setError(null)
+    setResult(null)
+    try {
+      const response = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'fetch_news', symbol }),
+      })
+      const data = (await response.json()) as FinancePayload & {
+        error?: string
+        newsIngestion?: NewsIngestion
+      }
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || `HTTP ${response.status}`)
+      }
+      onPayload(data)
+      setResult(data.newsIngestion ?? { fetched: 0, stored: 0 })
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : 'News research request failed',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section
+      className="mt-6 rounded-3xl border border-sky-400/25 bg-[var(--theme-panel)]/70 p-5"
+      aria-label="Trading news research"
+    >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/80">
+            Research only
+          </p>
+          <h2 className="mt-1 text-lg font-semibold">News Research</h2>
+          <p className="mt-1 max-w-2xl text-sm text-[var(--theme-muted)]">
+            Fetches public Google News RSS for a Binance spot symbol. This does
+            not create plans, orders, or executions.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="grid gap-1 text-xs font-medium text-[var(--theme-muted)]">
+            Binance symbol
+            <input
+              list="finance-news-symbols"
+              value={symbolInput}
+              onChange={(event) => setSymbolInput(event.target.value)}
+              className="w-36 rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-2 text-sm text-[var(--theme-text)]"
+              aria-invalid={!isValidSymbol}
+              aria-describedby="finance-news-symbol-help"
+              placeholder="BTCUSDT"
+            />
+          </label>
+          <datalist id="finance-news-symbols">
+            {symbols.map((option) => (
+              <option key={option} value={option} />
+            ))}
+          </datalist>
+          <button
+            type="button"
+            onClick={() => void fetchNews()}
+            disabled={busy || !isValidSymbol}
+            className="rounded-xl bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-100 transition-colors hover:bg-sky-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? 'Fetching…' : 'Fetch news'}
+          </button>
+        </div>
+      </div>
+      <p
+        id="finance-news-symbol-help"
+        className="mt-2 text-xs text-[var(--theme-muted)]"
+      >
+        Choose a configured symbol or enter a 5–20 character Binance spot
+        symbol.
+      </p>
+      {error && (
+        <p
+          className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-100"
+          role="alert"
+        >
+          {error}
+        </p>
+      )}
+      {result && (
+        <p
+          className="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100"
+          role="status"
+        >
+          Research refreshed for {symbol}: fetched {result.fetched}, stored{' '}
+          {result.stored} new item{result.stored === 1 ? '' : 's'}.
+        </p>
+      )}
+      <div className="mt-4 space-y-2" aria-live="polite">
+        {newsItems.length === 0 ? (
+          <p className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3 text-sm text-[var(--theme-muted)]">
+            No normalized news items stored for {symbol}. Fetch research to
+            refresh this list.
+          </p>
+        ) : (
+          newsItems.map((item) => (
+            <article
+              key={item.id}
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+            >
+              <p className="text-sm leading-5 text-[var(--theme-text)]">
+                {item.summary}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--theme-muted)]">
+                <span>{item.sourceName}</span>
+                <time dateTime={item.publishDate ?? undefined}>
+                  {formatNewsTime(item.publishDate)}
+                </time>
+                {item.sourceUrl && (
+                  <a
+                    href={item.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-200 underline underline-offset-2 hover:text-sky-100"
+                  >
+                    Open publisher
+                  </a>
+                )}
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+    </section>
+  )
+}
+
+function IntelligenceSummaryPanel({
+  onPayload,
+}: {
+  onPayload: (payload: FinancePayload) => void
+}) {
+  const [symbol, setSymbol] = useState(DEFAULT_NEWS_SYMBOLS[0])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [intelligence, setIntelligence] = useState<IntelligenceRefresh | null>(
+    null,
+  )
+
+  async function refresh() {
+    setBusy(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'refresh_intelligence', symbol }),
+      })
+      const data = (await response.json()) as FinancePayload & {
+        error?: string
+        intelligence?: IntelligenceRefresh
+      }
+      if (!response.ok || data.ok === false)
+        throw new Error(data.error || `HTTP ${response.status}`)
+      onPayload(data)
+      setIntelligence(data.intelligence ?? null)
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : 'Intelligence refresh failed',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const composite = intelligence?.composite
+  return (
+    <section
+      className="mt-6 rounded-3xl border border-violet-400/25 bg-[var(--theme-panel)]/70 p-5"
+      aria-label="Intelligence summary"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-200/80">
+            Research only
+          </p>
+          <h2 className="mt-1 text-lg font-semibold">Intelligence Summary</h2>
+          <p className="mt-1 text-sm text-[var(--theme-muted)]">
+            Derived from stored news. It does not create plans, orders, or executions.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={symbol}
+            onChange={(event) => setSymbol(normalizeBinanceSymbol(event.target.value))}
+            className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-2 text-sm text-[var(--theme-text)]"
+            aria-label="Intelligence symbol"
+          >
+            {DEFAULT_NEWS_SYMBOLS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            disabled={busy}
+            className="rounded-xl bg-violet-500/20 px-4 py-2 text-sm font-semibold text-violet-100 transition-colors hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+      {error && <p className="mt-3 text-sm text-red-200" role="alert">{error}</p>}
+      {composite ? (
+        <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <p>Sentiment: <strong>{composite.label}</strong> ({composite.score ?? 'unavailable'})</p>
+          <p>Confidence: <strong>{Math.round(composite.confidence * 100)}%</strong></p>
+          <p>Freshness: <strong>{Math.round(composite.freshness * 100)}%</strong></p>
+          <p>Research risk: <strong>{intelligence.stored.risk.riskLevel}</strong></p>
+          <p className="sm:col-span-2">Evidence: {composite.sourceIds.length} stored source{composite.sourceIds.length === 1 ? '' : 's'}</p>
+          <p className="sm:col-span-2">Updated: {formatDateTime(composite.observedAt)}</p>
+          {composite.blockers.length > 0 && (
+            <p className="sm:col-span-2 text-amber-100">Caution: {composite.blockers.join('; ')}.</p>
+          )}
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-[var(--theme-muted)]">
+          Refresh to summarize the latest stored research for this symbol.
+        </p>
+      )}
+    </section>
+  )
+}
+
+function PersonalFinanceWorkspace({
+  payload,
+  onPayload,
+}: {
+  payload: FinancePayload
+  onPayload: (payload: FinancePayload) => void
+}) {
+  const { summary } = payload
+  return (
+    <section className="mt-6 space-y-6" aria-label="Personal finance workspace">
+      <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200/80">
+          DollarWise-style personal finance
+        </p>
+        <h2 className="mt-2 text-2xl font-semibold">Money clarity, without trading controls</h2>
+        <p className="mt-2 max-w-3xl text-sm text-[var(--theme-muted)]">
+          Track accounts, spending, budgets, savings goals, and tax records separately from the automated trading workspace.
+        </p>
+      </div>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Net worth" value={formatLkr(summary.netWorthLkr)} />
+        <StatCard label="Cash balance" value={formatLkr(summary.cashBalanceLkr)} />
+        <StatCard label="Net savings" value={formatLkr(summary.netSavingsLkr)} tone={summary.netSavingsLkr >= 0 ? 'good' : 'danger'} />
+        <StatCard label="Savings rate" value={formatPct(summary.savingsRate)} tone={summary.savingsRate >= 20 ? 'good' : 'warn'} />
+        <StatCard label="Total income" value={formatLkr(summary.totalIncomeLkr)} tone="good" />
+        <StatCard label="Total expenses" value={formatLkr(summary.totalExpensesLkr)} tone={summary.totalExpensesLkr > summary.totalIncomeLkr && summary.totalIncomeLkr > 0 ? 'danger' : 'neutral'} />
+        <StatCard label="Tax reserve" value={formatLkr(summary.taxReserveLkr)} />
+        <StatCard label="Tracked accounts" value={String(summary.accountCount)} />
+      </section>
+      <BudgetPanel payload={payload} onPayload={onPayload} />
+      <section className="grid gap-4">
+        <DataTable title="Accounts" rows={payload.data.finance_accounts} columns={['name', 'type', 'currency', 'balance', 'platform']} />
+        <DataTable title="Income records" rows={payload.data.income_records} columns={['dateReceived', 'sourceName', 'incomeType', 'originalCurrency', 'originalAmount', 'convertedLkrAmount', 'taxable']} />
+        <DataTable title="Expense records" rows={payload.data.expense_records} columns={['date', 'vendor', 'category', 'currency', 'amount', 'convertedLkrAmount', 'recurring']} />
+        <DataTable title="Budget categories" rows={payload.data.budget_categories} columns={['month', 'category', 'currency', 'budgetAmount']} />
+        <DataTable title="Savings goals" rows={payload.data.savings_goals} columns={['name', 'targetAmount', 'currentAmount', 'currency', 'targetDate', 'status']} />
+        <DataTable title="Tax records" rows={payload.data.tax_records} columns={['taxYear', 'incomeType', 'convertedLkrAmount', 'taxPaid', 'taxDue', 'requiresConfirmation']} />
+      </section>
+      <p className="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">
+        Tax figures are estimates; confirm them against official sources before filing.
+      </p>
+    </section>
+  )
+}
+
 export function FinanceScreen() {
   const [payload, setPayload] = useState<FinancePayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activeWorkspace, setActiveWorkspace] = useState<'trading' | 'personal'>(
+    'trading',
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -2740,7 +3271,33 @@ export function FinanceScreen() {
         </div>
       </section>
 
-      <LivePriceTicker
+      <div
+        className="mt-6 inline-flex rounded-2xl border border-[var(--theme-border)] bg-black/10 p-1"
+        aria-label="Finance workspace"
+      >
+        {([
+          ['trading', 'Trading workspace'],
+          ['personal', 'Personal finance'],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={activeWorkspace === id}
+            onClick={() => setActiveWorkspace(id)}
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+              activeWorkspace === id
+                ? 'bg-emerald-500/20 text-emerald-100 shadow-sm'
+                : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeWorkspace === 'trading' ? (
+        <>
+          <LivePriceTicker
         symbols={
           Array.isArray(
             (payload.settings.demoTrading as Record<string, unknown> | undefined)
@@ -2752,6 +3309,9 @@ export function FinanceScreen() {
             : []
         }
       />
+
+      <NewsResearchPanel payload={payload} onPayload={setPayload} />
+      <IntelligenceSummaryPanel onPayload={setPayload} />
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -2795,11 +3355,12 @@ export function FinanceScreen() {
         />
       </section>
 
-      <BudgetPanel payload={payload} onPayload={setPayload} />
 
       <TradingControls summary={summary} onPayload={setPayload} />
 
       <PerformancePanel perf={payload.demoPerformance} />
+
+      <PaperDecisionQualityPanel report={payload.paperDecisionQuality} />
 
       <DecisionQualityPanel
         report={payload.decisionQuality}
@@ -2879,66 +3440,6 @@ export function FinanceScreen() {
 
       <section className="mt-6 grid gap-4">
         <DataTable
-          title="Accounts"
-          rows={payload.data.finance_accounts}
-          columns={['name', 'type', 'currency', 'balance', 'platform']}
-        />
-        <DataTable
-          title="Income records"
-          rows={payload.data.income_records}
-          columns={[
-            'dateReceived',
-            'sourceName',
-            'incomeType',
-            'originalCurrency',
-            'originalAmount',
-            'convertedLkrAmount',
-            'taxable',
-          ]}
-        />
-        <DataTable
-          title="Expense records"
-          rows={payload.data.expense_records}
-          columns={[
-            'date',
-            'vendor',
-            'category',
-            'currency',
-            'amount',
-            'convertedLkrAmount',
-            'recurring',
-          ]}
-        />
-        <DataTable
-          title="Budget categories"
-          rows={payload.data.budget_categories}
-          columns={['month', 'category', 'currency', 'budgetAmount']}
-        />
-        <DataTable
-          title="Savings goals"
-          rows={payload.data.savings_goals}
-          columns={[
-            'name',
-            'targetAmount',
-            'currentAmount',
-            'currency',
-            'targetDate',
-            'status',
-          ]}
-        />
-        <DataTable
-          title="Tax records"
-          rows={payload.data.tax_records}
-          columns={[
-            'taxYear',
-            'incomeType',
-            'convertedLkrAmount',
-            'taxPaid',
-            'taxDue',
-            'requiresConfirmation',
-          ]}
-        />
-        <DataTable
           title="Trading plans"
           rows={payload.data.trading_plans}
           columns={[
@@ -3001,6 +3502,10 @@ export function FinanceScreen() {
           in policy.
         </p>
       </section>
+        </>
+      ) : (
+        <PersonalFinanceWorkspace payload={payload} onPayload={setPayload} />
+      )}
     </main>
   )
 }

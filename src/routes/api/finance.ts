@@ -16,6 +16,7 @@ import {
   financeSummary,
   maskSensitive,
   readFinanceStore,
+  storeIntelligenceRecords,
   tradingPerformanceSummary,
   writeFinanceStore,
 } from '../../server/finance-store'
@@ -41,6 +42,13 @@ import {
   strategyOverrideState,
 } from '../../server/demo-trading-engine'
 import { startFinanceStorageMonitor } from '../../server/finance-storage-monitor'
+import { fetchAndStoreGoogleNews } from '../../server/finance-news.service'
+import { INTELLIGENCE_FORMULA_VERSION, assessResearchRisk, buildCompositeSentiment } from '../../server/finance-intelligence'
+import {
+  appendPaperDecisionSnapshot,
+  readPaperDecisionJournal,
+} from '../../server/paper-decision-journal'
+import { evaluatePaperDecisionQuality } from '../../server/paper-decision-quality'
 import { resetConnectivityBreaker } from '../../server/connectivity-breaker'
 
 const VALID_LONG_SHORT_PERIODS = new Set([
@@ -87,6 +95,16 @@ function binanceSymbolFromBody(body: JsonRecord): string {
       symbol,
     })
   }
+  return symbol
+}
+
+/** Research snapshots are provider-neutral and must not emit provider audit events. */
+function researchSymbolFromBody(body: JsonRecord): string {
+  const symbol =
+    typeof body.symbol === 'string' ? body.symbol.trim().toUpperCase() : ''
+  if (!symbol) throw new Error('symbol is required')
+  if (!/^[A-Z0-9]{5,20}$/.test(symbol))
+    throw new Error('symbol must be an uppercase alphanumeric market symbol')
   return symbol
 }
 
@@ -145,6 +163,11 @@ function financePayload() {
     tradingPerformance: tradingPerformanceSummary(db),
     demoPerformance: demoTradingPerformance(),
     decisionQuality: decisionQualityReport(),
+    paperDecisionQuality: evaluatePaperDecisionQuality({
+      decisions: readPaperDecisionJournal(),
+      historicalCandles: db.historical_candles,
+      evaluatedAt: new Date().toISOString(),
+    }),
     learning: learningReport(),
     marketLearning: marketLearningReport(),
     safeguardHistory: safeguardHistory(),
@@ -155,6 +178,32 @@ function financePayload() {
     connectivityBreaker: db.connectivityBreaker,
     data: maskSensitive(db),
   }
+}
+
+function refreshIntelligence(symbol: string) {
+  const db = readFinanceStore()
+  const now = new Date()
+  const composite = buildCompositeSentiment({ symbol, items: db.news_items, sentimentScores: db.sentiment_scores, now })
+  const risk = assessResearchRisk(composite)
+  const createdAt = now.toISOString()
+  const scoreId = `sentiment:${symbol}:${INTELLIGENCE_FORMULA_VERSION}:${createdAt}`
+  const riskId = `risk:${symbol}:${INTELLIGENCE_FORMULA_VERSION}:${createdAt}`
+  const stored = storeIntelligenceRecords({
+    sentiment: {
+      id: scoreId, symbol, kind: 'news_composite', score: composite.score ?? 0,
+      label: composite.label, confidenceScore: composite.confidence, freshness: composite.freshness,
+      inputRefs: composite.sourceIds, formulaVersion: composite.formulaVersion,
+      observedAt: composite.observedAt, expiresAt: composite.expiresAt, source: 'finance-intelligence',
+      createdAt, updatedAt: createdAt,
+    },
+    risk: {
+      id: riskId, platform: 'research_only', symbol, ...risk,
+      formulaVersion: composite.formulaVersion, inputRefs: composite.sourceIds,
+      observedAt: composite.observedAt, expiresAt: composite.expiresAt, source: 'finance-intelligence',
+      createdAt, updatedAt: createdAt,
+    },
+  })
+  return { composite, stored, researchOnly: true }
 }
 
 export const Route = createFileRoute('/api/finance')({
@@ -193,6 +242,52 @@ export const Route = createFileRoute('/api/finance')({
               'binance-public-api',
             )
             return json(financePayload())
+          }
+          if (action === 'fetch_news') {
+            // Public Google News RSS only: research ingestion has no keys and
+            // does not touch trading plans, orders, positions, or execution.
+            const symbol = binanceSymbolFromBody(body)
+            const newsIngestion = await fetchAndStoreGoogleNews(symbol)
+            return json({ ...financePayload(), newsIngestion })
+          }
+          if (action === 'refresh_intelligence') {
+            // Derives and stores research-only records from already stored
+            // inputs. It never creates plans, orders, positions, or execution.
+            const symbol = binanceSymbolFromBody(body)
+            const intelligence = refreshIntelligence(symbol)
+            return json({ ...financePayload(), intelligence })
+          }
+          if (action === 'record_paper_decision') {
+            // Authenticated research journal only. It derives a composite from
+            // stored inputs and appends one immutable snapshot; it never creates
+            // plans, orders, positions, executions, or exchange requests.
+            const symbol = researchSymbolFromBody(body)
+            const idempotencyKey =
+              typeof body.idempotencyKey === 'string'
+                ? body.idempotencyKey.trim()
+                : ''
+            if (!idempotencyKey || idempotencyKey.length > 128) {
+              return json(
+                { ok: false, error: 'A 1-128 character idempotencyKey is required.' },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            const composite = buildCompositeSentiment({
+              symbol,
+              items: db.news_items,
+              sentimentScores: db.sentiment_scores,
+              now: new Date(),
+            })
+            const journal = appendPaperDecisionSnapshot({
+              symbol,
+              composite,
+              idempotencyKey,
+            })
+            return json({
+              ...financePayload(),
+              paperDecisionJournal: { ...journal, researchOnly: true },
+            })
           }
           if (action === 'fetch_candles') {
             // Read-only historical OHLCV from Binance public klines.
