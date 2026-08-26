@@ -159,6 +159,8 @@ export interface RebalanceCycleResult {
   ran: boolean
   reason?: string
   trades: Array<RebalanceTrade>
+  /** Per-symbol drift snapshot from the cycle that just ran, for UI display. */
+  plan?: Array<RebalancePlanItem>
 }
 
 export interface RebalanceCycleOptions {
@@ -217,7 +219,7 @@ async function runRebalanceCycleInner(
   const driftTriggered = drift >= config.driftThresholdPct
 
   if (!timeTriggered && !driftTriggered) {
-    return { ran: true, trades: [] }
+    return { ran: true, trades: [], plan: items }
   }
 
   const tradePlan = buildTradePlan(items, config)
@@ -312,7 +314,7 @@ async function runRebalanceCycleInner(
     })
   }
 
-  return { ran: true, trades }
+  return { ran: true, trades, plan: items }
 }
 
 export async function runRebalanceCycle(

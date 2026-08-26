@@ -17,6 +17,14 @@ interface RebalanceTrade {
   notionalQuote: number
   createdAt: string
 }
+interface RebalancePlanItem {
+  symbol: string
+  actualWeight: number
+  targetWeight: number
+  actualValueQuote: number
+  targetValueQuote: number
+  diffQuote: number
+}
 interface RebalanceResponse {
   ok: boolean
   config: RebalanceConfig
@@ -36,7 +44,9 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 
 export function RebalanceCard() {
   const [data, setData] = useState<RebalanceResponse | null>(null)
+  const [plan, setPlan] = useState<Array<RebalancePlanItem> | null>(null)
   const [running, setRunning] = useState(false)
+  const [toggling, setToggling] = useState(false)
   const [note, setNote] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -70,6 +80,7 @@ export function RebalanceCard() {
         const count = result.result.trades?.length ?? 0
         setNote(count ? `${count} rebalance trade(s) this cycle` : 'Ran — no trades needed')
       }
+      if (result.result?.plan) setPlan(result.result.plan as Array<RebalancePlanItem>)
       await load()
     } catch (e) {
       setNote(e instanceof Error ? e.message : 'Request failed')
@@ -77,6 +88,27 @@ export function RebalanceCard() {
       setRunning(false)
     }
   }, [load])
+
+  const toggleEnabled = useCallback(async () => {
+    if (!data?.config) return
+    setToggling(true)
+    setNote(null)
+    try {
+      const nextEnabled = !data.config.enabled
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'set_rebalance_config', config: { enabled: nextEnabled } }),
+      })
+      const result = await res.json()
+      if (result.ok === false) setNote(result.error || 'Failed to update')
+      await load()
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Request failed')
+    } finally {
+      setToggling(false)
+    }
+  }, [data, load])
 
   const config = data?.config
   const state = data?.state
@@ -93,14 +125,28 @@ export function RebalanceCard() {
             of its own.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={runCycle}
-          disabled={running}
-          className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
-        >
-          {running ? 'Running…' : 'Run one cycle'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void toggleEnabled()}
+            disabled={toggling || !config}
+            className={`rounded-xl border px-4 py-2 text-sm font-medium disabled:opacity-50 ${
+              config?.enabled
+                ? 'border-red-400/30 bg-red-500/15 text-red-100 hover:bg-red-500/25'
+                : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-text)] hover:bg-black/20'
+            }`}
+          >
+            {toggling ? 'Updating…' : config?.enabled ? 'Disable' : 'Enable'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void runCycle()}
+            disabled={running}
+            className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+          >
+            {running ? 'Running…' : 'Run one cycle'}
+          </button>
+        </div>
       </div>
       {note && <p className="mt-2 text-xs text-[var(--theme-muted)]">{note}</p>}
 
@@ -115,6 +161,50 @@ export function RebalanceCard() {
           value={state?.lastRebalanceAt ? new Date(state.lastRebalanceAt).toLocaleString() : 'never'}
         />
         <MiniStat label="Trades logged" value={String(trades.length)} />
+      </div>
+
+      <h3 className="mt-4 text-sm font-semibold text-[var(--theme-text)]">
+        Per-asset drift {plan ? '' : '(run a cycle to see the latest snapshot)'}
+      </h3>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-left text-xs">
+          <thead>
+            <tr className="text-[var(--theme-muted)]">
+              <th className="pb-1 pr-4 font-medium">Symbol</th>
+              <th className="pb-1 pr-4 font-medium">Actual weight</th>
+              <th className="pb-1 pr-4 font-medium">Target weight</th>
+              <th className="pb-1 font-medium">Diff</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(plan ?? []).map((p) => (
+              <tr key={p.symbol} className="border-t border-[var(--theme-border)]/40">
+                <td className="py-1.5 pr-4 text-[var(--theme-text)]">{p.symbol}</td>
+                <td className="py-1.5 pr-4 tabular-nums text-[var(--theme-text)]">
+                  {(p.actualWeight * 100).toFixed(1)}%
+                </td>
+                <td className="py-1.5 pr-4 tabular-nums text-[var(--theme-text)]">
+                  {(p.targetWeight * 100).toFixed(1)}%
+                </td>
+                <td
+                  className={`py-1.5 tabular-nums ${
+                    p.diffQuote >= 0 ? 'text-emerald-400' : 'text-red-400'
+                  }`}
+                >
+                  {p.diffQuote >= 0 ? '+' : ''}
+                  {p.diffQuote.toFixed(2)} USDT
+                </td>
+              </tr>
+            ))}
+            {!plan?.length && (
+              <tr>
+                <td colSpan={4} className="py-2 text-[var(--theme-muted)]">
+                  No drift snapshot yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       <h3 className="mt-4 text-sm font-semibold text-[var(--theme-text)]">Recent trades</h3>
