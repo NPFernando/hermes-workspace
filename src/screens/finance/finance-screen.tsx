@@ -3438,23 +3438,6 @@ export function FinanceScreen() {
         </ol>
       </section>
 
-      <section className="mt-6 grid gap-4">
-        <DataTable
-          title="Trading plans"
-          rows={payload.data.trading_plans}
-          columns={[
-            'platform',
-            'symbol',
-            'assetType',
-            'decision',
-            'riskLevel',
-            'riskScore',
-            'status',
-            'executionStatus',
-          ]}
-        />
-      </section>
-
       <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5 text-sm text-[var(--theme-muted)]">
         <h2 className="text-lg font-semibold text-[var(--theme-text)]">
           Security and storage

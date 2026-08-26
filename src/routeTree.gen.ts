@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VtCapitalRouteImport } from './routes/vt-capital'
 import { Route as TerminalRouteImport } from './routes/terminal'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as Swarm2RouteImport } from './routes/swarm2'
@@ -41,12 +40,10 @@ import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceVersionRouteImport } from './routes/api/workspace-version'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiWorkflowTemplatesRouteImport } from './routes/api/workflow-templates'
-import { Route as ApiVtCapitalRouteImport } from './routes/api/vt-capital'
 import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
 import { Route as ApiUserSettingsRouteImport } from './routes/api/user-settings'
 import { Route as ApiUserProfileRouteImport } from './routes/api/user-profile'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
-import { Route as ApiTradingEngineRouteImport } from './routes/api/trading-engine'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
@@ -247,11 +244,6 @@ import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth.goo
 import { Route as ApiWorkspaceSkillsSkillIdContentRouteImport } from './routes/api/workspace/skills.$skillId.content'
 import { Route as ApiRunsSessionKeyRunIdAbandonRouteImport } from './routes/api/runs/$sessionKey.$runId.abandon'
 
-const VtCapitalRoute = VtCapitalRouteImport.update({
-  id: '/vt-capital',
-  path: '/vt-capital',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TerminalRoute = TerminalRouteImport.update({
   id: '/terminal',
   path: '/terminal',
@@ -407,11 +399,6 @@ const ApiWorkflowTemplatesRoute = ApiWorkflowTemplatesRouteImport.update({
   path: '/api/workflow-templates',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiVtCapitalRoute = ApiVtCapitalRouteImport.update({
-  id: '/api/vt-capital',
-  path: '/api/vt-capital',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiValidateProviderRoute = ApiValidateProviderRouteImport.update({
   id: '/api/validate-provider',
   path: '/api/validate-provider',
@@ -430,11 +417,6 @@ const ApiUserProfileRoute = ApiUserProfileRouteImport.update({
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   id: '/api/transcribe',
   path: '/api/transcribe',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiTradingEngineRoute = ApiTradingEngineRouteImport.update({
-  id: '/api/trading-engine',
-  path: '/api/trading-engine',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
@@ -1467,7 +1449,6 @@ export interface FileRoutesByFullPath {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
-  '/vt-capital': typeof VtCapitalRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
@@ -1591,12 +1572,10 @@ export interface FileRoutesByFullPath {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
-  '/api/trading-engine': typeof ApiTradingEngineRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/user-profile': typeof ApiUserProfileRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
-  '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/workflow-templates': typeof ApiWorkflowTemplatesRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-version': typeof ApiWorkspaceVersionRoute
@@ -1705,7 +1684,6 @@ export interface FileRoutesByTo {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
-  '/vt-capital': typeof VtCapitalRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
@@ -1829,12 +1807,10 @@ export interface FileRoutesByTo {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
-  '/api/trading-engine': typeof ApiTradingEngineRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/user-profile': typeof ApiUserProfileRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
-  '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/workflow-templates': typeof ApiWorkflowTemplatesRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-version': typeof ApiWorkspaceVersionRoute
@@ -1945,7 +1921,6 @@ export interface FileRoutesById {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
-  '/vt-capital': typeof VtCapitalRoute
   '/api/agent-bus': typeof ApiAgentBusRoute
   '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
@@ -2069,12 +2044,10 @@ export interface FileRoutesById {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
-  '/api/trading-engine': typeof ApiTradingEngineRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/user-profile': typeof ApiUserProfileRoute
   '/api/user-settings': typeof ApiUserSettingsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
-  '/api/vt-capital': typeof ApiVtCapitalRoute
   '/api/workflow-templates': typeof ApiWorkflowTemplatesRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
   '/api/workspace-version': typeof ApiWorkspaceVersionRoute
@@ -2186,7 +2159,6 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
-    | '/vt-capital'
     | '/api/agent-bus'
     | '/api/agent-dispatch'
     | '/api/agent-pause'
@@ -2310,12 +2282,10 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
-    | '/api/trading-engine'
     | '/api/transcribe'
     | '/api/user-profile'
     | '/api/user-settings'
     | '/api/validate-provider'
-    | '/api/vt-capital'
     | '/api/workflow-templates'
     | '/api/workspace'
     | '/api/workspace-version'
@@ -2424,7 +2394,6 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
-    | '/vt-capital'
     | '/api/agent-bus'
     | '/api/agent-dispatch'
     | '/api/agent-pause'
@@ -2548,12 +2517,10 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
-    | '/api/trading-engine'
     | '/api/transcribe'
     | '/api/user-profile'
     | '/api/user-settings'
     | '/api/validate-provider'
-    | '/api/vt-capital'
     | '/api/workflow-templates'
     | '/api/workspace'
     | '/api/workspace-version'
@@ -2663,7 +2630,6 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
-    | '/vt-capital'
     | '/api/agent-bus'
     | '/api/agent-dispatch'
     | '/api/agent-pause'
@@ -2787,12 +2753,10 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
-    | '/api/trading-engine'
     | '/api/transcribe'
     | '/api/user-profile'
     | '/api/user-settings'
     | '/api/validate-provider'
-    | '/api/vt-capital'
     | '/api/workflow-templates'
     | '/api/workspace'
     | '/api/workspace-version'
@@ -2903,7 +2867,6 @@ export interface RootRouteChildren {
   Swarm2Route: typeof Swarm2Route
   TasksRoute: typeof TasksRoute
   TerminalRoute: typeof TerminalRoute
-  VtCapitalRoute: typeof VtCapitalRoute
   ApiAgentBusRoute: typeof ApiAgentBusRoute
   ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentPauseRoute: typeof ApiAgentPauseRoute
@@ -3027,12 +2990,10 @@ export interface RootRouteChildren {
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
-  ApiTradingEngineRoute: typeof ApiTradingEngineRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiUserProfileRoute: typeof ApiUserProfileRoute
   ApiUserSettingsRoute: typeof ApiUserSettingsRoute
   ApiValidateProviderRoute: typeof ApiValidateProviderRoute
-  ApiVtCapitalRoute: typeof ApiVtCapitalRoute
   ApiWorkflowTemplatesRoute: typeof ApiWorkflowTemplatesRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRouteWithChildren
   ApiWorkspaceVersionRoute: typeof ApiWorkspaceVersionRoute
@@ -3082,13 +3043,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/vt-capital': {
-      id: '/vt-capital'
-      path: '/vt-capital'
-      fullPath: '/vt-capital'
-      preLoaderRoute: typeof VtCapitalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/terminal': {
       id: '/terminal'
       path: '/terminal'
@@ -3306,13 +3260,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkflowTemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/vt-capital': {
-      id: '/api/vt-capital'
-      path: '/api/vt-capital'
-      fullPath: '/api/vt-capital'
-      preLoaderRoute: typeof ApiVtCapitalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/validate-provider': {
       id: '/api/validate-provider'
       path: '/api/validate-provider'
@@ -3339,13 +3286,6 @@ declare module '@tanstack/react-router' {
       path: '/api/transcribe'
       fullPath: '/api/transcribe'
       preLoaderRoute: typeof ApiTranscribeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/trading-engine': {
-      id: '/api/trading-engine'
-      path: '/api/trading-engine'
-      fullPath: '/api/trading-engine'
-      preLoaderRoute: typeof ApiTradingEngineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/terminal-stream': {
@@ -5021,7 +4961,6 @@ const rootRouteChildren: RootRouteChildren = {
   Swarm2Route: Swarm2Route,
   TasksRoute: TasksRoute,
   TerminalRoute: TerminalRoute,
-  VtCapitalRoute: VtCapitalRoute,
   ApiAgentBusRoute: ApiAgentBusRoute,
   ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentPauseRoute: ApiAgentPauseRoute,
@@ -5145,12 +5084,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
-  ApiTradingEngineRoute: ApiTradingEngineRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiUserProfileRoute: ApiUserProfileRoute,
   ApiUserSettingsRoute: ApiUserSettingsRoute,
   ApiValidateProviderRoute: ApiValidateProviderRoute,
-  ApiVtCapitalRoute: ApiVtCapitalRoute,
   ApiWorkflowTemplatesRoute: ApiWorkflowTemplatesRoute,
   ApiWorkspaceRoute: ApiWorkspaceRouteWithChildren,
   ApiWorkspaceVersionRoute: ApiWorkspaceVersionRoute,

@@ -613,7 +613,6 @@ function ChatSidebarComponent({
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
   const isResearchActive = pathname.startsWith('/research')
   const isFinanceActive = pathname.startsWith('/finance')
-  const isVtCapitalActive = pathname.startsWith('/vt-capital')
   const isOpsCostActive = pathname.startsWith('/ops-cost')
   const echoStudioEnabled = useSettingsStore(
     (state) => state.settings.experimentalEchoStudio,
@@ -856,13 +855,6 @@ function ChatSidebarComponent({
       icon: CheckListIcon,
       label: 'Tasks',
       active: isTasksActive,
-    },
-    {
-      kind: 'link',
-      to: '/vt-capital',
-      icon: ChartCandleIcon,
-      label: 'VT Capital',
-      active: isVtCapitalActive,
     },
     {
       kind: 'link',
