@@ -637,6 +637,56 @@ function writeFinanceJsonStore(db: FinanceDatabase): void {
   fs.writeFileSync(FINANCE_DATA_PATH, `${JSON.stringify(db, null, 2)}\n`, {
     mode: 0o600,
   })
+  mirrorIntoSplitStores(db)
+}
+
+/**
+ * Phase 5 (dual-write step) of the finance/trading backend split — mirror
+ * into the two split stores in preparation for the eventual read cutover.
+ * Best-effort only: writeFinanceJsonStore's own write above (and the
+ * Postgres mirror alongside it) remain the sole source of truth. Never let
+ * a mirror failure propagate — see each store's own module doc.
+ *
+ * Hooked into writeFinanceJsonStore() specifically (not writeFinanceStore())
+ * because readFinanceStore()'s self-heal path calls writeFinanceJsonStore()
+ * directly when Postgres data should be preferred over local JSON — that
+ * path bypasses writeFinanceStore() entirely, and since Postgres is
+ * generally preferred in this environment, it's the dominant write path in
+ * practice. Confirmed via production journal: the JSON file's mtime updates
+ * on plain reads through that self-heal branch even with no engine cycle
+ * having run.
+ */
+function mirrorIntoSplitStores(db: FinanceDatabase): void {
+  writePersonalFinanceStore({
+    finance_accounts: db.finance_accounts,
+    income_records: db.income_records,
+    expense_records: db.expense_records,
+    budget_categories: db.budget_categories,
+    savings_goals: db.savings_goals,
+    tax_records: db.tax_records,
+    exchange_rates: db.exchange_rates,
+    investment_accounts: db.investment_accounts,
+  })
+  writeTradingStore({
+    assets: db.assets,
+    market_prices: db.market_prices,
+    historical_candles: db.historical_candles,
+    news_items: db.news_items,
+    sentiment_scores: db.sentiment_scores,
+    risk_scores: db.risk_scores,
+    intelligence_records: db.intelligence_records,
+    trading_plans: db.trading_plans,
+    trade_orders: db.trade_orders,
+    trade_executions: db.trade_executions,
+    virtual_accounts: db.virtual_accounts,
+    portfolio_positions: db.portfolio_positions,
+    account_balances: db.account_balances,
+    strategy_results: db.strategy_results,
+    prediction_results: db.prediction_results,
+    trading_signals: db.trading_signals,
+    riskState: db.riskState,
+    connectivityBreaker: db.connectivityBreaker,
+  })
 }
 
 function readFinanceJsonStore(): FinanceDatabase | null {
@@ -795,44 +845,8 @@ function migrateFinanceStore(db: FinanceDatabase): FinanceDatabase {
 export function writeFinanceStore(db: FinanceDatabase): void {
   fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
   const updated = { ...db, updatedAt: nowIso() }
-  writeFinanceJsonStore(updated)
+  writeFinanceJsonStore(updated) // also mirrors into the split stores, see its own doc
   writeFinancePostgresStore(updated)
-
-  // Phase 5 (dual-write step) of the finance/trading backend split — mirror
-  // into the two split stores in preparation for the eventual read cutover.
-  // Best-effort only: this file (finance-store.ts) and its Postgres mirror
-  // above remain the sole source of truth. Never let a mirror failure
-  // propagate — see each store's own module doc.
-  writePersonalFinanceStore({
-    finance_accounts: updated.finance_accounts,
-    income_records: updated.income_records,
-    expense_records: updated.expense_records,
-    budget_categories: updated.budget_categories,
-    savings_goals: updated.savings_goals,
-    tax_records: updated.tax_records,
-    exchange_rates: updated.exchange_rates,
-    investment_accounts: updated.investment_accounts,
-  })
-  writeTradingStore({
-    assets: updated.assets,
-    market_prices: updated.market_prices,
-    historical_candles: updated.historical_candles,
-    news_items: updated.news_items,
-    sentiment_scores: updated.sentiment_scores,
-    risk_scores: updated.risk_scores,
-    intelligence_records: updated.intelligence_records,
-    trading_plans: updated.trading_plans,
-    trade_orders: updated.trade_orders,
-    trade_executions: updated.trade_executions,
-    virtual_accounts: updated.virtual_accounts,
-    portfolio_positions: updated.portfolio_positions,
-    account_balances: updated.account_balances,
-    strategy_results: updated.strategy_results,
-    prediction_results: updated.prediction_results,
-    trading_signals: updated.trading_signals,
-    riskState: updated.riskState,
-    connectivityBreaker: updated.connectivityBreaker,
-  })
 }
 
 export function appendAuditLog(
