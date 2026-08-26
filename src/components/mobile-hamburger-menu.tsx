@@ -72,13 +72,6 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     match: (p: string) => p.startsWith('/jobs'),
   },
   {
-    id: 'vt-capital',
-    label: 'VT Capital',
-    icon: ChartCandleIcon,
-    to: '/vt-capital',
-    match: (p: string) => p.startsWith('/vt-capital'),
-  },
-  {
     id: 'finance',
     label: 'Finance',
     icon: ChartCandleIcon,
