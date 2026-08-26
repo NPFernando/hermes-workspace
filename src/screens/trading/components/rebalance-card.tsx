@@ -1,0 +1,158 @@
+import { useCallback, useEffect, useState } from 'react'
+
+interface RebalanceConfig {
+  enabled: boolean
+  symbols: Array<string>
+  targetWeights?: Record<string, number>
+  driftThresholdPct: number
+  minRebalanceIntervalMinutes: number
+}
+interface RebalanceState {
+  lastRebalanceAt: string | null
+}
+interface RebalanceTrade {
+  id: string
+  symbol: string
+  side: 'BUY' | 'SELL'
+  notionalQuote: number
+  createdAt: string
+}
+interface RebalanceResponse {
+  ok: boolean
+  config: RebalanceConfig
+  state: RebalanceState | null
+  trades: Array<RebalanceTrade>
+  error?: string
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[var(--theme-border)]/60 bg-black/10 p-2.5">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">{label}</div>
+      <div className="mt-1 text-sm font-semibold tabular-nums text-[var(--theme-text)]">{value}</div>
+    </div>
+  )
+}
+
+export function RebalanceCard() {
+  const [data, setData] = useState<RebalanceResponse | null>(null)
+  const [running, setRunning] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/demo-trading-rebalance', { cache: 'no-store' })
+      if (res.ok) setData((await res.json()) as RebalanceResponse)
+    } catch {
+      /* transient */
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+    const id = window.setInterval(load, 30_000)
+    return () => window.clearInterval(id)
+  }, [load])
+
+  const runCycle = useCallback(async () => {
+    setRunning(true)
+    setNote(null)
+    try {
+      const res = await fetch('/api/demo-trading-rebalance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'run_cycle' }),
+      })
+      const result = await res.json()
+      if (!result.ok) setNote(result.error || 'Cycle failed')
+      else if (!result.result?.ran) setNote(`Idle: ${result.result?.reason ?? 'not run'}`)
+      else {
+        const count = result.result.trades?.length ?? 0
+        setNote(count ? `${count} rebalance trade(s) this cycle` : 'Ran — no trades needed')
+      }
+      await load()
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Request failed')
+    } finally {
+      setRunning(false)
+    }
+  }, [load])
+
+  const config = data?.config
+  const state = data?.state
+  const trades = data?.trades ?? []
+
+  return (
+    <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--theme-text)]">Rebalance engine</h2>
+          <p className="text-xs text-[var(--theme-muted)]">
+            Portfolio-level drift rebalancer — buys underweight / sells overweight symbols
+            against a target allocation. Not a directional strategy, so it has no P&L concept
+            of its own.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={runCycle}
+          disabled={running}
+          className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+        >
+          {running ? 'Running…' : 'Run one cycle'}
+        </button>
+      </div>
+      {note && <p className="mt-2 text-xs text-[var(--theme-muted)]">{note}</p>}
+
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <MiniStat label="Enabled" value={config ? (config.enabled ? 'yes' : 'no') : '—'} />
+        <MiniStat
+          label="Drift threshold"
+          value={config ? `${config.driftThresholdPct.toFixed(1)}%` : '—'}
+        />
+        <MiniStat
+          label="Last rebalanced"
+          value={state?.lastRebalanceAt ? new Date(state.lastRebalanceAt).toLocaleString() : 'never'}
+        />
+        <MiniStat label="Trades logged" value={String(trades.length)} />
+      </div>
+
+      <h3 className="mt-4 text-sm font-semibold text-[var(--theme-text)]">Recent trades</h3>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-left text-xs">
+          <thead>
+            <tr className="text-[var(--theme-muted)]">
+              <th className="pb-1 pr-4 font-medium">Symbol</th>
+              <th className="pb-1 pr-4 font-medium">Side</th>
+              <th className="pb-1 pr-4 font-medium">Notional</th>
+              <th className="pb-1 font-medium">At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {trades.slice(0, 10).map((t) => (
+              <tr key={t.id} className="border-t border-[var(--theme-border)]/40">
+                <td className="py-1.5 pr-4 text-[var(--theme-text)]">{t.symbol}</td>
+                <td className={`py-1.5 pr-4 ${t.side === 'BUY' ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {t.side}
+                </td>
+                <td className="py-1.5 pr-4 tabular-nums text-[var(--theme-text)]">
+                  {t.notionalQuote.toFixed(2)} USDT
+                </td>
+                <td className="py-1.5 text-[var(--theme-muted)]">
+                  {new Date(t.createdAt).toLocaleString()}
+                </td>
+              </tr>
+            ))}
+            {!trades.length && (
+              <tr>
+                <td colSpan={4} className="py-2 text-[var(--theme-muted)]">
+                  No rebalance trades yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
