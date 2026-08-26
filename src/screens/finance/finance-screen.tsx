@@ -3178,12 +3178,24 @@ function PersonalFinanceWorkspace({
   )
 }
 
-export function FinanceScreen() {
+export function FinanceScreen({
+  initialWorkspace = 'trading',
+  showWorkspaceTabs = true,
+}: {
+  /**
+   * Stopgap for the /trading and /personal-finance routes (Phase 1 of the
+   * finance/trading refactor) — they render this same component pinned to
+   * one workspace with the tab switcher hidden, since nav is now the
+   * switching mechanism. Superseded by dedicated screens in Phase 3/4.
+   */
+  initialWorkspace?: 'trading' | 'personal'
+  showWorkspaceTabs?: boolean
+} = {}) {
   const [payload, setPayload] = useState<FinancePayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeWorkspace, setActiveWorkspace] = useState<'trading' | 'personal'>(
-    'trading',
+    initialWorkspace,
   )
 
   useEffect(() => {
@@ -3271,29 +3283,31 @@ export function FinanceScreen() {
         </div>
       </section>
 
-      <div
-        className="mt-6 inline-flex rounded-2xl border border-[var(--theme-border)] bg-black/10 p-1"
-        aria-label="Finance workspace"
-      >
-        {([
-          ['trading', 'Trading workspace'],
-          ['personal', 'Personal finance'],
-        ] as const).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            aria-pressed={activeWorkspace === id}
-            onClick={() => setActiveWorkspace(id)}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
-              activeWorkspace === id
-                ? 'bg-emerald-500/20 text-emerald-100 shadow-sm'
-                : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {showWorkspaceTabs && (
+        <div
+          className="mt-6 inline-flex rounded-2xl border border-[var(--theme-border)] bg-black/10 p-1"
+          aria-label="Finance workspace"
+        >
+          {([
+            ['trading', 'Trading workspace'],
+            ['personal', 'Personal finance'],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={activeWorkspace === id}
+              onClick={() => setActiveWorkspace(id)}
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                activeWorkspace === id
+                  ? 'bg-emerald-500/20 text-emerald-100 shadow-sm'
+                  : 'text-[var(--theme-muted)] hover:text-[var(--theme-text)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {activeWorkspace === 'trading' ? (
         <>
