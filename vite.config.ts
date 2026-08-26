@@ -538,20 +538,10 @@ const config = defineConfig(({ mode, command }) => {
       },
     },
     ssr: {
-      external: [
-        'playwright',
-        'playwright-core',
-        'playwright-extra',
-        'puppeteer-extra-plugin-stealth',
-      ],
+      external: ['playwright'],
     },
     optimizeDeps: {
-      exclude: [
-        'playwright',
-        'playwright-core',
-        'playwright-extra',
-        'puppeteer-extra-plugin-stealth',
-      ],
+      exclude: ['playwright'],
     },
     build: {
       rollupOptions: {

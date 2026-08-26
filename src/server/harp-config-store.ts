@@ -444,7 +444,7 @@ print(json.dumps({"source": source, "rows": rows}, default=str))
 }
 
 function getRouteHealth(cooldowns: Array<HarpHealthAttempt>): Pick<HarpHealthView, 'routeDecision' | 'routeReason' | 'primaryProvider' | 'primaryModel' | 'routes' | 'deadCatalogModels'> {
-  const selector = '/srv/projects/_hermes-control/scripts/harp-select-route.py'
+  const selector = '/home/ubuntu/workspace/projects/universal-harp-engine/scripts/harp-select-route.py'
   if (!fs.existsSync(selector)) {
     return {
       routeDecision: 'unavailable',
