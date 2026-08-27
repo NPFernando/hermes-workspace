@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import {
   buildFinanceStorageHealth,
   budgetVsActualSummary,
@@ -314,5 +317,59 @@ describe('finance-store', () => {
     const results = budgetVsActualSummary(db, '2026-07')
     expect(results).toHaveLength(1)
     expect(results[0]).toMatchObject({ category: 'Groceries', budget: 20_000 })
+  })
+})
+
+// Same isolation pattern as trading-summary.test.ts / rebalance-engine.test.ts —
+// point HOME at a temp dir so these never touch the real ~/.hermes/finance store.
+describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
+  let tmp: string
+  let realHome: string | undefined
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-records-'))
+    realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+  })
+  afterEach(() => {
+    if (realHome === undefined) delete process.env.HOME
+    else process.env.HOME = realHome
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('adds, then edits, then deletes an expense record', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('expense', { vendor: 'Cafe', category: 'Dining', amount: 500 })
+
+    let db = store.readFinanceStore()
+    expect(db.expense_records).toHaveLength(1)
+    const id = db.expense_records[0].id
+
+    store.updateFinanceRecord('expense', id, { amount: 750 })
+    db = store.readFinanceStore()
+    expect(db.expense_records[0].amount).toBe(750)
+
+    store.deleteFinanceRecord('expense', id)
+    db = store.readFinanceStore()
+    expect(db.expense_records).toHaveLength(0)
+  })
+
+  it('deleteFinanceRecord is idempotent for an id that does not exist', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('income', { sourceName: 'Salary', originalAmount: 1000 })
+
+    expect(() => store.deleteFinanceRecord('income', 'does-not-exist')).not.toThrow()
+    const db = store.readFinanceStore()
+    expect(db.income_records).toHaveLength(1)
+  })
+
+  it('throws for an unsupported kind on delete', async () => {
+    const store = await import('./finance-store')
+    expect(() => store.deleteFinanceRecord('trading_plan', 'some-id')).toThrow(/Unsupported/)
+  })
+
+  it('throws when updating a record that does not exist', async () => {
+    const store = await import('./finance-store')
+    expect(() => store.updateFinanceRecord('expense', 'does-not-exist', { amount: 1 })).toThrow(/not found/)
   })
 })
