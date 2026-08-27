@@ -647,6 +647,81 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
   })
 })
 
+describe('account (PF-100 Account Model)', () => {
+  let tmp: string
+  let realHome: string | undefined
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-accounts-'))
+    realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+  })
+  afterEach(() => {
+    if (realHome === undefined) delete process.env.HOME
+    else process.env.HOME = realHome
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('persists openingBalance/openingBalanceDate through add and update', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('account', {
+      name: 'Test Savings',
+      type: 'bank',
+      currency: 'LKR',
+      balance: 150000,
+      openingBalance: 100000,
+      openingBalanceDate: '2026-01-01',
+    })
+    let db = store.readFinanceStore()
+    expect(db.finance_accounts[0]).toMatchObject({
+      name: 'Test Savings',
+      type: 'bank',
+      balance: 150000,
+      openingBalance: 100000,
+      openingBalanceDate: '2026-01-01',
+    })
+    const id = db.finance_accounts[0].id
+
+    store.updateFinanceRecord('account', id, { balance: 175000 })
+    db = store.readFinanceStore()
+    expect(db.finance_accounts[0].balance).toBe(175000)
+    // Untouched fields survive the shallow-merge update, same as every other kind.
+    expect(db.finance_accounts[0].openingBalance).toBe(100000)
+    expect(db.finance_accounts[0].openingBalanceDate).toBe('2026-01-01')
+  })
+
+  it('supports an account with no opening balance (optional field)', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('account', { name: 'Wallet Cash', type: 'cash', currency: 'LKR', balance: 5000 })
+    const db = store.readFinanceStore()
+    expect(db.finance_accounts[0].openingBalance).toBeUndefined()
+    expect(db.finance_accounts[0].openingBalanceDate).toBeUndefined()
+  })
+
+  it('defaults account type to other for an unrecognized value', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('account', { name: 'Mystery', type: 'bogus', currency: 'LKR', balance: 0 })
+    const db = store.readFinanceStore()
+    expect(db.finance_accounts[0].type).toBe('other')
+  })
+
+  it('adds, edits, then deletes an account', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('account', { name: 'Crypto Wallet', type: 'crypto_wallet', currency: 'USD', balance: 100 })
+    let db = store.readFinanceStore()
+    expect(db.finance_accounts).toHaveLength(1)
+    const id = db.finance_accounts[0].id
+
+    store.updateFinanceRecord('account', id, { balance: 250 })
+    db = store.readFinanceStore()
+    expect(db.finance_accounts[0].balance).toBe(250)
+
+    store.deleteFinanceRecord('account', id)
+    db = store.readFinanceStore()
+    expect(db.finance_accounts).toHaveLength(0)
+  })
+})
+
 describe('financeSummary net worth with stock holdings and fixed deposits', () => {
   it('includes stock holdings at current price and active fixed deposit principal', () => {
     const db = createEmptyFinanceDatabase()

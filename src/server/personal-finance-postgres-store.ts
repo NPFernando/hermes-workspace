@@ -174,9 +174,12 @@ function ensurePersonalFinancePostgresSchema(): boolean {
     `
 CREATE TABLE IF NOT EXISTS finance_accounts (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL, currency TEXT NOT NULL,
-  balance DOUBLE PRECISION NOT NULL, masked_identifier TEXT, platform TEXT,
+  balance DOUBLE PRECISION NOT NULL, opening_balance DOUBLE PRECISION, opening_balance_date TEXT,
+  masked_identifier TEXT, platform TEXT,
   source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+ALTER TABLE finance_accounts ADD COLUMN IF NOT EXISTS opening_balance DOUBLE PRECISION;
+ALTER TABLE finance_accounts ADD COLUMN IF NOT EXISTS opening_balance_date TEXT;
 
 CREATE TABLE IF NOT EXISTS income_records (
   id TEXT PRIMARY KEY, date_received TEXT NOT NULL, source_name TEXT NOT NULL, income_type TEXT NOT NULL,
@@ -249,6 +252,8 @@ function financeAccountRows(rowsIn: Array<Record<string, unknown>>): Array<Array
     sqlText(firstText(row, 'type')),
     sqlText(firstText(row, 'currency')),
     sqlNumber(row.balance),
+    sqlNullableNumber(row.openingBalance),
+    sqlNullableText(row.openingBalanceDate),
     sqlNullableText(row.maskedIdentifier),
     sqlNullableText(row.platform),
     sqlText(firstText(row, 'source', 'manual')),
@@ -426,7 +431,10 @@ DELETE FROM fixed_deposits;
 
 ${insertRows(
   'finance_accounts',
-  ['id', 'name', 'type', 'currency', 'balance', 'masked_identifier', 'platform', 'source', 'created_at', 'updated_at'],
+  [
+    'id', 'name', 'type', 'currency', 'balance', 'opening_balance', 'opening_balance_date',
+    'masked_identifier', 'platform', 'source', 'created_at', 'updated_at',
+  ],
   financeAccountRows(rows(slice.finance_accounts)),
 )}
 
