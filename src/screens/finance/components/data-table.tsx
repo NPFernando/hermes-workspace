@@ -26,25 +26,64 @@ const inputClass =
  * payload type (see PersonalFinancePayload vs. whatever trading-screen.tsx
  * might eventually pass) — callers cast `onChanged`'s argument themselves.
  */
+type SortDirection = 'asc' | 'desc'
+
 export function DataTable({
   title,
   rows,
   columns,
   kind,
   onChanged,
+  searchable,
 }: {
   title: string
   rows: Array<Record<string, unknown>>
   columns: Array<string>
   kind?: string
   onChanged?: (payload: unknown) => void
+  /** Opt-in: adds a search box and click-to-sort column headers. Off by default so other DataTable consumers are unaffected. */
+  searchable?: boolean
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Record<string, unknown>>({})
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [sortColumn, setSortColumn] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const editable = Boolean(kind && onChanged)
+
+  function toggleSort(column: string) {
+    if (sortColumn !== column) {
+      setSortColumn(column)
+      setSortDirection('asc')
+    } else if (sortDirection === 'asc') {
+      setSortDirection('desc')
+    } else {
+      setSortColumn(null)
+    }
+  }
+
+  const trimmedSearch = search.trim().toLowerCase()
+  const filtered = trimmedSearch
+    ? rows.filter((row) => columns.some((column) => textValue(row, column).toLowerCase().includes(trimmedSearch)))
+    : rows
+
+  const sorted = sortColumn
+    ? [...filtered].sort((a, b) => {
+        const av = a[sortColumn]
+        const bv = b[sortColumn]
+        let cmp: number
+        if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv
+        else cmp = textValue(a, sortColumn).localeCompare(textValue(b, sortColumn))
+        return sortDirection === 'asc' ? cmp : -cmp
+      })
+    : filtered
+
+  // A search or sort implies looking beyond the recent-8 default — show
+  // everything matching instead of silently hiding older rows.
+  const visibleRows = searchable && (trimmedSearch || sortColumn) ? sorted : sorted.slice(-8)
 
   function startEdit(row: Record<string, unknown>) {
     setError(null)
@@ -109,13 +148,24 @@ export function DataTable({
 
   return (
     <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-[var(--theme-text)]">
           {title}
         </h2>
-        <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
-          {rows.length} records
-        </span>
+        <div className="flex items-center gap-2">
+          {searchable && rows.length > 0 && (
+            <input
+              type="text"
+              placeholder="Search…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="rounded-full border border-[var(--theme-border)] bg-black/10 px-3 py-1 text-xs text-[var(--theme-text)] outline-none"
+            />
+          )}
+          <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
+            {visibleRows.length === rows.length ? rows.length : `${visibleRows.length} / ${rows.length}`} records
+          </span>
+        </div>
       </div>
       {error && <p className="mb-2 text-xs text-red-300">{error}</p>}
       {rows.length === 0 ? (
@@ -123,6 +173,8 @@ export function DataTable({
           No records yet. Add records through /api/finance or future forms; the
           database is initialized and ready.
         </p>
+      ) : visibleRows.length === 0 ? (
+        <p className="text-sm text-[var(--theme-muted)]">No records match "{search}".</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
@@ -131,9 +183,11 @@ export function DataTable({
                 {columns.map((column) => (
                   <th
                     key={column}
-                    className="border-b border-[var(--theme-border)] py-2 pr-4"
+                    className={`border-b border-[var(--theme-border)] py-2 pr-4 ${searchable ? 'cursor-pointer select-none hover:text-[var(--theme-text)]' : ''}`}
+                    onClick={searchable ? () => toggleSort(column) : undefined}
                   >
                     {column}
+                    {sortColumn === column && (sortDirection === 'asc' ? ' ▲' : ' ▼')}
                   </th>
                 ))}
                 {editable && (
@@ -144,7 +198,7 @@ export function DataTable({
               </tr>
             </thead>
             <tbody>
-              {rows.slice(-8).map((row, index) => {
+              {visibleRows.map((row, index) => {
                 const rowId = String(row.id ?? index)
                 const isEditing = editable && editingId === rowId
                 return (
