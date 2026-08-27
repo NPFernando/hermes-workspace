@@ -373,3 +373,88 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
     expect(() => store.updateFinanceRecord('expense', 'does-not-exist', { amount: 1 })).toThrow(/not found/)
   })
 })
+
+describe('findPossibleDuplicate', () => {
+  let tmp: string
+  let realHome: string | undefined
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-dupes-'))
+    realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+  })
+  afterEach(() => {
+    if (realHome === undefined) delete process.env.HOME
+    else process.env.HOME = realHome
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('finds a same-day/vendor/amount expense match, case-insensitive on vendor', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('expense', { date: '2026-03-01', vendor: 'Cafe Nero', category: 'Dining', amount: 500 })
+
+    const match = store.findPossibleDuplicate('expense', 'cafe nero', '2026-03-01', 500)
+    expect(match).toMatchObject({ vendorOrSource: 'Cafe Nero', date: '2026-03-01', amount: 500 })
+  })
+
+  it('treats amounts within 1% as the same', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('expense', { date: '2026-03-01', vendor: 'Cafe Nero', category: 'Dining', amount: 500 })
+    expect(store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-01', 502)).not.toBeNull()
+  })
+
+  it('does not match a different date, vendor, or amount beyond tolerance', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('expense', { date: '2026-03-01', vendor: 'Cafe Nero', category: 'Dining', amount: 500 })
+
+    expect(store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-02', 500)).toBeNull()
+    expect(store.findPossibleDuplicate('expense', 'Different Cafe', '2026-03-01', 500)).toBeNull()
+    expect(store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-01', 600)).toBeNull()
+  })
+
+  it('checks income and expense collections independently', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('income', { dateReceived: '2026-03-01', sourceName: 'Client A', originalAmount: 1000 })
+
+    expect(store.findPossibleDuplicate('income', 'Client A', '2026-03-01', 1000)).not.toBeNull()
+    expect(store.findPossibleDuplicate('expense', 'Client A', '2026-03-01', 1000)).toBeNull()
+  })
+})
+
+describe('recordCategoryCorrection / getCategoryCorrections', () => {
+  let tmp: string
+  let realHome: string | undefined
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-corrections-'))
+    realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+  })
+  afterEach(() => {
+    if (realHome === undefined) delete process.env.HOME
+    else process.env.HOME = realHome
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('records and retrieves a vendor -> category correction, keyed case-insensitively', async () => {
+    const store = await import('./finance-store')
+    expect(store.getCategoryCorrections()).toEqual({})
+
+    store.recordCategoryCorrection('Keells Super', 'Groceries')
+    expect(store.getCategoryCorrections()).toEqual({ 'keells super': 'Groceries' })
+  })
+
+  it('overwrites a prior correction for the same vendor', async () => {
+    const store = await import('./finance-store')
+    store.recordCategoryCorrection('Keells Super', 'Groceries')
+    store.recordCategoryCorrection('keells super', 'Household')
+    expect(store.getCategoryCorrections()).toEqual({ 'keells super': 'Household' })
+  })
+
+  it('ignores an empty vendor or category', async () => {
+    const store = await import('./finance-store')
+    store.recordCategoryCorrection('', 'Groceries')
+    store.recordCategoryCorrection('Vendor', '')
+    expect(store.getCategoryCorrections()).toEqual({})
+  })
+})

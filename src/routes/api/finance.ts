@@ -15,9 +15,12 @@ import {
   financeStorageAlerts,
   financeStorageStatus,
   financeSummary,
+  findPossibleDuplicate,
+  getCategoryCorrections,
   listPendingIngestions,
   maskSensitive,
   readFinanceStore,
+  recordCategoryCorrection,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
   updateFinanceRecord,
@@ -1031,7 +1034,7 @@ export const Route = createFileRoute('/api/finance')({
             }
 
             const previewImagePath = normalized.imagePaths[0]
-            const extraction = await extractTransactionFromImage(previewImagePath)
+            const extraction = await extractTransactionFromImage(previewImagePath, getCategoryCorrections())
             const updated = updatePendingIngestion(id, {
               status: 'awaiting_review',
               rawPreviewImagePath: previewImagePath,
@@ -1044,6 +1047,7 @@ export const Route = createFileRoute('/api/finance')({
             const id = typeof body.id === 'string' ? body.id : ''
             const payload =
               body.payload && typeof body.payload === 'object' ? (body.payload as JsonRecord) : {}
+            const force = body.force === true
             const pending = listPendingIngestions().find((p) => p.id === id)
             if (!pending) return json({ ok: false, error: 'Pending ingestion not found.' }, { status: 404 })
 
@@ -1051,6 +1055,29 @@ export const Route = createFileRoute('/api/finance')({
             if (kind !== 'income' && kind !== 'expense') {
               return json({ ok: false, error: 'kind (income|expense) is required.' }, { status: 400 })
             }
+            const vendorOrSource = typeof payload.vendorOrSource === 'string' ? payload.vendorOrSource : ''
+            const date = typeof payload.date === 'string' ? payload.date : ''
+            const amount = typeof payload.amount === 'number' ? payload.amount : Number(payload.amount)
+
+            // Same-day/vendor/amount already on record — likely the same
+            // bill arriving via both Gmail and a manual upload. Warn instead
+            // of silently double-counting; the UI can resend with force:true.
+            if (!force) {
+              const duplicate = findPossibleDuplicate(kind, vendorOrSource, date, amount)
+              if (duplicate) {
+                return json({ ok: true, duplicateWarning: duplicate, pendingIngestion: pending })
+              }
+            }
+
+            // Learn from a category correction: if the user changed the
+            // AI-suggested category before confirming, remember it for next
+            // time this vendor shows up.
+            const suggestedCategory = pending.extracted?.category
+            const finalCategory = typeof payload.category === 'string' ? payload.category : undefined
+            if (vendorOrSource && finalCategory && finalCategory !== suggestedCategory) {
+              recordCategoryCorrection(vendorOrSource, finalCategory)
+            }
+
             addFinanceRecord(kind, {
               ...payload,
               source: pending.source,

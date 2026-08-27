@@ -19,6 +19,7 @@ import { getGmailAccessToken } from './google-oauth'
 import {
   FINANCE_INGESTION_UPLOAD_DIR,
   addPendingIngestion,
+  getCategoryCorrections,
   listPendingIngestions,
   readFinanceStore,
   writeFinanceStore,
@@ -142,6 +143,7 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
 
   let queued = 0
   let skippedAlreadyQueued = 0
+  const categoryHints = getCategoryCorrections()
 
   for (const messageId of messageIds) {
     if (alreadyQueued(messageId)) {
@@ -159,7 +161,7 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
 
     if (attachments.length === 0) {
       if (!bodyText.trim()) continue
-      const extraction = await extractTransactionFromText(bodyText)
+      const extraction = await extractTransactionFromText(bodyText, categoryHints)
       if (!extraction.ok) continue // no clear transaction in this email — skip rather than queue noise
       addPendingIngestion({
         source: 'gmail',
@@ -203,7 +205,7 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
       previewImagePath = normalized.imagePaths[0]
     }
 
-    const extraction = await extractTransactionFromImage(previewImagePath)
+    const extraction = await extractTransactionFromImage(previewImagePath, categoryHints)
     addPendingIngestion({
       source: 'gmail',
       sourceRef: savedPath,

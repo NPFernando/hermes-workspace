@@ -5,6 +5,7 @@ import { BudgetPanel } from './components/budget-panel'
 import { PendingIngestionPanel } from './components/pending-ingestion-panel'
 import { FinanceTrendsCard } from './components/finance-trends-card'
 import { SavingsGoalsProgress } from './components/savings-goals-progress'
+import { RecurringBillsInsight } from './components/recurring-bills-insight'
 import { formatLkr, formatPct } from './utils'
 import type { PersonalFinancePayload } from './types'
 
@@ -91,6 +92,8 @@ export function PersonalFinanceScreen() {
       <FinanceTrendsCard payload={payload} />
 
       <SavingsGoalsProgress payload={payload} />
+
+      <RecurringBillsInsight payload={payload} />
 
       <PendingIngestionPanel onConfirmed={setPayload} />
 

@@ -16,6 +16,7 @@ import {
   FINANCE_DATA_DIR,
   FINANCE_INGESTION_UPLOAD_DIR,
   addPendingIngestion,
+  getCategoryCorrections,
   listPendingIngestions,
 } from '../../server/finance-store'
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
@@ -117,7 +118,7 @@ export const Route = createFileRoute('/api/finance-upload')({
             previewImagePath = normalized.imagePaths[0]
           }
 
-          const extraction = await extractTransactionFromImage(previewImagePath)
+          const extraction = await extractTransactionFromImage(previewImagePath, getCategoryCorrections())
           const pending = addPendingIngestion({
             source: 'upload',
             sourceRef: savedPath,
