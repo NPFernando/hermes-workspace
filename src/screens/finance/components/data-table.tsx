@@ -134,15 +134,19 @@ export function DataTable({
       })
       const data = (await res.json()) as { ok?: boolean; error?: string }
       if (data.ok === false) {
+        // Keep the confirm dialog open with the error visible — closing it
+        // silently on failure is indistinguishable from the delete having
+        // succeeded (the original bug: a failed delete looked identical to
+        // a successful one).
         setError(data.error || 'Delete failed')
         return
       }
       onChanged(data)
+      setConfirmDeleteId(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
       setBusy(false)
-      setConfirmDeleteId(null)
     }
   }
 
@@ -288,11 +292,14 @@ export function DataTable({
       {confirmDeleteId && (
         <ConfirmDialog
           title="Delete this record?"
-          body="This can't be undone."
+          body={error ? `${error} — try again or cancel.` : "This can't be undone."}
           confirmLabel="Delete"
           busy={busy}
           onConfirm={() => void confirmDelete()}
-          onCancel={() => setConfirmDeleteId(null)}
+          onCancel={() => {
+            setConfirmDeleteId(null)
+            setError(null)
+          }}
         />
       )}
     </section>

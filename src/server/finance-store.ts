@@ -1367,9 +1367,12 @@ export function updateFinanceRecord(
 }
 
 /**
- * Deletes are idempotent — if the id isn't found, this is a no-op rather
- * than an error (matches how a delete button behaves if double-clicked or
- * the UI's list was stale). Only throws for a genuinely unsupported kind.
+ * Throws when the id isn't found (matching updateFinanceRecord's own
+ * not-found convention) rather than silently no-op'ing. A prior "idempotent,
+ * silent no-op" version of this function let the UI's delete button close
+ * its confirm dialog with no error even when nothing was actually deleted —
+ * indistinguishable from success. Also throws for a genuinely unsupported
+ * kind.
  */
 export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
   const db = ensureFinanceStore()
@@ -1403,10 +1406,12 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     throw new Error(`Unsupported finance record kind for delete: ${kind}`)
   }
 
-  if (removed) {
-    writeFinanceStore(db)
-    appendAuditLog(`record_deleted:${kind}`, { id, kind })
+  if (!removed) {
+    throw new Error(`Record not found for kind ${kind} and id ${id}`)
   }
+
+  writeFinanceStore(db)
+  appendAuditLog(`record_deleted:${kind}`, { id, kind })
   return db
 }
 

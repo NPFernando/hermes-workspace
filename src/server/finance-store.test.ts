@@ -354,11 +354,11 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
     expect(db.expense_records).toHaveLength(0)
   })
 
-  it('deleteFinanceRecord is idempotent for an id that does not exist', async () => {
+  it('throws when deleting an id that does not exist, instead of silently no-oping', async () => {
     const store = await import('./finance-store')
     store.addFinanceRecord('income', { sourceName: 'Salary', originalAmount: 1000 })
 
-    expect(() => store.deleteFinanceRecord('income', 'does-not-exist')).not.toThrow()
+    expect(() => store.deleteFinanceRecord('income', 'does-not-exist')).toThrow(/not found/)
     const db = store.readFinanceStore()
     expect(db.income_records).toHaveLength(1)
   })
