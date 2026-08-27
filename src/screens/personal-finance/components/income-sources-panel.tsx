@@ -25,6 +25,24 @@ function paydayLabel(job: Record<string, unknown>, incomeRecords: Array<Record<s
   return { text: `${-status.daysUntil}d past payday`, tone: paydayTone.due_soon }
 }
 
+const expiryTone = {
+  ok: 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]',
+  soon: 'border-amber-400/30 bg-amber-500/15 text-amber-100',
+  ended: 'border-red-400/30 bg-red-500/15 text-red-100',
+}
+
+function contractExpiryLabel(job: Record<string, unknown>): { text: string; tone: string } | null {
+  if (job.employmentType !== 'contract' || job.status !== 'active') return null
+  const contractEndDate = typeof job.contractEndDate === 'string' ? job.contractEndDate : ''
+  if (!contractEndDate) return null
+  const target = Date.parse(contractEndDate)
+  if (!Number.isFinite(target)) return null
+  const daysUntil = Math.ceil((target - Date.now()) / (24 * 60 * 60 * 1000))
+  if (daysUntil < 0) return { text: `Contract ended ${-daysUntil}d ago`, tone: expiryTone.ended }
+  if (daysUntil <= 30) return { text: `Contract ends in ${daysUntil}d`, tone: expiryTone.soon }
+  return { text: `Contract ends in ${daysUntil}d`, tone: expiryTone.ok }
+}
+
 const inputClass =
   'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
 const buttonClass =
@@ -283,6 +301,7 @@ export function IncomeSourcesPanel({
           const documentRef = stringField(job, 'documentRef')
           const paydayStatus = getPaydayStatus(job, payload.data.income_records)
           const badge = paydayLabel(job, payload.data.income_records)
+          const expiryBadge = contractExpiryLabel(job)
           return (
             <div
               key={id}
@@ -303,6 +322,11 @@ export function IncomeSourcesPanel({
                   {badge && (
                     <span className={`ml-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${badge.tone}`}>
                       {badge.text}
+                    </span>
+                  )}
+                  {expiryBadge && (
+                    <span className={`ml-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${expiryBadge.tone}`}>
+                      {expiryBadge.text}
                     </span>
                   )}
                   {stringField(job, 'paySchedule') && (

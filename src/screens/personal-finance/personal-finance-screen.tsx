@@ -113,6 +113,8 @@ export function PersonalFinanceScreen() {
     { name: 'Fixed deposits', value: Math.max(0, summary.fixedDepositsValueLkr) },
   ].filter((entry) => entry.value > 0)
 
+  const overBudgetCount = payload.budgetVsActual.filter((b) => b.overBudget).length
+
   return (
     <main className="min-h-dvh overflow-y-auto bg-[var(--theme-bg)] px-4 py-5 text-[var(--theme-text)] md:px-8 md:py-8">
       <section className="rounded-[2rem] border border-[var(--theme-border)] bg-gradient-to-br from-[var(--theme-panel)] via-[var(--theme-panel)] to-emerald-950/20 p-6 shadow-xl">
@@ -188,6 +190,11 @@ export function PersonalFinanceScreen() {
             {t.id === 'ingestion' && pendingIngestionCount > 0 && (
               <span className="ml-1.5 rounded-full bg-amber-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-amber-100">
                 {pendingIngestionCount}
+              </span>
+            )}
+            {t.id === 'records' && overBudgetCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-red-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-red-100">
+                {overBudgetCount}
               </span>
             )}
           </button>
