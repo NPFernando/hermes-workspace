@@ -103,6 +103,7 @@ export function PersonalFinanceScreen() {
           columns={['name', 'type', 'currency', 'balance', 'platform']}
           kind="account"
           onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+          searchable
         />
         <DataTable
           title="Income records"
@@ -110,6 +111,7 @@ export function PersonalFinanceScreen() {
           columns={['dateReceived', 'sourceName', 'incomeType', 'originalCurrency', 'originalAmount', 'convertedLkrAmount', 'taxable']}
           kind="income"
           onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+          searchable
         />
         <DataTable
           title="Expense records"
@@ -117,6 +119,7 @@ export function PersonalFinanceScreen() {
           columns={['date', 'vendor', 'category', 'currency', 'amount', 'convertedLkrAmount', 'recurring']}
           kind="expense"
           onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+          searchable
         />
         <DataTable
           title="Budget categories"
@@ -124,6 +127,7 @@ export function PersonalFinanceScreen() {
           columns={['month', 'category', 'currency', 'budgetAmount']}
           kind="budget_category"
           onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+          searchable
         />
         <DataTable
           title="Savings goals"
@@ -131,6 +135,7 @@ export function PersonalFinanceScreen() {
           columns={['name', 'targetAmount', 'currentAmount', 'currency', 'targetDate', 'status']}
           kind="goal"
           onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+          searchable
         />
         <DataTable
           title="Tax records"
@@ -138,6 +143,7 @@ export function PersonalFinanceScreen() {
           columns={['taxYear', 'incomeType', 'convertedLkrAmount', 'taxPaid', 'taxDue', 'requiresConfirmation']}
           kind="tax"
           onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+          searchable
         />
       </section>
 
