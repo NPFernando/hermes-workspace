@@ -1099,6 +1099,10 @@ export const Route = createFileRoute('/api/finance')({
               if (typeof payload.contractEndDate === 'string') jobPayload.contractEndDate = payload.contractEndDate
               if (typeof payload.jobTitle === 'string') jobPayload.jobTitle = payload.jobTitle
               if (combinedNotes) jobPayload.notes = combinedNotes
+              // Link back to the uploaded contract on both create and a
+              // renewal update, so "view original contract" always points
+              // at the most recently confirmed document for this job.
+              jobPayload.documentRef = pending.sourceRef
 
               if (targetIncomeSourceId) {
                 updateFinanceRecord('income_source', targetIncomeSourceId, jobPayload)
@@ -1106,7 +1110,6 @@ export const Route = createFileRoute('/api/finance')({
                 addFinanceRecord('income_source', {
                   ...jobPayload,
                   source: pending.source,
-                  documentRef: pending.sourceRef,
                 })
               }
               const updated = updatePendingIngestion(id, { status: 'confirmed' })

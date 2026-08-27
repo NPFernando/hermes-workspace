@@ -14,7 +14,10 @@ function stringField(row: Record<string, unknown>, key: string): string {
   return typeof value === 'string' ? value : ''
 }
 
-function numberField(row: Record<string, unknown>, key: string): number | undefined {
+function numberField(
+  row: Record<string, unknown>,
+  key: string,
+): number | undefined {
   const value = row[key]
   return typeof value === 'number' ? value : undefined
 }
@@ -31,10 +34,17 @@ export function IncomeSourcesPanel({
   payload: PersonalFinancePayload
   onPayload: (p: PersonalFinancePayload) => void
 }) {
-  const { run: post, busy, error: err, setError: setErr } = useFinanceAction<PersonalFinancePayload>(onPayload)
+  const {
+    run: post,
+    busy,
+    error: err,
+    setError: setErr,
+  } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [employerName, setEmployerName] = useState('')
-  const [employmentType, setEmploymentType] = useState<'full_time' | 'contract' | 'freelance' | 'other'>('full_time')
+  const [employmentType, setEmploymentType] = useState<
+    'full_time' | 'contract' | 'freelance' | 'other'
+  >('full_time')
   const [monthlyIncomeAmount, setMonthlyIncomeAmount] = useState('')
   const [currency, setCurrency] = useState('LKR')
   const [contractStartDate, setContractStartDate] = useState('')
@@ -52,7 +62,9 @@ export function IncomeSourcesPanel({
         payload: {
           employerName: employerName.trim(),
           employmentType,
-          monthlyIncomeAmount: monthlyIncomeAmount.trim() ? Number(monthlyIncomeAmount) : undefined,
+          monthlyIncomeAmount: monthlyIncomeAmount.trim()
+            ? Number(monthlyIncomeAmount)
+            : undefined,
           currency,
           contractStartDate: contractStartDate || undefined,
           contractEndDate: contractEndDate || undefined,
@@ -69,11 +81,22 @@ export function IncomeSourcesPanel({
   }
 
   async function endJob(id: string) {
-    await post({ action: 'update_record', kind: 'income_source', id, payload: { status: 'ended' } }, `end-${id}`)
+    await post(
+      {
+        action: 'update_record',
+        kind: 'income_source',
+        id,
+        payload: { status: 'ended' },
+      },
+      `end-${id}`,
+    )
   }
 
   async function deleteJob(id: string) {
-    const data = await post({ action: 'delete_record', kind: 'income_source', id }, `delete-${id}`)
+    const data = await post(
+      { action: 'delete_record', kind: 'income_source', id },
+      `delete-${id}`,
+    )
     if (data) setConfirmDeleteId(null)
   }
 
@@ -89,22 +112,30 @@ export function IncomeSourcesPanel({
     const amount = numberField(job, 'monthlyIncomeAmount')
     if (amount === undefined) continue
     const jobCurrency = stringField(job, 'currency') || 'LKR'
-    activeMonthlyTotals.set(jobCurrency, (activeMonthlyTotals.get(jobCurrency) ?? 0) + amount)
+    activeMonthlyTotals.set(
+      jobCurrency,
+      (activeMonthlyTotals.get(jobCurrency) ?? 0) + amount,
+    )
   }
   const activeMonthlyTotalText = Array.from(activeMonthlyTotals.entries())
-    .map(([entryCurrency, amount]) => `${entryCurrency} ${Math.round(amount).toLocaleString('en-LK')}`)
+    .map(
+      ([entryCurrency, amount]) =>
+        `${entryCurrency} ${Math.round(amount).toLocaleString('en-LK')}`,
+    )
     .join(' · ')
 
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <h2 className="text-lg font-semibold">Jobs / income sources</h2>
       <p className="text-xs text-[var(--theme-muted)]">
-        Track where your income comes from — full-time, contract (with a term), or freelance/irregular. A monthly
-        amount is optional; leave it blank for income that varies.
+        Track where your income comes from — full-time, contract (with a term),
+        or freelance/irregular. A monthly amount is optional; leave it blank for
+        income that varies.
       </p>
       {activeMonthlyTotalText && (
         <p className="mt-2 text-sm font-medium text-[var(--theme-text)]">
-          Active monthly income: <span className="text-emerald-300">{activeMonthlyTotalText}</span>/mo
+          Active monthly income:{' '}
+          <span className="text-emerald-300">{activeMonthlyTotalText}</span>/mo
         </p>
       )}
 
@@ -118,7 +149,9 @@ export function IncomeSourcesPanel({
         />
         <select
           value={employmentType}
-          onChange={(e) => setEmploymentType(e.target.value as typeof employmentType)}
+          onChange={(e) =>
+            setEmploymentType(e.target.value as typeof employmentType)
+          }
           className={inputClass}
         >
           <option value="full_time">Full-time</option>
@@ -133,7 +166,11 @@ export function IncomeSourcesPanel({
           onChange={(e) => setMonthlyIncomeAmount(e.target.value)}
           className={`${inputClass} w-40`}
         />
-        <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
+        <select
+          value={currency}
+          onChange={(e) => setCurrency(e.target.value)}
+          className={inputClass}
+        >
           <option value="LKR">LKR</option>
           <option value="USD">USD</option>
           <option value="AUD">AUD</option>
@@ -156,7 +193,12 @@ export function IncomeSourcesPanel({
             />
           </>
         )}
-        <button type="button" disabled={busy === 'job'} onClick={() => void submitJob()} className={buttonClass}>
+        <button
+          type="button"
+          disabled={busy === 'job'}
+          onClick={() => void submitJob()}
+          className={buttonClass}
+        >
           {busy === 'job' ? 'Saving…' : 'Add job'}
         </button>
       </div>
@@ -164,43 +206,76 @@ export function IncomeSourcesPanel({
       {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
 
       <div className="mt-4 grid gap-2">
-        {jobs.length === 0 && <p className="text-sm text-[var(--theme-muted)]">No jobs added yet.</p>}
+        {jobs.length === 0 && (
+          <p className="text-sm text-[var(--theme-muted)]">
+            No jobs added yet.
+          </p>
+        )}
         {jobs.map((job, index) => {
           const id = stringField(job, 'id') || String(index)
           const monthly = numberField(job, 'monthlyIncomeAmount')
           const status = stringField(job, 'status') || 'active'
+          const notes = stringField(job, 'notes')
+          const documentRef = stringField(job, 'documentRef')
           return (
             <div
               key={id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
             >
-              <div>
-                <span className="font-medium text-[var(--theme-text)]">{stringField(job, 'employerName')}</span>{' '}
-                <span className="text-xs text-[var(--theme-muted)]">
-                  · {stringField(job, 'employmentType').replace('_', ' ')} ·{' '}
-                  {monthly !== undefined ? `${formatLkr(monthly)}/mo` : 'irregular income'} · {status}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                {status === 'active' && (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="font-medium text-[var(--theme-text)]">
+                    {stringField(job, 'employerName')}
+                  </span>{' '}
+                  <span className="text-xs text-[var(--theme-muted)]">
+                    · {stringField(job, 'employmentType').replace('_', ' ')} ·{' '}
+                    {monthly !== undefined
+                      ? `${formatLkr(monthly)}/mo`
+                      : 'irregular income'}{' '}
+                    · {status}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  {documentRef && (
+                    <a
+                      href={`/api/finance-document?kind=income_source&id=${id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={buttonClass}
+                    >
+                      View original contract
+                    </a>
+                  )}
+                  {status === 'active' && (
+                    <button
+                      type="button"
+                      disabled={busy === `end-${id}`}
+                      onClick={() => void endJob(id)}
+                      className={buttonClass}
+                    >
+                      Mark ended
+                    </button>
+                  )}
                   <button
                     type="button"
-                    disabled={busy === `end-${id}`}
-                    onClick={() => void endJob(id)}
-                    className={buttonClass}
+                    disabled={busy === `delete-${id}`}
+                    onClick={() => setConfirmDeleteId(id)}
+                    className="rounded-xl border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
                   >
-                    Mark ended
+                    Delete
                   </button>
-                )}
-                <button
-                  type="button"
-                  disabled={busy === `delete-${id}`}
-                  onClick={() => setConfirmDeleteId(id)}
-                  className="rounded-xl border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
-                >
-                  Delete
-                </button>
+                </div>
               </div>
+              {notes && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-medium text-[var(--theme-muted)]">
+                    Notes / AI contract review
+                  </summary>
+                  <p className="mt-1 whitespace-pre-wrap text-xs text-[var(--theme-muted)]">
+                    {notes}
+                  </p>
+                </details>
+              )}
             </div>
           )
         })}

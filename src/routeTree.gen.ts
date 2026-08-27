@@ -136,6 +136,7 @@ import { Route as ApiHarpConfigRouteImport } from './routes/api/harp-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
 import { Route as ApiFinanceUploadRouteImport } from './routes/api/finance-upload'
+import { Route as ApiFinanceDocumentRouteImport } from './routes/api/finance-document'
 import { Route as ApiFinanceRouteImport } from './routes/api/finance'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
@@ -886,6 +887,11 @@ const ApiFinanceUploadRoute = ApiFinanceUploadRouteImport.update({
   path: '/api/finance-upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFinanceDocumentRoute = ApiFinanceDocumentRouteImport.update({
+  id: '/api/finance-document',
+  path: '/api/finance-document',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFinanceRoute = ApiFinanceRouteImport.update({
   id: '/api/finance',
   path: '/api/finance',
@@ -1521,6 +1527,7 @@ export interface FileRoutesByFullPath {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
+  '/api/finance-document': typeof ApiFinanceDocumentRoute
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -1762,6 +1769,7 @@ export interface FileRoutesByTo {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
+  '/api/finance-document': typeof ApiFinanceDocumentRoute
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -2005,6 +2013,7 @@ export interface FileRoutesById {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
+  '/api/finance-document': typeof ApiFinanceDocumentRoute
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -2249,6 +2258,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/finance'
+    | '/api/finance-document'
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -2490,6 +2500,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/finance'
+    | '/api/finance-document'
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -2732,6 +2743,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/finance'
+    | '/api/finance-document'
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -2975,6 +2987,7 @@ export interface RootRouteChildren {
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiFinanceRoute: typeof ApiFinanceRouteWithChildren
+  ApiFinanceDocumentRoute: typeof ApiFinanceDocumentRoute
   ApiFinanceUploadRoute: typeof ApiFinanceUploadRoute
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
@@ -4006,6 +4019,13 @@ declare module '@tanstack/react-router' {
       path: '/api/finance-upload'
       fullPath: '/api/finance-upload'
       preLoaderRoute: typeof ApiFinanceUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/finance-document': {
+      id: '/api/finance-document'
+      path: '/api/finance-document'
+      fullPath: '/api/finance-document'
+      preLoaderRoute: typeof ApiFinanceDocumentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/finance': {
@@ -5119,6 +5139,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiFinanceRoute: ApiFinanceRouteWithChildren,
+  ApiFinanceDocumentRoute: ApiFinanceDocumentRoute,
   ApiFinanceUploadRoute: ApiFinanceUploadRoute,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
