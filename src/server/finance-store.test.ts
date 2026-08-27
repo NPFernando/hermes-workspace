@@ -519,6 +519,17 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
     expect(db.income_sources[0].jobTitle).toBe('Senior Software Engineer')
   })
 
+  it('persists documentRef so the original uploaded contract can be retrieved later', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('income_source', {
+      employerName: 'Acme Corp',
+      employmentType: 'contract',
+      documentRef: '/home/ubuntu/.hermes/finance/ingestion-uploads/some-contract.pdf',
+    })
+    const db = store.readFinanceStore()
+    expect(db.income_sources[0].documentRef).toBe('/home/ubuntu/.hermes/finance/ingestion-uploads/some-contract.pdf')
+  })
+
   it('a partial contract-renewal update merges onto the existing job without clobbering untouched fields', async () => {
     const store = await import('./finance-store')
     store.addFinanceRecord('income_source', {

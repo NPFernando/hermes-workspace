@@ -201,6 +201,8 @@ export type IncomeSource = {
   jobTitle?: string
   status: 'active' | 'ended'
   notes?: string
+  /** Path to the original uploaded contract/offer letter, when created via that intake path. */
+  documentRef?: string
   source: string
   createdAt: string
   updatedAt: string
@@ -1370,6 +1372,7 @@ export function addFinanceRecord(
       jobTitle: optionalString(payload, 'jobTitle'),
       status: payload.status === 'ended' ? 'ended' : 'active',
       notes: optionalString(payload, 'notes'),
+      documentRef: optionalString(payload, 'documentRef'),
     })
   } else if (kind === 'stock_holding') {
     db.stock_holdings.push({
