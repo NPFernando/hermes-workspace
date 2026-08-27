@@ -105,6 +105,11 @@ function sqlNumber(value: unknown, fallback = 0): string {
   return Number.isFinite(number) ? String(number) : String(fallback)
 }
 
+function sqlNullableNumber(value: unknown): string {
+  const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : Number.NaN
+  return Number.isFinite(number) ? String(number) : 'NULL'
+}
+
 function sqlBoolean(value: unknown): string {
   return value === true ? 'TRUE' : 'FALSE'
 }
@@ -204,6 +209,26 @@ CREATE TABLE IF NOT EXISTS tax_records (
   deduction_category TEXT, estimated_taxable_amount DOUBLE PRECISION NOT NULL, tax_paid DOUBLE PRECISION NOT NULL,
   tax_due DOUBLE PRECISION NOT NULL, requires_confirmation BOOLEAN NOT NULL, notes TEXT, supporting_document TEXT,
   source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS income_sources (
+  id TEXT PRIMARY KEY, employer_name TEXT NOT NULL, employment_type TEXT NOT NULL,
+  monthly_income_amount DOUBLE PRECISION, currency TEXT NOT NULL, contract_start_date TEXT, contract_end_date TEXT,
+  status TEXT NOT NULL, notes TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS stock_holdings (
+  id TEXT PRIMARY KEY, symbol TEXT NOT NULL, company_name TEXT, platform TEXT NOT NULL,
+  quantity DOUBLE PRECISION NOT NULL, buy_price DOUBLE PRECISION NOT NULL, buy_date TEXT NOT NULL,
+  currency TEXT NOT NULL, last_known_price DOUBLE PRECISION, last_price_updated_at TEXT, price_source TEXT NOT NULL,
+  notes TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS fixed_deposits (
+  id TEXT PRIMARY KEY, bank_name TEXT NOT NULL, principal DOUBLE PRECISION NOT NULL, currency TEXT NOT NULL,
+  interest_rate_pct DOUBLE PRECISION NOT NULL, interest_payout TEXT NOT NULL, start_date TEXT NOT NULL,
+  maturity_date TEXT NOT NULL, status TEXT NOT NULL, notes TEXT, source TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 `,
   )
@@ -321,6 +346,61 @@ function taxRecordRows(rowsIn: Array<Record<string, unknown>>): Array<Array<stri
   ])
 }
 
+function incomeSourceRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  return rowsIn.map((row) => [
+    sqlText(firstText(row, 'id')),
+    sqlText(firstText(row, 'employerName')),
+    sqlText(firstText(row, 'employmentType', 'other')),
+    sqlNullableNumber(row.monthlyIncomeAmount),
+    sqlText(firstText(row, 'currency')),
+    sqlNullableText(row.contractStartDate),
+    sqlNullableText(row.contractEndDate),
+    sqlText(firstText(row, 'status', 'active')),
+    sqlNullableText(row.notes),
+    sqlText(firstText(row, 'source', 'manual')),
+    sqlText(firstText(row, 'createdAt')),
+    sqlText(firstText(row, 'updatedAt')),
+  ])
+}
+
+function stockHoldingRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  return rowsIn.map((row) => [
+    sqlText(firstText(row, 'id')),
+    sqlText(firstText(row, 'symbol')),
+    sqlNullableText(row.companyName),
+    sqlText(firstText(row, 'platform')),
+    sqlNumber(row.quantity),
+    sqlNumber(row.buyPrice),
+    sqlText(firstText(row, 'buyDate')),
+    sqlText(firstText(row, 'currency')),
+    sqlNullableNumber(row.lastKnownPrice),
+    sqlNullableText(row.lastPriceUpdatedAt),
+    sqlText(firstText(row, 'priceSource', 'manual')),
+    sqlNullableText(row.notes),
+    sqlText(firstText(row, 'source', 'manual')),
+    sqlText(firstText(row, 'createdAt')),
+    sqlText(firstText(row, 'updatedAt')),
+  ])
+}
+
+function fixedDepositRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  return rowsIn.map((row) => [
+    sqlText(firstText(row, 'id')),
+    sqlText(firstText(row, 'bankName')),
+    sqlNumber(row.principal),
+    sqlText(firstText(row, 'currency')),
+    sqlNumber(row.interestRatePct),
+    sqlText(firstText(row, 'interestPayout', 'at_maturity')),
+    sqlText(firstText(row, 'startDate')),
+    sqlText(firstText(row, 'maturityDate')),
+    sqlText(firstText(row, 'status', 'active')),
+    sqlNullableText(row.notes),
+    sqlText(firstText(row, 'source', 'manual')),
+    sqlText(firstText(row, 'createdAt')),
+    sqlText(firstText(row, 'updatedAt')),
+  ])
+}
+
 function personalFinanceMirrorSql(slice: PersonalFinanceSlice): string {
   return `
 DELETE FROM finance_accounts;
@@ -329,6 +409,9 @@ DELETE FROM expense_records;
 DELETE FROM budget_categories;
 DELETE FROM savings_goals;
 DELETE FROM tax_records;
+DELETE FROM income_sources;
+DELETE FROM stock_holdings;
+DELETE FROM fixed_deposits;
 
 ${insertRows(
   'finance_accounts',
@@ -379,6 +462,33 @@ ${insertRows(
     'notes', 'supporting_document', 'source', 'created_at', 'updated_at',
   ],
   taxRecordRows(rows(slice.tax_records)),
+)}
+
+${insertRows(
+  'income_sources',
+  [
+    'id', 'employer_name', 'employment_type', 'monthly_income_amount', 'currency', 'contract_start_date',
+    'contract_end_date', 'status', 'notes', 'source', 'created_at', 'updated_at',
+  ],
+  incomeSourceRows(rows(slice.income_sources)),
+)}
+
+${insertRows(
+  'stock_holdings',
+  [
+    'id', 'symbol', 'company_name', 'platform', 'quantity', 'buy_price', 'buy_date', 'currency',
+    'last_known_price', 'last_price_updated_at', 'price_source', 'notes', 'source', 'created_at', 'updated_at',
+  ],
+  stockHoldingRows(rows(slice.stock_holdings)),
+)}
+
+${insertRows(
+  'fixed_deposits',
+  [
+    'id', 'bank_name', 'principal', 'currency', 'interest_rate_pct', 'interest_payout', 'start_date',
+    'maturity_date', 'status', 'notes', 'source', 'created_at', 'updated_at',
+  ],
+  fixedDepositRows(rows(slice.fixed_deposits)),
 )}
 `
 }

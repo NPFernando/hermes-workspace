@@ -188,6 +188,58 @@ export type TaxRecord = {
   updatedAt: string
 }
 
+/** A "job" — an employment/income source, separate from one-off IncomeRecord entries. */
+export type IncomeSource = {
+  id: string
+  employerName: string
+  employmentType: 'full_time' | 'contract' | 'freelance' | 'other'
+  /** Omit for irregular/freelance income — not every job pays a fixed monthly amount. */
+  monthlyIncomeAmount?: number
+  currency: CurrencyCode
+  contractStartDate?: string
+  contractEndDate?: string
+  status: 'active' | 'ended'
+  notes?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type StockHolding = {
+  id: string
+  symbol: string
+  companyName?: string
+  platform: string
+  quantity: number
+  buyPrice: number
+  buyDate: string
+  currency: CurrencyCode
+  /** Cached from the CSE fetch, or manually entered when the fetch fails. */
+  lastKnownPrice?: number
+  lastPriceUpdatedAt?: string
+  priceSource: 'cse_api' | 'manual'
+  notes?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type FixedDeposit = {
+  id: string
+  bankName: string
+  principal: number
+  currency: CurrencyCode
+  interestRatePct: number
+  interestPayout: 'monthly' | 'quarterly' | 'annually' | 'at_maturity'
+  startDate: string
+  maturityDate: string
+  status: 'active' | 'matured' | 'withdrawn'
+  notes?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
 /**
  * A record awaiting AI extraction and/or human review before it becomes a
  * real income/expense record — the "AI proposes, human confirms" queue for
@@ -498,6 +550,9 @@ export type FinanceDatabase = {
   savings_goals: Array<SavingsGoal>
   tax_records: Array<TaxRecord>
   pending_ingestions: Array<PendingIngestion>
+  income_sources: Array<IncomeSource>
+  stock_holdings: Array<StockHolding>
+  fixed_deposits: Array<FixedDeposit>
   exchange_rates: Array<Record<string, unknown>>
   investment_accounts: Array<Record<string, unknown>>
   trading_platforms: Array<Record<string, unknown>>
@@ -591,6 +646,9 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     savings_goals: [],
     tax_records: [],
     pending_ingestions: [],
+    income_sources: [],
+    stock_holdings: [],
+    fixed_deposits: [],
     exchange_rates: [],
     investment_accounts: [],
     trading_platforms: [
@@ -709,6 +767,10 @@ function mirrorIntoSplitStores(db: FinanceDatabase): void {
     tax_records: db.tax_records,
     exchange_rates: db.exchange_rates,
     investment_accounts: db.investment_accounts,
+    pending_ingestions: db.pending_ingestions,
+    income_sources: db.income_sources,
+    stock_holdings: db.stock_holdings,
+    fixed_deposits: db.fixed_deposits,
   })
   writeTradingStore({
     assets: db.assets,
@@ -780,6 +842,10 @@ function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
           tax_records: personal.tax_records,
           exchange_rates: personal.exchange_rates,
           investment_accounts: personal.investment_accounts,
+          pending_ingestions: personal.pending_ingestions,
+          income_sources: personal.income_sources,
+          stock_holdings: personal.stock_holdings,
+          fixed_deposits: personal.fixed_deposits,
         }
       : {}),
     ...(tradingFresh
@@ -1267,6 +1333,46 @@ export function addFinanceRecord(
       currency: stringField(payload, 'currency', 'LKR'),
       budgetAmount: numberField(payload, 'budgetAmount', 0),
     })
+  } else if (kind === 'income_source') {
+    db.income_sources.push({
+      ...base,
+      employerName: stringField(payload, 'employerName', 'Employer'),
+      employmentType: employmentTypeField(payload.employmentType),
+      monthlyIncomeAmount: optionalNumber(payload, 'monthlyIncomeAmount'),
+      currency: stringField(payload, 'currency', 'LKR'),
+      contractStartDate: optionalString(payload, 'contractStartDate'),
+      contractEndDate: optionalString(payload, 'contractEndDate'),
+      status: payload.status === 'ended' ? 'ended' : 'active',
+      notes: optionalString(payload, 'notes'),
+    })
+  } else if (kind === 'stock_holding') {
+    db.stock_holdings.push({
+      ...base,
+      symbol: stringField(payload, 'symbol', 'UNKNOWN'),
+      companyName: optionalString(payload, 'companyName'),
+      platform: stringField(payload, 'platform', 'Unknown'),
+      quantity: numberField(payload, 'quantity', 0),
+      buyPrice: numberField(payload, 'buyPrice', 0),
+      buyDate: stringField(payload, 'buyDate', createdAt.slice(0, 10)),
+      currency: stringField(payload, 'currency', 'LKR'),
+      lastKnownPrice: optionalNumber(payload, 'lastKnownPrice'),
+      lastPriceUpdatedAt: optionalString(payload, 'lastPriceUpdatedAt'),
+      priceSource: payload.priceSource === 'cse_api' ? 'cse_api' : 'manual',
+      notes: optionalString(payload, 'notes'),
+    })
+  } else if (kind === 'fixed_deposit') {
+    db.fixed_deposits.push({
+      ...base,
+      bankName: stringField(payload, 'bankName', 'Bank'),
+      principal: numberField(payload, 'principal', 0),
+      currency: stringField(payload, 'currency', 'LKR'),
+      interestRatePct: numberField(payload, 'interestRatePct', 0),
+      interestPayout: interestPayoutField(payload.interestPayout),
+      startDate: stringField(payload, 'startDate', createdAt.slice(0, 10)),
+      maturityDate: stringField(payload, 'maturityDate', createdAt.slice(0, 10)),
+      status: fixedDepositStatusField(payload.status),
+      notes: optionalString(payload, 'notes'),
+    })
   } else if (kind === 'trading_plan') {
     db.trading_plans.push(createTradingPlan(payload, base))
   } else if (kind === 'virtual_account') {
@@ -1353,6 +1459,24 @@ export function updateFinanceRecord(
       }
       updated = true
     }
+  } else if (kind === 'income_source') {
+    const index = db.income_sources.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.income_sources[index] = { ...db.income_sources[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
+  } else if (kind === 'stock_holding') {
+    const index = db.stock_holdings.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.stock_holdings[index] = { ...db.stock_holdings[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
+  } else if (kind === 'fixed_deposit') {
+    const index = db.fixed_deposits.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.fixed_deposits[index] = { ...db.fixed_deposits[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
   } else {
     throw new Error(`Unsupported finance record kind for update: ${kind}`)
   }
@@ -1402,6 +1526,18 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.budget_categories.length
     db.budget_categories = db.budget_categories.filter((r) => r.id !== id)
     removed = db.budget_categories.length !== before
+  } else if (kind === 'income_source') {
+    const before = db.income_sources.length
+    db.income_sources = db.income_sources.filter((r) => r.id !== id)
+    removed = db.income_sources.length !== before
+  } else if (kind === 'stock_holding') {
+    const before = db.stock_holdings.length
+    db.stock_holdings = db.stock_holdings.filter((r) => r.id !== id)
+    removed = db.stock_holdings.length !== before
+  } else if (kind === 'fixed_deposit') {
+    const before = db.fixed_deposits.length
+    db.fixed_deposits = db.fixed_deposits.filter((r) => r.id !== id)
+    removed = db.fixed_deposits.length !== before
   } else {
     throw new Error(`Unsupported finance record kind for delete: ${kind}`)
   }
@@ -1730,9 +1866,20 @@ export function financeSummary(db: FinanceDatabase) {
   const debtLkr = db.finance_accounts
     .filter((account) => account.type === 'loan' || account.type === 'card')
     .reduce((sum, row) => sum + Math.abs(row.balance), 0)
+  // Never blocked on a live CSE price fetch succeeding — falls back to the
+  // buy price when no cached/manual current price is available yet.
+  const stockHoldingsValueLkr = db.stock_holdings.reduce(
+    (sum, holding) => sum + (holding.lastKnownPrice ?? holding.buyPrice) * holding.quantity,
+    0,
+  )
+  const fixedDepositsValueLkr = db.fixed_deposits
+    .filter((fd) => fd.status !== 'withdrawn')
+    .reduce((sum, fd) => sum + fd.principal, 0)
   const netWorthLkr =
     cashBalanceLkr +
-    db.savings_goals.reduce((sum, goal) => sum + goal.currentAmount, 0) -
+    db.savings_goals.reduce((sum, goal) => sum + goal.currentAmount, 0) +
+    stockHoldingsValueLkr +
+    fixedDepositsValueLkr -
     debtLkr
   const openPlans = db.trading_plans.filter(
     (plan) =>
@@ -1750,6 +1897,8 @@ export function financeSummary(db: FinanceDatabase) {
     taxReserveLkr,
     debtLkr,
     netWorthLkr,
+    stockHoldingsValueLkr,
+    fixedDepositsValueLkr,
     accountCount: db.finance_accounts.length,
     goalCount: db.savings_goals.length,
     taxRecordCount: db.tax_records.length,
@@ -2064,6 +2213,27 @@ function goalStatus(value: unknown): GoalStatus {
   ]
   return allowed.includes(value as GoalStatus)
     ? (value as GoalStatus)
+    : 'active'
+}
+
+function employmentTypeField(value: unknown): IncomeSource['employmentType'] {
+  const allowed: Array<IncomeSource['employmentType']> = ['full_time', 'contract', 'freelance', 'other']
+  return allowed.includes(value as IncomeSource['employmentType'])
+    ? (value as IncomeSource['employmentType'])
+    : 'other'
+}
+
+function interestPayoutField(value: unknown): FixedDeposit['interestPayout'] {
+  const allowed: Array<FixedDeposit['interestPayout']> = ['monthly', 'quarterly', 'annually', 'at_maturity']
+  return allowed.includes(value as FixedDeposit['interestPayout'])
+    ? (value as FixedDeposit['interestPayout'])
+    : 'at_maturity'
+}
+
+function fixedDepositStatusField(value: unknown): FixedDeposit['status'] {
+  const allowed: Array<FixedDeposit['status']> = ['active', 'matured', 'withdrawn']
+  return allowed.includes(value as FixedDeposit['status'])
+    ? (value as FixedDeposit['status'])
     : 'active'
 }
 

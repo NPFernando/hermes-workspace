@@ -150,6 +150,10 @@ describe('readFinanceStore split-store overlay (Phase 5 read cutover step)', () 
       tax_records: [],
       exchange_rates: [],
       investment_accounts: [],
+      pending_ingestions: [],
+      income_sources: [],
+      stock_holdings: [],
+      fixed_deposits: [],
     })
     const mirrorPath = path.join(tmp, '.hermes', 'finance', 'personal-finance.json')
     const mirror = JSON.parse(fs.readFileSync(mirrorPath, 'utf-8'))
