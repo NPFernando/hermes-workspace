@@ -458,3 +458,148 @@ describe('recordCategoryCorrection / getCategoryCorrections', () => {
     expect(store.getCategoryCorrections()).toEqual({})
   })
 })
+
+describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)', () => {
+  let tmp: string
+  let realHome: string | undefined
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-newkinds-'))
+    realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+  })
+  afterEach(() => {
+    if (realHome === undefined) delete process.env.HOME
+    else process.env.HOME = realHome
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('adds, edits, then deletes an income source (job)', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('income_source', {
+      employerName: 'Acme Corp',
+      employmentType: 'contract',
+      monthlyIncomeAmount: 5000,
+      currency: 'USD',
+      contractStartDate: '2026-01-01',
+      contractEndDate: '2026-12-31',
+    })
+    let db = store.readFinanceStore()
+    expect(db.income_sources).toHaveLength(1)
+    expect(db.income_sources[0]).toMatchObject({
+      employerName: 'Acme Corp',
+      employmentType: 'contract',
+      monthlyIncomeAmount: 5000,
+      status: 'active',
+    })
+    const id = db.income_sources[0].id
+
+    store.updateFinanceRecord('income_source', id, { status: 'ended' })
+    db = store.readFinanceStore()
+    expect(db.income_sources[0].status).toBe('ended')
+
+    store.deleteFinanceRecord('income_source', id)
+    db = store.readFinanceStore()
+    expect(db.income_sources).toHaveLength(0)
+  })
+
+  it('defaults employmentType to other for an unrecognized value', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('income_source', { employerName: 'X', employmentType: 'bogus' })
+    const db = store.readFinanceStore()
+    expect(db.income_sources[0].employmentType).toBe('other')
+  })
+
+  it('supports an income source with no monthlyIncomeAmount (irregular income)', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('income_source', { employerName: 'Freelance Clients', employmentType: 'freelance' })
+    const db = store.readFinanceStore()
+    expect(db.income_sources[0].monthlyIncomeAmount).toBeUndefined()
+  })
+
+  it('adds, edits, then deletes a stock holding', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('stock_holding', {
+      symbol: 'JKH.N0000',
+      platform: 'NDB Zone X',
+      quantity: 100,
+      buyPrice: 150,
+      buyDate: '2026-01-15',
+      currency: 'LKR',
+    })
+    let db = store.readFinanceStore()
+    expect(db.stock_holdings).toHaveLength(1)
+    expect(db.stock_holdings[0]).toMatchObject({ symbol: 'JKH.N0000', quantity: 100, buyPrice: 150, priceSource: 'manual' })
+    const id = db.stock_holdings[0].id
+
+    store.updateFinanceRecord('stock_holding', id, { lastKnownPrice: 165, priceSource: 'cse_api' })
+    db = store.readFinanceStore()
+    expect(db.stock_holdings[0]).toMatchObject({ lastKnownPrice: 165, priceSource: 'cse_api' })
+
+    store.deleteFinanceRecord('stock_holding', id)
+    db = store.readFinanceStore()
+    expect(db.stock_holdings).toHaveLength(0)
+  })
+
+  it('adds, edits, then deletes a fixed deposit', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('fixed_deposit', {
+      bankName: 'Sampath Bank',
+      principal: 500_000,
+      currency: 'LKR',
+      interestRatePct: 12.5,
+      interestPayout: 'monthly',
+      startDate: '2026-01-01',
+      maturityDate: '2027-01-01',
+    })
+    let db = store.readFinanceStore()
+    expect(db.fixed_deposits).toHaveLength(1)
+    expect(db.fixed_deposits[0]).toMatchObject({ bankName: 'Sampath Bank', principal: 500_000, status: 'active' })
+    const id = db.fixed_deposits[0].id
+
+    store.updateFinanceRecord('fixed_deposit', id, { status: 'matured' })
+    db = store.readFinanceStore()
+    expect(db.fixed_deposits[0].status).toBe('matured')
+
+    store.deleteFinanceRecord('fixed_deposit', id)
+    db = store.readFinanceStore()
+    expect(db.fixed_deposits).toHaveLength(0)
+  })
+})
+
+describe('financeSummary net worth with stock holdings and fixed deposits', () => {
+  it('includes stock holdings at current price and active fixed deposit principal', () => {
+    const db = createEmptyFinanceDatabase()
+    db.stock_holdings.push({
+      id: 's1', symbol: 'JKH.N0000', platform: 'Test', quantity: 10, buyPrice: 100, buyDate: '2026-01-01',
+      currency: 'LKR', lastKnownPrice: 120, priceSource: 'cse_api', source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.fixed_deposits.push({
+      id: 'f1', bankName: 'Test Bank', principal: 50_000, currency: 'LKR', interestRatePct: 10,
+      interestPayout: 'at_maturity', startDate: '2026-01-01', maturityDate: '2027-01-01', status: 'active',
+      source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.fixed_deposits.push({
+      id: 'f2', bankName: 'Withdrawn Bank', principal: 999_999, currency: 'LKR', interestRatePct: 10,
+      interestPayout: 'at_maturity', startDate: '2026-01-01', maturityDate: '2027-01-01', status: 'withdrawn',
+      source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+
+    const summary = financeSummary(db)
+    expect(summary.stockHoldingsValueLkr).toBe(1200) // 10 * 120 (current price, not buy price)
+    expect(summary.fixedDepositsValueLkr).toBe(50_000) // withdrawn FD excluded
+    expect(summary.netWorthLkr).toBe(1200 + 50_000)
+  })
+
+  it('falls back to buy price when a stock holding has no cached current price yet', () => {
+    const db = createEmptyFinanceDatabase()
+    db.stock_holdings.push({
+      id: 's1', symbol: 'JKH.N0000', platform: 'Test', quantity: 5, buyPrice: 200, buyDate: '2026-01-01',
+      currency: 'LKR', priceSource: 'manual', source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    const summary = financeSummary(db)
+    expect(summary.stockHoldingsValueLkr).toBe(1000) // 5 * 200 (buy price fallback)
+  })
+})

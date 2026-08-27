@@ -33,6 +33,10 @@ export interface PersonalFinanceSlice {
   tax_records: Array<Record<string, unknown>>
   exchange_rates: Array<Record<string, unknown>>
   investment_accounts: Array<Record<string, unknown>>
+  pending_ingestions: Array<Record<string, unknown>>
+  income_sources: Array<Record<string, unknown>>
+  stock_holdings: Array<Record<string, unknown>>
+  fixed_deposits: Array<Record<string, unknown>>
 }
 
 /**
