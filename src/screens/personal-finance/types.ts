@@ -8,6 +8,8 @@ export type PersonalFinancePayload = {
     totalIncomeLkr: number
     totalExpensesLkr: number
     taxReserveLkr: number
+    stockHoldingsValueLkr: number
+    fixedDepositsValueLkr: number
     accountCount: number
   }
   budgetVsActual: Array<{
@@ -27,6 +29,9 @@ export type PersonalFinancePayload = {
     budget_categories: Array<Record<string, unknown>>
     savings_goals: Array<Record<string, unknown>>
     tax_records: Array<Record<string, unknown>>
+    income_sources: Array<Record<string, unknown>>
+    stock_holdings: Array<Record<string, unknown>>
+    fixed_deposits: Array<Record<string, unknown>>
   }
 }
 
