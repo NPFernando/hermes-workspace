@@ -79,6 +79,22 @@ export function IncomeSourcesPanel({
 
   const jobs = payload.data.income_sources
 
+  // Grouped by currency rather than converted to one figure — the codebase's
+  // only FX handling is a manually-entered per-record rate on one-off income
+  // entries, not a general converter, so summing across currencies here
+  // would silently invent a conversion this app doesn't otherwise do.
+  const activeMonthlyTotals = new Map<string, number>()
+  for (const job of jobs) {
+    if (stringField(job, 'status') !== 'active') continue
+    const amount = numberField(job, 'monthlyIncomeAmount')
+    if (amount === undefined) continue
+    const jobCurrency = stringField(job, 'currency') || 'LKR'
+    activeMonthlyTotals.set(jobCurrency, (activeMonthlyTotals.get(jobCurrency) ?? 0) + amount)
+  }
+  const activeMonthlyTotalText = Array.from(activeMonthlyTotals.entries())
+    .map(([entryCurrency, amount]) => `${entryCurrency} ${Math.round(amount).toLocaleString('en-LK')}`)
+    .join(' · ')
+
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <h2 className="text-lg font-semibold">Jobs / income sources</h2>
@@ -86,6 +102,11 @@ export function IncomeSourcesPanel({
         Track where your income comes from — full-time, contract (with a term), or freelance/irregular. A monthly
         amount is optional; leave it blank for income that varies.
       </p>
+      {activeMonthlyTotalText && (
+        <p className="mt-2 text-sm font-medium text-[var(--theme-text)]">
+          Active monthly income: <span className="text-emerald-300">{activeMonthlyTotalText}</span>/mo
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2">
         <input
