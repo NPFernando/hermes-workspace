@@ -195,6 +195,44 @@ function financePayload() {
   }
 }
 
+/**
+ * Lighter-weight sibling of financePayload() for the Personal Finance
+ * screen: skips every trading-only report (tradingPerformanceSummary,
+ * decisionQualityReport, paperDecisionQuality, learningReport,
+ * marketLearningReport, safeguardHistory, strategyCatalog,
+ * strategyOverrideState — none of which Personal Finance ever reads) and
+ * only includes the personal-finance collections, not the full trading
+ * state (historical_candles, trading_plans, trade_orders, etc.). Reuses the
+ * same ensureFinanceStore() call as financePayload() — no change to the
+ * underlying read/write/migration path. The Trading screen keeps using the
+ * unscoped GET (financePayload()) unchanged.
+ */
+function personalFinancePayload() {
+  const db = ensureFinanceStore()
+  const storage = financeStorageStatus({ selfHeal: true })
+  const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
+  return {
+    ok: true,
+    checkedAt: Date.now(),
+    storage,
+    summary: financeSummary(db),
+    budgetVsActual: budgetVsActualSummary(db),
+    alerts,
+    data: maskSensitive({
+      finance_accounts: db.finance_accounts,
+      income_records: db.income_records,
+      expense_records: db.expense_records,
+      budget_categories: db.budget_categories,
+      savings_goals: db.savings_goals,
+      tax_records: db.tax_records,
+      income_sources: db.income_sources,
+      stock_holdings: db.stock_holdings,
+      fixed_deposits: db.fixed_deposits,
+      pending_ingestions: db.pending_ingestions,
+    }),
+  }
+}
+
 function refreshIntelligence(symbol: string) {
   const db = readFinanceStore()
   const now = new Date()
@@ -226,6 +264,8 @@ export const Route = createFileRoute('/api/finance')({
     handlers: {
       GET: ({ request }) => {
         if (!isAuthenticated(request)) return unauthorized()
+        const scope = new URL(request.url).searchParams.get('scope')
+        if (scope === 'personal_finance') return json(personalFinancePayload())
         return json(financePayload())
       },
       POST: async ({ request }) => {
