@@ -6,13 +6,27 @@ import { PendingIngestionPanel } from './components/pending-ingestion-panel'
 import { FinanceTrendsCard } from './components/finance-trends-card'
 import { SavingsGoalsProgress } from './components/savings-goals-progress'
 import { RecurringBillsInsight } from './components/recurring-bills-insight'
+import { IncomeSourcesPanel } from './components/income-sources-panel'
+import { StockHoldingsPanel } from './components/stock-holdings-panel'
+import { FixedDepositsPanel } from './components/fixed-deposits-panel'
 import { formatLkr, formatPct } from './utils'
 import type { PersonalFinancePayload } from './types'
+
+type Tab = 'overview' | 'income' | 'investments' | 'records' | 'ingestion'
+
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'income', label: 'Income & Jobs' },
+  { id: 'investments', label: 'Investments' },
+  { id: 'records', label: 'Accounts & Records' },
+  { id: 'ingestion', label: 'Ingestion' },
+]
 
 export function PersonalFinanceScreen() {
   const [payload, setPayload] = useState<PersonalFinancePayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<Tab>('overview')
 
   useEffect(() => {
     let cancelled = false
@@ -73,7 +87,7 @@ export function PersonalFinanceScreen() {
           Money clarity, without trading controls
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--theme-muted)]">
-          Track accounts, spending, budgets, savings goals, and tax records —
+          Track accounts, spending, budgets, savings goals, investments, and tax records —
           separate from the automated trading workspace.
         </p>
       </section>
@@ -85,74 +99,108 @@ export function PersonalFinanceScreen() {
         <StatCard label="Savings rate" value={formatPct(summary.savingsRate)} tone={summary.savingsRate >= 20 ? 'good' : 'warn'} />
         <StatCard label="Total income" value={formatLkr(summary.totalIncomeLkr)} tone="good" />
         <StatCard label="Total expenses" value={formatLkr(summary.totalExpensesLkr)} tone={summary.totalExpensesLkr > summary.totalIncomeLkr && summary.totalIncomeLkr > 0 ? 'danger' : 'neutral'} />
-        <StatCard label="Tax reserve" value={formatLkr(summary.taxReserveLkr)} />
-        <StatCard label="Tracked accounts" value={String(summary.accountCount)} />
+        <StatCard label="Stock holdings" value={formatLkr(summary.stockHoldingsValueLkr)} />
+        <StatCard label="Fixed deposits" value={formatLkr(summary.fixedDepositsValueLkr)} />
       </section>
 
-      <FinanceTrendsCard payload={payload} />
+      <nav className="mt-6 flex flex-wrap gap-2 border-b border-[var(--theme-border)] pb-2">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+              tab === t.id
+                ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent)]'
+                : 'text-[var(--theme-muted)] hover:bg-black/10 hover:text-[var(--theme-text)]'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
 
-      <SavingsGoalsProgress payload={payload} />
+      {tab === 'overview' && (
+        <>
+          <FinanceTrendsCard payload={payload} />
+          <SavingsGoalsProgress payload={payload} />
+          <RecurringBillsInsight payload={payload} />
+        </>
+      )}
 
-      <RecurringBillsInsight payload={payload} />
+      {tab === 'income' && (
+        <>
+          <IncomeSourcesPanel payload={payload} onPayload={setPayload} />
+          <BudgetPanel payload={payload} onPayload={setPayload} />
+          <section className="mt-6">
+            <DataTable
+              title="Income records"
+              rows={payload.data.income_records}
+              columns={['dateReceived', 'sourceName', 'incomeType', 'originalCurrency', 'originalAmount', 'convertedLkrAmount', 'taxable']}
+              kind="income"
+              onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+              searchable
+            />
+          </section>
+        </>
+      )}
 
-      <PendingIngestionPanel onConfirmed={setPayload} />
+      {tab === 'investments' && (
+        <>
+          <StockHoldingsPanel payload={payload} onPayload={setPayload} />
+          <FixedDepositsPanel payload={payload} onPayload={setPayload} />
+        </>
+      )}
 
-      <BudgetPanel payload={payload} onPayload={setPayload} />
+      {tab === 'records' && (
+        <section className="mt-6 grid gap-4">
+          <DataTable
+            title="Accounts"
+            rows={payload.data.finance_accounts}
+            columns={['name', 'type', 'currency', 'balance', 'platform']}
+            kind="account"
+            onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+            searchable
+          />
+          <DataTable
+            title="Expense records"
+            rows={payload.data.expense_records}
+            columns={['date', 'vendor', 'category', 'currency', 'amount', 'convertedLkrAmount', 'recurring']}
+            kind="expense"
+            onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+            searchable
+          />
+          <DataTable
+            title="Budget categories"
+            rows={payload.data.budget_categories}
+            columns={['month', 'category', 'currency', 'budgetAmount']}
+            kind="budget_category"
+            onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+            searchable
+          />
+          <DataTable
+            title="Savings goals"
+            rows={payload.data.savings_goals}
+            columns={['name', 'targetAmount', 'currentAmount', 'currency', 'targetDate', 'status']}
+            kind="goal"
+            onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+            searchable
+          />
+          <DataTable
+            title="Tax records"
+            rows={payload.data.tax_records}
+            columns={['taxYear', 'incomeType', 'convertedLkrAmount', 'taxPaid', 'taxDue', 'requiresConfirmation']}
+            kind="tax"
+            onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+            searchable
+          />
+          <p className="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">
+            Tax figures are estimates; confirm them against official sources before filing.
+          </p>
+        </section>
+      )}
 
-      <section className="mt-6 grid gap-4">
-        <DataTable
-          title="Accounts"
-          rows={payload.data.finance_accounts}
-          columns={['name', 'type', 'currency', 'balance', 'platform']}
-          kind="account"
-          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-          searchable
-        />
-        <DataTable
-          title="Income records"
-          rows={payload.data.income_records}
-          columns={['dateReceived', 'sourceName', 'incomeType', 'originalCurrency', 'originalAmount', 'convertedLkrAmount', 'taxable']}
-          kind="income"
-          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-          searchable
-        />
-        <DataTable
-          title="Expense records"
-          rows={payload.data.expense_records}
-          columns={['date', 'vendor', 'category', 'currency', 'amount', 'convertedLkrAmount', 'recurring']}
-          kind="expense"
-          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-          searchable
-        />
-        <DataTable
-          title="Budget categories"
-          rows={payload.data.budget_categories}
-          columns={['month', 'category', 'currency', 'budgetAmount']}
-          kind="budget_category"
-          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-          searchable
-        />
-        <DataTable
-          title="Savings goals"
-          rows={payload.data.savings_goals}
-          columns={['name', 'targetAmount', 'currentAmount', 'currency', 'targetDate', 'status']}
-          kind="goal"
-          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-          searchable
-        />
-        <DataTable
-          title="Tax records"
-          rows={payload.data.tax_records}
-          columns={['taxYear', 'incomeType', 'convertedLkrAmount', 'taxPaid', 'taxDue', 'requiresConfirmation']}
-          kind="tax"
-          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-          searchable
-        />
-      </section>
-
-      <p className="mt-6 rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">
-        Tax figures are estimates; confirm them against official sources before filing.
-      </p>
+      {tab === 'ingestion' && <PendingIngestionPanel onConfirmed={setPayload} />}
     </main>
   )
 }
