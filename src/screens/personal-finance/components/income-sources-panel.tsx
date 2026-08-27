@@ -61,6 +61,23 @@ function numberField(
   return typeof value === 'number' ? value : undefined
 }
 
+/** Fuzzy enough to catch "Acme Corp" vs "Acme Corp Pvt Ltd", not so fuzzy it flags unrelated names. */
+function findPossibleDuplicateJob(
+  jobs: Array<Record<string, unknown>>,
+  employerName: string,
+): Record<string, unknown> | null {
+  const target = employerName.trim().toLowerCase()
+  if (!target) return null
+  for (const job of jobs) {
+    if (stringField(job, 'status') !== 'active') continue
+    const existing = stringField(job, 'employerName').trim().toLowerCase()
+    if (existing && (existing === target || existing.includes(target) || target.includes(existing))) {
+      return job
+    }
+  }
+  return null
+}
+
 /**
  * "Jobs" — separate from one-off income entries. Not every job has a fixed
  * monthly amount (freelance/contract income can be irregular), so
@@ -91,12 +108,23 @@ export function IncomeSourcesPanel({
   const [expectedPaydayDayOfMonth, setExpectedPaydayDayOfMonth] = useState('')
   const [payLogDrafts, setPayLogDrafts] = useState<Record<string, { amount: string; currency: string; date: string }>>({})
   const [payLogOpenId, setPayLogOpenId] = useState<string | null>(null)
+  const [duplicateWarningName, setDuplicateWarningName] = useState<string | null>(null)
+  const [reanalyzingId, setReanalyzingId] = useState<string | null>(null)
+  const [reanalyzeNote, setReanalyzeNote] = useState<string | null>(null)
 
-  async function submitJob() {
+  async function submitJob(force = false) {
     if (!employerName.trim()) {
       setErr('Employer name is required')
       return
     }
+    if (!force) {
+      const duplicate = findPossibleDuplicateJob(payload.data.income_sources, employerName)
+      if (duplicate) {
+        setDuplicateWarningName(stringField(duplicate, 'employerName'))
+        return
+      }
+    }
+    setDuplicateWarningName(null)
     const data = await post(
       {
         action: 'add_record',
@@ -170,6 +198,30 @@ export function IncomeSourcesPanel({
       `delete-${id}`,
     )
     if (data) setConfirmDeleteId(null)
+  }
+
+  // Raw fetch, not useFinanceAction — the response is {ok, pendingIngestionId},
+  // not a full PersonalFinancePayload, so it must not be passed to onPayload.
+  async function reanalyzeContract(id: string) {
+    setReanalyzingId(id)
+    setReanalyzeNote(null)
+    try {
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'reanalyze_contract', incomeSourceId: id }),
+      })
+      const data = (await res.json()) as { ok?: boolean; error?: string }
+      setReanalyzeNote(
+        data.ok === false
+          ? data.error || 'Re-analysis failed'
+          : 'Re-analysis complete — check the Ingestion tab to review it.',
+      )
+    } catch (e) {
+      setReanalyzeNote(e instanceof Error ? e.message : 'Re-analysis failed')
+    } finally {
+      setReanalyzingId(null)
+    }
   }
 
   const jobs = payload.data.income_sources
@@ -278,14 +330,34 @@ export function IncomeSourcesPanel({
         <button
           type="button"
           disabled={busy === 'job'}
-          onClick={() => void submitJob()}
+          onClick={() => void submitJob(false)}
           className={buttonClass}
         >
           {busy === 'job' ? 'Saving…' : 'Add job'}
         </button>
       </div>
 
+      {duplicateWarningName && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 p-2">
+          <p className="text-xs text-amber-100">
+            A job for "{duplicateWarningName}" already exists — add this one anyway?
+          </p>
+          <button
+            type="button"
+            disabled={busy === 'job'}
+            onClick={() => void submitJob(true)}
+            className="rounded-xl border border-amber-400/40 bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/30 disabled:opacity-50"
+          >
+            Add anyway
+          </button>
+          <button type="button" onClick={() => setDuplicateWarningName(null)} className={buttonClass}>
+            Cancel
+          </button>
+        </div>
+      )}
+
       {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
+      {reanalyzeNote && <p className="mt-2 text-xs text-[var(--theme-muted)]">{reanalyzeNote}</p>}
 
       <div className="mt-4 grid gap-2">
         {jobs.length === 0 && (
@@ -337,14 +409,24 @@ export function IncomeSourcesPanel({
                 </div>
                 <div className="flex gap-2">
                   {documentRef && (
-                    <a
-                      href={`/api/finance-document?kind=income_source&id=${id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={buttonClass}
-                    >
-                      View original contract
-                    </a>
+                    <>
+                      <a
+                        href={`/api/finance-document?kind=income_source&id=${id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={buttonClass}
+                      >
+                        View original contract
+                      </a>
+                      <button
+                        type="button"
+                        disabled={reanalyzingId === id}
+                        onClick={() => void reanalyzeContract(id)}
+                        className={buttonClass}
+                      >
+                        {reanalyzingId === id ? 'Re-analyzing…' : 'Re-analyze contract'}
+                      </button>
+                    </>
                   )}
                   {status === 'active' &&
                     monthly !== undefined &&

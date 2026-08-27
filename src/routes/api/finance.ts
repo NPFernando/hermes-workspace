@@ -7,6 +7,7 @@ import {
   FINANCE_DATA_PATH,
   TRADING_MODES,
   addFinanceRecord,
+  addPendingIngestion,
   appendAuditLog,
   budgetVsActualSummary,
   deleteFinanceRecord,
@@ -1163,6 +1164,43 @@ export const Route = createFileRoute('/api/finance')({
             if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
             const updated = updatePendingIngestion(id, { status: 'rejected' })
             return json({ ok: true, pendingIngestion: updated })
+          }
+          if (action === 'reanalyze_contract') {
+            const incomeSourceId = typeof body.incomeSourceId === 'string' ? body.incomeSourceId : ''
+            if (!incomeSourceId) return json({ ok: false, error: 'incomeSourceId is required.' }, { status: 400 })
+            const job = readFinanceStore().income_sources.find((r) => r.id === incomeSourceId)
+            if (!job) return json({ ok: false, error: 'Job not found.' }, { status: 404 })
+            if (!job.documentRef) {
+              return json({ ok: false, error: 'No document on file for this job.' }, { status: 400 })
+            }
+
+            const isPdf = job.documentRef.toLowerCase().endsWith('.pdf')
+            let imagePaths = [job.documentRef]
+            if (isPdf) {
+              if (isPdfEncrypted(job.documentRef)) {
+                return json(
+                  { ok: false, error: 'This document is password-protected — re-upload it to unlock and re-analyze.' },
+                  { status: 400 },
+                )
+              }
+              const normalized = pdfToImages(job.documentRef)
+              if (!normalized.ok) {
+                return json({ ok: false, error: `Could not process document: ${normalized.reason}` }, { status: 400 })
+              }
+              imagePaths = normalized.imagePaths
+            }
+
+            const extraction = await extractEmploymentContract(imagePaths)
+            const pending = addPendingIngestion({
+              source: 'upload',
+              documentType: 'contract',
+              sourceRef: job.documentRef,
+              status: 'awaiting_review',
+              rawPreviewImagePath: imagePaths[0],
+              extractedContract: extraction.ok ? extraction.data : undefined,
+              error: extraction.ok ? undefined : extraction.reason,
+            })
+            return json({ ok: true, pendingIngestionId: pending.id })
           }
           if (action === 'refresh_stock_price') {
             const id = typeof body.id === 'string' ? body.id : ''
