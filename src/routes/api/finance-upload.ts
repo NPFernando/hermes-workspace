@@ -20,7 +20,7 @@ import {
   listPendingIngestions,
 } from '../../server/finance-store'
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
-import { extractTransactionFromImage } from '../../server/finance-extraction'
+import { extractEmploymentContract, extractTransactionFromImage } from '../../server/finance-extraction'
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 const UPLOAD_DIR = FINANCE_INGESTION_UPLOAD_DIR
@@ -79,6 +79,7 @@ export const Route = createFileRoute('/api/finance-upload')({
 
           const form = await request.formData()
           const file = form.get('file')
+          const documentType = form.get('documentType') === 'contract' ? 'contract' : 'transaction'
           if (!(file instanceof File)) {
             return json({ ok: false, error: 'Missing file.' }, { status: 400 })
           }
@@ -97,6 +98,7 @@ export const Route = createFileRoute('/api/finance-upload')({
           if (isPdf && isPdfEncrypted(savedPath)) {
             const pending = addPendingIngestion({
               source: 'upload',
+              documentType,
               sourceRef: savedPath,
               status: 'awaiting_password',
             })
@@ -104,11 +106,13 @@ export const Route = createFileRoute('/api/finance-upload')({
           }
 
           let previewImagePath = savedPath
+          let allImagePaths = [savedPath]
           if (isPdf) {
             const normalized = pdfToImages(savedPath)
             if (!normalized.ok) {
               const pending = addPendingIngestion({
                 source: 'upload',
+                documentType,
                 sourceRef: savedPath,
                 status: 'awaiting_review',
                 error: `Could not process document: ${normalized.reason}`,
@@ -116,11 +120,27 @@ export const Route = createFileRoute('/api/finance-upload')({
               return json({ ok: true, pendingIngestionId: pending.id, status: pending.status })
             }
             previewImagePath = normalized.imagePaths[0]
+            allImagePaths = normalized.imagePaths
+          }
+
+          if (documentType === 'contract') {
+            const extraction = await extractEmploymentContract(allImagePaths)
+            const pending = addPendingIngestion({
+              source: 'upload',
+              documentType: 'contract',
+              sourceRef: savedPath,
+              status: 'awaiting_review',
+              rawPreviewImagePath: previewImagePath,
+              extractedContract: extraction.ok ? extraction.data : undefined,
+              error: extraction.ok ? undefined : extraction.reason,
+            })
+            return json({ ok: true, pendingIngestionId: pending.id, status: pending.status })
           }
 
           const extraction = await extractTransactionFromImage(previewImagePath, getCategoryCorrections())
           const pending = addPendingIngestion({
             source: 'upload',
+            documentType: 'transaction',
             sourceRef: savedPath,
             status: 'awaiting_review',
             rawPreviewImagePath: previewImagePath,

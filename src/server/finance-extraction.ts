@@ -18,10 +18,14 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { callWithFallback, readOpenRouterKey, selectHarpRoutes } from './llm-signal-engine'
-import type { ExtractedTransaction } from './finance-store'
+import type { ContractRisk, ExtractedContract, ExtractedTransaction } from './finance-store'
 
 export type ExtractionResult =
   | { ok: true; data: ExtractedTransaction }
+  | { ok: false; reason: string }
+
+export type ContractExtractionResult =
+  | { ok: true; data: ExtractedContract }
   | { ok: false; reason: string }
 
 const EXTRACTION_PROMPT_INSTRUCTIONS = `You extract a single financial transaction from the given content (a bill, receipt, invoice, bank/payment notification, or salary/income notice).
@@ -224,6 +228,157 @@ export async function extractTransactionFromImage(
 
   const geminiContent = await callGeminiVision(instructions, image.base64, image.mimeType)
   if (geminiContent) return parseExtractionJson(geminiContent)
+
+  return { ok: false, reason: 'all_routes_failed' }
+}
+
+/**
+ * Employment contract extraction: reads the full document (all pages, not
+ * just page 1 like the single-transaction flow above — contracts routinely
+ * spread salary/dates/clauses across multiple pages) and returns both the
+ * structured job fields AND a plain-English risk review in one pass, since
+ * the vision model is already reading the whole document. This is not legal
+ * advice — the prompt asks the model to flag concerns, not render verdicts,
+ * and the UI carries an explicit disclaimer alongside the output.
+ */
+const CONTRACT_MAX_PAGES = 10
+
+const CONTRACT_EXTRACTION_PROMPT_INSTRUCTIONS = `You are reviewing an employment contract/offer letter on behalf of the EMPLOYEE (not the employer). Read all provided pages and respond with STRICT JSON only, no markdown fences, no commentary, matching exactly this shape:
+{
+  "employerName": "<company name>",
+  "employmentType": "full_time" | "contract" | "freelance" | "other",
+  "monthlyIncomeAmount": <number, monthly salary/rate converted to a monthly figure if the contract states annual/hourly, or null if not stated>,
+  "currency": "<3-letter currency code, e.g. LKR, USD, AUD>",
+  "contractStartDate": "<YYYY-MM-DD or null>",
+  "contractEndDate": "<YYYY-MM-DD, or null for full-time/indefinite employment>",
+  "jobTitle": "<job title/role, or null>",
+  "confidence": "high" | "medium" | "low",
+  "riskSummary": "<2-3 plain-English sentences on how favorable or unfavorable this contract looks for the employee overall>",
+  "risks": [
+    { "severity": "high" | "medium" | "low", "clause": "<short label, e.g. 'Termination notice'>", "concern": "<what is unusual, one-sided, or risky about it for the employee, in plain English>" }
+  ]
+}
+
+Look specifically for things like: notice-period asymmetry (employer owes less notice than employee), weak or absent severance, unusually broad or long non-compete/non-solicit terms, termination without cause with little/no protection, missing cost-of-living/inflation adjustment, unpaid or uncapped overtime expectations, one-sided IP assignment, mandatory individual arbitration waiving the right to sue, and any probation terms that strip protections for an extended period. List every genuine concern you find (up to 10), ranked most severe first. If the contract is largely standard/fair, say so plainly in riskSummary and return an empty risks array. This is not legal advice — flag concerns, do not declare the contract legal or illegal.
+
+If the content does not appear to be an employment contract/offer letter, respond with exactly: {"error": "not_a_contract"}`
+
+export function parseContractExtractionJson(raw: string): ContractExtractionResult {
+  const stripped = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
+  try {
+    const obj: unknown = JSON.parse(stripped)
+    if (typeof obj !== 'object' || obj === null) return { ok: false, reason: 'malformed_response' }
+    const o = obj as Record<string, unknown>
+    if (o.error) return { ok: false, reason: String(o.error) }
+
+    const employerName = typeof o.employerName === 'string' && o.employerName.trim() ? o.employerName.trim() : 'Unknown employer'
+    const employmentType =
+      o.employmentType === 'full_time' || o.employmentType === 'contract' || o.employmentType === 'freelance'
+        ? o.employmentType
+        : 'other'
+    const monthlyIncomeAmount =
+      typeof o.monthlyIncomeAmount === 'number' && Number.isFinite(o.monthlyIncomeAmount)
+        ? o.monthlyIncomeAmount
+        : undefined
+    const currency = typeof o.currency === 'string' && o.currency.trim() ? o.currency.trim() : 'LKR'
+    const contractStartDate = typeof o.contractStartDate === 'string' && o.contractStartDate.trim() ? o.contractStartDate.trim() : undefined
+    const contractEndDate = typeof o.contractEndDate === 'string' && o.contractEndDate.trim() ? o.contractEndDate.trim() : undefined
+    const jobTitle = typeof o.jobTitle === 'string' && o.jobTitle.trim() ? o.jobTitle.trim() : undefined
+    const confidence = o.confidence === 'high' || o.confidence === 'medium' || o.confidence === 'low' ? o.confidence : 'low'
+    const riskSummary = typeof o.riskSummary === 'string' ? o.riskSummary.trim().slice(0, 600) : ''
+
+    const rawRisks = Array.isArray(o.risks) ? o.risks : []
+    const risks: Array<ContractRisk> = rawRisks
+      .slice(0, 10)
+      .map((r): ContractRisk | null => {
+        if (typeof r !== 'object' || r === null) return null
+        const ro = r as Record<string, unknown>
+        const severity = ro.severity === 'high' || ro.severity === 'medium' || ro.severity === 'low' ? ro.severity : 'low'
+        const clause = typeof ro.clause === 'string' && ro.clause.trim() ? ro.clause.trim() : ''
+        const concern = typeof ro.concern === 'string' && ro.concern.trim() ? ro.concern.trim() : ''
+        if (!clause || !concern) return null
+        return { severity, clause, concern }
+      })
+      .filter((r): r is ContractRisk => r !== null)
+
+    return {
+      ok: true,
+      data: {
+        employerName,
+        employmentType,
+        monthlyIncomeAmount,
+        currency,
+        contractStartDate,
+        contractEndDate,
+        jobTitle,
+        confidence,
+        riskSummary,
+        risks,
+      },
+    }
+  } catch {
+    return { ok: false, reason: 'malformed_response' }
+  }
+}
+
+async function callOpenRouterVisionMulti(
+  model: string,
+  prompt: string,
+  images: Array<{ base64: string; mimeType: string }>,
+): Promise<string | null> {
+  const apiKey = readOpenRouterKey()
+  if (!apiKey) return null
+  try {
+    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              ...images.map((image) => ({
+                type: 'image_url' as const,
+                image_url: { url: `data:${image.mimeType};base64,${image.base64}` },
+              })),
+            ],
+          },
+        ],
+        temperature: 0.2,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    })
+    if (!resp.ok) return null
+    const data = (await resp.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    return data.choices?.[0]?.message?.content ?? null
+  } catch {
+    return null
+  }
+}
+
+async function callGeminiVisionMulti(prompt: string, images: Array<{ base64: string; mimeType: string }>): Promise<string | null> {
+  return callGemini([
+    { text: prompt },
+    ...images.map((image) => ({ inline_data: { mime_type: image.mimeType, data: image.base64 } })),
+  ])
+}
+
+export async function extractEmploymentContract(imagePaths: Array<string>): Promise<ContractExtractionResult> {
+  const images = imagePaths
+    .slice(0, CONTRACT_MAX_PAGES)
+    .map((imagePath) => readImageAsBase64(imagePath))
+    .filter((image): image is { base64: string; mimeType: string } => image !== null)
+  if (images.length === 0) return { ok: false, reason: 'image_not_found' }
+
+  for (const model of VISION_ROUTE_MODELS) {
+    const content = await callOpenRouterVisionMulti(model, CONTRACT_EXTRACTION_PROMPT_INSTRUCTIONS, images)
+    if (content) return parseContractExtractionJson(content)
+  }
+
+  const geminiContent = await callGeminiVisionMulti(CONTRACT_EXTRACTION_PROMPT_INSTRUCTIONS, images)
+  if (geminiContent) return parseContractExtractionJson(geminiContent)
 
   return { ok: false, reason: 'all_routes_failed' }
 }

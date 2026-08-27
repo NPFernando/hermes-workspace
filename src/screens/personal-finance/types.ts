@@ -45,12 +45,33 @@ export type ExtractedTransaction = {
   confidence: 'high' | 'medium' | 'low'
 }
 
+export type ContractRisk = {
+  severity: 'high' | 'medium' | 'low'
+  clause: string
+  concern: string
+}
+
+export type ExtractedContract = {
+  employerName: string
+  employmentType: 'full_time' | 'contract' | 'freelance' | 'other'
+  monthlyIncomeAmount?: number
+  currency: string
+  contractStartDate?: string
+  contractEndDate?: string
+  jobTitle?: string
+  confidence: 'high' | 'medium' | 'low'
+  riskSummary: string
+  risks: Array<ContractRisk>
+}
+
 export type PendingIngestion = {
   id: string
   status: 'awaiting_password' | 'awaiting_review' | 'confirmed' | 'rejected'
   source: 'gmail' | 'upload'
+  documentType: 'transaction' | 'contract'
   passwordHint?: string
   extracted?: ExtractedTransaction
+  extractedContract?: ExtractedContract
   rawPreviewImagePath?: string
   error?: string
 }

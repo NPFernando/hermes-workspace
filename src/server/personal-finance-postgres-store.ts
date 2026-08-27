@@ -214,8 +214,9 @@ CREATE TABLE IF NOT EXISTS tax_records (
 CREATE TABLE IF NOT EXISTS income_sources (
   id TEXT PRIMARY KEY, employer_name TEXT NOT NULL, employment_type TEXT NOT NULL,
   monthly_income_amount DOUBLE PRECISION, currency TEXT NOT NULL, contract_start_date TEXT, contract_end_date TEXT,
-  status TEXT NOT NULL, notes TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  job_title TEXT, status TEXT NOT NULL, notes TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+ALTER TABLE income_sources ADD COLUMN IF NOT EXISTS job_title TEXT;
 
 CREATE TABLE IF NOT EXISTS stock_holdings (
   id TEXT PRIMARY KEY, symbol TEXT NOT NULL, company_name TEXT, platform TEXT NOT NULL,
@@ -355,6 +356,7 @@ function incomeSourceRows(rowsIn: Array<Record<string, unknown>>): Array<Array<s
     sqlText(firstText(row, 'currency')),
     sqlNullableText(row.contractStartDate),
     sqlNullableText(row.contractEndDate),
+    sqlNullableText(row.jobTitle),
     sqlText(firstText(row, 'status', 'active')),
     sqlNullableText(row.notes),
     sqlText(firstText(row, 'source', 'manual')),
@@ -468,7 +470,7 @@ ${insertRows(
   'income_sources',
   [
     'id', 'employer_name', 'employment_type', 'monthly_income_amount', 'currency', 'contract_start_date',
-    'contract_end_date', 'status', 'notes', 'source', 'created_at', 'updated_at',
+    'contract_end_date', 'job_title', 'status', 'notes', 'source', 'created_at', 'updated_at',
   ],
   incomeSourceRows(rows(slice.income_sources)),
 )}

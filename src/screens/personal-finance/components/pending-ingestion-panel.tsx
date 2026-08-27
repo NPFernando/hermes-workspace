@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ExtractedTransaction, PendingIngestion, PersonalFinancePayload } from '../types'
+import type { ExtractedContract, ExtractedTransaction, PendingIngestion, PersonalFinancePayload } from '../types'
 
 type DuplicateWarning = { date: string; amount: number; vendorOrSource: string }
 
@@ -9,26 +9,38 @@ const confidenceTone: Record<ExtractedTransaction['confidence'], string> = {
   low: 'border-red-400/30 bg-red-500/15 text-red-100',
 }
 
+const severityTone: Record<'high' | 'medium' | 'low', string> = {
+  high: 'border-red-400/30 bg-red-500/15 text-red-100',
+  medium: 'border-amber-400/30 bg-amber-500/15 text-amber-100',
+  low: 'border-sky-400/30 bg-sky-500/15 text-sky-100',
+}
+
 /**
  * AI-assisted intake: upload a receipt/bill photo or PDF, or sync Gmail —
  * every extracted item lands here for review and never touches real
  * income/expense records until the user confirms it.
  */
 export function PendingIngestionPanel({
+  payload,
   onConfirmed,
 }: {
+  payload: PersonalFinancePayload
   onConfirmed: (payload: PersonalFinancePayload) => void
 }) {
   const [items, setItems] = useState<Array<PendingIngestion>>([])
   const [uploading, setUploading] = useState(false)
+  const [uploadingContract, setUploadingContract] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({})
   const [editDrafts, setEditDrafts] = useState<Record<string, Partial<ExtractedTransaction>>>({})
+  const [contractDrafts, setContractDrafts] = useState<Record<string, Partial<ExtractedContract>>>({})
+  const [targetJobDrafts, setTargetJobDrafts] = useState<Record<string, string>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
   const [gmailConnected, setGmailConnected] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [duplicateWarnings, setDuplicateWarnings] = useState<Record<string, DuplicateWarning>>({})
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const contractFileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     fetch('/api/auth/gmail-connect?check=1', { cache: 'no-store' })
@@ -81,12 +93,14 @@ export function PendingIngestionPanel({
     }
   }
 
-  async function uploadFile(file: File) {
-    setUploading(true)
+  async function uploadFile(file: File, documentType: 'transaction' | 'contract' = 'transaction') {
+    const setBusy = documentType === 'contract' ? setUploadingContract : setUploading
+    setBusy(true)
     setNote(null)
     try {
       const form = new FormData()
       form.set('file', file)
+      form.set('documentType', documentType)
       const res = await fetch('/api/finance-upload', { method: 'POST', body: form })
       const data = (await res.json()) as { ok: boolean; error?: string }
       if (!data.ok) setNote(data.error || 'Upload failed')
@@ -94,8 +108,9 @@ export function PendingIngestionPanel({
     } catch (e) {
       setNote(e instanceof Error ? e.message : 'Upload failed')
     } finally {
-      setUploading(false)
+      setBusy(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+      if (contractFileInputRef.current) contractFileInputRef.current.value = ''
     }
   }
 
@@ -176,6 +191,43 @@ export function PendingIngestionPanel({
     setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }))
   }
 
+  function updateContractDraft(id: string, patch: Partial<ExtractedContract>) {
+    setContractDrafts((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }))
+  }
+
+  async function confirmContractItem(item: PendingIngestion) {
+    const draft = { ...item.extractedContract, ...contractDrafts[item.id] }
+    if (!draft.employerName || !draft.employmentType) {
+      setNote('Employer name and employment type are required before confirming.')
+      return
+    }
+    setBusyId(item.id)
+    setNote(null)
+    try {
+      const targetIncomeSourceId = targetJobDrafts[item.id] || undefined
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'confirm_pending_ingestion',
+          id: item.id,
+          payload: { ...draft, targetIncomeSourceId },
+        }),
+      })
+      const data = (await res.json()) as { ok?: boolean; error?: string }
+      if (data.ok === false) {
+        setNote(data.error || 'Confirm failed')
+        return
+      }
+      onConfirmed(data as PersonalFinancePayload)
+      await load()
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Confirm failed')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const inputClass =
     'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
   const buttonClass =
@@ -210,6 +262,24 @@ export function PendingIngestionPanel({
             className={buttonClass}
           >
             {uploading ? 'Processing…' : 'Upload receipt / bill'}
+          </button>
+          <input
+            ref={contractFileInputRef}
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void uploadFile(file, 'contract')
+            }}
+          />
+          <button
+            type="button"
+            disabled={uploadingContract}
+            onClick={() => contractFileInputRef.current?.click()}
+            className={buttonClass}
+          >
+            {uploadingContract ? 'Processing…' : 'Upload employment contract'}
           </button>
           {gmailConnected ? (
             <button type="button" disabled={syncing} onClick={() => void syncGmail()} className={buttonClass}>
@@ -280,7 +350,128 @@ export function PendingIngestionPanel({
                   </div>
                 )}
 
-                {item.status === 'awaiting_review' && (
+                {item.status === 'awaiting_review' && item.documentType === 'contract' && (
+                  <div className="mt-2">
+                    {item.error && !item.extractedContract && (
+                      <p className="text-xs text-amber-200">
+                        Automatic extraction failed ({item.error}) — enter the details manually below.
+                      </p>
+                    )}
+                    {item.extractedContract && (
+                      <span
+                        className={`mb-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${confidenceTone[item.extractedContract.confidence]}`}
+                      >
+                        {item.extractedContract.confidence} confidence
+                      </span>
+                    )}
+                    {item.extractedContract && (
+                      <div className="mb-3 rounded-xl border border-[var(--theme-border)]/60 bg-black/20 p-3">
+                        <p className="text-xs font-semibold text-[var(--theme-text)]">AI contract review</p>
+                        <p className="mt-1 text-xs text-[var(--theme-muted)]">{item.extractedContract.riskSummary}</p>
+                        {item.extractedContract.risks.length > 0 && (
+                          <div className="mt-2 grid gap-1.5">
+                            {item.extractedContract.risks.map((risk, i) => (
+                              <div key={i} className="flex flex-wrap items-start gap-2">
+                                <span
+                                  className={`shrink-0 rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${severityTone[risk.severity]}`}
+                                >
+                                  {risk.severity}
+                                </span>
+                                <span className="text-xs text-[var(--theme-muted)]">
+                                  <strong className="text-[var(--theme-text)]">{risk.clause}:</strong> {risk.concern}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <p className="mt-2 text-[10px] italic text-[var(--theme-muted)]">
+                          AI-generated review — not legal advice; confirm important terms yourself before signing or
+                          acting on this.
+                        </p>
+                      </div>
+                    )}
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <input
+                        type="text"
+                        placeholder="Employer name"
+                        defaultValue={item.extractedContract?.employerName}
+                        onChange={(e) => updateContractDraft(item.id, { employerName: e.target.value })}
+                        className={inputClass}
+                      />
+                      <select
+                        value={
+                          (contractDrafts[item.id] ?? {}).employmentType ?? item.extractedContract?.employmentType ?? 'other'
+                        }
+                        onChange={(e) =>
+                          updateContractDraft(item.id, {
+                            employmentType: e.target.value as ExtractedContract['employmentType'],
+                          })
+                        }
+                        className={inputClass}
+                      >
+                        <option value="full_time">Full-time</option>
+                        <option value="contract">Contract</option>
+                        <option value="freelance">Freelance</option>
+                        <option value="other">Other</option>
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Job title (optional)"
+                        defaultValue={item.extractedContract?.jobTitle}
+                        onChange={(e) => updateContractDraft(item.id, { jobTitle: e.target.value })}
+                        className={inputClass}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Monthly amount (optional)"
+                        defaultValue={item.extractedContract?.monthlyIncomeAmount}
+                        onChange={(e) => updateContractDraft(item.id, { monthlyIncomeAmount: Number(e.target.value) })}
+                        className={`${inputClass} w-40`}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Currency"
+                        defaultValue={item.extractedContract?.currency ?? 'LKR'}
+                        onChange={(e) => updateContractDraft(item.id, { currency: e.target.value })}
+                        className={`${inputClass} w-20`}
+                      />
+                      <input
+                        type="date"
+                        defaultValue={item.extractedContract?.contractStartDate}
+                        onChange={(e) => updateContractDraft(item.id, { contractStartDate: e.target.value })}
+                        className={inputClass}
+                        title="Contract start date"
+                      />
+                      <input
+                        type="date"
+                        defaultValue={item.extractedContract?.contractEndDate}
+                        onChange={(e) => updateContractDraft(item.id, { contractEndDate: e.target.value })}
+                        className={inputClass}
+                        title="Contract end date"
+                      />
+                    </div>
+                    <div className="mt-2">
+                      <select
+                        value={targetJobDrafts[item.id] ?? ''}
+                        onChange={(e) => setTargetJobDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                        className={inputClass}
+                      >
+                        <option value="">Create new job</option>
+                        {payload.data.income_sources.map((job) => {
+                          const jobId = typeof job.id === 'string' ? job.id : ''
+                          const employerName = typeof job.employerName === 'string' ? job.employerName : 'Job'
+                          return (
+                            <option key={jobId} value={jobId}>
+                              Update existing job: {employerName}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {item.status === 'awaiting_review' && item.documentType !== 'contract' && (
                   <div className="mt-2">
                     {item.error && !item.extracted && (
                       <p className="text-xs text-amber-200">
@@ -349,7 +540,17 @@ export function PendingIngestionPanel({
               </div>
 
               <div className="flex gap-2">
-                {item.status === 'awaiting_review' && (
+                {item.status === 'awaiting_review' && item.documentType === 'contract' && (
+                  <button
+                    type="button"
+                    disabled={busyId === item.id}
+                    onClick={() => void confirmContractItem(item)}
+                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                  >
+                    Confirm
+                  </button>
+                )}
+                {item.status === 'awaiting_review' && item.documentType !== 'contract' && (
                   <button
                     type="button"
                     disabled={busyId === item.id}

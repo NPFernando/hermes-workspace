@@ -200,7 +200,7 @@ export function PersonalFinanceScreen() {
         </section>
       )}
 
-      {tab === 'ingestion' && <PendingIngestionPanel onConfirmed={setPayload} />}
+      {tab === 'ingestion' && <PendingIngestionPanel payload={payload} onConfirmed={setPayload} />}
     </main>
   )
 }
