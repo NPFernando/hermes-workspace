@@ -53,14 +53,14 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 
 ## Phase 1 — Core Financial Ledger
 
-**Goal:** Unified accounts + transactions as the foundation everything else depends on. **Depends on:** Phase 0. **Status:** planned — **recommended next major feature.**
+**Goal:** Unified accounts + transactions as the foundation everything else depends on. **Depends on:** Phase 0. **Status:** partial — Account Model shipped, Unified Transaction Model is next.
 
 | ID | Feature | Status | Note |
 |---|---|---|---|
-| PF-100 | Account Model | planned, **ready** | No blocking dependency — recommended entry point |
-| PF-101 | Account Types | planned | |
-| PF-102 | Account UI | partial | `finance_accounts` + generic DataTable exists, not the target model |
-| PF-103 | Opening Balances | planned | |
+| PF-100 | Account Model | **existing** | `openingBalance`/`openingBalanceDate` added to `FinanceAccount`; `balance` stays manually-maintained until PF-104 exists to compute it from a real ledger |
+| PF-101 | Account Types | **existing** | 8-type enum (`bank`/`cash`/`card`/`crypto_wallet`/`broker`/`foreign_currency`/`loan`/`other`) already existed, confirmed sufficient |
+| PF-102 | Account UI | **existing** | Dedicated `AccountsPanel` (add/edit/delete, per-currency total, opening-balance display) replaces the generic DataTable |
+| PF-103 | Opening Balances | **existing** | Optional `openingBalance` + `openingBalanceDate`, shown as a secondary line per account |
 | PF-104 | Unified Transaction Model | planned | The core gap |
 | PF-105 | Transaction CRUD | partial | Income/expense CRUD exists but as separate collections |
 | PF-106 | Transaction Types | planned | |
@@ -553,10 +553,16 @@ Dependencies met, scope clear — this is informational status only, nothing her
 - **PF-006** — Fix Fixed Deposit Rate Labelling (zero dependencies)
 - **PF-007** — Improve Investment P/L Display (zero dependencies)
 - **PF-009** — Standardize Money Formatting (zero dependencies)
-- **PF-100** — Account Model (unlocks 30+ downstream features — recommended next major feature)
+- **PF-104** — Unified Transaction Model (now that PF-100/101/102/103 exist — the next Phase 1 feature)
 
 ## Recommended Next Feature
 
-**PF-100 — Account Model**, designed as a migration path (new `accounts`/`transactions` tables that today's `finance_accounts`/`income_records`/`expense_records` gradually migrate into, not a rip-and-replace) so the working UI and existing data aren't disrupted. This unblocks the largest number of downstream phases of anything in the registry.
+**PF-104 — Unified Transaction Model.** With accounts now a real, dedicated model (PF-100/101/102/103 shipped), the next foundational piece is the transaction ledger itself — `income_records`/`expense_records` become entries in one `transactions` table with types, transfers, and splits. This unblocks credit cards, bills/subscriptions, forecasting, budget v2 extras, reconciliation, and analytics/history — the largest remaining cluster in the registry.
 
-PF-006 and PF-007 are independent zero-risk quick wins that can be done any time without touching Phase 1.
+PF-006 and PF-007 remain independent zero-risk quick wins that can be done any time without touching Phase 1.
+
+### Shipped: PF-100/101/102/103 — Account Model
+
+- **What was built**: `openingBalance?`/`openingBalanceDate?` added to `FinanceAccount` (`src/server/finance-store.ts`) and the `personal_finance` Postgres mirror; a dedicated `AccountsPanel` (`src/screens/personal-finance/components/accounts-panel.tsx`) replacing the generic DataTable in the Accounts & Records tab — add/edit/delete, human-readable account-type labels, a per-currency total-balance line, and an opening-balance secondary line per account.
+- **Known limitation**: `balance` is still a manually-maintained current figure, not derived from transactions — that's explicitly PF-104's job, not attempted here.
+- **Not built** (deliberately deferred, not dropped): a separate `institutions` entity — the existing free-text `platform` field is reused for "which bank/broker" for now; worth revisiting once multiple accounts actually share an institution and dedup value emerges.

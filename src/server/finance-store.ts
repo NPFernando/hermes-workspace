@@ -96,6 +96,9 @@ export type FinanceAccount = {
     | 'other'
   currency: CurrencyCode
   balance: number
+  /** Balance recorded when the user started tracking this account, distinct from the live `balance` above. */
+  openingBalance?: number
+  openingBalanceDate?: string
   maskedIdentifier?: string
   platform?: string
   source: string
@@ -1322,6 +1325,8 @@ export function addFinanceRecord(
       type: accountType(payload.type),
       currency: stringField(payload, 'currency', 'LKR'),
       balance: numberField(payload, 'balance', 0),
+      openingBalance: optionalNumber(payload, 'openingBalance'),
+      openingBalanceDate: optionalString(payload, 'openingBalanceDate'),
       maskedIdentifier: optionalString(payload, 'maskedIdentifier'),
       platform: optionalString(payload, 'platform'),
     })

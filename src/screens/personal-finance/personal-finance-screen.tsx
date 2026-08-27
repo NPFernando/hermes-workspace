@@ -10,6 +10,7 @@ import { RecurringBillsInsight } from './components/recurring-bills-insight'
 import { IncomeSourcesPanel } from './components/income-sources-panel'
 import { StockHoldingsPanel } from './components/stock-holdings-panel'
 import { FixedDepositsPanel } from './components/fixed-deposits-panel'
+import { AccountsPanel } from './components/accounts-panel'
 import { formatLkr, formatPct } from './utils'
 import type { PersonalFinancePayload } from './types'
 
@@ -309,14 +310,7 @@ export function PersonalFinanceScreen() {
 
       {tab === 'records' && (
         <section className="mt-6 grid gap-4">
-          <DataTable
-            title="Accounts"
-            rows={payload.data.finance_accounts}
-            columns={['name', 'type', 'currency', 'balance', 'platform']}
-            kind="account"
-            onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-            searchable
-          />
+          <AccountsPanel payload={payload} onPayload={setPayload} />
           <DataTable
             title="Expense records"
             rows={payload.data.expense_records}
