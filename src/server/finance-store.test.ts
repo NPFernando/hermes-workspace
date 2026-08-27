@@ -682,4 +682,32 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     const summary = financeSummary(db)
     expect(summary.stockHoldingsValueLkr).toBe(1000) // 5 * 200 (buy price fallback)
   })
+
+  it('computes unrealizedStockPnlLkr as (current - buy) * quantity, summed across holdings', () => {
+    const db = createEmptyFinanceDatabase()
+    db.stock_holdings.push({
+      id: 's1', symbol: 'JKH.N0000', platform: 'Test', quantity: 10, buyPrice: 100, buyDate: '2026-01-01',
+      currency: 'LKR', lastKnownPrice: 120, priceSource: 'cse_api', source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.stock_holdings.push({
+      id: 's2', symbol: 'COMB.N0000', platform: 'Test', quantity: 5, buyPrice: 300, buyDate: '2026-01-01',
+      currency: 'LKR', lastKnownPrice: 250, priceSource: 'cse_api', source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    const summary = financeSummary(db)
+    // (120-100)*10 + (250-300)*5 = 200 - 250 = -50
+    expect(summary.unrealizedStockPnlLkr).toBe(-50)
+  })
+
+  it('unrealizedStockPnlLkr is 0 when there is no cached current price (falls back to buy price)', () => {
+    const db = createEmptyFinanceDatabase()
+    db.stock_holdings.push({
+      id: 's1', symbol: 'JKH.N0000', platform: 'Test', quantity: 5, buyPrice: 200, buyDate: '2026-01-01',
+      currency: 'LKR', priceSource: 'manual', source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    const summary = financeSummary(db)
+    expect(summary.unrealizedStockPnlLkr).toBe(0)
+  })
 })
