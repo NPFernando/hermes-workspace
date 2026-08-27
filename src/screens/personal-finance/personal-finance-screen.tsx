@@ -105,7 +105,7 @@ export function PersonalFinanceScreen() {
     async function load() {
       setLoading(true)
       try {
-        const response = await fetch('/api/finance', { cache: 'no-store' })
+        const response = await fetch('/api/finance?scope=personal_finance', { cache: 'no-store' })
         if (!response.ok)
           throw new Error(`Finance API returned HTTP ${response.status}`)
         const data = (await response.json()) as PersonalFinancePayload
