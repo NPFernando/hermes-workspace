@@ -10,10 +10,16 @@
  * Deliberately a plain sibling module, not importing from finance-store.ts,
  * to avoid a circular import (finance-store.ts's writeFinanceStore() calls
  * into this file after every write).
+ *
+ * Also fans out to personal-finance-postgres-store.ts's own, separate
+ * `personal_finance` Postgres database — best-effort, same as this file's
+ * own JSON write; see that module's header for why it's a fully
+ * independent sibling rather than touching finance-postgres-store.ts.
  */
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { writePersonalFinancePostgresStore } from './personal-finance-postgres-store'
 
 const DATA_DIR = path.join(os.homedir(), '.hermes', 'finance')
 const DATA_PATH = path.join(DATA_DIR, 'personal-finance.json')
@@ -46,6 +52,11 @@ export function writePersonalFinanceStore(slice: PersonalFinanceSlice): void {
     fs.writeFileSync(DATA_PATH, JSON.stringify(payload), { mode: 0o600 })
   } catch (err) {
     console.error('personal-finance-store: mirror write failed', err)
+  }
+  try {
+    writePersonalFinancePostgresStore(slice)
+  } catch (err) {
+    console.error('personal-finance-store: Postgres mirror write failed', err)
   }
 }
 
