@@ -25,6 +25,22 @@ function daysUntil(dateStr: string): number | null {
   return Math.ceil((target - Date.now()) / (24 * 60 * 60 * 1000))
 }
 
+const maturityTone = {
+  ok: 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]',
+  soon: 'border-amber-400/30 bg-amber-500/15 text-amber-100',
+  overdue: 'border-red-400/30 bg-red-500/15 text-red-100',
+}
+
+function maturityBadge(remaining: number): { text: string; tone: string } {
+  if (remaining >= 0) {
+    const text = `Matures in ${remaining}d`
+    return { text, tone: remaining <= 30 ? maturityTone.soon : maturityTone.ok }
+  }
+  const overdue = Math.abs(remaining)
+  const text = `Matured ${overdue}d ago`
+  return { text, tone: overdue <= 7 ? maturityTone.soon : maturityTone.overdue }
+}
+
 export function FixedDepositsPanel({
   payload,
   onPayload,
@@ -162,16 +178,17 @@ export function FixedDepositsPanel({
                 <span className="font-medium text-[var(--theme-text)]">{stringField(fd, 'bankName')}</span>{' '}
                 <span className="text-xs text-[var(--theme-muted)]">
                   · {formatLkr(numberField(fd, 'principal'))} · {numberField(fd, 'interestRatePct')}% · {payout} · {status}
-                  {status === 'active' && remaining !== null && (
-                    <>
-                      {' '}
-                      ·{' '}
-                      {remaining >= 0
-                        ? `matures in ${remaining} day${remaining === 1 ? '' : 's'}`
-                        : `matured ${Math.abs(remaining)} day${Math.abs(remaining) === 1 ? '' : 's'} ago`}
-                    </>
-                  )}
                 </span>
+                {status === 'active' &&
+                  remaining !== null &&
+                  (() => {
+                    const badge = maturityBadge(remaining)
+                    return (
+                      <span className={`ml-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${badge.tone}`}>
+                        {badge.text}
+                      </span>
+                    )
+                  })()}
               </div>
               <div className="flex gap-2">
                 {status === 'active' && (
