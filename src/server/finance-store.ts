@@ -198,6 +198,7 @@ export type IncomeSource = {
   currency: CurrencyCode
   contractStartDate?: string
   contractEndDate?: string
+  jobTitle?: string
   status: 'active' | 'ended'
   notes?: string
   source: string
@@ -263,13 +264,37 @@ export type ExtractedTransaction = {
   confidence: 'high' | 'medium' | 'low'
 }
 
+/** A specific clause an AI contract review flagged as unusual or one-sided for the employee. */
+export type ContractRisk = {
+  severity: 'high' | 'medium' | 'low'
+  clause: string
+  concern: string
+}
+
+export type ExtractedContract = {
+  employerName: string
+  employmentType: 'full_time' | 'contract' | 'freelance' | 'other'
+  monthlyIncomeAmount?: number
+  currency: string
+  contractStartDate?: string
+  contractEndDate?: string
+  jobTitle?: string
+  confidence: 'high' | 'medium' | 'low'
+  /** Plain-English 2-3 sentence overview of how favorable/unfavorable the contract looks. */
+  riskSummary: string
+  risks: Array<ContractRisk>
+}
+
 export type PendingIngestion = {
   id: string
   status: PendingIngestionStatus
   source: 'gmail' | 'upload'
+  /** Defaults to 'transaction' — 'contract' drives a different extracted shape and confirm path. */
+  documentType: 'transaction' | 'contract'
   sourceRef: string
   passwordHint?: string
   extracted?: ExtractedTransaction
+  extractedContract?: ExtractedContract
   rawPreviewImagePath?: string
   error?: string
   createdAt: string
@@ -1342,6 +1367,7 @@ export function addFinanceRecord(
       currency: stringField(payload, 'currency', 'LKR'),
       contractStartDate: optionalString(payload, 'contractStartDate'),
       contractEndDate: optionalString(payload, 'contractEndDate'),
+      jobTitle: optionalString(payload, 'jobTitle'),
       status: payload.status === 'ended' ? 'ended' : 'active',
       notes: optionalString(payload, 'notes'),
     })
@@ -1621,7 +1647,12 @@ export function listPendingIngestions(): Array<PendingIngestion> {
 
 export function addPendingIngestion(
   input: Pick<PendingIngestion, 'source' | 'sourceRef'> &
-    Partial<Pick<PendingIngestion, 'status' | 'passwordHint' | 'extracted' | 'rawPreviewImagePath' | 'error'>>,
+    Partial<
+      Pick<
+        PendingIngestion,
+        'status' | 'documentType' | 'passwordHint' | 'extracted' | 'extractedContract' | 'rawPreviewImagePath' | 'error'
+      >
+    >,
 ): PendingIngestion {
   const db = ensureFinanceStore()
   const createdAt = nowIso()
@@ -1629,9 +1660,11 @@ export function addPendingIngestion(
     id: randomUUID(),
     status: input.status ?? 'awaiting_review',
     source: input.source,
+    documentType: input.documentType ?? 'transaction',
     sourceRef: input.sourceRef,
     passwordHint: input.passwordHint,
     extracted: input.extracted,
+    extractedContract: input.extractedContract,
     rawPreviewImagePath: input.rawPreviewImagePath,
     error: input.error,
     createdAt,

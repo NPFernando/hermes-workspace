@@ -28,7 +28,7 @@ import {
   writeFinanceStore,
 } from '../../server/finance-store'
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
-import { extractTransactionFromImage } from '../../server/finance-extraction'
+import { extractEmploymentContract, extractTransactionFromImage } from '../../server/finance-extraction'
 import { syncGmailNow } from '../../server/gmail-ingest'
 import { fetchCsePrice } from '../../server/cse-market.service'
 import {
@@ -1035,6 +1035,16 @@ export const Route = createFileRoute('/api/finance')({
             }
 
             const previewImagePath = normalized.imagePaths[0]
+            if (pending.documentType === 'contract') {
+              const extraction = await extractEmploymentContract(normalized.imagePaths)
+              const updated = updatePendingIngestion(id, {
+                status: 'awaiting_review',
+                rawPreviewImagePath: previewImagePath,
+                extractedContract: extraction.ok ? extraction.data : undefined,
+                error: extraction.ok ? undefined : extraction.reason,
+              })
+              return json({ ok: true, pendingIngestion: updated })
+            }
             const extraction = await extractTransactionFromImage(previewImagePath, getCategoryCorrections())
             const updated = updatePendingIngestion(id, {
               status: 'awaiting_review',
@@ -1051,6 +1061,57 @@ export const Route = createFileRoute('/api/finance')({
             const force = body.force === true
             const pending = listPendingIngestions().find((p) => p.id === id)
             if (!pending) return json({ ok: false, error: 'Pending ingestion not found.' }, { status: 404 })
+
+            if (pending.documentType === 'contract') {
+              const employerName = typeof payload.employerName === 'string' ? payload.employerName.trim() : ''
+              const employmentType = typeof payload.employmentType === 'string' ? payload.employmentType : undefined
+              if (!employerName || !employmentType) {
+                return json({ ok: false, error: 'employerName and employmentType are required.' }, { status: 400 })
+              }
+              const targetIncomeSourceId =
+                typeof payload.targetIncomeSourceId === 'string' && payload.targetIncomeSourceId
+                  ? payload.targetIncomeSourceId
+                  : undefined
+
+              const risks = pending.extractedContract?.risks ?? []
+              const riskSummary = pending.extractedContract?.riskSummary
+              const riskNote = riskSummary
+                ? `AI contract review: ${riskSummary}${
+                    risks.length > 0
+                      ? `\nConcerns: ${risks.map((r) => `[${r.severity}] ${r.clause}: ${r.concern}`).join('; ')}`
+                      : ''
+                  }`.slice(0, 2000)
+                : undefined
+              const userNotes = typeof payload.notes === 'string' ? payload.notes.trim() : ''
+              const combinedNotes = [userNotes, riskNote].filter(Boolean).join('\n\n') || undefined
+
+              // Whitelist to IncomeSource's actual fields only — payload also
+              // carries extraction-only data (risks, riskSummary, confidence,
+              // targetIncomeSourceId) that must never be persisted onto the record.
+              // Only include a key when the payload actually provided a value:
+              // updateFinanceRecord does a shallow `{...existing, ...payload}`
+              // merge, so an explicit `key: undefined` would wipe an existing
+              // field the renewal contract simply didn't restate.
+              const jobPayload: Record<string, unknown> = { employerName, employmentType }
+              if (typeof payload.monthlyIncomeAmount === 'number') jobPayload.monthlyIncomeAmount = payload.monthlyIncomeAmount
+              if (typeof payload.currency === 'string') jobPayload.currency = payload.currency
+              if (typeof payload.contractStartDate === 'string') jobPayload.contractStartDate = payload.contractStartDate
+              if (typeof payload.contractEndDate === 'string') jobPayload.contractEndDate = payload.contractEndDate
+              if (typeof payload.jobTitle === 'string') jobPayload.jobTitle = payload.jobTitle
+              if (combinedNotes) jobPayload.notes = combinedNotes
+
+              if (targetIncomeSourceId) {
+                updateFinanceRecord('income_source', targetIncomeSourceId, jobPayload)
+              } else {
+                addFinanceRecord('income_source', {
+                  ...jobPayload,
+                  source: pending.source,
+                  documentRef: pending.sourceRef,
+                })
+              }
+              const updated = updatePendingIngestion(id, { status: 'confirmed' })
+              return json({ pendingIngestion: updated, ...financePayload() })
+            }
 
             const kind = typeof payload.kind === 'string' ? payload.kind : pending.extracted?.kind
             if (kind !== 'income' && kind !== 'expense') {

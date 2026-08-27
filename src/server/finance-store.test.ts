@@ -503,6 +503,52 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
     expect(db.income_sources).toHaveLength(0)
   })
 
+  it('persists jobTitle through add and update (e.g. contract-driven intake)', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('income_source', {
+      employerName: 'Acme Corp',
+      employmentType: 'contract',
+      jobTitle: 'Software Engineer',
+    })
+    let db = store.readFinanceStore()
+    expect(db.income_sources[0].jobTitle).toBe('Software Engineer')
+    const id = db.income_sources[0].id
+
+    store.updateFinanceRecord('income_source', id, { jobTitle: 'Senior Software Engineer' })
+    db = store.readFinanceStore()
+    expect(db.income_sources[0].jobTitle).toBe('Senior Software Engineer')
+  })
+
+  it('a partial contract-renewal update merges onto the existing job without clobbering untouched fields', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('income_source', {
+      employerName: 'Acme Corp',
+      employmentType: 'contract',
+      jobTitle: 'Software Engineer',
+      monthlyIncomeAmount: 150000,
+      currency: 'LKR',
+      contractStartDate: '2025-01-01',
+      contractEndDate: '2026-01-01',
+    })
+    const id = store.readFinanceStore().income_sources[0].id
+
+    // Simulates confirming a renewal contract: only the fields present in the
+    // extracted/edited payload are sent, same as confirm_pending_ingestion.
+    store.updateFinanceRecord('income_source', id, {
+      contractEndDate: '2027-01-01',
+      monthlyIncomeAmount: 175000,
+    })
+    const db = store.readFinanceStore()
+    expect(db.income_sources[0]).toMatchObject({
+      employerName: 'Acme Corp',
+      employmentType: 'contract',
+      jobTitle: 'Software Engineer',
+      contractStartDate: '2025-01-01',
+      contractEndDate: '2027-01-01',
+      monthlyIncomeAmount: 175000,
+    })
+  })
+
   it('defaults employmentType to other for an unrecognized value', async () => {
     const store = await import('./finance-store')
     store.addFinanceRecord('income_source', { employerName: 'X', employmentType: 'bogus' })

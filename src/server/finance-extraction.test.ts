@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseExtractionJson, promptWithCategoryHints } from './finance-extraction'
+import { parseContractExtractionJson, parseExtractionJson, promptWithCategoryHints } from './finance-extraction'
 
 describe('parseExtractionJson', () => {
   it('parses a valid expense extraction', () => {
@@ -76,5 +76,76 @@ describe('promptWithCategoryHints', () => {
     const hints = Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`vendor${i}`, `cat${i}`]))
     const result = promptWithCategoryHints('BASE', hints)
     expect(result.match(/^- "/gm)?.length).toBe(10)
+  })
+})
+
+describe('parseContractExtractionJson', () => {
+  it('parses a valid contract extraction with risks', () => {
+    const result = parseContractExtractionJson(
+      JSON.stringify({
+        employerName: 'Acme Corp',
+        employmentType: 'contract',
+        monthlyIncomeAmount: 150000,
+        currency: 'LKR',
+        contractStartDate: '2026-01-01',
+        contractEndDate: '2027-01-01',
+        jobTitle: 'Software Engineer',
+        confidence: 'high',
+        riskSummary: 'Generally standard, but the non-compete is unusually broad.',
+        risks: [
+          { severity: 'high', clause: 'Non-compete', concern: 'Covers all of Sri Lanka for 3 years after leaving.' },
+        ],
+      }),
+    )
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        employerName: 'Acme Corp',
+        employmentType: 'contract',
+        monthlyIncomeAmount: 150000,
+        currency: 'LKR',
+        contractStartDate: '2026-01-01',
+        contractEndDate: '2027-01-01',
+        jobTitle: 'Software Engineer',
+        confidence: 'high',
+        riskSummary: 'Generally standard, but the non-compete is unusually broad.',
+        risks: [
+          { severity: 'high', clause: 'Non-compete', concern: 'Covers all of Sri Lanka for 3 years after leaving.' },
+        ],
+      },
+    })
+  })
+
+  it('strips markdown code fences before parsing', () => {
+    const result = parseContractExtractionJson(
+      '```json\n{"employerName":"Acme","employmentType":"full_time","currency":"LKR","confidence":"medium","riskSummary":"Fine.","risks":[]}\n```',
+    )
+    expect(result.ok).toBe(true)
+  })
+
+  it('returns the model-reported reason when the document is not a contract', () => {
+    expect(parseContractExtractionJson('{"error":"not_a_contract"}')).toEqual({ ok: false, reason: 'not_a_contract' })
+  })
+
+  it('defaults employmentType to other for an unrecognized value', () => {
+    const result = parseContractExtractionJson(
+      '{"employerName":"Acme","employmentType":"intern","currency":"LKR","confidence":"low","riskSummary":"","risks":[]}',
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data.employmentType).toBe('other')
+  })
+
+  it('caps risks at 10 entries and drops malformed ones', () => {
+    const risks = Array.from({ length: 15 }, (_, i) => ({ severity: 'low', clause: `Clause ${i}`, concern: `Concern ${i}` }))
+    risks.push({ severity: 'high', clause: '', concern: 'missing clause label' } as never)
+    const result = parseContractExtractionJson(
+      JSON.stringify({ employerName: 'Acme', employmentType: 'other', currency: 'LKR', confidence: 'low', riskSummary: '', risks }),
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data.risks).toHaveLength(10)
+  })
+
+  it('returns malformed_response for unparseable content', () => {
+    expect(parseContractExtractionJson('not json at all')).toEqual({ ok: false, reason: 'malformed_response' })
   })
 })
