@@ -30,6 +30,7 @@ import {
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
 import { extractTransactionFromImage } from '../../server/finance-extraction'
 import { syncGmailNow } from '../../server/gmail-ingest'
+import { fetchCsePrice } from '../../server/cse-market.service'
 import {
   addBinanceCandles,
   addMarketPrice,
@@ -1094,6 +1095,26 @@ export const Route = createFileRoute('/api/finance')({
             if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
             const updated = updatePendingIngestion(id, { status: 'rejected' })
             return json({ ok: true, pendingIngestion: updated })
+          }
+          if (action === 'refresh_stock_price') {
+            const id = typeof body.id === 'string' ? body.id : ''
+            if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
+            const db = readFinanceStore()
+            const holding = db.stock_holdings.find((h) => h.id === id)
+            if (!holding) return json({ ok: false, error: 'Stock holding not found.' }, { status: 404 })
+
+            const priceResult = await fetchCsePrice(holding.symbol)
+            if (!priceResult) {
+              // Not an error — the unofficial CSE endpoint failing is an
+              // expected, documented outcome; manual entry is the fallback.
+              return json({ priceFetchFailed: true, ...financePayload() })
+            }
+            updateFinanceRecord('stock_holding', id, {
+              lastKnownPrice: priceResult.price,
+              lastPriceUpdatedAt: priceResult.asOf,
+              priceSource: 'cse_api',
+            })
+            return json({ priceFetchFailed: false, ...financePayload() })
           }
           if (action === 'sync_gmail_now') {
             try {
