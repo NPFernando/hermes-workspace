@@ -1924,6 +1924,10 @@ export function financeSummary(db: FinanceDatabase) {
   const fixedDepositsValueLkr = db.fixed_deposits
     .filter((fd) => fd.status !== 'withdrawn')
     .reduce((sum, fd) => sum + fd.principal, 0)
+  const unrealizedStockPnlLkr = db.stock_holdings.reduce(
+    (sum, holding) => sum + ((holding.lastKnownPrice ?? holding.buyPrice) - holding.buyPrice) * holding.quantity,
+    0,
+  )
   const netWorthLkr =
     cashBalanceLkr +
     db.savings_goals.reduce((sum, goal) => sum + goal.currentAmount, 0) +
@@ -1948,6 +1952,7 @@ export function financeSummary(db: FinanceDatabase) {
     netWorthLkr,
     stockHoldingsValueLkr,
     fixedDepositsValueLkr,
+    unrealizedStockPnlLkr,
     accountCount: db.finance_accounts.length,
     goalCount: db.savings_goals.length,
     taxRecordCount: db.tax_records.length,

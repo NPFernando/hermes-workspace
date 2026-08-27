@@ -10,6 +10,7 @@ export type PersonalFinancePayload = {
     taxReserveLkr: number
     stockHoldingsValueLkr: number
     fixedDepositsValueLkr: number
+    unrealizedStockPnlLkr: number
     accountCount: number
   }
   budgetVsActual: Array<{

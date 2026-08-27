@@ -15,6 +15,48 @@ import type { PersonalFinancePayload } from './types'
 
 type Tab = 'overview' | 'income' | 'investments' | 'records' | 'ingestion'
 
+function stringField(row: Record<string, unknown>, key: string): string {
+  const value = row[key]
+  return typeof value === 'string' ? value : ''
+}
+
+function numberField(row: Record<string, unknown>, key: string): number | undefined {
+  const value = row[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+/**
+ * Grouped by currency, not converted to one figure — this codebase has no
+ * FX-conversion service (only a manually-entered per-record rate on one-off
+ * income entries), so summing across currencies here would invent a
+ * conversion the rest of the app deliberately doesn't do either.
+ */
+function currencyExposure(payload: PersonalFinancePayload): Array<{ currency: string; amount: number }> {
+  const totals = new Map<string, number>()
+  const add = (currency: string, amount: number) => totals.set(currency, (totals.get(currency) ?? 0) + amount)
+
+  for (const job of payload.data.income_sources) {
+    if (stringField(job, 'status') !== 'active') continue
+    const amount = numberField(job, 'monthlyIncomeAmount')
+    if (amount !== undefined) add(stringField(job, 'currency') || 'LKR', amount)
+  }
+  for (const holding of payload.data.stock_holdings) {
+    const qty = numberField(holding, 'quantity') ?? 0
+    const price = numberField(holding, 'lastKnownPrice') ?? numberField(holding, 'buyPrice') ?? 0
+    add(stringField(holding, 'currency') || 'LKR', qty * price)
+  }
+  for (const fd of payload.data.fixed_deposits) {
+    if (stringField(fd, 'status') === 'withdrawn') continue
+    const principal = numberField(fd, 'principal')
+    if (principal !== undefined) add(stringField(fd, 'currency') || 'LKR', principal)
+  }
+
+  return Array.from(totals.entries())
+    .filter(([, amount]) => amount > 0)
+    .map(([currency, amount]) => ({ currency, amount }))
+    .sort((a, b) => b.amount - a.amount)
+}
+
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'income', label: 'Income & Jobs' },
@@ -114,6 +156,7 @@ export function PersonalFinanceScreen() {
   ].filter((entry) => entry.value > 0)
 
   const overBudgetCount = payload.budgetVsActual.filter((b) => b.overBudget).length
+  const exposure = currencyExposure(payload)
 
   return (
     <main className="min-h-dvh overflow-y-auto bg-[var(--theme-bg)] px-4 py-5 text-[var(--theme-text)] md:px-8 md:py-8">
@@ -138,6 +181,11 @@ export function PersonalFinanceScreen() {
         <StatCard label="Total income" value={formatLkr(summary.totalIncomeLkr)} tone="good" />
         <StatCard label="Total expenses" value={formatLkr(summary.totalExpensesLkr)} tone={summary.totalExpensesLkr > summary.totalIncomeLkr && summary.totalIncomeLkr > 0 ? 'danger' : 'neutral'} />
         <StatCard label="Stock holdings" value={formatLkr(summary.stockHoldingsValueLkr)} />
+        <StatCard
+          label="Unrealized P/L"
+          value={`${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatLkr(summary.unrealizedStockPnlLkr)}`}
+          tone={summary.unrealizedStockPnlLkr >= 0 ? 'good' : 'danger'}
+        />
         <StatCard label="Fixed deposits" value={formatLkr(summary.fixedDepositsValueLkr)} />
       </section>
 
@@ -170,6 +218,21 @@ export function PersonalFinanceScreen() {
                 <Bar dataKey="value" fill="#38bdf8" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </section>
+      )}
+
+      {exposure.length > 0 && (
+        <section className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-4">
+          <p className="text-xs font-medium text-[var(--theme-muted)]">
+            Currency exposure (active jobs, holdings, and fixed deposits — not converted)
+          </p>
+          <div className="mt-2 flex flex-wrap gap-3">
+            {exposure.map(({ currency, amount }) => (
+              <span key={currency} className="text-sm font-medium text-[var(--theme-text)]">
+                {currency} {Math.round(amount).toLocaleString('en-LK')}
+              </span>
+            ))}
           </div>
         </section>
       )}
