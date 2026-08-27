@@ -91,12 +91,48 @@ export function PersonalFinanceScreen() {
       <BudgetPanel payload={payload} onPayload={setPayload} />
 
       <section className="mt-6 grid gap-4">
-        <DataTable title="Accounts" rows={payload.data.finance_accounts} columns={['name', 'type', 'currency', 'balance', 'platform']} />
-        <DataTable title="Income records" rows={payload.data.income_records} columns={['dateReceived', 'sourceName', 'incomeType', 'originalCurrency', 'originalAmount', 'convertedLkrAmount', 'taxable']} />
-        <DataTable title="Expense records" rows={payload.data.expense_records} columns={['date', 'vendor', 'category', 'currency', 'amount', 'convertedLkrAmount', 'recurring']} />
-        <DataTable title="Budget categories" rows={payload.data.budget_categories} columns={['month', 'category', 'currency', 'budgetAmount']} />
-        <DataTable title="Savings goals" rows={payload.data.savings_goals} columns={['name', 'targetAmount', 'currentAmount', 'currency', 'targetDate', 'status']} />
-        <DataTable title="Tax records" rows={payload.data.tax_records} columns={['taxYear', 'incomeType', 'convertedLkrAmount', 'taxPaid', 'taxDue', 'requiresConfirmation']} />
+        <DataTable
+          title="Accounts"
+          rows={payload.data.finance_accounts}
+          columns={['name', 'type', 'currency', 'balance', 'platform']}
+          kind="account"
+          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+        />
+        <DataTable
+          title="Income records"
+          rows={payload.data.income_records}
+          columns={['dateReceived', 'sourceName', 'incomeType', 'originalCurrency', 'originalAmount', 'convertedLkrAmount', 'taxable']}
+          kind="income"
+          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+        />
+        <DataTable
+          title="Expense records"
+          rows={payload.data.expense_records}
+          columns={['date', 'vendor', 'category', 'currency', 'amount', 'convertedLkrAmount', 'recurring']}
+          kind="expense"
+          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+        />
+        <DataTable
+          title="Budget categories"
+          rows={payload.data.budget_categories}
+          columns={['month', 'category', 'currency', 'budgetAmount']}
+          kind="budget_category"
+          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+        />
+        <DataTable
+          title="Savings goals"
+          rows={payload.data.savings_goals}
+          columns={['name', 'targetAmount', 'currentAmount', 'currency', 'targetDate', 'status']}
+          kind="goal"
+          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+        />
+        <DataTable
+          title="Tax records"
+          rows={payload.data.tax_records}
+          columns={['taxYear', 'incomeType', 'convertedLkrAmount', 'taxPaid', 'taxDue', 'requiresConfirmation']}
+          kind="tax"
+          onChanged={(p) => setPayload(p as PersonalFinancePayload)}
+        />
       </section>
 
       <p className="mt-6 rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">

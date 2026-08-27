@@ -1366,6 +1366,50 @@ export function updateFinanceRecord(
   return db
 }
 
+/**
+ * Deletes are idempotent — if the id isn't found, this is a no-op rather
+ * than an error (matches how a delete button behaves if double-clicked or
+ * the UI's list was stale). Only throws for a genuinely unsupported kind.
+ */
+export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
+  const db = ensureFinanceStore()
+  let removed = false
+
+  if (kind === 'income') {
+    const before = db.income_records.length
+    db.income_records = db.income_records.filter((r) => r.id !== id)
+    removed = db.income_records.length !== before
+  } else if (kind === 'expense') {
+    const before = db.expense_records.length
+    db.expense_records = db.expense_records.filter((r) => r.id !== id)
+    removed = db.expense_records.length !== before
+  } else if (kind === 'account') {
+    const before = db.finance_accounts.length
+    db.finance_accounts = db.finance_accounts.filter((r) => r.id !== id)
+    removed = db.finance_accounts.length !== before
+  } else if (kind === 'goal') {
+    const before = db.savings_goals.length
+    db.savings_goals = db.savings_goals.filter((r) => r.id !== id)
+    removed = db.savings_goals.length !== before
+  } else if (kind === 'tax') {
+    const before = db.tax_records.length
+    db.tax_records = db.tax_records.filter((r) => r.id !== id)
+    removed = db.tax_records.length !== before
+  } else if (kind === 'budget_category') {
+    const before = db.budget_categories.length
+    db.budget_categories = db.budget_categories.filter((r) => r.id !== id)
+    removed = db.budget_categories.length !== before
+  } else {
+    throw new Error(`Unsupported finance record kind for delete: ${kind}`)
+  }
+
+  if (removed) {
+    writeFinanceStore(db)
+    appendAuditLog(`record_deleted:${kind}`, { id, kind })
+  }
+  return db
+}
+
 export function listPendingIngestions(): Array<PendingIngestion> {
   return ensureFinanceStore().pending_ingestions
 }

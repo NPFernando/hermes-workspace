@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { ConfirmDialog } from '../../../components/confirm-dialog'
+
 function textValue(row: Record<string, unknown>, key: string): string {
   const value = row[key]
   if (value == null || value === '') return '—'
@@ -5,15 +8,105 @@ function textValue(row: Record<string, unknown>, key: string): string {
   return String(value)
 }
 
+function inputTypeFor(value: unknown): 'number' | 'checkbox' | 'text' {
+  if (typeof value === 'number') return 'number'
+  if (typeof value === 'boolean') return 'checkbox'
+  return 'text'
+}
+
+const inputClass =
+  'w-full rounded-lg border border-[var(--theme-border)] bg-black/10 px-2 py-1 text-xs text-[var(--theme-text)] outline-none'
+
+/**
+ * Optional per-row edit/delete — only rendered when both `kind` (the
+ * finance-store record kind, e.g. 'expense') and `onChanged` are passed.
+ * Calls the existing `update_record`/`delete_record` actions on
+ * /api/finance directly rather than going through useFinanceAction, since
+ * this component is shared across record shapes that don't share a common
+ * payload type (see PersonalFinancePayload vs. whatever trading-screen.tsx
+ * might eventually pass) — callers cast `onChanged`'s argument themselves.
+ */
 export function DataTable({
   title,
   rows,
   columns,
+  kind,
+  onChanged,
 }: {
   title: string
   rows: Array<Record<string, unknown>>
   columns: Array<string>
+  kind?: string
+  onChanged?: (payload: unknown) => void
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<Record<string, unknown>>({})
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const editable = Boolean(kind && onChanged)
+
+  function startEdit(row: Record<string, unknown>) {
+    setError(null)
+    setEditingId(String(row.id))
+    setDraft({ ...row })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setDraft({})
+  }
+
+  async function saveEdit(id: string) {
+    if (!kind || !onChanged) return
+    setBusy(true)
+    setError(null)
+    try {
+      const payload: Record<string, unknown> = {}
+      for (const column of columns) payload[column] = draft[column]
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'update_record', kind, id, payload }),
+      })
+      const data = (await res.json()) as { ok?: boolean; error?: string }
+      if (data.ok === false) {
+        setError(data.error || 'Update failed')
+        return
+      }
+      onChanged(data)
+      cancelEdit()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmDelete() {
+    if (!kind || !onChanged || !confirmDeleteId) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_record', kind, id: confirmDeleteId }),
+      })
+      const data = (await res.json()) as { ok?: boolean; error?: string }
+      if (data.ok === false) {
+        setError(data.error || 'Delete failed')
+        return
+      }
+      onChanged(data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed')
+    } finally {
+      setBusy(false)
+      setConfirmDeleteId(null)
+    }
+  }
+
   return (
     <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -24,6 +117,7 @@ export function DataTable({
           {rows.length} records
         </span>
       </div>
+      {error && <p className="mb-2 text-xs text-red-300">{error}</p>}
       {rows.length === 0 ? (
         <p className="text-sm text-[var(--theme-muted)]">
           No records yet. Add records through /api/finance or future forms; the
@@ -42,27 +136,110 @@ export function DataTable({
                     {column}
                   </th>
                 ))}
+                {editable && (
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
-              {rows.slice(-8).map((row, index) => (
-                <tr
-                  key={String(row.id ?? index)}
-                  className="text-[var(--theme-text)]"
-                >
-                  {columns.map((column) => (
-                    <td
-                      key={column}
-                      className="border-b border-[var(--theme-border)]/60 py-2 pr-4"
-                    >
-                      {textValue(row, column)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {rows.slice(-8).map((row, index) => {
+                const rowId = String(row.id ?? index)
+                const isEditing = editable && editingId === rowId
+                return (
+                  <tr key={rowId} className="text-[var(--theme-text)]">
+                    {columns.map((column) => (
+                      <td
+                        key={column}
+                        className="border-b border-[var(--theme-border)]/60 py-2 pr-4"
+                      >
+                        {isEditing ? (
+                          inputTypeFor(row[column]) === 'checkbox' ? (
+                            <input
+                              type="checkbox"
+                              checked={Boolean(draft[column])}
+                              onChange={(e) => setDraft((prev) => ({ ...prev, [column]: e.target.checked }))}
+                            />
+                          ) : (
+                            <input
+                              type={inputTypeFor(row[column])}
+                              value={draft[column] == null ? '' : String(draft[column])}
+                              onChange={(e) =>
+                                setDraft((prev) => ({
+                                  ...prev,
+                                  [column]:
+                                    inputTypeFor(row[column]) === 'number'
+                                      ? Number(e.target.value)
+                                      : e.target.value,
+                                }))
+                              }
+                              className={inputClass}
+                            />
+                          )
+                        ) : (
+                          textValue(row, column)
+                        )}
+                      </td>
+                    ))}
+                    {editable && (
+                      <td className="border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {isEditing ? (
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void saveEdit(rowId)}
+                              className="rounded-lg border border-emerald-400/30 bg-emerald-500/15 px-2 py-1 text-xs text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={cancelEdit}
+                              className="rounded-lg border border-[var(--theme-border)] bg-black/10 px-2 py-1 text-xs text-[var(--theme-text)] hover:bg-black/20"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(row)}
+                              className="rounded-lg border border-[var(--theme-border)] bg-black/10 px-2 py-1 text-xs text-[var(--theme-text)] hover:bg-black/20"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(rowId)}
+                              className="rounded-lg border border-red-400/30 bg-red-500/15 px-2 py-1 text-xs text-red-100 hover:bg-red-500/25"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
+      )}
+
+      {confirmDeleteId && (
+        <ConfirmDialog
+          title="Delete this record?"
+          body="This can't be undone."
+          confirmLabel="Delete"
+          busy={busy}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
       )}
     </section>
   )

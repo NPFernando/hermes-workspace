@@ -9,6 +9,7 @@ import {
   addFinanceRecord,
   appendAuditLog,
   budgetVsActualSummary,
+  deleteFinanceRecord,
   ensureFinanceStore,
   financeAlerts,
   financeStorageAlerts,
@@ -19,6 +20,7 @@ import {
   readFinanceStore,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
+  updateFinanceRecord,
   updatePendingIngestion,
   writeFinanceStore,
 } from '../../server/finance-store'
@@ -234,6 +236,24 @@ export const Route = createFileRoute('/api/finance')({
                 ? (body.payload as JsonRecord)
                 : {}
             addFinanceRecord(kind, payload)
+            return json(financePayload())
+          }
+          if (action === 'update_record') {
+            const kind = typeof body.kind === 'string' ? body.kind : ''
+            const id = typeof body.id === 'string' ? body.id : ''
+            const payload =
+              body.payload && typeof body.payload === 'object'
+                ? (body.payload as JsonRecord)
+                : {}
+            if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
+            updateFinanceRecord(kind, id, payload)
+            return json(financePayload())
+          }
+          if (action === 'delete_record') {
+            const kind = typeof body.kind === 'string' ? body.kind : ''
+            const id = typeof body.id === 'string' ? body.id : ''
+            if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
+            deleteFinanceRecord(kind, id)
             return json(financePayload())
           }
           if (action === 'fetch_market_price') {
