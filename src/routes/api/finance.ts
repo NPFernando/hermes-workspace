@@ -1098,6 +1098,10 @@ export const Route = createFileRoute('/api/finance')({
               if (typeof payload.contractStartDate === 'string') jobPayload.contractStartDate = payload.contractStartDate
               if (typeof payload.contractEndDate === 'string') jobPayload.contractEndDate = payload.contractEndDate
               if (typeof payload.jobTitle === 'string') jobPayload.jobTitle = payload.jobTitle
+              // Client sends the ExtractedContract field name (paydayDayOfMonth);
+              // IncomeSource persists it as expectedPaydayDayOfMonth.
+              if (typeof payload.paydayDayOfMonth === 'number') jobPayload.expectedPaydayDayOfMonth = payload.paydayDayOfMonth
+              if (typeof payload.paySchedule === 'string') jobPayload.paySchedule = payload.paySchedule
               if (combinedNotes) jobPayload.notes = combinedNotes
               // Link back to the uploaded contract on both create and a
               // renewal update, so "view original contract" always points

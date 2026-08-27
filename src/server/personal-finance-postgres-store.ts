@@ -182,8 +182,9 @@ CREATE TABLE IF NOT EXISTS income_records (
   id TEXT PRIMARY KEY, date_received TEXT NOT NULL, source_name TEXT NOT NULL, income_type TEXT NOT NULL,
   original_currency TEXT NOT NULL, original_amount DOUBLE PRECISION NOT NULL, exchange_rate_used DOUBLE PRECISION NOT NULL,
   converted_lkr_amount DOUBLE PRECISION NOT NULL, account_id TEXT, taxable BOOLEAN NOT NULL,
-  notes TEXT, document_ref TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  notes TEXT, document_ref TEXT, income_source_id TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+ALTER TABLE income_records ADD COLUMN IF NOT EXISTS income_source_id TEXT;
 
 CREATE TABLE IF NOT EXISTS expense_records (
   id TEXT PRIMARY KEY, date TEXT NOT NULL, vendor TEXT NOT NULL, category TEXT NOT NULL, subcategory TEXT,
@@ -214,11 +215,13 @@ CREATE TABLE IF NOT EXISTS tax_records (
 CREATE TABLE IF NOT EXISTS income_sources (
   id TEXT PRIMARY KEY, employer_name TEXT NOT NULL, employment_type TEXT NOT NULL,
   monthly_income_amount DOUBLE PRECISION, currency TEXT NOT NULL, contract_start_date TEXT, contract_end_date TEXT,
-  job_title TEXT, status TEXT NOT NULL, notes TEXT, document_ref TEXT, source TEXT NOT NULL,
-  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  job_title TEXT, expected_payday_day_of_month INTEGER, pay_schedule TEXT, status TEXT NOT NULL, notes TEXT,
+  document_ref TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 ALTER TABLE income_sources ADD COLUMN IF NOT EXISTS job_title TEXT;
 ALTER TABLE income_sources ADD COLUMN IF NOT EXISTS document_ref TEXT;
+ALTER TABLE income_sources ADD COLUMN IF NOT EXISTS expected_payday_day_of_month INTEGER;
+ALTER TABLE income_sources ADD COLUMN IF NOT EXISTS pay_schedule TEXT;
 
 CREATE TABLE IF NOT EXISTS stock_holdings (
   id TEXT PRIMARY KEY, symbol TEXT NOT NULL, company_name TEXT, platform TEXT NOT NULL,
@@ -268,6 +271,7 @@ function incomeRecordRows(rowsIn: Array<Record<string, unknown>>): Array<Array<s
     sqlBoolean(row.taxable),
     sqlNullableText(row.notes),
     sqlNullableText(row.documentRef),
+    sqlNullableText(row.incomeSourceId),
     sqlText(firstText(row, 'source', 'manual')),
     sqlText(firstText(row, 'createdAt')),
     sqlText(firstText(row, 'updatedAt')),
@@ -359,6 +363,8 @@ function incomeSourceRows(rowsIn: Array<Record<string, unknown>>): Array<Array<s
     sqlNullableText(row.contractStartDate),
     sqlNullableText(row.contractEndDate),
     sqlNullableText(row.jobTitle),
+    sqlNullableNumber(row.expectedPaydayDayOfMonth),
+    sqlNullableText(row.paySchedule),
     sqlText(firstText(row, 'status', 'active')),
     sqlNullableText(row.notes),
     sqlNullableText(row.documentRef),
@@ -429,7 +435,7 @@ ${insertRows(
   [
     'id', 'date_received', 'source_name', 'income_type', 'original_currency', 'original_amount',
     'exchange_rate_used', 'converted_lkr_amount', 'account_id', 'taxable', 'notes', 'document_ref',
-    'source', 'created_at', 'updated_at',
+    'income_source_id', 'source', 'created_at', 'updated_at',
   ],
   incomeRecordRows(rows(slice.income_records)),
 )}
@@ -473,7 +479,8 @@ ${insertRows(
   'income_sources',
   [
     'id', 'employer_name', 'employment_type', 'monthly_income_amount', 'currency', 'contract_start_date',
-    'contract_end_date', 'job_title', 'status', 'notes', 'document_ref', 'source', 'created_at', 'updated_at',
+    'contract_end_date', 'job_title', 'expected_payday_day_of_month', 'pay_schedule', 'status', 'notes',
+    'document_ref', 'source', 'created_at', 'updated_at',
   ],
   incomeSourceRows(rows(slice.income_sources)),
 )}

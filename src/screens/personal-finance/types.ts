@@ -59,6 +59,8 @@ export type ExtractedContract = {
   contractStartDate?: string
   contractEndDate?: string
   jobTitle?: string
+  paydayDayOfMonth?: number
+  paySchedule?: string
   confidence: 'high' | 'medium' | 'low'
   riskSummary: string
   risks: Array<ContractRisk>

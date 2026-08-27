@@ -530,6 +530,29 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
     expect(db.income_sources[0].documentRef).toBe('/home/ubuntu/.hermes/finance/ingestion-uploads/some-contract.pdf')
   })
 
+  it('persists expectedPaydayDayOfMonth/paySchedule on a job, and incomeSourceId on an income record', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('income_source', {
+      employerName: 'Acme Corp',
+      employmentType: 'full_time',
+      expectedPaydayDayOfMonth: 30,
+      paySchedule: 'Last business day of each month',
+    })
+    const job = store.readFinanceStore().income_sources[0]
+    expect(job.expectedPaydayDayOfMonth).toBe(30)
+    expect(job.paySchedule).toBe('Last business day of each month')
+
+    store.addFinanceRecord('income', {
+      dateReceived: '2026-08-30',
+      sourceName: 'Acme Corp',
+      originalAmount: 150000,
+      originalCurrency: 'LKR',
+      incomeSourceId: job.id,
+    })
+    const income = store.readFinanceStore().income_records[0]
+    expect(income.incomeSourceId).toBe(job.id)
+  })
+
   it('a partial contract-renewal update merges onto the existing job without clobbering untouched fields', async () => {
     const store = await import('./finance-store')
     store.addFinanceRecord('income_source', {

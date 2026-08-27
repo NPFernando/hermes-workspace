@@ -116,6 +116,8 @@ export type IncomeRecord = {
   taxable: boolean
   notes?: string
   documentRef?: string
+  /** Links this logged payment back to the job (IncomeSource) it came from, when known. */
+  incomeSourceId?: string
   source: string
   createdAt: string
   updatedAt: string
@@ -199,6 +201,10 @@ export type IncomeSource = {
   contractStartDate?: string
   contractEndDate?: string
   jobTitle?: string
+  /** Fixed day of month (1-31) pay is expected, when known — drives the payday reminder badge. */
+  expectedPaydayDayOfMonth?: number
+  /** Free-text pay timing that doesn't reduce to a fixed day, e.g. "Last business day of each month". Informational only. */
+  paySchedule?: string
   status: 'active' | 'ended'
   notes?: string
   /** Path to the original uploaded contract/offer letter, when created via that intake path. */
@@ -281,6 +287,10 @@ export type ExtractedContract = {
   contractStartDate?: string
   contractEndDate?: string
   jobTitle?: string
+  /** Only set when the contract states a clear fixed day (e.g. "salary paid on the 5th"). */
+  paydayDayOfMonth?: number
+  /** Free-text pay timing when it doesn't reduce to a fixed day (e.g. "last business day"). */
+  paySchedule?: string
   confidence: 'high' | 'medium' | 'low'
   /** Plain-English 2-3 sentence overview of how favorable/unfavorable the contract looks. */
   riskSummary: string
@@ -1278,6 +1288,7 @@ export function addFinanceRecord(
       taxable: booleanField(payload, 'taxable', true),
       notes: optionalString(payload, 'notes'),
       documentRef: optionalString(payload, 'documentRef'),
+      incomeSourceId: optionalString(payload, 'incomeSourceId'),
     })
   } else if (kind === 'expense') {
     db.expense_records.push({
@@ -1370,6 +1381,8 @@ export function addFinanceRecord(
       contractStartDate: optionalString(payload, 'contractStartDate'),
       contractEndDate: optionalString(payload, 'contractEndDate'),
       jobTitle: optionalString(payload, 'jobTitle'),
+      expectedPaydayDayOfMonth: optionalNumber(payload, 'expectedPaydayDayOfMonth'),
+      paySchedule: optionalString(payload, 'paySchedule'),
       status: payload.status === 'ended' ? 'ended' : 'active',
       notes: optionalString(payload, 'notes'),
       documentRef: optionalString(payload, 'documentRef'),

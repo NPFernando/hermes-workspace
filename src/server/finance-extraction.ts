@@ -252,6 +252,8 @@ const CONTRACT_EXTRACTION_PROMPT_INSTRUCTIONS = `You are reviewing an employment
   "contractStartDate": "<YYYY-MM-DD or null>",
   "contractEndDate": "<YYYY-MM-DD, or null for full-time/indefinite employment>",
   "jobTitle": "<job title/role, or null>",
+  "paydayDayOfMonth": <number 1-31, ONLY when the contract states a clear fixed day salary is paid on each month (e.g. "paid on the 5th" -> 5), otherwise null>,
+  "paySchedule": "<short free-text description of pay timing whenever ANY pay-timing language exists, e.g. "Last business day of each month", or null if nothing is stated>,
   "confidence": "high" | "medium" | "low",
   "riskSummary": "<2-3 plain-English sentences on how favorable or unfavorable this contract looks for the employee overall>",
   "risks": [
@@ -284,6 +286,11 @@ export function parseContractExtractionJson(raw: string): ContractExtractionResu
     const contractStartDate = typeof o.contractStartDate === 'string' && o.contractStartDate.trim() ? o.contractStartDate.trim() : undefined
     const contractEndDate = typeof o.contractEndDate === 'string' && o.contractEndDate.trim() ? o.contractEndDate.trim() : undefined
     const jobTitle = typeof o.jobTitle === 'string' && o.jobTitle.trim() ? o.jobTitle.trim() : undefined
+    const paydayDayOfMonth =
+      typeof o.paydayDayOfMonth === 'number' && Number.isInteger(o.paydayDayOfMonth) && o.paydayDayOfMonth >= 1 && o.paydayDayOfMonth <= 31
+        ? o.paydayDayOfMonth
+        : undefined
+    const paySchedule = typeof o.paySchedule === 'string' && o.paySchedule.trim() ? o.paySchedule.trim().slice(0, 200) : undefined
     const confidence = o.confidence === 'high' || o.confidence === 'medium' || o.confidence === 'low' ? o.confidence : 'low'
     const riskSummary = typeof o.riskSummary === 'string' ? o.riskSummary.trim().slice(0, 600) : ''
 
@@ -311,6 +318,8 @@ export function parseContractExtractionJson(raw: string): ContractExtractionResu
         contractStartDate,
         contractEndDate,
         jobTitle,
+        paydayDayOfMonth,
+        paySchedule,
         confidence,
         riskSummary,
         risks,

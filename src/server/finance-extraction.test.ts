@@ -123,6 +123,53 @@ describe('parseContractExtractionJson', () => {
     expect(result.ok).toBe(true)
   })
 
+  it('parses paydayDayOfMonth and paySchedule when present', () => {
+    const result = parseContractExtractionJson(
+      JSON.stringify({
+        employerName: 'Acme',
+        employmentType: 'full_time',
+        currency: 'LKR',
+        confidence: 'medium',
+        riskSummary: '',
+        risks: [],
+        paydayDayOfMonth: 5,
+        paySchedule: 'Last business day of each month',
+      }),
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.paydayDayOfMonth).toBe(5)
+      expect(result.data.paySchedule).toBe('Last business day of each month')
+    }
+  })
+
+  it('drops an out-of-range paydayDayOfMonth', () => {
+    const result = parseContractExtractionJson(
+      JSON.stringify({
+        employerName: 'Acme',
+        employmentType: 'full_time',
+        currency: 'LKR',
+        confidence: 'medium',
+        riskSummary: '',
+        risks: [],
+        paydayDayOfMonth: 45,
+      }),
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data.paydayDayOfMonth).toBeUndefined()
+  })
+
+  it('leaves paydayDayOfMonth/paySchedule undefined when absent', () => {
+    const result = parseContractExtractionJson(
+      '{"employerName":"Acme","employmentType":"full_time","currency":"LKR","confidence":"low","riskSummary":"","risks":[]}',
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.paydayDayOfMonth).toBeUndefined()
+      expect(result.data.paySchedule).toBeUndefined()
+    }
+  })
+
   it('returns the model-reported reason when the document is not a contract', () => {
     expect(parseContractExtractionJson('{"error":"not_a_contract"}')).toEqual({ ok: false, reason: 'not_a_contract' })
   })

@@ -2,7 +2,28 @@ import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatLkr } from '../utils'
+import { getPaydayStatus } from './payday-status'
 import type { PersonalFinancePayload } from '../types'
+
+const paydayTone: Record<'paid' | 'due_soon' | 'overdue', string> = {
+  paid: 'border-emerald-400/30 bg-emerald-500/15 text-emerald-100',
+  due_soon: 'border-amber-400/30 bg-amber-500/15 text-amber-100',
+  overdue: 'border-red-400/30 bg-red-500/15 text-red-100',
+}
+
+function paydayLabel(job: Record<string, unknown>, incomeRecords: Array<Record<string, unknown>>): { text: string; tone: string } | null {
+  const status = getPaydayStatus(job, incomeRecords)
+  if (status.state === 'not_tracked') return null
+  if (status.state === 'paid') {
+    return { text: `Paid ${status.lastPaidDate}`, tone: paydayTone.paid }
+  }
+  if (status.state === 'overdue') {
+    return { text: `Overdue by ${status.daysOverdue}d`, tone: paydayTone.overdue }
+  }
+  if (status.daysUntil > 3) return { text: `Due in ${status.daysUntil}d`, tone: 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]' }
+  if (status.daysUntil >= 0) return { text: status.daysUntil === 0 ? 'Due today' : `Due in ${status.daysUntil}d`, tone: paydayTone.due_soon }
+  return { text: `${-status.daysUntil}d past payday`, tone: paydayTone.due_soon }
+}
 
 const inputClass =
   'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
@@ -49,6 +70,9 @@ export function IncomeSourcesPanel({
   const [currency, setCurrency] = useState('LKR')
   const [contractStartDate, setContractStartDate] = useState('')
   const [contractEndDate, setContractEndDate] = useState('')
+  const [expectedPaydayDayOfMonth, setExpectedPaydayDayOfMonth] = useState('')
+  const [payLogDrafts, setPayLogDrafts] = useState<Record<string, { amount: string; currency: string; date: string }>>({})
+  const [payLogOpenId, setPayLogOpenId] = useState<string | null>(null)
 
   async function submitJob() {
     if (!employerName.trim()) {
@@ -68,6 +92,9 @@ export function IncomeSourcesPanel({
           currency,
           contractStartDate: contractStartDate || undefined,
           contractEndDate: contractEndDate || undefined,
+          expectedPaydayDayOfMonth: expectedPaydayDayOfMonth.trim()
+            ? Number(expectedPaydayDayOfMonth)
+            : undefined,
         },
       },
       'job',
@@ -77,7 +104,34 @@ export function IncomeSourcesPanel({
       setMonthlyIncomeAmount('')
       setContractStartDate('')
       setContractEndDate('')
+      setExpectedPaydayDayOfMonth('')
     }
+  }
+
+  async function logPayment(job: Record<string, unknown>) {
+    const jobId = stringField(job, 'id')
+    const draft = payLogDrafts[jobId]
+    const amount = Number(draft.amount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setErr('Enter a valid amount for this payment')
+      return
+    }
+    const data = await post(
+      {
+        action: 'add_record',
+        kind: 'income',
+        payload: {
+          dateReceived: draft.date,
+          sourceName: stringField(job, 'employerName'),
+          incomeType: 'Salary',
+          originalCurrency: draft.currency,
+          originalAmount: amount,
+          incomeSourceId: jobId,
+        },
+      },
+      `log-payment-${jobId}`,
+    )
+    if (data) setPayLogOpenId(null)
   }
 
   async function endJob(id: string) {
@@ -175,6 +229,16 @@ export function IncomeSourcesPanel({
           <option value="USD">USD</option>
           <option value="AUD">AUD</option>
         </select>
+        <input
+          type="number"
+          min={1}
+          max={31}
+          placeholder="Payday (day, optional)"
+          value={expectedPaydayDayOfMonth}
+          onChange={(e) => setExpectedPaydayDayOfMonth(e.target.value)}
+          className={`${inputClass} w-36`}
+          title="Expected day of month you get paid, e.g. 30"
+        />
         {employmentType === 'contract' && (
           <>
             <input
@@ -217,6 +281,8 @@ export function IncomeSourcesPanel({
           const status = stringField(job, 'status') || 'active'
           const notes = stringField(job, 'notes')
           const documentRef = stringField(job, 'documentRef')
+          const paydayStatus = getPaydayStatus(job, payload.data.income_records)
+          const badge = paydayLabel(job, payload.data.income_records)
           return (
             <div
               key={id}
@@ -234,6 +300,16 @@ export function IncomeSourcesPanel({
                       : 'irregular income'}{' '}
                     · {status}
                   </span>
+                  {badge && (
+                    <span className={`ml-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${badge.tone}`}>
+                      {badge.text}
+                    </span>
+                  )}
+                  {stringField(job, 'paySchedule') && (
+                    <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
+                      Pay schedule (from contract): {stringField(job, 'paySchedule')}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   {documentRef && (
@@ -246,6 +322,28 @@ export function IncomeSourcesPanel({
                       View original contract
                     </a>
                   )}
+                  {status === 'active' &&
+                    monthly !== undefined &&
+                    paydayStatus.state !== 'not_tracked' &&
+                    paydayStatus.state !== 'paid' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPayLogOpenId(id)
+                          setPayLogDrafts((prev) => ({
+                            ...prev,
+                            [id]: prev[id] ?? {
+                              amount: String(monthly),
+                              currency: stringField(job, 'currency') || 'LKR',
+                              date: new Date().toISOString().slice(0, 10),
+                            },
+                          }))
+                        }}
+                        className={buttonClass}
+                      >
+                        Log this month's payment
+                      </button>
+                    )}
                   {status === 'active' && (
                     <button
                       type="button"
@@ -266,6 +364,47 @@ export function IncomeSourcesPanel({
                   </button>
                 </div>
               </div>
+              {payLogOpenId === id && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--theme-border)]/60 bg-black/20 p-2">
+                  <input
+                    type="number"
+                    placeholder="Amount"
+                    value={payLogDrafts[id].amount}
+                    onChange={(e) =>
+                      setPayLogDrafts((prev) => ({ ...prev, [id]: { ...prev[id], amount: e.target.value } }))
+                    }
+                    className={`${inputClass} w-28`}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Currency"
+                    value={payLogDrafts[id].currency}
+                    onChange={(e) =>
+                      setPayLogDrafts((prev) => ({ ...prev, [id]: { ...prev[id], currency: e.target.value } }))
+                    }
+                    className={`${inputClass} w-20`}
+                  />
+                  <input
+                    type="date"
+                    value={payLogDrafts[id].date}
+                    onChange={(e) =>
+                      setPayLogDrafts((prev) => ({ ...prev, [id]: { ...prev[id], date: e.target.value } }))
+                    }
+                    className={inputClass}
+                  />
+                  <button
+                    type="button"
+                    disabled={busy === `log-payment-${id}`}
+                    onClick={() => void logPayment(job)}
+                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                  >
+                    {busy === `log-payment-${id}` ? 'Saving…' : 'Confirm payment'}
+                  </button>
+                  <button type="button" onClick={() => setPayLogOpenId(null)} className={buttonClass}>
+                    Cancel
+                  </button>
+                </div>
+              )}
               {notes && (
                 <details className="mt-2">
                   <summary className="cursor-pointer text-xs font-medium text-[var(--theme-muted)]">

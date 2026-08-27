@@ -449,7 +449,26 @@ export function PendingIngestionPanel({
                         className={inputClass}
                         title="Contract end date"
                       />
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        placeholder="Payday (day, optional)"
+                        defaultValue={item.extractedContract?.paydayDayOfMonth}
+                        onChange={(e) =>
+                          updateContractDraft(item.id, {
+                            paydayDayOfMonth: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                        className={`${inputClass} w-36`}
+                        title="Expected day of month pay lands"
+                      />
                     </div>
+                    {item.extractedContract?.paySchedule && (
+                      <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
+                        Pay schedule from contract: {item.extractedContract.paySchedule}
+                      </p>
+                    )}
                     <div className="mt-2">
                       <select
                         value={targetJobDrafts[item.id] ?? ''}
