@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseExtractionJson } from './finance-extraction'
+import { parseExtractionJson, promptWithCategoryHints } from './finance-extraction'
 
 describe('parseExtractionJson', () => {
   it('parses a valid expense extraction', () => {
@@ -56,5 +56,25 @@ describe('parseExtractionJson', () => {
       expect(result.data.category).toBeUndefined()
       expect(result.data.confidence).toBe('low')
     }
+  })
+})
+
+describe('promptWithCategoryHints', () => {
+  it('returns the base prompt unchanged when there are no hints', () => {
+    expect(promptWithCategoryHints('BASE')).toBe('BASE')
+    expect(promptWithCategoryHints('BASE', {})).toBe('BASE')
+  })
+
+  it('appends known vendor -> category corrections to the prompt', () => {
+    const result = promptWithCategoryHints('BASE', { 'keells super': 'Groceries', netflix: 'Subscriptions' })
+    expect(result).toContain('BASE')
+    expect(result).toContain('"keells super" -> "Groceries"')
+    expect(result).toContain('"netflix" -> "Subscriptions"')
+  })
+
+  it('caps hints at 10 entries', () => {
+    const hints = Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`vendor${i}`, `cat${i}`]))
+    const result = promptWithCategoryHints('BASE', hints)
+    expect(result.match(/^- "/gm)?.length).toBe(10)
   })
 })

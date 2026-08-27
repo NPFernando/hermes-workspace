@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import type { ExtractedTransaction, PendingIngestion, PersonalFinancePayload } from '../types'
+
+type DuplicateWarning = { date: string; amount: number; vendorOrSource: string }
 
 const confidenceTone: Record<ExtractedTransaction['confidence'], string> = {
   high: 'border-emerald-400/30 bg-emerald-500/15 text-emerald-100',
@@ -26,8 +27,8 @@ export function PendingIngestionPanel({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [gmailConnected, setGmailConnected] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [duplicateWarnings, setDuplicateWarnings] = useState<Record<string, DuplicateWarning>>({})
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const { run: confirm } = useFinanceAction<PersonalFinancePayload>(onConfirmed)
 
   useEffect(() => {
     fetch('/api/auth/gmail-connect?check=1', { cache: 'no-store' })
@@ -130,19 +131,42 @@ export function PendingIngestionPanel({
     }
   }
 
-  async function confirmItem(item: PendingIngestion) {
+  async function confirmItem(item: PendingIngestion, force = false) {
     const draft = { ...item.extracted, ...editDrafts[item.id] }
     if (!draft.kind || !Number.isFinite(draft.amount)) {
       setNote('Amount and type are required before confirming.')
       return
     }
     setBusyId(item.id)
+    setNote(null)
     try {
-      const data = await confirm(
-        { action: 'confirm_pending_ingestion', id: item.id, payload: draft },
-        `confirm-${item.id}`,
-      )
-      if (data) await load()
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'confirm_pending_ingestion', id: item.id, payload: draft, force }),
+      })
+      const data = (await res.json()) as {
+        ok?: boolean
+        error?: string
+        duplicateWarning?: { date: string; amount: number; vendorOrSource: string }
+      }
+      if (data.ok === false) {
+        setNote(data.error || 'Confirm failed')
+        return
+      }
+      if (data.duplicateWarning) {
+        setDuplicateWarnings((prev) => ({ ...prev, [item.id]: data.duplicateWarning! }))
+        return
+      }
+      setDuplicateWarnings((prev) => {
+        const next = { ...prev }
+        delete next[item.id]
+        return next
+      })
+      onConfirmed(data as PersonalFinancePayload)
+      await load()
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Confirm failed')
     } finally {
       setBusyId(null)
     }
@@ -207,7 +231,10 @@ export function PendingIngestionPanel({
         </p>
       ) : (
         <div className="mt-4 grid gap-3">
-          {items.map((item) => (
+          {items.map((item) => {
+            const hasDuplicateWarning = Object.hasOwn(duplicateWarnings, item.id)
+            const duplicateWarning = duplicateWarnings[item.id]
+            return (
             <div
               key={item.id}
               className="flex flex-wrap items-start gap-3 rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
@@ -311,6 +338,12 @@ export function PendingIngestionPanel({
                         className={inputClass}
                       />
                     </div>
+                    {hasDuplicateWarning && (
+                      <p className="mt-2 text-xs text-amber-200">
+                        Possible duplicate: an existing record for "{duplicateWarning.vendorOrSource}" on{' '}
+                        {duplicateWarning.date} for {duplicateWarning.amount} already exists.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -320,10 +353,10 @@ export function PendingIngestionPanel({
                   <button
                     type="button"
                     disabled={busyId === item.id}
-                    onClick={() => void confirmItem(item)}
+                    onClick={() => void confirmItem(item, hasDuplicateWarning)}
                     className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
                   >
-                    Confirm
+                    {hasDuplicateWarning ? 'Confirm anyway' : 'Confirm'}
                   </button>
                 )}
                 <button
@@ -336,7 +369,8 @@ export function PendingIngestionPanel({
                 </button>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </section>

@@ -39,6 +39,20 @@ Respond with STRICT JSON only, no markdown fences, no commentary, matching exact
 
 If the content does not clearly describe a single financial transaction, respond with exactly: {"error": "no_transaction_found"}`
 
+/**
+ * Appends known vendor -> category corrections (learned from the user
+ * overriding the AI's category guess at confirm time — see
+ * recordCategoryCorrection in finance-store.ts) so repeat vendors start
+ * from what the user actually picked instead of the model guessing again.
+ * Kept short (10 max) since this goes straight into the prompt.
+ */
+export function promptWithCategoryHints(base: string, categoryHints?: Record<string, string>): string {
+  const entries = categoryHints ? Object.entries(categoryHints).slice(0, 10) : []
+  if (entries.length === 0) return base
+  const hintLines = entries.map(([vendor, category]) => `- "${vendor}" -> "${category}"`).join('\n')
+  return `${base}\n\nKnown vendor -> category corrections from this user's past edits (use these when the vendor matches):\n${hintLines}`
+}
+
 export function parseExtractionJson(raw: string): ExtractionResult {
   const stripped = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
   try {
@@ -69,8 +83,12 @@ export function parseExtractionJson(raw: string): ExtractionResult {
   }
 }
 
-export async function extractTransactionFromText(bodyText: string): Promise<ExtractionResult> {
-  const prompt = `${EXTRACTION_PROMPT_INSTRUCTIONS}\n\nContent:\n${bodyText.slice(0, 8_000)}`
+export async function extractTransactionFromText(
+  bodyText: string,
+  categoryHints?: Record<string, string>,
+): Promise<ExtractionResult> {
+  const instructions = promptWithCategoryHints(EXTRACTION_PROMPT_INSTRUCTIONS, categoryHints)
+  const prompt = `${instructions}\n\nContent:\n${bodyText.slice(0, 8_000)}`
 
   // HARP's free-tier OpenRouter chain is tried first (same routing the rest
   // of the app uses), but its one usable free candidate is shared with, and
@@ -191,16 +209,20 @@ async function callGeminiText(prompt: string): Promise<string | null> {
   return callGemini([{ text: prompt }])
 }
 
-export async function extractTransactionFromImage(imagePath: string): Promise<ExtractionResult> {
+export async function extractTransactionFromImage(
+  imagePath: string,
+  categoryHints?: Record<string, string>,
+): Promise<ExtractionResult> {
   const image = readImageAsBase64(imagePath)
   if (!image) return { ok: false, reason: 'image_not_found' }
+  const instructions = promptWithCategoryHints(EXTRACTION_PROMPT_INSTRUCTIONS, categoryHints)
 
   for (const model of VISION_ROUTE_MODELS) {
-    const content = await callOpenRouterVision(model, EXTRACTION_PROMPT_INSTRUCTIONS, image.base64, image.mimeType)
+    const content = await callOpenRouterVision(model, instructions, image.base64, image.mimeType)
     if (content) return parseExtractionJson(content)
   }
 
-  const geminiContent = await callGeminiVision(EXTRACTION_PROMPT_INSTRUCTIONS, image.base64, image.mimeType)
+  const geminiContent = await callGeminiVision(instructions, image.base64, image.mimeType)
   if (geminiContent) return parseExtractionJson(geminiContent)
 
   return { ok: false, reason: 'all_routes_failed' }

@@ -1410,6 +1410,70 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
   return db
 }
 
+export type DuplicateMatch = { id: string; date: string; amount: number; vendorOrSource: string }
+
+/**
+ * Same-day, same-vendor(case-insensitive), ~same-amount (within 1%) match
+ * against existing records — used by confirm_pending_ingestion to warn
+ * before silently double-counting an email/upload that was already
+ * confirmed once (e.g. the same bill arriving via both Gmail and a manual
+ * upload). Read-only; callers decide whether to still create the record.
+ */
+export function findPossibleDuplicate(
+  kind: 'income' | 'expense',
+  vendorOrSource: string,
+  date: string,
+  amount: number,
+): DuplicateMatch | null {
+  if (!vendorOrSource.trim() || !date || !Number.isFinite(amount)) return null
+  const db = ensureFinanceStore()
+  const vendorKey = vendorOrSource.trim().toLowerCase()
+  const dateOnly = date.slice(0, 10)
+  const records: Array<{ id: string; vendor: string; date: string; amount: number }> =
+    kind === 'income'
+      ? db.income_records.map((r) => ({ id: r.id, vendor: r.sourceName, date: r.dateReceived, amount: r.originalAmount }))
+      : db.expense_records.map((r) => ({ id: r.id, vendor: r.vendor, date: r.date, amount: r.amount }))
+
+  for (const r of records) {
+    const sameVendor = r.vendor.trim().toLowerCase() === vendorKey
+    const sameDate = r.date.slice(0, 10) === dateOnly
+    const sameAmount = Math.abs(r.amount - amount) / Math.max(Math.abs(amount), 1) < 0.01
+    if (sameVendor && sameDate && sameAmount) {
+      return { id: r.id, date: r.date, amount: r.amount, vendorOrSource: r.vendor }
+    }
+  }
+  return null
+}
+
+/**
+ * Learns a vendor -> category mapping from a user's correction at
+ * ingestion-confirm time, so future AI extractions for the same vendor
+ * start from what the user actually picked instead of the model's guess.
+ * Stored under settings (not a new top-level collection) since it's a
+ * single small lookup map, not a record collection with its own lifecycle.
+ */
+export function recordCategoryCorrection(vendor: string, category: string): void {
+  if (!vendor.trim() || !category.trim()) return
+  const db = ensureFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const corrections = (
+    settings.categoryCorrections && typeof settings.categoryCorrections === 'object'
+      ? { ...(settings.categoryCorrections as Record<string, string>) }
+      : {}
+  ) as Record<string, string>
+  corrections[vendor.trim().toLowerCase()] = category.trim()
+  settings.categoryCorrections = corrections
+  writeFinanceStore(db)
+}
+
+export function getCategoryCorrections(): Record<string, string> {
+  const db = ensureFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  return settings.categoryCorrections && typeof settings.categoryCorrections === 'object'
+    ? (settings.categoryCorrections as Record<string, string>)
+    : {}
+}
+
 export function listPendingIngestions(): Array<PendingIngestion> {
   return ensureFinanceStore().pending_ingestions
 }
