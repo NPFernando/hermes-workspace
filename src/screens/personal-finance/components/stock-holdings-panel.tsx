@@ -24,6 +24,13 @@ function optionalNumberField(row: Record<string, unknown>, key: string): number 
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
+function daysSince(dateStr: string | undefined): number | null {
+  if (!dateStr) return null
+  const then = Date.parse(dateStr)
+  if (!Number.isFinite(then)) return null
+  return Math.max(0, Math.floor((Date.now() - then) / (24 * 60 * 60 * 1000)))
+}
+
 /**
  * Sri Lanka / CSE stock holdings — buy price is always known, current price
  * comes from the unofficial CSE endpoint (refresh_stock_price action) with
@@ -40,6 +47,7 @@ export function StockHoldingsPanel({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [manualPriceDrafts, setManualPriceDrafts] = useState<Record<string, string>>({})
   const [refreshFailedIds, setRefreshFailedIds] = useState<Record<string, boolean>>({})
+  const [refreshingAll, setRefreshingAll] = useState(false)
 
   const [symbol, setSymbol] = useState('')
   const [companyName, setCompanyName] = useState('')
@@ -129,9 +137,29 @@ export function StockHoldingsPanel({
 
   const holdings = payload.data.stock_holdings
 
+  // Sequential, not concurrent, to go easy on the unofficial CSE endpoint.
+  async function refreshAll() {
+    setRefreshingAll(true)
+    try {
+      for (const holding of holdings) {
+        const id = stringField(holding, 'id')
+        if (id) await refreshPrice(id)
+      }
+    } finally {
+      setRefreshingAll(false)
+    }
+  }
+
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
-      <h2 className="text-lg font-semibold">Stock holdings (Sri Lanka / CSE)</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Stock holdings (Sri Lanka / CSE)</h2>
+        {holdings.length > 0 && (
+          <button type="button" disabled={refreshingAll} onClick={() => void refreshAll()} className={buttonClass}>
+            {refreshingAll ? 'Refreshing…' : 'Refresh all'}
+          </button>
+        )}
+      </div>
       <p className="text-xs text-[var(--theme-muted)]">
         Enter what you bought through your broker app. Current price is fetched from CSE when you click Refresh —
         if that fails, you can type it in manually.
@@ -194,6 +222,7 @@ export function StockHoldingsPanel({
           const current = optionalNumberField(holding, 'lastKnownPrice')
           const gainLoss = current !== undefined ? (current - buy) * qty : undefined
           const priceSource = stringField(holding, 'priceSource')
+          const staleDays = daysSince(stringField(holding, 'lastPriceUpdatedAt') || undefined)
           return (
             <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -201,7 +230,10 @@ export function StockHoldingsPanel({
                   <span className="font-medium text-[var(--theme-text)]">{stringField(holding, 'symbol')}</span>{' '}
                   <span className="text-xs text-[var(--theme-muted)]">
                     · {stringField(holding, 'platform')} · qty {qty} · buy {formatLkr(buy)}
-                    {current !== undefined && ` · current ${formatLkr(current)} (${priceSource})`}
+                    {current !== undefined &&
+                      ` · current ${formatLkr(current)} (${priceSource}${
+                        staleDays !== null ? `, priced ${staleDays === 0 ? 'today' : `${staleDays}d ago`}` : ''
+                      })`}
                   </span>
                   {gainLoss !== undefined && (
                     <span className={`ml-2 text-xs font-medium ${gainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>

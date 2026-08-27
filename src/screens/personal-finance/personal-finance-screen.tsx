@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { StatCard } from '../finance/components/stat-card'
 import { DataTable } from '../finance/components/data-table'
 import { BudgetPanel } from './components/budget-panel'
@@ -27,6 +28,35 @@ export function PersonalFinanceScreen() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('overview')
+  const [pendingIngestionCount, setPendingIngestionCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadPendingCount() {
+      try {
+        const res = await fetch('/api/finance', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ action: 'list_pending_ingestions' }),
+        })
+        const data = (await res.json()) as { ok?: boolean; pendingIngestions?: Array<{ status: string }> }
+        if (!cancelled && data.ok) {
+          const count = (data.pendingIngestions ?? []).filter(
+            (p) => p.status === 'awaiting_review' || p.status === 'awaiting_password',
+          ).length
+          setPendingIngestionCount(count)
+        }
+      } catch {
+        /* transient */
+      }
+    }
+    void loadPendingCount()
+    const interval = setInterval(() => void loadPendingCount(), 30_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -77,6 +107,12 @@ export function PersonalFinanceScreen() {
 
   const { summary } = payload
 
+  const netWorthBreakdown = [
+    { name: 'Cash', value: Math.max(0, summary.cashBalanceLkr) },
+    { name: 'Stocks', value: Math.max(0, summary.stockHoldingsValueLkr) },
+    { name: 'Fixed deposits', value: Math.max(0, summary.fixedDepositsValueLkr) },
+  ].filter((entry) => entry.value > 0)
+
   return (
     <main className="min-h-dvh overflow-y-auto bg-[var(--theme-bg)] px-4 py-5 text-[var(--theme-text)] md:px-8 md:py-8">
       <section className="rounded-[2rem] border border-[var(--theme-border)] bg-gradient-to-br from-[var(--theme-panel)] via-[var(--theme-panel)] to-emerald-950/20 p-6 shadow-xl">
@@ -103,6 +139,39 @@ export function PersonalFinanceScreen() {
         <StatCard label="Fixed deposits" value={formatLkr(summary.fixedDepositsValueLkr)} />
       </section>
 
+      {netWorthBreakdown.length > 0 && (
+        <section className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-4">
+          <p className="text-xs font-medium text-[var(--theme-muted)]">Net worth breakdown</p>
+          <div className="mt-1 h-[90px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={netWorthBreakdown} layout="vertical" margin={{ top: 4, right: 12, left: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="2 4" stroke="var(--theme-border)" opacity={0.4} horizontal={false} />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 10, fill: 'var(--theme-muted)' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fontSize: 10, fill: 'var(--theme-muted)' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={80}
+                />
+                <Tooltip
+                  contentStyle={{ background: 'var(--theme-panel)', border: '1px solid var(--theme-border)', borderRadius: 8, fontSize: 11 }}
+                  formatter={(value: number) => formatLkr(value)}
+                />
+                <Bar dataKey="value" fill="#38bdf8" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      )}
+
       <nav className="mt-6 flex flex-wrap gap-2 border-b border-[var(--theme-border)] pb-2">
         {TABS.map((t) => (
           <button
@@ -116,6 +185,11 @@ export function PersonalFinanceScreen() {
             }`}
           >
             {t.label}
+            {t.id === 'ingestion' && pendingIngestionCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-amber-100">
+                {pendingIngestionCount}
+              </span>
+            )}
           </button>
         ))}
       </nav>
