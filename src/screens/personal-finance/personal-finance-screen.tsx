@@ -161,12 +161,23 @@ export function PersonalFinanceScreen() {
   return (
     <main className="min-h-dvh overflow-y-auto bg-[var(--theme-bg)] px-4 py-5 text-[var(--theme-text)] md:px-8 md:py-8">
       <section className="rounded-[2rem] border border-[var(--theme-border)] bg-gradient-to-br from-[var(--theme-panel)] via-[var(--theme-panel)] to-emerald-950/20 p-6 shadow-xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200/80">
-          DollarWise-style personal finance
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold md:text-4xl">
-          Money clarity, without trading controls
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200/80">
+              DollarWise-style personal finance
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold md:text-4xl">
+              Money clarity, without trading controls
+            </h1>
+          </div>
+          <a
+            href="/api/finance-export"
+            download
+            className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20"
+          >
+            Export data (JSON)
+          </a>
+        </div>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--theme-muted)]">
           Track accounts, spending, budgets, savings goals, investments, and tax records —
           separate from the automated trading workspace.

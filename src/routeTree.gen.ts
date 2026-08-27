@@ -136,6 +136,7 @@ import { Route as ApiHarpConfigRouteImport } from './routes/api/harp-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
 import { Route as ApiFinanceUploadRouteImport } from './routes/api/finance-upload'
+import { Route as ApiFinanceExportRouteImport } from './routes/api/finance-export'
 import { Route as ApiFinanceDocumentRouteImport } from './routes/api/finance-document'
 import { Route as ApiFinanceRouteImport } from './routes/api/finance'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
@@ -887,6 +888,11 @@ const ApiFinanceUploadRoute = ApiFinanceUploadRouteImport.update({
   path: '/api/finance-upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFinanceExportRoute = ApiFinanceExportRouteImport.update({
+  id: '/api/finance-export',
+  path: '/api/finance-export',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFinanceDocumentRoute = ApiFinanceDocumentRouteImport.update({
   id: '/api/finance-document',
   path: '/api/finance-document',
@@ -1528,6 +1534,7 @@ export interface FileRoutesByFullPath {
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/finance-document': typeof ApiFinanceDocumentRoute
+  '/api/finance-export': typeof ApiFinanceExportRoute
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -1770,6 +1777,7 @@ export interface FileRoutesByTo {
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/finance-document': typeof ApiFinanceDocumentRoute
+  '/api/finance-export': typeof ApiFinanceExportRoute
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -2014,6 +2022,7 @@ export interface FileRoutesById {
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/finance-document': typeof ApiFinanceDocumentRoute
+  '/api/finance-export': typeof ApiFinanceExportRoute
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -2259,6 +2268,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/finance'
     | '/api/finance-document'
+    | '/api/finance-export'
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -2501,6 +2511,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/finance'
     | '/api/finance-document'
+    | '/api/finance-export'
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -2744,6 +2755,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/finance'
     | '/api/finance-document'
+    | '/api/finance-export'
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -2988,6 +3000,7 @@ export interface RootRouteChildren {
   ApiFilesRoute: typeof ApiFilesRoute
   ApiFinanceRoute: typeof ApiFinanceRouteWithChildren
   ApiFinanceDocumentRoute: typeof ApiFinanceDocumentRoute
+  ApiFinanceExportRoute: typeof ApiFinanceExportRoute
   ApiFinanceUploadRoute: typeof ApiFinanceUploadRoute
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
@@ -4019,6 +4032,13 @@ declare module '@tanstack/react-router' {
       path: '/api/finance-upload'
       fullPath: '/api/finance-upload'
       preLoaderRoute: typeof ApiFinanceUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/finance-export': {
+      id: '/api/finance-export'
+      path: '/api/finance-export'
+      fullPath: '/api/finance-export'
+      preLoaderRoute: typeof ApiFinanceExportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/finance-document': {
@@ -5140,6 +5160,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFilesRoute: ApiFilesRoute,
   ApiFinanceRoute: ApiFinanceRouteWithChildren,
   ApiFinanceDocumentRoute: ApiFinanceDocumentRoute,
+  ApiFinanceExportRoute: ApiFinanceExportRoute,
   ApiFinanceUploadRoute: ApiFinanceUploadRoute,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
