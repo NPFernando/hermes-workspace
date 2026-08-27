@@ -3,6 +3,8 @@ import { StatCard } from '../finance/components/stat-card'
 import { DataTable } from '../finance/components/data-table'
 import { BudgetPanel } from './components/budget-panel'
 import { PendingIngestionPanel } from './components/pending-ingestion-panel'
+import { FinanceTrendsCard } from './components/finance-trends-card'
+import { SavingsGoalsProgress } from './components/savings-goals-progress'
 import { formatLkr, formatPct } from './utils'
 import type { PersonalFinancePayload } from './types'
 
@@ -85,6 +87,10 @@ export function PersonalFinanceScreen() {
         <StatCard label="Tax reserve" value={formatLkr(summary.taxReserveLkr)} />
         <StatCard label="Tracked accounts" value={String(summary.accountCount)} />
       </section>
+
+      <FinanceTrendsCard payload={payload} />
+
+      <SavingsGoalsProgress payload={payload} />
 
       <PendingIngestionPanel onConfirmed={setPayload} />
 
