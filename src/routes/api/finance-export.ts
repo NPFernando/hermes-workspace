@@ -20,6 +20,7 @@ export const Route = createFileRoute('/api/finance-export')({
         }
         const db = readFinanceStore()
         const exportData = {
+          schemaVersion: db.schemaVersion,
           exportedAt: new Date().toISOString(),
           finance_accounts: db.finance_accounts,
           income_records: db.income_records,
