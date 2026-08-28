@@ -337,7 +337,7 @@ export function PersonalFinanceScreen() {
           <DataTable
             title="Tax records"
             rows={payload.data.tax_records}
-            columns={['taxYear', 'incomeType', 'convertedLkrAmount', 'taxPaid', 'taxDue', 'requiresConfirmation']}
+            columns={['taxYear', 'incomeType', 'convertedLkrAmount', 'taxPaid', 'taxDue', 'deductionCategory', 'supportingDocument', 'requiresConfirmation']}
             kind="tax"
             onChanged={(p) => setPayload(p as PersonalFinancePayload)}
             searchable
