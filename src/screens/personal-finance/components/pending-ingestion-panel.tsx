@@ -37,17 +37,25 @@ export function PendingIngestionPanel({
   const [targetJobDrafts, setTargetJobDrafts] = useState<Record<string, string>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
   const [gmailConnected, setGmailConnected] = useState(false)
+  const [gmailLastSyncedAtSeconds, setGmailLastSyncedAtSeconds] = useState<number | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [duplicateWarnings, setDuplicateWarnings] = useState<Record<string, DuplicateWarning>>({})
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const contractFileInputRef = useRef<HTMLInputElement | null>(null)
 
-  useEffect(() => {
-    fetch('/api/auth/gmail-connect?check=1', { cache: 'no-store' })
+  const checkGmailConnection = useCallback(() => {
+    return fetch('/api/auth/gmail-connect?check=1', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((data: { connected?: boolean }) => setGmailConnected(Boolean(data.connected)))
+      .then((data: { connected?: boolean; lastSyncedAtSeconds?: number | null }) => {
+        setGmailConnected(Boolean(data.connected))
+        setGmailLastSyncedAtSeconds(data.lastSyncedAtSeconds ?? null)
+      })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    void checkGmailConnection()
+  }, [checkGmailConnection])
 
   const load = useCallback(async () => {
     try {
@@ -90,6 +98,7 @@ export function PendingIngestionPanel({
       setNote(e instanceof Error ? e.message : 'Gmail sync failed')
     } finally {
       setSyncing(false)
+      void checkGmailConnection()
     }
   }
 
@@ -292,6 +301,12 @@ export function PendingIngestionPanel({
           )}
         </div>
       </div>
+
+      {gmailConnected && (
+        <p className="mt-1 text-xs text-[var(--theme-muted)]">
+          {gmailLastSyncedAtSeconds ? `Last synced ${new Date(gmailLastSyncedAtSeconds * 1000).toLocaleString()}` : 'Never synced'}
+        </p>
+      )}
 
       {note && <p className="mt-2 text-xs text-red-300">{note}</p>}
 
