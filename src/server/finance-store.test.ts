@@ -10,6 +10,7 @@ import {
   financeAlerts,
   financeSummary,
   financeStorageAlerts,
+  getUnifiedTransactions,
   maskSensitive,
 } from './finance-store'
 
@@ -719,6 +720,127 @@ describe('account (PF-100 Account Model)', () => {
     store.deleteFinanceRecord('account', id)
     db = store.readFinanceStore()
     expect(db.finance_accounts).toHaveLength(0)
+  })
+})
+
+describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
+  it('maps income and expense records into the shared shape with renamed fields', () => {
+    const db = createEmptyFinanceDatabase()
+    db.income_records.push({
+      id: 'income-1',
+      dateReceived: '2026-06-01',
+      sourceName: 'Employer Co',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: 100_000,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 100_000,
+      taxable: true,
+      incomeSourceId: 'job-1',
+      source: 'test',
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    db.expense_records.push({
+      id: 'expense-1',
+      date: '2026-06-02',
+      vendor: 'Cloud Provider',
+      category: 'Cloud services',
+      currency: 'USD',
+      amount: 10,
+      convertedLkrAmount: 3_000,
+      recurring: true,
+      workRelated: true,
+      taxDeductiblePossible: true,
+      source: 'test',
+      createdAt: '2026-06-02T00:00:00.000Z',
+      updatedAt: '2026-06-02T00:00:00.000Z',
+    })
+
+    const txns = getUnifiedTransactions(db)
+    expect(txns).toHaveLength(2)
+
+    const income = txns.find((t) => t.kind === 'income')
+    expect(income).toMatchObject({
+      id: 'income-1',
+      date: '2026-06-01',
+      counterparty: 'Employer Co',
+      category: 'Salary',
+      currency: 'LKR',
+      amount: 100_000,
+      taxable: true,
+      incomeSourceId: 'job-1',
+    })
+    expect(income?.recurring).toBeUndefined()
+
+    const expense = txns.find((t) => t.kind === 'expense')
+    expect(expense).toMatchObject({
+      id: 'expense-1',
+      date: '2026-06-02',
+      counterparty: 'Cloud Provider',
+      category: 'Cloud services',
+      currency: 'USD',
+      amount: 10,
+      recurring: true,
+    })
+    expect(expense?.taxable).toBeUndefined()
+  })
+
+  it('sorts mixed-kind results by date descending', () => {
+    const db = createEmptyFinanceDatabase()
+    db.income_records.push({
+      id: 'older',
+      dateReceived: '2026-01-01',
+      sourceName: 'A',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: 1,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 1,
+      taxable: true,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.expense_records.push({
+      id: 'newer',
+      date: '2026-06-01',
+      vendor: 'B',
+      category: 'X',
+      currency: 'LKR',
+      amount: 1,
+      convertedLkrAmount: 1,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const txns = getUnifiedTransactions(db)
+    expect(txns.map((t) => t.id)).toEqual(['newer', 'older'])
+  })
+
+  it('does not mutate the underlying income_records/expense_records collections', () => {
+    const db = createEmptyFinanceDatabase()
+    db.income_records.push({
+      id: 'income-1',
+      dateReceived: '2026-06-01',
+      sourceName: 'Employer Co',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: 100_000,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 100_000,
+      taxable: true,
+      source: 'test',
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    const before = JSON.stringify(db.income_records)
+    getUnifiedTransactions(db)
+    expect(JSON.stringify(db.income_records)).toBe(before)
   })
 })
 

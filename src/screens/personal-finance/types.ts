@@ -23,6 +23,7 @@ export type PersonalFinancePayload = {
     percentUsed: number
     overBudget: boolean
   }>
+  transactions: Array<Record<string, unknown>>
   data: {
     finance_accounts: Array<Record<string, unknown>>
     income_records: Array<Record<string, unknown>>

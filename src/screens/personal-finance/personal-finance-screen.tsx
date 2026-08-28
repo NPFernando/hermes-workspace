@@ -11,6 +11,7 @@ import { IncomeSourcesPanel } from './components/income-sources-panel'
 import { StockHoldingsPanel } from './components/stock-holdings-panel'
 import { FixedDepositsPanel } from './components/fixed-deposits-panel'
 import { AccountsPanel } from './components/accounts-panel'
+import { TransactionsPanel } from './components/transactions-panel'
 import { formatLkr, formatPct } from './utils'
 import type { PersonalFinancePayload } from './types'
 
@@ -288,16 +289,6 @@ export function PersonalFinanceScreen() {
         <>
           <IncomeSourcesPanel payload={payload} onPayload={setPayload} />
           <BudgetPanel payload={payload} onPayload={setPayload} />
-          <section className="mt-6">
-            <DataTable
-              title="Income records"
-              rows={payload.data.income_records}
-              columns={['dateReceived', 'sourceName', 'incomeType', 'originalCurrency', 'originalAmount', 'convertedLkrAmount', 'taxable']}
-              kind="income"
-              onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-              searchable
-            />
-          </section>
         </>
       )}
 
@@ -311,14 +302,7 @@ export function PersonalFinanceScreen() {
       {tab === 'records' && (
         <section className="mt-6 grid gap-4">
           <AccountsPanel payload={payload} onPayload={setPayload} />
-          <DataTable
-            title="Expense records"
-            rows={payload.data.expense_records}
-            columns={['date', 'vendor', 'category', 'currency', 'amount', 'convertedLkrAmount', 'recurring']}
-            kind="expense"
-            onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-            searchable
-          />
+          <TransactionsPanel payload={payload} onPayload={setPayload} />
           <DataTable
             title="Budget categories"
             rows={payload.data.budget_categories}
