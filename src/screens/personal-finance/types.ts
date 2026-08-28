@@ -26,6 +26,7 @@ export type PersonalFinancePayload = {
     overBudget: boolean
   }>
   transactions: Array<Record<string, unknown>>
+  alerts: Array<{ level: 'info' | 'warning' | 'critical'; title: string; detail: string }>
   storage: {
     active: 'postgres' | 'json'
     fallback: 'json'
