@@ -455,14 +455,14 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | DOC-103 | Credit Card Documents | blocked |
 | DOC-104 | Investment Documents | planned |
 | DOC-105 | Fixed Deposit Documents | planned |
-| DOC-106 | Receipts | partial (stored, not browsable) |
-| DOC-107 | Bills | partial (stored, not browsable) |
+| DOC-106 | Receipts | **existing** (viewable via "View document" link on transactions once `documentRef` is set) |
+| DOC-107 | Bills | **existing** (same viewer, shared with receipts) |
 | DOC-108 | Tax | planned |
 | DOC-109 | Insurance | planned |
 | DOC-110 | Loans | blocked |
 | DOC-111 | Property | blocked |
 | DOC-112 | Search | planned |
-| DOC-113 | Record Linking | partial (`documentRef` pattern, income_source only) |
+| DOC-113 | Record Linking | **existing** (`documentRef` viewer extended from income_source to income_record/expense_record) |
 | DOC-114 | Checksum / Duplicate Detection | planned |
 
 ## Phase 38 — Analytics and Historical State
@@ -572,9 +572,13 @@ Not ready without design work first: **PF-115** (needs new audit-log query/diff 
 
 A follow-up scoping pass over three more unaudited phases (Phase 5 Income/Employment, Phase 41 Tax Records, Phase 44 Reliability/Observability) found **TAX-103 (Potential Deduction Records) and TAX-104 (Supporting Documents)** the clear next pick, combined into one slice — the smallest change of the entire session: two already-existing, already-populated `TaxRecord` fields just needed adding to the generic `DataTable`'s `columns` array. Both are now shipped. The same pass also caught that **OPS-100 (System Health)** was already fully satisfied by PF-413's `DataHealthCard` and just needed its stale status corrected — done in the same PR, no code required.
 
-**OPS-105** is also now shipped — the last-synced timestamp is surfaced end-to-end (`auth.gmail-connect.ts`'s response + `pending-ingestion-panel.tsx`'s display, with a refetch after manual sync so it doesn't go stale). This closes out the current run of "surface an already-computed value" wins found across every phase audited so far this session (Phase 0/1/4/8/10/42/41/44). The next step is a fresh registry pass over still-unaudited phases rather than naming a specific feature unilaterally.
+**OPS-105** is also now shipped — the last-synced timestamp is surfaced end-to-end (`auth.gmail-connect.ts`'s response + `pending-ingestion-panel.tsx`'s display, with a refetch after manual sync so it doesn't go stale). This closes out the current run of "surface an already-computed value" wins found across every phase audited so far this session (Phase 0/1/4/8/10/42/41/44).
 
-Not ready in the phases audited this session: **PF-509** (Contract Lifecycle — the stored `status` union is genuinely just `'active' | 'ended'`, nothing hiding; would need new lifecycle states and a design decision), **OPS-103** (needs a new aggregate health computation across holdings, not a surfacing fix), **OPS-109** (a platform-wide utility used well beyond finance, not finance-scoped), **OPS-110** (needs new retry/backoff logic, a real feature build).
+A follow-up pass over Phase 36 (Fixed Deposits V2), Phase 37 (Documents Vault), and Phase 43 (Security) found that pattern genuinely exhausted in Phase 36 (no `partial` rows at all) and Phase 43 (all three `partial` items need new data capture or a real authz/policy design decision). Phase 37's **DOC-106, DOC-107, and DOC-113** were the one structural candidate — extending the already-shipped `finance-document.ts` employment-contract viewer to also serve receipts/bills via the already-existing `documentRef` field on income/expense records. Explicitly flagged before building: this environment has zero live receipt/bill data with `documentRef` populated, so the feature ships correct and ready but not immediately visible — Naveen confirmed shipping it anyway as correct, low-risk infrastructure. Now shipped.
+
+With Phase 36/37/43 exhausted for this pattern too, the next scoping pass should look at genuinely unaudited phases (e.g. Phase 2 Multi-Currency, Phase 5's remaining items, Phase 33/34 Smart Alerts/Scheduled Reviews) — or this may be close to the natural stopping point for "surface existing data" wins, with further work needing a real design/build effort instead.
+
+Not ready in the phases audited this session: **PF-509** (Contract Lifecycle — the stored `status` union is genuinely just `'active' | 'ended'`, nothing hiding; would need new lifecycle states and a design decision), **OPS-103** (needs a new aggregate health computation across holdings, not a surfacing fix), **OPS-109** (a platform-wide utility used well beyond finance, not finance-scoped), **OPS-110** (needs new retry/backoff logic, a real feature build), **PF-1107** (Maturity Value — needs a new maturity-value computation, not a surfacing fix), **SEC-102/106/110** (all need new data capture or a real authz/policy design decision).
 
 ### Shipped: PF-100/101/102/103 — Account Model
 
@@ -697,3 +701,9 @@ This closes out Phase 42's quick wins from this scoping pass — see "Recommende
 - **What was built**: `GET /api/auth/gmail-connect?check=1` now returns `lastSyncedAtSeconds`, reusing the already-written `settings.gmailIngest.lastSyncedAtSeconds` (read with the same untyped-cast convention as `getCategoryCorrections()` — `gmailIngest` stays outside the `FinanceSettings` type, no schema change). `pending-ingestion-panel.tsx` shows "Last synced <date>" or "Never synced" next to the Gmail button, and the connection check was extracted into a reusable `checkGmailConnection()` now also called after a manual sync completes, so the timestamp doesn't go stale immediately after syncing.
 - **External issue surfaced during verification**: the actual "Sync Gmail now" call failed with `Gmail list failed: 403` in this environment — a pre-existing external Gmail API problem (likely token/scope/quota) unrelated to this change. The read/display path was verified directly (by temporarily injecting a timestamp value) since a live successful sync wasn't available to test the write path end-to-end; flagged to Naveen for separate investigation.
 - **Known limitation / deliberate scope**: single-account only (matches the app's existing single-Gmail-connection design, no multi-account disambiguation needed).
+
+### Shipped: DOC-106, DOC-107 & DOC-113 — Receipt/Bill Document Viewing
+
+- **What was built**: `GET /api/finance-document` (previously `kind=income_source` only, built for the employment-contract viewer) now also accepts `kind=income_record`/`kind=expense_record`, reusing the exact same auth/path-guard/`contentTypeFor` logic. `TransactionsPanel` now shows a "View document" link on any transaction with a `documentRef`, mirroring the pattern already shipped in `income-sources-panel.tsx`. `documentRef` already existed on both record types and was already stamped by `confirm_pending_ingestion` when confirming a receipt/bill via ingestion, and already flowed unmasked through `getUnifiedTransactions()` — no new data model, no write-path changes.
+- **Deliberate scope decision, made explicitly before building**: this environment's `finance.json` had zero income/expense records with `documentRef` populated at shipping time (no receipt/bill had been confirmed via ingestion yet — all pending ingestions on record were employment contracts). This means the feature is correct and ready but was not immediately visible in this environment on ship day. Verified by creating a temporary test record pointing at an existing uploaded file, confirming the link rendered and served the file with the correct content-type, then cleaning up. Shipped as intentional, low-risk infrastructure for when real receipt/bill ingestion happens, per explicit confirmation before starting.
+- **Known limitation**: none beyond the above — the mechanism itself has no edge cases (a record with no `documentRef` simply shows no link, matching the existing contract-viewer's own behavior).
