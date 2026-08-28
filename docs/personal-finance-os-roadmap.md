@@ -44,7 +44,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | PF-003 | Current UI/Page Inventory | existing | 5-tab `personal-finance-screen.tsx` (Overview/Income & Jobs/Investments/Accounts & Records/Ingestion) |
 | PF-004 | Current Calculation Validation | partial | 1288 unit tests cover most computed values; no standalone "calculation validation" doc |
 | PF-005 | Fix Currency Display Inconsistencies | planned | `formatLkr()` only handles LKR; other currencies use raw string interpolation in a few places |
-| PF-006 | Fix Fixed Deposit Rate Labelling | planned, **ready** | Confirmed bug — needs "p.a." qualifier distinct from payout frequency |
+| PF-006 | Fix Fixed Deposit Rate Labelling | **existing** | Add-form placeholder and row display now show "% p.a.", helper text says "annual interest rate" explicitly — display-text only, `interestRatePct` was already stored unambiguously |
 | PF-007 | Improve Investment P/L Display | planned, **ready** | Confirmed gap — no percentage shown alongside LKR gain/loss (row-level or Overview aggregate) |
 | PF-008 | Remove Developer/API Language From User UI | planned | Not yet audited line-by-line |
 | PF-009 | Standardize Money Formatting | planned | Needs a currency-aware formatter, not LKR-only |
@@ -431,7 +431,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 
 | ID | Feature | Status |
 |---|---|---|
-| PF-1100 | Annual Interest Rate | existing (needs PF-006's label fix) |
+| PF-1100 | Annual Interest Rate | existing |
 | PF-1101 | Payout Frequency | existing |
 | PF-1102 | Interest Schedule | planned |
 | PF-1103 | Accrued Interest | planned |
@@ -550,13 +550,12 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 
 Dependencies met, scope clear — this is informational status only, nothing here is queued for autonomous work:
 
-- **PF-006** — Fix Fixed Deposit Rate Labelling (zero dependencies)
 - **PF-007** — Improve Investment P/L Display (zero dependencies)
 - **PF-009** — Standardize Money Formatting (zero dependencies)
 
 ## Recommended Next Feature
 
-**PF-006 — Fix Fixed Deposit Rate Labelling.** The additive-catalogue pattern (Category → Subcategory → Merchant) has now shipped three times in a row; the next catalogue-style items (PF-112 Tags, PF-113 Pending/Cleared/Reconciled Status) are real but PF-006/PF-007/PF-009 have been sitting `Ready Now` the longest without being picked — small, zero-dependency, zero-risk fixes worth clearing before starting a fourth catalogue.
+**PF-007 — Improve Investment P/L Display.** With PF-006 cleared, this is the next zero-dependency quick win sitting `Ready Now` — worth clearing alongside PF-009 before starting a fourth additive catalogue (PF-112 Tags or PF-113 Pending/Cleared/Reconciled Status).
 
 PF-007 and PF-009 remain independent zero-risk quick wins that can be done any time without touching Phase 1.
 
@@ -590,3 +589,8 @@ PF-007 and PF-009 remain independent zero-risk quick wins that can be done any t
 - **What was built**: a new `Merchant` entity (`id, name, defaultCategory?, notes?, source, createdAt, updatedAt`) as a net-new `merchants` collection (JSON + `personal_finance` Postgres mirror), managed via a new sibling `MerchantsPanel` (`src/screens/personal-finance/components/merchants-panel.tsx` — a separate file from `CategoriesPanel`, which already carried two catalogue blocks) — add/edit/delete, a usage count per merchant, and an "in use, not yet a merchant" formalize section. `TransactionsPanel`'s vendor input gained a `pf-known-merchants` datalist (the first vendor-side autocomplete in the codebase) and an on-blur handler that fills the category field from a recognized merchant's `defaultCategory` — only when the category field is empty, so a manually-typed category is never overwritten.
 - **Known limitation / deliberate scope**: `ExpenseRecord.vendor` remains a plain free-text string (no FK); the existing AI-extraction vendor→category hint map (`db.settings.categoryCorrections`) was deliberately left untouched — it stays exclusively the ingestion-hinting mechanism it already was, not merged with or read from this new catalogue.
 - **Not built** (deliberately deferred, not dropped): a `merchantId` foreign key, fuzzy/case-insensitive matching for the auto-fill (exact match only), and any income-side "payer" catalogue (no such concept exists or was needed — `IncomeRecord.sourceName` stays plain text).
+
+### Shipped: PF-006 — Fix Fixed Deposit Rate Labelling
+
+- **What was built**: the interest-rate field's add-form placeholder and read-only row display now both show "% p.a." instead of a bare "%", and the panel's helper text explicitly says "the annual interest rate" — disambiguating it from the adjacent Payout Frequency control (e.g. "12.5% · monthly" could previously be misread as a monthly rate).
+- **Known limitation / deliberate scope**: display-text only — `FixedDeposit.interestRatePct` was already stored unambiguously as an annual percentage number (confirmed no interest-accrual calculation exists anywhere that could have been affected); no type, storage, or calculation change was needed or made.
