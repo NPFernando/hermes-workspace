@@ -198,7 +198,7 @@ export function PersonalFinanceScreen() {
         <StatCard label="Stock holdings" value={formatLkr(summary.stockHoldingsValueLkr)} />
         <StatCard
           label="Unrealized P/L"
-          value={`${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatLkr(summary.unrealizedStockPnlLkr)}`}
+          value={`${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatLkr(summary.unrealizedStockPnlLkr)} (${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatPct(summary.unrealizedStockPnlPct)})`}
           tone={summary.unrealizedStockPnlLkr >= 0 ? 'good' : 'danger'}
         />
         <StatCard label="Fixed deposits" value={formatLkr(summary.fixedDepositsValueLkr)} />

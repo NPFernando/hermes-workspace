@@ -2066,6 +2066,11 @@ export function financeSummary(db: FinanceDatabase) {
     (sum, holding) => sum + ((holding.lastKnownPrice ?? holding.buyPrice) - holding.buyPrice) * holding.quantity,
     0,
   )
+  const totalStockCostBasisLkr = db.stock_holdings.reduce(
+    (sum, holding) => sum + holding.buyPrice * holding.quantity,
+    0,
+  )
+  const unrealizedStockPnlPct = totalStockCostBasisLkr > 0 ? (unrealizedStockPnlLkr / totalStockCostBasisLkr) * 100 : 0
   const netWorthLkr =
     cashBalanceLkr +
     db.savings_goals.reduce((sum, goal) => sum + goal.currentAmount, 0) +
@@ -2091,6 +2096,7 @@ export function financeSummary(db: FinanceDatabase) {
     stockHoldingsValueLkr,
     fixedDepositsValueLkr,
     unrealizedStockPnlLkr,
+    unrealizedStockPnlPct,
     accountCount: db.finance_accounts.length,
     goalCount: db.savings_goals.length,
     taxRecordCount: db.tax_records.length,
