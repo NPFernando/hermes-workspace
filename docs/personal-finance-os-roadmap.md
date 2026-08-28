@@ -103,7 +103,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | PF-300 | Financial Rules Model | planned |
 | PF-301 | Financial Rules Settings Page | planned |
 | PF-302 | Minimum Cash Reserve | planned |
-| PF-303 | Emergency Fund Target | planned |
+| PF-303 | Emergency Fund Target | **existing** (settings-driven target, in months of average expenses; see PF-1005/PF-1006 and Shipped note) |
 | PF-304 | Savings Rate Target | planned (rate is computed/displayed, no target/threshold) |
 | PF-305 | Credit Utilization Threshold | blocked (no credit cards yet) |
 | PF-306 | Monthly Investment Target | planned |
@@ -198,8 +198,8 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | PF-1002 | Goal Target Date | existing |
 | PF-1003 | Required Monthly Contribution | **existing** (`SavingsGoalsProgress` now derives "Needs LKR X/mo to reach by <date>" from stored `targetAmount`/`currentAmount`/`targetDate`, display-only) |
 | PF-1004 | Account-Linked Goals | partial (`linkedAccountId` field exists) |
-| PF-1005 | Emergency Fund | planned (no dedicated concept) |
-| PF-1006 | Emergency Coverage Months | planned |
+| PF-1005 | Emergency Fund | **existing** (dedicated concept: `FinanceSettings.emergencyFundTargetMonths` tracked against real `cashBalanceLkr`, not a fake `SavingsGoal` row; see Shipped note) |
+| PF-1006 | Emergency Coverage Months | **existing** (`coverageMonths` — current cash ÷ trailing 3-month average expenses) |
 | PF-1007 | Sinking Funds | planned |
 | PF-1008 | Sinking Fund Contribution Schedule | planned |
 | PF-1009 | Goal Completion Events | planned |
@@ -574,6 +574,8 @@ A follow-up scoping pass over three more unaudited phases (Phase 5 Income/Employ
 
 **OPS-105** is also now shipped — the last-synced timestamp is surfaced end-to-end (`auth.gmail-connect.ts`'s response + `pending-ingestion-panel.tsx`'s display, with a refetch after manual sync so it doesn't go stale). This closes out the current run of "surface an already-computed value" wins found across every phase audited so far this session (Phase 0/1/4/8/10/42/41/44).
 
+**PF-303, PF-1005 & PF-1006 (Emergency Fund Target/Fund/Coverage Months)** are also now shipped — the first genuine design/build effort of this session rather than a surfacing fix, after a comprehensive scoping pass confirmed the "surface an already-computed value" pattern exhausted across every phase audited (Phase 0/1/2/4/5/8/10/33/34/36/37/41/42/43/44). See the Shipped note below for the design decision (settings-driven target tracked against real cash, not a fake `SavingsGoal`). With this shipped, the next candidates for a similar real design/build effort include **PF-1007 (Sinking Funds)** and **CSE-206 (Dividend Income)** — both genuinely new concepts, not yet scoped in detail.
+
 A follow-up pass over Phase 36 (Fixed Deposits V2), Phase 37 (Documents Vault), and Phase 43 (Security) found that pattern genuinely exhausted in Phase 36 (no `partial` rows at all) and Phase 43 (all three `partial` items need new data capture or a real authz/policy design decision). Phase 37's **DOC-106, DOC-107, and DOC-113** were the one structural candidate — extending the already-shipped `finance-document.ts` employment-contract viewer to also serve receipts/bills via the already-existing `documentRef` field on income/expense records. Explicitly flagged before building: this environment has zero live receipt/bill data with `documentRef` populated, so the feature ships correct and ready but not immediately visible — Naveen confirmed shipping it anyway as correct, low-risk infrastructure. Now shipped.
 
 A follow-up pass over Phase 2 (Multi-Currency), Phase 5's remainder, and Phase 33/34 (Smart Alerts/Scheduled Reviews) found **AUTO-101 (Important Finance Alerts)** a clean instance of this pattern — `financeAlerts()`/`financeStorageAlerts()` were already computed and merged into both payload builders' `alerts` field, with a proven render precedent already shipped in `trading-screen.tsx`. Now shipped. The pass also confirmed Phase 34 has no `partial` rows left at all, and Phase 5's remaining rows are all `existing`/`planned` besides the already-ruled-out PF-509.
@@ -724,3 +726,11 @@ This closes out Phase 42's quick wins from this scoping pass — see "Recommende
 - **Known limitation / deliberate scope**: `IncomeRecord.exchangeRateUsed` (a related but differently-named field, PF-205/PF-207's territory) remains unsurfaced — `IncomeRecord` has no dedicated `DataTable`/browsable view today (it's only visible via the unified `TransactionsPanel`, which doesn't use the generic column-array pattern), so this fix was scoped to Tax records only, where the fix was a trivial column addition. Extending FX metadata visibility to income records would need either a new column on `TransactionsPanel` or a design decision about whether that's worth the added row complexity — deliberately out of scope here.
 
 This closes out the "surface an already-computed value" pattern across every phase audited this session — see "Recommended Next Feature" above for what to scope next.
+
+### Shipped: PF-303, PF-1005 & PF-1006 — Emergency Fund Target, Emergency Fund, Coverage Months
+
+- **Why bundled**: the roadmap split one underlying concept across two phases — PF-303 (Phase 3, Financial Rules) as a user-set *target*, and PF-1005/PF-1006 (Phase 10) as the *dedicated tracked concept* and its derived "months covered" metric. Both needed the same underlying data model, so they were designed and shipped together rather than as three separate slices.
+- **What was built** (a genuine design/build effort, not a surfacing fix — nothing emergency-fund-shaped existed anywhere in the codebase before this): `FinanceSettings.emergencyFundTargetMonths` (`src/server/finance-store.ts`) stores a user-set target in months of average expenses. A new `getAverageMonthlyExpensesLkr()` function (built on top of `getMonthlySummary()`, which had zero callers anywhere in the codebase before this) computes a trailing 3-month average, excluding the current in-progress month. `personalFinancePayload()` (`src/routes/api/finance.ts`) derives an `emergencyFund` block (`targetMonths`, `avgMonthlyExpensesLkr`, `currentLkr`, `targetLkr`, `coverageMonths`, `progressPct`) and a new `set_emergency_fund_target` POST action lets the user set it. A new `EmergencyFundCard` (`src/screens/personal-finance/components/emergency-fund-card.tsx`) renders an inline "set target" control when unset, or a progress bar once configured.
+- **Key design decision**: the emergency fund is tracked against real liquid cash (`cashBalanceLkr`) rather than a manually-entered `SavingsGoal` row — a `SavingsGoal.currentAmount` is manually maintained (fine for active deposits), but an emergency fund's "current amount" should be its actual cash balance, avoiding a second, driftable ledger. This also avoids repeating the only prior "special goal" precedent, `taxReserveLkr`'s fragile `goal.name.toLowerCase().includes('tax')` string match.
+- **Known limitation / deliberate scope**: there's no Financial Rules Settings Page (PF-301) yet, so the target is set via a minimal inline control on the card itself rather than a dedicated settings screen — PF-300/301 remain `planned`. `cashBalanceLkr` only sums LKR-currency accounts (a pre-existing limitation, not introduced here), so foreign-currency cash doesn't count toward coverage.
+- **Verified live**: set to 6 months, confirmed persistence across reload, confirmed correct "no complete month of expense history yet" messaging (this environment currently has no expense records), then reset back to unset (`0`) to leave a clean state.
