@@ -10,6 +10,7 @@ import { SavingsGoalsProgress } from './components/savings-goals-progress'
 import { UpcomingMoney } from './components/upcoming-money'
 import { RecurringBillsInsight } from './components/recurring-bills-insight'
 import { DataHealthCard } from './components/data-health-card'
+import { EmergencyFundCard } from './components/emergency-fund-card'
 import { IncomeSourcesPanel } from './components/income-sources-panel'
 import { StockHoldingsPanel } from './components/stock-holdings-panel'
 import { FixedDepositsPanel } from './components/fixed-deposits-panel'
@@ -293,6 +294,7 @@ export function PersonalFinanceScreen() {
           <FinanceAlertsCard payload={payload} />
           <FinanceTrendsCard payload={payload} />
           <SavingsGoalsProgress payload={payload} />
+          <EmergencyFundCard payload={payload} onPayload={setPayload} />
           <UpcomingMoney payload={payload} />
           <RecurringBillsInsight payload={payload} />
           <DataHealthCard payload={payload} />

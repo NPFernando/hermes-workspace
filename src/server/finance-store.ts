@@ -668,6 +668,8 @@ export type FinanceSettings = {
   autoRefinement?: Record<string, unknown>
   /** Gates non-critical (info/warning) Telegram delivery in alerts.ts. Off by default — critical alerts always send regardless. */
   alertsEnabled?: boolean
+  /** PF-303: user-set emergency fund target, in months of average expenses. Unset/0 means no target configured yet. */
+  emergencyFundTargetMonths?: number
   strategyDecayDetection?: Record<string, unknown>
   /** Per-strategy validated backtest baselines, keyed by strategyId. See strategy-decay.ts. */
   strategyBaselines?: Record<string, unknown>
@@ -2657,6 +2659,22 @@ export function getMonthlySummary(
   })
 
   return result
+}
+
+/**
+ * Trailing average of monthly expenses, excluding the current in-progress
+ * calendar month (which is always partial). Used to convert an "N months of
+ * expenses" emergency-fund target into an LKR amount. Returns 0 if there is
+ * no complete month of expense history yet.
+ */
+export function getAverageMonthlyExpensesLkr(db: FinanceDatabase, months = 3): number {
+  const now = new Date()
+  const currentKey = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}`
+  const complete = getMonthlySummary(db).filter((row) => `${row.year}-${row.month}` !== currentKey)
+  if (complete.length === 0) return 0
+  const trailing = complete.slice(-months)
+  const total = trailing.reduce((sum, row) => sum + row.expense, 0)
+  return total / trailing.length
 }
 
 export function getBudgetVsActual(

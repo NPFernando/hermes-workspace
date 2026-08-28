@@ -17,6 +17,7 @@ import {
   financeStorageStatus,
   financeSummary,
   findPossibleDuplicate,
+  getAverageMonthlyExpensesLkr,
   getCategoryCorrections,
   getUnifiedTransactions,
   listPendingIngestions,
@@ -213,6 +214,12 @@ function personalFinancePayload() {
   const db = ensureFinanceStore()
   const storage = financeStorageStatus({ selfHeal: true })
   const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
+  const efTargetMonths = db.settings.emergencyFundTargetMonths ?? 0
+  const efAvgMonthlyExpensesLkr = getAverageMonthlyExpensesLkr(db, 3)
+  const efCurrentLkr = financeSummary(db).cashBalanceLkr
+  const efTargetLkr = efTargetMonths * efAvgMonthlyExpensesLkr
+  const efCoverageMonths = efAvgMonthlyExpensesLkr > 0 ? efCurrentLkr / efAvgMonthlyExpensesLkr : 0
+  const efProgressPct = efTargetLkr > 0 ? Math.min(100, (efCurrentLkr / efTargetLkr) * 100) : 0
   return {
     ok: true,
     checkedAt: Date.now(),
@@ -221,6 +228,14 @@ function personalFinancePayload() {
     budgetVsActual: budgetVsActualSummary(db),
     transactions: maskSensitive(getUnifiedTransactions(db)),
     alerts,
+    emergencyFund: {
+      targetMonths: efTargetMonths,
+      avgMonthlyExpensesLkr: efAvgMonthlyExpensesLkr,
+      currentLkr: efCurrentLkr,
+      targetLkr: efTargetLkr,
+      coverageMonths: efCoverageMonths,
+      progressPct: efProgressPct,
+    },
     data: maskSensitive({
       finance_accounts: db.finance_accounts,
       income_records: db.income_records,
@@ -593,6 +608,17 @@ export const Route = createFileRoute('/api/finance')({
             writeFinanceStore(db)
             appendAuditLog('alerts_config_updated', { enabled, source: 'finance_api' })
             return json(financePayload())
+          }
+          if (action === 'set_emergency_fund_target') {
+            // PF-303: user-set target, in months of average expenses. Clamped
+            // to a sane range; 0 clears the target back to "not configured".
+            const rawMonths = typeof body.months === 'number' ? body.months : 0
+            const months = Math.max(0, Math.min(24, Math.round(rawMonths)))
+            const db = readFinanceStore()
+            db.settings.emergencyFundTargetMonths = months
+            writeFinanceStore(db)
+            appendAuditLog('emergency_fund_target_updated', { months })
+            return json(personalFinancePayload())
           }
           if (action === 'set_demo_config' || action === 'set_engine_config') {
             // Update the demo engine's tunable knobs (settings.demoTrading), merged

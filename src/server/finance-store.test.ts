@@ -10,6 +10,7 @@ import {
   financeAlerts,
   financeSummary,
   financeStorageAlerts,
+  getAverageMonthlyExpensesLkr,
   getUnifiedTransactions,
   maskSensitive,
 } from './finance-store'
@@ -1100,6 +1101,43 @@ describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
     const before = JSON.stringify(db.income_records)
     getUnifiedTransactions(db)
     expect(JSON.stringify(db.income_records)).toBe(before)
+  })
+})
+
+describe('getAverageMonthlyExpensesLkr (PF-303 Emergency Fund Target)', () => {
+  function monthsAgoDateString(monthsAgo: number): string {
+    const d = new Date()
+    d.setUTCDate(1) // avoid month-length rollover surprises
+    d.setUTCMonth(d.getUTCMonth() - monthsAgo)
+    return d.toISOString().slice(0, 10)
+  }
+
+  function pushExpense(db: ReturnType<typeof createEmptyFinanceDatabase>, monthsAgo: number, amount: number) {
+    db.expense_records.push({
+      id: `e-${monthsAgo}-${amount}`, date: monthsAgoDateString(monthsAgo), vendor: 'Test', category: 'Other',
+      currency: 'LKR', amount, convertedLkrAmount: amount, recurring: false, workRelated: false,
+      taxDeductiblePossible: false, source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+  }
+
+  it('returns 0 when there is no complete month of expense history', () => {
+    const db = createEmptyFinanceDatabase()
+    expect(getAverageMonthlyExpensesLkr(db)).toBe(0)
+  })
+
+  it('ignores the current in-progress month and averages the trailing complete months', () => {
+    const db = createEmptyFinanceDatabase()
+    pushExpense(db, 0, 999_999) // current month — must be excluded
+    pushExpense(db, 1, 30_000)
+    pushExpense(db, 2, 60_000)
+    pushExpense(db, 3, 30_000)
+    expect(getAverageMonthlyExpensesLkr(db, 3)).toBe(40_000)
+  })
+
+  it('averages only what history exists when fewer than the requested months are available', () => {
+    const db = createEmptyFinanceDatabase()
+    pushExpense(db, 1, 50_000)
+    expect(getAverageMonthlyExpensesLkr(db, 3)).toBe(50_000)
   })
 })
 

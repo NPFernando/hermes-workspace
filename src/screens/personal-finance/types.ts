@@ -27,6 +27,14 @@ export type PersonalFinancePayload = {
   }>
   transactions: Array<Record<string, unknown>>
   alerts: Array<{ level: 'info' | 'warning' | 'critical'; title: string; detail: string }>
+  emergencyFund: {
+    targetMonths: number
+    avgMonthlyExpensesLkr: number
+    currentLkr: number
+    targetLkr: number
+    coverageMonths: number
+    progressPct: number
+  }
   storage: {
     active: 'postgres' | 'json'
     fallback: 'json'
