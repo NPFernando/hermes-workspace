@@ -45,7 +45,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | PF-004 | Current Calculation Validation | partial | 1288 unit tests cover most computed values; no standalone "calculation validation" doc |
 | PF-005 | Fix Currency Display Inconsistencies | planned | `formatLkr()` only handles LKR; other currencies use raw string interpolation in a few places |
 | PF-006 | Fix Fixed Deposit Rate Labelling | **existing** | Add-form placeholder and row display now show "% p.a.", helper text says "annual interest rate" explicitly — display-text only, `interestRatePct` was already stored unambiguously |
-| PF-007 | Improve Investment P/L Display | planned, **ready** | Confirmed gap — no percentage shown alongside LKR gain/loss (row-level or Overview aggregate) |
+| PF-007 | Improve Investment P/L Display | **existing** | `financeSummary()` returns `unrealizedStockPnlPct` alongside the existing LKR figure; shown on the Overview StatCard and per-holding row, e.g. "+LKR 200 (+20.0%)" |
 | PF-008 | Remove Developer/API Language From User UI | planned | Not yet audited line-by-line |
 | PF-009 | Standardize Money Formatting | planned | Needs a currency-aware formatter, not LKR-only |
 | PF-010 | Standardize Date Handling | planned | Not yet audited line-by-line |
@@ -239,7 +239,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | CSE-202 | Allocation | planned |
 | CSE-203 | Holding Detail | partial (row-level only) |
 | CSE-204 | Price vs Cost | existing |
-| CSE-205 | P/L % | planned (same gap as PF-007) |
+| CSE-205 | P/L % | existing (shipped as part of PF-007) |
 | CSE-206 | Dividend Income | planned |
 | CSE-207 | Portfolio History | planned |
 | CSE-208 | Investment Journal | planned |
@@ -550,14 +550,11 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 
 Dependencies met, scope clear — this is informational status only, nothing here is queued for autonomous work:
 
-- **PF-007** — Improve Investment P/L Display (zero dependencies)
 - **PF-009** — Standardize Money Formatting (zero dependencies)
 
 ## Recommended Next Feature
 
-**PF-007 — Improve Investment P/L Display.** With PF-006 cleared, this is the next zero-dependency quick win sitting `Ready Now` — worth clearing alongside PF-009 before starting a fourth additive catalogue (PF-112 Tags or PF-113 Pending/Cleared/Reconciled Status).
-
-PF-007 and PF-009 remain independent zero-risk quick wins that can be done any time without touching Phase 1.
+**PF-009 — Standardize Money Formatting.** The last remaining zero-dependency quick win sitting `Ready Now` — with PF-006 and PF-007 cleared, this is worth finishing before starting a fourth additive catalogue (PF-112 Tags or PF-113 Pending/Cleared/Reconciled Status).
 
 ### Shipped: PF-100/101/102/103 — Account Model
 
@@ -594,3 +591,8 @@ PF-007 and PF-009 remain independent zero-risk quick wins that can be done any t
 
 - **What was built**: the interest-rate field's add-form placeholder and read-only row display now both show "% p.a." instead of a bare "%", and the panel's helper text explicitly says "the annual interest rate" — disambiguating it from the adjacent Payout Frequency control (e.g. "12.5% · monthly" could previously be misread as a monthly rate).
 - **Known limitation / deliberate scope**: display-text only — `FixedDeposit.interestRatePct` was already stored unambiguously as an annual percentage number (confirmed no interest-accrual calculation exists anywhere that could have been affected); no type, storage, or calculation change was needed or made.
+
+### Shipped: PF-007 — Improve Investment P/L Display (+ CSE-205)
+
+- **What was built**: `financeSummary()` now returns `unrealizedStockPnlPct` (`unrealizedStockPnlLkr` ÷ total cost basis × 100, guarded to `0` when there are no holdings) alongside the pre-existing `unrealizedStockPnlLkr`. Shown on the Overview "Unrealized P/L" `StatCard` (e.g. "-LKR 2,913 (-9.2%)") and per-holding in `StockHoldingsPanel` (e.g. "+LKR 200 (+20.0%)"), reusing the existing `formatPct()` helper and green/red color-coding — no new formatter or color logic needed since the sign of the dollar and percentage figures always agree.
+- **Known limitation / deliberate scope**: purely additive — the existing `unrealizedStockPnlLkr` formula (locked in by two pre-existing unit tests) was not touched; no `StockHolding` type, storage, or Postgres change was needed since P/L is computed entirely at read time from existing fields.
