@@ -66,7 +66,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | PF-106 | Transaction Types | planned | Deferred by the PF-104 slice — no enum, `kind: 'income' \| 'expense'` only |
 | PF-107 | Transfers | planned | Deferred by the PF-104 slice — no transfer/double-entry concept exists |
 | PF-108 | Transaction Splits | planned | Deferred by the PF-104 slice |
-| PF-109 | Categories | partial | Free-text `category` field exists on expenses/budgets, not a proper entity; still the join key `TransactionsPanel` and budget-vs-actual both rely on |
+| PF-109 | Categories | **existing** | `Category` entity + `CategoriesPanel` (add/edit/delete, usage counts, "in use, not yet a category" formalize flow) + shared datalist wired into Transactions/Budget category inputs; free-text `category`/`incomeType` remain the join key for budget-vs-actual, unchanged — no `categoryId` FK yet |
 | PF-110 | Subcategories | planned | Deferred by the PF-104 slice |
 | PF-111 | Merchant Registry | planned | Deferred by the PF-104 slice |
 | PF-112 | Tags | planned | Deferred by the PF-104 slice |
@@ -553,13 +553,13 @@ Dependencies met, scope clear — this is informational status only, nothing her
 - **PF-006** — Fix Fixed Deposit Rate Labelling (zero dependencies)
 - **PF-007** — Improve Investment P/L Display (zero dependencies)
 - **PF-009** — Standardize Money Formatting (zero dependencies)
-- **PF-109** — Categories as a real entity (now that PF-104's unified view and budget-vs-actual both depend on the same free-text join — the next Phase 1 feature)
+- **PF-110** — Subcategories (now that a real `Category` entity exists to hang them off)
 
 ## Recommended Next Feature
 
-**PF-109 — Categories.** `ExpenseRecord.category`/`BudgetCategory.category`/`IncomeRecord.incomeType` are all free text today, joined by exact string match (case- and whitespace-sensitive) between budgets and expenses. Now that `TransactionsPanel` (PF-104) is the single place users add/edit both kinds, promoting category to a real entity (with an ID, not just a string) would fix the fragile budget join and unlock PF-110 (Subcategories) and PF-111 (Merchant Registry) cleanly.
+**PF-110 — Subcategories.** `ExpenseRecord.subcategory?` already exists as a field but isn't surfaced in any panel or validated against anything. With `Category` (PF-109) now a real entity, subcategories can be modeled as a name scoped to a parent category (still free text against the expense record, same additive pattern as PF-109 — no FK required to ship real value).
 
-PF-006 and PF-007 remain independent zero-risk quick wins that can be done any time without touching Phase 1.
+PF-006, PF-007, and PF-009 remain independent zero-risk quick wins that can be done any time without touching Phase 1.
 
 ### Shipped: PF-100/101/102/103 — Account Model
 
@@ -572,3 +572,9 @@ PF-006 and PF-007 remain independent zero-risk quick wins that can be done any t
 - **What was built**: an additive read layer, not a storage migration — `getUnifiedTransactions()` (`src/server/finance-store.ts`) maps `income_records`/`expense_records` into one shared `UnifiedTransaction` shape (renaming `dateReceived`→`date`, `sourceName`→`vendor`-equivalent `counterparty`, `incomeType`→`category`, etc.) and sorts them together by date. `TransactionsPanel` (`src/screens/personal-finance/components/transactions-panel.tsx`) replaces the two separate, no-create `DataTable`s (income records in the Income & Jobs tab, expense records in Accounts & Records) with one panel: an income/expense toggle add-form, inline edit, delete, a counterparty/category search box, and a kind filter — all routed through the existing `add_record`/`update_record`/`delete_record` dispatch under the hood. `transactions` is now included in both `personalFinancePayload()` (GET) and `financePayload()` (the shape every mutation's POST response returns via `useFinanceAction`), matching how `budgetVsActual` is already present in both.
 - **Known limitation / deliberate scope**: `income_records` and `expense_records` remain two separate collections in storage (JSON + both Postgres mirrors) — `financeSummary`, `budgetVsActual`, `getMonthlySummary`, and duplicate-detection are all untouched and still read the original collections directly. A real storage migration to one `transactions` table (PF-106 types, PF-107 transfers, PF-108 splits, PF-113 reconciliation status, PF-116 soft delete) was deliberately deferred as a separate, larger, higher-risk future feature rather than bundled into this slice.
 - **Not built** (deliberately deferred, not dropped): transfers between the user's own accounts (no transfer concept exists anywhere in the codebase today — confirmed via full-file grep), a formal transaction-type enum, merchant/tag entities, and date-range/amount filters (only counterparty/category text search + kind filter shipped).
+
+### Shipped: PF-109 — Categories
+
+- **What was built**: a new `Category` entity (`id, name, kind: 'income'|'expense'|'both', color?, notes?`) as a net-new `categories` collection (JSON + `personal_finance` Postgres mirror), managed via `CategoriesPanel` (`src/screens/personal-finance/components/categories-panel.tsx`) — add/edit/delete, a usage count per category computed by matching its name against existing `expense_records`/`income_records`/`budget_categories`, and an "in use, not yet a category" section listing free-text category strings that don't yet have a matching `Category` row, each with a one-click button to formalize it (never automatic). A shared `<datalist id="pf-known-categories">` is wired into the existing free-text category inputs in `TransactionsPanel` and `BudgetPanel` for native browser autocomplete.
+- **Known limitation / deliberate scope**: `ExpenseRecord.category`, `IncomeRecord.incomeType`, and `BudgetCategory.category` remain plain free-text strings — `getBudgetVsActual`'s exact-string join is completely untouched. Renaming or deleting a `Category` row does not retroactively update any existing record's free-text field (the panel's own copy says this explicitly).
+- **Not built** (deliberately deferred, not dropped): a `categoryId` foreign key on expense/income/budget records, and rewriting the budget-vs-actual join to key on ID instead of name — both remain real future work once this entity has proven itself in use.
