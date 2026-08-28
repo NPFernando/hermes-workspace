@@ -123,6 +123,8 @@ export type IncomeRecord = {
   incomeSourceId?: string
   /** Comma-separated free text — matches the Tag catalogue (PF-112) by name, no FK. */
   tags?: string
+  /** Reconciliation status (PF-113). Defaults to 'cleared' to match prior implicit behavior. */
+  status?: 'pending' | 'cleared' | 'reconciled'
   source: string
   createdAt: string
   updatedAt: string
@@ -145,6 +147,8 @@ export type ExpenseRecord = {
   documentRef?: string
   /** Comma-separated free text — matches the Tag catalogue (PF-112) by name, no FK. */
   tags?: string
+  /** Reconciliation status (PF-113). Defaults to 'cleared' to match prior implicit behavior. */
+  status?: 'pending' | 'cleared' | 'reconciled'
   source: string
   createdAt: string
   updatedAt: string
@@ -168,6 +172,7 @@ export type UnifiedTransaction = {
   incomeSourceId?: string
   subcategory?: string
   tags?: string
+  status?: 'pending' | 'cleared' | 'reconciled'
   source: string
   createdAt: string
   updatedAt: string
@@ -1399,6 +1404,7 @@ export function addFinanceRecord(
       documentRef: optionalString(payload, 'documentRef'),
       incomeSourceId: optionalString(payload, 'incomeSourceId'),
       tags: optionalString(payload, 'tags'),
+      status: reconciliationStatus(payload.status),
     })
   } else if (kind === 'expense') {
     db.expense_records.push({
@@ -1425,6 +1431,7 @@ export function addFinanceRecord(
       notes: optionalString(payload, 'notes'),
       documentRef: optionalString(payload, 'documentRef'),
       tags: optionalString(payload, 'tags'),
+      status: reconciliationStatus(payload.status),
     })
   } else if (kind === 'account') {
     db.finance_accounts.push({
@@ -2482,6 +2489,13 @@ function fixedDepositStatusField(value: unknown): FixedDeposit['status'] {
     : 'active'
 }
 
+function reconciliationStatus(value: unknown): 'pending' | 'cleared' | 'reconciled' {
+  const allowed: Array<'pending' | 'cleared' | 'reconciled'> = ['pending', 'cleared', 'reconciled']
+  return allowed.includes(value as 'pending' | 'cleared' | 'reconciled')
+    ? (value as 'pending' | 'cleared' | 'reconciled')
+    : 'cleared'
+}
+
 function planStatus(value: unknown): PlanStatus {
   const allowed: Array<PlanStatus> = [
     'draft',
@@ -2548,6 +2562,7 @@ export function getUnifiedTransactions(db: FinanceDatabase): Array<UnifiedTransa
     taxable: inc.taxable,
     incomeSourceId: inc.incomeSourceId,
     tags: inc.tags,
+    status: inc.status,
     source: inc.source,
     createdAt: inc.createdAt,
     updatedAt: inc.updatedAt,
@@ -2568,6 +2583,7 @@ export function getUnifiedTransactions(db: FinanceDatabase): Array<UnifiedTransa
     recurring: exp.recurring,
     subcategory: exp.subcategory,
     tags: exp.tags,
+    status: exp.status,
     source: exp.source,
     createdAt: exp.createdAt,
     updatedAt: exp.updatedAt,

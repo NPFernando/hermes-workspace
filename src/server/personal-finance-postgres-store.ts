@@ -185,18 +185,20 @@ CREATE TABLE IF NOT EXISTS income_records (
   id TEXT PRIMARY KEY, date_received TEXT NOT NULL, source_name TEXT NOT NULL, income_type TEXT NOT NULL,
   original_currency TEXT NOT NULL, original_amount DOUBLE PRECISION NOT NULL, exchange_rate_used DOUBLE PRECISION NOT NULL,
   converted_lkr_amount DOUBLE PRECISION NOT NULL, account_id TEXT, taxable BOOLEAN NOT NULL,
-  notes TEXT, document_ref TEXT, income_source_id TEXT, tags TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  notes TEXT, document_ref TEXT, income_source_id TEXT, tags TEXT, status TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 ALTER TABLE income_records ADD COLUMN IF NOT EXISTS income_source_id TEXT;
 ALTER TABLE income_records ADD COLUMN IF NOT EXISTS tags TEXT;
+ALTER TABLE income_records ADD COLUMN IF NOT EXISTS status TEXT;
 
 CREATE TABLE IF NOT EXISTS expense_records (
   id TEXT PRIMARY KEY, date TEXT NOT NULL, vendor TEXT NOT NULL, category TEXT NOT NULL, subcategory TEXT,
   account_id TEXT, currency TEXT NOT NULL, amount DOUBLE PRECISION NOT NULL, converted_lkr_amount DOUBLE PRECISION NOT NULL,
   recurring BOOLEAN NOT NULL, work_related BOOLEAN NOT NULL, tax_deductible_possible BOOLEAN NOT NULL,
-  notes TEXT, document_ref TEXT, tags TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  notes TEXT, document_ref TEXT, tags TEXT, status TEXT, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 ALTER TABLE expense_records ADD COLUMN IF NOT EXISTS tags TEXT;
+ALTER TABLE expense_records ADD COLUMN IF NOT EXISTS status TEXT;
 
 CREATE TABLE IF NOT EXISTS budget_categories (
   id TEXT PRIMARY KEY, month TEXT NOT NULL, category TEXT NOT NULL, currency TEXT NOT NULL,
@@ -300,6 +302,7 @@ function incomeRecordRows(rowsIn: Array<Record<string, unknown>>): Array<Array<s
     sqlNullableText(row.documentRef),
     sqlNullableText(row.incomeSourceId),
     sqlNullableText(row.tags),
+    sqlNullableText(row.status),
     sqlText(firstText(row, 'source', 'manual')),
     sqlText(firstText(row, 'createdAt')),
     sqlText(firstText(row, 'updatedAt')),
@@ -323,6 +326,7 @@ function expenseRecordRows(rowsIn: Array<Record<string, unknown>>): Array<Array<
     sqlNullableText(row.notes),
     sqlNullableText(row.documentRef),
     sqlNullableText(row.tags),
+    sqlNullableText(row.status),
     sqlText(firstText(row, 'source', 'manual')),
     sqlText(firstText(row, 'createdAt')),
     sqlText(firstText(row, 'updatedAt')),
@@ -518,7 +522,7 @@ ${insertRows(
   [
     'id', 'date_received', 'source_name', 'income_type', 'original_currency', 'original_amount',
     'exchange_rate_used', 'converted_lkr_amount', 'account_id', 'taxable', 'notes', 'document_ref',
-    'income_source_id', 'tags', 'source', 'created_at', 'updated_at',
+    'income_source_id', 'tags', 'status', 'source', 'created_at', 'updated_at',
   ],
   incomeRecordRows(rows(slice.income_records)),
 )}
@@ -528,7 +532,7 @@ ${insertRows(
   [
     'id', 'date', 'vendor', 'category', 'subcategory', 'account_id', 'currency', 'amount',
     'converted_lkr_amount', 'recurring', 'work_related', 'tax_deductible_possible', 'notes',
-    'document_ref', 'tags', 'source', 'created_at', 'updated_at',
+    'document_ref', 'tags', 'status', 'source', 'created_at', 'updated_at',
   ],
   expenseRecordRows(rows(slice.expense_records)),
 )}

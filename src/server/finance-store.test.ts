@@ -920,6 +920,58 @@ describe('tag (PF-112 Tags)', () => {
   })
 })
 
+describe('reconciliationStatus (PF-113 Pending/Cleared/Reconciled Status)', () => {
+  let tmp: string
+  let realHome: string | undefined
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-status-'))
+    realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+  })
+  afterEach(() => {
+    if (realHome === undefined) delete process.env.HOME
+    else process.env.HOME = realHome
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('defaults to cleared when status is missing or invalid, for both expense and income', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('expense', { vendor: 'Test', category: 'Other', amount: 10 })
+    store.addFinanceRecord('income', { sourceName: 'Test', incomeType: 'Other income', originalAmount: 10, status: 'bogus' })
+    const db = store.readFinanceStore()
+    expect(db.expense_records[0].status).toBe('cleared')
+    expect(db.income_records[0].status).toBe('cleared')
+  })
+
+  it('accepts all three valid status values on create, for both expense and income', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('expense', { vendor: 'Test', category: 'Other', amount: 10, status: 'pending' })
+    store.addFinanceRecord('income', { sourceName: 'Test', incomeType: 'Other income', originalAmount: 10, status: 'reconciled' })
+    const db = store.readFinanceStore()
+    expect(db.expense_records[0].status).toBe('pending')
+    expect(db.income_records[0].status).toBe('reconciled')
+  })
+
+  it('round-trips status on expense and income records through update', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('expense', { vendor: 'Test', category: 'Other', amount: 10, status: 'pending' })
+    let db = store.readFinanceStore()
+    const expenseId = db.expense_records[0].id
+    store.updateFinanceRecord('expense', expenseId, { vendor: 'Test Updated' })
+    db = store.readFinanceStore()
+    // Untouched status survives the shallow-merge update, same as tags/subcategory.
+    expect(db.expense_records[0].status).toBe('pending')
+
+    store.addFinanceRecord('income', { sourceName: 'Test', incomeType: 'Other income', originalAmount: 10, status: 'reconciled' })
+    db = store.readFinanceStore()
+    const incomeId = db.income_records[0].id
+    store.updateFinanceRecord('income', incomeId, { sourceName: 'Test Updated' })
+    db = store.readFinanceStore()
+    expect(db.income_records[0].status).toBe('reconciled')
+  })
+})
+
 describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
   it('maps income and expense records into the shared shape with renamed fields', () => {
     const db = createEmptyFinanceDatabase()
@@ -935,6 +987,7 @@ describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
       taxable: true,
       incomeSourceId: 'job-1',
       tags: 'salary, primary',
+      status: 'reconciled',
       source: 'test',
       createdAt: '2026-06-01T00:00:00.000Z',
       updatedAt: '2026-06-01T00:00:00.000Z',
@@ -952,6 +1005,7 @@ describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
       workRelated: true,
       taxDeductiblePossible: true,
       tags: 'work',
+      status: 'pending',
       source: 'test',
       createdAt: '2026-06-02T00:00:00.000Z',
       updatedAt: '2026-06-02T00:00:00.000Z',
@@ -971,6 +1025,7 @@ describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
       taxable: true,
       incomeSourceId: 'job-1',
       tags: 'salary, primary',
+      status: 'reconciled',
     })
     expect(income?.recurring).toBeUndefined()
 
@@ -985,6 +1040,7 @@ describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
       amount: 10,
       recurring: true,
       tags: 'work',
+      status: 'pending',
     })
     expect(expense?.taxable).toBeUndefined()
   })

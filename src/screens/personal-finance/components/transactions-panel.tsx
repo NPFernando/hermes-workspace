@@ -48,6 +48,7 @@ type EditDraft = {
   category: string
   subcategory: string
   tags: string
+  status: string
   currency: string
   amount: string
   accountId: string
@@ -81,6 +82,7 @@ export function TransactionsPanel({
   const [category, setCategory] = useState('')
   const [subcategory, setSubcategory] = useState('')
   const [tags, setTags] = useState('')
+  const [status, setStatus] = useState('cleared')
   const [currency, setCurrency] = useState('LKR')
   const [amount, setAmount] = useState('')
   const [accountId, setAccountId] = useState('')
@@ -90,6 +92,7 @@ export function TransactionsPanel({
 
   const [search, setSearch] = useState('')
   const [filterKind, setFilterKind] = useState<'all' | TxnKind>('all')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'cleared' | 'reconciled'>('all')
 
   const accounts = payload.data.finance_accounts
   const transactions = payload.transactions
@@ -104,6 +107,7 @@ export function TransactionsPanel({
       accountId: accountId || undefined,
       notes: notes.trim() || undefined,
       tags: tags.trim() || undefined,
+      status,
     }
     const data =
       addKind === 'income'
@@ -147,6 +151,7 @@ export function TransactionsPanel({
       setCategory('')
       setSubcategory('')
       setTags('')
+      setStatus('cleared')
       setAmount('')
       setNotes('')
       setDate(todayIso())
@@ -163,6 +168,7 @@ export function TransactionsPanel({
         category: stringField(txn, 'category'),
         subcategory: stringField(txn, 'subcategory'),
         tags: stringField(txn, 'tags'),
+        status: stringField(txn, 'status') || 'cleared',
         currency: stringField(txn, 'currency') || 'LKR',
         amount: String(numberField(txn, 'amount')),
         accountId: stringField(txn, 'accountId'),
@@ -188,6 +194,7 @@ export function TransactionsPanel({
       accountId: draft.accountId || undefined,
       notes: draft.notes.trim() || undefined,
       tags: draft.tags.trim() || undefined,
+      status: draft.status,
     }
     const data =
       kind === 'income'
@@ -241,12 +248,13 @@ export function TransactionsPanel({
     return transactions.filter((txn) => {
       const kind = stringField(txn, 'kind')
       if (filterKind !== 'all' && kind !== filterKind) return false
+      if (filterStatus !== 'all' && (stringField(txn, 'status') || 'cleared') !== filterStatus) return false
       if (!term) return true
       const counterpartyValue = stringField(txn, 'counterparty').toLowerCase()
       const categoryValue = stringField(txn, 'category').toLowerCase()
       return counterpartyValue.includes(term) || categoryValue.includes(term)
     })
-  }, [transactions, search, filterKind])
+  }, [transactions, search, filterKind, filterStatus])
 
   const totalsByCurrency = new Map<string, number>()
   let incomeCount = 0
@@ -336,6 +344,11 @@ export function TransactionsPanel({
           list="pf-known-tags"
           className={inputClass}
         />
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
+          <option value="pending">Pending</option>
+          <option value="cleared">Cleared</option>
+          <option value="reconciled">Reconciled</option>
+        </select>
         <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
           <option value="LKR">LKR</option>
           <option value="USD">USD</option>
@@ -402,6 +415,16 @@ export function TransactionsPanel({
           <option value="income">Income</option>
           <option value="expense">Expense</option>
         </select>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value as 'all' | 'pending' | 'cleared' | 'reconciled')}
+          className={inputClass}
+        >
+          <option value="all">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="cleared">Cleared</option>
+          <option value="reconciled">Reconciled</option>
+        </select>
       </div>
 
       <div className="mt-3 grid gap-2">
@@ -412,6 +435,7 @@ export function TransactionsPanel({
           const isEditing = editOpenId === id
           const txnCurrency = stringField(txn, 'currency') || 'LKR'
           const amountValue = numberField(txn, 'amount')
+          const txnStatus = stringField(txn, 'status') || 'cleared'
 
           return (
             <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
@@ -466,6 +490,15 @@ export function TransactionsPanel({
                     list="pf-known-tags"
                     className={inputClass}
                   />
+                  <select
+                    value={editDrafts[id].status}
+                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], status: e.target.value } }))}
+                    className={inputClass}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="cleared">Cleared</option>
+                    <option value="reconciled">Reconciled</option>
+                  </select>
                   <select
                     value={editDrafts[id].currency}
                     onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], currency: e.target.value } }))}
@@ -547,6 +580,13 @@ export function TransactionsPanel({
                     >
                       {kind === 'income' ? 'Income' : 'Expense'}
                     </span>
+                    {txnStatus !== 'cleared' && (
+                      <span
+                        className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${txnStatus === 'pending' ? 'bg-amber-500/25 text-amber-100' : 'bg-indigo-500/25 text-indigo-100'}`}
+                      >
+                        {txnStatus === 'pending' ? 'Pending' : 'Reconciled'}
+                      </span>
+                    )}
                     <span className="font-medium text-[var(--theme-text)]">{stringField(txn, 'counterparty')}</span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
                       · {stringField(txn, 'category')}
