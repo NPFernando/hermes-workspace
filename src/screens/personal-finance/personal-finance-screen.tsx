@@ -14,6 +14,7 @@ import { AccountsPanel } from './components/accounts-panel'
 import { TransactionsPanel } from './components/transactions-panel'
 import { CategoriesPanel } from './components/categories-panel'
 import { MerchantsPanel } from './components/merchants-panel'
+import { TagsPanel } from './components/tags-panel'
 import { formatLkr, formatMoney, formatPct } from './utils'
 import type { PersonalFinancePayload } from './types'
 
@@ -307,6 +308,7 @@ export function PersonalFinanceScreen() {
           <TransactionsPanel payload={payload} onPayload={setPayload} />
           <CategoriesPanel payload={payload} onPayload={setPayload} />
           <MerchantsPanel payload={payload} onPayload={setPayload} />
+          <TagsPanel payload={payload} onPayload={setPayload} />
           <DataTable
             title="Budget categories"
             rows={payload.data.budget_categories}

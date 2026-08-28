@@ -229,6 +229,7 @@ function personalFinancePayload() {
       categories: db.categories,
       subcategories: db.subcategories,
       merchants: db.merchants,
+      tags: db.tags,
       savings_goals: db.savings_goals,
       tax_records: db.tax_records,
       income_sources: db.income_sources,

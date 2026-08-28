@@ -121,6 +121,8 @@ export type IncomeRecord = {
   documentRef?: string
   /** Links this logged payment back to the job (IncomeSource) it came from, when known. */
   incomeSourceId?: string
+  /** Comma-separated free text — matches the Tag catalogue (PF-112) by name, no FK. */
+  tags?: string
   source: string
   createdAt: string
   updatedAt: string
@@ -141,6 +143,8 @@ export type ExpenseRecord = {
   taxDeductiblePossible: boolean
   notes?: string
   documentRef?: string
+  /** Comma-separated free text — matches the Tag catalogue (PF-112) by name, no FK. */
+  tags?: string
   source: string
   createdAt: string
   updatedAt: string
@@ -163,6 +167,7 @@ export type UnifiedTransaction = {
   taxable?: boolean
   incomeSourceId?: string
   subcategory?: string
+  tags?: string
   source: string
   createdAt: string
   updatedAt: string
@@ -221,6 +226,21 @@ export type Merchant = {
   id: string
   name: string
   defaultCategory?: string
+  notes?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Real tag entity (PF-112), matched by name against the comma-separated
+ * ExpenseRecord.tags/IncomeRecord.tags free-text fields — same additive
+ * pattern as Category/Subcategory/Merchant, but many-to-many rather than
+ * one-per-record.
+ */
+export type Tag = {
+  id: string
+  name: string
   notes?: string
   source: string
   createdAt: string
@@ -660,6 +680,7 @@ export type FinanceDatabase = {
   categories: Array<Category>
   subcategories: Array<Subcategory>
   merchants: Array<Merchant>
+  tags: Array<Tag>
   savings_goals: Array<SavingsGoal>
   tax_records: Array<TaxRecord>
   pending_ingestions: Array<PendingIngestion>
@@ -759,6 +780,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     categories: [],
     subcategories: [],
     merchants: [],
+    tags: [],
     savings_goals: [],
     tax_records: [],
     pending_ingestions: [],
@@ -882,6 +904,7 @@ function mirrorIntoSplitStores(db: FinanceDatabase): void {
     categories: db.categories,
     subcategories: db.subcategories,
     merchants: db.merchants,
+    tags: db.tags,
     savings_goals: db.savings_goals,
     tax_records: db.tax_records,
     exchange_rates: db.exchange_rates,
@@ -960,6 +983,7 @@ function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
           categories: personal.categories ?? [],
           subcategories: personal.subcategories ?? [],
           merchants: personal.merchants ?? [],
+          tags: personal.tags ?? [],
           savings_goals: personal.savings_goals,
           tax_records: personal.tax_records,
           exchange_rates: personal.exchange_rates,
@@ -1374,6 +1398,7 @@ export function addFinanceRecord(
       notes: optionalString(payload, 'notes'),
       documentRef: optionalString(payload, 'documentRef'),
       incomeSourceId: optionalString(payload, 'incomeSourceId'),
+      tags: optionalString(payload, 'tags'),
     })
   } else if (kind === 'expense') {
     db.expense_records.push({
@@ -1399,6 +1424,7 @@ export function addFinanceRecord(
       ),
       notes: optionalString(payload, 'notes'),
       documentRef: optionalString(payload, 'documentRef'),
+      tags: optionalString(payload, 'tags'),
     })
   } else if (kind === 'account') {
     db.finance_accounts.push({
@@ -1477,6 +1503,12 @@ export function addFinanceRecord(
       ...base,
       name: stringField(payload, 'name', 'Untitled'),
       defaultCategory: optionalString(payload, 'defaultCategory'),
+      notes: optionalString(payload, 'notes'),
+    })
+  } else if (kind === 'tag') {
+    db.tags.push({
+      ...base,
+      name: stringField(payload, 'name', 'Untitled'),
       notes: optionalString(payload, 'notes'),
     })
   } else if (kind === 'income_source') {
@@ -1627,6 +1659,12 @@ export function updateFinanceRecord(
       db.merchants[index] = { ...db.merchants[index], ...payload, updatedAt: nowIso() }
       updated = true
     }
+  } else if (kind === 'tag') {
+    const index = db.tags.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.tags[index] = { ...db.tags[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
   } else if (kind === 'income_source') {
     const index = db.income_sources.findIndex((r) => r.id === id)
     if (index !== -1) {
@@ -1706,6 +1744,10 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.merchants.length
     db.merchants = db.merchants.filter((r) => r.id !== id)
     removed = db.merchants.length !== before
+  } else if (kind === 'tag') {
+    const before = db.tags.length
+    db.tags = db.tags.filter((r) => r.id !== id)
+    removed = db.tags.length !== before
   } else if (kind === 'income_source') {
     const before = db.income_sources.length
     db.income_sources = db.income_sources.filter((r) => r.id !== id)
@@ -2505,6 +2547,7 @@ export function getUnifiedTransactions(db: FinanceDatabase): Array<UnifiedTransa
     documentRef: inc.documentRef,
     taxable: inc.taxable,
     incomeSourceId: inc.incomeSourceId,
+    tags: inc.tags,
     source: inc.source,
     createdAt: inc.createdAt,
     updatedAt: inc.updatedAt,
@@ -2524,6 +2567,7 @@ export function getUnifiedTransactions(db: FinanceDatabase): Array<UnifiedTransa
     documentRef: exp.documentRef,
     recurring: exp.recurring,
     subcategory: exp.subcategory,
+    tags: exp.tags,
     source: exp.source,
     createdAt: exp.createdAt,
     updatedAt: exp.updatedAt,
