@@ -93,6 +93,10 @@ export function TransactionsPanel({
   const [search, setSearch] = useState('')
   const [filterKind, setFilterKind] = useState<'all' | TxnKind>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'cleared' | 'reconciled'>('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [amountMin, setAmountMin] = useState('')
+  const [amountMax, setAmountMax] = useState('')
 
   const accounts = payload.data.finance_accounts
   const transactions = payload.transactions
@@ -249,12 +253,18 @@ export function TransactionsPanel({
       const kind = stringField(txn, 'kind')
       if (filterKind !== 'all' && kind !== filterKind) return false
       if (filterStatus !== 'all' && (stringField(txn, 'status') || 'cleared') !== filterStatus) return false
+      const txnDate = stringField(txn, 'date')
+      if (dateFrom && txnDate < dateFrom) return false
+      if (dateTo && txnDate > dateTo) return false
+      const txnAmount = numberField(txn, 'amount')
+      if (amountMin && txnAmount < Number(amountMin)) return false
+      if (amountMax && txnAmount > Number(amountMax)) return false
       if (!term) return true
       const counterpartyValue = stringField(txn, 'counterparty').toLowerCase()
       const categoryValue = stringField(txn, 'category').toLowerCase()
       return counterpartyValue.includes(term) || categoryValue.includes(term)
     })
-  }, [transactions, search, filterKind, filterStatus])
+  }, [transactions, search, filterKind, filterStatus, dateFrom, dateTo, amountMin, amountMax])
 
   const totalsByCurrency = new Map<string, number>()
   let incomeCount = 0
@@ -425,6 +435,34 @@ export function TransactionsPanel({
           <option value="cleared">Cleared</option>
           <option value="reconciled">Reconciled</option>
         </select>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          title="From date"
+          className={inputClass}
+        />
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          title="To date"
+          className={inputClass}
+        />
+        <input
+          type="number"
+          placeholder="Min amount"
+          value={amountMin}
+          onChange={(e) => setAmountMin(e.target.value)}
+          className={`${inputClass} w-28`}
+        />
+        <input
+          type="number"
+          placeholder="Max amount"
+          value={amountMax}
+          onChange={(e) => setAmountMax(e.target.value)}
+          className={`${inputClass} w-28`}
+        />
       </div>
 
       <div className="mt-3 grid gap-2">
