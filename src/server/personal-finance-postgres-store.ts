@@ -201,6 +201,11 @@ CREATE TABLE IF NOT EXISTS budget_categories (
   budget_amount DOUBLE PRECISION NOT NULL, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS categories (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, color TEXT, notes TEXT,
+  source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS savings_goals (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, target_amount DOUBLE PRECISION NOT NULL, current_amount DOUBLE PRECISION NOT NULL,
   currency TEXT NOT NULL, target_date TEXT, monthly_contribution DOUBLE PRECISION NOT NULL, priority DOUBLE PRECISION NOT NULL,
@@ -318,6 +323,19 @@ function budgetCategoryRows(rowsIn: Array<Record<string, unknown>>): Array<Array
   ])
 }
 
+function categoryRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  return rowsIn.map((row) => [
+    sqlText(firstText(row, 'id')),
+    sqlText(firstText(row, 'name')),
+    sqlText(firstText(row, 'kind', 'both')),
+    sqlNullableText(row.color),
+    sqlNullableText(row.notes),
+    sqlText(firstText(row, 'source', 'manual')),
+    sqlText(firstText(row, 'createdAt')),
+    sqlText(firstText(row, 'updatedAt')),
+  ])
+}
+
 function savingsGoalRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
@@ -423,6 +441,7 @@ DELETE FROM finance_accounts;
 DELETE FROM income_records;
 DELETE FROM expense_records;
 DELETE FROM budget_categories;
+DELETE FROM categories;
 DELETE FROM savings_goals;
 DELETE FROM tax_records;
 DELETE FROM income_sources;
@@ -462,6 +481,12 @@ ${insertRows(
   'budget_categories',
   ['id', 'month', 'category', 'currency', 'budget_amount', 'source', 'created_at', 'updated_at'],
   budgetCategoryRows(rows(slice.budget_categories)),
+)}
+
+${insertRows(
+  'categories',
+  ['id', 'name', 'kind', 'color', 'notes', 'source', 'created_at', 'updated_at'],
+  categoryRows(rows(slice.categories)),
 )}
 
 ${insertRows(

@@ -723,6 +723,60 @@ describe('account (PF-100 Account Model)', () => {
   })
 })
 
+describe('category (PF-109 Categories)', () => {
+  let tmp: string
+  let realHome: string | undefined
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-categories-'))
+    realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+  })
+  afterEach(() => {
+    if (realHome === undefined) delete process.env.HOME
+    else process.env.HOME = realHome
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('adds, edits, then deletes a category', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('category', { name: 'Groceries', kind: 'expense', color: '#22c55e' })
+    let db = store.readFinanceStore()
+    expect(db.categories).toHaveLength(1)
+    expect(db.categories[0]).toMatchObject({ name: 'Groceries', kind: 'expense', color: '#22c55e' })
+    const id = db.categories[0].id
+
+    store.updateFinanceRecord('category', id, { name: 'Groceries & Household' })
+    db = store.readFinanceStore()
+    expect(db.categories[0].name).toBe('Groceries & Household')
+    // Untouched fields survive the shallow-merge update, same as every other kind.
+    expect(db.categories[0].kind).toBe('expense')
+
+    store.deleteFinanceRecord('category', id)
+    db = store.readFinanceStore()
+    expect(db.categories).toHaveLength(0)
+  })
+
+  it('defaults kind to both for an unrecognized or missing value', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('category', { name: 'Misc' })
+    let db = store.readFinanceStore()
+    expect(db.categories[0].kind).toBe('both')
+
+    store.addFinanceRecord('category', { name: 'Bogus Kind', kind: 'not-a-real-kind' })
+    db = store.readFinanceStore()
+    expect(db.categories[1].kind).toBe('both')
+  })
+
+  it('supports a category with no color or notes (optional fields)', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('category', { name: 'Salary', kind: 'income' })
+    const db = store.readFinanceStore()
+    expect(db.categories[0].color).toBeUndefined()
+    expect(db.categories[0].notes).toBeUndefined()
+  })
+})
+
 describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
   it('maps income and expense records into the shared shape with renamed fields', () => {
     const db = createEmptyFinanceDatabase()
