@@ -47,7 +47,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | PF-006 | Fix Fixed Deposit Rate Labelling | **existing** | Add-form placeholder and row display now show "% p.a.", helper text says "annual interest rate" explicitly — display-text only, `interestRatePct` was already stored unambiguously |
 | PF-007 | Improve Investment P/L Display | **existing** | `financeSummary()` returns `unrealizedStockPnlPct` alongside the existing LKR figure; shown on the Overview StatCard and per-holding row, e.g. "+LKR 200 (+20.0%)" |
 | PF-008 | Remove Developer/API Language From User UI | planned | Not yet audited line-by-line |
-| PF-009 | Standardize Money Formatting | planned | Needs a currency-aware formatter, not LKR-only |
+| PF-009 | Standardize Money Formatting | **existing** | Shared `formatMoney(amount, currency)` in `utils.ts`; 4 duplicated reimplementations deduplicated, and 2 real mislabeling bugs (stock holdings, fixed deposits showing "LKR" for non-LKR currencies) fixed |
 | PF-010 | Standardize Date Handling | planned | Not yet audited line-by-line |
 | PF-011 | Add Current Feature Regression Tests | partial | 1288 tests exist covering this session's work; not organized as a named regression suite |
 
@@ -550,11 +550,11 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 
 Dependencies met, scope clear — this is informational status only, nothing here is queued for autonomous work:
 
-- **PF-009** — Standardize Money Formatting (zero dependencies)
+All three zero-dependency quick wins (PF-006, PF-007, PF-009) are now shipped — nothing left on this list.
 
 ## Recommended Next Feature
 
-**PF-009 — Standardize Money Formatting.** The last remaining zero-dependency quick win sitting `Ready Now` — with PF-006 and PF-007 cleared, this is worth finishing before starting a fourth additive catalogue (PF-112 Tags or PF-113 Pending/Cleared/Reconciled Status).
+**PF-112 — Tags.** With PF-006/007/009 cleared, this is the next real feature: a fourth additive catalogue (mirroring `Category`/`Subcategory`/`Merchant` from PF-109/110/111) but many-to-many rather than one-per-record — a `Tag` entity plus a free-text, comma-separated or repeated-field tag list on `ExpenseRecord`/`IncomeRecord`, no FK, same "management panel + usage counts + formalize unmanaged" pattern proven three times already. PF-113 (Pending/Cleared/Reconciled Status) remains a reasonable alternative — both were only ever "Deferred by the PF-104 slice," a dependency that shipped long ago.
 
 ### Shipped: PF-100/101/102/103 — Account Model
 
@@ -596,3 +596,8 @@ Dependencies met, scope clear — this is informational status only, nothing her
 
 - **What was built**: `financeSummary()` now returns `unrealizedStockPnlPct` (`unrealizedStockPnlLkr` ÷ total cost basis × 100, guarded to `0` when there are no holdings) alongside the pre-existing `unrealizedStockPnlLkr`. Shown on the Overview "Unrealized P/L" `StatCard` (e.g. "-LKR 2,913 (-9.2%)") and per-holding in `StockHoldingsPanel` (e.g. "+LKR 200 (+20.0%)"), reusing the existing `formatPct()` helper and green/red color-coding — no new formatter or color logic needed since the sign of the dollar and percentage figures always agree.
 - **Known limitation / deliberate scope**: purely additive — the existing `unrealizedStockPnlLkr` formula (locked in by two pre-existing unit tests) was not touched; no `StockHolding` type, storage, or Postgres change was needed since P/L is computed entirely at read time from existing fields.
+
+### Shipped: PF-009 — Standardize Money Formatting
+
+- **What was built**: a shared `formatMoney(amount, currency)` added to `src/screens/personal-finance/utils.ts`; `formatLkr` is now a thin wrapper over it (`formatMoney(value, 'LKR')`) with identical output for every existing caller. Deduplicated 4 independent reimplementations of the same formatting logic onto the shared function (`accounts-panel.tsx`'s local `formatAmount`, a separate identical copy in `transactions-panel.tsx`, and inline template literals in `personal-finance-screen.tsx`'s currency-exposure section and `income-sources-panel.tsx`). Fixed a real mislabeling bug: `stock-holdings-panel.tsx` and `fixed-deposits-panel.tsx` called the LKR-hardcoded `formatLkr()` on values carrying their own real `currency` field — a USD stock holding's price was silently shown as "LKR 150"; both now thread the record's actual currency through `formatMoney`.
+- **Known limitation / deliberate scope**: deliberately did not touch `finance-trends-card.tsx`, `recurring-bills-insight.tsx`, `budget-panel.tsx`, `savings-goals-progress.tsx`, or the Overview `StatCard`s — these display genuinely-LKR aggregate figures from `financeSummary()`/`getMonthlySummary()` (which sum `convertedLkrAmount`), so `formatLkr` was already correct there and touching them would have been scope creep with no confirmed bug behind it.
