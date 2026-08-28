@@ -537,7 +537,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | OPS-102 | Hermes Health | planned (not finance-specific) |
 | OPS-103 | CSE Provider Health | partial (`priceFetchFailed` handling) |
 | OPS-104 | FX Provider Health | planned |
-| OPS-105 | Gmail Health | partial (connect-check exists) |
+| OPS-105 | Gmail Health | **existing** (connect-check now also returns/shows `lastSyncedAtSeconds`) |
 | OPS-106 | AI Provider Health | planned |
 | OPS-107 | Backup Health | planned (backups exist, no in-app health surface) |
 | OPS-108 | Background Job Monitoring | planned |
@@ -572,7 +572,9 @@ Not ready without design work first: **PF-115** (needs new audit-log query/diff 
 
 A follow-up scoping pass over three more unaudited phases (Phase 5 Income/Employment, Phase 41 Tax Records, Phase 44 Reliability/Observability) found **TAX-103 (Potential Deduction Records) and TAX-104 (Supporting Documents)** the clear next pick, combined into one slice — the smallest change of the entire session: two already-existing, already-populated `TaxRecord` fields just needed adding to the generic `DataTable`'s `columns` array. Both are now shipped. The same pass also caught that **OPS-100 (System Health)** was already fully satisfied by PF-413's `DataHealthCard` and just needed its stale status corrected — done in the same PR, no code required.
 
-The next candidate from this pass is OPS-105's unused `gmailIngest.lastSyncedAtSeconds` field (written but never returned to the client) — a legitimate same-shape gap, but it touches two separate modules (`gmail-ingest.ts` settings + `auth.gmail-connect.ts`'s response) rather than one, so it's more work than this pick was. Not ready in this pass: **PF-509** (Contract Lifecycle — the stored `status` union is genuinely just `'active' | 'ended'`, nothing hiding; would need new lifecycle states and a design decision), **OPS-103** (needs a new aggregate health computation across holdings, not a surfacing fix), **OPS-109** (a platform-wide utility used well beyond finance, not finance-scoped), **OPS-110** (needs new retry/backoff logic, a real feature build).
+**OPS-105** is also now shipped — the last-synced timestamp is surfaced end-to-end (`auth.gmail-connect.ts`'s response + `pending-ingestion-panel.tsx`'s display, with a refetch after manual sync so it doesn't go stale). This closes out the current run of "surface an already-computed value" wins found across every phase audited so far this session (Phase 0/1/4/8/10/42/41/44). The next step is a fresh registry pass over still-unaudited phases rather than naming a specific feature unilaterally.
+
+Not ready in the phases audited this session: **PF-509** (Contract Lifecycle — the stored `status` union is genuinely just `'active' | 'ended'`, nothing hiding; would need new lifecycle states and a design decision), **OPS-103** (needs a new aggregate health computation across holdings, not a surfacing fix), **OPS-109** (a platform-wide utility used well beyond finance, not finance-scoped), **OPS-110** (needs new retry/backoff logic, a real feature build).
 
 ### Shipped: PF-100/101/102/103 — Account Model
 
@@ -689,3 +691,9 @@ This closes out Phase 42's quick wins from this scoping pass — see "Recommende
 - **What was built**: the Tax records `DataTable` (`src/screens/personal-finance/personal-finance-screen.tsx`) now lists `deductionCategory` and `supportingDocument` in its `columns` array. Both fields already existed on `TaxRecord` (`src/server/finance-store.ts`) and were already populated on write — `DataTable` is fully generic and key-driven, so no other code changed.
 - **Roadmap-accuracy fix bundled in the same PR**: **OPS-100 (System Health)** was found already fully shipped via PF-413's `DataHealthCard` — the row was simply stale; reclassified to `existing`, no code change needed.
 - **Known limitation / deliberate scope**: none — this is a pure surfacing fix with no edge cases (missing values already render as `—` via `DataTable`'s existing `textValue()` helper).
+
+### Shipped: OPS-105 — Gmail Health (last-synced timestamp)
+
+- **What was built**: `GET /api/auth/gmail-connect?check=1` now returns `lastSyncedAtSeconds`, reusing the already-written `settings.gmailIngest.lastSyncedAtSeconds` (read with the same untyped-cast convention as `getCategoryCorrections()` — `gmailIngest` stays outside the `FinanceSettings` type, no schema change). `pending-ingestion-panel.tsx` shows "Last synced <date>" or "Never synced" next to the Gmail button, and the connection check was extracted into a reusable `checkGmailConnection()` now also called after a manual sync completes, so the timestamp doesn't go stale immediately after syncing.
+- **External issue surfaced during verification**: the actual "Sync Gmail now" call failed with `Gmail list failed: 403` in this environment — a pre-existing external Gmail API problem (likely token/scope/quota) unrelated to this change. The read/display path was verified directly (by temporarily injecting a timestamp value) since a live successful sync wasn't available to test the write path end-to-end; flagged to Naveen for separate investigation.
+- **Known limitation / deliberate scope**: single-account only (matches the app's existing single-Gmail-connection design, no multi-account disambiguation needed).
