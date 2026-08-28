@@ -474,6 +474,7 @@ export function TransactionsPanel({
           const txnCurrency = stringField(txn, 'currency') || 'LKR'
           const amountValue = numberField(txn, 'amount')
           const txnStatus = stringField(txn, 'status') || 'cleared'
+          const documentRef = stringField(txn, 'documentRef')
 
           return (
             <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
@@ -645,6 +646,16 @@ export function TransactionsPanel({
                     )}
                   </div>
                   <div className="flex gap-2">
+                    {documentRef && (
+                      <a
+                        href={`/api/finance-document?kind=${kind === 'income' ? 'income_record' : 'expense_record'}&id=${id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={buttonClass}
+                      >
+                        View document
+                      </a>
+                    )}
                     <button type="button" onClick={() => startEdit(txn)} className={buttonClass}>
                       Edit
                     </button>

@@ -1,10 +1,11 @@
 /**
  * Serves the original uploaded document behind a finance record's
- * `documentRef` (currently: income_source, i.e. an employment contract
- * confirmed via the AI intake path). Looks the path up server-side from the
- * record id — never trusts a client-supplied path — and validates the
- * resolved path stays under FINANCE_DATA_DIR, same guard as
- * finance-upload.ts's preview-image GET handler.
+ * `documentRef` — income_source (employment contract), income_record, or
+ * expense_record (receipt/bill), all confirmed via the AI intake path. Looks
+ * the path up server-side from the record id — never trusts a
+ * client-supplied path — and validates the resolved path stays under
+ * FINANCE_DATA_DIR, same guard as finance-upload.ts's preview-image GET
+ * handler.
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -30,11 +31,20 @@ export const Route = createFileRoute('/api/finance-document')({
         const url = new URL(request.url)
         const kind = url.searchParams.get('kind')
         const id = url.searchParams.get('id')
-        if (kind !== 'income_source' || !id) {
-          return json({ ok: false, error: 'kind=income_source and id are required.' }, { status: 400 })
+        if (!id || (kind !== 'income_source' && kind !== 'income_record' && kind !== 'expense_record')) {
+          return json(
+            { ok: false, error: 'kind=income_source|income_record|expense_record and id are required.' },
+            { status: 400 },
+          )
         }
 
-        const record = readFinanceStore().income_sources.find((r) => r.id === id)
+        const db = readFinanceStore()
+        const record =
+          kind === 'income_source'
+            ? db.income_sources.find((r) => r.id === id)
+            : kind === 'income_record'
+              ? db.income_records.find((r) => r.id === id)
+              : db.expense_records.find((r) => r.id === id)
         const documentRef = record?.documentRef
         if (!documentRef) return json({ ok: false, error: 'No document on file for this record.' }, { status: 404 })
 
