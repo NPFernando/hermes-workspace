@@ -146,6 +146,27 @@ export type ExpenseRecord = {
   updatedAt: string
 }
 
+/** Read-only unified view over income_records + expense_records for a single combined transaction list/UI. Storage stays split; this is computed on read, never persisted. */
+export type UnifiedTransaction = {
+  id: string
+  kind: 'income' | 'expense'
+  date: string
+  counterparty: string
+  category: string
+  accountId?: string
+  currency: CurrencyCode
+  amount: number
+  convertedLkrAmount: number
+  notes?: string
+  documentRef?: string
+  recurring?: boolean
+  taxable?: boolean
+  incomeSourceId?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type BudgetCategory = {
   id: string
   month: string
@@ -2344,6 +2365,50 @@ function parseDate(dateString: string): { year: number; month: number } | null {
     year: parseInt(match[1], 10),
     month: parseInt(match[2], 10),
   }
+}
+
+export function getUnifiedTransactions(db: FinanceDatabase): Array<UnifiedTransaction> {
+  const fromIncome: Array<UnifiedTransaction> = db.income_records.map((inc) => ({
+    id: inc.id,
+    kind: 'income',
+    date: inc.dateReceived,
+    counterparty: inc.sourceName,
+    category: inc.incomeType,
+    accountId: inc.accountId,
+    currency: inc.originalCurrency,
+    amount: inc.originalAmount,
+    convertedLkrAmount: inc.convertedLkrAmount,
+    notes: inc.notes,
+    documentRef: inc.documentRef,
+    taxable: inc.taxable,
+    incomeSourceId: inc.incomeSourceId,
+    source: inc.source,
+    createdAt: inc.createdAt,
+    updatedAt: inc.updatedAt,
+  }))
+
+  const fromExpense: Array<UnifiedTransaction> = db.expense_records.map((exp) => ({
+    id: exp.id,
+    kind: 'expense',
+    date: exp.date,
+    counterparty: exp.vendor,
+    category: exp.category,
+    accountId: exp.accountId,
+    currency: exp.currency,
+    amount: exp.amount,
+    convertedLkrAmount: exp.convertedLkrAmount,
+    notes: exp.notes,
+    documentRef: exp.documentRef,
+    recurring: exp.recurring,
+    source: exp.source,
+    createdAt: exp.createdAt,
+    updatedAt: exp.updatedAt,
+  }))
+
+  return [...fromIncome, ...fromExpense].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1
+    return a.createdAt < b.createdAt ? 1 : -1
+  })
 }
 
 export function getMonthlySummary(

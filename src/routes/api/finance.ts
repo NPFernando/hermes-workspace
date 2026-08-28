@@ -18,6 +18,7 @@ import {
   financeSummary,
   findPossibleDuplicate,
   getCategoryCorrections,
+  getUnifiedTransactions,
   listPendingIngestions,
   maskSensitive,
   readFinanceStore,
@@ -172,6 +173,7 @@ function financePayload() {
     },
     summary: financeSummary(db),
     budgetVsActual: budgetVsActualSummary(db),
+    transactions: maskSensitive(getUnifiedTransactions(db)),
     tradingPerformance: tradingPerformanceSummary(db),
     demoPerformance: demoTradingPerformance(),
     decisionQuality: decisionQualityReport(),
@@ -217,6 +219,7 @@ function personalFinancePayload() {
     storage,
     summary: financeSummary(db),
     budgetVsActual: budgetVsActualSummary(db),
+    transactions: maskSensitive(getUnifiedTransactions(db)),
     alerts,
     data: maskSensitive({
       finance_accounts: db.finance_accounts,
