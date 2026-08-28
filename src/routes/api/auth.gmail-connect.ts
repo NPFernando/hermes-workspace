@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { readFinanceStore } from '../../server/finance-store'
 import {
   buildGmailConnectAuthUrl,
   isGmailConnected,
@@ -18,7 +19,15 @@ export const Route = createFileRoute('/api/auth/gmail-connect')({
 
         const url = new URL(request.url)
         if (url.searchParams.get('check') === '1') {
-          return Response.json({ enabled: isGoogleOAuthEnabled(), connected: isGmailConnected() })
+          const db = readFinanceStore()
+          const gmailIngest = (db.settings as Record<string, unknown>).gmailIngest as
+            | { lastSyncedAtSeconds?: number }
+            | undefined
+          return Response.json({
+            enabled: isGoogleOAuthEnabled(),
+            connected: isGmailConnected(),
+            lastSyncedAtSeconds: gmailIngest?.lastSyncedAtSeconds ?? null,
+          })
         }
 
         if (!isGoogleOAuthEnabled()) {
