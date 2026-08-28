@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
-import { formatLkr, formatPct } from '../utils'
+import { formatMoney, formatPct } from '../utils'
 import type { PersonalFinancePayload } from '../types'
 
 const inputClass =
@@ -273,6 +273,7 @@ export function StockHoldingsPanel({
           const current = optionalNumberField(holding, 'lastKnownPrice')
           const gainLoss = current !== undefined ? (current - buy) * qty : undefined
           const gainLossPct = current !== undefined && buy > 0 ? ((current - buy) / buy) * 100 : undefined
+          const holdingCurrency = stringField(holding, 'currency') || 'LKR'
           const priceSource = stringField(holding, 'priceSource')
           const staleDays = daysSince(stringField(holding, 'lastPriceUpdatedAt') || undefined)
           const isEditing = editOpenId === id
@@ -346,16 +347,16 @@ export function StockHoldingsPanel({
                   <div>
                     <span className="font-medium text-[var(--theme-text)]">{stringField(holding, 'symbol')}</span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
-                      · {stringField(holding, 'platform')} · qty {qty} · buy {formatLkr(buy)}
+                      · {stringField(holding, 'platform')} · qty {qty} · buy {formatMoney(buy, holdingCurrency)}
                       {current !== undefined &&
-                        ` · current ${formatLkr(current)} (${priceSource}${
+                        ` · current ${formatMoney(current, holdingCurrency)} (${priceSource}${
                           staleDays !== null ? `, priced ${staleDays === 0 ? 'today' : `${staleDays}d ago`}` : ''
                         })`}
                     </span>
                     {gainLoss !== undefined && (
                       <span className={`ml-2 text-xs font-medium ${gainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                         {gainLoss >= 0 ? '+' : ''}
-                        {formatLkr(gainLoss)}
+                        {formatMoney(gainLoss, holdingCurrency)}
                         {gainLossPct !== undefined && ` (${gainLoss >= 0 ? '+' : ''}${formatPct(gainLossPct)})`}
                       </span>
                     )}

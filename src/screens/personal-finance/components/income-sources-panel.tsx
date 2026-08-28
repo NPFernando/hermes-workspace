@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
-import { formatLkr } from '../utils'
+import { formatLkr, formatMoney } from '../utils'
 import { getPaydayStatus } from './payday-status'
 import type { PersonalFinancePayload } from '../types'
 
@@ -242,10 +242,7 @@ export function IncomeSourcesPanel({
     )
   }
   const activeMonthlyTotalText = Array.from(activeMonthlyTotals.entries())
-    .map(
-      ([entryCurrency, amount]) =>
-        `${entryCurrency} ${Math.round(amount).toLocaleString('en-LK')}`,
-    )
+    .map(([entryCurrency, amount]) => formatMoney(amount, entryCurrency))
     .join(' · ')
 
   return (

@@ -1,5 +1,9 @@
+export function formatMoney(amount: number, currency: string): string {
+  return `${currency} ${Math.round(amount).toLocaleString('en-LK')}`
+}
+
 export function formatLkr(value: number): string {
-  return `LKR ${Math.round(value).toLocaleString('en-LK')}`
+  return formatMoney(value, 'LKR')
 }
 
 export function formatPct(value: number): string {
