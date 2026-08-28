@@ -486,8 +486,8 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | TAX-100 | Tax Year | existing |
 | TAX-101 | Income Records | existing |
 | TAX-102 | Tax Withheld | existing (`taxPaid`) |
-| TAX-103 | Potential Deduction Records | partial (`deductionCategory` field, no dedicated flow) |
-| TAX-104 | Supporting Documents | partial (`supportingDocument` field exists) |
+| TAX-103 | Potential Deduction Records | **existing** (`deductionCategory` now shown/editable in the Tax records table) |
+| TAX-104 | Supporting Documents | **existing** (`supportingDocument` now shown/editable in the Tax records table) |
 | TAX-105 | Tax Export | partial (covered generically by JSON export) |
 | TAX-106 | Tax Review Queue | planned (`requiresConfirmation` field exists, no queue UI) |
 
@@ -532,7 +532,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 
 | ID | Feature | Status |
 |---|---|---|
-| OPS-100 | System Health | partial (`financeStorageStatus()`) |
+| OPS-100 | System Health | **existing** (fully shipped via PF-413's `DataHealthCard` — row was stale) |
 | OPS-101 | Database Health | existing (self-heal logic) |
 | OPS-102 | Hermes Health | planned (not finance-specific) |
 | OPS-103 | CSE Provider Health | partial (`priceFetchFailed` handling) |
@@ -569,6 +569,10 @@ A follow-up scoping pass over Phase 3 (Personal Financial Rules), Phase 10 (Goal
 **DATA-100** is also now shipped — the one-line `schemaVersion` stamp closes out the Phase 42 quick wins found in that pass. The phase's remaining actionable items (DATA-101 CSV export, DATA-103 Import, DATA-108 Schema Version enforcement/migrations, DATA-109 Migration Compatibility) are all genuinely `planned` — real design/build efforts, not further quick wins — so the next step is another fresh registry pass rather than continuing Phase 42.
 
 Not ready without design work first: **PF-115** (needs new audit-log query/diff plumbing), **PF-808** (needs a new configurable-threshold schema field and a per-category-vs-global design decision), **PF-800** (not independently scoped — it's the umbrella row for Phase 8's other large `planned` items), **PF-300** (Financial Rules Model — needs a wholly new entity with no existing analog), **PF-304** (Savings Rate Target — technically small, but would pre-empt where Phase 3's other threshold rules end up living; an ordering problem, not a size problem), **PF-1004** (Account-Linked Goals — blocked on whether linking should derive `currentAmount` from the account, plus `DataTable` having no select/dropdown input type).
+
+A follow-up scoping pass over three more unaudited phases (Phase 5 Income/Employment, Phase 41 Tax Records, Phase 44 Reliability/Observability) found **TAX-103 (Potential Deduction Records) and TAX-104 (Supporting Documents)** the clear next pick, combined into one slice — the smallest change of the entire session: two already-existing, already-populated `TaxRecord` fields just needed adding to the generic `DataTable`'s `columns` array. Both are now shipped. The same pass also caught that **OPS-100 (System Health)** was already fully satisfied by PF-413's `DataHealthCard` and just needed its stale status corrected — done in the same PR, no code required.
+
+The next candidate from this pass is OPS-105's unused `gmailIngest.lastSyncedAtSeconds` field (written but never returned to the client) — a legitimate same-shape gap, but it touches two separate modules (`gmail-ingest.ts` settings + `auth.gmail-connect.ts`'s response) rather than one, so it's more work than this pick was. Not ready in this pass: **PF-509** (Contract Lifecycle — the stored `status` union is genuinely just `'active' | 'ended'`, nothing hiding; would need new lifecycle states and a design decision), **OPS-103** (needs a new aggregate health computation across holdings, not a surfacing fix), **OPS-109** (a platform-wide utility used well beyond finance, not finance-scoped), **OPS-110** (needs new retry/backoff logic, a real feature build).
 
 ### Shipped: PF-100/101/102/103 — Account Model
 
@@ -679,3 +683,9 @@ This closes out the Phase 4/8 scoping pass — see "Recommended Next Feature" ab
 - **Known limitation / deliberate scope**: this is the data's own existing schema version, not a separate export-format version — DATA-108 (Schema Version, still `planned`) would be where a distinct migration/versioning concept lives if one is ever needed; this slice deliberately didn't invent one.
 
 This closes out Phase 42's quick wins from this scoping pass — see "Recommended Next Feature" above for what to scope next.
+
+### Shipped: TAX-103 & TAX-104 — Potential Deduction Records and Supporting Documents
+
+- **What was built**: the Tax records `DataTable` (`src/screens/personal-finance/personal-finance-screen.tsx`) now lists `deductionCategory` and `supportingDocument` in its `columns` array. Both fields already existed on `TaxRecord` (`src/server/finance-store.ts`) and were already populated on write — `DataTable` is fully generic and key-driven, so no other code changed.
+- **Roadmap-accuracy fix bundled in the same PR**: **OPS-100 (System Health)** was found already fully shipped via PF-413's `DataHealthCard` — the row was simply stale; reclassified to `existing`, no code change needed.
+- **Known limitation / deliberate scope**: none — this is a pure surfacing fix with no edge cases (missing values already render as `—` via `DataTable`'s existing `textValue()` helper).
