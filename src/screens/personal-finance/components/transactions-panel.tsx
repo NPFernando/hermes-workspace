@@ -147,7 +147,7 @@ export function TransactionsPanel({
         date: stringField(txn, 'date'),
         counterparty: stringField(txn, 'counterparty'),
         category: stringField(txn, 'category'),
-        subcategory: '',
+        subcategory: stringField(txn, 'subcategory'),
         currency: stringField(txn, 'currency') || 'LKR',
         amount: String(numberField(txn, 'amount')),
         accountId: stringField(txn, 'accountId'),
@@ -302,6 +302,7 @@ export function TransactionsPanel({
             placeholder="Subcategory (optional)"
             value={subcategory}
             onChange={(e) => setSubcategory(e.target.value)}
+            list="pf-known-subcategories"
             className={inputClass}
           />
         )}
@@ -417,6 +418,7 @@ export function TransactionsPanel({
                       onChange={(e) =>
                         setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], subcategory: e.target.value } }))
                       }
+                      list="pf-known-subcategories"
                       className={inputClass}
                     />
                   )}
@@ -503,8 +505,9 @@ export function TransactionsPanel({
                     </span>
                     <span className="font-medium text-[var(--theme-text)]">{stringField(txn, 'counterparty')}</span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
-                      · {stringField(txn, 'category')} · {stringField(txn, 'date')} ·{' '}
-                      {formatAmount(txnCurrency, amountValue)}
+                      · {stringField(txn, 'category')}
+                      {stringField(txn, 'subcategory') && ` / ${stringField(txn, 'subcategory')}`} ·{' '}
+                      {stringField(txn, 'date')} · {formatAmount(txnCurrency, amountValue)}
                     </span>
                   </div>
                   <div className="flex gap-2">

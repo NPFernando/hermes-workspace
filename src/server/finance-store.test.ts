@@ -777,6 +777,48 @@ describe('category (PF-109 Categories)', () => {
   })
 })
 
+describe('subcategory_entry (PF-110 Subcategories)', () => {
+  let tmp: string
+  let realHome: string | undefined
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-subcategories-'))
+    realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+  })
+  afterEach(() => {
+    if (realHome === undefined) delete process.env.HOME
+    else process.env.HOME = realHome
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('adds, edits, then deletes a subcategory', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('subcategory_entry', { name: 'Coffee', parentCategory: 'Dining' })
+    let db = store.readFinanceStore()
+    expect(db.subcategories).toHaveLength(1)
+    expect(db.subcategories[0]).toMatchObject({ name: 'Coffee', parentCategory: 'Dining' })
+    const id = db.subcategories[0].id
+
+    store.updateFinanceRecord('subcategory_entry', id, { name: 'Coffee & Tea' })
+    db = store.readFinanceStore()
+    expect(db.subcategories[0].name).toBe('Coffee & Tea')
+    // Untouched fields survive the shallow-merge update, same as every other kind.
+    expect(db.subcategories[0].parentCategory).toBe('Dining')
+
+    store.deleteFinanceRecord('subcategory_entry', id)
+    db = store.readFinanceStore()
+    expect(db.subcategories).toHaveLength(0)
+  })
+
+  it('defaults parentCategory to Other when missing', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('subcategory_entry', { name: 'Misc Sub' })
+    const db = store.readFinanceStore()
+    expect(db.subcategories[0].parentCategory).toBe('Other')
+  })
+})
+
 describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
   it('maps income and expense records into the shared shape with renamed fields', () => {
     const db = createEmptyFinanceDatabase()
@@ -800,6 +842,7 @@ describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
       date: '2026-06-02',
       vendor: 'Cloud Provider',
       category: 'Cloud services',
+      subcategory: 'Hosting',
       currency: 'USD',
       amount: 10,
       convertedLkrAmount: 3_000,
@@ -833,6 +876,7 @@ describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
       date: '2026-06-02',
       counterparty: 'Cloud Provider',
       category: 'Cloud services',
+      subcategory: 'Hosting',
       currency: 'USD',
       amount: 10,
       recurring: true,

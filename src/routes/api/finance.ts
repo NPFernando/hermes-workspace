@@ -227,6 +227,7 @@ function personalFinancePayload() {
       expense_records: db.expense_records,
       budget_categories: db.budget_categories,
       categories: db.categories,
+      subcategories: db.subcategories,
       savings_goals: db.savings_goals,
       tax_records: db.tax_records,
       income_sources: db.income_sources,
