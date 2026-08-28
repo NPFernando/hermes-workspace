@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
-import { formatLkr } from '../utils'
+import { formatLkr, formatPct } from '../utils'
 import type { PersonalFinancePayload } from '../types'
 
 const inputClass =
@@ -272,6 +272,7 @@ export function StockHoldingsPanel({
           const buy = numberField(holding, 'buyPrice')
           const current = optionalNumberField(holding, 'lastKnownPrice')
           const gainLoss = current !== undefined ? (current - buy) * qty : undefined
+          const gainLossPct = current !== undefined && buy > 0 ? ((current - buy) / buy) * 100 : undefined
           const priceSource = stringField(holding, 'priceSource')
           const staleDays = daysSince(stringField(holding, 'lastPriceUpdatedAt') || undefined)
           const isEditing = editOpenId === id
@@ -355,6 +356,7 @@ export function StockHoldingsPanel({
                       <span className={`ml-2 text-xs font-medium ${gainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                         {gainLoss >= 0 ? '+' : ''}
                         {formatLkr(gainLoss)}
+                        {gainLossPct !== undefined && ` (${gainLoss >= 0 ? '+' : ''}${formatPct(gainLossPct)})`}
                       </span>
                     )}
                   </div>

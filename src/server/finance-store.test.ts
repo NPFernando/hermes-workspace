@@ -1036,6 +1036,8 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     const summary = financeSummary(db)
     // (120-100)*10 + (250-300)*5 = 200 - 250 = -50
     expect(summary.unrealizedStockPnlLkr).toBe(-50)
+    // cost basis = 10*100 + 5*300 = 2500; pct = -50/2500*100 = -2
+    expect(summary.unrealizedStockPnlPct).toBe(-2)
   })
 
   it('unrealizedStockPnlLkr is 0 when there is no cached current price (falls back to buy price)', () => {
@@ -1047,5 +1049,12 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     })
     const summary = financeSummary(db)
     expect(summary.unrealizedStockPnlLkr).toBe(0)
+    expect(summary.unrealizedStockPnlPct).toBe(0)
+  })
+
+  it('unrealizedStockPnlPct is 0 when there are no stock holdings (division-by-zero guard)', () => {
+    const db = createEmptyFinanceDatabase()
+    const summary = financeSummary(db)
+    expect(summary.unrealizedStockPnlPct).toBe(0)
   })
 })
