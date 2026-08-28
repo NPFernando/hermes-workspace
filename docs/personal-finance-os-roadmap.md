@@ -196,7 +196,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | PF-1000 | Savings Goals | existing |
 | PF-1001 | Goal Progress | existing (`SavingsGoalsProgress`) |
 | PF-1002 | Goal Target Date | existing |
-| PF-1003 | Required Monthly Contribution | partial (stored, not auto-calculated) |
+| PF-1003 | Required Monthly Contribution | **existing** (`SavingsGoalsProgress` now derives "Needs LKR X/mo to reach by <date>" from stored `targetAmount`/`currentAmount`/`targetDate`, display-only) |
 | PF-1004 | Account-Linked Goals | partial (`linkedAccountId` field exists) |
 | PF-1005 | Emergency Fund | planned (no dedicated concept) |
 | PF-1006 | Emergency Coverage Months | planned |
@@ -499,7 +499,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 |---|---|---|
 | DATA-100 | Versioned JSON Export | partial (export exists, PR #71; no explicit schema version) |
 | DATA-101 | CSV Transaction Export | planned |
-| DATA-102 | Investment Export | partial (covered by general JSON export) |
+| DATA-102 | Investment Export | **existing** (`stock_holdings`/`fixed_deposits` were already both included in the general JSON export — roadmap-accuracy fix, no code change) |
 | DATA-103 | Import | planned |
 | DATA-104 | Backup | existing (nightly Postgres dumps, infra-level) |
 | DATA-105 | Encrypted Backup | planned |
@@ -564,9 +564,11 @@ There is no separate "master registry" file distinct from this document — this
 
 **PF-411 (Upcoming Money)** is also now shipped, closing out this entire Phase 4/8 scoping pass — every `partial` item checked (PF-409, PF-410, PF-411, PF-413, PF-806) is now `existing`, and the remaining Phase 8 items (PF-800, PF-808) were confirmed not independently actionable without further design work.
 
-With this pass exhausted, the next step is a fresh registry review rather than naming a specific feature unilaterally — candidates worth a scoping look include Phase 3 (Personal Financial Rules), Phase 10 (Goals, Emergency Funds, Sinking Funds), or Phase 42 (Backup, Import and Restore), each of which has several `partial`/`planned` items that haven't been individually audited against the current codebase the way Phase 1/4/8 just were.
+A follow-up scoping pass over Phase 3 (Personal Financial Rules), Phase 10 (Goals/Emergency Funds), and Phase 42 (Backup/Import) found **PF-1003 (Required Monthly Contribution)** the clear next pick — fully additive, reusing `SavingsGoal`'s already-stored `targetAmount`/`currentAmount`/`targetDate`. It's now shipped. The same pass also caught that **DATA-102 (Investment Export)** was already fully satisfied by the existing export and just needed its status corrected — done in the same PR, no code required.
 
-Not ready without design work first: **PF-115** (needs new audit-log query/diff plumbing), **PF-808** (needs a new configurable-threshold schema field and a per-category-vs-global design decision), **PF-800** (not independently scoped — it's the umbrella row for Phase 8's other large `planned` items).
+The next candidate from this pass is **DATA-100** (stamp the already-existing `db.schemaVersion` into the JSON export — a one-line, zero-risk change, though with less user-visible value than PF-1003 had).
+
+Not ready without design work first: **PF-115** (needs new audit-log query/diff plumbing), **PF-808** (needs a new configurable-threshold schema field and a per-category-vs-global design decision), **PF-800** (not independently scoped — it's the umbrella row for Phase 8's other large `planned` items), **PF-300** (Financial Rules Model — needs a wholly new entity with no existing analog), **PF-304** (Savings Rate Target — technically small, but would pre-empt where Phase 3's other threshold rules end up living; an ordering problem, not a size problem), **PF-1004** (Account-Linked Goals — blocked on whether linking should derive `currentAmount` from the account, plus `DataTable` having no select/dropdown input type).
 
 ### Shipped: PF-100/101/102/103 — Account Model
 
@@ -663,3 +665,10 @@ Not ready without design work first: **PF-115** (needs new audit-log query/diff 
 - **Known limitation / deliberate scope**: purely an aggregation view — no new data, no server/schema changes. The neutral-tone filter means a job/FD/contract with nothing urgent won't appear here even though it still shows its own (neutral) badge in its home panel — this is the intended behavior for an "upcoming" list, not a bug.
 
 This closes out the Phase 4/8 scoping pass — see "Recommended Next Feature" above for what to scope next.
+
+### Shipped: PF-1003 — Required Monthly Contribution
+
+- **What was built**: `SavingsGoalsProgress` (`src/screens/personal-finance/components/savings-goals-progress.tsx`) now derives and shows a "Needs LKR X/mo to reach by <date>" line per goal, computed from the already-stored `targetAmount`/`currentAmount`/`targetDate` fields on `SavingsGoal` — no new entity, no schema change, no write-back to the separately user-entered `monthlyContribution` field (kept purely a display annotation to avoid new reconciliation questions between the two figures).
+- **Edge cases resolved in-PR**: no line shown when there's no `targetDate` (can't compute) or when the goal is already met/exceeded (nothing further required); shows "Target date passed" instead of a divide-by-zero/nonsensical figure when the date has elapsed without meeting the goal.
+- **Roadmap-accuracy fix bundled in the same PR**: **DATA-102 (Investment Export)** was found already fully satisfied by the existing JSON export (both `stock_holdings` and `fixed_deposits` already included) — reclassified to `existing`, no code change needed.
+- **Known limitation / deliberate scope**: `monthsUntil` floors to a minimum of 1 to avoid an inflated per-month figure for near-term dates; this environment had zero live savings goals at verification time, so the feature was verified with a temporary test goal rather than real user data.
