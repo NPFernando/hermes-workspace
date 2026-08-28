@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
+import { formatMoney } from '../utils'
 import type { PersonalFinancePayload } from '../types'
 
 const inputClass =
@@ -36,10 +37,6 @@ function numberField(row: Record<string, unknown>, key: string): number {
 function optionalNumberField(row: Record<string, unknown>, key: string): number | undefined {
   const value = row[key]
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
-}
-
-function formatAmount(currency: string, amount: number): string {
-  return `${currency} ${Math.round(amount).toLocaleString('en-LK')}`
 }
 
 type EditDraft = {
@@ -174,7 +171,7 @@ export function AccountsPanel({
     totalsByCurrency.set(accountCurrency, (totalsByCurrency.get(accountCurrency) ?? 0) + numberField(account, 'balance'))
   }
   const totalsText = Array.from(totalsByCurrency.entries())
-    .map(([entryCurrency, amount]) => formatAmount(entryCurrency, amount))
+    .map(([entryCurrency, amount]) => formatMoney(amount, entryCurrency))
     .join(' · ')
 
   return (
@@ -353,13 +350,13 @@ export function AccountsPanel({
                   <div>
                     <span className="font-medium text-[var(--theme-text)]">{stringField(account, 'name')}</span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
-                      · {accountTypeLabel(stringField(account, 'type'))} · {formatAmount(accountCurrency, balanceValue)}
+                      · {accountTypeLabel(stringField(account, 'type'))} · {formatMoney(balanceValue, accountCurrency)}
                       {maskedIdentifierValue && ` · ${maskedIdentifierValue}`}
                       {platformValue && ` · ${platformValue}`}
                     </span>
                     {openingBalanceValue !== undefined && (
                       <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
-                        Opened at {formatAmount(accountCurrency, openingBalanceValue)}
+                        Opened at {formatMoney(openingBalanceValue, accountCurrency)}
                         {openingBalanceDateValue && ` on ${openingBalanceDateValue}`}
                       </p>
                     )}

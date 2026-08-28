@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
-import { formatLkr } from '../utils'
+import { formatMoney } from '../utils'
 import type { PersonalFinancePayload } from '../types'
 
 const inputClass =
@@ -170,6 +170,7 @@ export function FixedDepositsPanel({
           const maturity = stringField(fd, 'maturityDate')
           const remaining = daysUntil(maturity)
           const payout = stringField(fd, 'interestPayout').replace('_', ' ')
+          const fdCurrency = stringField(fd, 'currency') || 'LKR'
           return (
             <div
               key={id}
@@ -178,7 +179,8 @@ export function FixedDepositsPanel({
               <div>
                 <span className="font-medium text-[var(--theme-text)]">{stringField(fd, 'bankName')}</span>{' '}
                 <span className="text-xs text-[var(--theme-muted)]">
-                  · {formatLkr(numberField(fd, 'principal'))} · {numberField(fd, 'interestRatePct')}% p.a. · {payout} ·{' '}
+                  · {formatMoney(numberField(fd, 'principal'), fdCurrency)} · {numberField(fd, 'interestRatePct')}% p.a. ·{' '}
+                  {payout} ·{' '}
                   {status}
                 </span>
                 {status === 'active' &&

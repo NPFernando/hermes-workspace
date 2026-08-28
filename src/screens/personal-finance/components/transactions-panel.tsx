@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
+import { formatMoney } from '../utils'
 import type { PersonalFinancePayload } from '../types'
 
 const inputClass =
@@ -22,10 +23,6 @@ function numberField(row: Record<string, unknown>, key: string): number {
 
 function boolField(row: Record<string, unknown>, key: string): boolean {
   return row[key] === true
-}
-
-function formatAmount(currency: string, amount: number): string {
-  return `${currency} ${Math.round(amount).toLocaleString('en-LK')}`
 }
 
 function todayIso(): string {
@@ -250,7 +247,7 @@ export function TransactionsPanel({
     totalsByCurrency.set(txnCurrency, (totalsByCurrency.get(txnCurrency) ?? 0) + signed)
   }
   const totalsText = Array.from(totalsByCurrency.entries())
-    .map(([entryCurrency, entryAmount]) => formatAmount(entryCurrency, entryAmount))
+    .map(([entryCurrency, entryAmount]) => formatMoney(entryAmount, entryCurrency))
     .join(' · ')
 
   return (
@@ -525,7 +522,7 @@ export function TransactionsPanel({
                     <span className="text-xs text-[var(--theme-muted)]">
                       · {stringField(txn, 'category')}
                       {stringField(txn, 'subcategory') && ` / ${stringField(txn, 'subcategory')}`} ·{' '}
-                      {stringField(txn, 'date')} · {formatAmount(txnCurrency, amountValue)}
+                      {stringField(txn, 'date')} · {formatMoney(amountValue, txnCurrency)}
                     </span>
                   </div>
                   <div className="flex gap-2">

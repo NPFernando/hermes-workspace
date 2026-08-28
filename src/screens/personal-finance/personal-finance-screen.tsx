@@ -14,7 +14,7 @@ import { AccountsPanel } from './components/accounts-panel'
 import { TransactionsPanel } from './components/transactions-panel'
 import { CategoriesPanel } from './components/categories-panel'
 import { MerchantsPanel } from './components/merchants-panel'
-import { formatLkr, formatPct } from './utils'
+import { formatLkr, formatMoney, formatPct } from './utils'
 import type { PersonalFinancePayload } from './types'
 
 type Tab = 'overview' | 'income' | 'investments' | 'records' | 'ingestion'
@@ -245,7 +245,7 @@ export function PersonalFinanceScreen() {
           <div className="mt-2 flex flex-wrap gap-3">
             {exposure.map(({ currency, amount }) => (
               <span key={currency} className="text-sm font-medium text-[var(--theme-text)]">
-                {currency} {Math.round(amount).toLocaleString('en-LK')}
+                {formatMoney(amount, currency)}
               </span>
             ))}
           </div>
