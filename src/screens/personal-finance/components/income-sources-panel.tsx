@@ -11,7 +11,7 @@ const paydayTone: Record<'paid' | 'due_soon' | 'overdue', string> = {
   overdue: 'border-red-400/30 bg-red-500/15 text-red-100',
 }
 
-function paydayLabel(job: Record<string, unknown>, incomeRecords: Array<Record<string, unknown>>): { text: string; tone: string } | null {
+export function paydayLabel(job: Record<string, unknown>, incomeRecords: Array<Record<string, unknown>>): { text: string; tone: string } | null {
   const status = getPaydayStatus(job, incomeRecords)
   if (status.state === 'not_tracked') return null
   if (status.state === 'paid') {
@@ -31,7 +31,7 @@ const expiryTone = {
   ended: 'border-red-400/30 bg-red-500/15 text-red-100',
 }
 
-function contractExpiryLabel(job: Record<string, unknown>): { text: string; tone: string } | null {
+export function contractExpiryLabel(job: Record<string, unknown>): { text: string; tone: string } | null {
   if (job.employmentType !== 'contract' || job.status !== 'active') return null
   const contractEndDate = typeof job.contractEndDate === 'string' ? job.contractEndDate : ''
   if (!contractEndDate) return null
