@@ -17,9 +17,14 @@ function toneFor(percent: number): { bar: string; text: string } {
   return { bar: 'bg-amber-400', text: 'text-amber-200' }
 }
 
-/** Visual progress-bar view of savings goals — sits above the full editable DataTable. */
+/**
+ * Visual progress-bar view of open-ended savings goals — sits above the full
+ * editable DataTable. Sinking funds (goalKind: 'sinking') are excluded here
+ * since they have their own dedicated SinkingFundsPanel (PF-1007) with
+ * schedule-status tracking; showing them in both places would be duplicative.
+ */
 export function SavingsGoalsProgress({ payload }: { payload: PersonalFinancePayload }) {
-  const goals = payload.data.savings_goals
+  const goals = payload.data.savings_goals.filter((row) => stringField(row, 'goalKind') !== 'sinking')
   if (goals.length === 0) return null
 
   return (

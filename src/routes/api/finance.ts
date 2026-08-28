@@ -96,6 +96,24 @@ function unauthorized() {
   return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 }
 
+/**
+ * add_record/update_record/delete_record are only ever called from the
+ * Personal Finance screen's generic DataTable/panels (confirmed: no trading
+ * UI calls these actions) — for these kinds, respond with
+ * personalFinancePayload() so the caller's cast to PersonalFinancePayload is
+ * actually correct (financePayload() lacks emergencyFund and other
+ * personal-finance-only fields, which previously crashed EmergencyFundCard
+ * on every goal/tax/budget-category edit or delete).
+ */
+const PERSONAL_FINANCE_RECORD_KINDS = new Set([
+  'income', 'expense', 'account', 'goal', 'tax', 'budget_category', 'category',
+  'subcategory_entry', 'merchant', 'tag', 'income_source', 'stock_holding', 'fixed_deposit',
+])
+
+function recordActionResponse(kind: string) {
+  return json(PERSONAL_FINANCE_RECORD_KINDS.has(kind) ? personalFinancePayload() : financePayload())
+}
+
 function binanceSymbolFromBody(body: JsonRecord): string {
   const symbol =
     typeof body.symbol === 'string' ? body.symbol.trim().toUpperCase() : ''
@@ -303,7 +321,7 @@ export const Route = createFileRoute('/api/finance')({
                 ? (body.payload as JsonRecord)
                 : {}
             addFinanceRecord(kind, payload)
-            return json(financePayload())
+            return recordActionResponse(kind)
           }
           if (action === 'update_record') {
             const kind = typeof body.kind === 'string' ? body.kind : ''
@@ -314,14 +332,14 @@ export const Route = createFileRoute('/api/finance')({
                 : {}
             if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
             updateFinanceRecord(kind, id, payload)
-            return json(financePayload())
+            return recordActionResponse(kind)
           }
           if (action === 'delete_record') {
             const kind = typeof body.kind === 'string' ? body.kind : ''
             const id = typeof body.id === 'string' ? body.id : ''
             if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
             deleteFinanceRecord(kind, id)
-            return json(financePayload())
+            return recordActionResponse(kind)
           }
           if (action === 'fetch_market_price') {
             // Read-only market data: Binance is the active provider. IBKR is a future feature.

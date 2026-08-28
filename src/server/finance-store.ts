@@ -263,6 +263,8 @@ export type SavingsGoal = {
   priority: number
   linkedAccountId?: string
   status: GoalStatus
+  /** PF-1007: distinguishes a sinking fund (saving for a specific planned future expense) from an open-ended goal. */
+  goalKind?: 'general' | 'sinking'
   source: string
   createdAt: string
   updatedAt: string
@@ -1459,6 +1461,7 @@ export function addFinanceRecord(
       priority: numberField(payload, 'priority', 3),
       linkedAccountId: optionalString(payload, 'linkedAccountId'),
       status: goalStatus(payload.status),
+      goalKind: goalKindField(payload.goalKind),
     })
   } else if (kind === 'tax') {
     db.tax_records.push({
@@ -2468,6 +2471,10 @@ function goalStatus(value: unknown): GoalStatus {
   return allowed.includes(value as GoalStatus)
     ? (value as GoalStatus)
     : 'active'
+}
+
+function goalKindField(value: unknown): 'general' | 'sinking' {
+  return value === 'sinking' ? 'sinking' : 'general'
 }
 
 function employmentTypeField(value: unknown): IncomeSource['employmentType'] {

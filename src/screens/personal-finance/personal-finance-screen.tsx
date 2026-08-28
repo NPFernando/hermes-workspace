@@ -7,6 +7,7 @@ import { PendingIngestionPanel } from './components/pending-ingestion-panel'
 import { FinanceAlertsCard } from './components/finance-alerts-card'
 import { FinanceTrendsCard } from './components/finance-trends-card'
 import { SavingsGoalsProgress } from './components/savings-goals-progress'
+import { SinkingFundsPanel } from './components/sinking-funds-panel'
 import { UpcomingMoney } from './components/upcoming-money'
 import { RecurringBillsInsight } from './components/recurring-bills-insight'
 import { DataHealthCard } from './components/data-health-card'
@@ -294,6 +295,7 @@ export function PersonalFinanceScreen() {
           <FinanceAlertsCard payload={payload} />
           <FinanceTrendsCard payload={payload} />
           <SavingsGoalsProgress payload={payload} />
+          <SinkingFundsPanel payload={payload} />
           <EmergencyFundCard payload={payload} onPayload={setPayload} />
           <UpcomingMoney payload={payload} />
           <RecurringBillsInsight payload={payload} />
@@ -333,7 +335,7 @@ export function PersonalFinanceScreen() {
           <DataTable
             title="Savings goals"
             rows={payload.data.savings_goals}
-            columns={['name', 'targetAmount', 'currentAmount', 'currency', 'targetDate', 'status']}
+            columns={['name', 'targetAmount', 'currentAmount', 'currency', 'targetDate', 'status', 'goalKind', 'monthlyContribution', 'priority']}
             kind="goal"
             onChanged={(p) => setPayload(p as PersonalFinancePayload)}
             searchable

@@ -230,6 +230,7 @@ CREATE TABLE IF NOT EXISTS savings_goals (
   currency TEXT NOT NULL, target_date TEXT, monthly_contribution DOUBLE PRECISION NOT NULL, priority DOUBLE PRECISION NOT NULL,
   linked_account_id TEXT, status TEXT NOT NULL, source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+ALTER TABLE savings_goals ADD COLUMN IF NOT EXISTS goal_kind TEXT;
 
 CREATE TABLE IF NOT EXISTS tax_records (
   id TEXT PRIMARY KEY, tax_year TEXT NOT NULL, income_type TEXT NOT NULL, amount DOUBLE PRECISION NOT NULL,
@@ -408,6 +409,7 @@ function savingsGoalRows(rowsIn: Array<Record<string, unknown>>): Array<Array<st
     sqlText(firstText(row, 'source', 'manual')),
     sqlText(firstText(row, 'createdAt')),
     sqlText(firstText(row, 'updatedAt')),
+    sqlNullableText(row.goalKind),
   ])
 }
 
@@ -571,7 +573,7 @@ ${insertRows(
   'savings_goals',
   [
     'id', 'name', 'target_amount', 'current_amount', 'currency', 'target_date', 'monthly_contribution',
-    'priority', 'linked_account_id', 'status', 'source', 'created_at', 'updated_at',
+    'priority', 'linked_account_id', 'status', 'source', 'created_at', 'updated_at', 'goal_kind',
   ],
   savingsGoalRows(rows(slice.savings_goals)),
 )}

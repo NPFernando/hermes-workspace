@@ -374,6 +374,18 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
     const store = await import('./finance-store')
     expect(() => store.updateFinanceRecord('expense', 'does-not-exist', { amount: 1 })).toThrow(/not found/)
   })
+
+  it('goalKind (PF-1007 Sinking Funds) defaults to general and accepts sinking', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('goal', { name: 'Untyped goal', targetAmount: 1000 })
+    store.addFinanceRecord('goal', { name: 'Car fund', targetAmount: 2000, goalKind: 'sinking' })
+    store.addFinanceRecord('goal', { name: 'Bogus kind', targetAmount: 500, goalKind: 'not-a-real-kind' })
+
+    const db = store.readFinanceStore()
+    expect(db.savings_goals.find((g) => g.name === 'Untyped goal')?.goalKind).toBe('general')
+    expect(db.savings_goals.find((g) => g.name === 'Car fund')?.goalKind).toBe('sinking')
+    expect(db.savings_goals.find((g) => g.name === 'Bogus kind')?.goalKind).toBe('general')
+  })
 })
 
 describe('findPossibleDuplicate', () => {
