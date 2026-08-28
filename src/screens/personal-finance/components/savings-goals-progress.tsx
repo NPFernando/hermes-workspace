@@ -32,6 +32,23 @@ export function SavingsGoalsProgress({ payload }: { payload: PersonalFinancePayl
           const percent = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0
           const tone = toneFor(percent)
           const name = stringField(goal, 'name') || 'Goal'
+          const targetDate = stringField(goal, 'targetDate')
+          const remaining = target - current
+          let requiredLine: { text: string; tone: string } | null = null
+          if (remaining > 0 && targetDate) {
+            const daysUntil = Math.ceil((Date.parse(targetDate) - Date.now()) / (24 * 60 * 60 * 1000))
+            if (Number.isFinite(daysUntil)) {
+              if (daysUntil <= 0) {
+                requiredLine = { text: 'Target date passed', tone: 'text-red-300' }
+              } else {
+                const monthsUntil = Math.max(1, Math.ceil(daysUntil / 30))
+                requiredLine = {
+                  text: `Needs ${formatLkr(remaining / monthsUntil)}/mo to reach by ${targetDate}`,
+                  tone: 'text-[var(--theme-muted)]',
+                }
+              }
+            }
+          }
           return (
             <div key={String(goal.id ?? index)} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
               <div className="flex items-center justify-between text-sm">
@@ -44,6 +61,7 @@ export function SavingsGoalsProgress({ payload }: { payload: PersonalFinancePayl
               <p className="mt-1 text-xs text-[var(--theme-muted)]">
                 {formatLkr(current)} / {formatLkr(target)}
               </p>
+              {requiredLine && <p className={`mt-1 text-xs ${requiredLine.tone}`}>{requiredLine.text}</p>}
             </div>
           )
         })}
