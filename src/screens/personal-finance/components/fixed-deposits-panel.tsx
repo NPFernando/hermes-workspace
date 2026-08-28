@@ -19,7 +19,7 @@ function numberField(row: Record<string, unknown>, key: string): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
-function daysUntil(dateStr: string): number | null {
+export function daysUntil(dateStr: string): number | null {
   const target = Date.parse(dateStr)
   if (!Number.isFinite(target)) return null
   return Math.ceil((target - Date.now()) / (24 * 60 * 60 * 1000))
@@ -31,7 +31,7 @@ const maturityTone = {
   overdue: 'border-red-400/30 bg-red-500/15 text-red-100',
 }
 
-function maturityBadge(remaining: number): { text: string; tone: string } {
+export function maturityBadge(remaining: number): { text: string; tone: string } {
   if (remaining >= 0) {
     const text = `Matures in ${remaining}d`
     return { text, tone: remaining <= 30 ? maturityTone.soon : maturityTone.ok }
