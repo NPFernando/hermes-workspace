@@ -176,7 +176,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | PF-803 | Annual Budgets | planned |
 | PF-804 | Budget vs Actual | existing |
 | PF-805 | Committed Spend | planned |
-| PF-806 | Remaining Budget | partial (variance/percentUsed computed) |
+| PF-806 | Remaining Budget | **existing** (`row.variance` displayed as "Remaining"/"Over by" suffix on each budget `StatCard`) |
 | PF-807 | Projected Spend | planned |
 | PF-808 | Budget Thresholds | partial (boolean overBudget only, no configurable %) |
 | PF-809 | Budget Rollover | planned |
@@ -554,11 +554,13 @@ All three zero-dependency quick wins (PF-006, PF-007, PF-009) are now shipped �
 
 ## Recommended Next Feature
 
-There is no separate "master registry" file distinct from this document — this roadmap doc itself is the living source of truth (confirmed via the commit that introduced it). A scoping pass over this doc's own Phase 1 table found **PF-114** (Transaction Search and Filters) ready with zero unmet dependencies — `date`/`amount` already existed on every `UnifiedTransaction`, so it was a pure, additive client-side filter change. It's now shipped.
+There is no separate "master registry" file distinct from this document — this roadmap doc itself is the living source of truth (confirmed via the commit that introduced it). With Phase 1's easy wins exhausted after PF-114, a scoping pass over Phase 4 (Overview V2) and Phase 8 (Budget V2) checked every `partial` item's actual code (PF-409, PF-410, PF-411, PF-413, PF-800, PF-806, PF-808) and found **PF-806** (Remaining Budget) the smallest and safest: `variance` was already computed server-side and already typed on the client payload, just never rendered — a one-line display change. It's now shipped.
 
-The next adjacent candidate, **PF-115 (Transaction Audit History)**, is *not* actually ready: the existing `appendAuditLog()` (`finance-store.ts`) is a generic, write-only, undifferentiated event log with no read/query path and no before/after field diffs on update/delete. Building a real per-transaction audit view needs two pieces of new plumbing first — a query function keyed by transaction id, and richer audit payloads that capture actual field-level changes — making it a small design task, not a drop-in slice. The remaining Phase 1 items (PF-106 Transaction Types, PF-107 Transfers, PF-108 Transaction Splits, PF-116 Soft Delete) are all explicitly "deferred by the PF-104 slice" pending a real unified-ledger storage migration — larger, higher-risk work, not quick wins.
+The next-best candidate from that same scoping pass is **PF-413 (Data Health)**: `financeStorageStatus()` (`finance-store.ts`) already computes a full `FinanceStorageHealth` object and `personalFinancePayload()` already ships it to the client on every poll — it's fetched but currently dropped on the floor, since `PersonalFinancePayload` doesn't even declare a `storage` field yet and no component renders it. This needs one type-field addition plus one new small card component (not zero-code like PF-806, but still zero backend/schema risk and zero design ambiguity — the semantics are already tested via `finance-storage-monitor.test.ts`).
 
-With Phase 1's easy wins exhausted, the next scoping pass should either (a) design the small audit-log query/diff plumbing PF-115 needs, or (b) look outside Phase 1 — e.g. Phase 4 (Overview V2) or Phase 8 (Budget V2) both have several `partial` items that may have similarly low-risk, dependency-satisfied gaps worth auditing the same way PF-114 was.
+Also purely additive from the same pass, in rough order of remaining scope: **PF-410** (add a derived net-cash-flow line to the already-shipped `FinanceTrendsCard` chart), **PF-409** (Assets vs Liabilities — `debtLkr` and `finance_accounts` already exist and are already client-visible, but needs a small design call on what counts as an "asset" for the breakdown), and **PF-411** (Upcoming Money — no new data needed, but consolidating three already-working badge computations scattered across `payday-status.ts`/`income-sources-panel.tsx`/`fixed-deposits-panel.tsx` into one widget is more refactor surface than a single-file change).
+
+Not ready without design work first: **PF-115** (needs new audit-log query/diff plumbing), **PF-808** (needs a new configurable-threshold schema field and a per-category-vs-global design decision), **PF-800** (not independently scoped — it's the umbrella row for Phase 8's other large `planned` items).
 
 ### Shipped: PF-100/101/102/103 — Account Model
 
@@ -623,3 +625,9 @@ With Phase 1's easy wins exhausted, the next scoping pass should either (a) desi
 - **What was built**: date-range (From/To) and amount-range (Min/Max) filter inputs added to `TransactionsPanel`'s filter bar, composing with the existing search/kind/status filters in the same `filtered` `useMemo`. Purely additive client-side filtering — no server, schema, or Postgres changes, since `date`/`amount` already exist on every `UnifiedTransaction` row.
 - **Known limitation / deliberate scope**: date-range comparison uses plain ISO `YYYY-MM-DD` string comparison (safe and correct given native `<input type="date">` values are already ISO-formatted) — no timezone or partial-date handling was needed or added. Amount filtering compares each transaction's own `amount` field directly; it does not normalize across currencies (e.g. filtering "min 100" matches a 100 USD row and a 100 LKR row equally) — cross-currency amount filtering would need to key off `convertedLkrAmount` instead, and was left out as a separate, deliberate scope decision since the doc's own PF-114 gap description only called for basic date/amount ranges.
 - **Not built** (deliberately deferred, not dropped): no "clear filters" button — each of the seven filter controls is cleared individually today, matching the existing pattern for `filterKind`/`filterStatus`.
+
+### Shipped: PF-806 — Remaining Budget
+
+- **What was built**: `BudgetPanel`'s budget-vs-actual `StatCard`s (`src/screens/personal-finance/components/budget-panel.tsx`) now append a "Remaining LKR X" (under budget) or "Over by LKR X" (over budget) suffix to the existing actual/budget value string, using the already-signed `variance` field (`budgetAmount - actual`) that `budgetVsActualSummary()` (`finance-store.ts`) already computes and that was already typed on `PersonalFinancePayload.budgetVsActual[].variance` — it simply wasn't read by any component before this.
+- **Known limitation / deliberate scope**: purely a display change — no new component, no `StatCard` prop change, no server/schema/Postgres changes. `variance`'s own computation and sign convention were untouched.
+- **Not built** (deliberately deferred, not dropped): no separate progress bar or dedicated "remaining" visual treatment — the existing tone-coded (`good`/`warn`/`danger`) `StatCard` background already communicates over/under-budget status at a glance; the text suffix was judged sufficient for this slice.
