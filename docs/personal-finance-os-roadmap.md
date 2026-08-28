@@ -67,7 +67,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | PF-107 | Transfers | planned | Deferred by the PF-104 slice — no transfer/double-entry concept exists |
 | PF-108 | Transaction Splits | planned | Deferred by the PF-104 slice |
 | PF-109 | Categories | **existing** | `Category` entity + `CategoriesPanel` (add/edit/delete, usage counts, "in use, not yet a category" formalize flow) + shared datalist wired into Transactions/Budget category inputs; free-text `category`/`incomeType` remain the join key for budget-vs-actual, unchanged — no `categoryId` FK yet |
-| PF-110 | Subcategories | planned | Deferred by the PF-104 slice |
+| PF-110 | Subcategories | **existing** | `Subcategory` entity (name + parentCategory, additive, no FK) managed inline in `CategoriesPanel` — chips per category, usage counts, "in use, not yet a subcategory" formalize flow; also fixed a real bug where `ExpenseRecord.subcategory` was silently blanked on every edit |
 | PF-111 | Merchant Registry | planned | Deferred by the PF-104 slice |
 | PF-112 | Tags | planned | Deferred by the PF-104 slice |
 | PF-113 | Pending/Cleared/Reconciled Status | planned | Deferred by the PF-104 slice |
@@ -553,11 +553,11 @@ Dependencies met, scope clear — this is informational status only, nothing her
 - **PF-006** — Fix Fixed Deposit Rate Labelling (zero dependencies)
 - **PF-007** — Improve Investment P/L Display (zero dependencies)
 - **PF-009** — Standardize Money Formatting (zero dependencies)
-- **PF-110** — Subcategories (now that a real `Category` entity exists to hang them off)
+- **PF-111** — Merchant Registry (same additive-catalogue pattern as PF-109/PF-110, now proven twice)
 
 ## Recommended Next Feature
 
-**PF-110 — Subcategories.** `ExpenseRecord.subcategory?` already exists as a field but isn't surfaced in any panel or validated against anything. With `Category` (PF-109) now a real entity, subcategories can be modeled as a name scoped to a parent category (still free text against the expense record, same additive pattern as PF-109 — no FK required to ship real value).
+**PF-111 — Merchant Registry.** `ExpenseRecord.vendor` is free text with no catalogue at all, similar to where `category` was before PF-109. A `Merchant` entity (name + optional default category, additive, no FK — same pattern as `Category`/`Subcategory`) would let a recognized vendor suggest its usual category on entry, building on the vendor→category learned-mapping that already exists in `db.settings.categoryCorrections` (`recordCategoryCorrection`/`getCategoryCorrections`, used today only to hint the AI extractor).
 
 PF-006, PF-007, and PF-009 remain independent zero-risk quick wins that can be done any time without touching Phase 1.
 
@@ -578,3 +578,10 @@ PF-006, PF-007, and PF-009 remain independent zero-risk quick wins that can be d
 - **What was built**: a new `Category` entity (`id, name, kind: 'income'|'expense'|'both', color?, notes?`) as a net-new `categories` collection (JSON + `personal_finance` Postgres mirror), managed via `CategoriesPanel` (`src/screens/personal-finance/components/categories-panel.tsx`) — add/edit/delete, a usage count per category computed by matching its name against existing `expense_records`/`income_records`/`budget_categories`, and an "in use, not yet a category" section listing free-text category strings that don't yet have a matching `Category` row, each with a one-click button to formalize it (never automatic). A shared `<datalist id="pf-known-categories">` is wired into the existing free-text category inputs in `TransactionsPanel` and `BudgetPanel` for native browser autocomplete.
 - **Known limitation / deliberate scope**: `ExpenseRecord.category`, `IncomeRecord.incomeType`, and `BudgetCategory.category` remain plain free-text strings — `getBudgetVsActual`'s exact-string join is completely untouched. Renaming or deleting a `Category` row does not retroactively update any existing record's free-text field (the panel's own copy says this explicitly).
 - **Not built** (deliberately deferred, not dropped): a `categoryId` foreign key on expense/income/budget records, and rewriting the budget-vs-actual join to key on ID instead of name — both remain real future work once this entity has proven itself in use.
+
+### Shipped: PF-110 — Subcategories
+
+- **What was built**: a new `Subcategory` entity (`id, name, parentCategory, source, createdAt, updatedAt`) as a net-new `subcategories` collection (JSON + `personal_finance` Postgres mirror), managed inline within `CategoriesPanel` — each category row shows its subcategories as removable chips with a usage count, plus an inline add-input scoped to that category, and an "in use, not yet a subcategory" section mirroring the category one. A shared `<datalist id="pf-known-subcategories">` is wired into `TransactionsPanel`'s subcategory inputs.
+- **Bug fixed as part of this work**: `getUnifiedTransactions()` never included `ExpenseRecord.subcategory` in the unified view `TransactionsPanel` reads from — subcategory was invisible in the transaction list, and `startEdit()` always seeded the edit form's subcategory field as blank, so opening the editor for any expense with an existing subcategory and saving would silently erase it. Fixed by adding `subcategory` to `UnifiedTransaction` and its mapping; verified via a regression test and live Playwright confirmation that editing no longer blanks the field.
+- **Known limitation / deliberate scope**: `ExpenseRecord.subcategory` remains a plain free-text string, scoped to a parent category by name only (not an FK) — identical tradeoff to PF-109. No income-side subcategory concept exists or was added (`IncomeRecord` has none).
+- **Not built** (deliberately deferred, not dropped): a `subcategoryId`/`categoryId` foreign key, per-category-filtered datalist (ships one flat list of every subcategory name, same simplicity as the category datalist), and subcategory-level budgets.
