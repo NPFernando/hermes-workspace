@@ -1,10 +1,12 @@
 import { useMemo } from 'react'
 import {
   Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -40,7 +42,7 @@ function stringField(row: Record<string, unknown>, key: string): string {
   return typeof value === 'string' ? value : ''
 }
 
-export type TrendPoint = { month: string; label: string; income: number; expense: number }
+export type TrendPoint = { month: string; label: string; income: number; expense: number; net: number }
 
 export function buildTrendData(
   months: Array<string>,
@@ -57,12 +59,11 @@ export function buildTrendData(
     const month = stringField(row, 'date').slice(0, 7)
     expenseByMonth.set(month, (expenseByMonth.get(month) ?? 0) + numberField(row, 'convertedLkrAmount'))
   }
-  return months.map((month) => ({
-    month,
-    label: monthLabel(month),
-    income: incomeByMonth.get(month) ?? 0,
-    expense: expenseByMonth.get(month) ?? 0,
-  }))
+  return months.map((month) => {
+    const income = incomeByMonth.get(month) ?? 0
+    const expense = expenseByMonth.get(month) ?? 0
+    return { month, label: monthLabel(month), income, expense, net: income - expense }
+  })
 }
 
 export type CategoryTotal = { category: string; amount: number }
@@ -104,10 +105,16 @@ export function FinanceTrendsCard({ payload }: { payload: PersonalFinancePayload
       <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
         <h2 className="text-lg font-semibold text-[var(--theme-text)]">Income vs. expense</h2>
         <p className="text-xs text-[var(--theme-muted)]">Last {MONTHS_BACK} months, LKR-converted totals.</p>
+        {hasTrendData && (
+          <p className="text-xs text-[var(--theme-muted)]">
+            This month&apos;s net: {trendData[trendData.length - 1].net >= 0 ? '+' : ''}
+            {formatLkr(trendData[trendData.length - 1].net)}
+          </p>
+        )}
         {hasTrendData ? (
           <div className="mt-3 h-[220px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <ComposedChart data={trendData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="pfIncome" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#34d399" stopOpacity={0.4} />
@@ -131,9 +138,11 @@ export function FinanceTrendsCard({ payload }: { payload: PersonalFinancePayload
                   contentStyle={{ background: 'var(--theme-panel)', border: '1px solid var(--theme-border)', borderRadius: 8, fontSize: 11 }}
                   formatter={(value: number, name: string) => [formatLkr(value), name]}
                 />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Area type="monotone" dataKey="income" name="Income" stroke="#34d399" fill="url(#pfIncome)" strokeWidth={1.6} dot={false} />
                 <Area type="monotone" dataKey="expense" name="Expense" stroke="#f87171" fill="url(#pfExpense)" strokeWidth={1.6} dot={false} />
-              </AreaChart>
+                <Line type="monotone" dataKey="net" name="Net" stroke="#38bdf8" strokeWidth={2} strokeDasharray="4 2" dot={false} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         ) : (

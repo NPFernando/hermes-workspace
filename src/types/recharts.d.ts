@@ -8,6 +8,8 @@ declare module 'recharts' {
   export const Bar: ComponentType<any>
   export const LineChart: ComponentType<any>
   export const Line: ComponentType<any>
+  export const ComposedChart: ComponentType<any>
+  export const Legend: ComponentType<any>
   export const CartesianGrid: ComponentType<any>
   export const XAxis: ComponentType<any>
   export const YAxis: ComponentType<any>
