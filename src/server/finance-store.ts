@@ -178,6 +178,23 @@ export type BudgetCategory = {
   updatedAt: string
 }
 
+/**
+ * Real category entity (PF-109) alongside the free-text `category`/`incomeType`
+ * strings on ExpenseRecord/IncomeRecord/BudgetCategory, which remain the
+ * source of truth for the budget-vs-actual join (getBudgetVsActual). This is
+ * additive: a management catalogue, not a foreign key on existing records.
+ */
+export type Category = {
+  id: string
+  name: string
+  kind: 'income' | 'expense' | 'both'
+  color?: string
+  notes?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type SavingsGoal = {
   id: string
   name: string
@@ -608,6 +625,7 @@ export type FinanceDatabase = {
   income_records: Array<IncomeRecord>
   expense_records: Array<ExpenseRecord>
   budget_categories: Array<BudgetCategory>
+  categories: Array<Category>
   savings_goals: Array<SavingsGoal>
   tax_records: Array<TaxRecord>
   pending_ingestions: Array<PendingIngestion>
@@ -704,6 +722,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     income_records: [],
     expense_records: [],
     budget_categories: [],
+    categories: [],
     savings_goals: [],
     tax_records: [],
     pending_ingestions: [],
@@ -824,6 +843,7 @@ function mirrorIntoSplitStores(db: FinanceDatabase): void {
     income_records: db.income_records,
     expense_records: db.expense_records,
     budget_categories: db.budget_categories,
+    categories: db.categories,
     savings_goals: db.savings_goals,
     tax_records: db.tax_records,
     exchange_rates: db.exchange_rates,
@@ -899,6 +919,7 @@ function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
           income_records: personal.income_records,
           expense_records: personal.expense_records,
           budget_categories: personal.budget_categories,
+          categories: personal.categories ?? [],
           savings_goals: personal.savings_goals,
           tax_records: personal.tax_records,
           exchange_rates: personal.exchange_rates,
@@ -1397,6 +1418,14 @@ export function addFinanceRecord(
       currency: stringField(payload, 'currency', 'LKR'),
       budgetAmount: numberField(payload, 'budgetAmount', 0),
     })
+  } else if (kind === 'category') {
+    db.categories.push({
+      ...base,
+      name: stringField(payload, 'name', 'Untitled'),
+      kind: categoryKind(payload.kind),
+      color: optionalString(payload, 'color'),
+      notes: optionalString(payload, 'notes'),
+    })
   } else if (kind === 'income_source') {
     db.income_sources.push({
       ...base,
@@ -1527,6 +1556,12 @@ export function updateFinanceRecord(
       }
       updated = true
     }
+  } else if (kind === 'category') {
+    const index = db.categories.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.categories[index] = { ...db.categories[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
   } else if (kind === 'income_source') {
     const index = db.income_sources.findIndex((r) => r.id === id)
     if (index !== -1) {
@@ -1594,6 +1629,10 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.budget_categories.length
     db.budget_categories = db.budget_categories.filter((r) => r.id !== id)
     removed = db.budget_categories.length !== before
+  } else if (kind === 'category') {
+    const before = db.categories.length
+    db.categories = db.categories.filter((r) => r.id !== id)
+    removed = db.categories.length !== before
   } else if (kind === 'income_source') {
     const before = db.income_sources.length
     db.income_sources = db.income_sources.filter((r) => r.id !== id)
@@ -2280,6 +2319,11 @@ function accountType(value: unknown): FinanceAccount['type'] {
   return allowed.includes(value as FinanceAccount['type'])
     ? (value as FinanceAccount['type'])
     : 'other'
+}
+
+function categoryKind(value: unknown): Category['kind'] {
+  const allowed: Array<Category['kind']> = ['income', 'expense', 'both']
+  return allowed.includes(value as Category['kind']) ? (value as Category['kind']) : 'both'
 }
 
 function goalStatus(value: unknown): GoalStatus {

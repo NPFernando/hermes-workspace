@@ -12,6 +12,7 @@ import { StockHoldingsPanel } from './components/stock-holdings-panel'
 import { FixedDepositsPanel } from './components/fixed-deposits-panel'
 import { AccountsPanel } from './components/accounts-panel'
 import { TransactionsPanel } from './components/transactions-panel'
+import { CategoriesPanel } from './components/categories-panel'
 import { formatLkr, formatPct } from './utils'
 import type { PersonalFinancePayload } from './types'
 
@@ -303,6 +304,7 @@ export function PersonalFinanceScreen() {
         <section className="mt-6 grid gap-4">
           <AccountsPanel payload={payload} onPayload={setPayload} />
           <TransactionsPanel payload={payload} onPayload={setPayload} />
+          <CategoriesPanel payload={payload} onPayload={setPayload} />
           <DataTable
             title="Budget categories"
             rows={payload.data.budget_categories}

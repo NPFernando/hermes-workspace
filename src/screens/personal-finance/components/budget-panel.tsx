@@ -114,6 +114,7 @@ export function BudgetPanel({
               placeholder="Category (e.g. Groceries)"
               value={budgetCategory}
               onChange={(e) => setBudgetCategory(e.target.value)}
+              list="pf-known-categories"
               className={inputClass}
             />
             <input
@@ -164,6 +165,7 @@ export function BudgetPanel({
               placeholder="Category"
               value={expenseCategory}
               onChange={(e) => setExpenseCategory(e.target.value)}
+              list="pf-known-categories"
               className={inputClass}
             />
             <input

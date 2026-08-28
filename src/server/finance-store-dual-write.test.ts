@@ -146,6 +146,7 @@ describe('readFinanceStore split-store overlay (Phase 5 read cutover step)', () 
       income_records: [{ id: 'stale-income', source: 'stale' }],
       expense_records: [],
       budget_categories: [],
+      categories: [],
       savings_goals: [],
       tax_records: [],
       exchange_rates: [],

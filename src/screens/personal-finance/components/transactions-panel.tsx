@@ -293,6 +293,7 @@ export function TransactionsPanel({
           placeholder={addKind === 'income' ? 'Income type' : 'Category'}
           value={category}
           onChange={(e) => setCategory(e.target.value)}
+          list="pf-known-categories"
           className={inputClass}
         />
         {addKind === 'expense' && (
@@ -405,6 +406,7 @@ export function TransactionsPanel({
                     placeholder={kind === 'income' ? 'Income type' : 'Category'}
                     value={editDrafts[id].category}
                     onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], category: e.target.value } }))}
+                    list="pf-known-categories"
                     className={inputClass}
                   />
                   {kind === 'expense' && (
