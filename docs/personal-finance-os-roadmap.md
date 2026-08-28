@@ -68,7 +68,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | PF-108 | Transaction Splits | planned | Deferred by the PF-104 slice |
 | PF-109 | Categories | **existing** | `Category` entity + `CategoriesPanel` (add/edit/delete, usage counts, "in use, not yet a category" formalize flow) + shared datalist wired into Transactions/Budget category inputs; free-text `category`/`incomeType` remain the join key for budget-vs-actual, unchanged — no `categoryId` FK yet |
 | PF-110 | Subcategories | **existing** | `Subcategory` entity (name + parentCategory, additive, no FK) managed inline in `CategoriesPanel` — chips per category, usage counts, "in use, not yet a subcategory" formalize flow; also fixed a real bug where `ExpenseRecord.subcategory` was silently blanked on every edit |
-| PF-111 | Merchant Registry | planned | Deferred by the PF-104 slice |
+| PF-111 | Merchant Registry | **existing** | `Merchant` entity (name + optional defaultCategory, additive, no FK) via `MerchantsPanel`; vendor input in `TransactionsPanel` now autocompletes against known merchants and auto-fills category on blur when the category field is empty |
 | PF-112 | Tags | planned | Deferred by the PF-104 slice |
 | PF-113 | Pending/Cleared/Reconciled Status | planned | Deferred by the PF-104 slice |
 | PF-114 | Transaction Search and Filters | partial | `TransactionsPanel` now has basic counterparty/category search + kind filter (client-side); no date-range or amount filters yet |
@@ -553,13 +553,12 @@ Dependencies met, scope clear — this is informational status only, nothing her
 - **PF-006** — Fix Fixed Deposit Rate Labelling (zero dependencies)
 - **PF-007** — Improve Investment P/L Display (zero dependencies)
 - **PF-009** — Standardize Money Formatting (zero dependencies)
-- **PF-111** — Merchant Registry (same additive-catalogue pattern as PF-109/PF-110, now proven twice)
 
 ## Recommended Next Feature
 
-**PF-111 — Merchant Registry.** `ExpenseRecord.vendor` is free text with no catalogue at all, similar to where `category` was before PF-109. A `Merchant` entity (name + optional default category, additive, no FK — same pattern as `Category`/`Subcategory`) would let a recognized vendor suggest its usual category on entry, building on the vendor→category learned-mapping that already exists in `db.settings.categoryCorrections` (`recordCategoryCorrection`/`getCategoryCorrections`, used today only to hint the AI extractor).
+**PF-006 — Fix Fixed Deposit Rate Labelling.** The additive-catalogue pattern (Category → Subcategory → Merchant) has now shipped three times in a row; the next catalogue-style items (PF-112 Tags, PF-113 Pending/Cleared/Reconciled Status) are real but PF-006/PF-007/PF-009 have been sitting `Ready Now` the longest without being picked — small, zero-dependency, zero-risk fixes worth clearing before starting a fourth catalogue.
 
-PF-006, PF-007, and PF-009 remain independent zero-risk quick wins that can be done any time without touching Phase 1.
+PF-007 and PF-009 remain independent zero-risk quick wins that can be done any time without touching Phase 1.
 
 ### Shipped: PF-100/101/102/103 — Account Model
 
@@ -585,3 +584,9 @@ PF-006, PF-007, and PF-009 remain independent zero-risk quick wins that can be d
 - **Bug fixed as part of this work**: `getUnifiedTransactions()` never included `ExpenseRecord.subcategory` in the unified view `TransactionsPanel` reads from — subcategory was invisible in the transaction list, and `startEdit()` always seeded the edit form's subcategory field as blank, so opening the editor for any expense with an existing subcategory and saving would silently erase it. Fixed by adding `subcategory` to `UnifiedTransaction` and its mapping; verified via a regression test and live Playwright confirmation that editing no longer blanks the field.
 - **Known limitation / deliberate scope**: `ExpenseRecord.subcategory` remains a plain free-text string, scoped to a parent category by name only (not an FK) — identical tradeoff to PF-109. No income-side subcategory concept exists or was added (`IncomeRecord` has none).
 - **Not built** (deliberately deferred, not dropped): a `subcategoryId`/`categoryId` foreign key, per-category-filtered datalist (ships one flat list of every subcategory name, same simplicity as the category datalist), and subcategory-level budgets.
+
+### Shipped: PF-111 — Merchant Registry
+
+- **What was built**: a new `Merchant` entity (`id, name, defaultCategory?, notes?, source, createdAt, updatedAt`) as a net-new `merchants` collection (JSON + `personal_finance` Postgres mirror), managed via a new sibling `MerchantsPanel` (`src/screens/personal-finance/components/merchants-panel.tsx` — a separate file from `CategoriesPanel`, which already carried two catalogue blocks) — add/edit/delete, a usage count per merchant, and an "in use, not yet a merchant" formalize section. `TransactionsPanel`'s vendor input gained a `pf-known-merchants` datalist (the first vendor-side autocomplete in the codebase) and an on-blur handler that fills the category field from a recognized merchant's `defaultCategory` — only when the category field is empty, so a manually-typed category is never overwritten.
+- **Known limitation / deliberate scope**: `ExpenseRecord.vendor` remains a plain free-text string (no FK); the existing AI-extraction vendor→category hint map (`db.settings.categoryCorrections`) was deliberately left untouched — it stays exclusively the ingestion-hinting mechanism it already was, not merged with or read from this new catalogue.
+- **Not built** (deliberately deferred, not dropped): a `merchantId` foreign key, fuzzy/case-insensitive matching for the auto-fill (exact match only), and any income-side "payer" catalogue (no such concept exists or was needed — `IncomeRecord.sourceName` stays plain text).
