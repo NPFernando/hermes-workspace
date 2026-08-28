@@ -33,6 +33,8 @@ export interface PersonalFinanceSlice {
   categories?: Array<Record<string, unknown>>
   /** Optional: absent on a mirror file written before PF-110 shipped. */
   subcategories?: Array<Record<string, unknown>>
+  /** Optional: absent on a mirror file written before PF-111 shipped. */
+  merchants?: Array<Record<string, unknown>>
   savings_goals: Array<Record<string, unknown>>
   tax_records: Array<Record<string, unknown>>
   exchange_rates: Array<Record<string, unknown>>

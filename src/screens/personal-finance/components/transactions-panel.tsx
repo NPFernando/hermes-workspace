@@ -32,6 +32,12 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+function merchantDefaultCategory(merchants: Array<Record<string, unknown>>, vendorName: string): string | undefined {
+  const match = merchants.find((m) => stringField(m, 'name') === vendorName)
+  const defaultCategory = match ? stringField(match, 'defaultCategory') : ''
+  return defaultCategory || undefined
+}
+
 type EditDraft = {
   date: string
   counterparty: string
@@ -286,6 +292,12 @@ export function TransactionsPanel({
           placeholder={addKind === 'income' ? 'Source name' : 'Vendor'}
           value={counterparty}
           onChange={(e) => setCounterparty(e.target.value)}
+          onBlur={() => {
+            if (addKind !== 'expense' || category.trim()) return
+            const guess = merchantDefaultCategory(payload.data.merchants, counterparty.trim())
+            if (guess) setCategory(guess)
+          }}
+          list={addKind === 'expense' ? 'pf-known-merchants' : undefined}
           className={inputClass}
         />
         <input
@@ -400,6 +412,12 @@ export function TransactionsPanel({
                     onChange={(e) =>
                       setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], counterparty: e.target.value } }))
                     }
+                    onBlur={() => {
+                      if (kind !== 'expense' || editDrafts[id].category.trim()) return
+                      const guess = merchantDefaultCategory(payload.data.merchants, editDrafts[id].counterparty.trim())
+                      if (guess) setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], category: guess } }))
+                    }}
+                    list={kind === 'expense' ? 'pf-known-merchants' : undefined}
                     className={inputClass}
                   />
                   <input

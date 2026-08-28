@@ -819,6 +819,49 @@ describe('subcategory_entry (PF-110 Subcategories)', () => {
   })
 })
 
+describe('merchant (PF-111 Merchant Registry)', () => {
+  let tmp: string
+  let realHome: string | undefined
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-merchants-'))
+    realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+  })
+  afterEach(() => {
+    if (realHome === undefined) delete process.env.HOME
+    else process.env.HOME = realHome
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('adds, edits, then deletes a merchant', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('merchant', { name: 'Cargills', defaultCategory: 'Groceries' })
+    let db = store.readFinanceStore()
+    expect(db.merchants).toHaveLength(1)
+    expect(db.merchants[0]).toMatchObject({ name: 'Cargills', defaultCategory: 'Groceries' })
+    const id = db.merchants[0].id
+
+    store.updateFinanceRecord('merchant', id, { name: 'Cargills Food City' })
+    db = store.readFinanceStore()
+    expect(db.merchants[0].name).toBe('Cargills Food City')
+    // Untouched fields survive the shallow-merge update, same as every other kind.
+    expect(db.merchants[0].defaultCategory).toBe('Groceries')
+
+    store.deleteFinanceRecord('merchant', id)
+    db = store.readFinanceStore()
+    expect(db.merchants).toHaveLength(0)
+  })
+
+  it('supports a merchant with no default category or notes (optional fields)', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('merchant', { name: 'Unknown Vendor' })
+    const db = store.readFinanceStore()
+    expect(db.merchants[0].defaultCategory).toBeUndefined()
+    expect(db.merchants[0].notes).toBeUndefined()
+  })
+})
+
 describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
   it('maps income and expense records into the shared shape with renamed fields', () => {
     const db = createEmptyFinanceDatabase()
