@@ -475,6 +475,7 @@ export function TransactionsPanel({
           const amountValue = numberField(txn, 'amount')
           const txnStatus = stringField(txn, 'status') || 'cleared'
           const documentRef = stringField(txn, 'documentRef')
+          const txnSource = stringField(txn, 'source') || 'manual'
 
           return (
             <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
@@ -624,6 +625,11 @@ export function TransactionsPanel({
                         className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${txnStatus === 'pending' ? 'bg-amber-500/25 text-amber-100' : 'bg-indigo-500/25 text-indigo-100'}`}
                       >
                         {txnStatus === 'pending' ? 'Pending' : 'Reconciled'}
+                      </span>
+                    )}
+                    {txnSource !== 'manual' && (
+                      <span className="mr-1.5 rounded-full bg-sky-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-sky-100">
+                        {txnSource === 'gmail' ? 'via Gmail' : txnSource === 'upload' ? 'via Upload' : txnSource}
                       </span>
                     )}
                     <span className="font-medium text-[var(--theme-text)]">{stringField(txn, 'counterparty')}</span>{' '}
