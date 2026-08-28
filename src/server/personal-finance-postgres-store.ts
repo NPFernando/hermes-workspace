@@ -211,6 +211,11 @@ CREATE TABLE IF NOT EXISTS subcategories (
   source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS merchants (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, default_category TEXT, notes TEXT,
+  source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS savings_goals (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, target_amount DOUBLE PRECISION NOT NULL, current_amount DOUBLE PRECISION NOT NULL,
   currency TEXT NOT NULL, target_date TEXT, monthly_contribution DOUBLE PRECISION NOT NULL, priority DOUBLE PRECISION NOT NULL,
@@ -352,6 +357,18 @@ function subcategoryRows(rowsIn: Array<Record<string, unknown>>): Array<Array<st
   ])
 }
 
+function merchantRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  return rowsIn.map((row) => [
+    sqlText(firstText(row, 'id')),
+    sqlText(firstText(row, 'name')),
+    sqlNullableText(row.defaultCategory),
+    sqlNullableText(row.notes),
+    sqlText(firstText(row, 'source', 'manual')),
+    sqlText(firstText(row, 'createdAt')),
+    sqlText(firstText(row, 'updatedAt')),
+  ])
+}
+
 function savingsGoalRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
@@ -459,6 +476,7 @@ DELETE FROM expense_records;
 DELETE FROM budget_categories;
 DELETE FROM categories;
 DELETE FROM subcategories;
+DELETE FROM merchants;
 DELETE FROM savings_goals;
 DELETE FROM tax_records;
 DELETE FROM income_sources;
@@ -510,6 +528,12 @@ ${insertRows(
   'subcategories',
   ['id', 'name', 'parent_category', 'source', 'created_at', 'updated_at'],
   subcategoryRows(rows(slice.subcategories)),
+)}
+
+${insertRows(
+  'merchants',
+  ['id', 'name', 'default_category', 'notes', 'source', 'created_at', 'updated_at'],
+  merchantRows(rows(slice.merchants)),
 )}
 
 ${insertRows(

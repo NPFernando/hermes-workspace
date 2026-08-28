@@ -210,6 +210,23 @@ export type Subcategory = {
   updatedAt: string
 }
 
+/**
+ * Real merchant entity (PF-111), scoped alongside the free-text
+ * ExpenseRecord.vendor field — same additive pattern as Category/Subcategory:
+ * a management catalogue, not a foreign key. `defaultCategory` (also free
+ * text) powers a UI convenience (auto-fill category when a known merchant is
+ * entered), never a hard link.
+ */
+export type Merchant = {
+  id: string
+  name: string
+  defaultCategory?: string
+  notes?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type SavingsGoal = {
   id: string
   name: string
@@ -642,6 +659,7 @@ export type FinanceDatabase = {
   budget_categories: Array<BudgetCategory>
   categories: Array<Category>
   subcategories: Array<Subcategory>
+  merchants: Array<Merchant>
   savings_goals: Array<SavingsGoal>
   tax_records: Array<TaxRecord>
   pending_ingestions: Array<PendingIngestion>
@@ -740,6 +758,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     budget_categories: [],
     categories: [],
     subcategories: [],
+    merchants: [],
     savings_goals: [],
     tax_records: [],
     pending_ingestions: [],
@@ -862,6 +881,7 @@ function mirrorIntoSplitStores(db: FinanceDatabase): void {
     budget_categories: db.budget_categories,
     categories: db.categories,
     subcategories: db.subcategories,
+    merchants: db.merchants,
     savings_goals: db.savings_goals,
     tax_records: db.tax_records,
     exchange_rates: db.exchange_rates,
@@ -939,6 +959,7 @@ function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
           budget_categories: personal.budget_categories,
           categories: personal.categories ?? [],
           subcategories: personal.subcategories ?? [],
+          merchants: personal.merchants ?? [],
           savings_goals: personal.savings_goals,
           tax_records: personal.tax_records,
           exchange_rates: personal.exchange_rates,
@@ -1451,6 +1472,13 @@ export function addFinanceRecord(
       name: stringField(payload, 'name', 'Untitled'),
       parentCategory: stringField(payload, 'parentCategory', 'Other'),
     })
+  } else if (kind === 'merchant') {
+    db.merchants.push({
+      ...base,
+      name: stringField(payload, 'name', 'Untitled'),
+      defaultCategory: optionalString(payload, 'defaultCategory'),
+      notes: optionalString(payload, 'notes'),
+    })
   } else if (kind === 'income_source') {
     db.income_sources.push({
       ...base,
@@ -1593,6 +1621,12 @@ export function updateFinanceRecord(
       db.subcategories[index] = { ...db.subcategories[index], ...payload, updatedAt: nowIso() }
       updated = true
     }
+  } else if (kind === 'merchant') {
+    const index = db.merchants.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.merchants[index] = { ...db.merchants[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
   } else if (kind === 'income_source') {
     const index = db.income_sources.findIndex((r) => r.id === id)
     if (index !== -1) {
@@ -1668,6 +1702,10 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.subcategories.length
     db.subcategories = db.subcategories.filter((r) => r.id !== id)
     removed = db.subcategories.length !== before
+  } else if (kind === 'merchant') {
+    const before = db.merchants.length
+    db.merchants = db.merchants.filter((r) => r.id !== id)
+    removed = db.merchants.length !== before
   } else if (kind === 'income_source') {
     const before = db.income_sources.length
     db.income_sources = db.income_sources.filter((r) => r.id !== id)
