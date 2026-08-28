@@ -497,7 +497,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 
 | ID | Feature | Status |
 |---|---|---|
-| DATA-100 | Versioned JSON Export | partial (export exists, PR #71; no explicit schema version) |
+| DATA-100 | Versioned JSON Export | **existing** (export now includes `schemaVersion: db.schemaVersion`) |
 | DATA-101 | CSV Transaction Export | planned |
 | DATA-102 | Investment Export | **existing** (`stock_holdings`/`fixed_deposits` were already both included in the general JSON export — roadmap-accuracy fix, no code change) |
 | DATA-103 | Import | planned |
@@ -566,7 +566,7 @@ There is no separate "master registry" file distinct from this document — this
 
 A follow-up scoping pass over Phase 3 (Personal Financial Rules), Phase 10 (Goals/Emergency Funds), and Phase 42 (Backup/Import) found **PF-1003 (Required Monthly Contribution)** the clear next pick — fully additive, reusing `SavingsGoal`'s already-stored `targetAmount`/`currentAmount`/`targetDate`. It's now shipped. The same pass also caught that **DATA-102 (Investment Export)** was already fully satisfied by the existing export and just needed its status corrected — done in the same PR, no code required.
 
-The next candidate from this pass is **DATA-100** (stamp the already-existing `db.schemaVersion` into the JSON export — a one-line, zero-risk change, though with less user-visible value than PF-1003 had).
+**DATA-100** is also now shipped — the one-line `schemaVersion` stamp closes out the Phase 42 quick wins found in that pass. The phase's remaining actionable items (DATA-101 CSV export, DATA-103 Import, DATA-108 Schema Version enforcement/migrations, DATA-109 Migration Compatibility) are all genuinely `planned` — real design/build efforts, not further quick wins — so the next step is another fresh registry pass rather than continuing Phase 42.
 
 Not ready without design work first: **PF-115** (needs new audit-log query/diff plumbing), **PF-808** (needs a new configurable-threshold schema field and a per-category-vs-global design decision), **PF-800** (not independently scoped — it's the umbrella row for Phase 8's other large `planned` items), **PF-300** (Financial Rules Model — needs a wholly new entity with no existing analog), **PF-304** (Savings Rate Target — technically small, but would pre-empt where Phase 3's other threshold rules end up living; an ordering problem, not a size problem), **PF-1004** (Account-Linked Goals — blocked on whether linking should derive `currentAmount` from the account, plus `DataTable` having no select/dropdown input type).
 
@@ -672,3 +672,10 @@ This closes out the Phase 4/8 scoping pass — see "Recommended Next Feature" ab
 - **Edge cases resolved in-PR**: no line shown when there's no `targetDate` (can't compute) or when the goal is already met/exceeded (nothing further required); shows "Target date passed" instead of a divide-by-zero/nonsensical figure when the date has elapsed without meeting the goal.
 - **Roadmap-accuracy fix bundled in the same PR**: **DATA-102 (Investment Export)** was found already fully satisfied by the existing JSON export (both `stock_holdings` and `fixed_deposits` already included) — reclassified to `existing`, no code change needed.
 - **Known limitation / deliberate scope**: `monthsUntil` floors to a minimum of 1 to avoid an inflated per-month figure for near-term dates; this environment had zero live savings goals at verification time, so the feature was verified with a temporary test goal rather than real user data.
+
+### Shipped: DATA-100 — Versioned JSON Export
+
+- **What was built**: `GET /api/finance-export` (`src/routes/api/finance-export.ts`) now includes `schemaVersion: db.schemaVersion` in the exported object — a single field reusing the already-existing `FinanceDatabase.schemaVersion` (itself populated from the already-existing `FINANCE_SCHEMA_VERSION` constant, currently `1`). No new constant, no new concept, no server/schema changes.
+- **Known limitation / deliberate scope**: this is the data's own existing schema version, not a separate export-format version — DATA-108 (Schema Version, still `planned`) would be where a distinct migration/versioning concept lives if one is ever needed; this slice deliberately didn't invent one.
+
+This closes out Phase 42's quick wins from this scoping pass — see "Recommended Next Feature" above for what to scope next.
