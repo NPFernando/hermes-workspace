@@ -862,6 +862,64 @@ describe('merchant (PF-111 Merchant Registry)', () => {
   })
 })
 
+describe('tag (PF-112 Tags)', () => {
+  let tmp: string
+  let realHome: string | undefined
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-tags-'))
+    realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+  })
+  afterEach(() => {
+    if (realHome === undefined) delete process.env.HOME
+    else process.env.HOME = realHome
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('adds, edits, then deletes a tag', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('tag', { name: 'Travel', notes: 'Trip-related spending' })
+    let db = store.readFinanceStore()
+    expect(db.tags).toHaveLength(1)
+    expect(db.tags[0]).toMatchObject({ name: 'Travel', notes: 'Trip-related spending' })
+    const id = db.tags[0].id
+
+    store.updateFinanceRecord('tag', id, { name: 'Travel & Leisure' })
+    db = store.readFinanceStore()
+    expect(db.tags[0].name).toBe('Travel & Leisure')
+    // Untouched fields survive the shallow-merge update, same as every other kind.
+    expect(db.tags[0].notes).toBe('Trip-related spending')
+
+    store.deleteFinanceRecord('tag', id)
+    db = store.readFinanceStore()
+    expect(db.tags).toHaveLength(0)
+  })
+
+  it('supports a tag with no notes (optional field)', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('tag', { name: 'Work' })
+    const db = store.readFinanceStore()
+    expect(db.tags[0].notes).toBeUndefined()
+  })
+
+  it('round-trips tags on expense and income records through add/update', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('expense', { vendor: 'Test', category: 'Other', amount: 10, tags: 'work, travel' })
+    let db = store.readFinanceStore()
+    expect(db.expense_records[0].tags).toBe('work, travel')
+    const expenseId = db.expense_records[0].id
+    store.updateFinanceRecord('expense', expenseId, { vendor: 'Test Updated' })
+    db = store.readFinanceStore()
+    // Untouched tags survive the shallow-merge update.
+    expect(db.expense_records[0].tags).toBe('work, travel')
+
+    store.addFinanceRecord('income', { sourceName: 'Test', incomeType: 'Other income', originalAmount: 10, tags: 'bonus' })
+    db = store.readFinanceStore()
+    expect(db.income_records[0].tags).toBe('bonus')
+  })
+})
+
 describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
   it('maps income and expense records into the shared shape with renamed fields', () => {
     const db = createEmptyFinanceDatabase()
@@ -876,6 +934,7 @@ describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
       convertedLkrAmount: 100_000,
       taxable: true,
       incomeSourceId: 'job-1',
+      tags: 'salary, primary',
       source: 'test',
       createdAt: '2026-06-01T00:00:00.000Z',
       updatedAt: '2026-06-01T00:00:00.000Z',
@@ -892,6 +951,7 @@ describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
       recurring: true,
       workRelated: true,
       taxDeductiblePossible: true,
+      tags: 'work',
       source: 'test',
       createdAt: '2026-06-02T00:00:00.000Z',
       updatedAt: '2026-06-02T00:00:00.000Z',
@@ -910,6 +970,7 @@ describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
       amount: 100_000,
       taxable: true,
       incomeSourceId: 'job-1',
+      tags: 'salary, primary',
     })
     expect(income?.recurring).toBeUndefined()
 
@@ -923,6 +984,7 @@ describe('getUnifiedTransactions (PF-104 Unified Transaction Model)', () => {
       currency: 'USD',
       amount: 10,
       recurring: true,
+      tags: 'work',
     })
     expect(expense?.taxable).toBeUndefined()
   })

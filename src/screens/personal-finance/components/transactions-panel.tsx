@@ -25,6 +25,13 @@ function boolField(row: Record<string, unknown>, key: string): boolean {
   return row[key] === true
 }
 
+function splitTags(value: string): Array<string> {
+  return value
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+}
+
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -40,6 +47,7 @@ type EditDraft = {
   counterparty: string
   category: string
   subcategory: string
+  tags: string
   currency: string
   amount: string
   accountId: string
@@ -72,6 +80,7 @@ export function TransactionsPanel({
   const [counterparty, setCounterparty] = useState('')
   const [category, setCategory] = useState('')
   const [subcategory, setSubcategory] = useState('')
+  const [tags, setTags] = useState('')
   const [currency, setCurrency] = useState('LKR')
   const [amount, setAmount] = useState('')
   const [accountId, setAccountId] = useState('')
@@ -94,6 +103,7 @@ export function TransactionsPanel({
     const shared = {
       accountId: accountId || undefined,
       notes: notes.trim() || undefined,
+      tags: tags.trim() || undefined,
     }
     const data =
       addKind === 'income'
@@ -136,6 +146,7 @@ export function TransactionsPanel({
       setCounterparty('')
       setCategory('')
       setSubcategory('')
+      setTags('')
       setAmount('')
       setNotes('')
       setDate(todayIso())
@@ -151,6 +162,7 @@ export function TransactionsPanel({
         counterparty: stringField(txn, 'counterparty'),
         category: stringField(txn, 'category'),
         subcategory: stringField(txn, 'subcategory'),
+        tags: stringField(txn, 'tags'),
         currency: stringField(txn, 'currency') || 'LKR',
         amount: String(numberField(txn, 'amount')),
         accountId: stringField(txn, 'accountId'),
@@ -175,6 +187,7 @@ export function TransactionsPanel({
     const shared = {
       accountId: draft.accountId || undefined,
       notes: draft.notes.trim() || undefined,
+      tags: draft.tags.trim() || undefined,
     }
     const data =
       kind === 'income'
@@ -315,6 +328,14 @@ export function TransactionsPanel({
             className={inputClass}
           />
         )}
+        <input
+          type="text"
+          placeholder="Tags (comma-separated, optional)"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          list="pf-known-tags"
+          className={inputClass}
+        />
         <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
           <option value="LKR">LKR</option>
           <option value="USD">USD</option>
@@ -437,6 +458,14 @@ export function TransactionsPanel({
                       className={inputClass}
                     />
                   )}
+                  <input
+                    type="text"
+                    placeholder="Tags (comma-separated)"
+                    value={editDrafts[id].tags}
+                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], tags: e.target.value } }))}
+                    list="pf-known-tags"
+                    className={inputClass}
+                  />
                   <select
                     value={editDrafts[id].currency}
                     onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], currency: e.target.value } }))}
@@ -524,6 +553,18 @@ export function TransactionsPanel({
                       {stringField(txn, 'subcategory') && ` / ${stringField(txn, 'subcategory')}`} ·{' '}
                       {stringField(txn, 'date')} · {formatMoney(amountValue, txnCurrency)}
                     </span>
+                    {splitTags(stringField(txn, 'tags')).length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {splitTags(stringField(txn, 'tags')).map((t) => (
+                          <span
+                            key={t}
+                            className="rounded-full border border-[var(--theme-border)]/60 bg-black/10 px-2 py-0.5 text-[10px] text-[var(--theme-muted)]"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => startEdit(txn)} className={buttonClass}>
