@@ -54,7 +54,11 @@ export function CategoriesPanel({
   const [color, setColor] = useState('')
   const [notes, setNotes] = useState('')
 
+  const [confirmDeleteSubId, setConfirmDeleteSubId] = useState<string | null>(null)
+  const [subInputByCategory, setSubInputByCategory] = useState<Record<string, string>>({})
+
   const categories = payload.data.categories
+  const subcategories = payload.data.subcategories
 
   async function submitCategory(prefill?: { name: string; kind: string }) {
     const finalName = (prefill?.name ?? name).trim()
@@ -128,6 +132,22 @@ export function CategoriesPanel({
     if (data) setConfirmDeleteId(null)
   }
 
+  async function submitSubcategory(subName: string, parentCategory: string) {
+    const finalName = subName.trim()
+    if (!finalName) return
+    const busyKey = `subcategory-${parentCategory}`
+    const data = await post(
+      { action: 'add_record', kind: 'subcategory_entry', payload: { name: finalName, parentCategory } },
+      busyKey,
+    )
+    if (data) setSubInputByCategory((prev) => ({ ...prev, [parentCategory]: '' }))
+  }
+
+  async function deleteSubcategory(id: string) {
+    const data = await post({ action: 'delete_record', kind: 'subcategory_entry', id }, `delete-sub-${id}`)
+    if (data) setConfirmDeleteSubId(null)
+  }
+
   const usageCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const exp of payload.data.expense_records) {
@@ -163,11 +183,35 @@ export function CategoriesPanel({
     return Array.from(found.entries())
   }, [categories, payload.data.expense_records, payload.data.income_records, payload.data.budget_categories])
 
+  const subUsageCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const exp of payload.data.expense_records) {
+      const s = stringField(exp, 'subcategory')
+      if (s) counts.set(s, (counts.get(s) ?? 0) + 1)
+    }
+    return counts
+  }, [payload.data.expense_records])
+
+  const unmanagedSub = useMemo(() => {
+    const known = new Set(subcategories.map((s) => stringField(s, 'name')))
+    const found = new Map<string, string>()
+    for (const exp of payload.data.expense_records) {
+      const s = stringField(exp, 'subcategory')
+      if (s && !known.has(s) && !found.has(s)) found.set(s, stringField(exp, 'category') || 'Other')
+    }
+    return Array.from(found.entries())
+  }, [subcategories, payload.data.expense_records])
+
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <datalist id="pf-known-categories">
         {categories.map((c, index) => (
           <option key={stringField(c, 'id') || String(index)} value={stringField(c, 'name')} />
+        ))}
+      </datalist>
+      <datalist id="pf-known-subcategories">
+        {subcategories.map((s, index) => (
+          <option key={stringField(s, 'id') || String(index)} value={stringField(s, 'name')} />
         ))}
       </datalist>
 
@@ -299,6 +343,52 @@ export function CategoriesPanel({
                   </div>
                 </div>
               )}
+
+              {!isEditing && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-[var(--theme-border)]/40 pt-2">
+                  {subcategories
+                    .filter((s) => stringField(s, 'parentCategory') === categoryName)
+                    .map((s, subIndex) => {
+                      const subId = stringField(s, 'id') || String(subIndex)
+                      const subName = stringField(s, 'name')
+                      const subCount = subUsageCounts.get(subName) ?? 0
+                      return (
+                        <span
+                          key={subId}
+                          className="flex items-center gap-1 rounded-full border border-[var(--theme-border)]/60 bg-black/10 px-2 py-0.5 text-[10px] text-[var(--theme-muted)]"
+                        >
+                          {subName} ({subCount})
+                          <button
+                            type="button"
+                            disabled={busy === `delete-sub-${subId}`}
+                            onClick={() => setConfirmDeleteSubId(subId)}
+                            className="text-red-300 hover:text-red-100"
+                            aria-label={`Delete subcategory ${subName}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )
+                    })}
+                  <input
+                    type="text"
+                    placeholder="Add subcategory"
+                    value={subInputByCategory[categoryName] ?? ''}
+                    onChange={(e) =>
+                      setSubInputByCategory((prev) => ({ ...prev, [categoryName]: e.target.value }))
+                    }
+                    className={`${inputClass} w-32`}
+                  />
+                  <button
+                    type="button"
+                    disabled={busy === `subcategory-${categoryName}`}
+                    onClick={() => void submitSubcategory(subInputByCategory[categoryName] ?? '', categoryName)}
+                    className={buttonClass}
+                  >
+                    {busy === `subcategory-${categoryName}` ? 'Saving…' : '+ Sub'}
+                  </button>
+                </div>
+              )}
             </div>
           )
         })}
@@ -323,6 +413,25 @@ export function CategoriesPanel({
         </div>
       )}
 
+      {unmanagedSub.length > 0 && (
+        <div className="mt-4 border-t border-[var(--theme-border)]/50 pt-3">
+          <p className="text-xs font-medium text-[var(--theme-muted)]">In use, not yet a subcategory</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {unmanagedSub.map(([subName, parentCategory]) => (
+              <button
+                key={subName}
+                type="button"
+                disabled={busy === `subcategory-${parentCategory}`}
+                onClick={() => void submitSubcategory(subName, parentCategory)}
+                className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1 text-xs text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40"
+              >
+                + {subName} ({parentCategory})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {confirmDeleteId && (
         <ConfirmDialog
           title="Delete this category?"
@@ -331,6 +440,17 @@ export function CategoriesPanel({
           busy={busy === `delete-${confirmDeleteId}`}
           onConfirm={() => void deleteCategory(confirmDeleteId)}
           onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
+
+      {confirmDeleteSubId && (
+        <ConfirmDialog
+          title="Delete this subcategory?"
+          body="Existing records keep their subcategory text — this only removes it from the managed list."
+          confirmLabel="Delete"
+          busy={busy === `delete-sub-${confirmDeleteSubId}`}
+          onConfirm={() => void deleteSubcategory(confirmDeleteSubId)}
+          onCancel={() => setConfirmDeleteSubId(null)}
         />
       )}
     </section>

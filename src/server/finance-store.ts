@@ -162,6 +162,7 @@ export type UnifiedTransaction = {
   recurring?: boolean
   taxable?: boolean
   incomeSourceId?: string
+  subcategory?: string
   source: string
   createdAt: string
   updatedAt: string
@@ -190,6 +191,20 @@ export type Category = {
   kind: 'income' | 'expense' | 'both'
   color?: string
   notes?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Real subcategory entity (PF-110), scoped to a parent category by name —
+ * same additive pattern as Category (PF-109): a management catalogue over
+ * the existing free-text ExpenseRecord.subcategory field, not a foreign key.
+ */
+export type Subcategory = {
+  id: string
+  name: string
+  parentCategory: string
   source: string
   createdAt: string
   updatedAt: string
@@ -626,6 +641,7 @@ export type FinanceDatabase = {
   expense_records: Array<ExpenseRecord>
   budget_categories: Array<BudgetCategory>
   categories: Array<Category>
+  subcategories: Array<Subcategory>
   savings_goals: Array<SavingsGoal>
   tax_records: Array<TaxRecord>
   pending_ingestions: Array<PendingIngestion>
@@ -723,6 +739,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     expense_records: [],
     budget_categories: [],
     categories: [],
+    subcategories: [],
     savings_goals: [],
     tax_records: [],
     pending_ingestions: [],
@@ -844,6 +861,7 @@ function mirrorIntoSplitStores(db: FinanceDatabase): void {
     expense_records: db.expense_records,
     budget_categories: db.budget_categories,
     categories: db.categories,
+    subcategories: db.subcategories,
     savings_goals: db.savings_goals,
     tax_records: db.tax_records,
     exchange_rates: db.exchange_rates,
@@ -920,6 +938,7 @@ function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
           expense_records: personal.expense_records,
           budget_categories: personal.budget_categories,
           categories: personal.categories ?? [],
+          subcategories: personal.subcategories ?? [],
           savings_goals: personal.savings_goals,
           tax_records: personal.tax_records,
           exchange_rates: personal.exchange_rates,
@@ -1426,6 +1445,12 @@ export function addFinanceRecord(
       color: optionalString(payload, 'color'),
       notes: optionalString(payload, 'notes'),
     })
+  } else if (kind === 'subcategory_entry') {
+    db.subcategories.push({
+      ...base,
+      name: stringField(payload, 'name', 'Untitled'),
+      parentCategory: stringField(payload, 'parentCategory', 'Other'),
+    })
   } else if (kind === 'income_source') {
     db.income_sources.push({
       ...base,
@@ -1562,6 +1587,12 @@ export function updateFinanceRecord(
       db.categories[index] = { ...db.categories[index], ...payload, updatedAt: nowIso() }
       updated = true
     }
+  } else if (kind === 'subcategory_entry') {
+    const index = db.subcategories.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.subcategories[index] = { ...db.subcategories[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
   } else if (kind === 'income_source') {
     const index = db.income_sources.findIndex((r) => r.id === id)
     if (index !== -1) {
@@ -1633,6 +1664,10 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.categories.length
     db.categories = db.categories.filter((r) => r.id !== id)
     removed = db.categories.length !== before
+  } else if (kind === 'subcategory_entry') {
+    const before = db.subcategories.length
+    db.subcategories = db.subcategories.filter((r) => r.id !== id)
+    removed = db.subcategories.length !== before
   } else if (kind === 'income_source') {
     const before = db.income_sources.length
     db.income_sources = db.income_sources.filter((r) => r.id !== id)
@@ -2444,6 +2479,7 @@ export function getUnifiedTransactions(db: FinanceDatabase): Array<UnifiedTransa
     notes: exp.notes,
     documentRef: exp.documentRef,
     recurring: exp.recurring,
+    subcategory: exp.subcategory,
     source: exp.source,
     createdAt: exp.createdAt,
     updatedAt: exp.updatedAt,
