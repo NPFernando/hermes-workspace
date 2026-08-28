@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { StatCard } from '../finance/components/stat-card'
 import { DataTable } from '../finance/components/data-table'
 import { BudgetPanel } from './components/budget-panel'
@@ -156,9 +156,10 @@ export function PersonalFinanceScreen() {
   const { summary } = payload
 
   const netWorthBreakdown = [
-    { name: 'Cash', value: Math.max(0, summary.cashBalanceLkr) },
-    { name: 'Stocks', value: Math.max(0, summary.stockHoldingsValueLkr) },
-    { name: 'Fixed deposits', value: Math.max(0, summary.fixedDepositsValueLkr) },
+    { name: 'Cash', value: Math.max(0, summary.cashBalanceLkr), fill: '#38bdf8' },
+    { name: 'Stocks', value: Math.max(0, summary.stockHoldingsValueLkr), fill: '#38bdf8' },
+    { name: 'Fixed deposits', value: Math.max(0, summary.fixedDepositsValueLkr), fill: '#38bdf8' },
+    { name: 'Debt', value: Math.max(0, summary.debtLkr), fill: '#f87171' },
   ].filter((entry) => entry.value > 0)
 
   const overBudgetCount = payload.budgetVsActual.filter((b) => b.overBudget).length
@@ -208,7 +209,7 @@ export function PersonalFinanceScreen() {
 
       {netWorthBreakdown.length > 0 && (
         <section className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-4">
-          <p className="text-xs font-medium text-[var(--theme-muted)]">Net worth breakdown</p>
+          <p className="text-xs font-medium text-[var(--theme-muted)]">Assets vs. liabilities</p>
           <div className="mt-1 h-[90px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={netWorthBreakdown} layout="vertical" margin={{ top: 4, right: 12, left: 8, bottom: 0 }}>
@@ -232,7 +233,11 @@ export function PersonalFinanceScreen() {
                   contentStyle={{ background: 'var(--theme-panel)', border: '1px solid var(--theme-border)', borderRadius: 8, fontSize: 11 }}
                   formatter={(value: number) => formatLkr(value)}
                 />
-                <Bar dataKey="value" fill="#38bdf8" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {netWorthBreakdown.map((entry) => (
+                    <Cell key={entry.name} fill={entry.fill} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

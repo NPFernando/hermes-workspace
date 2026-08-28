@@ -10,6 +10,7 @@ export type PersonalFinancePayload = {
     taxReserveLkr: number
     stockHoldingsValueLkr: number
     fixedDepositsValueLkr: number
+    debtLkr: number
     unrealizedStockPnlLkr: number
     unrealizedStockPnlPct: number
     accountCount: number

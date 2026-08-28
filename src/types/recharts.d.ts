@@ -6,6 +6,7 @@ declare module 'recharts' {
   export const Area: ComponentType<any>
   export const BarChart: ComponentType<any>
   export const Bar: ComponentType<any>
+  export const Cell: ComponentType<any>
   export const LineChart: ComponentType<any>
   export const Line: ComponentType<any>
   export const ComposedChart: ComponentType<any>
