@@ -7,6 +7,7 @@ import { PendingIngestionPanel } from './components/pending-ingestion-panel'
 import { FinanceTrendsCard } from './components/finance-trends-card'
 import { SavingsGoalsProgress } from './components/savings-goals-progress'
 import { RecurringBillsInsight } from './components/recurring-bills-insight'
+import { DataHealthCard } from './components/data-health-card'
 import { IncomeSourcesPanel } from './components/income-sources-panel'
 import { StockHoldingsPanel } from './components/stock-holdings-panel'
 import { FixedDepositsPanel } from './components/fixed-deposits-panel'
@@ -285,6 +286,7 @@ export function PersonalFinanceScreen() {
           <FinanceTrendsCard payload={payload} />
           <SavingsGoalsProgress payload={payload} />
           <RecurringBillsInsight payload={payload} />
+          <DataHealthCard payload={payload} />
         </>
       )}
 
