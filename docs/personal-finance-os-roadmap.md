@@ -61,19 +61,19 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | PF-101 | Account Types | **existing** | 8-type enum (`bank`/`cash`/`card`/`crypto_wallet`/`broker`/`foreign_currency`/`loan`/`other`) already existed, confirmed sufficient |
 | PF-102 | Account UI | **existing** | Dedicated `AccountsPanel` (add/edit/delete, per-currency total, opening-balance display) replaces the generic DataTable |
 | PF-103 | Opening Balances | **existing** | Optional `openingBalance` + `openingBalanceDate`, shown as a secondary line per account |
-| PF-104 | Unified Transaction Model | planned | The core gap |
-| PF-105 | Transaction CRUD | partial | Income/expense CRUD exists but as separate collections |
-| PF-106 | Transaction Types | planned | |
-| PF-107 | Transfers | planned | |
-| PF-108 | Transaction Splits | planned | |
-| PF-109 | Categories | partial | Free-text `category` field exists on expenses/budgets, not a proper entity |
-| PF-110 | Subcategories | planned | |
-| PF-111 | Merchant Registry | planned | |
-| PF-112 | Tags | planned | |
-| PF-113 | Pending/Cleared/Reconciled Status | planned | |
-| PF-114 | Transaction Search and Filters | partial | `DataTable`'s generic searchable/sortable, not transaction-specific |
+| PF-104 | Unified Transaction Model | **existing** | Additive read view — `getUnifiedTransactions()` (`finance-store.ts`) maps `income_records`/`expense_records` into one shared shape/sort order; storage itself stays split (deliberate, see Shipped note below) |
+| PF-105 | Transaction CRUD | **partial (stronger)** | One `TransactionsPanel` now does add/edit/delete for both kinds from a single UI, but there's still no formal transaction-type enum and each kind keeps its own field set under the hood |
+| PF-106 | Transaction Types | planned | Deferred by the PF-104 slice — no enum, `kind: 'income' \| 'expense'` only |
+| PF-107 | Transfers | planned | Deferred by the PF-104 slice — no transfer/double-entry concept exists |
+| PF-108 | Transaction Splits | planned | Deferred by the PF-104 slice |
+| PF-109 | Categories | partial | Free-text `category` field exists on expenses/budgets, not a proper entity; still the join key `TransactionsPanel` and budget-vs-actual both rely on |
+| PF-110 | Subcategories | planned | Deferred by the PF-104 slice |
+| PF-111 | Merchant Registry | planned | Deferred by the PF-104 slice |
+| PF-112 | Tags | planned | Deferred by the PF-104 slice |
+| PF-113 | Pending/Cleared/Reconciled Status | planned | Deferred by the PF-104 slice |
+| PF-114 | Transaction Search and Filters | partial | `TransactionsPanel` now has basic counterparty/category search + kind filter (client-side); no date-range or amount filters yet |
 | PF-115 | Transaction Audit History | partial | `appendAuditLog` covers all mutations generically |
-| PF-116 | Soft Delete | planned | Deletes are hard deletes today |
+| PF-116 | Soft Delete | planned | Deferred by the PF-104 slice — deletes are hard deletes today |
 | PF-117 | Finance Calculation Service Foundation | existing | `finance-store.ts`'s `financeSummary()` etc. already fill this role |
 
 ## Phase 2 — Multi-Currency and FX
@@ -553,11 +553,11 @@ Dependencies met, scope clear — this is informational status only, nothing her
 - **PF-006** — Fix Fixed Deposit Rate Labelling (zero dependencies)
 - **PF-007** — Improve Investment P/L Display (zero dependencies)
 - **PF-009** — Standardize Money Formatting (zero dependencies)
-- **PF-104** — Unified Transaction Model (now that PF-100/101/102/103 exist — the next Phase 1 feature)
+- **PF-109** — Categories as a real entity (now that PF-104's unified view and budget-vs-actual both depend on the same free-text join — the next Phase 1 feature)
 
 ## Recommended Next Feature
 
-**PF-104 — Unified Transaction Model.** With accounts now a real, dedicated model (PF-100/101/102/103 shipped), the next foundational piece is the transaction ledger itself — `income_records`/`expense_records` become entries in one `transactions` table with types, transfers, and splits. This unblocks credit cards, bills/subscriptions, forecasting, budget v2 extras, reconciliation, and analytics/history — the largest remaining cluster in the registry.
+**PF-109 — Categories.** `ExpenseRecord.category`/`BudgetCategory.category`/`IncomeRecord.incomeType` are all free text today, joined by exact string match (case- and whitespace-sensitive) between budgets and expenses. Now that `TransactionsPanel` (PF-104) is the single place users add/edit both kinds, promoting category to a real entity (with an ID, not just a string) would fix the fragile budget join and unlock PF-110 (Subcategories) and PF-111 (Merchant Registry) cleanly.
 
 PF-006 and PF-007 remain independent zero-risk quick wins that can be done any time without touching Phase 1.
 
@@ -566,3 +566,9 @@ PF-006 and PF-007 remain independent zero-risk quick wins that can be done any t
 - **What was built**: `openingBalance?`/`openingBalanceDate?` added to `FinanceAccount` (`src/server/finance-store.ts`) and the `personal_finance` Postgres mirror; a dedicated `AccountsPanel` (`src/screens/personal-finance/components/accounts-panel.tsx`) replacing the generic DataTable in the Accounts & Records tab — add/edit/delete, human-readable account-type labels, a per-currency total-balance line, and an opening-balance secondary line per account.
 - **Known limitation**: `balance` is still a manually-maintained current figure, not derived from transactions — that's explicitly PF-104's job, not attempted here.
 - **Not built** (deliberately deferred, not dropped): a separate `institutions` entity — the existing free-text `platform` field is reused for "which bank/broker" for now; worth revisiting once multiple accounts actually share an institution and dedup value emerges.
+
+### Shipped: PF-104 — Unified Transaction Model (+ partial PF-105, PF-114)
+
+- **What was built**: an additive read layer, not a storage migration — `getUnifiedTransactions()` (`src/server/finance-store.ts`) maps `income_records`/`expense_records` into one shared `UnifiedTransaction` shape (renaming `dateReceived`→`date`, `sourceName`→`vendor`-equivalent `counterparty`, `incomeType`→`category`, etc.) and sorts them together by date. `TransactionsPanel` (`src/screens/personal-finance/components/transactions-panel.tsx`) replaces the two separate, no-create `DataTable`s (income records in the Income & Jobs tab, expense records in Accounts & Records) with one panel: an income/expense toggle add-form, inline edit, delete, a counterparty/category search box, and a kind filter — all routed through the existing `add_record`/`update_record`/`delete_record` dispatch under the hood. `transactions` is now included in both `personalFinancePayload()` (GET) and `financePayload()` (the shape every mutation's POST response returns via `useFinanceAction`), matching how `budgetVsActual` is already present in both.
+- **Known limitation / deliberate scope**: `income_records` and `expense_records` remain two separate collections in storage (JSON + both Postgres mirrors) — `financeSummary`, `budgetVsActual`, `getMonthlySummary`, and duplicate-detection are all untouched and still read the original collections directly. A real storage migration to one `transactions` table (PF-106 types, PF-107 transfers, PF-108 splits, PF-113 reconciliation status, PF-116 soft delete) was deliberately deferred as a separate, larger, higher-risk future feature rather than bundled into this slice.
+- **Not built** (deliberately deferred, not dropped): transfers between the user's own accounts (no transfer concept exists anywhere in the codebase today — confirmed via full-file grep), a formal transaction-type enum, merchant/tag entities, and date-range/amount filters (only counterparty/category text search + kind filter shipped).
