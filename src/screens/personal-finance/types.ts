@@ -25,6 +25,37 @@ export type PersonalFinancePayload = {
     overBudget: boolean
   }>
   transactions: Array<Record<string, unknown>>
+  storage: {
+    active: 'postgres' | 'json'
+    fallback: 'json'
+    postgres: {
+      enabled: boolean
+      available: boolean
+      snapshotAvailable: boolean
+      database?: string
+      reason?: string
+      lastWriteError?: string
+    }
+    health: {
+      status: 'healthy' | 'json_primary' | 'postgres_unavailable' | 'postgres_behind' | 'mirror_mismatch'
+      warnings: Array<string>
+      jsonUpdatedAt: string | null
+      postgresUpdatedAt: string | null
+      postgresLagMs: number
+      isPostgresBehindJson: boolean
+      selfHeal: {
+        attempted: boolean
+        attempts: number
+        succeeded: boolean
+        lastAttemptAt: string | null
+      }
+      rowCounts: {
+        json: Record<string, number>
+        postgres: Record<string, number>
+        lagging: Record<string, { json: number; postgres: number }>
+      }
+    }
+  }
   data: {
     finance_accounts: Array<Record<string, unknown>>
     income_records: Array<Record<string, unknown>>
