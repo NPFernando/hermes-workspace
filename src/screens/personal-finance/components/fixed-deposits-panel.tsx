@@ -107,7 +107,8 @@ export function FixedDepositsPanel({
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <h2 className="text-lg font-semibold">Fixed deposits</h2>
       <p className="text-xs text-[var(--theme-muted)]">
-        Track principal, rate, and when interest pays out — monthly, quarterly, annually, or all at maturity.
+        Track principal, the annual interest rate, and when interest pays out — monthly, quarterly, annually, or all
+        at maturity.
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -131,7 +132,7 @@ export function FixedDepositsPanel({
         </select>
         <input
           type="number"
-          placeholder="Interest rate %"
+          placeholder="Interest rate % (p.a.)"
           value={interestRatePct}
           onChange={(e) => setInterestRatePct(e.target.value)}
           className={`${inputClass} w-32`}
@@ -177,7 +178,8 @@ export function FixedDepositsPanel({
               <div>
                 <span className="font-medium text-[var(--theme-text)]">{stringField(fd, 'bankName')}</span>{' '}
                 <span className="text-xs text-[var(--theme-muted)]">
-                  · {formatLkr(numberField(fd, 'principal'))} · {numberField(fd, 'interestRatePct')}% · {payout} · {status}
+                  · {formatLkr(numberField(fd, 'principal'))} · {numberField(fd, 'interestRatePct')}% p.a. · {payout} ·{' '}
+                  {status}
                 </span>
                 {status === 'active' &&
                   remaining !== null &&
