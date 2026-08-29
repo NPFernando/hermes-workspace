@@ -58,6 +58,7 @@ export function FixedDepositsPanel({
   const [interestPayout, setInterestPayout] = useState<'monthly' | 'quarterly' | 'annually' | 'at_maturity'>('at_maturity')
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [maturityDate, setMaturityDate] = useState('')
+  const [notes, setNotes] = useState('')
 
   async function submitFd() {
     if (!bankName.trim() || !maturityDate) {
@@ -76,6 +77,7 @@ export function FixedDepositsPanel({
           interestPayout,
           startDate,
           maturityDate,
+          notes: notes.trim() || undefined,
         },
       },
       'fd',
@@ -85,6 +87,7 @@ export function FixedDepositsPanel({
       setPrincipal('')
       setInterestRatePct('')
       setMaturityDate('')
+      setNotes('')
     }
   }
 
@@ -155,6 +158,13 @@ export function FixedDepositsPanel({
           className={inputClass}
           title="Maturity date"
         />
+        <input
+          type="text"
+          placeholder="Notes (optional)"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className={inputClass}
+        />
         <button type="button" disabled={busy === 'fd'} onClick={() => void submitFd()} className={buttonClass}>
           {busy === 'fd' ? 'Saving…' : 'Add fixed deposit'}
         </button>
@@ -193,6 +203,9 @@ export function FixedDepositsPanel({
                       </span>
                     )
                   })()}
+                {stringField(fd, 'notes') && (
+                  <p className="mt-1 text-xs text-[var(--theme-muted)]">{stringField(fd, 'notes')}</p>
+                )}
               </div>
               <div className="flex gap-2">
                 {status === 'active' && (

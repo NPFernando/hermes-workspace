@@ -50,7 +50,7 @@ export function StockHoldingsPanel({
   const [refreshingAll, setRefreshingAll] = useState(false)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<
-    Record<string, { symbol: string; companyName: string; platform: string; quantity: string; buyPrice: string; buyDate: string; currency: string }>
+    Record<string, { symbol: string; companyName: string; platform: string; quantity: string; buyPrice: string; buyDate: string; currency: string; notes: string }>
   >({})
 
   const [symbol, setSymbol] = useState('')
@@ -60,6 +60,7 @@ export function StockHoldingsPanel({
   const [buyPrice, setBuyPrice] = useState('')
   const [buyDate, setBuyDate] = useState(new Date().toISOString().slice(0, 10))
   const [currency, setCurrency] = useState('LKR')
+  const [notes, setNotes] = useState('')
 
   async function submitHolding() {
     if (!symbol.trim() || !platform.trim()) {
@@ -78,6 +79,7 @@ export function StockHoldingsPanel({
           buyPrice: Number(buyPrice) || 0,
           buyDate,
           currency,
+          notes: notes.trim() || undefined,
         },
       },
       'holding',
@@ -88,6 +90,7 @@ export function StockHoldingsPanel({
       setPlatform('')
       setQuantity('')
       setBuyPrice('')
+      setNotes('')
     }
   }
 
@@ -151,6 +154,7 @@ export function StockHoldingsPanel({
         buyPrice: String(numberField(holding, 'buyPrice')),
         buyDate: stringField(holding, 'buyDate'),
         currency: stringField(holding, 'currency') || 'LKR',
+        notes: stringField(holding, 'notes'),
       },
     }))
     setEditOpenId(id)
@@ -179,6 +183,7 @@ export function StockHoldingsPanel({
           buyPrice: Number(draft.buyPrice) || 0,
           buyDate: draft.buyDate,
           currency: draft.currency,
+          notes: draft.notes.trim() || undefined,
         },
       },
       `edit-${id}`,
@@ -257,6 +262,13 @@ export function StockHoldingsPanel({
           <option value="LKR">LKR</option>
           <option value="USD">USD</option>
         </select>
+        <input
+          type="text"
+          placeholder="Notes (optional)"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className={inputClass}
+        />
         <button type="button" disabled={busy === 'holding'} onClick={() => void submitHolding()} className={buttonClass}>
           {busy === 'holding' ? 'Saving…' : 'Add holding'}
         </button>
@@ -330,6 +342,13 @@ export function StockHoldingsPanel({
                     <option value="LKR">LKR</option>
                     <option value="USD">USD</option>
                   </select>
+                  <input
+                    type="text"
+                    placeholder="Notes (optional)"
+                    value={editDrafts[id].notes}
+                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], notes: e.target.value } }))}
+                    className={inputClass}
+                  />
                   <button
                     type="button"
                     disabled={busy === `edit-${id}`}
@@ -359,6 +378,9 @@ export function StockHoldingsPanel({
                         {formatMoney(gainLoss, holdingCurrency)}
                         {gainLossPct !== undefined && ` (${gainLoss >= 0 ? '+' : ''}${formatPct(gainLossPct)})`}
                       </span>
+                    )}
+                    {stringField(holding, 'notes') && (
+                      <p className="mt-1 text-xs text-[var(--theme-muted)]">{stringField(holding, 'notes')}</p>
                     )}
                   </div>
                   <div className="flex gap-2">
