@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ExtractedContract, ExtractedTransaction, PendingIngestion, PersonalFinancePayload } from '../types'
 
 type DuplicateWarning = { date: string; amount: number; vendorOrSource: string }
@@ -15,6 +15,14 @@ const severityTone: Record<'high' | 'medium' | 'low', string> = {
   low: 'border-sky-400/30 bg-sky-500/15 text-sky-100',
 }
 
+/** AI-307: rank items needing the most attention first — missing confidence (extraction failed) ranks with 'low'. */
+function confidenceRank(item: PendingIngestion): number {
+  const confidence = item.extracted?.confidence ?? item.extractedContract?.confidence
+  if (confidence === 'high') return 2
+  if (confidence === 'medium') return 1
+  return 0
+}
+
 /**
  * AI-assisted intake: upload a receipt/bill photo or PDF, or sync Gmail —
  * every extracted item lands here for review and never touches real
@@ -28,6 +36,10 @@ export function PendingIngestionPanel({
   onConfirmed: (payload: PersonalFinancePayload) => void
 }) {
   const [items, setItems] = useState<Array<PendingIngestion>>([])
+  const sortedItems = useMemo(
+    () => [...items].sort((a, b) => confidenceRank(a) - confidenceRank(b)),
+    [items],
+  )
   const [uploading, setUploading] = useState(false)
   const [uploadingContract, setUploadingContract] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -316,7 +328,7 @@ export function PendingIngestionPanel({
         </p>
       ) : (
         <div className="mt-4 grid gap-3">
-          {items.map((item) => {
+          {sortedItems.map((item) => {
             const hasDuplicateWarning = Object.hasOwn(duplicateWarnings, item.id)
             const duplicateWarning = duplicateWarnings[item.id]
             return (
