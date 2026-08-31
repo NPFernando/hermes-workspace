@@ -11,6 +11,7 @@ import {
   financeSummary,
   financeStorageAlerts,
   getAverageMonthlyExpensesLkr,
+  getAverageMonthlySavingsRatePct,
   getUnifiedTransactions,
   maskSensitive,
 } from './finance-store'
@@ -1150,6 +1151,56 @@ describe('getAverageMonthlyExpensesLkr (PF-303 Emergency Fund Target)', () => {
     const db = createEmptyFinanceDatabase()
     pushExpense(db, 1, 50_000)
     expect(getAverageMonthlyExpensesLkr(db, 3)).toBe(50_000)
+  })
+})
+
+describe('getAverageMonthlySavingsRatePct (PF-304 Savings Rate Target)', () => {
+  function monthsAgoDateString(monthsAgo: number): string {
+    const d = new Date()
+    d.setUTCDate(1)
+    d.setUTCMonth(d.getUTCMonth() - monthsAgo)
+    return d.toISOString().slice(0, 10)
+  }
+
+  function pushExpense(db: ReturnType<typeof createEmptyFinanceDatabase>, monthsAgo: number, amount: number) {
+    db.expense_records.push({
+      id: `sr-e-${monthsAgo}-${amount}`, date: monthsAgoDateString(monthsAgo), vendor: 'Test', category: 'Other',
+      currency: 'LKR', amount, convertedLkrAmount: amount, recurring: false, workRelated: false,
+      taxDeductiblePossible: false, source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+  }
+
+  function pushIncome(db: ReturnType<typeof createEmptyFinanceDatabase>, monthsAgo: number, amount: number) {
+    db.income_records.push({
+      id: `sr-i-${monthsAgo}-${amount}`, dateReceived: monthsAgoDateString(monthsAgo), sourceName: 'Test',
+      incomeType: 'Salary', originalCurrency: 'LKR', originalAmount: amount, exchangeRateUsed: 1,
+      convertedLkrAmount: amount, taxable: true, source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+  }
+
+  it('returns hasData: false when there is no complete month of history', () => {
+    const db = createEmptyFinanceDatabase()
+    expect(getAverageMonthlySavingsRatePct(db)).toEqual({ actualPct: 0, hasData: false })
+  })
+
+  it('computes a ratio-of-sums rate across the trailing window, excluding the current month', () => {
+    const db = createEmptyFinanceDatabase()
+    pushIncome(db, 0, 999_999) // current month — must be excluded
+    pushIncome(db, 1, 100_000)
+    pushExpense(db, 1, 80_000)
+    pushIncome(db, 2, 100_000)
+    pushExpense(db, 2, 90_000)
+    // sumIncome = 200_000, sumSavings = (100_000-80_000)+(100_000-90_000) = 30_000 -> 15%
+    const result = getAverageMonthlySavingsRatePct(db, 3)
+    expect(result.hasData).toBe(true)
+    expect(result.actualPct).toBeCloseTo(15, 5)
+  })
+
+  it('returns hasData: false when trailing-window income is 0 (avoids divide-by-zero)', () => {
+    const db = createEmptyFinanceDatabase()
+    pushExpense(db, 1, 10_000)
+    expect(getAverageMonthlySavingsRatePct(db, 3)).toEqual({ actualPct: 0, hasData: false })
   })
 })
 

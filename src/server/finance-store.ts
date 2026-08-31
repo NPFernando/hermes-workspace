@@ -672,6 +672,8 @@ export type FinanceSettings = {
   alertsEnabled?: boolean
   /** PF-303: user-set emergency fund target, in months of average expenses. Unset/0 means no target configured yet. */
   emergencyFundTargetMonths?: number
+  /** PF-304: user-set savings rate target, as a percentage. Unset/0 means no target configured yet. */
+  savingsRateTargetPct?: number
   strategyDecayDetection?: Record<string, unknown>
   /** Per-strategy validated backtest baselines, keyed by strategyId. See strategy-decay.ts. */
   strategyBaselines?: Record<string, unknown>
@@ -2682,6 +2684,30 @@ export function getAverageMonthlyExpensesLkr(db: FinanceDatabase, months = 3): n
   const trailing = complete.slice(-months)
   const total = trailing.reduce((sum, row) => sum + row.expense, 0)
   return total / trailing.length
+}
+
+/**
+ * Trailing 3-month (by default) savings rate, excluding the current
+ * in-progress calendar month, as a ratio of summed savings to summed income
+ * across the window (not an average of each month's own percentage — a
+ * near-zero-income month would otherwise produce an extreme or undefined
+ * individual rate and distort the result). Used to compare against a
+ * PF-304 savings-rate target. `hasData` is false when there's no complete
+ * month of history yet, or the window's total income is 0.
+ */
+export function getAverageMonthlySavingsRatePct(
+  db: FinanceDatabase,
+  months = 3,
+): { actualPct: number; hasData: boolean } {
+  const now = new Date()
+  const currentKey = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}`
+  const complete = getMonthlySummary(db).filter((row) => `${row.year}-${row.month}` !== currentKey)
+  if (complete.length === 0) return { actualPct: 0, hasData: false }
+  const trailing = complete.slice(-months)
+  const sumIncome = trailing.reduce((sum, row) => sum + row.income, 0)
+  const sumSavings = trailing.reduce((sum, row) => sum + row.savings, 0)
+  if (sumIncome <= 0) return { actualPct: 0, hasData: false }
+  return { actualPct: (sumSavings / sumIncome) * 100, hasData: true }
 }
 
 export function getBudgetVsActual(

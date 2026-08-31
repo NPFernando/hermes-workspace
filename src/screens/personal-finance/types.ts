@@ -35,6 +35,12 @@ export type PersonalFinancePayload = {
     coverageMonths: number
     progressPct: number
   }
+  savingsRateTarget: {
+    targetPct: number
+    actualPct: number
+    progressPct: number
+    hasData: boolean
+  }
   storage: {
     active: 'postgres' | 'json'
     fallback: 'json'

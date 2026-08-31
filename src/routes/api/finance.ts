@@ -18,6 +18,7 @@ import {
   financeSummary,
   findPossibleDuplicate,
   getAverageMonthlyExpensesLkr,
+  getAverageMonthlySavingsRatePct,
   getCategoryCorrections,
   getUnifiedTransactions,
   listPendingIngestions,
@@ -238,6 +239,9 @@ function personalFinancePayload() {
   const efTargetLkr = efTargetMonths * efAvgMonthlyExpensesLkr
   const efCoverageMonths = efAvgMonthlyExpensesLkr > 0 ? efCurrentLkr / efAvgMonthlyExpensesLkr : 0
   const efProgressPct = efTargetLkr > 0 ? Math.min(100, (efCurrentLkr / efTargetLkr) * 100) : 0
+  const srTargetPct = db.settings.savingsRateTargetPct ?? 0
+  const { actualPct: srActualPct, hasData: srHasData } = getAverageMonthlySavingsRatePct(db, 3)
+  const srProgressPct = srTargetPct > 0 ? Math.min(100, Math.max(0, (srActualPct / srTargetPct) * 100)) : 0
   return {
     ok: true,
     checkedAt: Date.now(),
@@ -253,6 +257,12 @@ function personalFinancePayload() {
       targetLkr: efTargetLkr,
       coverageMonths: efCoverageMonths,
       progressPct: efProgressPct,
+    },
+    savingsRateTarget: {
+      targetPct: srTargetPct,
+      actualPct: srActualPct,
+      progressPct: srProgressPct,
+      hasData: srHasData,
     },
     data: maskSensitive({
       finance_accounts: db.finance_accounts,
@@ -636,6 +646,17 @@ export const Route = createFileRoute('/api/finance')({
             db.settings.emergencyFundTargetMonths = months
             writeFinanceStore(db)
             appendAuditLog('emergency_fund_target_updated', { months })
+            return json(personalFinancePayload())
+          }
+          if (action === 'set_savings_rate_target') {
+            // PF-304: user-set target, as a percentage. Clamped to 0..100; 0
+            // clears the target back to "not configured".
+            const rawPct = typeof body.pct === 'number' ? body.pct : 0
+            const pct = Math.max(0, Math.min(100, Math.round(rawPct)))
+            const db = readFinanceStore()
+            db.settings.savingsRateTargetPct = pct
+            writeFinanceStore(db)
+            appendAuditLog('savings_rate_target_updated', { pct })
             return json(personalFinancePayload())
           }
           if (action === 'set_demo_config' || action === 'set_engine_config') {
