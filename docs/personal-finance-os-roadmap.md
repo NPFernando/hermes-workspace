@@ -320,7 +320,7 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | AI-304 | Duplicate Review | existing (`findPossibleDuplicate` + duplicate-job guard) |
 | AI-305 | Missing Category Review | planned |
 | AI-306 | Reconciliation Issues | planned |
-| AI-307 | Low Confidence Review | partial (badge shown, no dedicated queue) |
+| AI-307 | Low Confidence Review | **existing** (pending-ingestion list now defaults to sorting low/no-confidence items first; see Shipped note) |
 | AI-308 | Batch Approval | planned |
 | AI-309 | Inbox Priority | planned |
 
@@ -580,7 +580,9 @@ A follow-up scoping pass over three more unaudited phases (Phase 5 Income/Employ
 
 A follow-up scoping pass over every phase not yet audited this session (12, 13, 23, 25, 26, 27, 35 — the rest are one-line "blocked, nothing exists" stubs with no rows to check) found three genuine quick wins: **AI-411 (Document Provenance)**, CSE-203 (`StockHolding.notes`, a write-only dead field — same shape as PF-1007's `monthlyContribution`/`priority`, plus a `FixedDeposit.notes` twin), and AI-307 (surface pending-ingestion confidence via sort/filter). AI-411 was the cleanest (zero design ambiguity) and is now shipped.
 
-**CSE-203 (Holding Detail)** is also now shipped — `notes` added to both panels' add forms and row displays; stock holdings (which already has a full edit mode) also got notes in its edit form. See Shipped note for the fixed-deposit edit-mode limitation. This leaves **AI-307** as the last identified quick win from this pass; everything else in phases 12/13/23/25/26/27/35 (AI-102/103/111, AI-300/301, AI-400, AI-503, AI-506) needs genuine new design work (a permissions model, inbox item taxonomy, document classifier, or a new persisted sync-history concept) — not further surfacing fixes.
+**CSE-203 (Holding Detail)** is also now shipped — `notes` added to both panels' add forms and row displays; stock holdings (which already has a full edit mode) also got notes in its edit form. See Shipped note for the fixed-deposit edit-mode limitation.
+
+**AI-307 (Low Confidence Review)** is also now shipped — the pending-ingestion list now defaults to a sort that surfaces low/no-confidence items first, since that's already-computed data that just wasn't used to order the list. This closes out the scoping pass over phases 12/13/23/25/26/27/35: everything else found there (AI-102/103/111, AI-300/301, AI-400, AI-503, AI-506) needs genuine new design work (a permissions model, inbox item taxonomy, document classifier, or a new persisted sync-history concept) — not further surfacing fixes. The next step is either a fresh scoping pass over any remaining unaudited phases, or picking one of those real design efforts directly.
 
 A follow-up pass over Phase 36 (Fixed Deposits V2), Phase 37 (Documents Vault), and Phase 43 (Security) found that pattern genuinely exhausted in Phase 36 (no `partial` rows at all) and Phase 43 (all three `partial` items need new data capture or a real authz/policy design decision). Phase 37's **DOC-106, DOC-107, and DOC-113** were the one structural candidate — extending the already-shipped `finance-document.ts` employment-contract viewer to also serve receipts/bills via the already-existing `documentRef` field on income/expense records. Explicitly flagged before building: this environment has zero live receipt/bill data with `documentRef` populated, so the feature ships correct and ready but not immediately visible — Naveen confirmed shipping it anyway as correct, low-risk infrastructure. Now shipped.
 
@@ -760,3 +762,9 @@ This closes out the "surface an already-computed value" pattern across every pha
 - **What was built**: `StockHolding.notes` and `FixedDeposit.notes` (`src/server/finance-store.ts`) were already fully wired server-side (accepted on add and update) but neither panel offered an input or display. Added a `notes` text field to both panels' add forms and a conditional muted-text display line on each row.
 - **Known limitation / deliberate scope**: `fixed-deposits-panel.tsx` has no edit mode at all today (only status-change actions and delete) — building one from scratch was out of scope for this slice, so a fixed deposit's notes can only be set at creation, not edited afterward. `stock-holdings-panel.tsx` already had a full edit mode, so its notes field supports add and edit both.
 - **Verified live**: added a test stock holding with notes, confirmed it rendered; edited the notes and confirmed the update replaced the old value; added a test fixed deposit with notes, confirmed it rendered with no edit control available (as expected); cleaned up both.
+
+### Shipped: AI-307 — Low Confidence Review (default sort)
+
+- **What was built**: `confidence: 'high'|'medium'|'low'` (`ExtractedTransaction`/`ExtractedContract`, `types.ts`) was already computed per pending-ingestion item and already rendered as a badge (`pending-ingestion-panel.tsx`), but the list had no sort — pure fetch/insertion order. Added a default sort (via a new `confidenceRank()` helper and a `useMemo`-derived `sortedItems`) so low-confidence or extraction-failed items surface first, since they most need a human's attention.
+- **Known limitation / deliberate scope**: no new sort/filter UI control — "surface low-confidence items first" reads as a default ordering, not an opt-in toggle nobody asked for.
+- **Verified**: the sort algorithm itself in isolation (low/no-confidence ranks first with stable tie-breaking, then medium, then high); live smoke-tested that the Ingestion tab still loads without error. This environment had no live low/medium-confidence pending items to observe real reordering against, and a direct-JSON-edit synthetic-data attempt was abandoned after discovering `readFinanceStore()` prefers the (currently stale) Postgres mirror over direct JSON edits on read — an unrelated pre-existing dual-store quirk, not worth working around for a change this size.

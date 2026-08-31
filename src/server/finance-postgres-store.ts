@@ -190,7 +190,7 @@ function stableId(
   const id = firstText(row, ['id'])
   if (id) return id
   const suffix = parts.filter(Boolean).join(':')
-  return suffix ? `${table}:${suffix}` : `${table}:${index + 1}`
+  return suffix ? `${table}:${suffix}:${index + 1}` : `${table}:${index + 1}`
 }
 
 function jsonText(value: unknown): string {
