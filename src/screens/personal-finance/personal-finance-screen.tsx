@@ -295,8 +295,8 @@ export function PersonalFinanceScreen() {
         <>
           <FinanceAlertsCard payload={payload} />
           <FinanceTrendsCard payload={payload} />
-          <SavingsGoalsProgress payload={payload} />
-          <SinkingFundsPanel payload={payload} />
+          <SavingsGoalsProgress payload={payload} onPayload={setPayload} />
+          <SinkingFundsPanel payload={payload} onPayload={setPayload} />
           <EmergencyFundCard payload={payload} onPayload={setPayload} />
           <SavingsRateTargetCard payload={payload} onPayload={setPayload} />
           <UpcomingMoney payload={payload} />

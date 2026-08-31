@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { formatLkr } from '../utils'
 import type { PersonalFinancePayload } from '../types'
 
@@ -18,12 +19,86 @@ function toneFor(percent: number): { bar: string; text: string } {
 }
 
 /**
+ * PF-1004: purely informational link to an account — the linked account's
+ * balance is manually-maintained today (no transaction-ledger derivation,
+ * that's PF-104), so linking does not change how currentAmount is tracked.
+ */
+function LinkedAccountControl({
+  goal,
+  payload,
+  onPayload,
+  editingId,
+  setEditingId,
+}: {
+  goal: Record<string, unknown>
+  payload: PersonalFinancePayload
+  onPayload: (payload: PersonalFinancePayload) => void
+  editingId: string | null
+  setEditingId: (id: string | null) => void
+}) {
+  const id = stringField(goal, 'id')
+  const linkedAccountId = stringField(goal, 'linkedAccountId')
+  const accounts = payload.data.finance_accounts
+  const linkedAccount = accounts.find((a) => stringField(a, 'id') === linkedAccountId)
+
+  async function setLinkedAccount(nextId: string) {
+    setEditingId(null)
+    await fetch('/api/finance', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'update_record', kind: 'goal', id, payload: { linkedAccountId: nextId || null } }),
+    })
+      .then((r) => r.json())
+      .then((data: PersonalFinancePayload) => {
+        if (data.ok) onPayload(data)
+      })
+      .catch(() => {})
+  }
+
+  if (linkedAccountId && editingId !== id) {
+    return (
+      <p className="mt-1 text-xs text-[var(--theme-muted)]">
+        🔗 Linked to {linkedAccount ? stringField(linkedAccount, 'name') : '(removed account)'}{' '}
+        <button type="button" onClick={() => setEditingId(id)} className="underline hover:text-[var(--theme-text)]">
+          Change
+        </button>
+      </p>
+    )
+  }
+
+  return (
+    <select
+      value={linkedAccountId}
+      onChange={(e) => void setLinkedAccount(e.target.value)}
+      className="mt-1 rounded-lg border border-[var(--theme-border)] bg-black/10 px-2 py-0.5 text-xs text-[var(--theme-text)] outline-none"
+    >
+      <option value="">— No linked account —</option>
+      {accounts.map((account, index) => {
+        const accountId = stringField(account, 'id') || String(index)
+        return (
+          <option key={accountId} value={accountId}>
+            {stringField(account, 'name')}
+          </option>
+        )
+      })}
+    </select>
+  )
+}
+
+/**
  * Visual progress-bar view of open-ended savings goals — sits above the full
  * editable DataTable. Sinking funds (goalKind: 'sinking') are excluded here
  * since they have their own dedicated SinkingFundsPanel (PF-1007) with
  * schedule-status tracking; showing them in both places would be duplicative.
  */
-export function SavingsGoalsProgress({ payload }: { payload: PersonalFinancePayload }) {
+export function SavingsGoalsProgress({
+  payload,
+  onPayload,
+}: {
+  payload: PersonalFinancePayload
+  onPayload: (payload: PersonalFinancePayload) => void
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null)
   const goals = payload.data.savings_goals.filter((row) => stringField(row, 'goalKind') !== 'sinking')
   if (goals.length === 0) return null
 
@@ -67,6 +142,13 @@ export function SavingsGoalsProgress({ payload }: { payload: PersonalFinancePayl
                 {formatLkr(current)} / {formatLkr(target)}
               </p>
               {requiredLine && <p className={`mt-1 text-xs ${requiredLine.tone}`}>{requiredLine.text}</p>}
+              <LinkedAccountControl
+                goal={goal}
+                payload={payload}
+                onPayload={onPayload}
+                editingId={editingId}
+                setEditingId={setEditingId}
+              />
             </div>
           )
         })}
