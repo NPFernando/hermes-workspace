@@ -50,6 +50,9 @@ export function PendingIngestionPanel({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [gmailConnected, setGmailConnected] = useState(false)
   const [gmailLastSyncedAtSeconds, setGmailLastSyncedAtSeconds] = useState<number | null>(null)
+  const [gmailSyncHistory, setGmailSyncHistory] = useState<
+    Array<{ at: number; found: number; queued: number; skippedAlreadyQueued: number }>
+  >([])
   const [syncing, setSyncing] = useState(false)
   const [duplicateWarnings, setDuplicateWarnings] = useState<Record<string, DuplicateWarning>>({})
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -58,10 +61,17 @@ export function PendingIngestionPanel({
   const checkGmailConnection = useCallback(() => {
     return fetch('/api/auth/gmail-connect?check=1', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((data: { connected?: boolean; lastSyncedAtSeconds?: number | null }) => {
-        setGmailConnected(Boolean(data.connected))
-        setGmailLastSyncedAtSeconds(data.lastSyncedAtSeconds ?? null)
-      })
+      .then(
+        (data: {
+          connected?: boolean
+          lastSyncedAtSeconds?: number | null
+          syncHistory?: Array<{ at: number; found: number; queued: number; skippedAlreadyQueued: number }>
+        }) => {
+          setGmailConnected(Boolean(data.connected))
+          setGmailLastSyncedAtSeconds(data.lastSyncedAtSeconds ?? null)
+          setGmailSyncHistory(data.syncHistory ?? [])
+        },
+      )
       .catch(() => {})
   }, [])
 
@@ -318,6 +328,16 @@ export function PendingIngestionPanel({
         <p className="mt-1 text-xs text-[var(--theme-muted)]">
           {gmailLastSyncedAtSeconds ? `Last synced ${new Date(gmailLastSyncedAtSeconds * 1000).toLocaleString()}` : 'Never synced'}
         </p>
+      )}
+
+      {gmailConnected && gmailSyncHistory.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--theme-muted)]">
+          {[...gmailSyncHistory].reverse().map((run) => (
+            <span key={run.at}>
+              {new Date(run.at * 1000).toLocaleDateString()}: found {run.found}, queued {run.queued}
+            </span>
+          ))}
+        </div>
       )}
 
       {note && <p className="mt-2 text-xs text-red-300">{note}</p>}

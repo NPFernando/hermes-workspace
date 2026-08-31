@@ -21,12 +21,16 @@ export const Route = createFileRoute('/api/auth/gmail-connect')({
         if (url.searchParams.get('check') === '1') {
           const db = readFinanceStore()
           const gmailIngest = (db.settings as Record<string, unknown>).gmailIngest as
-            | { lastSyncedAtSeconds?: number }
+            | {
+                lastSyncedAtSeconds?: number
+                syncHistory?: Array<{ at: number; found: number; queued: number; skippedAlreadyQueued: number }>
+              }
             | undefined
           return Response.json({
             enabled: isGoogleOAuthEnabled(),
             connected: isGmailConnected(),
             lastSyncedAtSeconds: gmailIngest?.lastSyncedAtSeconds ?? null,
+            syncHistory: gmailIngest?.syncHistory ?? [],
           })
         }
 

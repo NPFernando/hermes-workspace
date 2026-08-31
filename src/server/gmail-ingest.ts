@@ -217,7 +217,15 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
     queued += 1
   }
 
-  gmailIngest.lastSyncedAtSeconds = Math.floor(Date.now() / 1000)
+  const now = Math.floor(Date.now() / 1000)
+  gmailIngest.lastSyncedAtSeconds = now
+  // AI-506: capped recent-activity list, not a full audit trail — the
+  // unbounded gmail_sync_run audit-log entries already cover that.
+  const priorHistory = Array.isArray(gmailIngest.syncHistory) ? gmailIngest.syncHistory : []
+  gmailIngest.syncHistory = [
+    ...priorHistory,
+    { at: now, found: messageIds.length, queued, skippedAlreadyQueued },
+  ].slice(-10)
   settings.gmailIngest = gmailIngest
   writeFinanceStore(db)
 
