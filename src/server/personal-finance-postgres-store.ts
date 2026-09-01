@@ -158,6 +158,41 @@ function runPsql(database: string, sql: string): { ok: true; stdout: string } | 
   return { ok: false, reason: 'psql executable not found' }
 }
 
+/**
+ * Phase B (read path): runs `sql`, wrapped so Postgres itself serializes the
+ * result set to JSON (`json_agg`) — avoids ever hand-parsing psql's tabular
+ * text output (fragile against embedded delimiters/quotes/nulls), the same
+ * trick finance-postgres-store.ts already uses for its own JSONB snapshot.
+ * Returns null on any failure; an empty result set returns [].
+ */
+function selectJson(database: string, sql: string): Array<Record<string, unknown>> | null {
+  const result = runPsql(database, `SELECT json_agg(t) FROM (${sql}) t;`)
+  if (!result.ok) return null
+  if (!result.stdout) return []
+  try {
+    const parsed: unknown = JSON.parse(result.stdout)
+    return Array.isArray(parsed) ? (parsed as Array<Record<string, unknown>>) : []
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Converts a Postgres row's snake_case column names back to the camelCase
+ * field names the JS shapes use (converted_lkr_amount -> convertedLkrAmount).
+ * Does NOT recurse into nested objects/arrays — those are opaque payloads
+ * (e.g. investment_accounts.data) that must round-trip untouched, not
+ * generic multi-level records to re-key.
+ */
+export function snakeRowToCamel(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(row)) {
+    const camelKey = key.replace(/_([a-z0-9])/g, (_match, char: string) => char.toUpperCase())
+    out[camelKey] = value
+  }
+  return out
+}
+
 function ensurePersonalFinanceDatabase(): boolean {
   const exists = runPsql('postgres', `SELECT 1 FROM pg_database WHERE datname = ${sqlText(PERSONAL_FINANCE_PG_DATABASE)};`)
   if (!exists.ok) return false
@@ -1041,5 +1076,175 @@ export function personalFinancePostgresStatus(): PersonalFinancePostgresStatus {
     available: true,
     database: PERSONAL_FINANCE_PG_DATABASE,
     lastWriteError: lastWriteError ?? undefined,
+  }
+}
+
+const FLAT_TABLES = [
+  'finance_accounts', 'income_records', 'expense_records', 'budget_categories', 'categories',
+  'subcategories', 'merchants', 'tags', 'savings_goals', 'tax_records', 'income_sources',
+  'stock_holdings', 'fixed_deposits', 'loans', 'properties', 'beneficiaries',
+] as const
+
+function selectTableRows(database: string, table: string): Array<Record<string, unknown>> | null {
+  const result = selectJson(database, `SELECT * FROM ${sqlIdentifier(table)} ORDER BY created_at`)
+  if (result === null) return null
+  return result.map(snakeRowToCamel)
+}
+
+function readExchangeRates(database: string): Array<Record<string, unknown>> | null {
+  const rowsOut = selectJson(database, 'SELECT * FROM exchange_rates ORDER BY date')
+  if (rowsOut === null) return null
+  return rowsOut.map((row) => {
+    const camel = snakeRowToCamel(row)
+    const { baseCurrency, targetCurrency, ...rest } = camel
+    return { ...rest, base: baseCurrency, target: targetCurrency }
+  })
+}
+
+/** Unpacks the generic JSONB blob back into a flat record — the inverse of investmentAccountRows(). */
+function readInvestmentAccounts(database: string): Array<Record<string, unknown>> | null {
+  const rowsOut = selectJson(database, 'SELECT * FROM investment_accounts ORDER BY created_at')
+  if (rowsOut === null) return null
+  return rowsOut.map((row) => {
+    const camel = snakeRowToCamel(row)
+    const data = isRecord(camel.data) ? camel.data : {}
+    return { ...data, id: camel.id, source: camel.source, createdAt: camel.createdAt, updatedAt: camel.updatedAt }
+  })
+}
+
+function readPendingIngestions(database: string): Array<Record<string, unknown>> | null {
+  const parents = selectJson(database, 'SELECT * FROM pending_ingestions ORDER BY created_at')
+  const transactions = selectJson(database, 'SELECT * FROM pending_ingestion_extracted_transactions')
+  const contracts = selectJson(database, 'SELECT * FROM pending_ingestion_extracted_contracts')
+  const risks = selectJson(database, 'SELECT * FROM pending_ingestion_contract_risks')
+  if (parents === null || transactions === null || contracts === null || risks === null) return null
+
+  const transactionById = new Map(transactions.map((row) => [row.pending_ingestion_id, snakeRowToCamel(row)]))
+  const contractById = new Map(contracts.map((row) => [row.pending_ingestion_id, snakeRowToCamel(row)]))
+  const risksByContractId = new Map<unknown, Array<Record<string, unknown>>>()
+  for (const risk of risks) {
+    const key = risk.pending_ingestion_id
+    const list = risksByContractId.get(key) ?? []
+    list.push(snakeRowToCamel(risk))
+    risksByContractId.set(key, list)
+  }
+
+  return parents.map((row) => {
+    const camel = snakeRowToCamel(row)
+    const extracted = transactionById.get(row.id)
+    if (extracted) {
+      const { pendingIngestionId, ...rest } = extracted
+      camel.extracted = rest
+    }
+    const contract = contractById.get(row.id)
+    if (contract) {
+      const { pendingIngestionId, ...rest } = contract
+      camel.extractedContract = { ...rest, risks: risksByContractId.get(row.id) ?? [] }
+    }
+    return camel
+  })
+}
+
+function readPersonalFinanceSettings(
+  database: string,
+): PersonalFinanceSlice['personalFinanceSettings'] | null {
+  const settingsRows = selectJson(database, 'SELECT * FROM personal_finance_settings')
+  const qaHistoryRows = selectJson(database, 'SELECT * FROM finance_qa_history ORDER BY asked_at')
+  const gmailStateRows = selectJson(database, 'SELECT * FROM gmail_ingest_state')
+  const syncHistoryRows = selectJson(database, 'SELECT * FROM gmail_sync_history ORDER BY synced_at')
+  const correctionRows = selectJson(database, 'SELECT * FROM category_correction_hints')
+  if (
+    settingsRows === null ||
+    qaHistoryRows === null ||
+    gmailStateRows === null ||
+    syncHistoryRows === null ||
+    correctionRows === null
+  ) {
+    return null
+  }
+
+  const settings = settingsRows[0] ? snakeRowToCamel(settingsRows[0]) : {}
+  const gmailState = gmailStateRows[0] ? snakeRowToCamel(gmailStateRows[0]) : {}
+  const categoryCorrections: Record<string, string> = {}
+  for (const row of correctionRows) {
+    if (typeof row.vendor === 'string' && typeof row.category === 'string') {
+      categoryCorrections[row.vendor] = row.category
+    }
+  }
+
+  return {
+    emergencyFundTargetMonths: settings.emergencyFundTargetMonths as number | undefined,
+    savingsRateTargetPct: settings.savingsRateTargetPct as number | undefined,
+    wealthGoalTargetLkr: settings.wealthGoalTargetLkr as number | undefined,
+    wealthGoalTargetDate: settings.wealthGoalTargetDate as string | undefined,
+    financeQaHistory: qaHistoryRows.map((row) => {
+      const camel = snakeRowToCamel(row)
+      return { at: camel.askedAt as number, question: camel.question as string, answer: camel.answer as string }
+    }),
+    gmailIngestState: {
+      lastSyncedAtSeconds: gmailState.lastSyncedAtSeconds as number | undefined,
+      syncHistory: syncHistoryRows.map((row) => {
+        const camel = snakeRowToCamel(row)
+        return {
+          at: camel.syncedAt as number,
+          found: camel.found as number,
+          queued: camel.queued as number,
+          skippedAlreadyQueued: camel.skippedAlreadyQueued as number,
+        }
+      }),
+    },
+    categoryCorrections,
+  }
+}
+
+/**
+ * Phase B: reconstructs the full PersonalFinanceSlice shape from the real
+ * `personal_finance` Postgres tables. NOT currently called from any live
+ * read path — finance-store.ts's overlaySplitStores() still reads from the
+ * JSON split store exclusively. Exists so this read path can be built and
+ * verified (live round-trip: write via the existing mirror, read back here,
+ * diff) in complete isolation before Phase C ever wires it into a real read.
+ * Returns null if the database is unavailable or any query fails — never a
+ * partially-correct result.
+ */
+export function readPersonalFinancePostgresStore(): PersonalFinanceSlice | null {
+  if (!pgConn()) return null
+  if (!ensurePersonalFinancePostgresSchema()) return null
+  const database = PERSONAL_FINANCE_PG_DATABASE
+
+  const flat: Record<string, Array<Record<string, unknown>>> = {}
+  for (const table of FLAT_TABLES) {
+    const result = selectTableRows(database, table)
+    if (result === null) return null
+    flat[table] = result
+  }
+
+  const exchangeRates = readExchangeRates(database)
+  const investmentAccounts = readInvestmentAccounts(database)
+  const pendingIngestions = readPendingIngestions(database)
+  const personalFinanceSettings = readPersonalFinanceSettings(database)
+  if (exchangeRates === null || investmentAccounts === null || pendingIngestions === null) return null
+
+  return {
+    finance_accounts: flat.finance_accounts,
+    income_records: flat.income_records,
+    expense_records: flat.expense_records,
+    budget_categories: flat.budget_categories,
+    categories: flat.categories,
+    subcategories: flat.subcategories,
+    merchants: flat.merchants,
+    tags: flat.tags,
+    savings_goals: flat.savings_goals,
+    tax_records: flat.tax_records,
+    exchange_rates: exchangeRates,
+    investment_accounts: investmentAccounts,
+    pending_ingestions: pendingIngestions,
+    income_sources: flat.income_sources,
+    stock_holdings: flat.stock_holdings,
+    fixed_deposits: flat.fixed_deposits,
+    loans: flat.loans,
+    properties: flat.properties,
+    beneficiaries: flat.beneficiaries,
+    personalFinanceSettings: personalFinanceSettings ?? undefined,
   }
 }
