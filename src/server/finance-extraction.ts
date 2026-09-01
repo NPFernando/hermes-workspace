@@ -114,24 +114,53 @@ export async function extractTransactionFromText(
   return { ok: false, reason: 'all_routes_failed' }
 }
 
+export type FinanceQaTurn = { question: string; answer: string }
+
+/**
+ * AI-204: builds the flat prompt string for answerFinanceQuestion(), with an
+ * optional "Conversation so far" block folded in ahead of the Data/Question
+ * sections. Pulled out as a pure function so multi-turn context assembly is
+ * unit-testable without a network call. priorTurns is capped to the last 3
+ * regardless of how many are passed in (defense-in-depth; the caller is also
+ * expected to already cap — see ask_finance_question in routes/api/finance.ts).
+ */
+export function buildFinanceAnswerPrompt(
+  question: string,
+  context: unknown,
+  priorTurns: Array<FinanceQaTurn> = [],
+): string {
+  const recentTurns = priorTurns.slice(-3)
+  const conversationBlock =
+    recentTurns.length > 0
+      ? `Conversation so far:
+${recentTurns.map((turn) => `Q: ${turn.question}\nA: ${turn.answer}`).join('\n')}
+
+`
+      : ''
+
+  return `You are a personal finance analyst. Answer the user's question using ONLY the JSON data below — do not assume anything not present in it. If the data doesn't contain what's needed to answer, say so honestly rather than guessing. Be concise (2-4 sentences).
+
+${conversationBlock}Data:
+${JSON.stringify(context)}
+
+Question: ${question}`
+}
+
 /**
  * Phase 24 (AI-200/201): answers a free-text question about the user's own
  * finances using ONLY the bounded, pre-aggregated context the caller
  * provides (buildFinanceQueryContext in finance-store.ts) — never a raw
  * transaction dump. Same two-tier HARP -> Gemini fallback as
  * extractTransactionFromText(), just a plain-text answer instead of
- * structured JSON.
+ * structured JSON. AI-204: optionally folds in the last few prior turns of
+ * this conversation so follow-up questions carry context.
  */
 export async function answerFinanceQuestion(
   question: string,
   context: unknown,
+  priorTurns: Array<FinanceQaTurn> = [],
 ): Promise<{ ok: true; answer: string } | { ok: false; reason: string }> {
-  const prompt = `You are a personal finance analyst. Answer the user's question using ONLY the JSON data below — do not assume anything not present in it. If the data doesn't contain what's needed to answer, say so honestly rather than guessing. Be concise (2-4 sentences).
-
-Data:
-${JSON.stringify(context)}
-
-Question: ${question}`
+  const prompt = buildFinanceAnswerPrompt(question, context, priorTurns)
 
   const routes = selectHarpRoutes('text_summary', 'standard')
   if (routes.length > 0) {

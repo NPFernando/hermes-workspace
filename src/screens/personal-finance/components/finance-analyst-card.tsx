@@ -11,11 +11,13 @@ function truncate(text: string, max: number): string {
 }
 
 /**
- * Phase 24 (AI-200/201/202): a same-origin, authenticated-user-only question/
- * answer exchange over the user's own finance data. AI-202 adds a capped
- * (last 10, showing the last 5) recent-questions list stored in
- * FinanceSettings.financeQaHistory — see the ask_finance_question action
- * (routes/api/finance.ts) for the bounded context/LLM-call/history side.
+ * Phase 24 (AI-200/201/202/204): a same-origin, authenticated-user-only
+ * question/answer exchange over the user's own finance data. AI-202 adds a
+ * capped (last 10, showing the last 5) recent-questions list stored in
+ * FinanceSettings.financeQaHistory. AI-204 adds in-session-only conversation
+ * memory (`turns`, separate from that persisted list) so follow-up questions
+ * carry context — see the ask_finance_question action (routes/api/finance.ts)
+ * for the bounded context/LLM-call/history side.
  */
 export function FinanceAnalystCard({
   payload,
@@ -28,9 +30,14 @@ export function FinanceAnalystCard({
   const [answer, setAnswer] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [asking, setAsking] = useState(false)
+  // AI-204: in-session-only conversation turns, separate from the persisted
+  // payload.financeQaHistory audit log — resets on reload, explicitly
+  // clearable via "New conversation" below.
+  const [turns, setTurns] = useState<Array<{ question: string; answer: string }>>([])
 
   async function ask() {
-    if (!question.trim()) return
+    const asked = question.trim()
+    if (!asked) return
     setAsking(true)
     setError(null)
     setAnswer(null)
@@ -38,11 +45,16 @@ export function FinanceAnalystCard({
       const res = await fetch('/api/finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'ask_finance_question', question: question.trim() }),
+        body: JSON.stringify({
+          action: 'ask_finance_question',
+          question: asked,
+          priorTurns: turns.slice(-3),
+        }),
       })
       const data = (await res.json()) as PersonalFinancePayload & { answer?: string; error?: string }
       if (data.ok && data.answer) {
         setAnswer(data.answer)
+        setTurns((prior) => [...prior, { question: asked, answer: data.answer as string }])
         onPayload(data)
       } else {
         setError(data.error || 'Could not answer that question')
@@ -52,6 +64,12 @@ export function FinanceAnalystCard({
     } finally {
       setAsking(false)
     }
+  }
+
+  function startNewConversation() {
+    setTurns([])
+    setAnswer(null)
+    setError(null)
   }
 
   const recentHistory = [...payload.financeQaHistory].reverse().slice(0, 5)
@@ -76,6 +94,11 @@ export function FinanceAnalystCard({
         <button type="button" disabled={asking} onClick={() => void ask()} className={buttonClass}>
           {asking ? 'Asking…' : 'Ask'}
         </button>
+        {turns.length > 0 && (
+          <button type="button" onClick={startNewConversation} className={buttonClass}>
+            New conversation
+          </button>
+        )}
       </div>
       {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
       {answer && <p className="mt-2 text-sm text-[var(--theme-text)]">{answer}</p>}

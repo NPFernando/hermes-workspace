@@ -695,9 +695,22 @@ export const Route = createFileRoute('/api/finance')({
             // don't apply here; deferred for any future agent variant.
             const question = typeof body.question === 'string' ? body.question.trim() : ''
             if (!question) return json({ ok: false, error: 'question is required.' }, { status: 400 })
+            // AI-204: client sends its in-session conversation turns; never
+            // trust its length, so re-validate shape and cap to the last 3
+            // here regardless of what was sent.
+            const rawPriorTurns = Array.isArray(body.priorTurns) ? body.priorTurns : []
+            const priorTurns = rawPriorTurns
+              .filter(
+                (turn): turn is { question: string; answer: string } =>
+                  !!turn &&
+                  typeof turn === 'object' &&
+                  typeof (turn as Record<string, unknown>).question === 'string' &&
+                  typeof (turn as Record<string, unknown>).answer === 'string',
+              )
+              .slice(-3)
             const db = readFinanceStore()
             const context = buildFinanceQueryContext(db)
-            const result = await answerFinanceQuestion(question, context)
+            const result = await answerFinanceQuestion(question, context, priorTurns)
             if (!result.ok) return json({ ok: false, error: result.reason }, { status: 502 })
             // AI-202: capped recent-activity list, same bounded-log
             // convention as AI-506's gmailIngest.syncHistory.

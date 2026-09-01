@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { parseContractExtractionJson, parseExtractionJson, promptWithCategoryHints } from './finance-extraction'
+import {
+  buildFinanceAnswerPrompt,
+  parseContractExtractionJson,
+  parseExtractionJson,
+  promptWithCategoryHints,
+} from './finance-extraction'
 
 describe('parseExtractionJson', () => {
   it('parses a valid expense extraction', () => {
@@ -76,6 +81,37 @@ describe('promptWithCategoryHints', () => {
     const hints = Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`vendor${i}`, `cat${i}`]))
     const result = promptWithCategoryHints('BASE', hints)
     expect(result.match(/^- "/gm)?.length).toBe(10)
+  })
+})
+
+describe('buildFinanceAnswerPrompt', () => {
+  const context = { summary: { netWorthLkr: 100 } }
+
+  it('matches the original single-turn shape when there are no prior turns', () => {
+    const result = buildFinanceAnswerPrompt('What is my net worth?', context)
+    expect(result).not.toContain('Conversation so far')
+    expect(result).toContain(`Data:\n${JSON.stringify(context)}`)
+    expect(result).toContain('Question: What is my net worth?')
+  })
+
+  it('folds prior turns into a "Conversation so far" block ahead of Data/Question', () => {
+    const result = buildFinanceAnswerPrompt('And last month?', context, [
+      { question: 'How much did I spend this month?', answer: 'You spent 50,000 LKR.' },
+    ])
+    expect(result).toContain('Conversation so far:')
+    expect(result).toContain('Q: How much did I spend this month?\nA: You spent 50,000 LKR.')
+    expect(result.indexOf('Conversation so far')).toBeLessThan(result.indexOf('Data:'))
+    expect(result).toContain('Question: And last month?')
+  })
+
+  it('caps prior turns to the last 3 even if more are passed in', () => {
+    const turns = Array.from({ length: 5 }, (_, i) => ({ question: `Q${i}`, answer: `A${i}` }))
+    const result = buildFinanceAnswerPrompt('Follow-up', context, turns)
+    expect(result).not.toContain('Q0')
+    expect(result).not.toContain('Q1')
+    expect(result).toContain('Q2')
+    expect(result).toContain('Q3')
+    expect(result).toContain('Q4')
   })
 })
 
