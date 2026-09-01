@@ -51,6 +51,27 @@ export interface PersonalFinanceSlice {
   properties?: Array<Record<string, unknown>>
   /** Optional: absent on a mirror file written before WEALTH-108 (Estate/Beneficiary Notes) shipped. */
   beneficiaries?: Array<Record<string, unknown>>
+  /**
+   * Postgres-migration Phase A: the personal-finance-owned subset of the
+   * shared FinanceSettings bag, split out so it can get real Postgres
+   * tables of its own — the trading-shared remainder of FinanceSettings
+   * (tradingMode, liveTradingEnabled, demoTrading* config, etc.) is
+   * deliberately NOT part of this slice; it stays exactly where it is
+   * today (finance-postgres-store.ts's whole-snapshot mirror), untouched.
+   * Optional: absent on a mirror file written before this shipped.
+   */
+  personalFinanceSettings?: {
+    emergencyFundTargetMonths?: number
+    savingsRateTargetPct?: number
+    wealthGoalTargetLkr?: number
+    wealthGoalTargetDate?: string
+    financeQaHistory?: Array<{ at: number; question: string; answer: string }>
+    gmailIngestState?: {
+      lastSyncedAtSeconds?: number
+      syncHistory?: Array<{ at: number; found: number; queued: number; skippedAlreadyQueued: number }>
+    }
+    categoryCorrections?: Record<string, string>
+  }
 }
 
 /**

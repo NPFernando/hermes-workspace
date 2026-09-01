@@ -283,6 +283,70 @@ CREATE TABLE IF NOT EXISTS beneficiaries (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, relationship TEXT NOT NULL, note TEXT, source TEXT NOT NULL,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+
+-- Postgres-migration Phase A: previously-unmirrored collections + the
+-- personal-finance-owned subset of FinanceSettings, split into real
+-- relational tables instead of loose JSON columns.
+
+CREATE TABLE IF NOT EXISTS pending_ingestions (
+  id TEXT PRIMARY KEY, status TEXT NOT NULL, source TEXT NOT NULL, document_type TEXT NOT NULL,
+  source_ref TEXT NOT NULL, password_hint TEXT, raw_preview_image_path TEXT, error TEXT,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pending_ingestion_extracted_transactions (
+  pending_ingestion_id TEXT PRIMARY KEY REFERENCES pending_ingestions(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL, amount DOUBLE PRECISION NOT NULL, currency TEXT NOT NULL,
+  vendor_or_source TEXT NOT NULL, date TEXT NOT NULL, category TEXT, confidence TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pending_ingestion_extracted_contracts (
+  pending_ingestion_id TEXT PRIMARY KEY REFERENCES pending_ingestions(id) ON DELETE CASCADE,
+  employer_name TEXT NOT NULL, employment_type TEXT NOT NULL, monthly_income_amount DOUBLE PRECISION,
+  currency TEXT NOT NULL, contract_start_date TEXT, contract_end_date TEXT, job_title TEXT,
+  payday_day_of_month INTEGER, pay_schedule TEXT, confidence TEXT NOT NULL, risk_summary TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pending_ingestion_contract_risks (
+  id SERIAL PRIMARY KEY, pending_ingestion_id TEXT NOT NULL REFERENCES pending_ingestions(id) ON DELETE CASCADE,
+  severity TEXT NOT NULL, clause TEXT NOT NULL, concern TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS exchange_rates (
+  id TEXT PRIMARY KEY, base_currency TEXT NOT NULL, target_currency TEXT NOT NULL, date TEXT NOT NULL,
+  rate DOUBLE PRECISION NOT NULL,
+  UNIQUE (base_currency, target_currency, date)
+);
+
+-- Kept generic (no CRUD path or defined shape exists anywhere in the app
+-- for this collection today, confirmed via research) rather than inventing
+-- speculative columns for an unused feature.
+CREATE TABLE IF NOT EXISTS investment_accounts (
+  id TEXT PRIMARY KEY, data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS personal_finance_settings (
+  id TEXT PRIMARY KEY DEFAULT 'default', emergency_fund_target_months DOUBLE PRECISION,
+  savings_rate_target_pct DOUBLE PRECISION, wealth_goal_target_lkr DOUBLE PRECISION, wealth_goal_target_date TEXT
+);
+
+CREATE TABLE IF NOT EXISTS finance_qa_history (
+  id SERIAL PRIMARY KEY, asked_at BIGINT NOT NULL, question TEXT NOT NULL, answer TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS gmail_ingest_state (
+  id TEXT PRIMARY KEY DEFAULT 'default', last_synced_at_seconds BIGINT
+);
+
+CREATE TABLE IF NOT EXISTS gmail_sync_history (
+  id SERIAL PRIMARY KEY, synced_at BIGINT NOT NULL, found INTEGER NOT NULL, queued INTEGER NOT NULL,
+  skipped_already_queued INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS category_correction_hints (
+  vendor TEXT PRIMARY KEY, category TEXT NOT NULL
+);
 `,
   )
   if (result.ok) schemaReady = true
@@ -561,6 +625,145 @@ function beneficiaryRows(rowsIn: Array<Record<string, unknown>>): Array<Array<st
   ])
 }
 
+function pendingIngestionRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  return rowsIn.map((row) => [
+    sqlText(firstText(row, 'id')),
+    sqlText(firstText(row, 'status', 'awaiting_review')),
+    sqlText(firstText(row, 'source', 'upload')),
+    sqlText(firstText(row, 'documentType', 'transaction')),
+    sqlText(firstText(row, 'sourceRef')),
+    sqlNullableText(row.passwordHint),
+    sqlNullableText(row.rawPreviewImagePath),
+    sqlNullableText(row.error),
+    sqlText(firstText(row, 'createdAt')),
+    sqlText(firstText(row, 'updatedAt')),
+  ])
+}
+
+function pendingIngestionExtractedTransactionRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  const out: Array<Array<string>> = []
+  for (const row of rowsIn) {
+    const extracted = row.extracted
+    if (!isRecord(extracted)) continue
+    out.push([
+      sqlText(firstText(row, 'id')),
+      sqlText(firstText(extracted, 'kind', 'expense')),
+      sqlNumber(extracted.amount),
+      sqlText(firstText(extracted, 'currency', 'LKR')),
+      sqlText(firstText(extracted, 'vendorOrSource', 'Unknown')),
+      sqlText(firstText(extracted, 'date')),
+      sqlNullableText(extracted.category),
+      sqlText(firstText(extracted, 'confidence', 'low')),
+    ])
+  }
+  return out
+}
+
+function pendingIngestionExtractedContractRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  const out: Array<Array<string>> = []
+  for (const row of rowsIn) {
+    const contract = row.extractedContract
+    if (!isRecord(contract)) continue
+    out.push([
+      sqlText(firstText(row, 'id')),
+      sqlText(firstText(contract, 'employerName', 'Unknown')),
+      sqlText(firstText(contract, 'employmentType', 'other')),
+      sqlNullableNumber(contract.monthlyIncomeAmount),
+      sqlText(firstText(contract, 'currency', 'LKR')),
+      sqlNullableText(contract.contractStartDate),
+      sqlNullableText(contract.contractEndDate),
+      sqlNullableText(contract.jobTitle),
+      sqlNullableNumber(contract.paydayDayOfMonth),
+      sqlNullableText(contract.paySchedule),
+      sqlText(firstText(contract, 'confidence', 'low')),
+      sqlText(firstText(contract, 'riskSummary')),
+    ])
+  }
+  return out
+}
+
+function pendingIngestionContractRiskRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  const out: Array<Array<string>> = []
+  for (const row of rowsIn) {
+    const contract = row.extractedContract
+    if (!isRecord(contract)) continue
+    const pendingId = firstText(row, 'id')
+    const risks = Array.isArray(contract.risks) ? contract.risks : []
+    for (const risk of risks) {
+      if (!isRecord(risk)) continue
+      out.push([
+        sqlText(pendingId),
+        sqlText(firstText(risk, 'severity', 'low')),
+        sqlText(firstText(risk, 'clause')),
+        sqlText(firstText(risk, 'concern')),
+      ])
+    }
+  }
+  return out
+}
+
+function exchangeRateRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  return rowsIn.map((row, index) => [
+    sqlText(firstText(row, 'id') || `rate-${index}`),
+    sqlText(firstText(row, 'base')),
+    sqlText(firstText(row, 'target')),
+    sqlText(firstText(row, 'date')),
+    sqlNumber(row.rate),
+  ])
+}
+
+/** Kept generic — no CRUD path or defined shape exists anywhere in the app for this collection today. */
+function investmentAccountRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  return rowsIn.map((row, index) => [
+    sqlText(firstText(row, 'id') || `investment-account-${index}`),
+    sqlText(JSON.stringify(row)),
+    sqlText(firstText(row, 'source', 'manual')),
+    sqlText(firstText(row, 'createdAt', new Date().toISOString())),
+    sqlText(firstText(row, 'updatedAt', new Date().toISOString())),
+  ])
+}
+
+function personalFinanceSettingsRows(
+  settings: PersonalFinanceSlice['personalFinanceSettings'],
+): Array<Array<string>> {
+  if (!settings) return []
+  return [
+    [
+      sqlText('default'),
+      sqlNullableNumber(settings.emergencyFundTargetMonths),
+      sqlNullableNumber(settings.savingsRateTargetPct),
+      sqlNullableNumber(settings.wealthGoalTargetLkr),
+      sqlNullableText(settings.wealthGoalTargetDate),
+    ],
+  ]
+}
+
+function financeQaHistoryRows(
+  entries: Array<{ at: number; question: string; answer: string }> | undefined,
+): Array<Array<string>> {
+  return (entries ?? []).map((entry) => [sqlNumber(entry.at), sqlText(entry.question), sqlText(entry.answer)])
+}
+
+function gmailIngestStateRows(state: { lastSyncedAtSeconds?: number } | undefined): Array<Array<string>> {
+  if (!state) return []
+  return [[sqlText('default'), sqlNullableNumber(state.lastSyncedAtSeconds)]]
+}
+
+function gmailSyncHistoryRows(
+  entries: Array<{ at: number; found: number; queued: number; skippedAlreadyQueued: number }> | undefined,
+): Array<Array<string>> {
+  return (entries ?? []).map((entry) => [
+    sqlNumber(entry.at),
+    sqlNumber(entry.found),
+    sqlNumber(entry.queued),
+    sqlNumber(entry.skippedAlreadyQueued),
+  ])
+}
+
+function categoryCorrectionRows(hints: Record<string, string> | undefined): Array<Array<string>> {
+  return Object.entries(hints ?? {}).map(([vendor, category]) => [sqlText(vendor), sqlText(category)])
+}
+
 function personalFinanceMirrorSql(slice: PersonalFinanceSlice): string {
   return `
 DELETE FROM finance_accounts;
@@ -579,6 +782,17 @@ DELETE FROM fixed_deposits;
 DELETE FROM loans;
 DELETE FROM properties;
 DELETE FROM beneficiaries;
+DELETE FROM pending_ingestion_contract_risks;
+DELETE FROM pending_ingestion_extracted_contracts;
+DELETE FROM pending_ingestion_extracted_transactions;
+DELETE FROM pending_ingestions;
+DELETE FROM exchange_rates;
+DELETE FROM investment_accounts;
+DELETE FROM personal_finance_settings;
+DELETE FROM finance_qa_history;
+DELETE FROM gmail_sync_history;
+DELETE FROM gmail_ingest_state;
+DELETE FROM category_correction_hints;
 
 ${insertRows(
   'finance_accounts',
@@ -708,6 +922,79 @@ ${insertRows(
   'beneficiaries',
   ['id', 'name', 'relationship', 'note', 'source', 'created_at', 'updated_at'],
   beneficiaryRows(rows(slice.beneficiaries)),
+)}
+
+${insertRows(
+  'pending_ingestions',
+  [
+    'id', 'status', 'source', 'document_type', 'source_ref', 'password_hint', 'raw_preview_image_path',
+    'error', 'created_at', 'updated_at',
+  ],
+  pendingIngestionRows(rows(slice.pending_ingestions)),
+)}
+
+${insertRows(
+  'pending_ingestion_extracted_transactions',
+  ['pending_ingestion_id', 'kind', 'amount', 'currency', 'vendor_or_source', 'date', 'category', 'confidence'],
+  pendingIngestionExtractedTransactionRows(rows(slice.pending_ingestions)),
+)}
+
+${insertRows(
+  'pending_ingestion_extracted_contracts',
+  [
+    'pending_ingestion_id', 'employer_name', 'employment_type', 'monthly_income_amount', 'currency',
+    'contract_start_date', 'contract_end_date', 'job_title', 'payday_day_of_month', 'pay_schedule',
+    'confidence', 'risk_summary',
+  ],
+  pendingIngestionExtractedContractRows(rows(slice.pending_ingestions)),
+)}
+
+${insertRows(
+  'pending_ingestion_contract_risks',
+  ['pending_ingestion_id', 'severity', 'clause', 'concern'],
+  pendingIngestionContractRiskRows(rows(slice.pending_ingestions)),
+)}
+
+${insertRows(
+  'exchange_rates',
+  ['id', 'base_currency', 'target_currency', 'date', 'rate'],
+  exchangeRateRows(rows(slice.exchange_rates)),
+)}
+
+${insertRows(
+  'investment_accounts',
+  ['id', 'data', 'source', 'created_at', 'updated_at'],
+  investmentAccountRows(rows(slice.investment_accounts)),
+)}
+
+${insertRows(
+  'personal_finance_settings',
+  ['id', 'emergency_fund_target_months', 'savings_rate_target_pct', 'wealth_goal_target_lkr', 'wealth_goal_target_date'],
+  personalFinanceSettingsRows(slice.personalFinanceSettings),
+)}
+
+${insertRows(
+  'finance_qa_history',
+  ['asked_at', 'question', 'answer'],
+  financeQaHistoryRows(slice.personalFinanceSettings?.financeQaHistory),
+)}
+
+${insertRows(
+  'gmail_ingest_state',
+  ['id', 'last_synced_at_seconds'],
+  gmailIngestStateRows(slice.personalFinanceSettings?.gmailIngestState),
+)}
+
+${insertRows(
+  'gmail_sync_history',
+  ['synced_at', 'found', 'queued', 'skipped_already_queued'],
+  gmailSyncHistoryRows(slice.personalFinanceSettings?.gmailIngestState?.syncHistory),
+)}
+
+${insertRows(
+  'category_correction_hints',
+  ['vendor', 'category'],
+  categoryCorrectionRows(slice.personalFinanceSettings?.categoryCorrections),
 )}
 `
 }

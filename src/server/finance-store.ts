@@ -985,6 +985,19 @@ function mirrorIntoSplitStores(db: FinanceDatabase): void {
     loans: db.loans,
     properties: db.properties,
     beneficiaries: db.beneficiaries,
+    personalFinanceSettings: {
+      emergencyFundTargetMonths: db.settings.emergencyFundTargetMonths,
+      savingsRateTargetPct: db.settings.savingsRateTargetPct,
+      wealthGoalTargetLkr: db.settings.wealthGoalTargetLkr,
+      wealthGoalTargetDate: db.settings.wealthGoalTargetDate,
+      financeQaHistory: db.settings.financeQaHistory,
+      gmailIngestState: (db.settings as unknown as Record<string, unknown>).gmailIngest as
+        | { lastSyncedAtSeconds?: number; syncHistory?: Array<{ at: number; found: number; queued: number; skippedAlreadyQueued: number }> }
+        | undefined,
+      categoryCorrections: (db.settings as unknown as Record<string, unknown>).categoryCorrections as
+        | Record<string, string>
+        | undefined,
+    },
   })
   writeTradingStore({
     assets: db.assets,
