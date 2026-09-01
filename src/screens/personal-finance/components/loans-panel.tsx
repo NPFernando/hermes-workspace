@@ -19,6 +19,48 @@ function numberField(row: Record<string, unknown>, key: string): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
+type PayoffProjection =
+  | { insufficientPayment: true }
+  | { insufficientPayment: false; monthsRemaining: number; payoffDate: string; termComparisonText?: string }
+
+/**
+ * WEALTH-104/105: pure client-side projection from fields the loan already
+ * has — no server/payload changes, mirroring PF-1008's sinking-fund
+ * schedule-status precedent. Elapsed time since startDate isn't factored in
+ * (this projects forward from currentBalance as of now, not a full
+ * historical schedule reconciliation).
+ */
+function payoffProjection(loan: Record<string, unknown>): PayoffProjection | null {
+  const currentBalance = numberField(loan, 'currentBalance')
+  const interestRatePct = numberField(loan, 'interestRatePct')
+  const monthlyPayment = numberField(loan, 'monthlyPayment')
+  const termMonths = numberField(loan, 'termMonths')
+  if ((stringField(loan, 'status') || 'active') !== 'active') return null
+  if (monthlyPayment <= 0 || currentBalance <= 0) return null
+
+  const r = interestRatePct / 100 / 12
+  const interestOnly = currentBalance * r
+  if (monthlyPayment <= interestOnly) return { insufficientPayment: true }
+
+  const monthsRemaining =
+    r === 0
+      ? Math.ceil(currentBalance / monthlyPayment)
+      : Math.ceil(Math.log(monthlyPayment / (monthlyPayment - currentBalance * r)) / Math.log(1 + r))
+
+  const payoff = new Date()
+  payoff.setMonth(payoff.getMonth() + monthsRemaining)
+  const payoffDate = payoff.toISOString().slice(0, 10)
+
+  let termComparisonText: string | undefined
+  if (termMonths > 0) {
+    const diff = monthsRemaining - termMonths
+    termComparisonText =
+      diff <= 0 ? `within the original ${termMonths}-month term` : `~${diff} months longer than the original ${termMonths}-month term`
+  }
+
+  return { insufficientPayment: false, monthsRemaining, payoffDate, termComparisonText }
+}
+
 /**
  * Phase 40 (WEALTH-100/101): dedicated loan tracking — principal is the
  * original amount, currentBalance is the remaining balance the user updates
@@ -227,6 +269,7 @@ export function LoansPanel({
           const loanCurrency = stringField(loan, 'currency') || 'LKR'
           const status = stringField(loan, 'status') || 'active'
           const isEditing = editOpenId === id
+          const projection = payoffProjection(loan)
           return (
             <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
               {isEditing ? (
@@ -327,6 +370,17 @@ export function LoansPanel({
                     {stringField(loan, 'notes') && (
                       <p className="mt-1 text-xs text-[var(--theme-muted)]">{stringField(loan, 'notes')}</p>
                     )}
+                    {projection &&
+                      (projection.insufficientPayment ? (
+                        <p className="mt-1 text-xs text-amber-300/80">
+                          Monthly payment doesn't cover interest — balance will grow.
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                          Paying off in ~{projection.monthsRemaining} months (~{projection.payoffDate})
+                          {projection.termComparisonText && ` — ${projection.termComparisonText}`}
+                        </p>
+                      ))}
                   </div>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => startEdit(loan)} className={buttonClass}>
