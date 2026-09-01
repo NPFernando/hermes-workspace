@@ -336,6 +336,8 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 | AI-308 | Batch Approval | planned |
 | AI-309 | Inbox Priority | planned |
 
+**Fixed (bug, not a new feature slice, 2026-09-01):** camera/photo uploads (AI-302 Receipt Review) failed extraction every time for HEIC/HEIF images — the default photo format on iPhone cameras and many recent Android phones. `readImageAsBase64()` only recognized `.jpg`/`.jpeg` and silently mislabeled everything else, including HEIC, as `image/png`, so both vision extraction routes failed to decode it. Fixed by correctly detecting the real mime type (`mimeTypeForImageExtension()`, `finance-extraction.ts`) — Gemini's API accepts `image/heic`/`image/heif` natively, so no file conversion was needed, just the correct label. The preview thumbnail still can't render HEIC in a browser `<img>` tag (no mainstream browser decodes it), so a "Preview not available for this format" placeholder now shows instead of a broken-image icon. See `git log` on `fix-heic-upload-extraction` for the full change.
+
 ## Phase 26 — Document Intelligence
 
 **Depends on:** Phase 23. **Status:** partial (strong).
