@@ -110,6 +110,7 @@ function unauthorized() {
 const PERSONAL_FINANCE_RECORD_KINDS = new Set([
   'income', 'expense', 'account', 'goal', 'tax', 'budget_category', 'category',
   'subcategory_entry', 'merchant', 'tag', 'income_source', 'stock_holding', 'fixed_deposit',
+  'beneficiary',
 ])
 
 function recordActionResponse(kind: string) {
@@ -292,6 +293,7 @@ function personalFinancePayload() {
       fixed_deposits: db.fixed_deposits,
       loans: db.loans,
       properties: db.properties,
+      beneficiaries: db.beneficiaries,
       pending_ingestions: db.pending_ingestions,
     }),
   }

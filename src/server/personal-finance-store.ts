@@ -49,6 +49,8 @@ export interface PersonalFinanceSlice {
   loans?: Array<Record<string, unknown>>
   /** Optional: absent on a mirror file written before Phase 40 (Property Tracking) shipped. */
   properties?: Array<Record<string, unknown>>
+  /** Optional: absent on a mirror file written before WEALTH-108 (Estate/Beneficiary Notes) shipped. */
+  beneficiaries?: Array<Record<string, unknown>>
 }
 
 /**

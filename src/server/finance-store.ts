@@ -384,6 +384,17 @@ export type Property = {
   updatedAt: string
 }
 
+/** WEALTH-108: purely informational — no legal/binding weight, no percentage-split math, zero involvement in financeSummary(). */
+export type Beneficiary = {
+  id: string
+  name: string
+  relationship: string
+  note?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
 /**
  * A record awaiting AI extraction and/or human review before it becomes a
  * real income/expense record — the "AI proposes, human confirms" queue for
@@ -741,6 +752,7 @@ export type FinanceDatabase = {
   fixed_deposits: Array<FixedDeposit>
   loans: Array<Loan>
   properties: Array<Property>
+  beneficiaries: Array<Beneficiary>
   exchange_rates: Array<Record<string, unknown>>
   investment_accounts: Array<Record<string, unknown>>
   trading_platforms: Array<Record<string, unknown>>
@@ -843,6 +855,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     fixed_deposits: [],
     loans: [],
     properties: [],
+    beneficiaries: [],
     exchange_rates: [],
     investment_accounts: [],
     trading_platforms: [
@@ -971,6 +984,7 @@ function mirrorIntoSplitStores(db: FinanceDatabase): void {
     fixed_deposits: db.fixed_deposits,
     loans: db.loans,
     properties: db.properties,
+    beneficiaries: db.beneficiaries,
   })
   writeTradingStore({
     assets: db.assets,
@@ -1052,6 +1066,7 @@ function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
           fixed_deposits: personal.fixed_deposits,
           loans: personal.loans ?? [],
           properties: personal.properties ?? [],
+          beneficiaries: personal.beneficiaries ?? [],
         }
       : {}),
     ...(tradingFresh
@@ -1644,6 +1659,13 @@ export function addFinanceRecord(
       notes: optionalString(payload, 'notes'),
       linkedLoanId: optionalString(payload, 'linkedLoanId'),
     })
+  } else if (kind === 'beneficiary') {
+    db.beneficiaries.push({
+      ...base,
+      name: stringField(payload, 'name', 'Beneficiary'),
+      relationship: stringField(payload, 'relationship', ''),
+      note: optionalString(payload, 'note'),
+    })
   } else if (kind === 'trading_plan') {
     db.trading_plans.push(createTradingPlan(payload, base))
   } else if (kind === 'virtual_account') {
@@ -1784,6 +1806,12 @@ export function updateFinanceRecord(
       db.properties[index] = { ...db.properties[index], ...payload, updatedAt: nowIso() }
       updated = true
     }
+  } else if (kind === 'beneficiary') {
+    const index = db.beneficiaries.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.beneficiaries[index] = { ...db.beneficiaries[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
   } else {
     throw new Error(`Unsupported finance record kind for update: ${kind}`)
   }
@@ -1869,6 +1897,10 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.properties.length
     db.properties = db.properties.filter((r) => r.id !== id)
     removed = db.properties.length !== before
+  } else if (kind === 'beneficiary') {
+    const before = db.beneficiaries.length
+    db.beneficiaries = db.beneficiaries.filter((r) => r.id !== id)
+    removed = db.beneficiaries.length !== before
   } else {
     throw new Error(`Unsupported finance record kind for delete: ${kind}`)
   }

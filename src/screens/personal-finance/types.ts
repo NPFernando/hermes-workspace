@@ -95,6 +95,7 @@ export type PersonalFinancePayload = {
     fixed_deposits: Array<Record<string, unknown>>
     loans: Array<Record<string, unknown>>
     properties: Array<Record<string, unknown>>
+    beneficiaries: Array<Record<string, unknown>>
   }
 }
 

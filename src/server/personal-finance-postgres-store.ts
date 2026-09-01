@@ -278,6 +278,11 @@ CREATE TABLE IF NOT EXISTS properties (
   source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS linked_loan_id TEXT;
+
+CREATE TABLE IF NOT EXISTS beneficiaries (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, relationship TEXT NOT NULL, note TEXT, source TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
 `,
   )
   if (result.ok) schemaReady = true
@@ -544,6 +549,18 @@ function propertyRows(rowsIn: Array<Record<string, unknown>>): Array<Array<strin
   ])
 }
 
+function beneficiaryRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  return rowsIn.map((row) => [
+    sqlText(firstText(row, 'id')),
+    sqlText(firstText(row, 'name')),
+    sqlText(firstText(row, 'relationship')),
+    sqlNullableText(row.note),
+    sqlText(firstText(row, 'source', 'manual')),
+    sqlText(firstText(row, 'createdAt')),
+    sqlText(firstText(row, 'updatedAt')),
+  ])
+}
+
 function personalFinanceMirrorSql(slice: PersonalFinanceSlice): string {
   return `
 DELETE FROM finance_accounts;
@@ -561,6 +578,7 @@ DELETE FROM stock_holdings;
 DELETE FROM fixed_deposits;
 DELETE FROM loans;
 DELETE FROM properties;
+DELETE FROM beneficiaries;
 
 ${insertRows(
   'finance_accounts',
@@ -684,6 +702,12 @@ ${insertRows(
     'purchase_date', 'notes', 'source', 'created_at', 'updated_at', 'linked_loan_id',
   ],
   propertyRows(rows(slice.properties)),
+)}
+
+${insertRows(
+  'beneficiaries',
+  ['id', 'name', 'relationship', 'note', 'source', 'created_at', 'updated_at'],
+  beneficiaryRows(rows(slice.beneficiaries)),
 )}
 `
 }
