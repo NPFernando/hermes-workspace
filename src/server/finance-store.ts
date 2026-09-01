@@ -709,6 +709,10 @@ export type FinanceSettings = {
   emergencyFundTargetMonths?: number
   /** PF-304: user-set savings rate target, as a percentage. Unset/0 means no target configured yet. */
   savingsRateTargetPct?: number
+  /** WEALTH-107: user-set long-term net worth target. Unset/0 means no target configured yet. */
+  wealthGoalTargetLkr?: number
+  /** WEALTH-107: optional target date for wealthGoalTargetLkr — a target date without an amount is meaningless, so this is only read when wealthGoalTargetLkr is set. */
+  wealthGoalTargetDate?: string
   strategyDecayDetection?: Record<string, unknown>
   /** Per-strategy validated backtest baselines, keyed by strategyId. See strategy-decay.ts. */
   strategyBaselines?: Record<string, unknown>

@@ -41,6 +41,12 @@ export type PersonalFinancePayload = {
     progressPct: number
     hasData: boolean
   }
+  wealthGoal: {
+    targetLkr: number
+    targetDate: string | null
+    currentLkr: number
+    progressPct: number
+  }
   storage: {
     active: 'postgres' | 'json'
     fallback: 'json'

@@ -242,6 +242,10 @@ function personalFinancePayload() {
   const srTargetPct = db.settings.savingsRateTargetPct ?? 0
   const { actualPct: srActualPct, hasData: srHasData } = getAverageMonthlySavingsRatePct(db, 3)
   const srProgressPct = srTargetPct > 0 ? Math.min(100, Math.max(0, (srActualPct / srTargetPct) * 100)) : 0
+  const wgTargetLkr = db.settings.wealthGoalTargetLkr ?? 0
+  const wgTargetDate = db.settings.wealthGoalTargetDate ?? null
+  const wgCurrentLkr = financeSummary(db).netWorthLkr
+  const wgProgressPct = wgTargetLkr > 0 ? Math.min(100, Math.max(0, (wgCurrentLkr / wgTargetLkr) * 100)) : 0
   return {
     ok: true,
     checkedAt: Date.now(),
@@ -263,6 +267,12 @@ function personalFinancePayload() {
       actualPct: srActualPct,
       progressPct: srProgressPct,
       hasData: srHasData,
+    },
+    wealthGoal: {
+      targetLkr: wgTargetLkr,
+      targetDate: wgTargetDate,
+      currentLkr: wgCurrentLkr,
+      progressPct: wgProgressPct,
     },
     data: maskSensitive({
       finance_accounts: db.finance_accounts,
@@ -659,6 +669,20 @@ export const Route = createFileRoute('/api/finance')({
             db.settings.savingsRateTargetPct = pct
             writeFinanceStore(db)
             appendAuditLog('savings_rate_target_updated', { pct })
+            return json(personalFinancePayload())
+          }
+          if (action === 'set_wealth_goal') {
+            // WEALTH-107: user-set long-term net worth target, with an
+            // optional target date. 0 clears the target back to "not
+            // configured"; an empty/missing targetDate clears the date only.
+            const rawTargetLkr = typeof body.targetLkr === 'number' ? body.targetLkr : 0
+            const targetLkr = Math.max(0, Math.round(rawTargetLkr))
+            const targetDate = typeof body.targetDate === 'string' && body.targetDate ? body.targetDate : undefined
+            const db = readFinanceStore()
+            db.settings.wealthGoalTargetLkr = targetLkr
+            db.settings.wealthGoalTargetDate = targetDate
+            writeFinanceStore(db)
+            appendAuditLog('wealth_goal_updated', { targetLkr, targetDate })
             return json(personalFinancePayload())
           }
           if (action === 'set_demo_config' || action === 'set_engine_config') {
