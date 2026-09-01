@@ -277,6 +277,7 @@ CREATE TABLE IF NOT EXISTS properties (
   current_value DOUBLE PRECISION NOT NULL, currency TEXT NOT NULL, purchase_date TEXT NOT NULL, notes TEXT,
   source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS linked_loan_id TEXT;
 `,
   )
   if (result.ok) schemaReady = true
@@ -539,6 +540,7 @@ function propertyRows(rowsIn: Array<Record<string, unknown>>): Array<Array<strin
     sqlText(firstText(row, 'source', 'manual')),
     sqlText(firstText(row, 'createdAt')),
     sqlText(firstText(row, 'updatedAt')),
+    sqlNullableText(row.linkedLoanId),
   ])
 }
 
@@ -679,7 +681,7 @@ ${insertRows(
   'properties',
   [
     'id', 'description', 'property_type', 'purchase_price', 'current_value', 'currency',
-    'purchase_date', 'notes', 'source', 'created_at', 'updated_at',
+    'purchase_date', 'notes', 'source', 'created_at', 'updated_at', 'linked_loan_id',
   ],
   propertyRows(rows(slice.properties)),
 )}

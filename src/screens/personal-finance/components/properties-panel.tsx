@@ -20,10 +20,76 @@ function numberField(row: Record<string, unknown>, key: string): number {
 }
 
 /**
+ * Property-loan linkage: purely informational (PF-1004 precedent) — does
+ * not affect debtLkr/propertyValueLkr/netWorthLkr, each already counted
+ * once independently regardless of linkage.
+ */
+function LinkedLoanControl({
+  property,
+  payload,
+  onPayload,
+  editingId,
+  setEditingId,
+}: {
+  property: Record<string, unknown>
+  payload: PersonalFinancePayload
+  onPayload: (payload: PersonalFinancePayload) => void
+  editingId: string | null
+  setEditingId: (id: string | null) => void
+}) {
+  const id = stringField(property, 'id')
+  const linkedLoanId = stringField(property, 'linkedLoanId')
+  const loans = payload.data.loans
+  const linkedLoan = loans.find((l) => stringField(l, 'id') === linkedLoanId)
+
+  async function setLinkedLoan(nextId: string) {
+    setEditingId(null)
+    await fetch('/api/finance', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'update_record', kind: 'property', id, payload: { linkedLoanId: nextId || null } }),
+    })
+      .then((r) => r.json())
+      .then((data: PersonalFinancePayload) => {
+        if (data.ok) onPayload(data)
+      })
+      .catch(() => {})
+  }
+
+  if (linkedLoanId && editingId !== id) {
+    return (
+      <p className="mt-1 text-xs text-[var(--theme-muted)]">
+        🔗 Secured by {linkedLoan ? stringField(linkedLoan, 'lender') : '(removed loan)'}{' '}
+        <button type="button" onClick={() => setEditingId(id)} className="underline hover:text-[var(--theme-text)]">
+          Change
+        </button>
+      </p>
+    )
+  }
+
+  return (
+    <select
+      value={linkedLoanId}
+      onChange={(e) => void setLinkedLoan(e.target.value)}
+      className="mt-1 rounded-lg border border-[var(--theme-border)] bg-black/10 px-2 py-0.5 text-xs text-[var(--theme-text)] outline-none"
+    >
+      <option value="">— No linked loan —</option>
+      {loans.map((loan, index) => {
+        const loanId = stringField(loan, 'id') || String(index)
+        return (
+          <option key={loanId} value={loanId}>
+            {stringField(loan, 'lender')}
+          </option>
+        )
+      })}
+    </select>
+  )
+}
+
+/**
  * Phase 40 (WEALTH-102/103): dedicated property tracking — currentValue is
  * manually updated (no valuation API), like Loan.currentBalance. Feeds
- * financeSummary()'s netWorthLkr as an asset; no linkage to loans/mortgages
- * yet (a real future design question, deliberately deferred).
+ * financeSummary()'s netWorthLkr as an asset.
  */
 export function PropertiesPanel({
   payload,
@@ -34,6 +100,7 @@ export function PropertiesPanel({
 }) {
   const { run: post, busy, error: err, setError: setErr } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [linkEditingId, setLinkEditingId] = useState<string | null>(null)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<
     Record<
@@ -297,6 +364,13 @@ export function PropertiesPanel({
                     {stringField(property, 'notes') && (
                       <p className="mt-1 text-xs text-[var(--theme-muted)]">{stringField(property, 'notes')}</p>
                     )}
+                    <LinkedLoanControl
+                      property={property}
+                      payload={payload}
+                      onPayload={onPayload}
+                      editingId={linkEditingId}
+                      setEditingId={setLinkEditingId}
+                    />
                   </div>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => startEdit(property)} className={buttonClass}>

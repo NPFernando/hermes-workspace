@@ -377,6 +377,8 @@ export type Property = {
   currency: CurrencyCode
   purchaseDate: string
   notes?: string
+  /** Informational only (PF-1004 precedent) — does not affect debtLkr/propertyValueLkr/netWorthLkr, each already counted once independently. */
+  linkedLoanId?: string
   source: string
   createdAt: string
   updatedAt: string
@@ -1634,6 +1636,7 @@ export function addFinanceRecord(
       currency: stringField(payload, 'currency', 'LKR'),
       purchaseDate: stringField(payload, 'purchaseDate', createdAt.slice(0, 10)),
       notes: optionalString(payload, 'notes'),
+      linkedLoanId: optionalString(payload, 'linkedLoanId'),
     })
   } else if (kind === 'trading_plan') {
     db.trading_plans.push(createTradingPlan(payload, base))
