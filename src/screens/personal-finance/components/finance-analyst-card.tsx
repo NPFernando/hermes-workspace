@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { buildFinanceAnswerMarkdown } from '../utils'
 import type { PersonalFinancePayload } from '../types'
 
 const inputClass =
@@ -18,15 +19,19 @@ function formatNumber(v: number): string {
 type AnalystChart = { title: string; data: Array<{ label: string; value: number }> }
 
 /**
- * Phase 24 (AI-200/201/202/203/204): a same-origin, authenticated-user-only
- * question/answer exchange over the user's own finance data. AI-202 adds a
- * capped (last 10, showing the last 5) recent-questions list stored in
- * FinanceSettings.financeQaHistory. AI-204 adds in-session-only conversation
- * memory (`turns`, separate from that persisted list) so follow-up questions
- * carry context. AI-203 lets the live answer optionally include a chart
- * (rendered with the same recharts bar-chart shape as FinanceTrendsCard's
- * "Spending by category" — not persisted in financeQaHistory or turns) — see
- * the ask_finance_question action (routes/api/finance.ts) for the bounded
+ * Phase 24 (AI-200/201/202/203/204/207): a same-origin, authenticated-user-
+ * only question/answer exchange over the user's own finance data. AI-202
+ * adds a capped (last 10, showing the last 5) recent-questions list stored
+ * in FinanceSettings.financeQaHistory. AI-204 adds in-session-only
+ * conversation memory (`turns`, separate from that persisted list) so
+ * follow-up questions carry context. AI-203 lets the live answer optionally
+ * include a chart (rendered with the same recharts bar-chart shape as
+ * FinanceTrendsCard's "Spending by category" — not persisted in
+ * financeQaHistory or turns). AI-207 lets the live answer be copied/
+ * downloaded as markdown (buildFinanceAnswerMarkdown, utils.ts), reusing the
+ * exact Blob-download/clipboard-copy shape ExportMissionButton already uses
+ * (src/screens/gateway/components/export-mission.tsx) — see the
+ * ask_finance_question action (routes/api/finance.ts) for the bounded
  * context/LLM-call/history side.
  */
 export function FinanceAnalystCard({
@@ -37,10 +42,12 @@ export function FinanceAnalystCard({
   onPayload: (payload: PersonalFinancePayload) => void
 }) {
   const [question, setQuestion] = useState('')
+  const [lastQuestion, setLastQuestion] = useState('')
   const [answer, setAnswer] = useState<string | null>(null)
   const [chart, setChart] = useState<AnalystChart | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [asking, setAsking] = useState(false)
+  const [copied, setCopied] = useState(false)
   // AI-204: in-session-only conversation turns, separate from the persisted
   // payload.financeQaHistory audit log — resets on reload, explicitly
   // clearable via "New conversation" below.
@@ -71,6 +78,7 @@ export function FinanceAnalystCard({
       if (data.ok && data.answer) {
         setAnswer(data.answer)
         setChart(data.chart ?? null)
+        setLastQuestion(asked)
         setTurns((prior) => [...prior, { question: asked, answer: data.answer as string }])
         onPayload(data)
       } else {
@@ -87,8 +95,40 @@ export function FinanceAnalystCard({
     setTurns([])
     setAnswer(null)
     setChart(null)
+    setLastQuestion('')
     setError(null)
   }
+
+  const handleDownload = useCallback(() => {
+    if (!answer) return
+    const md = buildFinanceAnswerMarkdown(lastQuestion, answer, chart)
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `finance-answer-${new Date().toISOString().slice(0, 10)}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [answer, lastQuestion, chart])
+
+  const handleCopy = useCallback(async () => {
+    if (!answer) return
+    const md = buildFinanceAnswerMarkdown(lastQuestion, answer, chart)
+    try {
+      await navigator.clipboard.writeText(md)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = md
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [answer, lastQuestion, chart])
 
   const recentHistory = [...payload.financeQaHistory].reverse().slice(0, 5)
 
@@ -150,6 +190,16 @@ export function FinanceAnalystCard({
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      )}
+      {answer && (
+        <div className="mt-2 flex gap-2">
+          <button type="button" onClick={() => void handleCopy()} className={buttonClass}>
+            {copied ? '✓ Copied' : '📋 Copy'}
+          </button>
+          <button type="button" onClick={handleDownload} className={buttonClass}>
+            📄 Download .md
+          </button>
         </div>
       )}
 
