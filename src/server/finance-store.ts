@@ -2838,6 +2838,7 @@ export function buildFinanceQueryContext(db: FinanceDatabase): {
   monthlySummary: ReturnType<typeof getMonthlySummary>
   categoryBreakdown: { thisMonth: Record<string, number>; lastMonth: Record<string, number> }
   topVendors: { thisMonth: Array<{ vendor: string; amount: number }> }
+  tradingSummary: ReturnType<typeof tradingPerformanceSummary>
 } {
   const now = new Date()
   const thisMonthKey = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}`
@@ -2871,6 +2872,11 @@ export function buildFinanceQueryContext(db: FinanceDatabase): {
     monthlySummary: getMonthlySummary(db).slice(-6),
     categoryBreakdown: { thisMonth: byCategory(thisMonthKey), lastMonth: byCategory(lastMonthKey) },
     topVendors: { thisMonth: topVendorsThisMonth },
+    // AI-206: db already contains the trading tables (trading_plans etc.) —
+    // tradingPerformanceSummary operates on the already-loaded db with no
+    // extra readFinanceStore() calls, unlike the richer getTradingSummary()
+    // (trading-summary.ts) which re-reads the store across all 4 engines.
+    tradingSummary: tradingPerformanceSummary(db),
   }
 }
 

@@ -16,6 +16,7 @@ import {
   getMonthlySummary,
   getUnifiedTransactions,
   maskSensitive,
+  tradingPerformanceSummary,
 } from './finance-store'
 
 describe('finance-store', () => {
@@ -1322,6 +1323,37 @@ describe('buildFinanceQueryContext (Phase 24 Hermes Finance Analyst)', () => {
     const context = buildFinanceQueryContext(db)
     expect(context.summary).toEqual(financeSummary(db))
     expect(context.monthlySummary).toEqual(getMonthlySummary(db).slice(-6))
+  })
+
+  function pushExecutedTrade(
+    db: ReturnType<typeof createEmptyFinanceDatabase>,
+    id: string,
+    profitLoss: number,
+  ) {
+    db.trading_plans.push({
+      id, platform: 'manual', symbol: 'TSLA', assetType: 'stock', decision: 'HOLD',
+      reason: 'test', riskLevel: 'low_risk', riskScore: 10, confidenceScore: 80,
+      dataUsed: [], newsReviewed: [], finalRecommendation: 'test', status: 'executed',
+      userApprovalStatus: 'approved', executionStatus: 'executed', profitLoss,
+      source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+  }
+
+  it('includes a tradingSummary matching tradingPerformanceSummary (AI-206), with no trades', () => {
+    const db = createEmptyFinanceDatabase()
+    const context = buildFinanceQueryContext(db)
+    expect(context.tradingSummary).toEqual(tradingPerformanceSummary(db))
+    expect(context.tradingSummary.totalTrades).toBe(0)
+  })
+
+  it('includes a tradingSummary matching tradingPerformanceSummary (AI-206), with executed trades', () => {
+    const db = createEmptyFinanceDatabase()
+    pushExecutedTrade(db, 't1', 500)
+    pushExecutedTrade(db, 't2', -200)
+    const context = buildFinanceQueryContext(db)
+    expect(context.tradingSummary).toEqual(tradingPerformanceSummary(db))
+    expect(context.tradingSummary.totalTrades).toBe(2)
+    expect(context.tradingSummary.winRate).toBe(0.5)
   })
 })
 

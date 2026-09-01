@@ -138,7 +138,7 @@ ${recentTurns.map((turn) => `Q: ${turn.question}\nA: ${turn.answer}`).join('\n')
 `
       : ''
 
-  return `You are a personal finance analyst. Answer the user's question using ONLY the JSON data below — do not assume anything not present in it. If the data doesn't contain what's needed to answer, say so honestly rather than guessing.
+  return `You are a personal finance analyst. Answer the user's question using ONLY the JSON data below (which includes the user's personal finances and, if they trade, a tradingSummary of their trading performance) — do not assume anything not present in it. If the data doesn't contain what's needed to answer, say so honestly rather than guessing.
 
 Respond with STRICT JSON only, no markdown fences, no commentary, matching exactly this shape:
 {
