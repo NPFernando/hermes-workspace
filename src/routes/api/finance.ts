@@ -10,6 +10,7 @@ import {
   addPendingIngestion,
   appendAuditLog,
   budgetVsActualSummary,
+  buildFinanceQueryContext,
   deleteFinanceRecord,
   ensureFinanceStore,
   financeAlerts,
@@ -32,7 +33,7 @@ import {
   writeFinanceStore,
 } from '../../server/finance-store'
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
-import { extractEmploymentContract, extractTransactionFromImage } from '../../server/finance-extraction'
+import { answerFinanceQuestion, extractEmploymentContract, extractTransactionFromImage } from '../../server/finance-extraction'
 import { syncGmailNow } from '../../server/gmail-ingest'
 import { fetchCsePrice } from '../../server/cse-market.service'
 import {
@@ -684,6 +685,20 @@ export const Route = createFileRoute('/api/finance')({
             writeFinanceStore(db)
             appendAuditLog('wealth_goal_updated', { targetLkr, targetDate })
             return json(personalFinancePayload())
+          }
+          if (action === 'ask_finance_question') {
+            // Phase 24 (AI-200/201): same-origin, authenticated-user-only —
+            // already gated by isAuthenticated() above. No autonomous/
+            // external agent access, so AI-102/103/111 (agent read
+            // permissions/action contract/sensitive data classification)
+            // don't apply here; deferred for any future agent variant.
+            const question = typeof body.question === 'string' ? body.question.trim() : ''
+            if (!question) return json({ ok: false, error: 'question is required.' }, { status: 400 })
+            const db = readFinanceStore()
+            const context = buildFinanceQueryContext(db)
+            const result = await answerFinanceQuestion(question, context)
+            if (!result.ok) return json({ ok: false, error: result.reason }, { status: 502 })
+            return json({ ok: true, answer: result.answer })
           }
           if (action === 'set_demo_config' || action === 'set_engine_config') {
             // Update the demo engine's tunable knobs (settings.demoTrading), merged

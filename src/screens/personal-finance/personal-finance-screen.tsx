@@ -5,6 +5,7 @@ import { DataTable } from '../finance/components/data-table'
 import { BudgetPanel } from './components/budget-panel'
 import { PendingIngestionPanel } from './components/pending-ingestion-panel'
 import { FinanceAlertsCard } from './components/finance-alerts-card'
+import { FinanceAnalystCard } from './components/finance-analyst-card'
 import { FinanceTrendsCard } from './components/finance-trends-card'
 import { SavingsGoalsProgress } from './components/savings-goals-progress'
 import { SinkingFundsPanel } from './components/sinking-funds-panel'
@@ -297,6 +298,7 @@ export function PersonalFinanceScreen() {
       {tab === 'overview' && (
         <>
           <FinanceAlertsCard payload={payload} />
+          <FinanceAnalystCard />
           <FinanceTrendsCard payload={payload} />
           <SavingsGoalsProgress payload={payload} onPayload={setPayload} />
           <SinkingFundsPanel payload={payload} onPayload={setPayload} />

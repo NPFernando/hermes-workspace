@@ -2824,6 +2824,54 @@ export function getAverageMonthlySavingsRatePct(
   return { actualPct: (sumSavings / sumIncome) * 100, hasData: true }
 }
 
+/**
+ * Phase 24 (AI-200/201): bounded, pre-aggregated context for the Finance
+ * Analyst LLM call — not a raw transaction dump (unbounded prompt size,
+ * more PII exposure than necessary). Reuses already-computed
+ * financeSummary()/getMonthlySummary(); only the category/vendor breakdown
+ * here is new, grouping getUnifiedTransactions()'s expense rows by month.
+ */
+export function buildFinanceQueryContext(db: FinanceDatabase): {
+  summary: ReturnType<typeof financeSummary>
+  monthlySummary: ReturnType<typeof getMonthlySummary>
+  categoryBreakdown: { thisMonth: Record<string, number>; lastMonth: Record<string, number> }
+  topVendors: { thisMonth: Array<{ vendor: string; amount: number }> }
+} {
+  const now = new Date()
+  const thisMonthKey = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}`
+  const lastMonthDate = new Date(now)
+  lastMonthDate.setUTCMonth(lastMonthDate.getUTCMonth() - 1)
+  const lastMonthKey = `${lastMonthDate.getUTCFullYear()}-${lastMonthDate.getUTCMonth() + 1}`
+
+  const expenses = getUnifiedTransactions(db).filter((t) => t.kind === 'expense')
+  const byCategory = (monthKey: string) => {
+    const totals: Record<string, number> = {}
+    for (const t of expenses) {
+      const d = parseDate(t.date)
+      if (!d || `${d.year}-${d.month}` !== monthKey) continue
+      totals[t.category] = (totals[t.category] ?? 0) + t.convertedLkrAmount
+    }
+    return totals
+  }
+  const vendorTotals: Record<string, number> = {}
+  for (const t of expenses) {
+    const d = parseDate(t.date)
+    if (!d || `${d.year}-${d.month}` !== thisMonthKey) continue
+    vendorTotals[t.counterparty] = (vendorTotals[t.counterparty] ?? 0) + t.convertedLkrAmount
+  }
+  const topVendorsThisMonth = Object.entries(vendorTotals)
+    .map(([vendor, amount]) => ({ vendor, amount }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 10)
+
+  return {
+    summary: financeSummary(db),
+    monthlySummary: getMonthlySummary(db).slice(-6),
+    categoryBreakdown: { thisMonth: byCategory(thisMonthKey), lastMonth: byCategory(lastMonthKey) },
+    topVendors: { thisMonth: topVendorsThisMonth },
+  }
+}
+
 export function getBudgetVsActual(
   db: FinanceDatabase,
   category: string,

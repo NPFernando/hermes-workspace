@@ -114,6 +114,37 @@ export async function extractTransactionFromText(
   return { ok: false, reason: 'all_routes_failed' }
 }
 
+/**
+ * Phase 24 (AI-200/201): answers a free-text question about the user's own
+ * finances using ONLY the bounded, pre-aggregated context the caller
+ * provides (buildFinanceQueryContext in finance-store.ts) — never a raw
+ * transaction dump. Same two-tier HARP -> Gemini fallback as
+ * extractTransactionFromText(), just a plain-text answer instead of
+ * structured JSON.
+ */
+export async function answerFinanceQuestion(
+  question: string,
+  context: unknown,
+): Promise<{ ok: true; answer: string } | { ok: false; reason: string }> {
+  const prompt = `You are a personal finance analyst. Answer the user's question using ONLY the JSON data below — do not assume anything not present in it. If the data doesn't contain what's needed to answer, say so honestly rather than guessing. Be concise (2-4 sentences).
+
+Data:
+${JSON.stringify(context)}
+
+Question: ${question}`
+
+  const routes = selectHarpRoutes('text_summary', 'standard')
+  if (routes.length > 0) {
+    const result = await callWithFallback(routes, prompt)
+    if (result?.content) return { ok: true, answer: result.content.trim() }
+  }
+
+  const geminiContent = await callGeminiText(prompt)
+  if (geminiContent) return { ok: true, answer: geminiContent.trim() }
+
+  return { ok: false, reason: 'all_routes_failed' }
+}
+
 function readImageAsBase64(imagePath: string): { base64: string; mimeType: string } | null {
   try {
     const buffer = fs.readFileSync(imagePath)

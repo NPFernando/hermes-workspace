@@ -12,6 +12,8 @@ import {
   financeStorageAlerts,
   getAverageMonthlyExpensesLkr,
   getAverageMonthlySavingsRatePct,
+  buildFinanceQueryContext,
+  getMonthlySummary,
   getUnifiedTransactions,
   maskSensitive,
 } from './finance-store'
@@ -1273,6 +1275,53 @@ describe('getAverageMonthlySavingsRatePct (PF-304 Savings Rate Target)', () => {
     const db = createEmptyFinanceDatabase()
     pushExpense(db, 1, 10_000)
     expect(getAverageMonthlySavingsRatePct(db, 3)).toEqual({ actualPct: 0, hasData: false })
+  })
+})
+
+describe('buildFinanceQueryContext (Phase 24 Hermes Finance Analyst)', () => {
+  function monthsAgoDateString(monthsAgo: number): string {
+    const d = new Date()
+    d.setUTCDate(1)
+    d.setUTCMonth(d.getUTCMonth() - monthsAgo)
+    return d.toISOString().slice(0, 10)
+  }
+
+  function pushExpense(
+    db: ReturnType<typeof createEmptyFinanceDatabase>,
+    monthsAgo: number,
+    amount: number,
+    category: string,
+    vendor: string,
+  ) {
+    db.expense_records.push({
+      id: `q-e-${monthsAgo}-${category}-${vendor}-${amount}`, date: monthsAgoDateString(monthsAgo), vendor,
+      category, currency: 'LKR', amount, convertedLkrAmount: amount, recurring: false, workRelated: false,
+      taxDeductiblePossible: false, source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+  }
+
+  it('groups this-month and last-month expenses by category, and this-month by vendor', () => {
+    const db = createEmptyFinanceDatabase()
+    pushExpense(db, 0, 3000, 'Groceries', 'Store A')
+    pushExpense(db, 0, 2000, 'Groceries', 'Store B')
+    pushExpense(db, 0, 1500, 'Dining', 'Cafe A')
+    pushExpense(db, 1, 4000, 'Groceries', 'Store A')
+
+    const context = buildFinanceQueryContext(db)
+    expect(context.categoryBreakdown.thisMonth).toEqual({ Groceries: 5000, Dining: 1500 })
+    expect(context.categoryBreakdown.lastMonth).toEqual({ Groceries: 4000 })
+    expect(context.topVendors.thisMonth).toEqual([
+      { vendor: 'Store A', amount: 3000 },
+      { vendor: 'Store B', amount: 2000 },
+      { vendor: 'Cafe A', amount: 1500 },
+    ])
+  })
+
+  it('passes through the already-tested summary and monthlySummary unchanged', () => {
+    const db = createEmptyFinanceDatabase()
+    const context = buildFinanceQueryContext(db)
+    expect(context.summary).toEqual(financeSummary(db))
+    expect(context.monthlySummary).toEqual(getMonthlySummary(db).slice(-6))
   })
 })
 
