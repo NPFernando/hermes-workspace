@@ -475,7 +475,19 @@ This is the living roadmap for evolving the Personal Finance module into the ful
 
 ## Phase 40 — Loans, Property and Long-Term Wealth
 
-**Depends on:** Phase 1. **Status:** blocked (WEALTH-100 through WEALTH-108).
+**Depends on:** Phase 1. **Status:** partial. This phase had no per-row table until its first slice shipped — the WEALTH-10x IDs below are newly assigned (there is no prior canonical definition of them anywhere else), starting from WEALTH-100 for the first concept shipped.
+
+| ID | Feature | Status |
+|---|---|---|
+| WEALTH-100 | Loan Tracking | **existing** (dedicated `Loan` entity — principal, current balance, rate, optional term/payment, status; see Shipped note) |
+| WEALTH-101 | Debt in Net Worth | **existing** (`financeSummary()`'s `debtLkr`/`netWorthLkr` now derive from active loans' `currentBalance`, not a generic loan-type account balance) |
+| WEALTH-102 | Property Tracking | planned — no design work started |
+| WEALTH-103 | Property Valuation | planned — no design work started |
+| WEALTH-104 | Loan Amortization Schedule | planned — `Loan.monthlyPayment`/`termMonths` are captured but not used to project a payoff schedule yet |
+| WEALTH-105 | Loan Payoff Projection | planned |
+| WEALTH-106 | Combined Net Worth Trend (assets + property - loans, over time) | planned — depends on Phase 38 (Analytics and Historical State), itself blocked |
+| WEALTH-107 | Long-Term Wealth Goals | planned |
+| WEALTH-108 | Estate/Beneficiary Notes | planned |
 
 ## Phase 41 — Tax Records
 
@@ -588,7 +600,9 @@ With every real per-row phase in this roadmap now audited at least once this ses
 
 **AI-506 (Gmail Sync History)** is also now shipped — chosen over the other remaining candidate, PF-1004 (Account-Linked Goals), as the smaller and more self-contained of the two (PF-1004 needs a new `DataTable` dropdown input type plus an unresolved design question about whether linking should override manual entry). See Shipped note for the storage design decision (extend the existing untyped `gmailIngest` blob, matching the codebase's convention for small bounded logs, rather than a new top-level `FinanceDatabase` array).
 
-**PF-1004 (Account-Linked Goals)** is also now shipped, resolving both open questions from the note above: the design question was resolved by keeping the link purely informational (not a `currentAmount` derivation — see Shipped note for why), and the `DataTable` dropdown question was sidestepped entirely by adding the picker as a small inline control on `SavingsGoalsProgress`/`SinkingFundsPanel` instead, reusing the `<select>` pattern already proven in `transactions-panel.tsx`. **This closes out every real-design candidate identified across this session's scoping passes.** The next step is a fresh scoping pass over any phases not yet checked, or a newly-named feature.
+**PF-1004 (Account-Linked Goals)** is also now shipped, resolving both open questions from the note above: the design question was resolved by keeping the link purely informational (not a `currentAmount` derivation — see Shipped note for why), and the `DataTable` dropdown question was sidestepped entirely by adding the picker as a small inline control on `SavingsGoalsProgress`/`SinkingFundsPanel` instead, reusing the `<select>` pattern already proven in `transactions-panel.tsx`. **This closes out every real-design candidate identified across this session's scoping passes.** With that, every phase in this roadmap (0-44) was confirmed either audited this session or a one-line "nothing exists, needs a whole new subsystem" stub — no more small/medium candidates existed to autonomously pick.
+
+Naveen picked **Phase 40 (Loans, Property and Long-Term Wealth)** as the next subsystem to scope — the first phase this session where the roadmap itself provided no feature list to work from (just "WEALTH-100 through WEALTH-108", never defined anywhere). Research found `debtLkr` only represented debt via a generic account's manually-typed balance, with zero principal/rate/term concept, and zero property-tracking precedent anywhere in the codebase. **WEALTH-100 (Loan Tracking) and WEALTH-101 (Debt in Net Worth)** are now shipped as the first slice — see the new Phase 40 table and Shipped note. Property tracking (WEALTH-102/103), amortization/payoff projection (WEALTH-104/105), and the rest of Phase 40 remain explicitly deferred; the next step is either continuing Phase 40 or picking a different subsystem (Phase 24 Hermes Finance Analyst and Phase 28 Reconciliation Agent were the other two candidates raised, not yet started).
 
 A follow-up pass over Phase 36 (Fixed Deposits V2), Phase 37 (Documents Vault), and Phase 43 (Security) found that pattern genuinely exhausted in Phase 36 (no `partial` rows at all) and Phase 43 (all three `partial` items need new data capture or a real authz/policy design decision). Phase 37's **DOC-106, DOC-107, and DOC-113** were the one structural candidate — extending the already-shipped `finance-document.ts` employment-contract viewer to also serve receipts/bills via the already-existing `documentRef` field on income/expense records. Explicitly flagged before building: this environment has zero live receipt/bill data with `documentRef` populated, so the feature ships correct and ready but not immediately visible — Naveen confirmed shipping it anyway as correct, low-risk infrastructure. Now shipped.
 
@@ -798,3 +812,13 @@ This closes out the "surface an already-computed value" pattern across every pha
 - **Verified live**: created a test account and goal, linked them via the dropdown (confirmed the card flipped to "🔗 Linked to..."), used "Change" to unlink back to "— No linked account —" (confirmed correct after the fix above), then deleted both test records.
 
 This closes out every real-design candidate identified across this session's scoping passes — see "Recommended Next Feature" above for what to scope next.
+
+### Shipped: WEALTH-100 & WEALTH-101 — Loan Tracking + Debt in Net Worth (Phase 40, first slice)
+
+- **What was built**: a dedicated `Loan` entity (`src/server/finance-store.ts`) — `principal`, `currentBalance`, `currency`, `interestRatePct`, optional `monthlyPayment`/`termMonths`, `status` (`active`/`paid_off`/`defaulted`), `notes` — with full add/edit/delete CRUD (`LoansPanel`, mirroring `StockHoldingsPanel`'s edit-mode pattern) on the Investments tab. `financeSummary()`'s `debtLkr` now sums active loans' `currentBalance` plus `card`-type account balances.
+- **Why this was harder than every other feature this session**: it's the first genuinely new top-level entity added — every prior feature reused an existing collection. Adding one required wiring through the full JSON→split-store→Postgres mirror pipeline discovered during earlier verification work: `mirrorIntoSplitStores()`/`overlaySplitStores()` in `finance-store.ts`, a new optional `loans?` field on `PersonalFinanceSlice` (`personal-finance-store.ts`), and a new table/row-serializer/insert in `personal-finance-postgres-store.ts` (the safe sibling file, not the off-limits `finance-postgres-store.ts`).
+- **Key design decision #1 (remaining balance, not just principal)**: unlike `FixedDeposit`'s principal (which never changes), a loan's `currentBalance` decreases as it's paid down — both fields are tracked, and `debtLkr` uses `currentBalance`.
+- **Key design decision #2 (debt tracking moves off generic accounts)**: `'loan'`-type `finance_accounts` no longer contribute to `debtLkr` — zero live loan-type accounts existed in this environment, making this a safe behavior change — matching how `SavingsGoal`/`StockHolding`/`FixedDeposit` already specialized away from generic accounts. `'card'` stays account-based since credit cards have no term/rate model.
+- **Key design decision #3 (full edit mode from day one)**: unlike `FixedDepositsPanel` (add-only), a loan's balance needs periodic updates — this used `StockHoldingsPanel`'s full CRUD pattern instead.
+- **Known limitation / deliberate scope**: property tracking (WEALTH-102/103) and amortization/payoff projection (WEALTH-104/105) are explicitly out of scope for this slice — `monthlyPayment`/`termMonths` are captured but not yet used to compute anything.
+- **Verified live**: added a test loan, confirmed `debtLkr` moved by the exact expected amount through add → balance edit → marking paid off (80,000 → 60,000 → 0), confirmed correct row rendering, then deleted the test record. Also confirmed live in production after deploy.
