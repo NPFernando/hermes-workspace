@@ -367,6 +367,21 @@ export type Loan = {
   updatedAt: string
 }
 
+/** Phase 40 (WEALTH-102/103): currentValue is manually updated, like Loan.currentBalance — no valuation API. */
+export type Property = {
+  id: string
+  description: string
+  propertyType: 'residential' | 'land' | 'commercial' | 'other'
+  purchasePrice: number
+  currentValue: number
+  currency: CurrencyCode
+  purchaseDate: string
+  notes?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
 /**
  * A record awaiting AI extraction and/or human review before it becomes a
  * real income/expense record — the "AI proposes, human confirms" queue for
@@ -717,6 +732,7 @@ export type FinanceDatabase = {
   stock_holdings: Array<StockHolding>
   fixed_deposits: Array<FixedDeposit>
   loans: Array<Loan>
+  properties: Array<Property>
   exchange_rates: Array<Record<string, unknown>>
   investment_accounts: Array<Record<string, unknown>>
   trading_platforms: Array<Record<string, unknown>>
@@ -818,6 +834,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     stock_holdings: [],
     fixed_deposits: [],
     loans: [],
+    properties: [],
     exchange_rates: [],
     investment_accounts: [],
     trading_platforms: [
@@ -945,6 +962,7 @@ function mirrorIntoSplitStores(db: FinanceDatabase): void {
     stock_holdings: db.stock_holdings,
     fixed_deposits: db.fixed_deposits,
     loans: db.loans,
+    properties: db.properties,
   })
   writeTradingStore({
     assets: db.assets,
@@ -1025,6 +1043,7 @@ function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
           stock_holdings: personal.stock_holdings,
           fixed_deposits: personal.fixed_deposits,
           loans: personal.loans ?? [],
+          properties: personal.properties ?? [],
         }
       : {}),
     ...(tradingFresh
@@ -1605,6 +1624,17 @@ export function addFinanceRecord(
       status: loanStatusField(payload.status),
       notes: optionalString(payload, 'notes'),
     })
+  } else if (kind === 'property') {
+    db.properties.push({
+      ...base,
+      description: stringField(payload, 'description', 'Property'),
+      propertyType: propertyTypeField(payload.propertyType),
+      purchasePrice: numberField(payload, 'purchasePrice', 0),
+      currentValue: numberField(payload, 'currentValue', 0),
+      currency: stringField(payload, 'currency', 'LKR'),
+      purchaseDate: stringField(payload, 'purchaseDate', createdAt.slice(0, 10)),
+      notes: optionalString(payload, 'notes'),
+    })
   } else if (kind === 'trading_plan') {
     db.trading_plans.push(createTradingPlan(payload, base))
   } else if (kind === 'virtual_account') {
@@ -1739,6 +1769,12 @@ export function updateFinanceRecord(
       db.loans[index] = { ...db.loans[index], ...payload, updatedAt: nowIso() }
       updated = true
     }
+  } else if (kind === 'property') {
+    const index = db.properties.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.properties[index] = { ...db.properties[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
   } else {
     throw new Error(`Unsupported finance record kind for update: ${kind}`)
   }
@@ -1820,6 +1856,10 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.loans.length
     db.loans = db.loans.filter((r) => r.id !== id)
     removed = db.loans.length !== before
+  } else if (kind === 'property') {
+    const before = db.properties.length
+    db.properties = db.properties.filter((r) => r.id !== id)
+    removed = db.properties.length !== before
   } else {
     throw new Error(`Unsupported finance record kind for delete: ${kind}`)
   }
@@ -2172,6 +2212,7 @@ export function financeSummary(db: FinanceDatabase) {
   const fixedDepositsValueLkr = db.fixed_deposits
     .filter((fd) => fd.status !== 'withdrawn')
     .reduce((sum, fd) => sum + fd.principal, 0)
+  const propertyValueLkr = db.properties.reduce((sum, p) => sum + p.currentValue, 0)
   const unrealizedStockPnlLkr = db.stock_holdings.reduce(
     (sum, holding) => sum + ((holding.lastKnownPrice ?? holding.buyPrice) - holding.buyPrice) * holding.quantity,
     0,
@@ -2185,7 +2226,8 @@ export function financeSummary(db: FinanceDatabase) {
     cashBalanceLkr +
     db.savings_goals.reduce((sum, goal) => sum + goal.currentAmount, 0) +
     stockHoldingsValueLkr +
-    fixedDepositsValueLkr -
+    fixedDepositsValueLkr +
+    propertyValueLkr -
     debtLkr
   const openPlans = db.trading_plans.filter(
     (plan) =>
@@ -2205,6 +2247,7 @@ export function financeSummary(db: FinanceDatabase) {
     netWorthLkr,
     stockHoldingsValueLkr,
     fixedDepositsValueLkr,
+    propertyValueLkr,
     unrealizedStockPnlLkr,
     unrealizedStockPnlPct,
     accountCount: db.finance_accounts.length,
@@ -2557,6 +2600,11 @@ function fixedDepositStatusField(value: unknown): FixedDeposit['status'] {
 function loanStatusField(value: unknown): Loan['status'] {
   const allowed: Array<Loan['status']> = ['active', 'paid_off', 'defaulted']
   return allowed.includes(value as Loan['status']) ? (value as Loan['status']) : 'active'
+}
+
+function propertyTypeField(value: unknown): Property['propertyType'] {
+  const allowed: Array<Property['propertyType']> = ['residential', 'land', 'commercial', 'other']
+  return allowed.includes(value as Property['propertyType']) ? (value as Property['propertyType']) : 'residential'
 }
 
 function reconciliationStatus(value: unknown): 'pending' | 'cleared' | 'reconciled' {

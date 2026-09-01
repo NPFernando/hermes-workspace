@@ -17,6 +17,7 @@ import { IncomeSourcesPanel } from './components/income-sources-panel'
 import { StockHoldingsPanel } from './components/stock-holdings-panel'
 import { FixedDepositsPanel } from './components/fixed-deposits-panel'
 import { LoansPanel } from './components/loans-panel'
+import { PropertiesPanel } from './components/properties-panel'
 import { AccountsPanel } from './components/accounts-panel'
 import { TransactionsPanel } from './components/transactions-panel'
 import { CategoriesPanel } from './components/categories-panel'
@@ -318,6 +319,7 @@ export function PersonalFinanceScreen() {
           <StockHoldingsPanel payload={payload} onPayload={setPayload} />
           <FixedDepositsPanel payload={payload} onPayload={setPayload} />
           <LoansPanel payload={payload} onPayload={setPayload} />
+          <PropertiesPanel payload={payload} onPayload={setPayload} />
         </>
       )}
 

@@ -426,6 +426,39 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
     expect(db.loans.find((l) => l.lender === 'B')?.status).toBe('paid_off')
     expect(db.loans.find((l) => l.lender === 'C')?.status).toBe('active')
   })
+
+  it('property (Phase 40) round-trips through add, update, delete, and defaults propertyType to residential', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('property', {
+      description: 'Test House', purchasePrice: 5_000_000, currentValue: 5_500_000, currency: 'LKR',
+    })
+    let db = store.readFinanceStore()
+    expect(db.properties).toHaveLength(1)
+    const property = db.properties[0]
+    expect(property.description).toBe('Test House')
+    expect(property.propertyType).toBe('residential')
+    expect(property.currentValue).toBe(5_500_000)
+
+    store.updateFinanceRecord('property', property.id, { currentValue: 5_800_000 })
+    db = store.readFinanceStore()
+    expect(db.properties[0].currentValue).toBe(5_800_000)
+
+    store.deleteFinanceRecord('property', property.id)
+    db = store.readFinanceStore()
+    expect(db.properties).toHaveLength(0)
+  })
+
+  it('propertyType defaults to residential on add when omitted or invalid', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('property', { description: 'A', purchasePrice: 1000, currentValue: 1000 })
+    store.addFinanceRecord('property', { description: 'B', purchasePrice: 1000, currentValue: 1000, propertyType: 'land' })
+    store.addFinanceRecord('property', { description: 'C', purchasePrice: 1000, currentValue: 1000, propertyType: 'bogus' })
+
+    const db = store.readFinanceStore()
+    expect(db.properties.find((p) => p.description === 'A')?.propertyType).toBe('residential')
+    expect(db.properties.find((p) => p.description === 'B')?.propertyType).toBe('land')
+    expect(db.properties.find((p) => p.description === 'C')?.propertyType).toBe('residential')
+  })
 })
 
 describe('findPossibleDuplicate', () => {
@@ -1292,6 +1325,24 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     const summary = financeSummary(db)
     // 15_000 (card) + 60_000 (active loan) — the 999_999 loan-type account and the paid-off loan are excluded
     expect(summary.debtLkr).toBe(75_000)
+  })
+
+  it('propertyValueLkr (Phase 40) sums current property values and adds to netWorthLkr', () => {
+    const db = createEmptyFinanceDatabase()
+    db.properties.push({
+      id: 'p1', description: 'Test House', propertyType: 'residential', purchasePrice: 5_000_000,
+      currentValue: 5_500_000, currency: 'LKR', purchaseDate: '2026-01-01', source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.properties.push({
+      id: 'p2', description: 'Test Land', propertyType: 'land', purchasePrice: 1_000_000,
+      currentValue: 1_200_000, currency: 'LKR', purchaseDate: '2026-01-01', source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+
+    const summary = financeSummary(db)
+    expect(summary.propertyValueLkr).toBe(6_700_000)
+    expect(summary.netWorthLkr).toBe(6_700_000)
   })
 
   it('falls back to buy price when a stock holding has no cached current price yet', () => {

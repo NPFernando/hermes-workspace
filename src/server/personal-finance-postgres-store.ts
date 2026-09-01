@@ -271,6 +271,12 @@ CREATE TABLE IF NOT EXISTS loans (
   start_date TEXT NOT NULL, term_months INTEGER, status TEXT NOT NULL, notes TEXT, source TEXT NOT NULL,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS properties (
+  id TEXT PRIMARY KEY, description TEXT NOT NULL, property_type TEXT NOT NULL, purchase_price DOUBLE PRECISION NOT NULL,
+  current_value DOUBLE PRECISION NOT NULL, currency TEXT NOT NULL, purchase_date TEXT NOT NULL, notes TEXT,
+  source TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
 `,
   )
   if (result.ok) schemaReady = true
@@ -520,6 +526,22 @@ function loanRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> 
   ])
 }
 
+function propertyRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  return rowsIn.map((row) => [
+    sqlText(firstText(row, 'id')),
+    sqlText(firstText(row, 'description')),
+    sqlText(firstText(row, 'propertyType', 'residential')),
+    sqlNumber(row.purchasePrice),
+    sqlNumber(row.currentValue),
+    sqlText(firstText(row, 'currency')),
+    sqlText(firstText(row, 'purchaseDate')),
+    sqlNullableText(row.notes),
+    sqlText(firstText(row, 'source', 'manual')),
+    sqlText(firstText(row, 'createdAt')),
+    sqlText(firstText(row, 'updatedAt')),
+  ])
+}
+
 function personalFinanceMirrorSql(slice: PersonalFinanceSlice): string {
   return `
 DELETE FROM finance_accounts;
@@ -536,6 +558,7 @@ DELETE FROM income_sources;
 DELETE FROM stock_holdings;
 DELETE FROM fixed_deposits;
 DELETE FROM loans;
+DELETE FROM properties;
 
 ${insertRows(
   'finance_accounts',
@@ -650,6 +673,15 @@ ${insertRows(
     'start_date', 'term_months', 'status', 'notes', 'source', 'created_at', 'updated_at',
   ],
   loanRows(rows(slice.loans)),
+)}
+
+${insertRows(
+  'properties',
+  [
+    'id', 'description', 'property_type', 'purchase_price', 'current_value', 'currency',
+    'purchase_date', 'notes', 'source', 'created_at', 'updated_at',
+  ],
+  propertyRows(rows(slice.properties)),
 )}
 `
 }
