@@ -387,6 +387,45 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
     expect(db.savings_goals.find((g) => g.name === 'Car fund')?.goalKind).toBe('sinking')
     expect(db.savings_goals.find((g) => g.name === 'Bogus kind')?.goalKind).toBe('general')
   })
+
+  it('loan (Phase 40) round-trips through add, update, delete, and defaults status to active', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('loan', {
+      lender: 'Test Bank', principal: 100_000, currentBalance: 90_000, currency: 'LKR', interestRatePct: 12,
+    })
+    let db = store.readFinanceStore()
+    expect(db.loans).toHaveLength(1)
+    const loan = db.loans[0]
+    expect(loan.lender).toBe('Test Bank')
+    expect(loan.currentBalance).toBe(90_000)
+    expect(loan.status).toBe('active')
+
+    store.updateFinanceRecord('loan', loan.id, { currentBalance: 80_000, status: 'active' })
+    db = store.readFinanceStore()
+    expect(db.loans[0].currentBalance).toBe(80_000)
+
+    store.updateFinanceRecord('loan', loan.id, { status: 'not-a-real-status' })
+    db = store.readFinanceStore()
+    // update_record does a plain spread-merge — an invalid status string is
+    // stored as-is (unlike add, which validates through loanStatusField()).
+    expect(db.loans[0].status).toBe('not-a-real-status')
+
+    store.deleteFinanceRecord('loan', loan.id)
+    db = store.readFinanceStore()
+    expect(db.loans).toHaveLength(0)
+  })
+
+  it('loan status defaults to active on add when omitted or invalid', async () => {
+    const store = await import('./finance-store')
+    store.addFinanceRecord('loan', { lender: 'A', principal: 1000, currentBalance: 1000 })
+    store.addFinanceRecord('loan', { lender: 'B', principal: 1000, currentBalance: 1000, status: 'paid_off' })
+    store.addFinanceRecord('loan', { lender: 'C', principal: 1000, currentBalance: 1000, status: 'bogus' })
+
+    const db = store.readFinanceStore()
+    expect(db.loans.find((l) => l.lender === 'A')?.status).toBe('active')
+    expect(db.loans.find((l) => l.lender === 'B')?.status).toBe('paid_off')
+    expect(db.loans.find((l) => l.lender === 'C')?.status).toBe('active')
+  })
 })
 
 describe('findPossibleDuplicate', () => {
@@ -1227,6 +1266,32 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     expect(summary.stockHoldingsValueLkr).toBe(1200) // 10 * 120 (current price, not buy price)
     expect(summary.fixedDepositsValueLkr).toBe(50_000) // withdrawn FD excluded
     expect(summary.netWorthLkr).toBe(1200 + 50_000)
+  })
+
+  it('debtLkr (Phase 40) sums active loan currentBalance and card account balances, excluding loan-type accounts and paid-off loans', () => {
+    const db = createEmptyFinanceDatabase()
+    db.finance_accounts.push({
+      id: 'a1', name: 'Credit Card', type: 'card', currency: 'LKR', balance: -15_000, source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.finance_accounts.push({
+      id: 'a2', name: 'Legacy Loan Account', type: 'loan', currency: 'LKR', balance: -999_999, source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.loans.push({
+      id: 'l1', lender: 'Test Bank', principal: 100_000, currentBalance: 60_000, currency: 'LKR',
+      interestRatePct: 12, startDate: '2026-01-01', status: 'active', source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.loans.push({
+      id: 'l2', lender: 'Paid Off Bank', principal: 50_000, currentBalance: 0, currency: 'LKR',
+      interestRatePct: 8, startDate: '2026-01-01', status: 'paid_off', source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+
+    const summary = financeSummary(db)
+    // 15_000 (card) + 60_000 (active loan) — the 999_999 loan-type account and the paid-off loan are excluded
+    expect(summary.debtLkr).toBe(75_000)
   })
 
   it('falls back to buy price when a stock holding has no cached current price yet', () => {

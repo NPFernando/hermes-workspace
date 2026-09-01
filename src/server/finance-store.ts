@@ -349,6 +349,24 @@ export type FixedDeposit = {
   updatedAt: string
 }
 
+/** Phase 40 (WEALTH-100/101): unlike FixedDeposit's principal, currentBalance decreases as the loan is paid down. */
+export type Loan = {
+  id: string
+  lender: string
+  principal: number
+  currentBalance: number
+  currency: CurrencyCode
+  interestRatePct: number
+  monthlyPayment?: number
+  startDate: string
+  termMonths?: number
+  status: 'active' | 'paid_off' | 'defaulted'
+  notes?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
 /**
  * A record awaiting AI extraction and/or human review before it becomes a
  * real income/expense record — the "AI proposes, human confirms" queue for
@@ -698,6 +716,7 @@ export type FinanceDatabase = {
   income_sources: Array<IncomeSource>
   stock_holdings: Array<StockHolding>
   fixed_deposits: Array<FixedDeposit>
+  loans: Array<Loan>
   exchange_rates: Array<Record<string, unknown>>
   investment_accounts: Array<Record<string, unknown>>
   trading_platforms: Array<Record<string, unknown>>
@@ -798,6 +817,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     income_sources: [],
     stock_holdings: [],
     fixed_deposits: [],
+    loans: [],
     exchange_rates: [],
     investment_accounts: [],
     trading_platforms: [
@@ -924,6 +944,7 @@ function mirrorIntoSplitStores(db: FinanceDatabase): void {
     income_sources: db.income_sources,
     stock_holdings: db.stock_holdings,
     fixed_deposits: db.fixed_deposits,
+    loans: db.loans,
   })
   writeTradingStore({
     assets: db.assets,
@@ -1003,6 +1024,7 @@ function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
           income_sources: personal.income_sources,
           stock_holdings: personal.stock_holdings,
           fixed_deposits: personal.fixed_deposits,
+          loans: personal.loans ?? [],
         }
       : {}),
     ...(tradingFresh
@@ -1569,6 +1591,20 @@ export function addFinanceRecord(
       status: fixedDepositStatusField(payload.status),
       notes: optionalString(payload, 'notes'),
     })
+  } else if (kind === 'loan') {
+    db.loans.push({
+      ...base,
+      lender: stringField(payload, 'lender', 'Lender'),
+      principal: numberField(payload, 'principal', 0),
+      currentBalance: numberField(payload, 'currentBalance', 0),
+      currency: stringField(payload, 'currency', 'LKR'),
+      interestRatePct: numberField(payload, 'interestRatePct', 0),
+      monthlyPayment: optionalNumber(payload, 'monthlyPayment'),
+      startDate: stringField(payload, 'startDate', createdAt.slice(0, 10)),
+      termMonths: optionalNumber(payload, 'termMonths'),
+      status: loanStatusField(payload.status),
+      notes: optionalString(payload, 'notes'),
+    })
   } else if (kind === 'trading_plan') {
     db.trading_plans.push(createTradingPlan(payload, base))
   } else if (kind === 'virtual_account') {
@@ -1697,6 +1733,12 @@ export function updateFinanceRecord(
       db.fixed_deposits[index] = { ...db.fixed_deposits[index], ...payload, updatedAt: nowIso() }
       updated = true
     }
+  } else if (kind === 'loan') {
+    const index = db.loans.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.loans[index] = { ...db.loans[index], ...payload, updatedAt: nowIso() }
+      updated = true
+    }
   } else {
     throw new Error(`Unsupported finance record kind for update: ${kind}`)
   }
@@ -1774,6 +1816,10 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.fixed_deposits.length
     db.fixed_deposits = db.fixed_deposits.filter((r) => r.id !== id)
     removed = db.fixed_deposits.length !== before
+  } else if (kind === 'loan') {
+    const before = db.loans.length
+    db.loans = db.loans.filter((r) => r.id !== id)
+    removed = db.loans.length !== before
   } else {
     throw new Error(`Unsupported finance record kind for delete: ${kind}`)
   }
@@ -2106,9 +2152,17 @@ export function financeSummary(db: FinanceDatabase) {
   const taxReserveLkr = db.savings_goals
     .filter((goal) => goal.name.toLowerCase().includes('tax'))
     .reduce((sum, goal) => sum + goal.currentAmount, 0)
-  const debtLkr = db.finance_accounts
-    .filter((account) => account.type === 'loan' || account.type === 'card')
-    .reduce((sum, row) => sum + Math.abs(row.balance), 0)
+  // 'loan'-type accounts no longer contribute here — Phase 40 gives loans a
+  // dedicated entity (principal/rate/term, remaining balance tracked
+  // separately from the original amount); 'card' stays account-based since
+  // credit cards have no term/rate model.
+  const debtLkr =
+    db.finance_accounts
+      .filter((account) => account.type === 'card')
+      .reduce((sum, row) => sum + Math.abs(row.balance), 0) +
+    db.loans
+      .filter((loan) => loan.status === 'active')
+      .reduce((sum, loan) => sum + loan.currentBalance, 0)
   // Never blocked on a live CSE price fetch succeeding — falls back to the
   // buy price when no cached/manual current price is available yet.
   const stockHoldingsValueLkr = db.stock_holdings.reduce(
@@ -2498,6 +2552,11 @@ function fixedDepositStatusField(value: unknown): FixedDeposit['status'] {
   return allowed.includes(value as FixedDeposit['status'])
     ? (value as FixedDeposit['status'])
     : 'active'
+}
+
+function loanStatusField(value: unknown): Loan['status'] {
+  const allowed: Array<Loan['status']> = ['active', 'paid_off', 'defaulted']
+  return allowed.includes(value as Loan['status']) ? (value as Loan['status']) : 'active'
 }
 
 function reconciliationStatus(value: unknown): 'pending' | 'cleared' | 'reconciled' {

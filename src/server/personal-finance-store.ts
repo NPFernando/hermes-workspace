@@ -45,6 +45,8 @@ export interface PersonalFinanceSlice {
   income_sources: Array<Record<string, unknown>>
   stock_holdings: Array<Record<string, unknown>>
   fixed_deposits: Array<Record<string, unknown>>
+  /** Optional: absent on a mirror file written before Phase 40 (Loan Tracking) shipped. */
+  loans?: Array<Record<string, unknown>>
 }
 
 /**

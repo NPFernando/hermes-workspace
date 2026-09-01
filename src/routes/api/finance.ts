@@ -278,6 +278,7 @@ function personalFinancePayload() {
       income_sources: db.income_sources,
       stock_holdings: db.stock_holdings,
       fixed_deposits: db.fixed_deposits,
+      loans: db.loans,
       pending_ingestions: db.pending_ingestions,
     }),
   }

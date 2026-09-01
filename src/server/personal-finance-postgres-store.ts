@@ -264,6 +264,13 @@ CREATE TABLE IF NOT EXISTS fixed_deposits (
   maturity_date TEXT NOT NULL, status TEXT NOT NULL, notes TEXT, source TEXT NOT NULL,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS loans (
+  id TEXT PRIMARY KEY, lender TEXT NOT NULL, principal DOUBLE PRECISION NOT NULL, current_balance DOUBLE PRECISION NOT NULL,
+  currency TEXT NOT NULL, interest_rate_pct DOUBLE PRECISION NOT NULL, monthly_payment DOUBLE PRECISION,
+  start_date TEXT NOT NULL, term_months INTEGER, status TEXT NOT NULL, notes TEXT, source TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
 `,
   )
   if (result.ok) schemaReady = true
@@ -494,6 +501,25 @@ function fixedDepositRows(rowsIn: Array<Record<string, unknown>>): Array<Array<s
   ])
 }
 
+function loanRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+  return rowsIn.map((row) => [
+    sqlText(firstText(row, 'id')),
+    sqlText(firstText(row, 'lender')),
+    sqlNumber(row.principal),
+    sqlNumber(row.currentBalance),
+    sqlText(firstText(row, 'currency')),
+    sqlNumber(row.interestRatePct),
+    sqlNullableNumber(row.monthlyPayment),
+    sqlText(firstText(row, 'startDate')),
+    sqlNullableNumber(row.termMonths),
+    sqlText(firstText(row, 'status', 'active')),
+    sqlNullableText(row.notes),
+    sqlText(firstText(row, 'source', 'manual')),
+    sqlText(firstText(row, 'createdAt')),
+    sqlText(firstText(row, 'updatedAt')),
+  ])
+}
+
 function personalFinanceMirrorSql(slice: PersonalFinanceSlice): string {
   return `
 DELETE FROM finance_accounts;
@@ -509,6 +535,7 @@ DELETE FROM tax_records;
 DELETE FROM income_sources;
 DELETE FROM stock_holdings;
 DELETE FROM fixed_deposits;
+DELETE FROM loans;
 
 ${insertRows(
   'finance_accounts',
@@ -614,6 +641,15 @@ ${insertRows(
     'maturity_date', 'status', 'notes', 'source', 'created_at', 'updated_at',
   ],
   fixedDepositRows(rows(slice.fixed_deposits)),
+)}
+
+${insertRows(
+  'loans',
+  [
+    'id', 'lender', 'principal', 'current_balance', 'currency', 'interest_rate_pct', 'monthly_payment',
+    'start_date', 'term_months', 'status', 'notes', 'source', 'created_at', 'updated_at',
+  ],
+  loanRows(rows(slice.loans)),
 )}
 `
 }
