@@ -138,7 +138,14 @@ ${recentTurns.map((turn) => `Q: ${turn.question}\nA: ${turn.answer}`).join('\n')
 `
       : ''
 
-  return `You are a personal finance analyst. Answer the user's question using ONLY the JSON data below — do not assume anything not present in it. If the data doesn't contain what's needed to answer, say so honestly rather than guessing. Be concise (2-4 sentences).
+  return `You are a personal finance analyst. Answer the user's question using ONLY the JSON data below — do not assume anything not present in it. If the data doesn't contain what's needed to answer, say so honestly rather than guessing.
+
+Respond with STRICT JSON only, no markdown fences, no commentary, matching exactly this shape:
+{
+  "text": "<your answer, 1-4 concise sentences>",
+  "chart": null | { "title": "<short chart title>", "data": [{ "label": "<string>", "value": <number> }, ...] }
+}
+Only include "chart" (non-null) when the question specifically calls for a breakdown/comparison across categories, vendors, or months that a bar chart would make clearer — plain factual questions (e.g. a single total) should have "chart": null.
 
 ${conversationBlock}Data:
 ${JSON.stringify(context)}
@@ -146,30 +153,83 @@ ${JSON.stringify(context)}
 Question: ${question}`
 }
 
+export type FinanceAnswerChart = { title: string; data: Array<{ label: string; value: number }> }
+
+/**
+ * AI-203: parses the strict-JSON response answerFinanceQuestion()'s prompt
+ * requests, following the exact fence-stripping/JSON.parse/type-guard
+ * pattern already used by parseExtractionJson/parseContractExtractionJson.
+ * Never throws — a model that ignores the JSON instruction (common on
+ * weaker fallback tiers) degrades to the raw response as plain text with no
+ * chart, rather than failing the whole answer.
+ */
+export function parseFinanceAnswerJson(raw: string): { text: string; chart: FinanceAnswerChart | null } {
+  const stripped = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
+  try {
+    const obj: unknown = JSON.parse(stripped)
+    if (typeof obj !== 'object' || obj === null) return { text: raw.trim(), chart: null }
+    const o = obj as Record<string, unknown>
+    if (typeof o.text !== 'string' || !o.text.trim()) return { text: raw.trim(), chart: null }
+
+    let chart: FinanceAnswerChart | null = null
+    if (o.chart && typeof o.chart === 'object') {
+      const c = o.chart as Record<string, unknown>
+      const title = typeof c.title === 'string' && c.title.trim() ? c.title.trim() : null
+      const rawData = Array.isArray(c.data) ? c.data : null
+      if (title && rawData) {
+        const data = rawData
+          .filter(
+            (row): row is { label: string; value: number } =>
+              !!row &&
+              typeof row === 'object' &&
+              typeof (row as Record<string, unknown>).label === 'string' &&
+              Number.isFinite(Number((row as Record<string, unknown>).value)),
+          )
+          .map((row) => ({ label: row.label, value: Number(row.value) }))
+          .slice(0, 10)
+        if (data.length > 0) chart = { title, data }
+      }
+    }
+
+    return { text: o.text.trim(), chart }
+  } catch {
+    return { text: raw.trim(), chart: null }
+  }
+}
+
 /**
  * Phase 24 (AI-200/201): answers a free-text question about the user's own
  * finances using ONLY the bounded, pre-aggregated context the caller
  * provides (buildFinanceQueryContext in finance-store.ts) — never a raw
  * transaction dump. Same two-tier HARP -> Gemini fallback as
- * extractTransactionFromText(), just a plain-text answer instead of
- * structured JSON. AI-204: optionally folds in the last few prior turns of
- * this conversation so follow-up questions carry context.
+ * extractTransactionFromText(). AI-204: optionally folds in the last few
+ * prior turns of this conversation so follow-up questions carry context.
+ * AI-203: the response is strict JSON (parsed via parseFinanceAnswerJson)
+ * so the model can optionally return chart data alongside its text answer.
  */
 export async function answerFinanceQuestion(
   question: string,
   context: unknown,
   priorTurns: Array<FinanceQaTurn> = [],
-): Promise<{ ok: true; answer: string } | { ok: false; reason: string }> {
+): Promise<
+  { ok: true; answer: string; chart: FinanceAnswerChart | null } | { ok: false; reason: string }
+> {
   const prompt = buildFinanceAnswerPrompt(question, context, priorTurns)
 
   const routes = selectHarpRoutes('text_summary', 'standard')
   if (routes.length > 0) {
     const result = await callWithFallback(routes, prompt)
-    if (result?.content) return { ok: true, answer: result.content.trim() }
+    if (result?.content) {
+      const parsed = parseFinanceAnswerJson(result.content)
+      return { ok: true, answer: parsed.text, chart: parsed.chart }
+    }
   }
 
   const geminiContent = await callGeminiText(prompt)
-  if (geminiContent) return { ok: true, answer: geminiContent.trim() }
+  if (geminiContent) {
+    const parsed = parseFinanceAnswerJson(geminiContent)
+    return { ok: true, answer: parsed.text, chart: parsed.chart }
+  }
 
   return { ok: false, reason: 'all_routes_failed' }
 }

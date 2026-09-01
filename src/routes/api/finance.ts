@@ -720,7 +720,7 @@ export const Route = createFileRoute('/api/finance')({
               { at: Math.floor(Date.now() / 1000), question, answer: result.answer },
             ].slice(-10)
             writeFinanceStore(db)
-            return json({ ...personalFinancePayload(), answer: result.answer })
+            return json({ ...personalFinancePayload(), answer: result.answer, chart: result.chart })
           }
           if (action === 'set_demo_config' || action === 'set_engine_config') {
             // Update the demo engine's tunable knobs (settings.demoTrading), merged

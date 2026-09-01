@@ -3,6 +3,7 @@ import {
   buildFinanceAnswerPrompt,
   parseContractExtractionJson,
   parseExtractionJson,
+  parseFinanceAnswerJson,
   promptWithCategoryHints,
 } from './finance-extraction'
 
@@ -112,6 +113,59 @@ describe('buildFinanceAnswerPrompt', () => {
     expect(result).toContain('Q2')
     expect(result).toContain('Q3')
     expect(result).toContain('Q4')
+  })
+})
+
+describe('parseFinanceAnswerJson', () => {
+  it('parses a valid text-only response', () => {
+    const result = parseFinanceAnswerJson(JSON.stringify({ text: 'Your net worth is 100,000 LKR.', chart: null }))
+    expect(result).toEqual({ text: 'Your net worth is 100,000 LKR.', chart: null })
+  })
+
+  it('parses a valid response with chart data', () => {
+    const result = parseFinanceAnswerJson(
+      JSON.stringify({
+        text: 'Groceries is your top category.',
+        chart: {
+          title: 'Spending by category',
+          data: [
+            { label: 'Groceries', value: 20000 },
+            { label: 'Utilities', value: 8000 },
+          ],
+        },
+      }),
+    )
+    expect(result.text).toBe('Groceries is your top category.')
+    expect(result.chart).toEqual({
+      title: 'Spending by category',
+      data: [
+        { label: 'Groceries', value: 20000 },
+        { label: 'Utilities', value: 8000 },
+      ],
+    })
+  })
+
+  it('strips markdown fences before parsing', () => {
+    const result = parseFinanceAnswerJson('```json\n{"text": "Fenced answer.", "chart": null}\n```')
+    expect(result).toEqual({ text: 'Fenced answer.', chart: null })
+  })
+
+  it('falls back to the raw response as plain text when parsing fails', () => {
+    const result = parseFinanceAnswerJson('I could not find that in your data.')
+    expect(result).toEqual({ text: 'I could not find that in your data.', chart: null })
+  })
+
+  it('drops a malformed chart but keeps the text', () => {
+    const result = parseFinanceAnswerJson(
+      JSON.stringify({ text: 'Here you go.', chart: { title: 'Missing data field' } }),
+    )
+    expect(result).toEqual({ text: 'Here you go.', chart: null })
+  })
+
+  it('caps chart data at 10 entries', () => {
+    const data = Array.from({ length: 15 }, (_, i) => ({ label: `Vendor ${i}`, value: i }))
+    const result = parseFinanceAnswerJson(JSON.stringify({ text: 'Top vendors.', chart: { title: 'Vendors', data } }))
+    expect(result.chart?.data.length).toBe(10)
   })
 })
 

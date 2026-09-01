@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { PersonalFinancePayload } from '../types'
 
 const inputClass =
@@ -10,14 +11,23 @@ function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}…` : text
 }
 
+function formatNumber(v: number): string {
+  return v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)
+}
+
+type AnalystChart = { title: string; data: Array<{ label: string; value: number }> }
+
 /**
- * Phase 24 (AI-200/201/202/204): a same-origin, authenticated-user-only
+ * Phase 24 (AI-200/201/202/203/204): a same-origin, authenticated-user-only
  * question/answer exchange over the user's own finance data. AI-202 adds a
  * capped (last 10, showing the last 5) recent-questions list stored in
  * FinanceSettings.financeQaHistory. AI-204 adds in-session-only conversation
  * memory (`turns`, separate from that persisted list) so follow-up questions
- * carry context — see the ask_finance_question action (routes/api/finance.ts)
- * for the bounded context/LLM-call/history side.
+ * carry context. AI-203 lets the live answer optionally include a chart
+ * (rendered with the same recharts bar-chart shape as FinanceTrendsCard's
+ * "Spending by category" — not persisted in financeQaHistory or turns) — see
+ * the ask_finance_question action (routes/api/finance.ts) for the bounded
+ * context/LLM-call/history side.
  */
 export function FinanceAnalystCard({
   payload,
@@ -28,6 +38,7 @@ export function FinanceAnalystCard({
 }) {
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<string | null>(null)
+  const [chart, setChart] = useState<AnalystChart | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [asking, setAsking] = useState(false)
   // AI-204: in-session-only conversation turns, separate from the persisted
@@ -41,6 +52,7 @@ export function FinanceAnalystCard({
     setAsking(true)
     setError(null)
     setAnswer(null)
+    setChart(null)
     try {
       const res = await fetch('/api/finance', {
         method: 'POST',
@@ -51,9 +63,14 @@ export function FinanceAnalystCard({
           priorTurns: turns.slice(-3),
         }),
       })
-      const data = (await res.json()) as PersonalFinancePayload & { answer?: string; error?: string }
+      const data = (await res.json()) as PersonalFinancePayload & {
+        answer?: string
+        chart?: AnalystChart | null
+        error?: string
+      }
       if (data.ok && data.answer) {
         setAnswer(data.answer)
+        setChart(data.chart ?? null)
         setTurns((prior) => [...prior, { question: asked, answer: data.answer as string }])
         onPayload(data)
       } else {
@@ -69,6 +86,7 @@ export function FinanceAnalystCard({
   function startNewConversation() {
     setTurns([])
     setAnswer(null)
+    setChart(null)
     setError(null)
   }
 
@@ -102,6 +120,38 @@ export function FinanceAnalystCard({
       </div>
       {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
       {answer && <p className="mt-2 text-sm text-[var(--theme-text)]">{answer}</p>}
+      {chart && (
+        <div className="mt-3">
+          <p className="text-xs font-medium text-[var(--theme-text)]">{chart.title}</p>
+          <div className="mt-2 h-[220px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chart.data} layout="vertical" margin={{ top: 4, right: 12, left: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="2 4" stroke="var(--theme-border)" opacity={0.4} horizontal={false} />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 10, fill: 'var(--theme-muted)' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={formatNumber}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="label"
+                  tick={{ fontSize: 10, fill: 'var(--theme-muted)' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={90}
+                />
+                <Tooltip
+                  contentStyle={{ background: 'var(--theme-panel)', border: '1px solid var(--theme-border)', borderRadius: 8, fontSize: 11 }}
+                  formatter={(value: number) => value.toLocaleString()}
+                />
+                <Bar dataKey="value" fill="#38bdf8" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {recentHistory.length > 0 && (
         <div className="mt-4 border-t border-[var(--theme-border)]/60 pt-3">
