@@ -166,6 +166,15 @@ market_data_spec/
 risk_model_prototype/
 news_intelligence_*
 docs/PERSONAL_FINANCE_REQUIREMENTS.md
+
+# Additional scratch patterns
+*.mmd
+investment_platforms_*
+market_data_*
+ebbinghaus_*
+trading_alert_*
+*_SUMMARY.md
+*_VERIFICATION.md
 docs/RISK_MODEL_DESIGN.md
 docs/adaptive_memory_decay_design.md
 docs/agent_learning_mechanism_design.md
