@@ -1,11 +1,37 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildFinanceAnswerPrompt,
+  mimeTypeForImageExtension,
   parseContractExtractionJson,
   parseExtractionJson,
   parseFinanceAnswerJson,
   promptWithCategoryHints,
 } from './finance-extraction'
+
+describe('mimeTypeForImageExtension', () => {
+  it('maps common image extensions to their real mime types', () => {
+    expect(mimeTypeForImageExtension('.jpg')).toBe('image/jpeg')
+    expect(mimeTypeForImageExtension('.jpeg')).toBe('image/jpeg')
+    expect(mimeTypeForImageExtension('.png')).toBe('image/png')
+    expect(mimeTypeForImageExtension('.webp')).toBe('image/webp')
+    expect(mimeTypeForImageExtension('.gif')).toBe('image/gif')
+  })
+
+  it('maps HEIC/HEIF (default iPhone/Android camera format) to their real mime types, not image/png', () => {
+    expect(mimeTypeForImageExtension('.heic')).toBe('image/heic')
+    expect(mimeTypeForImageExtension('.heif')).toBe('image/heif')
+  })
+
+  it('is case-insensitive', () => {
+    expect(mimeTypeForImageExtension('.HEIC')).toBe('image/heic')
+    expect(mimeTypeForImageExtension('.JPG')).toBe('image/jpeg')
+  })
+
+  it('defaults an unrecognized extension to image/jpeg', () => {
+    expect(mimeTypeForImageExtension('.bmp')).toBe('image/jpeg')
+    expect(mimeTypeForImageExtension('')).toBe('image/jpeg')
+  })
+})
 
 describe('parseExtractionJson', () => {
   it('parses a valid expense extraction', () => {

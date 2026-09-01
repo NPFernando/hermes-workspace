@@ -55,6 +55,11 @@ export function PendingIngestionPanel({
   >([])
   const [syncing, setSyncing] = useState(false)
   const [duplicateWarnings, setDuplicateWarnings] = useState<Record<string, DuplicateWarning>>({})
+  // Some formats (notably HEIC/HEIF from phone cameras) extract fine
+  // server-side but no mainstream browser can decode them in an <img> tag —
+  // track which previews failed to load so we can show a placeholder
+  // instead of a broken-image icon.
+  const [previewFailedIds, setPreviewFailedIds] = useState<Record<string, boolean>>({})
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const contractFileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -357,11 +362,18 @@ export function PendingIngestionPanel({
               className="flex flex-wrap items-start gap-3 rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
             >
               {item.rawPreviewImagePath && (
-                <img
-                  src={`/api/finance-upload?id=${item.id}`}
-                  alt="Document preview"
-                  className="h-24 w-24 rounded-xl border border-[var(--theme-border)]/60 object-cover"
-                />
+                previewFailedIds[item.id] ? (
+                  <div className="flex h-24 w-24 items-center justify-center rounded-xl border border-[var(--theme-border)]/60 bg-black/20 p-2 text-center text-[10px] text-[var(--theme-muted)]">
+                    Preview not available for this format
+                  </div>
+                ) : (
+                  <img
+                    src={`/api/finance-upload?id=${item.id}`}
+                    alt="Document preview"
+                    className="h-24 w-24 rounded-xl border border-[var(--theme-border)]/60 object-cover"
+                    onError={() => setPreviewFailedIds((prev) => ({ ...prev, [item.id]: true }))}
+                  />
+                )
               )}
 
               <div className="min-w-[220px] flex-1">

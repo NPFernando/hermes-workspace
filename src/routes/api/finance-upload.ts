@@ -20,7 +20,7 @@ import {
   listPendingIngestions,
 } from '../../server/finance-store'
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
-import { extractEmploymentContract, extractTransactionFromImage } from '../../server/finance-extraction'
+import { extractEmploymentContract, extractTransactionFromImage, mimeTypeForImageExtension } from '../../server/finance-extraction'
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 const UPLOAD_DIR = FINANCE_INGESTION_UPLOAD_DIR
@@ -54,9 +54,7 @@ export const Route = createFileRoute('/api/finance-upload')({
         }
         try {
           const buffer = fs.readFileSync(resolved)
-          const contentType = resolved.toLowerCase().endsWith('.jpg') || resolved.toLowerCase().endsWith('.jpeg')
-            ? 'image/jpeg'
-            : 'image/png'
+          const contentType = mimeTypeForImageExtension(path.extname(resolved))
           return new Response(buffer, { headers: { 'content-type': contentType, 'cache-control': 'private, max-age=300' } })
         } catch {
           return json({ ok: false, error: 'Preview file not found.' }, { status: 404 })

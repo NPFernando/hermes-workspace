@@ -234,11 +234,30 @@ export async function answerFinanceQuestion(
   return { ok: false, reason: 'all_routes_failed' }
 }
 
+const IMAGE_MIME_TYPES_BY_EXTENSION: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  // iPhone cameras (and many recent Android phones) default to HEIC/HEIF —
+  // Gemini's generateContent API accepts these natively, so labeling them
+  // correctly (instead of the previous silent fallback to image/png) is
+  // enough to let extraction actually work, no conversion needed:
+  // https://ai.google.dev/gemini-api/docs/image-understanding
+  '.heic': 'image/heic',
+  '.heif': 'image/heif',
+}
+
+/** Defaults to image/jpeg for an unrecognized extension — the far more common camera/photo format than PNG. */
+export function mimeTypeForImageExtension(ext: string): string {
+  return IMAGE_MIME_TYPES_BY_EXTENSION[ext.toLowerCase()] ?? 'image/jpeg'
+}
+
 function readImageAsBase64(imagePath: string): { base64: string; mimeType: string } | null {
   try {
     const buffer = fs.readFileSync(imagePath)
-    const ext = path.extname(imagePath).toLowerCase()
-    const mimeType = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png'
+    const mimeType = mimeTypeForImageExtension(path.extname(imagePath))
     return { base64: buffer.toString('base64'), mimeType }
   } catch {
     return null
