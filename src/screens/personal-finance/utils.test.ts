@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildFinanceAnswerMarkdown, formatLkr, formatMoney, formatPct } from './utils'
+import { buildFinanceAnswerMarkdown, computeAccountLedgerBalance, formatLkr, formatMoney, formatPct } from './utils'
+import type { ReconcileTransaction } from './utils'
 
 describe('formatMoney/formatLkr/formatPct', () => {
   it('formats an amount with a currency prefix, rounded, with thousands separators', () => {
@@ -46,5 +47,39 @@ describe('buildFinanceAnswerMarkdown', () => {
     const md = buildFinanceAnswerMarkdown('Q', 'A', null)
     expect(md).toContain('Exported')
     expect(md).toContain('Hermes Workspace — Personal Finance')
+  })
+})
+
+describe('computeAccountLedgerBalance', () => {
+  const account = { id: 'acc-1', currency: 'LKR', openingBalance: 10000 }
+
+  it('returns null when the account has no openingBalance', () => {
+    expect(computeAccountLedgerBalance({ id: 'acc-1', currency: 'LKR' }, [])).toBeNull()
+  })
+
+  it('returns exactly the openingBalance with zero transactions', () => {
+    expect(computeAccountLedgerBalance(account, [])).toBe(10000)
+  })
+
+  it('adds income and subtracts expenses for the matching account and currency', () => {
+    const records: Array<ReconcileTransaction> = [
+      { accountId: 'acc-1', currency: 'LKR', amount: 5000, kind: 'income' },
+      { accountId: 'acc-1', currency: 'LKR', amount: 2000, kind: 'expense' },
+    ]
+    expect(computeAccountLedgerBalance(account, records)).toBe(13000)
+  })
+
+  it('excludes records for a different accountId', () => {
+    const records: Array<ReconcileTransaction> = [
+      { accountId: 'acc-2', currency: 'LKR', amount: 5000, kind: 'income' },
+    ]
+    expect(computeAccountLedgerBalance(account, records)).toBe(10000)
+  })
+
+  it('excludes records in a different currency', () => {
+    const records: Array<ReconcileTransaction> = [
+      { accountId: 'acc-1', currency: 'USD', amount: 500, kind: 'income' },
+    ]
+    expect(computeAccountLedgerBalance(account, records)).toBe(10000)
   })
 })

@@ -49,3 +49,28 @@ export function buildFinanceAnswerMarkdown(
 
   return lines.join('\n')
 }
+
+export type ReconcileTransaction = { accountId?: string; currency: string; amount: number; kind: 'income' | 'expense' }
+
+/**
+ * AI-600 (Phase 28, first slice): reconciles an account's manually-maintained
+ * `balance` against what its own tagged transactions say it should be,
+ * starting from `openingBalance`. Returns null when there's no
+ * openingBalance to start from — without one, "since some unknown point"
+ * transactions can't be meaningfully checked, so no number is shown rather
+ * than a misleading one. Only same-currency transactions are summed;
+ * cross-currency records tagged to the account are excluded (no conversion
+ * attempted this slice).
+ */
+export function computeAccountLedgerBalance(
+  account: { id: string; currency: string; openingBalance?: number },
+  records: Array<ReconcileTransaction>,
+): number | null {
+  if (account.openingBalance === undefined) return null
+  let balance = account.openingBalance
+  for (const record of records) {
+    if (record.accountId !== account.id || record.currency !== account.currency) continue
+    balance += record.kind === 'income' ? record.amount : -record.amount
+  }
+  return balance
+}

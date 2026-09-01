@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
-import { formatMoney } from '../utils'
+import { computeAccountLedgerBalance, formatMoney } from '../utils'
+import type { ReconcileTransaction } from '../utils'
 import type { PersonalFinancePayload } from '../types'
 
 const inputClass =
@@ -52,9 +53,12 @@ type EditDraft = {
 
 /**
  * Accounts — dedicated panel (PF-100/101/102/103), replacing the generic
- * DataTable treatment. `balance` stays a manually-maintained current figure
- * for now; it isn't derived from a transaction ledger yet (that's PF-104,
- * a separate future feature — see docs/personal-finance-os-roadmap.md).
+ * DataTable treatment. `balance` stays a manually-maintained current figure,
+ * edited directly here — it is never auto-recalculated. AI-600 (Phase 28)
+ * adds an informational per-account reconciliation badge below, comparing
+ * this declared balance against what the account's own tagged transactions
+ * say it should be (starting from openingBalance) — see
+ * computeAccountLedgerBalance in utils.ts.
  */
 export function AccountsPanel({
   payload,
@@ -165,6 +169,24 @@ export function AccountsPanel({
 
   const accounts = payload.data.finance_accounts
 
+  const ledgerTransactions: Array<ReconcileTransaction> = useMemo(
+    () => [
+      ...payload.data.income_records.map((r) => ({
+        accountId: stringField(r, 'accountId') || undefined,
+        currency: stringField(r, 'originalCurrency') || 'LKR',
+        amount: numberField(r, 'originalAmount'),
+        kind: 'income' as const,
+      })),
+      ...payload.data.expense_records.map((r) => ({
+        accountId: stringField(r, 'accountId') || undefined,
+        currency: stringField(r, 'currency') || 'LKR',
+        amount: numberField(r, 'amount'),
+        kind: 'expense' as const,
+      })),
+    ],
+    [payload.data.income_records, payload.data.expense_records],
+  )
+
   const totalsByCurrency = new Map<string, number>()
   for (const account of accounts) {
     const accountCurrency = stringField(account, 'currency') || 'LKR'
@@ -261,6 +283,11 @@ export function AccountsPanel({
           const openingBalanceDateValue = stringField(account, 'openingBalanceDate')
           const maskedIdentifierValue = stringField(account, 'maskedIdentifier')
           const platformValue = stringField(account, 'platform')
+          const ledgerBalance = computeAccountLedgerBalance(
+            { id, currency: accountCurrency, openingBalance: openingBalanceValue },
+            ledgerTransactions,
+          )
+          const reconciliationDiff = ledgerBalance === null ? null : balanceValue - ledgerBalance
 
           return (
             <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
@@ -358,6 +385,17 @@ export function AccountsPanel({
                       <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
                         Opened at {formatMoney(openingBalanceValue, accountCurrency)}
                         {openingBalanceDateValue && ` on ${openingBalanceDateValue}`}
+                      </p>
+                    )}
+                    {reconciliationDiff === null ? (
+                      <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
+                        Set an opening balance to enable reconciliation.
+                      </p>
+                    ) : Math.abs(reconciliationDiff) < 1 ? (
+                      <p className="mt-1 text-[10px] text-emerald-300">✓ Reconciled with recorded transactions</p>
+                    ) : (
+                      <p className="mt-1 text-[10px] text-amber-300">
+                        ⚠ Off by {formatMoney(Math.abs(reconciliationDiff), accountCurrency)} from recorded transactions
                       </p>
                     )}
                   </div>
