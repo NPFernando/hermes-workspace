@@ -713,6 +713,8 @@ export type FinanceSettings = {
   wealthGoalTargetLkr?: number
   /** WEALTH-107: optional target date for wealthGoalTargetLkr — a target date without an amount is meaningless, so this is only read when wealthGoalTargetLkr is set. */
   wealthGoalTargetDate?: string
+  /** AI-202: capped (last 10) recent-activity list for the Finance Analyst — same "bounded log" convention as AI-506's gmailIngest.syncHistory. */
+  financeQaHistory?: Array<{ at: number; question: string; answer: string }>
   strategyDecayDetection?: Record<string, unknown>
   /** Per-strategy validated backtest baselines, keyed by strategyId. See strategy-decay.ts. */
   strategyBaselines?: Record<string, unknown>

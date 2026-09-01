@@ -298,7 +298,7 @@ export function PersonalFinanceScreen() {
       {tab === 'overview' && (
         <>
           <FinanceAlertsCard payload={payload} />
-          <FinanceAnalystCard />
+          <FinanceAnalystCard payload={payload} onPayload={setPayload} />
           <FinanceTrendsCard payload={payload} />
           <SavingsGoalsProgress payload={payload} onPayload={setPayload} />
           <SinkingFundsPanel payload={payload} onPayload={setPayload} />

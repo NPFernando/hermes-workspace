@@ -47,6 +47,7 @@ export type PersonalFinancePayload = {
     currentLkr: number
     progressPct: number
   }
+  financeQaHistory: Array<{ at: number; question: string; answer: string }>
   storage: {
     active: 'postgres' | 'json'
     fallback: 'json'

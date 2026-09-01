@@ -275,6 +275,7 @@ function personalFinancePayload() {
       currentLkr: wgCurrentLkr,
       progressPct: wgProgressPct,
     },
+    financeQaHistory: db.settings.financeQaHistory ?? [],
     data: maskSensitive({
       finance_accounts: db.finance_accounts,
       income_records: db.income_records,
@@ -698,7 +699,15 @@ export const Route = createFileRoute('/api/finance')({
             const context = buildFinanceQueryContext(db)
             const result = await answerFinanceQuestion(question, context)
             if (!result.ok) return json({ ok: false, error: result.reason }, { status: 502 })
-            return json({ ok: true, answer: result.answer })
+            // AI-202: capped recent-activity list, same bounded-log
+            // convention as AI-506's gmailIngest.syncHistory.
+            const priorHistory = db.settings.financeQaHistory ?? []
+            db.settings.financeQaHistory = [
+              ...priorHistory,
+              { at: Math.floor(Date.now() / 1000), question, answer: result.answer },
+            ].slice(-10)
+            writeFinanceStore(db)
+            return json({ ...personalFinancePayload(), answer: result.answer })
           }
           if (action === 'set_demo_config' || action === 'set_engine_config') {
             // Update the demo engine's tunable knobs (settings.demoTrading), merged
