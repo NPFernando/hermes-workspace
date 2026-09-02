@@ -382,5 +382,71 @@
     "description": "Clean up the untracked budget route dependencies and typing errors so npx tsc --noEmit can return to a strict green baseline.",
     "category": "backend",
     "estimated_effort": "medium"
+  },
+  {
+    "title": "Add keyboard shortcuts for common workspace actions",
+    "description": "Implement global keyboard shortcuts (e.g., Ctrl+K for command palette, Ctrl+B for sidebar toggle, Ctrl+Shift+F for search) with a shortcuts help dialog accessible from the header.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Improve React error boundary UI with recovery actions",
+    "description": "Replace generic error boundaries with a user-friendly error display that shows actionable recovery options (retry, reset component, report issue) and preserves context.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add workspace health dashboard widget",
+    "description": "Create a collapsible widget in the workspace header or sidebar showing real-time system metrics (memory, disk, CPU) and service health status with color-coded indicators.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add toast notification system for background task events",
+    "description": "Implement a non-intrusive toast/notification system for task completion, errors, and warnings that works across all workspace screens and respects reduced-motion preferences.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add API route for workspace performance metrics",
+    "description": "Expose a /api/metrics endpoint that returns aggregated performance data (bundle sizes, API latency percentiles, cache hit rates) for monitoring dashboards.",
+    "category": "api",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Clean up root-level untracked scratch files and add .gitignore patterns",
+    "description": "Archive or remove 25+ untracked root/docs/src scratch files (docs/, risk_model_prototype/, market_data_spec/, news_intelligence_*, TASK_SUMMARY.md, etc.) and add .gitignore patterns for *.mmd, investment_platforms_*, market_data_*, news_intelligence_*, risk_model_prototype/, ebbinghaus_*, trading_alert_*, and common scratch suffixes to prevent future root pollution.",
+    "category": "config",
+    "estimated_effort": "low"
+  },
+  {
+    "title": "Integrate orphaned untracked API routes with proper auth and tests",
+    "description": "Review untracked API routes in src/routes/api/ (native-cron-overview.ts, native-dashboard-capabilities.ts, ops-logs.ts) and src/lib/ops-snapshot-regression.ts. Add auth guards, focused API tests, and either integrate properly into the route tree or archive to external reports.",
+    "category": "api",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Fix finance route TypeScript baseline and clean untracked budget dependencies",
+    "description": "Clean up the untracked budget route dependencies and typing errors in src/routes/api/finance/ so npx tsc --noEmit can return to a strict green baseline.",
+    "category": "backend",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add a dark mode toggle to the workspace header",
+    "description": "Add a toggle switch in the workspace header to switch between light and dark themes, persisting the user's preference in local storage.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Implement a search bar in the task board to filter tasks by title",
+    "description": "Add a search input field above the task board columns that filters tasks in real-time by title as the user types.",
+    "category": "ui",
+    "estimated_effort": "medium"
+  },
+  {
+    "title": "Add a feature to export task board data as CSV",
+    "description": "Add a button in the task board header to export all tasks (across all columns) to a CSV file with columns: ID, Title, Status, Assignee, Due Date, Description.",
+    "category": "ui",
+    "estimated_effort": "medium"
   }
 ]
