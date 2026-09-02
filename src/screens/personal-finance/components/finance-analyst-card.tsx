@@ -4,7 +4,7 @@ import { buildFinanceAnswerMarkdown } from '../utils'
 import type { PersonalFinancePayload } from '../types'
 
 const inputClass =
-  'flex-1 rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
+  'min-w-[200px] flex-1 rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
 const buttonClass =
   'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40'
 
