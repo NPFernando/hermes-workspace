@@ -1475,13 +1475,16 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
   })
 })
 
-// Postgres Migration Phase C: overlaySplitStores() now tries Postgres first
-// for personal-finance collections/settings. Mock readPersonalFinancePostgresStore
-// (real Postgres access is already disabled under VITEST by that module's own
-// guard, so without this mock these tests would just exercise the pre-Phase-C
-// JSON-only path) and isolate HOME so writeFinanceStore()/readFinanceStore()
+// Postgres Migration Phase C/D: overlaySplitStores() tries Postgres first
+// for personal-finance collections/settings; Phase D removed the JSON
+// split-store middle tier, so a failed Postgres read now falls through to
+// whatever's already in the base file (no explicit override). Mock
+// readPersonalFinancePostgresStore (real Postgres access is already
+// disabled under VITEST by that module's own guard, so without this mock
+// these tests would just exercise the Postgres-unavailable path
+// unconditionally) and isolate HOME so writeFinanceStore()/readFinanceStore()
 // never touch the real ~/.hermes/finance store.
-describe('overlaySplitStores (Postgres Migration Phase C)', () => {
+describe('overlaySplitStores (Postgres Migration Phase D)', () => {
   let tmp: string
   let realHome: string | undefined
   beforeEach(() => {
@@ -1529,17 +1532,17 @@ describe('overlaySplitStores (Postgres Migration Phase C)', () => {
     expect(db.settings.financeQaHistory).toEqual([{ at: 1, question: 'Q', answer: 'A' }])
   })
 
-  it('falls back to the JSON split store when the Postgres read returns null', async () => {
+  it('falls back to the base file when the Postgres read returns null', async () => {
     vi.doMock('./personal-finance-postgres-store', () => ({
       readPersonalFinancePostgresStore: () => null,
       writePersonalFinancePostgresStore: () => true,
     }))
     const store = await import('./finance-store')
-    store.addFinanceRecord('account', { name: 'From JSON fallback', type: 'bank', currency: 'LKR', balance: 100 })
+    store.addFinanceRecord('account', { name: 'From base file fallback', type: 'bank', currency: 'LKR', balance: 100 })
 
     const db = store.readFinanceStore()
     expect(db.finance_accounts).toHaveLength(1)
-    expect(db.finance_accounts[0].name).toBe('From JSON fallback')
+    expect(db.finance_accounts[0].name).toBe('From base file fallback')
   })
 
   it('HERMES_PERSONAL_FINANCE_READ_SOURCE=json bypasses Postgres even when it would succeed', async () => {
@@ -1554,10 +1557,10 @@ describe('overlaySplitStores (Postgres Migration Phase C)', () => {
       writePersonalFinancePostgresStore: () => true,
     }))
     const store = await import('./finance-store')
-    store.addFinanceRecord('account', { name: 'From JSON via kill switch', type: 'bank', currency: 'LKR', balance: 100 })
+    store.addFinanceRecord('account', { name: 'From base file via kill switch', type: 'bank', currency: 'LKR', balance: 100 })
 
     const db = store.readFinanceStore()
     expect(db.finance_accounts.some((a) => a.name === 'Should be ignored')).toBe(false)
-    expect(db.finance_accounts.some((a) => a.name === 'From JSON via kill switch')).toBe(true)
+    expect(db.finance_accounts.some((a) => a.name === 'From base file via kill switch')).toBe(true)
   })
 })

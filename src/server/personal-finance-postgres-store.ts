@@ -1,5 +1,5 @@
 /**
- * Structured Postgres mirror for personal-finance data, in its own
+ * Structured Postgres store for personal-finance data, in its own
  * `personal_finance` database — separate from the `finance` database
  * `finance-postgres-store.ts` owns (trading engine state only). Two
  * databases on the same single PG 18.1 instance, split by domain, matching
@@ -9,15 +9,18 @@
  * Deliberately a fully self-contained sibling file — does not import from
  * or get imported by finance-postgres-store.ts, which has unrelated live
  * work in progress elsewhere; nothing here should ever require touching
- * that file. Hooked in from personal-finance-store.ts's own
- * writePersonalFinanceStore(), not from finance-store.ts directly.
+ * that file. Hooked in directly from finance-store.ts's
+ * mirrorIntoSplitStores()/overlaySplitStores() (Postgres Migration Phase D)
+ * — personal-finance-store.ts's former JSON-mirror write/read functions
+ * were retired at that point (kept only as a shared type module now).
  *
- * Write-only relative to the running app: the JSON mirror
- * (personal-finance-store.ts) remains the thing the app actually reads
- * back from (via finance-store.ts's overlaySplitStores()). This Postgres
- * copy exists so personal-finance data is queryable as real SQL tables
- * instead of only living inside a JSONB blob — it is not a read path for
- * the app itself, so its own unavailability can never break a read.
+ * As of Postgres Migration Phase C/D, this IS the app's live read path for
+ * personal-finance data (via readPersonalFinancePostgresStore(), called
+ * from finance-store.ts's overlaySplitStores()) — the base
+ * ~/.hermes/finance/finance.json file is now only a same-process fallback
+ * for when this database is unavailable, not a separate mirror to keep in
+ * sync. See docs/personal-finance-os-roadmap.md's "Postgres Migration
+ * Project" section for the full phase history.
  */
 import { spawnSync } from 'node:child_process'
 import * as fs from 'node:fs'
@@ -52,8 +55,8 @@ function personalFinancePostgresEnabled(): boolean {
   // Same guard as finance-postgres-store.ts's own financePostgresEnabled():
   // tests isolate the JSON store via a $HOME override, which does nothing
   // for this module's direct Postgres connection — without this, any test
-  // calling writePersonalFinanceStore() would silently write to the real
-  // production personal_finance database.
+  // calling writePersonalFinancePostgresStore() would silently write to the
+  // real production personal_finance database.
   if (process.env.VITEST || process.env.NODE_ENV === 'test') return false
   return process.env.HERMES_FINANCE_STORE !== 'json'
 }
@@ -1035,9 +1038,10 @@ ${insertRows(
 }
 
 /**
- * Best-effort — must never throw back into the caller. Called from
- * personal-finance-store.ts's writePersonalFinanceStore() alongside its
- * own JSON-file write, which stays the thing the app actually reads back.
+ * Best-effort — must never throw back into the caller. Called directly from
+ * finance-store.ts's mirrorIntoSplitStores() (Postgres Migration Phase D) —
+ * this is now the app's primary write path for personal-finance data, not
+ * a secondary mirror alongside a JSON write.
  */
 export function writePersonalFinancePostgresStore(slice: PersonalFinanceSlice): boolean {
   if (!ensurePersonalFinancePostgresSchema()) return false

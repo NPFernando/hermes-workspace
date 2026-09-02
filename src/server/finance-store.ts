@@ -9,10 +9,9 @@ import {
   writeFinancePostgresStore,
 } from './finance-postgres-store'
 import {
-  readPersonalFinanceStore,
-  writePersonalFinanceStore,
-} from './personal-finance-store'
-import { readPersonalFinancePostgresStore } from './personal-finance-postgres-store'
+  readPersonalFinancePostgresStore,
+  writePersonalFinancePostgresStore,
+} from './personal-finance-postgres-store'
 import { readTradingStore, writeTradingStore } from './trading-store'
 import type { ConnectivityBreakerState } from './connectivity-breaker'
 
@@ -966,7 +965,11 @@ function writeFinanceJsonStore(db: FinanceDatabase): void {
  * having run.
  */
 function mirrorIntoSplitStores(db: FinanceDatabase): void {
-  writePersonalFinanceStore({
+  // Postgres Migration Phase D: calls the Postgres write directly instead of
+  // through the now-removed personal-finance-store.ts JSON split-store
+  // mirror (frozen at ~/.hermes/finance/personal-finance.json.frozen-phaseD-*
+  // as a rollback-only snapshot, no longer written to).
+  writePersonalFinancePostgresStore({
     finance_accounts: db.finance_accounts,
     income_records: db.income_records,
     expense_records: db.expense_records,
@@ -1036,43 +1039,35 @@ function readFinanceJsonStore(): FinanceDatabase | null {
 
 /**
  * Phase 5 (read cutover step) of the finance/trading backend split.
- * mirrorIntoSplitStores() writes the split stores from this same base
- * file's own data on every write, so in the normal case they're never
- * staler than it — overlay them here so callers gradually source
- * personal/trading collections from the split files, while the
- * trading-shared remainder of settings and the still-unsplit misc
- * collections (trading_platforms, api_connections, agent_memory,
- * audit_logs, error_logs) keep coming from this shared base file (never
- * split — see the plan's own rationale).
+ * mirrorIntoSplitStores() writes the trading split store from this same
+ * base file's own data on every write, so in the normal case it's never
+ * staler than it — overlay it here so callers gradually source trading
+ * collections from the split file, while the trading-shared remainder of
+ * settings and the still-unsplit misc collections (trading_platforms,
+ * api_connections, agent_memory, audit_logs, error_logs) keep coming from
+ * this shared base file (never split — see the plan's own rationale).
  *
- * Postgres Migration Phase C: for personal-finance collections, Postgres
- * (via readPersonalFinancePostgresStore()) is now tried FIRST and used
- * whenever it returns a result — three-tier fallback: Postgres -> JSON
- * split store (with its own freshness check, same as before this phase) ->
- * base file. Writes are unchanged (still go to the base file, the JSON
- * split store, AND Postgres every time — see mirrorIntoSplitStores()), so
- * the JSON split store stays a fully valid fallback throughout this phase,
- * not a decaying snapshot. Set HERMES_PERSONAL_FINANCE_READ_SOURCE=json to
- * disable the Postgres read path instantly without a redeploy.
- *
- * The mirror write is deliberately best-effort and can silently fail (must
- * never block a real trade write) — if it failed on the most recent write
- * while the base file succeeded, the split store would hold OLDER data
- * than the base file for that collection. Guard against serving that stale
- * data: only overlay the JSON split store if its own updatedAt is not
- * older than the base file's (irrelevant to the Postgres path, which is
- * always a live query, never a cached/stale copy by definition).
+ * Postgres Migration Phase D: personal-finance collections and settings are
+ * now a clean TWO-tier fallback: Postgres (via
+ * readPersonalFinancePostgresStore()) when it succeeds, otherwise whatever
+ * is already in `base` (no explicit override applied) — the old JSON split
+ * store (personal-finance.json) is retired (frozen as a rollback snapshot,
+ * see personal-finance-store.ts's history) since nothing writes it anymore
+ * and it would otherwise silently go stale forever. The base file itself
+ * never goes stale for these fields despite having no dedicated mirror-
+ * write step: overlaySplitStores() already populates it with fresh
+ * Postgres data on every read, and the app's normal read-mutate-write cycle
+ * serializes that already-current object straight back to disk. Set
+ * HERMES_PERSONAL_FINANCE_READ_SOURCE=json to skip Postgres and use the
+ * base file directly — still an instant, no-redeploy rollback.
  */
 function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
   const baseUpdatedMs = updatedAtMs(base)
-  const postgresPersonal =
+  const personalSource =
     process.env.HERMES_PERSONAL_FINANCE_READ_SOURCE === 'json' ? null : readPersonalFinancePostgresStore()
-  const personal = readPersonalFinanceStore()
   const trading = readTradingStore()
-  const personalFresh = personal && Date.parse(personal.updatedAt) >= baseUpdatedMs
   const tradingFresh = trading && Date.parse(trading.updatedAt) >= baseUpdatedMs
-  const personalSource = postgresPersonal ?? (personalFresh ? personal : null)
-  const postgresSettings = postgresPersonal?.personalFinanceSettings
+  const postgresSettings = personalSource?.personalFinanceSettings
 
   return {
     ...base,
