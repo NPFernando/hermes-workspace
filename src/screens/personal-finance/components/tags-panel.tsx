@@ -1,24 +1,9 @@
 import { useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
+import { buttonClass, inputClass } from '../shared-styles'
+import { splitTags, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
-
-const inputClass =
-  'min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
-const buttonClass =
-  'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40'
-
-function stringField(row: Record<string, unknown>, key: string): string {
-  const value = row[key]
-  return typeof value === 'string' ? value : ''
-}
-
-function splitTags(value: string): Array<string> {
-  return value
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean)
-}
 
 type EditDraft = {
   name: string
@@ -39,7 +24,12 @@ export function TagsPanel({
   payload: PersonalFinancePayload
   onPayload: (p: PersonalFinancePayload) => void
 }) {
-  const { run: post, busy, error: err, setError: setErr } = useFinanceAction<PersonalFinancePayload>(onPayload)
+  const {
+    run: post,
+    busy,
+    error: err,
+    setError: setErr,
+  } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<Record<string, EditDraft>>({})
@@ -110,17 +100,22 @@ export function TagsPanel({
   }
 
   async function deleteTag(id: string) {
-    const data = await post({ action: 'delete_record', kind: 'tag', id }, `delete-${id}`)
+    const data = await post(
+      { action: 'delete_record', kind: 'tag', id },
+      `delete-${id}`,
+    )
     if (data) setConfirmDeleteId(null)
   }
 
   const usageCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const exp of payload.data.expense_records) {
-      for (const t of splitTags(stringField(exp, 'tags'))) counts.set(t, (counts.get(t) ?? 0) + 1)
+      for (const t of splitTags(stringField(exp, 'tags')))
+        counts.set(t, (counts.get(t) ?? 0) + 1)
     }
     for (const inc of payload.data.income_records) {
-      for (const t of splitTags(stringField(inc, 'tags'))) counts.set(t, (counts.get(t) ?? 0) + 1)
+      for (const t of splitTags(stringField(inc, 'tags')))
+        counts.set(t, (counts.get(t) ?? 0) + 1)
     }
     return counts
   }, [payload.data.expense_records, payload.data.income_records])
@@ -129,10 +124,12 @@ export function TagsPanel({
     const known = new Set(tags.map((t) => stringField(t, 'name')))
     const found = new Set<string>()
     for (const exp of payload.data.expense_records) {
-      for (const t of splitTags(stringField(exp, 'tags'))) if (!known.has(t)) found.add(t)
+      for (const t of splitTags(stringField(exp, 'tags')))
+        if (!known.has(t)) found.add(t)
     }
     for (const inc of payload.data.income_records) {
-      for (const t of splitTags(stringField(inc, 'tags'))) if (!known.has(t)) found.add(t)
+      for (const t of splitTags(stringField(inc, 'tags')))
+        if (!known.has(t)) found.add(t)
     }
     return Array.from(found)
   }, [tags, payload.data.expense_records, payload.data.income_records])
@@ -141,14 +138,18 @@ export function TagsPanel({
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <datalist id="pf-known-tags">
         {tags.map((t, index) => (
-          <option key={stringField(t, 'id') || String(index)} value={stringField(t, 'name')} />
+          <option
+            key={stringField(t, 'id') || String(index)}
+            value={stringField(t, 'name')}
+          />
         ))}
       </datalist>
 
       <h2 className="text-lg font-semibold">Tags</h2>
       <p className="text-xs text-[var(--theme-muted)]">
-        A managed list of tags — income and expense records store a comma-separated free-text list, so any record
-        can carry several tags. Renaming or deleting a tag here does not touch past records.
+        A managed list of tags — income and expense records store a
+        comma-separated free-text list, so any record can carry several tags.
+        Renaming or deleting a tag here does not touch past records.
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -166,7 +167,12 @@ export function TagsPanel({
           onChange={(e) => setNotes(e.target.value)}
           className={inputClass}
         />
-        <button type="button" disabled={busy === 'tag'} onClick={() => void submitTag()} className={buttonClass}>
+        <button
+          type="button"
+          disabled={busy === 'tag'}
+          onClick={() => void submitTag()}
+          className={buttonClass}
+        >
           {busy === 'tag' ? 'Saving…' : 'Add tag'}
         </button>
       </div>
@@ -174,7 +180,11 @@ export function TagsPanel({
       {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
 
       <div className="mt-4 grid gap-2">
-        {tags.length === 0 && <p className="text-sm text-[var(--theme-muted)]">No tags added yet.</p>}
+        {tags.length === 0 && (
+          <p className="text-sm text-[var(--theme-muted)]">
+            No tags added yet.
+          </p>
+        )}
         {tags.map((tag, index) => {
           const id = stringField(tag, 'id') || String(index)
           const isEditing = editOpenId === id
@@ -182,21 +192,34 @@ export function TagsPanel({
           const count = usageCounts.get(tagName) ?? 0
 
           return (
-            <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+            <div
+              key={id}
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+            >
               {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="text"
                     placeholder="Tag name"
                     value={editDrafts[id].name}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], name: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], name: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <input
                     type="text"
                     placeholder="Notes"
                     value={editDrafts[id].notes}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], notes: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], notes: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <button
@@ -207,20 +230,30 @@ export function TagsPanel({
                   >
                     {busy === `edit-${id}` ? 'Saving…' : 'Save'}
                   </button>
-                  <button type="button" onClick={cancelEdit} className={buttonClass}>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className={buttonClass}
+                  >
                     Cancel
                   </button>
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <span className="font-medium text-[var(--theme-text)]">{tagName}</span>{' '}
+                    <span className="font-medium text-[var(--theme-text)]">
+                      {tagName}
+                    </span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
                       used {count} time{count === 1 ? '' : 's'}
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => startEdit(tag)} className={buttonClass}>
+                    <button
+                      type="button"
+                      onClick={() => startEdit(tag)}
+                      className={buttonClass}
+                    >
                       Edit
                     </button>
                     <button
@@ -241,7 +274,9 @@ export function TagsPanel({
 
       {unmanaged.length > 0 && (
         <div className="mt-4 border-t border-[var(--theme-border)]/50 pt-3">
-          <p className="text-xs font-medium text-[var(--theme-muted)]">In use, not yet a tag</p>
+          <p className="text-xs font-medium text-[var(--theme-muted)]">
+            In use, not yet a tag
+          </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {unmanaged.map((tagName) => (
               <button

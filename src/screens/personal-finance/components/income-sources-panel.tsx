@@ -2,55 +2,77 @@ import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatLkr, formatMoney } from '../utils'
+import {
+  buttonClass,
+  dangerTone,
+  inputClass,
+  neutralTone,
+  positiveTone,
+  warningTone,
+} from '../shared-styles'
+import { stringField } from '../field-helpers'
 import { getPaydayStatus } from './payday-status'
 import type { PersonalFinancePayload } from '../types'
 
 const paydayTone: Record<'paid' | 'due_soon' | 'overdue', string> = {
-  paid: 'border-emerald-400/30 bg-emerald-500/15 text-emerald-100',
-  due_soon: 'border-amber-400/30 bg-amber-500/15 text-amber-100',
-  overdue: 'border-red-400/30 bg-red-500/15 text-red-100',
+  paid: positiveTone,
+  due_soon: warningTone,
+  overdue: dangerTone,
 }
 
-export function paydayLabel(job: Record<string, unknown>, incomeRecords: Array<Record<string, unknown>>): { text: string; tone: string } | null {
+export function paydayLabel(
+  job: Record<string, unknown>,
+  incomeRecords: Array<Record<string, unknown>>,
+): { text: string; tone: string } | null {
   const status = getPaydayStatus(job, incomeRecords)
   if (status.state === 'not_tracked') return null
   if (status.state === 'paid') {
     return { text: `Paid ${status.lastPaidDate}`, tone: paydayTone.paid }
   }
   if (status.state === 'overdue') {
-    return { text: `Overdue by ${status.daysOverdue}d`, tone: paydayTone.overdue }
+    return {
+      text: `Overdue by ${status.daysOverdue}d`,
+      tone: paydayTone.overdue,
+    }
   }
-  if (status.daysUntil > 3) return { text: `Due in ${status.daysUntil}d`, tone: 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]' }
-  if (status.daysUntil >= 0) return { text: status.daysUntil === 0 ? 'Due today' : `Due in ${status.daysUntil}d`, tone: paydayTone.due_soon }
-  return { text: `${-status.daysUntil}d past payday`, tone: paydayTone.due_soon }
+  if (status.daysUntil > 3)
+    return {
+      text: `Due in ${status.daysUntil}d`,
+      tone: neutralTone,
+    }
+  if (status.daysUntil >= 0)
+    return {
+      text:
+        status.daysUntil === 0 ? 'Due today' : `Due in ${status.daysUntil}d`,
+      tone: paydayTone.due_soon,
+    }
+  return {
+    text: `${-status.daysUntil}d past payday`,
+    tone: paydayTone.due_soon,
+  }
 }
 
 const expiryTone = {
-  ok: 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]',
-  soon: 'border-amber-400/30 bg-amber-500/15 text-amber-100',
-  ended: 'border-red-400/30 bg-red-500/15 text-red-100',
+  ok: neutralTone,
+  soon: warningTone,
+  ended: dangerTone,
 }
 
-export function contractExpiryLabel(job: Record<string, unknown>): { text: string; tone: string } | null {
+export function contractExpiryLabel(
+  job: Record<string, unknown>,
+): { text: string; tone: string } | null {
   if (job.employmentType !== 'contract' || job.status !== 'active') return null
-  const contractEndDate = typeof job.contractEndDate === 'string' ? job.contractEndDate : ''
+  const contractEndDate =
+    typeof job.contractEndDate === 'string' ? job.contractEndDate : ''
   if (!contractEndDate) return null
   const target = Date.parse(contractEndDate)
   if (!Number.isFinite(target)) return null
   const daysUntil = Math.ceil((target - Date.now()) / (24 * 60 * 60 * 1000))
-  if (daysUntil < 0) return { text: `Contract ended ${-daysUntil}d ago`, tone: expiryTone.ended }
-  if (daysUntil <= 30) return { text: `Contract ends in ${daysUntil}d`, tone: expiryTone.soon }
+  if (daysUntil < 0)
+    return { text: `Contract ended ${-daysUntil}d ago`, tone: expiryTone.ended }
+  if (daysUntil <= 30)
+    return { text: `Contract ends in ${daysUntil}d`, tone: expiryTone.soon }
   return { text: `Contract ends in ${daysUntil}d`, tone: expiryTone.ok }
-}
-
-const inputClass =
-  'min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
-const buttonClass =
-  'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40'
-
-function stringField(row: Record<string, unknown>, key: string): string {
-  const value = row[key]
-  return typeof value === 'string' ? value : ''
 }
 
 function numberField(
@@ -71,7 +93,12 @@ function findPossibleDuplicateJob(
   for (const job of jobs) {
     if (stringField(job, 'status') !== 'active') continue
     const existing = stringField(job, 'employerName').trim().toLowerCase()
-    if (existing && (existing === target || existing.includes(target) || target.includes(existing))) {
+    if (
+      existing &&
+      (existing === target ||
+        existing.includes(target) ||
+        target.includes(existing))
+    ) {
       return job
     }
   }
@@ -106,9 +133,13 @@ export function IncomeSourcesPanel({
   const [contractStartDate, setContractStartDate] = useState('')
   const [contractEndDate, setContractEndDate] = useState('')
   const [expectedPaydayDayOfMonth, setExpectedPaydayDayOfMonth] = useState('')
-  const [payLogDrafts, setPayLogDrafts] = useState<Record<string, { amount: string; currency: string; date: string }>>({})
+  const [payLogDrafts, setPayLogDrafts] = useState<
+    Record<string, { amount: string; currency: string; date: string }>
+  >({})
   const [payLogOpenId, setPayLogOpenId] = useState<string | null>(null)
-  const [duplicateWarningName, setDuplicateWarningName] = useState<string | null>(null)
+  const [duplicateWarningName, setDuplicateWarningName] = useState<
+    string | null
+  >(null)
   const [reanalyzingId, setReanalyzingId] = useState<string | null>(null)
   const [reanalyzeNote, setReanalyzeNote] = useState<string | null>(null)
 
@@ -118,7 +149,10 @@ export function IncomeSourcesPanel({
       return
     }
     if (!force) {
-      const duplicate = findPossibleDuplicateJob(payload.data.income_sources, employerName)
+      const duplicate = findPossibleDuplicateJob(
+        payload.data.income_sources,
+        employerName,
+      )
       if (duplicate) {
         setDuplicateWarningName(stringField(duplicate, 'employerName'))
         return
@@ -209,7 +243,10 @@ export function IncomeSourcesPanel({
       const res = await fetch('/api/finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'reanalyze_contract', incomeSourceId: id }),
+        body: JSON.stringify({
+          action: 'reanalyze_contract',
+          incomeSourceId: id,
+        }),
       })
       const data = (await res.json()) as { ok?: boolean; error?: string }
       setReanalyzeNote(
@@ -337,7 +374,8 @@ export function IncomeSourcesPanel({
       {duplicateWarningName && (
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 p-2">
           <p className="text-xs text-amber-100">
-            A job for "{duplicateWarningName}" already exists — add this one anyway?
+            A job for "{duplicateWarningName}" already exists — add this one
+            anyway?
           </p>
           <button
             type="button"
@@ -347,14 +385,22 @@ export function IncomeSourcesPanel({
           >
             Add anyway
           </button>
-          <button type="button" onClick={() => setDuplicateWarningName(null)} className={buttonClass}>
+          <button
+            type="button"
+            onClick={() => setDuplicateWarningName(null)}
+            className={buttonClass}
+          >
             Cancel
           </button>
         </div>
       )}
 
       {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
-      {reanalyzeNote && <p className="mt-2 text-xs text-[var(--theme-muted)]">{reanalyzeNote}</p>}
+      {reanalyzeNote && (
+        <p className="mt-2 text-xs text-[var(--theme-muted)]">
+          {reanalyzeNote}
+        </p>
+      )}
 
       <div className="mt-4 grid gap-2">
         {jobs.length === 0 && (
@@ -389,18 +435,23 @@ export function IncomeSourcesPanel({
                     · {status}
                   </span>
                   {badge && (
-                    <span className={`ml-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${badge.tone}`}>
+                    <span
+                      className={`ml-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${badge.tone}`}
+                    >
                       {badge.text}
                     </span>
                   )}
                   {expiryBadge && (
-                    <span className={`ml-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${expiryBadge.tone}`}>
+                    <span
+                      className={`ml-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${expiryBadge.tone}`}
+                    >
                       {expiryBadge.text}
                     </span>
                   )}
                   {stringField(job, 'paySchedule') && (
                     <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
-                      Pay schedule (from contract): {stringField(job, 'paySchedule')}
+                      Pay schedule (from contract):{' '}
+                      {stringField(job, 'paySchedule')}
                     </p>
                   )}
                 </div>
@@ -421,7 +472,9 @@ export function IncomeSourcesPanel({
                         onClick={() => void reanalyzeContract(id)}
                         className={buttonClass}
                       >
-                        {reanalyzingId === id ? 'Re-analyzing…' : 'Re-analyze contract'}
+                        {reanalyzingId === id
+                          ? 'Re-analyzing…'
+                          : 'Re-analyze contract'}
                       </button>
                     </>
                   )}
@@ -474,7 +527,10 @@ export function IncomeSourcesPanel({
                     placeholder="Amount"
                     value={payLogDrafts[id].amount}
                     onChange={(e) =>
-                      setPayLogDrafts((prev) => ({ ...prev, [id]: { ...prev[id], amount: e.target.value } }))
+                      setPayLogDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], amount: e.target.value },
+                      }))
                     }
                     className={`${inputClass} w-28`}
                   />
@@ -483,7 +539,10 @@ export function IncomeSourcesPanel({
                     placeholder="Currency"
                     value={payLogDrafts[id].currency}
                     onChange={(e) =>
-                      setPayLogDrafts((prev) => ({ ...prev, [id]: { ...prev[id], currency: e.target.value } }))
+                      setPayLogDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], currency: e.target.value },
+                      }))
                     }
                     className={`${inputClass} w-20`}
                   />
@@ -491,7 +550,10 @@ export function IncomeSourcesPanel({
                     type="date"
                     value={payLogDrafts[id].date}
                     onChange={(e) =>
-                      setPayLogDrafts((prev) => ({ ...prev, [id]: { ...prev[id], date: e.target.value } }))
+                      setPayLogDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], date: e.target.value },
+                      }))
                     }
                     className={inputClass}
                   />
@@ -501,9 +563,15 @@ export function IncomeSourcesPanel({
                     onClick={() => void logPayment(job)}
                     className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
                   >
-                    {busy === `log-payment-${id}` ? 'Saving…' : 'Confirm payment'}
+                    {busy === `log-payment-${id}`
+                      ? 'Saving…'
+                      : 'Confirm payment'}
                   </button>
-                  <button type="button" onClick={() => setPayLogOpenId(null)} className={buttonClass}>
+                  <button
+                    type="button"
+                    onClick={() => setPayLogOpenId(null)}
+                    className={buttonClass}
+                  >
                     Cancel
                   </button>
                 </div>

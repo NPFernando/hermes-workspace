@@ -10,7 +10,10 @@ export function formatPct(value: number): string {
   return `${value.toFixed(1)}%`
 }
 
-export type FinanceAnswerChartExport = { title: string; data: Array<{ label: string; value: number }> }
+export type FinanceAnswerChartExport = {
+  title: string
+  data: Array<{ label: string; value: number }>
+}
 
 /**
  * AI-207: builds a shareable markdown report from a live Finance Analyst
@@ -45,12 +48,19 @@ export function buildFinanceAnswerMarkdown(
 
   lines.push('')
   lines.push('---')
-  lines.push(`*Exported ${new Date().toLocaleString()} from Hermes Workspace — Personal Finance*`)
+  lines.push(
+    `*Exported ${new Date().toLocaleString()} from Hermes Workspace — Personal Finance*`,
+  )
 
   return lines.join('\n')
 }
 
-export type ReconcileTransaction = { accountId?: string; currency: string; amount: number; kind: 'income' | 'expense' }
+export type ReconcileTransaction = {
+  accountId?: string
+  currency: string
+  amount: number
+  kind: 'income' | 'expense'
+}
 
 /**
  * AI-600 (Phase 28, first slice): reconciles an account's manually-maintained
@@ -69,7 +79,8 @@ export function computeAccountLedgerBalance(
   if (account.openingBalance === undefined) return null
   let balance = account.openingBalance
   for (const record of records) {
-    if (record.accountId !== account.id || record.currency !== account.currency) continue
+    if (record.accountId !== account.id || record.currency !== account.currency)
+      continue
     balance += record.kind === 'income' ? record.amount : -record.amount
   }
   return balance

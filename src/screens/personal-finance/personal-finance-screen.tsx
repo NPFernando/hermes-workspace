@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { StatCard } from '../finance/components/stat-card'
 import { DataTable } from '../finance/components/data-table'
 import { BudgetPanel } from './components/budget-panel'
@@ -27,19 +36,14 @@ import { CategoriesPanel } from './components/categories-panel'
 import { MerchantsPanel } from './components/merchants-panel'
 import { TagsPanel } from './components/tags-panel'
 import { formatLkr, formatMoney, formatPct } from './utils'
+import {
+  optionalNumberField as numberField,
+  stringField,
+} from './field-helpers'
+import { buttonClass } from './shared-styles'
 import type { PersonalFinancePayload } from './types'
 
 type Tab = 'overview' | 'income' | 'investments' | 'records' | 'ingestion'
-
-function stringField(row: Record<string, unknown>, key: string): string {
-  const value = row[key]
-  return typeof value === 'string' ? value : ''
-}
-
-function numberField(row: Record<string, unknown>, key: string): number | undefined {
-  const value = row[key]
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
-}
 
 /**
  * Grouped by currency, not converted to one figure — this codebase has no
@@ -47,9 +51,12 @@ function numberField(row: Record<string, unknown>, key: string): number | undefi
  * income entries), so summing across currencies here would invent a
  * conversion the rest of the app deliberately doesn't do either.
  */
-function currencyExposure(payload: PersonalFinancePayload): Array<{ currency: string; amount: number }> {
+function currencyExposure(
+  payload: PersonalFinancePayload,
+): Array<{ currency: string; amount: number }> {
   const totals = new Map<string, number>()
-  const add = (currency: string, amount: number) => totals.set(currency, (totals.get(currency) ?? 0) + amount)
+  const add = (currency: string, amount: number) =>
+    totals.set(currency, (totals.get(currency) ?? 0) + amount)
 
   for (const job of payload.data.income_sources) {
     if (stringField(job, 'status') !== 'active') continue
@@ -58,13 +65,17 @@ function currencyExposure(payload: PersonalFinancePayload): Array<{ currency: st
   }
   for (const holding of payload.data.stock_holdings) {
     const qty = numberField(holding, 'quantity') ?? 0
-    const price = numberField(holding, 'lastKnownPrice') ?? numberField(holding, 'buyPrice') ?? 0
+    const price =
+      numberField(holding, 'lastKnownPrice') ??
+      numberField(holding, 'buyPrice') ??
+      0
     add(stringField(holding, 'currency') || 'LKR', qty * price)
   }
   for (const fd of payload.data.fixed_deposits) {
     if (stringField(fd, 'status') === 'withdrawn') continue
     const principal = numberField(fd, 'principal')
-    if (principal !== undefined) add(stringField(fd, 'currency') || 'LKR', principal)
+    if (principal !== undefined)
+      add(stringField(fd, 'currency') || 'LKR', principal)
   }
 
   return Array.from(totals.entries())
@@ -97,10 +108,15 @@ export function PersonalFinanceScreen() {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ action: 'list_pending_ingestions' }),
         })
-        const data = (await res.json()) as { ok?: boolean; pendingIngestions?: Array<{ status: string }> }
+        const data = (await res.json()) as {
+          ok?: boolean
+          pendingIngestions?: Array<{ status: string }>
+        }
         if (!cancelled && data.ok) {
           const count = (data.pendingIngestions ?? []).filter(
-            (p) => p.status === 'awaiting_review' || p.status === 'awaiting_password',
+            (p) =>
+              p.status === 'awaiting_review' ||
+              p.status === 'awaiting_password',
           ).length
           setPendingIngestionCount(count)
         }
@@ -121,7 +137,9 @@ export function PersonalFinanceScreen() {
     async function load() {
       setLoading(true)
       try {
-        const response = await fetch('/api/finance?scope=personal_finance', { cache: 'no-store' })
+        const response = await fetch('/api/finance?scope=personal_finance', {
+          cache: 'no-store',
+        })
         if (!response.ok)
           throw new Error(`Finance API returned HTTP ${response.status}`)
         const data = (await response.json()) as PersonalFinancePayload
@@ -166,13 +184,27 @@ export function PersonalFinanceScreen() {
   const { summary } = payload
 
   const netWorthBreakdown = [
-    { name: 'Cash', value: Math.max(0, summary.cashBalanceLkr), fill: '#38bdf8' },
-    { name: 'Stocks', value: Math.max(0, summary.stockHoldingsValueLkr), fill: '#38bdf8' },
-    { name: 'Fixed deposits', value: Math.max(0, summary.fixedDepositsValueLkr), fill: '#38bdf8' },
+    {
+      name: 'Cash',
+      value: Math.max(0, summary.cashBalanceLkr),
+      fill: '#38bdf8',
+    },
+    {
+      name: 'Stocks',
+      value: Math.max(0, summary.stockHoldingsValueLkr),
+      fill: '#38bdf8',
+    },
+    {
+      name: 'Fixed deposits',
+      value: Math.max(0, summary.fixedDepositsValueLkr),
+      fill: '#38bdf8',
+    },
     { name: 'Debt', value: Math.max(0, summary.debtLkr), fill: '#f87171' },
   ].filter((entry) => entry.value > 0)
 
-  const overBudgetCount = payload.budgetVsActual.filter((b) => b.overBudget).length
+  const overBudgetCount = payload.budgetVsActual.filter(
+    (b) => b.overBudget,
+  ).length
   const exposure = currencyExposure(payload)
 
   return (
@@ -187,49 +219,88 @@ export function PersonalFinanceScreen() {
               Money clarity, without trading controls
             </h1>
           </div>
-          <a
-            href="/api/finance-export"
-            download
-            className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20"
-          >
+          <a href="/api/finance-export" download className={buttonClass}>
             Export data (JSON)
           </a>
         </div>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--theme-muted)]">
-          Track accounts, spending, budgets, savings goals, investments, and tax records —
-          separate from the automated trading workspace.
+          Track accounts, spending, budgets, savings goals, investments, and tax
+          records — separate from the automated trading workspace.
         </p>
       </section>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Net worth" value={formatLkr(summary.netWorthLkr)} />
-        <StatCard label="Cash balance" value={formatLkr(summary.cashBalanceLkr)} />
-        <StatCard label="Net savings" value={formatLkr(summary.netSavingsLkr)} tone={summary.netSavingsLkr >= 0 ? 'good' : 'danger'} />
-        <StatCard label="Savings rate" value={formatPct(summary.savingsRate)} tone={summary.savingsRate >= 20 ? 'good' : 'warn'} />
-        <StatCard label="Total income" value={formatLkr(summary.totalIncomeLkr)} tone="good" />
-        <StatCard label="Total expenses" value={formatLkr(summary.totalExpensesLkr)} tone={summary.totalExpensesLkr > summary.totalIncomeLkr && summary.totalIncomeLkr > 0 ? 'danger' : 'neutral'} />
-        <StatCard label="Stock holdings" value={formatLkr(summary.stockHoldingsValueLkr)} />
+        <StatCard
+          label="Cash balance"
+          value={formatLkr(summary.cashBalanceLkr)}
+        />
+        <StatCard
+          label="Net savings"
+          value={formatLkr(summary.netSavingsLkr)}
+          tone={summary.netSavingsLkr >= 0 ? 'good' : 'danger'}
+        />
+        <StatCard
+          label="Savings rate"
+          value={formatPct(summary.savingsRate)}
+          tone={summary.savingsRate >= 20 ? 'good' : 'warn'}
+        />
+        <StatCard
+          label="Total income"
+          value={formatLkr(summary.totalIncomeLkr)}
+          tone="good"
+        />
+        <StatCard
+          label="Total expenses"
+          value={formatLkr(summary.totalExpensesLkr)}
+          tone={
+            summary.totalExpensesLkr > summary.totalIncomeLkr &&
+            summary.totalIncomeLkr > 0
+              ? 'danger'
+              : 'neutral'
+          }
+        />
+        <StatCard
+          label="Stock holdings"
+          value={formatLkr(summary.stockHoldingsValueLkr)}
+        />
         <StatCard
           label="Unrealized P/L"
           value={`${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatLkr(summary.unrealizedStockPnlLkr)} (${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatPct(summary.unrealizedStockPnlPct)})`}
           tone={summary.unrealizedStockPnlLkr >= 0 ? 'good' : 'danger'}
         />
-        <StatCard label="Fixed deposits" value={formatLkr(summary.fixedDepositsValueLkr)} />
+        <StatCard
+          label="Fixed deposits"
+          value={formatLkr(summary.fixedDepositsValueLkr)}
+        />
       </section>
 
       {netWorthBreakdown.length > 0 && (
-        <section className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-4">
-          <p className="text-xs font-medium text-[var(--theme-muted)]">Assets vs. liabilities</p>
+        <section className="mt-4 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+          <p className="text-xs font-medium text-[var(--theme-muted)]">
+            Assets vs. liabilities
+          </p>
           <div className="mt-1 h-[90px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={netWorthBreakdown} layout="vertical" margin={{ top: 4, right: 12, left: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="2 4" stroke="var(--theme-border)" opacity={0.4} horizontal={false} />
+              <BarChart
+                data={netWorthBreakdown}
+                layout="vertical"
+                margin={{ top: 4, right: 12, left: 8, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="2 4"
+                  stroke="var(--theme-border)"
+                  opacity={0.4}
+                  horizontal={false}
+                />
                 <XAxis
                   type="number"
                   tick={{ fontSize: 10, fill: 'var(--theme-muted)' }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+                  tickFormatter={(v: number) =>
+                    v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)
+                  }
                 />
                 <YAxis
                   type="category"
@@ -240,7 +311,12 @@ export function PersonalFinanceScreen() {
                   width={80}
                 />
                 <Tooltip
-                  contentStyle={{ background: 'var(--theme-panel)', border: '1px solid var(--theme-border)', borderRadius: 8, fontSize: 11 }}
+                  contentStyle={{
+                    background: 'var(--theme-panel)',
+                    border: '1px solid var(--theme-border)',
+                    borderRadius: 8,
+                    fontSize: 11,
+                  }}
                   formatter={(value: number) => formatLkr(value)}
                 />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
@@ -255,13 +331,17 @@ export function PersonalFinanceScreen() {
       )}
 
       {exposure.length > 0 && (
-        <section className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-4">
+        <section className="mt-4 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
           <p className="text-xs font-medium text-[var(--theme-muted)]">
-            Currency exposure (active jobs, holdings, and fixed deposits — not converted)
+            Currency exposure (active jobs, holdings, and fixed deposits — not
+            converted)
           </p>
           <div className="mt-2 flex flex-wrap gap-3">
             {exposure.map(({ currency, amount }) => (
-              <span key={currency} className="text-sm font-medium text-[var(--theme-text)]">
+              <span
+                key={currency}
+                className="text-sm font-medium text-[var(--theme-text)]"
+              >
                 {formatMoney(amount, currency)}
               </span>
             ))}
@@ -347,7 +427,17 @@ export function PersonalFinanceScreen() {
           <DataTable
             title="Savings goals"
             rows={payload.data.savings_goals}
-            columns={['name', 'targetAmount', 'currentAmount', 'currency', 'targetDate', 'status', 'goalKind', 'monthlyContribution', 'priority']}
+            columns={[
+              'name',
+              'targetAmount',
+              'currentAmount',
+              'currency',
+              'targetDate',
+              'status',
+              'goalKind',
+              'monthlyContribution',
+              'priority',
+            ]}
             kind="goal"
             onChanged={(p) => setPayload(p as PersonalFinancePayload)}
             searchable
@@ -355,18 +445,32 @@ export function PersonalFinanceScreen() {
           <DataTable
             title="Tax records"
             rows={payload.data.tax_records}
-            columns={['taxYear', 'incomeType', 'currency', 'convertedLkrAmount', 'exchangeRateSource', 'taxPaid', 'taxDue', 'deductionCategory', 'supportingDocument', 'requiresConfirmation']}
+            columns={[
+              'taxYear',
+              'incomeType',
+              'currency',
+              'convertedLkrAmount',
+              'exchangeRateSource',
+              'taxPaid',
+              'taxDue',
+              'deductionCategory',
+              'supportingDocument',
+              'requiresConfirmation',
+            ]}
             kind="tax"
             onChanged={(p) => setPayload(p as PersonalFinancePayload)}
             searchable
           />
           <p className="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">
-            Tax figures are estimates; confirm them against official sources before filing.
+            Tax figures are estimates; confirm them against official sources
+            before filing.
           </p>
         </section>
       )}
 
-      {tab === 'ingestion' && <PendingIngestionPanel payload={payload} onConfirmed={setPayload} />}
+      {tab === 'ingestion' && (
+        <PendingIngestionPanel payload={payload} onConfirmed={setPayload} />
+      )}
     </main>
   )
 }

@@ -13,6 +13,7 @@ import {
   YAxis,
 } from 'recharts'
 import { formatLkr } from '../utils'
+import { numberField, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
 const MONTHS_BACK = 6
@@ -27,22 +28,20 @@ export function lastNMonths(n: number, now: Date = new Date()): Array<string> {
   const months: Array<string> = []
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+    months.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+    )
   }
   return months
 }
 
-function numberField(row: Record<string, unknown>, key: string): number {
-  const value = row[key]
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+export type TrendPoint = {
+  month: string
+  label: string
+  income: number
+  expense: number
+  net: number
 }
-
-function stringField(row: Record<string, unknown>, key: string): string {
-  const value = row[key]
-  return typeof value === 'string' ? value : ''
-}
-
-export type TrendPoint = { month: string; label: string; income: number; expense: number; net: number }
 
 export function buildTrendData(
   months: Array<string>,
@@ -53,16 +52,28 @@ export function buildTrendData(
   const expenseByMonth = new Map<string, number>()
   for (const row of incomeRecords) {
     const month = stringField(row, 'dateReceived').slice(0, 7)
-    incomeByMonth.set(month, (incomeByMonth.get(month) ?? 0) + numberField(row, 'convertedLkrAmount'))
+    incomeByMonth.set(
+      month,
+      (incomeByMonth.get(month) ?? 0) + numberField(row, 'convertedLkrAmount'),
+    )
   }
   for (const row of expenseRecords) {
     const month = stringField(row, 'date').slice(0, 7)
-    expenseByMonth.set(month, (expenseByMonth.get(month) ?? 0) + numberField(row, 'convertedLkrAmount'))
+    expenseByMonth.set(
+      month,
+      (expenseByMonth.get(month) ?? 0) + numberField(row, 'convertedLkrAmount'),
+    )
   }
   return months.map((month) => {
     const income = incomeByMonth.get(month) ?? 0
     const expense = expenseByMonth.get(month) ?? 0
-    return { month, label: monthLabel(month), income, expense, net: income - expense }
+    return {
+      month,
+      label: monthLabel(month),
+      income,
+      expense,
+      net: income - expense,
+    }
   })
 }
 
@@ -76,7 +87,10 @@ export function buildCategoryData(
   for (const row of expenseRecords) {
     if (stringField(row, 'date').slice(0, 7) !== currentMonth) continue
     const category = stringField(row, 'category') || 'Other'
-    totals.set(category, (totals.get(category) ?? 0) + numberField(row, 'convertedLkrAmount'))
+    totals.set(
+      category,
+      (totals.get(category) ?? 0) + numberField(row, 'convertedLkrAmount'),
+    )
   }
   return Array.from(totals.entries())
     .map(([category, amount]) => ({ category, amount }))
@@ -84,16 +98,29 @@ export function buildCategoryData(
     .slice(0, 8)
 }
 
-export function FinanceTrendsCard({ payload }: { payload: PersonalFinancePayload }) {
+export function FinanceTrendsCard({
+  payload,
+}: {
+  payload: PersonalFinancePayload
+}) {
   const months = useMemo(() => lastNMonths(MONTHS_BACK), [])
 
   const trendData = useMemo(
-    () => buildTrendData(months, payload.data.income_records, payload.data.expense_records),
+    () =>
+      buildTrendData(
+        months,
+        payload.data.income_records,
+        payload.data.expense_records,
+      ),
     [payload, months],
   )
 
   const categoryData = useMemo(
-    () => buildCategoryData(months[months.length - 1], payload.data.expense_records),
+    () =>
+      buildCategoryData(
+        months[months.length - 1],
+        payload.data.expense_records,
+      ),
     [payload, months],
   )
 
@@ -103,18 +130,26 @@ export function FinanceTrendsCard({ payload }: { payload: PersonalFinancePayload
   return (
     <section className="mt-6 grid gap-4 lg:grid-cols-2">
       <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
-        <h2 className="text-lg font-semibold text-[var(--theme-text)]">Income vs. expense</h2>
-        <p className="text-xs text-[var(--theme-muted)]">Last {MONTHS_BACK} months, LKR-converted totals.</p>
+        <h2 className="text-lg font-semibold text-[var(--theme-text)]">
+          Income vs. expense
+        </h2>
+        <p className="text-xs text-[var(--theme-muted)]">
+          Last {MONTHS_BACK} months, LKR-converted totals.
+        </p>
         {hasTrendData && (
           <p className="text-xs text-[var(--theme-muted)]">
-            This month&apos;s net: {trendData[trendData.length - 1].net >= 0 ? '+' : ''}
+            This month&apos;s net:{' '}
+            {trendData[trendData.length - 1].net >= 0 ? '+' : ''}
             {formatLkr(trendData[trendData.length - 1].net)}
           </p>
         )}
         {hasTrendData ? (
           <div className="mt-3 h-[220px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={trendData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <ComposedChart
+                data={trendData}
+                margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+              >
                 <defs>
                   <linearGradient id="pfIncome" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#34d399" stopOpacity={0.4} />
@@ -125,45 +160,105 @@ export function FinanceTrendsCard({ payload }: { payload: PersonalFinancePayload
                     <stop offset="100%" stopColor="#f87171" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="2 4" stroke="var(--theme-border)" opacity={0.4} />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--theme-muted)' }} axisLine={false} tickLine={false} />
+                <CartesianGrid
+                  strokeDasharray="2 4"
+                  stroke="var(--theme-border)"
+                  opacity={0.4}
+                />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 10, fill: 'var(--theme-muted)' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
                 <YAxis
                   tick={{ fontSize: 10, fill: 'var(--theme-muted)' }}
                   axisLine={false}
                   tickLine={false}
                   width={44}
-                  tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+                  tickFormatter={(v: number) =>
+                    v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)
+                  }
                 />
                 <Tooltip
-                  contentStyle={{ background: 'var(--theme-panel)', border: '1px solid var(--theme-border)', borderRadius: 8, fontSize: 11 }}
-                  formatter={(value: number, name: string) => [formatLkr(value), name]}
+                  contentStyle={{
+                    background: 'var(--theme-panel)',
+                    border: '1px solid var(--theme-border)',
+                    borderRadius: 8,
+                    fontSize: 11,
+                  }}
+                  formatter={(value: number, name: string) => [
+                    formatLkr(value),
+                    name,
+                  ]}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Area type="monotone" dataKey="income" name="Income" stroke="#34d399" fill="url(#pfIncome)" strokeWidth={1.6} dot={false} />
-                <Area type="monotone" dataKey="expense" name="Expense" stroke="#f87171" fill="url(#pfExpense)" strokeWidth={1.6} dot={false} />
-                <Line type="monotone" dataKey="net" name="Net" stroke="#38bdf8" strokeWidth={2} strokeDasharray="4 2" dot={false} />
+                <Area
+                  type="monotone"
+                  dataKey="income"
+                  name="Income"
+                  stroke="#34d399"
+                  fill="url(#pfIncome)"
+                  strokeWidth={1.6}
+                  dot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="expense"
+                  name="Expense"
+                  stroke="#f87171"
+                  fill="url(#pfExpense)"
+                  strokeWidth={1.6}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="net"
+                  name="Net"
+                  stroke="#38bdf8"
+                  strokeWidth={2}
+                  strokeDasharray="4 2"
+                  dot={false}
+                />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
         ) : (
-          <p className="mt-4 text-sm text-[var(--theme-muted)]">Not enough dated records yet to chart a trend.</p>
+          <p className="mt-4 text-sm text-[var(--theme-muted)]">
+            Not enough dated records yet to chart a trend.
+          </p>
         )}
       </div>
 
       <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
-        <h2 className="text-lg font-semibold text-[var(--theme-text)]">Spending by category</h2>
-        <p className="text-xs text-[var(--theme-muted)]">This month, LKR-converted totals.</p>
+        <h2 className="text-lg font-semibold text-[var(--theme-text)]">
+          Spending by category
+        </h2>
+        <p className="text-xs text-[var(--theme-muted)]">
+          This month, LKR-converted totals.
+        </p>
         {hasCategoryData ? (
           <div className="mt-3 h-[220px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={categoryData} layout="vertical" margin={{ top: 4, right: 12, left: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="2 4" stroke="var(--theme-border)" opacity={0.4} horizontal={false} />
+              <BarChart
+                data={categoryData}
+                layout="vertical"
+                margin={{ top: 4, right: 12, left: 8, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="2 4"
+                  stroke="var(--theme-border)"
+                  opacity={0.4}
+                  horizontal={false}
+                />
                 <XAxis
                   type="number"
                   tick={{ fontSize: 10, fill: 'var(--theme-muted)' }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+                  tickFormatter={(v: number) =>
+                    v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)
+                  }
                 />
                 <YAxis
                   type="category"
@@ -174,7 +269,12 @@ export function FinanceTrendsCard({ payload }: { payload: PersonalFinancePayload
                   width={90}
                 />
                 <Tooltip
-                  contentStyle={{ background: 'var(--theme-panel)', border: '1px solid var(--theme-border)', borderRadius: 8, fontSize: 11 }}
+                  contentStyle={{
+                    background: 'var(--theme-panel)',
+                    border: '1px solid var(--theme-border)',
+                    borderRadius: 8,
+                    fontSize: 11,
+                  }}
                   formatter={(value: number) => formatLkr(value)}
                 />
                 <Bar dataKey="amount" fill="#38bdf8" radius={[0, 4, 4, 0]} />
@@ -182,7 +282,9 @@ export function FinanceTrendsCard({ payload }: { payload: PersonalFinancePayload
             </ResponsiveContainer>
           </div>
         ) : (
-          <p className="mt-4 text-sm text-[var(--theme-muted)]">No expenses logged this month yet.</p>
+          <p className="mt-4 text-sm text-[var(--theme-muted)]">
+            No expenses logged this month yet.
+          </p>
         )}
       </div>
     </section>

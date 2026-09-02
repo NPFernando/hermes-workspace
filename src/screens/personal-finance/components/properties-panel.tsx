@@ -2,22 +2,9 @@ import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatMoney, formatPct } from '../utils'
+import { buttonClass, inputClass } from '../shared-styles'
+import { numberField, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
-
-const inputClass =
-  'min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
-const buttonClass =
-  'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40'
-
-function stringField(row: Record<string, unknown>, key: string): string {
-  const value = row[key]
-  return typeof value === 'string' ? value : ''
-}
-
-function numberField(row: Record<string, unknown>, key: string): number {
-  const value = row[key]
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
-}
 
 /**
  * Property-loan linkage: purely informational (PF-1004 precedent) — does
@@ -47,7 +34,12 @@ function LinkedLoanControl({
     await fetch('/api/finance', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ action: 'update_record', kind: 'property', id, payload: { linkedLoanId: nextId || null } }),
+      body: JSON.stringify({
+        action: 'update_record',
+        kind: 'property',
+        id,
+        payload: { linkedLoanId: nextId || null },
+      }),
     })
       .then((r) => r.json())
       .then((data: PersonalFinancePayload) => {
@@ -59,8 +51,13 @@ function LinkedLoanControl({
   if (linkedLoanId && editingId !== id) {
     return (
       <p className="mt-1 text-xs text-[var(--theme-muted)]">
-        🔗 Secured by {linkedLoan ? stringField(linkedLoan, 'lender') : '(removed loan)'}{' '}
-        <button type="button" onClick={() => setEditingId(id)} className="underline hover:text-[var(--theme-text)]">
+        🔗 Secured by{' '}
+        {linkedLoan ? stringField(linkedLoan, 'lender') : '(removed loan)'}{' '}
+        <button
+          type="button"
+          onClick={() => setEditingId(id)}
+          className="underline hover:text-[var(--theme-text)]"
+        >
           Change
         </button>
       </p>
@@ -98,7 +95,12 @@ export function PropertiesPanel({
   payload: PersonalFinancePayload
   onPayload: (p: PersonalFinancePayload) => void
 }) {
-  const { run: post, busy, error: err, setError: setErr } = useFinanceAction<PersonalFinancePayload>(onPayload)
+  const {
+    run: post,
+    busy,
+    error: err,
+    setError: setErr,
+  } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [linkEditingId, setLinkEditingId] = useState<string | null>(null)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
@@ -122,7 +124,9 @@ export function PropertiesPanel({
   const [purchasePrice, setPurchasePrice] = useState('')
   const [currentValue, setCurrentValue] = useState('')
   const [currency, setCurrency] = useState('LKR')
-  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0, 10))
+  const [purchaseDate, setPurchaseDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  )
   const [notes, setNotes] = useState('')
 
   async function submitProperty() {
@@ -155,7 +159,10 @@ export function PropertiesPanel({
   }
 
   async function deleteProperty(id: string) {
-    const data = await post({ action: 'delete_record', kind: 'property', id }, `delete-${id}`)
+    const data = await post(
+      { action: 'delete_record', kind: 'property', id },
+      `delete-${id}`,
+    )
     if (data) setConfirmDeleteId(null)
   }
 
@@ -212,7 +219,8 @@ export function PropertiesPanel({
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <h2 className="text-lg font-semibold">Properties</h2>
       <p className="text-xs text-[var(--theme-muted)]">
-        Track what you own — current value is manually updated, like a fixed deposit's balance.
+        Track what you own — current value is manually updated, like a fixed
+        deposit's balance.
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -223,7 +231,11 @@ export function PropertiesPanel({
           onChange={(e) => setDescription(e.target.value)}
           className={inputClass}
         />
-        <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)} className={inputClass}>
+        <select
+          value={propertyType}
+          onChange={(e) => setPropertyType(e.target.value)}
+          className={inputClass}
+        >
           <option value="residential">Residential</option>
           <option value="land">Land</option>
           <option value="commercial">Commercial</option>
@@ -243,7 +255,11 @@ export function PropertiesPanel({
           onChange={(e) => setCurrentValue(e.target.value)}
           className={`${inputClass} w-32`}
         />
-        <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
+        <select
+          value={currency}
+          onChange={(e) => setCurrency(e.target.value)}
+          className={inputClass}
+        >
           <option value="LKR">LKR</option>
           <option value="USD">USD</option>
         </select>
@@ -261,7 +277,12 @@ export function PropertiesPanel({
           onChange={(e) => setNotes(e.target.value)}
           className={inputClass}
         />
-        <button type="button" disabled={busy === 'property'} onClick={() => void submitProperty()} className={buttonClass}>
+        <button
+          type="button"
+          disabled={busy === 'property'}
+          onClick={() => void submitProperty()}
+          className={buttonClass}
+        >
           {busy === 'property' ? 'Saving…' : 'Add property'}
         </button>
       </div>
@@ -269,7 +290,11 @@ export function PropertiesPanel({
       {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
 
       <div className="mt-4 grid gap-2">
-        {properties.length === 0 && <p className="text-sm text-[var(--theme-muted)]">No properties added yet.</p>}
+        {properties.length === 0 && (
+          <p className="text-sm text-[var(--theme-muted)]">
+            No properties added yet.
+          </p>
+        )}
         {properties.map((property, index) => {
           const id = stringField(property, 'id') || String(index)
           const propCurrency = stringField(property, 'currency') || 'LKR'
@@ -279,19 +304,32 @@ export function PropertiesPanel({
           const gainLossPct = purchase > 0 ? (gainLoss / purchase) * 100 : 0
           const isEditing = editOpenId === id
           return (
-            <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+            <div
+              key={id}
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+            >
               {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="text"
                     placeholder="Description"
                     value={editDrafts[id].description}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], description: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], description: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <select
                     value={editDrafts[id].propertyType}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], propertyType: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], propertyType: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   >
                     <option value="residential">Residential</option>
@@ -303,19 +341,34 @@ export function PropertiesPanel({
                     type="number"
                     placeholder="Purchase price"
                     value={editDrafts[id].purchasePrice}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], purchasePrice: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], purchasePrice: e.target.value },
+                      }))
+                    }
                     className={`${inputClass} w-32`}
                   />
                   <input
                     type="number"
                     placeholder="Current value"
                     value={editDrafts[id].currentValue}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], currentValue: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], currentValue: e.target.value },
+                      }))
+                    }
                     className={`${inputClass} w-32`}
                   />
                   <select
                     value={editDrafts[id].currency}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], currency: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], currency: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   >
                     <option value="LKR">LKR</option>
@@ -324,14 +377,24 @@ export function PropertiesPanel({
                   <input
                     type="date"
                     value={editDrafts[id].purchaseDate}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], purchaseDate: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], purchaseDate: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <input
                     type="text"
                     placeholder="Notes (optional)"
                     value={editDrafts[id].notes}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], notes: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], notes: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <button
@@ -342,27 +405,39 @@ export function PropertiesPanel({
                   >
                     {busy === `edit-${id}` ? 'Saving…' : 'Save'}
                   </button>
-                  <button type="button" onClick={cancelEdit} className={buttonClass}>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className={buttonClass}
+                  >
                     Cancel
                   </button>
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <span className="font-medium text-[var(--theme-text)]">{stringField(property, 'description')}</span>{' '}
+                    <span className="font-medium text-[var(--theme-text)]">
+                      {stringField(property, 'description')}
+                    </span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
-                      · {stringField(property, 'propertyType')} · current {formatMoney(current, propCurrency)} (bought{' '}
+                      · {stringField(property, 'propertyType')} · current{' '}
+                      {formatMoney(current, propCurrency)} (bought{' '}
                       {formatMoney(purchase, propCurrency)})
                     </span>
                     {purchase > 0 && (
-                      <span className={`ml-2 text-xs font-medium ${gainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <span
+                        className={`ml-2 text-xs font-medium ${gainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                      >
                         {gainLoss >= 0 ? '+' : ''}
-                        {formatMoney(gainLoss, propCurrency)} ({gainLoss >= 0 ? '+' : ''}
+                        {formatMoney(gainLoss, propCurrency)} (
+                        {gainLoss >= 0 ? '+' : ''}
                         {formatPct(gainLossPct)})
                       </span>
                     )}
                     {stringField(property, 'notes') && (
-                      <p className="mt-1 text-xs text-[var(--theme-muted)]">{stringField(property, 'notes')}</p>
+                      <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                        {stringField(property, 'notes')}
+                      </p>
                     )}
                     <LinkedLoanControl
                       property={property}
@@ -373,7 +448,11 @@ export function PropertiesPanel({
                     />
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => startEdit(property)} className={buttonClass}>
+                    <button
+                      type="button"
+                      onClick={() => startEdit(property)}
+                      className={buttonClass}
+                    >
                       Edit
                     </button>
                     <button

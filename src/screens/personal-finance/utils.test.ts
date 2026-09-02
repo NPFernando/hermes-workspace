@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { buildFinanceAnswerMarkdown, computeAccountLedgerBalance, formatLkr, formatMoney, formatPct } from './utils'
+import {
+  buildFinanceAnswerMarkdown,
+  computeAccountLedgerBalance,
+  formatLkr,
+  formatMoney,
+  formatPct,
+} from './utils'
 import type { ReconcileTransaction } from './utils'
 
 describe('formatMoney/formatLkr/formatPct', () => {
@@ -18,7 +24,11 @@ describe('formatMoney/formatLkr/formatPct', () => {
 
 describe('buildFinanceAnswerMarkdown', () => {
   it('includes the question and answer, with no chart section when chart is null', () => {
-    const md = buildFinanceAnswerMarkdown('What is my net worth?', 'Your net worth is 376,437 LKR.', null)
+    const md = buildFinanceAnswerMarkdown(
+      'What is my net worth?',
+      'Your net worth is 376,437 LKR.',
+      null,
+    )
     expect(md).toContain('# Finance Analyst')
     expect(md).toContain('**Q:** What is my net worth?')
     expect(md).toContain('Your net worth is 376,437 LKR.')
@@ -54,7 +64,9 @@ describe('computeAccountLedgerBalance', () => {
   const account = { id: 'acc-1', currency: 'LKR', openingBalance: 10000 }
 
   it('returns null when the account has no openingBalance', () => {
-    expect(computeAccountLedgerBalance({ id: 'acc-1', currency: 'LKR' }, [])).toBeNull()
+    expect(
+      computeAccountLedgerBalance({ id: 'acc-1', currency: 'LKR' }, []),
+    ).toBeNull()
   })
 
   it('returns exactly the openingBalance with zero transactions', () => {

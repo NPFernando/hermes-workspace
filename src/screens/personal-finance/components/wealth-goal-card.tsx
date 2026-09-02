@@ -1,12 +1,7 @@
 import { useState } from 'react'
 import { formatLkr } from '../utils'
+import { toneFor } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
-
-function toneFor(percent: number): { bar: string; text: string } {
-  if (percent >= 100) return { bar: 'bg-emerald-400', text: 'text-emerald-200' }
-  if (percent >= 50) return { bar: 'bg-sky-400', text: 'text-sky-200' }
-  return { bar: 'bg-amber-400', text: 'text-amber-200' }
-}
 
 /**
  * WEALTH-107: long-term net worth target, compared against the already
@@ -34,7 +29,11 @@ export function WealthGoalCard({
       const res = await fetch('/api/finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'set_wealth_goal', targetLkr, targetDate: draftTargetDate || undefined }),
+        body: JSON.stringify({
+          action: 'set_wealth_goal',
+          targetLkr,
+          targetDate: draftTargetDate || undefined,
+        }),
       })
       const data = (await res.json()) as PersonalFinancePayload
       if (data.ok) onPayload(data)
@@ -46,9 +45,12 @@ export function WealthGoalCard({
   if (wg.targetLkr === 0) {
     return (
       <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
-        <h2 className="text-lg font-semibold text-[var(--theme-text)]">Long-term wealth goal</h2>
+        <h2 className="text-lg font-semibold text-[var(--theme-text)]">
+          Long-term wealth goal
+        </h2>
         <p className="mt-1 text-xs text-[var(--theme-muted)]">
-          No target set yet. Choose a net worth target, and optionally a date to reach it by.
+          No target set yet. Choose a net worth target, and optionally a date to
+          reach it by.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <input
@@ -85,7 +87,9 @@ export function WealthGoalCard({
 
   let requiredLine: { text: string; tone: string } | null = null
   if (remaining > 0 && wg.targetDate) {
-    const daysUntil = Math.ceil((Date.parse(wg.targetDate) - Date.now()) / (24 * 60 * 60 * 1000))
+    const daysUntil = Math.ceil(
+      (Date.parse(wg.targetDate) - Date.now()) / (24 * 60 * 60 * 1000),
+    )
     if (Number.isFinite(daysUntil)) {
       if (daysUntil <= 0) {
         requiredLine = { text: 'Target date passed', tone: 'text-red-300' }
@@ -102,16 +106,25 @@ export function WealthGoalCard({
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--theme-text)]">Long-term wealth goal</h2>
+        <h2 className="text-lg font-semibold text-[var(--theme-text)]">
+          Long-term wealth goal
+        </h2>
         <span className={tone.text}>{percent}%</span>
       </div>
       <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-black/20">
-        <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${Math.min(100, percent)}%` }} />
+        <div
+          className={`h-full rounded-full ${tone.bar}`}
+          style={{ width: `${Math.min(100, percent)}%` }}
+        />
       </div>
       <p className="mt-2 text-xs text-[var(--theme-muted)]">
         {formatLkr(wg.currentLkr)} / {formatLkr(wg.targetLkr)}
       </p>
-      {requiredLine && <p className={`mt-1 text-xs ${requiredLine.tone}`}>{requiredLine.text}</p>}
+      {requiredLine && (
+        <p className={`mt-1 text-xs ${requiredLine.tone}`}>
+          {requiredLine.text}
+        </p>
+      )}
     </section>
   )
 }

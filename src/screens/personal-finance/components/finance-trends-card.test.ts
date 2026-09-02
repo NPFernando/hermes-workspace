@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { buildCategoryData, buildTrendData, lastNMonths, monthLabel } from './finance-trends-card'
+import {
+  buildCategoryData,
+  buildTrendData,
+  lastNMonths,
+  monthLabel,
+} from './finance-trends-card'
 
 describe('lastNMonths', () => {
   it('returns n months ending at the given month, oldest first', () => {
@@ -32,14 +37,16 @@ describe('buildTrendData', () => {
 
     const result = buildTrendData(months, income, expense)
     expect(result).toEqual([
-      { month: '2026-01', label: 'Jan', income: 1500, expense: 300 },
-      { month: '2026-02', label: 'Feb', income: 2000, expense: 0 },
+      { month: '2026-01', label: 'Jan', income: 1500, expense: 300, net: 1200 },
+      { month: '2026-02', label: 'Feb', income: 2000, expense: 0, net: 2000 },
     ])
   })
 
   it('returns zeros for months with no records', () => {
     const result = buildTrendData(['2026-05'], [], [])
-    expect(result).toEqual([{ month: '2026-05', label: 'May', income: 0, expense: 0 }])
+    expect(result).toEqual([
+      { month: '2026-05', label: 'May', income: 0, expense: 0, net: 0 },
+    ])
   })
 })
 
@@ -59,7 +66,9 @@ describe('buildCategoryData', () => {
   })
 
   it('defaults a missing category to "Other"', () => {
-    const result = buildCategoryData('2026-03', [{ date: '2026-03-01', convertedLkrAmount: 50 }])
+    const result = buildCategoryData('2026-03', [
+      { date: '2026-03-01', convertedLkrAmount: 50 },
+    ])
     expect(result).toEqual([{ category: 'Other', amount: 50 }])
   })
 

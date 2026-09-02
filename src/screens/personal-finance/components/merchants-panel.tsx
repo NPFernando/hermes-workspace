@@ -1,17 +1,9 @@
 import { useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
+import { buttonClass, inputClass } from '../shared-styles'
+import { stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
-
-const inputClass =
-  'min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
-const buttonClass =
-  'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40'
-
-function stringField(row: Record<string, unknown>, key: string): string {
-  const value = row[key]
-  return typeof value === 'string' ? value : ''
-}
 
 type EditDraft = {
   name: string
@@ -34,7 +26,12 @@ export function MerchantsPanel({
   payload: PersonalFinancePayload
   onPayload: (p: PersonalFinancePayload) => void
 }) {
-  const { run: post, busy, error: err, setError: setErr } = useFinanceAction<PersonalFinancePayload>(onPayload)
+  const {
+    run: post,
+    busy,
+    error: err,
+    setError: setErr,
+  } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<Record<string, EditDraft>>({})
@@ -57,7 +54,9 @@ export function MerchantsPanel({
         kind: 'merchant',
         payload: {
           name: finalName,
-          defaultCategory: prefill ? undefined : defaultCategory.trim() || undefined,
+          defaultCategory: prefill
+            ? undefined
+            : defaultCategory.trim() || undefined,
           notes: prefill ? undefined : notes.trim() || undefined,
         },
       },
@@ -110,7 +109,10 @@ export function MerchantsPanel({
   }
 
   async function deleteMerchant(id: string) {
-    const data = await post({ action: 'delete_record', kind: 'merchant', id }, `delete-${id}`)
+    const data = await post(
+      { action: 'delete_record', kind: 'merchant', id },
+      `delete-${id}`,
+    )
     if (data) setConfirmDeleteId(null)
   }
 
@@ -137,14 +139,19 @@ export function MerchantsPanel({
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <datalist id="pf-known-merchants">
         {merchants.map((m, index) => (
-          <option key={stringField(m, 'id') || String(index)} value={stringField(m, 'name')} />
+          <option
+            key={stringField(m, 'id') || String(index)}
+            value={stringField(m, 'name')}
+          />
         ))}
       </datalist>
 
       <h2 className="text-lg font-semibold">Merchants</h2>
       <p className="text-xs text-[var(--theme-muted)]">
-        A managed list of vendors — set a default category so entering a recognized vendor in Transactions can
-        suggest it. Expense matching still uses the free-text vendor name; renaming here does not touch past records.
+        A managed list of vendors — set a default category so entering a
+        recognized vendor in Transactions can suggest it. Expense matching still
+        uses the free-text vendor name; renaming here does not touch past
+        records.
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -170,7 +177,12 @@ export function MerchantsPanel({
           onChange={(e) => setNotes(e.target.value)}
           className={inputClass}
         />
-        <button type="button" disabled={busy === 'merchant'} onClick={() => void submitMerchant()} className={buttonClass}>
+        <button
+          type="button"
+          disabled={busy === 'merchant'}
+          onClick={() => void submitMerchant()}
+          className={buttonClass}
+        >
           {busy === 'merchant' ? 'Saving…' : 'Add merchant'}
         </button>
       </div>
@@ -178,23 +190,38 @@ export function MerchantsPanel({
       {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
 
       <div className="mt-4 grid gap-2">
-        {merchants.length === 0 && <p className="text-sm text-[var(--theme-muted)]">No merchants added yet.</p>}
+        {merchants.length === 0 && (
+          <p className="text-sm text-[var(--theme-muted)]">
+            No merchants added yet.
+          </p>
+        )}
         {merchants.map((merchant, index) => {
           const id = stringField(merchant, 'id') || String(index)
           const isEditing = editOpenId === id
           const merchantName = stringField(merchant, 'name')
-          const merchantDefaultCategory = stringField(merchant, 'defaultCategory')
+          const merchantDefaultCategory = stringField(
+            merchant,
+            'defaultCategory',
+          )
           const count = usageCounts.get(merchantName) ?? 0
 
           return (
-            <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+            <div
+              key={id}
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+            >
               {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="text"
                     placeholder="Merchant name"
                     value={editDrafts[id].name}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], name: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], name: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <input
@@ -202,7 +229,10 @@ export function MerchantsPanel({
                     placeholder="Default category"
                     value={editDrafts[id].defaultCategory}
                     onChange={(e) =>
-                      setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], defaultCategory: e.target.value } }))
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], defaultCategory: e.target.value },
+                      }))
                     }
                     list="pf-known-categories"
                     className={inputClass}
@@ -211,7 +241,12 @@ export function MerchantsPanel({
                     type="text"
                     placeholder="Notes"
                     value={editDrafts[id].notes}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], notes: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], notes: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <button
@@ -222,21 +257,33 @@ export function MerchantsPanel({
                   >
                     {busy === `edit-${id}` ? 'Saving…' : 'Save'}
                   </button>
-                  <button type="button" onClick={cancelEdit} className={buttonClass}>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className={buttonClass}
+                  >
                     Cancel
                   </button>
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <span className="font-medium text-[var(--theme-text)]">{merchantName}</span>{' '}
+                    <span className="font-medium text-[var(--theme-text)]">
+                      {merchantName}
+                    </span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
-                      {merchantDefaultCategory && `· default: ${merchantDefaultCategory} `}· used {count} time
+                      {merchantDefaultCategory &&
+                        `· default: ${merchantDefaultCategory} `}
+                      · used {count} time
                       {count === 1 ? '' : 's'}
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => startEdit(merchant)} className={buttonClass}>
+                    <button
+                      type="button"
+                      onClick={() => startEdit(merchant)}
+                      className={buttonClass}
+                    >
                       Edit
                     </button>
                     <button
@@ -257,7 +304,9 @@ export function MerchantsPanel({
 
       {unmanaged.length > 0 && (
         <div className="mt-4 border-t border-[var(--theme-border)]/50 pt-3">
-          <p className="text-xs font-medium text-[var(--theme-muted)]">In use, not yet a merchant</p>
+          <p className="text-xs font-medium text-[var(--theme-muted)]">
+            In use, not yet a merchant
+          </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {unmanaged.map((vendorName) => (
               <button

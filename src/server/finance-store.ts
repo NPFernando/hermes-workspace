@@ -20,7 +20,10 @@ export const FINANCE_DATA_DIR = path.join(os.homedir(), '.hermes', 'finance')
 export const FINANCE_DATA_PATH = path.join(FINANCE_DATA_DIR, 'finance.json')
 export const FINANCE_AUDIT_PATH = path.join(FINANCE_DATA_DIR, 'audit.jsonl')
 /** Original documents/photos from both ingestion paths (upload, Gmail attachments) — referenced by pending_ingestions.sourceRef. */
-export const FINANCE_INGESTION_UPLOAD_DIR = path.join(FINANCE_DATA_DIR, 'ingestion-uploads')
+export const FINANCE_INGESTION_UPLOAD_DIR = path.join(
+  FINANCE_DATA_DIR,
+  'ingestion-uploads',
+)
 
 export const SUPPORTED_CURRENCIES = ['LKR', 'AUD', 'USD'] as const
 export const TRADING_MODES = [
@@ -995,12 +998,20 @@ function mirrorIntoSplitStores(db: FinanceDatabase): void {
       wealthGoalTargetLkr: db.settings.wealthGoalTargetLkr,
       wealthGoalTargetDate: db.settings.wealthGoalTargetDate,
       financeQaHistory: db.settings.financeQaHistory,
-      gmailIngestState: (db.settings as unknown as Record<string, unknown>).gmailIngest as
-        | { lastSyncedAtSeconds?: number; syncHistory?: Array<{ at: number; found: number; queued: number; skippedAlreadyQueued: number }> }
+      gmailIngestState: (db.settings as unknown as Record<string, unknown>)
+        .gmailIngest as
+        | {
+            lastSyncedAtSeconds?: number
+            syncHistory?: Array<{
+              at: number
+              found: number
+              queued: number
+              skippedAlreadyQueued: number
+            }>
+          }
         | undefined,
-      categoryCorrections: (db.settings as unknown as Record<string, unknown>).categoryCorrections as
-        | Record<string, string>
-        | undefined,
+      categoryCorrections: (db.settings as unknown as Record<string, unknown>)
+        .categoryCorrections as Record<string, string> | undefined,
     },
   })
   writeTradingStore({
@@ -1064,7 +1075,9 @@ function readFinanceJsonStore(): FinanceDatabase | null {
 function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
   const baseUpdatedMs = updatedAtMs(base)
   const personalSource =
-    process.env.HERMES_PERSONAL_FINANCE_READ_SOURCE === 'json' ? null : readPersonalFinancePostgresStore()
+    process.env.HERMES_PERSONAL_FINANCE_READ_SOURCE === 'json'
+      ? null
+      : readPersonalFinancePostgresStore()
   const trading = readTradingStore()
   const tradingFresh = trading && Date.parse(trading.updatedAt) >= baseUpdatedMs
   const postgresSettings = personalSource?.personalFinanceSettings
@@ -1098,7 +1111,8 @@ function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
       ? {
           settings: {
             ...base.settings,
-            emergencyFundTargetMonths: postgresSettings.emergencyFundTargetMonths,
+            emergencyFundTargetMonths:
+              postgresSettings.emergencyFundTargetMonths,
             savingsRateTargetPct: postgresSettings.savingsRateTargetPct,
             wealthGoalTargetLkr: postgresSettings.wealthGoalTargetLkr,
             wealthGoalTargetDate: postgresSettings.wealthGoalTargetDate,
@@ -1127,7 +1141,8 @@ function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
           prediction_results: trading.prediction_results,
           trading_signals: trading.trading_signals,
           riskState: trading.riskState as RiskState,
-          connectivityBreaker: trading.connectivityBreaker as ConnectivityBreakerState,
+          connectivityBreaker:
+            trading.connectivityBreaker as ConnectivityBreakerState,
         }
       : {}),
   } as FinanceDatabase
@@ -1638,7 +1653,10 @@ export function addFinanceRecord(
       contractStartDate: optionalString(payload, 'contractStartDate'),
       contractEndDate: optionalString(payload, 'contractEndDate'),
       jobTitle: optionalString(payload, 'jobTitle'),
-      expectedPaydayDayOfMonth: optionalNumber(payload, 'expectedPaydayDayOfMonth'),
+      expectedPaydayDayOfMonth: optionalNumber(
+        payload,
+        'expectedPaydayDayOfMonth',
+      ),
       paySchedule: optionalString(payload, 'paySchedule'),
       status: payload.status === 'ended' ? 'ended' : 'active',
       notes: optionalString(payload, 'notes'),
@@ -1668,7 +1686,11 @@ export function addFinanceRecord(
       interestRatePct: numberField(payload, 'interestRatePct', 0),
       interestPayout: interestPayoutField(payload.interestPayout),
       startDate: stringField(payload, 'startDate', createdAt.slice(0, 10)),
-      maturityDate: stringField(payload, 'maturityDate', createdAt.slice(0, 10)),
+      maturityDate: stringField(
+        payload,
+        'maturityDate',
+        createdAt.slice(0, 10),
+      ),
       status: fixedDepositStatusField(payload.status),
       notes: optionalString(payload, 'notes'),
     })
@@ -1694,7 +1716,11 @@ export function addFinanceRecord(
       purchasePrice: numberField(payload, 'purchasePrice', 0),
       currentValue: numberField(payload, 'currentValue', 0),
       currency: stringField(payload, 'currency', 'LKR'),
-      purchaseDate: stringField(payload, 'purchaseDate', createdAt.slice(0, 10)),
+      purchaseDate: stringField(
+        payload,
+        'purchaseDate',
+        createdAt.slice(0, 10),
+      ),
       notes: optionalString(payload, 'notes'),
       linkedLoanId: optionalString(payload, 'linkedLoanId'),
     })
@@ -1794,19 +1820,31 @@ export function updateFinanceRecord(
   } else if (kind === 'category') {
     const index = db.categories.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.categories[index] = { ...db.categories[index], ...payload, updatedAt: nowIso() }
+      db.categories[index] = {
+        ...db.categories[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'subcategory_entry') {
     const index = db.subcategories.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.subcategories[index] = { ...db.subcategories[index], ...payload, updatedAt: nowIso() }
+      db.subcategories[index] = {
+        ...db.subcategories[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'merchant') {
     const index = db.merchants.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.merchants[index] = { ...db.merchants[index], ...payload, updatedAt: nowIso() }
+      db.merchants[index] = {
+        ...db.merchants[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'tag') {
@@ -1818,19 +1856,31 @@ export function updateFinanceRecord(
   } else if (kind === 'income_source') {
     const index = db.income_sources.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.income_sources[index] = { ...db.income_sources[index], ...payload, updatedAt: nowIso() }
+      db.income_sources[index] = {
+        ...db.income_sources[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'stock_holding') {
     const index = db.stock_holdings.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.stock_holdings[index] = { ...db.stock_holdings[index], ...payload, updatedAt: nowIso() }
+      db.stock_holdings[index] = {
+        ...db.stock_holdings[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'fixed_deposit') {
     const index = db.fixed_deposits.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.fixed_deposits[index] = { ...db.fixed_deposits[index], ...payload, updatedAt: nowIso() }
+      db.fixed_deposits[index] = {
+        ...db.fixed_deposits[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'loan') {
@@ -1842,13 +1892,21 @@ export function updateFinanceRecord(
   } else if (kind === 'property') {
     const index = db.properties.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.properties[index] = { ...db.properties[index], ...payload, updatedAt: nowIso() }
+      db.properties[index] = {
+        ...db.properties[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else if (kind === 'beneficiary') {
     const index = db.beneficiaries.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.beneficiaries[index] = { ...db.beneficiaries[index], ...payload, updatedAt: nowIso() }
+      db.beneficiaries[index] = {
+        ...db.beneficiaries[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
       updated = true
     }
   } else {
@@ -1953,7 +2011,12 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
   return db
 }
 
-export type DuplicateMatch = { id: string; date: string; amount: number; vendorOrSource: string }
+export type DuplicateMatch = {
+  id: string
+  date: string
+  amount: number
+  vendorOrSource: string
+}
 
 /**
  * Same-day, same-vendor(case-insensitive), ~same-amount (within 1%) match
@@ -1972,17 +2035,38 @@ export function findPossibleDuplicate(
   const db = ensureFinanceStore()
   const vendorKey = vendorOrSource.trim().toLowerCase()
   const dateOnly = date.slice(0, 10)
-  const records: Array<{ id: string; vendor: string; date: string; amount: number }> =
+  const records: Array<{
+    id: string
+    vendor: string
+    date: string
+    amount: number
+  }> =
     kind === 'income'
-      ? db.income_records.map((r) => ({ id: r.id, vendor: r.sourceName, date: r.dateReceived, amount: r.originalAmount }))
-      : db.expense_records.map((r) => ({ id: r.id, vendor: r.vendor, date: r.date, amount: r.amount }))
+      ? db.income_records.map((r) => ({
+          id: r.id,
+          vendor: r.sourceName,
+          date: r.dateReceived,
+          amount: r.originalAmount,
+        }))
+      : db.expense_records.map((r) => ({
+          id: r.id,
+          vendor: r.vendor,
+          date: r.date,
+          amount: r.amount,
+        }))
 
   for (const r of records) {
     const sameVendor = r.vendor.trim().toLowerCase() === vendorKey
     const sameDate = r.date.slice(0, 10) === dateOnly
-    const sameAmount = Math.abs(r.amount - amount) / Math.max(Math.abs(amount), 1) < 0.01
+    const sameAmount =
+      Math.abs(r.amount - amount) / Math.max(Math.abs(amount), 1) < 0.01
     if (sameVendor && sameDate && sameAmount) {
-      return { id: r.id, date: r.date, amount: r.amount, vendorOrSource: r.vendor }
+      return {
+        id: r.id,
+        date: r.date,
+        amount: r.amount,
+        vendorOrSource: r.vendor,
+      }
     }
   }
   return null
@@ -1995,12 +2079,16 @@ export function findPossibleDuplicate(
  * Stored under settings (not a new top-level collection) since it's a
  * single small lookup map, not a record collection with its own lifecycle.
  */
-export function recordCategoryCorrection(vendor: string, category: string): void {
+export function recordCategoryCorrection(
+  vendor: string,
+  category: string,
+): void {
   if (!vendor.trim() || !category.trim()) return
   const db = ensureFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const corrections = (
-    settings.categoryCorrections && typeof settings.categoryCorrections === 'object'
+    settings.categoryCorrections &&
+    typeof settings.categoryCorrections === 'object'
       ? { ...(settings.categoryCorrections as Record<string, string>) }
       : {}
   ) as Record<string, string>
@@ -2012,7 +2100,8 @@ export function recordCategoryCorrection(vendor: string, category: string): void
 export function getCategoryCorrections(): Record<string, string> {
   const db = ensureFinanceStore()
   const settings = db.settings as Record<string, unknown>
-  return settings.categoryCorrections && typeof settings.categoryCorrections === 'object'
+  return settings.categoryCorrections &&
+    typeof settings.categoryCorrections === 'object'
     ? (settings.categoryCorrections as Record<string, string>)
     : {}
 }
@@ -2026,7 +2115,13 @@ export function addPendingIngestion(
     Partial<
       Pick<
         PendingIngestion,
-        'status' | 'documentType' | 'passwordHint' | 'extracted' | 'extractedContract' | 'rawPreviewImagePath' | 'error'
+        | 'status'
+        | 'documentType'
+        | 'passwordHint'
+        | 'extracted'
+        | 'extractedContract'
+        | 'rawPreviewImagePath'
+        | 'error'
       >
     >,
 ): PendingIngestion {
@@ -2048,7 +2143,11 @@ export function addPendingIngestion(
   }
   db.pending_ingestions.push(record)
   writeFinanceStore(db)
-  appendAuditLog('pending_ingestion_added', { id: record.id, source: record.source, status: record.status })
+  appendAuditLog('pending_ingestion_added', {
+    id: record.id,
+    source: record.source,
+    status: record.status,
+  })
   return record
 }
 
@@ -2286,22 +2385,32 @@ export function financeSummary(db: FinanceDatabase) {
   // Never blocked on a live CSE price fetch succeeding — falls back to the
   // buy price when no cached/manual current price is available yet.
   const stockHoldingsValueLkr = db.stock_holdings.reduce(
-    (sum, holding) => sum + (holding.lastKnownPrice ?? holding.buyPrice) * holding.quantity,
+    (sum, holding) =>
+      sum + (holding.lastKnownPrice ?? holding.buyPrice) * holding.quantity,
     0,
   )
   const fixedDepositsValueLkr = db.fixed_deposits
     .filter((fd) => fd.status !== 'withdrawn')
     .reduce((sum, fd) => sum + fd.principal, 0)
-  const propertyValueLkr = db.properties.reduce((sum, p) => sum + p.currentValue, 0)
+  const propertyValueLkr = db.properties.reduce(
+    (sum, p) => sum + p.currentValue,
+    0,
+  )
   const unrealizedStockPnlLkr = db.stock_holdings.reduce(
-    (sum, holding) => sum + ((holding.lastKnownPrice ?? holding.buyPrice) - holding.buyPrice) * holding.quantity,
+    (sum, holding) =>
+      sum +
+      ((holding.lastKnownPrice ?? holding.buyPrice) - holding.buyPrice) *
+        holding.quantity,
     0,
   )
   const totalStockCostBasisLkr = db.stock_holdings.reduce(
     (sum, holding) => sum + holding.buyPrice * holding.quantity,
     0,
   )
-  const unrealizedStockPnlPct = totalStockCostBasisLkr > 0 ? (unrealizedStockPnlLkr / totalStockCostBasisLkr) * 100 : 0
+  const unrealizedStockPnlPct =
+    totalStockCostBasisLkr > 0
+      ? (unrealizedStockPnlLkr / totalStockCostBasisLkr) * 100
+      : 0
   const netWorthLkr =
     cashBalanceLkr +
     db.savings_goals.reduce((sum, goal) => sum + goal.currentAmount, 0) +
@@ -2394,136 +2503,6 @@ export function financeAlerts(db: FinanceDatabase): Array<{
     })
   }
   return alerts
-}
-
-export function generateTradingSignal(
-  symbol: string,
-  marketData: Record<string, any> = {},
-): TradingSignal {
-  // This is a simplified decision engine
-  // In a real implementation, this would use technical analysis, ML models, etc.
-
-  // Generate a mock signal based on some basic logic
-  const rsi = Math.random() * 100 // Simulated RSI
-  const macd = Math.random() * 2 - 1 // Simulated MACD
-  const smaRatio = Math.random() * 0.5 + 0.8 // Price vs SMA ratio
-
-  let action: 'buy' | 'sell' | 'hold' = 'hold'
-  let strength = 50
-  let confidence = 50
-
-  if (rsi < 30 && macd > 0) {
-    // Oversold and bullish momentum
-    action = 'buy'
-    strength = 80
-    confidence = 75
-  } else if (rsi > 70 && macd < 0) {
-    // Overbought and bearish momentum
-    action = 'sell'
-    strength = 80
-    confidence = 75
-  } else if (smaRatio > 1.05) {
-    // Price above SMA - bullish
-    action = 'buy'
-    strength = 60
-    confidence = 60
-  } else if (smaRatio < 0.95) {
-    // Price below SMA - bearish
-    action = 'sell'
-    strength = 60
-    confidence = 60
-  }
-
-  const price = 100 + Math.random() * 50 // Mock price
-
-  const signalPayload: any = {
-    symbol,
-    action,
-    strength,
-    confidence,
-    priceTarget: action === 'buy' ? price * 1.1 : price * 0.9,
-    stopLoss: action === 'buy' ? price * 0.95 : price * 1.05,
-    reasoning: `RSI: ${rsi.toFixed(1)}, MACD: ${macd.toFixed(3)}, SMA Ratio: ${smaRatio.toFixed(3)}`,
-    indicators: { rsi, macd, smaRatio },
-  }
-
-  return createTradingSignal(signalPayload)
-}
-
-export function updateVirtualAccountPrices(
-  prices: Record<string, number>,
-): void {
-  const db = ensureFinanceStore()
-
-  // Update unrealized P&L for all virtual accounts based on current prices
-  // In a real system, we would track individual positions
-  for (const account of db.virtual_accounts) {
-    // This is simplified - in reality we'd need to track what assets we hold
-    const priceChange = (Math.random() - 0.5) * 0.1 // Random +/- 5% change
-    const portfolioValue = account.balance * (1 + priceChange)
-    const unrealizedPnl = portfolioValue - account.balance
-
-    account.unrealizedPnl = unrealizedPnl
-    account.balance = portfolioValue
-    account.updatedAt = new Date().toISOString()
-  }
-
-  writeFinanceStore(db)
-}
-
-export function createPaperTradingAccount(
-  platform: 'binance' | 'binance_shadow' = 'binance',
-  initialBalance: number = 10000,
-): VirtualAccount {
-  const db = ensureFinanceStore()
-
-  // Check if account already exists for this platform
-  let account = db.virtual_accounts.find(
-    (acc) => acc.platform === platform && acc.currency === 'LKR',
-  )
-
-  if (!account) {
-    const accountPayload: any = {
-      platform,
-      currency: 'LKR',
-      balance: initialBalance,
-      initialBalance: initialBalance,
-    }
-    account = createVirtualAccount(accountPayload)
-    db.virtual_accounts.push(account)
-    writeFinanceStore(db)
-    appendAuditLog('paper_trading_account_created', {
-      platform,
-      initialBalance,
-    })
-  }
-
-  return account
-}
-
-export function getPaperTradingBalance(
-  platform: 'binance' | 'binance_shadow' = 'binance',
-): {
-  balance: number
-  initialBalance: number
-  totalPnl: number
-  totalPnlPercentage: number
-} | null {
-  const db = ensureFinanceStore()
-  const account = db.virtual_accounts.find(
-    (acc) => acc.platform === platform && acc.currency === 'LKR',
-  )
-
-  if (!account) {
-    return null
-  }
-
-  return {
-    balance: account.balance,
-    initialBalance: account.initialBalance,
-    totalPnl: account.totalPnl,
-    totalPnlPercentage: account.totalPnlPercentage,
-  }
 }
 
 export function maskSensitive(value: unknown): unknown {
@@ -2635,7 +2614,9 @@ function accountType(value: unknown): FinanceAccount['type'] {
 
 function categoryKind(value: unknown): Category['kind'] {
   const allowed: Array<Category['kind']> = ['income', 'expense', 'both']
-  return allowed.includes(value as Category['kind']) ? (value as Category['kind']) : 'both'
+  return allowed.includes(value as Category['kind'])
+    ? (value as Category['kind'])
+    : 'both'
 }
 
 function goalStatus(value: unknown): GoalStatus {
@@ -2657,21 +2638,35 @@ function goalKindField(value: unknown): 'general' | 'sinking' {
 }
 
 function employmentTypeField(value: unknown): IncomeSource['employmentType'] {
-  const allowed: Array<IncomeSource['employmentType']> = ['full_time', 'contract', 'freelance', 'other']
+  const allowed: Array<IncomeSource['employmentType']> = [
+    'full_time',
+    'contract',
+    'freelance',
+    'other',
+  ]
   return allowed.includes(value as IncomeSource['employmentType'])
     ? (value as IncomeSource['employmentType'])
     : 'other'
 }
 
 function interestPayoutField(value: unknown): FixedDeposit['interestPayout'] {
-  const allowed: Array<FixedDeposit['interestPayout']> = ['monthly', 'quarterly', 'annually', 'at_maturity']
+  const allowed: Array<FixedDeposit['interestPayout']> = [
+    'monthly',
+    'quarterly',
+    'annually',
+    'at_maturity',
+  ]
   return allowed.includes(value as FixedDeposit['interestPayout'])
     ? (value as FixedDeposit['interestPayout'])
     : 'at_maturity'
 }
 
 function fixedDepositStatusField(value: unknown): FixedDeposit['status'] {
-  const allowed: Array<FixedDeposit['status']> = ['active', 'matured', 'withdrawn']
+  const allowed: Array<FixedDeposit['status']> = [
+    'active',
+    'matured',
+    'withdrawn',
+  ]
   return allowed.includes(value as FixedDeposit['status'])
     ? (value as FixedDeposit['status'])
     : 'active'
@@ -2679,16 +2674,31 @@ function fixedDepositStatusField(value: unknown): FixedDeposit['status'] {
 
 function loanStatusField(value: unknown): Loan['status'] {
   const allowed: Array<Loan['status']> = ['active', 'paid_off', 'defaulted']
-  return allowed.includes(value as Loan['status']) ? (value as Loan['status']) : 'active'
+  return allowed.includes(value as Loan['status'])
+    ? (value as Loan['status'])
+    : 'active'
 }
 
 function propertyTypeField(value: unknown): Property['propertyType'] {
-  const allowed: Array<Property['propertyType']> = ['residential', 'land', 'commercial', 'other']
-  return allowed.includes(value as Property['propertyType']) ? (value as Property['propertyType']) : 'residential'
+  const allowed: Array<Property['propertyType']> = [
+    'residential',
+    'land',
+    'commercial',
+    'other',
+  ]
+  return allowed.includes(value as Property['propertyType'])
+    ? (value as Property['propertyType'])
+    : 'residential'
 }
 
-function reconciliationStatus(value: unknown): 'pending' | 'cleared' | 'reconciled' {
-  const allowed: Array<'pending' | 'cleared' | 'reconciled'> = ['pending', 'cleared', 'reconciled']
+function reconciliationStatus(
+  value: unknown,
+): 'pending' | 'cleared' | 'reconciled' {
+  const allowed: Array<'pending' | 'cleared' | 'reconciled'> = [
+    'pending',
+    'cleared',
+    'reconciled',
+  ]
   return allowed.includes(value as 'pending' | 'cleared' | 'reconciled')
     ? (value as 'pending' | 'cleared' | 'reconciled')
     : 'cleared'
@@ -2744,48 +2754,54 @@ function parseDate(dateString: string): { year: number; month: number } | null {
   }
 }
 
-export function getUnifiedTransactions(db: FinanceDatabase): Array<UnifiedTransaction> {
-  const fromIncome: Array<UnifiedTransaction> = db.income_records.map((inc) => ({
-    id: inc.id,
-    kind: 'income',
-    date: inc.dateReceived,
-    counterparty: inc.sourceName,
-    category: inc.incomeType,
-    accountId: inc.accountId,
-    currency: inc.originalCurrency,
-    amount: inc.originalAmount,
-    convertedLkrAmount: inc.convertedLkrAmount,
-    notes: inc.notes,
-    documentRef: inc.documentRef,
-    taxable: inc.taxable,
-    incomeSourceId: inc.incomeSourceId,
-    tags: inc.tags,
-    status: inc.status,
-    source: inc.source,
-    createdAt: inc.createdAt,
-    updatedAt: inc.updatedAt,
-  }))
+export function getUnifiedTransactions(
+  db: FinanceDatabase,
+): Array<UnifiedTransaction> {
+  const fromIncome: Array<UnifiedTransaction> = db.income_records.map(
+    (inc) => ({
+      id: inc.id,
+      kind: 'income',
+      date: inc.dateReceived,
+      counterparty: inc.sourceName,
+      category: inc.incomeType,
+      accountId: inc.accountId,
+      currency: inc.originalCurrency,
+      amount: inc.originalAmount,
+      convertedLkrAmount: inc.convertedLkrAmount,
+      notes: inc.notes,
+      documentRef: inc.documentRef,
+      taxable: inc.taxable,
+      incomeSourceId: inc.incomeSourceId,
+      tags: inc.tags,
+      status: inc.status,
+      source: inc.source,
+      createdAt: inc.createdAt,
+      updatedAt: inc.updatedAt,
+    }),
+  )
 
-  const fromExpense: Array<UnifiedTransaction> = db.expense_records.map((exp) => ({
-    id: exp.id,
-    kind: 'expense',
-    date: exp.date,
-    counterparty: exp.vendor,
-    category: exp.category,
-    accountId: exp.accountId,
-    currency: exp.currency,
-    amount: exp.amount,
-    convertedLkrAmount: exp.convertedLkrAmount,
-    notes: exp.notes,
-    documentRef: exp.documentRef,
-    recurring: exp.recurring,
-    subcategory: exp.subcategory,
-    tags: exp.tags,
-    status: exp.status,
-    source: exp.source,
-    createdAt: exp.createdAt,
-    updatedAt: exp.updatedAt,
-  }))
+  const fromExpense: Array<UnifiedTransaction> = db.expense_records.map(
+    (exp) => ({
+      id: exp.id,
+      kind: 'expense',
+      date: exp.date,
+      counterparty: exp.vendor,
+      category: exp.category,
+      accountId: exp.accountId,
+      currency: exp.currency,
+      amount: exp.amount,
+      convertedLkrAmount: exp.convertedLkrAmount,
+      notes: exp.notes,
+      documentRef: exp.documentRef,
+      recurring: exp.recurring,
+      subcategory: exp.subcategory,
+      tags: exp.tags,
+      status: exp.status,
+      source: exp.source,
+      createdAt: exp.createdAt,
+      updatedAt: exp.updatedAt,
+    }),
+  )
 
   return [...fromIncome, ...fromExpense].sort((a, b) => {
     if (a.date !== b.date) return a.date < b.date ? 1 : -1
@@ -2863,10 +2879,15 @@ export function getMonthlySummary(
  * expenses" emergency-fund target into an LKR amount. Returns 0 if there is
  * no complete month of expense history yet.
  */
-export function getAverageMonthlyExpensesLkr(db: FinanceDatabase, months = 3): number {
+export function getAverageMonthlyExpensesLkr(
+  db: FinanceDatabase,
+  months = 3,
+): number {
   const now = new Date()
   const currentKey = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}`
-  const complete = getMonthlySummary(db).filter((row) => `${row.year}-${row.month}` !== currentKey)
+  const complete = getMonthlySummary(db).filter(
+    (row) => `${row.year}-${row.month}` !== currentKey,
+  )
   if (complete.length === 0) return 0
   const trailing = complete.slice(-months)
   const total = trailing.reduce((sum, row) => sum + row.expense, 0)
@@ -2888,7 +2909,9 @@ export function getAverageMonthlySavingsRatePct(
 ): { actualPct: number; hasData: boolean } {
   const now = new Date()
   const currentKey = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}`
-  const complete = getMonthlySummary(db).filter((row) => `${row.year}-${row.month}` !== currentKey)
+  const complete = getMonthlySummary(db).filter(
+    (row) => `${row.year}-${row.month}` !== currentKey,
+  )
   if (complete.length === 0) return { actualPct: 0, hasData: false }
   const trailing = complete.slice(-months)
   const sumIncome = trailing.reduce((sum, row) => sum + row.income, 0)
@@ -2907,7 +2930,10 @@ export function getAverageMonthlySavingsRatePct(
 export function buildFinanceQueryContext(db: FinanceDatabase): {
   summary: ReturnType<typeof financeSummary>
   monthlySummary: ReturnType<typeof getMonthlySummary>
-  categoryBreakdown: { thisMonth: Record<string, number>; lastMonth: Record<string, number> }
+  categoryBreakdown: {
+    thisMonth: Record<string, number>
+    lastMonth: Record<string, number>
+  }
   topVendors: { thisMonth: Array<{ vendor: string; amount: number }> }
   tradingSummary: ReturnType<typeof tradingPerformanceSummary>
 } {
@@ -2917,7 +2943,9 @@ export function buildFinanceQueryContext(db: FinanceDatabase): {
   lastMonthDate.setUTCMonth(lastMonthDate.getUTCMonth() - 1)
   const lastMonthKey = `${lastMonthDate.getUTCFullYear()}-${lastMonthDate.getUTCMonth() + 1}`
 
-  const expenses = getUnifiedTransactions(db).filter((t) => t.kind === 'expense')
+  const expenses = getUnifiedTransactions(db).filter(
+    (t) => t.kind === 'expense',
+  )
   const byCategory = (monthKey: string) => {
     const totals: Record<string, number> = {}
     for (const t of expenses) {
@@ -2931,7 +2959,8 @@ export function buildFinanceQueryContext(db: FinanceDatabase): {
   for (const t of expenses) {
     const d = parseDate(t.date)
     if (!d || `${d.year}-${d.month}` !== thisMonthKey) continue
-    vendorTotals[t.counterparty] = (vendorTotals[t.counterparty] ?? 0) + t.convertedLkrAmount
+    vendorTotals[t.counterparty] =
+      (vendorTotals[t.counterparty] ?? 0) + t.convertedLkrAmount
   }
   const topVendorsThisMonth = Object.entries(vendorTotals)
     .map(([vendor, amount]) => ({ vendor, amount }))
@@ -2941,7 +2970,10 @@ export function buildFinanceQueryContext(db: FinanceDatabase): {
   return {
     summary: financeSummary(db),
     monthlySummary: getMonthlySummary(db).slice(-6),
-    categoryBreakdown: { thisMonth: byCategory(thisMonthKey), lastMonth: byCategory(lastMonthKey) },
+    categoryBreakdown: {
+      thisMonth: byCategory(thisMonthKey),
+      lastMonth: byCategory(lastMonthKey),
+    },
     topVendors: { thisMonth: topVendorsThisMonth },
     // AI-206: db already contains the trading tables (trading_plans etc.) —
     // tradingPerformanceSummary operates on the already-loaded db with no

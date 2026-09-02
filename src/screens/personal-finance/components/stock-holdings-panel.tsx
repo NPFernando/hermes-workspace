@@ -2,27 +2,9 @@ import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatMoney, formatPct } from '../utils'
+import { buttonClass, inputClass } from '../shared-styles'
+import { numberField, optionalNumberField, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
-
-const inputClass =
-  'min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
-const buttonClass =
-  'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40'
-
-function stringField(row: Record<string, unknown>, key: string): string {
-  const value = row[key]
-  return typeof value === 'string' ? value : ''
-}
-
-function numberField(row: Record<string, unknown>, key: string): number {
-  const value = row[key]
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
-}
-
-function optionalNumberField(row: Record<string, unknown>, key: string): number | undefined {
-  const value = row[key]
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
-}
 
 function daysSince(dateStr: string | undefined): number | null {
   if (!dateStr) return null
@@ -43,14 +25,35 @@ export function StockHoldingsPanel({
   payload: PersonalFinancePayload
   onPayload: (p: PersonalFinancePayload) => void
 }) {
-  const { run: post, busy, error: err, setError: setErr } = useFinanceAction<PersonalFinancePayload>(onPayload)
+  const {
+    run: post,
+    busy,
+    error: err,
+    setError: setErr,
+  } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [manualPriceDrafts, setManualPriceDrafts] = useState<Record<string, string>>({})
-  const [refreshFailedIds, setRefreshFailedIds] = useState<Record<string, boolean>>({})
+  const [manualPriceDrafts, setManualPriceDrafts] = useState<
+    Record<string, string>
+  >({})
+  const [refreshFailedIds, setRefreshFailedIds] = useState<
+    Record<string, boolean>
+  >({})
   const [refreshingAll, setRefreshingAll] = useState(false)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<
-    Record<string, { symbol: string; companyName: string; platform: string; quantity: string; buyPrice: string; buyDate: string; currency: string; notes: string }>
+    Record<
+      string,
+      {
+        symbol: string
+        companyName: string
+        platform: string
+        quantity: string
+        buyPrice: string
+        buyDate: string
+        currency: string
+        notes: string
+      }
+    >
   >({})
 
   const [symbol, setSymbol] = useState('')
@@ -102,7 +105,11 @@ export function StockHoldingsPanel({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'refresh_stock_price', id }),
       })
-      const data = (await res.json()) as { ok?: boolean; priceFetchFailed?: boolean; error?: string }
+      const data = (await res.json()) as {
+        ok?: boolean
+        priceFetchFailed?: boolean
+        error?: string
+      }
       if (data.ok === false) {
         setErr(data.error || 'Price refresh failed')
         return
@@ -127,7 +134,11 @@ export function StockHoldingsPanel({
         action: 'update_record',
         kind: 'stock_holding',
         id,
-        payload: { lastKnownPrice: price, lastPriceUpdatedAt: new Date().toISOString(), priceSource: 'manual' },
+        payload: {
+          lastKnownPrice: price,
+          lastPriceUpdatedAt: new Date().toISOString(),
+          priceSource: 'manual',
+        },
       },
       `manual-price-${id}`,
     )
@@ -138,7 +149,10 @@ export function StockHoldingsPanel({
   }
 
   async function deleteHolding(id: string) {
-    const data = await post({ action: 'delete_record', kind: 'stock_holding', id }, `delete-${id}`)
+    const data = await post(
+      { action: 'delete_record', kind: 'stock_holding', id },
+      `delete-${id}`,
+    )
     if (data) setConfirmDeleteId(null)
   }
 
@@ -209,16 +223,24 @@ export function StockHoldingsPanel({
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Stock holdings (Sri Lanka / CSE)</h2>
+        <h2 className="text-lg font-semibold">
+          Stock holdings (Sri Lanka / CSE)
+        </h2>
         {holdings.length > 0 && (
-          <button type="button" disabled={refreshingAll} onClick={() => void refreshAll()} className={buttonClass}>
+          <button
+            type="button"
+            disabled={refreshingAll}
+            onClick={() => void refreshAll()}
+            className={buttonClass}
+          >
             {refreshingAll ? 'Refreshing…' : 'Refresh all'}
           </button>
         )}
       </div>
       <p className="text-xs text-[var(--theme-muted)]">
-        Enter what you bought through your broker app. Current price is fetched from CSE when you click Refresh —
-        if that fails, you can type it in manually.
+        Enter what you bought through your broker app. Current price is fetched
+        from CSE when you click Refresh — if that fails, you can type it in
+        manually.
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -257,8 +279,17 @@ export function StockHoldingsPanel({
           onChange={(e) => setBuyPrice(e.target.value)}
           className={`${inputClass} w-28`}
         />
-        <input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} className={inputClass} />
-        <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
+        <input
+          type="date"
+          value={buyDate}
+          onChange={(e) => setBuyDate(e.target.value)}
+          className={inputClass}
+        />
+        <select
+          value={currency}
+          onChange={(e) => setCurrency(e.target.value)}
+          className={inputClass}
+        >
           <option value="LKR">LKR</option>
           <option value="USD">USD</option>
         </select>
@@ -269,7 +300,12 @@ export function StockHoldingsPanel({
           onChange={(e) => setNotes(e.target.value)}
           className={inputClass}
         />
-        <button type="button" disabled={busy === 'holding'} onClick={() => void submitHolding()} className={buttonClass}>
+        <button
+          type="button"
+          disabled={busy === 'holding'}
+          onClick={() => void submitHolding()}
+          className={buttonClass}
+        >
           {busy === 'holding' ? 'Saving…' : 'Add holding'}
         </button>
       </div>
@@ -277,66 +313,114 @@ export function StockHoldingsPanel({
       {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
 
       <div className="mt-4 grid gap-2">
-        {holdings.length === 0 && <p className="text-sm text-[var(--theme-muted)]">No stock holdings added yet.</p>}
+        {holdings.length === 0 && (
+          <p className="text-sm text-[var(--theme-muted)]">
+            No stock holdings added yet.
+          </p>
+        )}
         {holdings.map((holding, index) => {
           const id = stringField(holding, 'id') || String(index)
           const qty = numberField(holding, 'quantity')
           const buy = numberField(holding, 'buyPrice')
           const current = optionalNumberField(holding, 'lastKnownPrice')
-          const gainLoss = current !== undefined ? (current - buy) * qty : undefined
-          const gainLossPct = current !== undefined && buy > 0 ? ((current - buy) / buy) * 100 : undefined
+          const gainLoss =
+            current !== undefined ? (current - buy) * qty : undefined
+          const gainLossPct =
+            current !== undefined && buy > 0
+              ? ((current - buy) / buy) * 100
+              : undefined
           const holdingCurrency = stringField(holding, 'currency') || 'LKR'
           const priceSource = stringField(holding, 'priceSource')
-          const staleDays = daysSince(stringField(holding, 'lastPriceUpdatedAt') || undefined)
+          const staleDays = daysSince(
+            stringField(holding, 'lastPriceUpdatedAt') || undefined,
+          )
           const isEditing = editOpenId === id
           return (
-            <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+            <div
+              key={id}
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+            >
               {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="text"
                     placeholder="Symbol"
                     value={editDrafts[id].symbol}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], symbol: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], symbol: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <input
                     type="text"
                     placeholder="Company name (optional)"
                     value={editDrafts[id].companyName}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], companyName: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], companyName: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <input
                     type="text"
                     placeholder="Broker / platform"
                     value={editDrafts[id].platform}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], platform: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], platform: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <input
                     type="number"
                     placeholder="Quantity"
                     value={editDrafts[id].quantity}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], quantity: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], quantity: e.target.value },
+                      }))
+                    }
                     className={`${inputClass} w-24`}
                   />
                   <input
                     type="number"
                     placeholder="Buy price"
                     value={editDrafts[id].buyPrice}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], buyPrice: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], buyPrice: e.target.value },
+                      }))
+                    }
                     className={`${inputClass} w-28`}
                   />
                   <input
                     type="date"
                     value={editDrafts[id].buyDate}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], buyDate: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], buyDate: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <select
                     value={editDrafts[id].currency}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], currency: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], currency: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   >
                     <option value="LKR">LKR</option>
@@ -346,7 +430,12 @@ export function StockHoldingsPanel({
                     type="text"
                     placeholder="Notes (optional)"
                     value={editDrafts[id].notes}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], notes: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], notes: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <button
@@ -357,30 +446,44 @@ export function StockHoldingsPanel({
                   >
                     {busy === `edit-${id}` ? 'Saving…' : 'Save'}
                   </button>
-                  <button type="button" onClick={cancelEdit} className={buttonClass}>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className={buttonClass}
+                  >
                     Cancel
                   </button>
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <span className="font-medium text-[var(--theme-text)]">{stringField(holding, 'symbol')}</span>{' '}
+                    <span className="font-medium text-[var(--theme-text)]">
+                      {stringField(holding, 'symbol')}
+                    </span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
-                      · {stringField(holding, 'platform')} · qty {qty} · buy {formatMoney(buy, holdingCurrency)}
+                      · {stringField(holding, 'platform')} · qty {qty} · buy{' '}
+                      {formatMoney(buy, holdingCurrency)}
                       {current !== undefined &&
                         ` · current ${formatMoney(current, holdingCurrency)} (${priceSource}${
-                          staleDays !== null ? `, priced ${staleDays === 0 ? 'today' : `${staleDays}d ago`}` : ''
+                          staleDays !== null
+                            ? `, priced ${staleDays === 0 ? 'today' : `${staleDays}d ago`}`
+                            : ''
                         })`}
                     </span>
                     {gainLoss !== undefined && (
-                      <span className={`ml-2 text-xs font-medium ${gainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <span
+                        className={`ml-2 text-xs font-medium ${gainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                      >
                         {gainLoss >= 0 ? '+' : ''}
                         {formatMoney(gainLoss, holdingCurrency)}
-                        {gainLossPct !== undefined && ` (${gainLoss >= 0 ? '+' : ''}${formatPct(gainLossPct)})`}
+                        {gainLossPct !== undefined &&
+                          ` (${gainLoss >= 0 ? '+' : ''}${formatPct(gainLossPct)})`}
                       </span>
                     )}
                     {stringField(holding, 'notes') && (
-                      <p className="mt-1 text-xs text-[var(--theme-muted)]">{stringField(holding, 'notes')}</p>
+                      <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                        {stringField(holding, 'notes')}
+                      </p>
                     )}
                   </div>
                   <div className="flex gap-2">
@@ -391,7 +494,11 @@ export function StockHoldingsPanel({
                     >
                       Refresh price
                     </button>
-                    <button type="button" onClick={() => startEdit(holding)} className={buttonClass}>
+                    <button
+                      type="button"
+                      onClick={() => startEdit(holding)}
+                      className={buttonClass}
+                    >
                       Edit
                     </button>
                     <button
@@ -408,13 +515,19 @@ export function StockHoldingsPanel({
               {refreshFailedIds[id] && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <p className="text-xs text-amber-200">
-                    Automatic price fetch failed — enter the current price manually:
+                    Automatic price fetch failed — enter the current price
+                    manually:
                   </p>
                   <input
                     type="number"
                     placeholder="Current price"
                     value={manualPriceDrafts[id] ?? ''}
-                    onChange={(e) => setManualPriceDrafts((prev) => ({ ...prev, [id]: e.target.value }))}
+                    onChange={(e) =>
+                      setManualPriceDrafts((prev) => ({
+                        ...prev,
+                        [id]: e.target.value,
+                      }))
+                    }
                     className={`${inputClass} w-28`}
                   />
                   <button

@@ -2,41 +2,24 @@ import { useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatMoney } from '../utils'
+import { buttonClass, inputClass } from '../shared-styles'
+import { numberField, splitTags, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
-
-const inputClass =
-  'min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
-const buttonClass =
-  'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40'
 
 type TxnKind = 'income' | 'expense'
 
-function stringField(row: Record<string, unknown>, key: string): string {
-  const value = row[key]
-  return typeof value === 'string' ? value : ''
-}
-
-function numberField(row: Record<string, unknown>, key: string): number {
-  const value = row[key]
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
-}
-
 function boolField(row: Record<string, unknown>, key: string): boolean {
   return row[key] === true
-}
-
-function splitTags(value: string): Array<string> {
-  return value
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean)
 }
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function merchantDefaultCategory(merchants: Array<Record<string, unknown>>, vendorName: string): string | undefined {
+function merchantDefaultCategory(
+  merchants: Array<Record<string, unknown>>,
+  vendorName: string,
+): string | undefined {
   const match = merchants.find((m) => stringField(m, 'name') === vendorName)
   const defaultCategory = match ? stringField(match, 'defaultCategory') : ''
   return defaultCategory || undefined
@@ -71,7 +54,12 @@ export function TransactionsPanel({
   payload: PersonalFinancePayload
   onPayload: (p: PersonalFinancePayload) => void
 }) {
-  const { run: post, busy, error: err, setError: setErr } = useFinanceAction<PersonalFinancePayload>(onPayload)
+  const {
+    run: post,
+    busy,
+    error: err,
+    setError: setErr,
+  } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<Record<string, EditDraft>>({})
@@ -92,7 +80,9 @@ export function TransactionsPanel({
 
   const [search, setSearch] = useState('')
   const [filterKind, setFilterKind] = useState<'all' | TxnKind>('all')
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'cleared' | 'reconciled'>('all')
+  const [filterStatus, setFilterStatus] = useState<
+    'all' | 'pending' | 'cleared' | 'reconciled'
+  >('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [amountMin, setAmountMin] = useState('')
@@ -103,7 +93,9 @@ export function TransactionsPanel({
 
   async function submitTransaction() {
     if (!counterparty.trim()) {
-      setErr(addKind === 'income' ? 'Source name is required' : 'Vendor is required')
+      setErr(
+        addKind === 'income' ? 'Source name is required' : 'Vendor is required',
+      )
       return
     }
     const busyKey = 'add-transaction'
@@ -191,7 +183,9 @@ export function TransactionsPanel({
   async function saveEdit(id: string, kind: TxnKind) {
     const draft = editDrafts[id]
     if (!draft.counterparty.trim()) {
-      setErr(kind === 'income' ? 'Source name is required' : 'Vendor is required')
+      setErr(
+        kind === 'income' ? 'Source name is required' : 'Vendor is required',
+      )
       return
     }
     const shared = {
@@ -243,7 +237,10 @@ export function TransactionsPanel({
   }
 
   async function deleteTransaction(id: string, kind: TxnKind) {
-    const data = await post({ action: 'delete_record', kind, id }, `delete-${id}`)
+    const data = await post(
+      { action: 'delete_record', kind, id },
+      `delete-${id}`,
+    )
     if (data) setConfirmDeleteId(null)
   }
 
@@ -252,7 +249,11 @@ export function TransactionsPanel({
     return transactions.filter((txn) => {
       const kind = stringField(txn, 'kind')
       if (filterKind !== 'all' && kind !== filterKind) return false
-      if (filterStatus !== 'all' && (stringField(txn, 'status') || 'cleared') !== filterStatus) return false
+      if (
+        filterStatus !== 'all' &&
+        (stringField(txn, 'status') || 'cleared') !== filterStatus
+      )
+        return false
       const txnDate = stringField(txn, 'date')
       if (dateFrom && txnDate < dateFrom) return false
       if (dateTo && txnDate > dateTo) return false
@@ -264,7 +265,16 @@ export function TransactionsPanel({
       const categoryValue = stringField(txn, 'category').toLowerCase()
       return counterpartyValue.includes(term) || categoryValue.includes(term)
     })
-  }, [transactions, search, filterKind, filterStatus, dateFrom, dateTo, amountMin, amountMax])
+  }, [
+    transactions,
+    search,
+    filterKind,
+    filterStatus,
+    dateFrom,
+    dateTo,
+    amountMin,
+    amountMax,
+  ])
 
   const totalsByCurrency = new Map<string, number>()
   let incomeCount = 0
@@ -274,18 +284,27 @@ export function TransactionsPanel({
     if (kind === 'income') incomeCount += 1
     if (kind === 'expense') expenseCount += 1
     const txnCurrency = stringField(txn, 'currency') || 'LKR'
-    const signed = kind === 'income' ? numberField(txn, 'amount') : -numberField(txn, 'amount')
-    totalsByCurrency.set(txnCurrency, (totalsByCurrency.get(txnCurrency) ?? 0) + signed)
+    const signed =
+      kind === 'income'
+        ? numberField(txn, 'amount')
+        : -numberField(txn, 'amount')
+    totalsByCurrency.set(
+      txnCurrency,
+      (totalsByCurrency.get(txnCurrency) ?? 0) + signed,
+    )
   }
   const totalsText = Array.from(totalsByCurrency.entries())
-    .map(([entryCurrency, entryAmount]) => formatMoney(entryAmount, entryCurrency))
+    .map(([entryCurrency, entryAmount]) =>
+      formatMoney(entryAmount, entryCurrency),
+    )
     .join(' · ')
 
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <h2 className="text-lg font-semibold">Transactions</h2>
       <p className="text-xs text-[var(--theme-muted)]">
-        A unified view of income and expenses — added here writes to the same underlying records shown elsewhere.
+        A unified view of income and expenses — added here writes to the same
+        underlying records shown elsewhere.
       </p>
       <p className="mt-2 text-sm font-medium text-[var(--theme-text)]">
         {incomeCount} income · {expenseCount} expense
@@ -314,7 +333,12 @@ export function TransactionsPanel({
             Expense
           </button>
         </div>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className={inputClass}
+        />
         <input
           type="text"
           placeholder={addKind === 'income' ? 'Source name' : 'Vendor'}
@@ -322,7 +346,10 @@ export function TransactionsPanel({
           onChange={(e) => setCounterparty(e.target.value)}
           onBlur={() => {
             if (addKind !== 'expense' || category.trim()) return
-            const guess = merchantDefaultCategory(payload.data.merchants, counterparty.trim())
+            const guess = merchantDefaultCategory(
+              payload.data.merchants,
+              counterparty.trim(),
+            )
             if (guess) setCategory(guess)
           }}
           list={addKind === 'expense' ? 'pf-known-merchants' : undefined}
@@ -354,12 +381,20 @@ export function TransactionsPanel({
           list="pf-known-tags"
           className={inputClass}
         />
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className={inputClass}
+        >
           <option value="pending">Pending</option>
           <option value="cleared">Cleared</option>
           <option value="reconciled">Reconciled</option>
         </select>
-        <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
+        <select
+          value={currency}
+          onChange={(e) => setCurrency(e.target.value)}
+          className={inputClass}
+        >
           <option value="LKR">LKR</option>
           <option value="USD">USD</option>
           <option value="AUD">AUD</option>
@@ -371,7 +406,11 @@ export function TransactionsPanel({
           onChange={(e) => setAmount(e.target.value)}
           className={`${inputClass} w-32`}
         />
-        <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className={inputClass}>
+        <select
+          value={accountId}
+          onChange={(e) => setAccountId(e.target.value)}
+          className={inputClass}
+        >
           <option value="">No account</option>
           {accounts.map((account, index) => {
             const id = stringField(account, 'id') || String(index)
@@ -391,12 +430,20 @@ export function TransactionsPanel({
         />
         {addKind === 'income' ? (
           <label className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
-            <input type="checkbox" checked={taxable} onChange={(e) => setTaxable(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={taxable}
+              onChange={(e) => setTaxable(e.target.checked)}
+            />
             Taxable
           </label>
         ) : (
           <label className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
-            <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={recurring}
+              onChange={(e) => setRecurring(e.target.checked)}
+            />
             Recurring
           </label>
         )}
@@ -420,14 +467,22 @@ export function TransactionsPanel({
           onChange={(e) => setSearch(e.target.value)}
           className={`${inputClass} w-64`}
         />
-        <select value={filterKind} onChange={(e) => setFilterKind(e.target.value as 'all' | TxnKind)} className={inputClass}>
+        <select
+          value={filterKind}
+          onChange={(e) => setFilterKind(e.target.value as 'all' | TxnKind)}
+          className={inputClass}
+        >
           <option value="all">All</option>
           <option value="income">Income</option>
           <option value="expense">Expense</option>
         </select>
         <select
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value as 'all' | 'pending' | 'cleared' | 'reconciled')}
+          onChange={(e) =>
+            setFilterStatus(
+              e.target.value as 'all' | 'pending' | 'cleared' | 'reconciled',
+            )
+          }
           className={inputClass}
         >
           <option value="all">All statuses</option>
@@ -466,7 +521,11 @@ export function TransactionsPanel({
       </div>
 
       <div className="mt-3 grid gap-2">
-        {filtered.length === 0 && <p className="text-sm text-[var(--theme-muted)]">No transactions match.</p>}
+        {filtered.length === 0 && (
+          <p className="text-sm text-[var(--theme-muted)]">
+            No transactions match.
+          </p>
+        )}
         {filtered.map((txn, index) => {
           const id = stringField(txn, 'id') || String(index)
           const kind = (stringField(txn, 'kind') || 'expense') as TxnKind
@@ -478,13 +537,21 @@ export function TransactionsPanel({
           const txnSource = stringField(txn, 'source') || 'manual'
 
           return (
-            <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+            <div
+              key={id}
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+            >
               {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="date"
                     value={editDrafts[id].date}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], date: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], date: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <input
@@ -492,12 +559,23 @@ export function TransactionsPanel({
                     placeholder={kind === 'income' ? 'Source name' : 'Vendor'}
                     value={editDrafts[id].counterparty}
                     onChange={(e) =>
-                      setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], counterparty: e.target.value } }))
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], counterparty: e.target.value },
+                      }))
                     }
                     onBlur={() => {
-                      if (kind !== 'expense' || editDrafts[id].category.trim()) return
-                      const guess = merchantDefaultCategory(payload.data.merchants, editDrafts[id].counterparty.trim())
-                      if (guess) setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], category: guess } }))
+                      if (kind !== 'expense' || editDrafts[id].category.trim())
+                        return
+                      const guess = merchantDefaultCategory(
+                        payload.data.merchants,
+                        editDrafts[id].counterparty.trim(),
+                      )
+                      if (guess)
+                        setEditDrafts((prev) => ({
+                          ...prev,
+                          [id]: { ...prev[id], category: guess },
+                        }))
                     }}
                     list={kind === 'expense' ? 'pf-known-merchants' : undefined}
                     className={inputClass}
@@ -506,7 +584,12 @@ export function TransactionsPanel({
                     type="text"
                     placeholder={kind === 'income' ? 'Income type' : 'Category'}
                     value={editDrafts[id].category}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], category: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], category: e.target.value },
+                      }))
+                    }
                     list="pf-known-categories"
                     className={inputClass}
                   />
@@ -516,7 +599,10 @@ export function TransactionsPanel({
                       placeholder="Subcategory"
                       value={editDrafts[id].subcategory}
                       onChange={(e) =>
-                        setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], subcategory: e.target.value } }))
+                        setEditDrafts((prev) => ({
+                          ...prev,
+                          [id]: { ...prev[id], subcategory: e.target.value },
+                        }))
                       }
                       list="pf-known-subcategories"
                       className={inputClass}
@@ -526,13 +612,23 @@ export function TransactionsPanel({
                     type="text"
                     placeholder="Tags (comma-separated)"
                     value={editDrafts[id].tags}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], tags: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], tags: e.target.value },
+                      }))
+                    }
                     list="pf-known-tags"
                     className={inputClass}
                   />
                   <select
                     value={editDrafts[id].status}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], status: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], status: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   >
                     <option value="pending">Pending</option>
@@ -541,7 +637,12 @@ export function TransactionsPanel({
                   </select>
                   <select
                     value={editDrafts[id].currency}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], currency: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], currency: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   >
                     <option value="LKR">LKR</option>
@@ -552,17 +653,28 @@ export function TransactionsPanel({
                     type="number"
                     placeholder="Amount"
                     value={editDrafts[id].amount}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], amount: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], amount: e.target.value },
+                      }))
+                    }
                     className={`${inputClass} w-32`}
                   />
                   <select
                     value={editDrafts[id].accountId}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], accountId: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], accountId: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   >
                     <option value="">No account</option>
                     {accounts.map((account, accountIndex) => {
-                      const accountRowId = stringField(account, 'id') || String(accountIndex)
+                      const accountRowId =
+                        stringField(account, 'id') || String(accountIndex)
                       return (
                         <option key={accountRowId} value={accountRowId}>
                           {stringField(account, 'name')}
@@ -574,7 +686,12 @@ export function TransactionsPanel({
                     type="text"
                     placeholder="Notes"
                     value={editDrafts[id].notes}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], notes: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], notes: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   {kind === 'income' ? (
@@ -583,7 +700,10 @@ export function TransactionsPanel({
                         type="checkbox"
                         checked={editDrafts[id].taxable}
                         onChange={(e) =>
-                          setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], taxable: e.target.checked } }))
+                          setEditDrafts((prev) => ({
+                            ...prev,
+                            [id]: { ...prev[id], taxable: e.target.checked },
+                          }))
                         }
                       />
                       Taxable
@@ -594,7 +714,10 @@ export function TransactionsPanel({
                         type="checkbox"
                         checked={editDrafts[id].recurring}
                         onChange={(e) =>
-                          setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], recurring: e.target.checked } }))
+                          setEditDrafts((prev) => ({
+                            ...prev,
+                            [id]: { ...prev[id], recurring: e.target.checked },
+                          }))
                         }
                       />
                       Recurring
@@ -608,7 +731,11 @@ export function TransactionsPanel({
                   >
                     {busy === `edit-${id}` ? 'Saving…' : 'Save'}
                   </button>
-                  <button type="button" onClick={cancelEdit} className={buttonClass}>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className={buttonClass}
+                  >
                     Cancel
                   </button>
                 </div>
@@ -629,14 +756,22 @@ export function TransactionsPanel({
                     )}
                     {txnSource !== 'manual' && (
                       <span className="mr-1.5 rounded-full bg-sky-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-sky-100">
-                        {txnSource === 'gmail' ? 'via Gmail' : txnSource === 'upload' ? 'via Upload' : txnSource}
+                        {txnSource === 'gmail'
+                          ? 'via Gmail'
+                          : txnSource === 'upload'
+                            ? 'via Upload'
+                            : txnSource}
                       </span>
                     )}
-                    <span className="font-medium text-[var(--theme-text)]">{stringField(txn, 'counterparty')}</span>{' '}
+                    <span className="font-medium text-[var(--theme-text)]">
+                      {stringField(txn, 'counterparty')}
+                    </span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
                       · {stringField(txn, 'category')}
-                      {stringField(txn, 'subcategory') && ` / ${stringField(txn, 'subcategory')}`} ·{' '}
-                      {stringField(txn, 'date')} · {formatMoney(amountValue, txnCurrency)}
+                      {stringField(txn, 'subcategory') &&
+                        ` / ${stringField(txn, 'subcategory')}`}{' '}
+                      · {stringField(txn, 'date')} ·{' '}
+                      {formatMoney(amountValue, txnCurrency)}
                     </span>
                     {splitTags(stringField(txn, 'tags')).length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
@@ -662,7 +797,11 @@ export function TransactionsPanel({
                         View document
                       </a>
                     )}
-                    <button type="button" onClick={() => startEdit(txn)} className={buttonClass}>
+                    <button
+                      type="button"
+                      onClick={() => startEdit(txn)}
+                      className={buttonClass}
+                    >
                       Edit
                     </button>
                     <button
@@ -688,7 +827,9 @@ export function TransactionsPanel({
           confirmLabel="Delete"
           busy={busy === `delete-${confirmDeleteId}`}
           onConfirm={() => {
-            const txn = transactions.find((t) => stringField(t, 'id') === confirmDeleteId)
+            const txn = transactions.find(
+              (t) => stringField(t, 'id') === confirmDeleteId,
+            )
             const kind = (txn ? stringField(txn, 'kind') : 'expense') as TxnKind
             void deleteTransaction(confirmDeleteId, kind)
           }}

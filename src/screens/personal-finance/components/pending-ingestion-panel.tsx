@@ -1,23 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ExtractedContract, ExtractedTransaction, PendingIngestion, PersonalFinancePayload } from '../types'
+import {
+  buttonClass,
+  dangerTone,
+  inputClass,
+  positiveTone,
+  warningTone,
+} from '../shared-styles'
+import type {
+  ExtractedContract,
+  ExtractedTransaction,
+  PendingIngestion,
+  PersonalFinancePayload,
+} from '../types'
 
 type DuplicateWarning = { date: string; amount: number; vendorOrSource: string }
 
 const confidenceTone: Record<ExtractedTransaction['confidence'], string> = {
-  high: 'border-emerald-400/30 bg-emerald-500/15 text-emerald-100',
-  medium: 'border-amber-400/30 bg-amber-500/15 text-amber-100',
-  low: 'border-red-400/30 bg-red-500/15 text-red-100',
+  high: positiveTone,
+  medium: warningTone,
+  low: dangerTone,
 }
 
 const severityTone: Record<'high' | 'medium' | 'low', string> = {
-  high: 'border-red-400/30 bg-red-500/15 text-red-100',
-  medium: 'border-amber-400/30 bg-amber-500/15 text-amber-100',
+  high: dangerTone,
+  medium: warningTone,
   low: 'border-sky-400/30 bg-sky-500/15 text-sky-100',
 }
 
 /** AI-307: rank items needing the most attention first — missing confidence (extraction failed) ranks with 'low'. */
 function confidenceRank(item: PendingIngestion): number {
-  const confidence = item.extracted?.confidence ?? item.extractedContract?.confidence
+  const confidence =
+    item.extracted?.confidence ?? item.extractedContract?.confidence
   if (confidence === 'high') return 2
   if (confidence === 'medium') return 1
   return 0
@@ -43,23 +56,42 @@ export function PendingIngestionPanel({
   const [uploading, setUploading] = useState(false)
   const [uploadingContract, setUploadingContract] = useState(false)
   const [note, setNote] = useState<string | null>(null)
-  const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({})
-  const [editDrafts, setEditDrafts] = useState<Record<string, Partial<ExtractedTransaction>>>({})
-  const [contractDrafts, setContractDrafts] = useState<Record<string, Partial<ExtractedContract>>>({})
-  const [targetJobDrafts, setTargetJobDrafts] = useState<Record<string, string>>({})
+  const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>(
+    {},
+  )
+  const [editDrafts, setEditDrafts] = useState<
+    Record<string, Partial<ExtractedTransaction>>
+  >({})
+  const [contractDrafts, setContractDrafts] = useState<
+    Record<string, Partial<ExtractedContract>>
+  >({})
+  const [targetJobDrafts, setTargetJobDrafts] = useState<
+    Record<string, string>
+  >({})
   const [busyId, setBusyId] = useState<string | null>(null)
   const [gmailConnected, setGmailConnected] = useState(false)
-  const [gmailLastSyncedAtSeconds, setGmailLastSyncedAtSeconds] = useState<number | null>(null)
+  const [gmailLastSyncedAtSeconds, setGmailLastSyncedAtSeconds] = useState<
+    number | null
+  >(null)
   const [gmailSyncHistory, setGmailSyncHistory] = useState<
-    Array<{ at: number; found: number; queued: number; skippedAlreadyQueued: number }>
+    Array<{
+      at: number
+      found: number
+      queued: number
+      skippedAlreadyQueued: number
+    }>
   >([])
   const [syncing, setSyncing] = useState(false)
-  const [duplicateWarnings, setDuplicateWarnings] = useState<Record<string, DuplicateWarning>>({})
+  const [duplicateWarnings, setDuplicateWarnings] = useState<
+    Record<string, DuplicateWarning>
+  >({})
   // Some formats (notably HEIC/HEIF from phone cameras) extract fine
   // server-side but no mainstream browser can decode them in an <img> tag —
   // track which previews failed to load so we can show a placeholder
   // instead of a broken-image icon.
-  const [previewFailedIds, setPreviewFailedIds] = useState<Record<string, boolean>>({})
+  const [previewFailedIds, setPreviewFailedIds] = useState<
+    Record<string, boolean>
+  >({})
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const contractFileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -70,7 +102,12 @@ export function PendingIngestionPanel({
         (data: {
           connected?: boolean
           lastSyncedAtSeconds?: number | null
-          syncHistory?: Array<{ at: number; found: number; queued: number; skippedAlreadyQueued: number }>
+          syncHistory?: Array<{
+            at: number
+            found: number
+            queued: number
+            skippedAlreadyQueued: number
+          }>
         }) => {
           setGmailConnected(Boolean(data.connected))
           setGmailLastSyncedAtSeconds(data.lastSyncedAtSeconds ?? null)
@@ -91,9 +128,18 @@ export function PendingIngestionPanel({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'list_pending_ingestions' }),
       })
-      const data = (await res.json()) as { ok: boolean; pendingIngestions?: Array<PendingIngestion> }
+      const data = (await res.json()) as {
+        ok: boolean
+        pendingIngestions?: Array<PendingIngestion>
+      }
       if (data.ok) {
-        setItems((data.pendingIngestions ?? []).filter((p) => p.status === 'awaiting_password' || p.status === 'awaiting_review'))
+        setItems(
+          (data.pendingIngestions ?? []).filter(
+            (p) =>
+              p.status === 'awaiting_password' ||
+              p.status === 'awaiting_review',
+          ),
+        )
       }
     } catch {
       /* transient */
@@ -119,7 +165,10 @@ export function PendingIngestionPanel({
         result?: { found: number; queued: number; skippedAlreadyQueued: number }
       }
       if (!data.ok) setNote(data.error || 'Gmail sync failed')
-      else if (data.result) setNote(`Found ${data.result.found}, queued ${data.result.queued} for review.`)
+      else if (data.result)
+        setNote(
+          `Found ${data.result.found}, queued ${data.result.queued} for review.`,
+        )
       await load()
     } catch (e) {
       setNote(e instanceof Error ? e.message : 'Gmail sync failed')
@@ -129,15 +178,22 @@ export function PendingIngestionPanel({
     }
   }
 
-  async function uploadFile(file: File, documentType: 'transaction' | 'contract' = 'transaction') {
-    const setBusy = documentType === 'contract' ? setUploadingContract : setUploading
+  async function uploadFile(
+    file: File,
+    documentType: 'transaction' | 'contract' = 'transaction',
+  ) {
+    const setBusy =
+      documentType === 'contract' ? setUploadingContract : setUploading
     setBusy(true)
     setNote(null)
     try {
       const form = new FormData()
       form.set('file', file)
       form.set('documentType', documentType)
-      const res = await fetch('/api/finance-upload', { method: 'POST', body: form })
+      const res = await fetch('/api/finance-upload', {
+        method: 'POST',
+        body: form,
+      })
       const data = (await res.json()) as { ok: boolean; error?: string }
       if (!data.ok) setNote(data.error || 'Upload failed')
       await load()
@@ -158,7 +214,11 @@ export function PendingIngestionPanel({
       const res = await fetch('/api/finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'submit_ingestion_password', id, password }),
+        body: JSON.stringify({
+          action: 'submit_ingestion_password',
+          id,
+          password,
+        }),
       })
       const data = (await res.json()) as { ok: boolean; error?: string }
       if (!data.ok) setNote(data.error || 'Could not unlock document')
@@ -194,19 +254,31 @@ export function PendingIngestionPanel({
       const res = await fetch('/api/finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'confirm_pending_ingestion', id: item.id, payload: draft, force }),
+        body: JSON.stringify({
+          action: 'confirm_pending_ingestion',
+          id: item.id,
+          payload: draft,
+          force,
+        }),
       })
       const data = (await res.json()) as {
         ok?: boolean
         error?: string
-        duplicateWarning?: { date: string; amount: number; vendorOrSource: string }
+        duplicateWarning?: {
+          date: string
+          amount: number
+          vendorOrSource: string
+        }
       }
       if (data.ok === false) {
         setNote(data.error || 'Confirm failed')
         return
       }
       if (data.duplicateWarning) {
-        setDuplicateWarnings((prev) => ({ ...prev, [item.id]: data.duplicateWarning! }))
+        setDuplicateWarnings((prev) => ({
+          ...prev,
+          [item.id]: data.duplicateWarning!,
+        }))
         return
       }
       setDuplicateWarnings((prev) => {
@@ -234,7 +306,9 @@ export function PendingIngestionPanel({
   async function confirmContractItem(item: PendingIngestion) {
     const draft = { ...item.extractedContract, ...contractDrafts[item.id] }
     if (!draft.employerName || !draft.employmentType) {
-      setNote('Employer name and employment type are required before confirming.')
+      setNote(
+        'Employer name and employment type are required before confirming.',
+      )
       return
     }
     setBusyId(item.id)
@@ -264,19 +338,15 @@ export function PendingIngestionPanel({
     }
   }
 
-  const inputClass =
-    'min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
-  const buttonClass =
-    'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40'
-
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">AI-assisted intake</h2>
           <p className="text-xs text-[var(--theme-muted)]">
-            Upload a photo or document of a bill/receipt and AI extracts the details — nothing
-            is added to your records until you review and confirm it below.
+            Upload a photo or document of a bill/receipt and AI extracts the
+            details — nothing is added to your records until you review and
+            confirm it below.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -318,7 +388,12 @@ export function PendingIngestionPanel({
             {uploadingContract ? 'Processing…' : 'Upload employment contract'}
           </button>
           {gmailConnected ? (
-            <button type="button" disabled={syncing} onClick={() => void syncGmail()} className={buttonClass}>
+            <button
+              type="button"
+              disabled={syncing}
+              onClick={() => void syncGmail()}
+              className={buttonClass}
+            >
               {syncing ? 'Syncing…' : 'Sync Gmail now'}
             </button>
           ) : (
@@ -331,7 +406,9 @@ export function PendingIngestionPanel({
 
       {gmailConnected && (
         <p className="mt-1 text-xs text-[var(--theme-muted)]">
-          {gmailLastSyncedAtSeconds ? `Last synced ${new Date(gmailLastSyncedAtSeconds * 1000).toLocaleString()}` : 'Never synced'}
+          {gmailLastSyncedAtSeconds
+            ? `Last synced ${new Date(gmailLastSyncedAtSeconds * 1000).toLocaleString()}`
+            : 'Never synced'}
         </p>
       )}
 
@@ -339,7 +416,8 @@ export function PendingIngestionPanel({
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--theme-muted)]">
           {[...gmailSyncHistory].reverse().map((run) => (
             <span key={run.at}>
-              {new Date(run.at * 1000).toLocaleDateString()}: found {run.found}, queued {run.queued}
+              {new Date(run.at * 1000).toLocaleDateString()}: found {run.found},
+              queued {run.queued}
             </span>
           ))}
         </div>
@@ -354,300 +432,412 @@ export function PendingIngestionPanel({
       ) : (
         <div className="mt-4 grid gap-3">
           {sortedItems.map((item) => {
-            const hasDuplicateWarning = Object.hasOwn(duplicateWarnings, item.id)
+            const hasDuplicateWarning = Object.hasOwn(
+              duplicateWarnings,
+              item.id,
+            )
             const duplicateWarning = duplicateWarnings[item.id]
             return (
-            <div
-              key={item.id}
-              className="flex flex-wrap items-start gap-3 rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
-            >
-              {item.rawPreviewImagePath && (
-                previewFailedIds[item.id] ? (
-                  <div className="flex h-24 w-24 items-center justify-center rounded-xl border border-[var(--theme-border)]/60 bg-black/20 p-2 text-center text-[10px] text-[var(--theme-muted)]">
-                    Preview not available for this format
-                  </div>
-                ) : (
-                  <img
-                    src={`/api/finance-upload?id=${item.id}`}
-                    alt="Document preview"
-                    className="h-24 w-24 rounded-xl border border-[var(--theme-border)]/60 object-cover"
-                    onError={() => setPreviewFailedIds((prev) => ({ ...prev, [item.id]: true }))}
-                  />
-                )
-              )}
+              <div
+                key={item.id}
+                className="flex flex-wrap items-start gap-3 rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              >
+                {item.rawPreviewImagePath &&
+                  (previewFailedIds[item.id] ? (
+                    <div className="flex h-24 w-24 items-center justify-center rounded-xl border border-[var(--theme-border)]/60 bg-black/20 p-2 text-center text-[10px] text-[var(--theme-muted)]">
+                      Preview not available for this format
+                    </div>
+                  ) : (
+                    <img
+                      src={`/api/finance-upload?id=${item.id}`}
+                      alt="Document preview"
+                      className="h-24 w-24 rounded-xl border border-[var(--theme-border)]/60 object-cover"
+                      onError={() =>
+                        setPreviewFailedIds((prev) => ({
+                          ...prev,
+                          [item.id]: true,
+                        }))
+                      }
+                    />
+                  ))}
 
-              <div className="min-w-[220px] flex-1">
-                <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
-                  <span className="uppercase tracking-wide">{item.source}</span>
-                  <span>·</span>
-                  <span>{item.status.replace('_', ' ')}</span>
+                <div className="min-w-[220px] flex-1">
+                  <div className="flex items-center gap-2 text-xs text-[var(--theme-muted)]">
+                    <span className="uppercase tracking-wide">
+                      {item.source}
+                    </span>
+                    <span>·</span>
+                    <span>{item.status.replace('_', ' ')}</span>
+                  </div>
+
+                  {item.status === 'awaiting_password' && (
+                    <div className="mt-2">
+                      {item.passwordHint && (
+                        <p className="text-xs text-[var(--theme-muted)]">
+                          Hint: {item.passwordHint}
+                        </p>
+                      )}
+                      {item.error && (
+                        <p className="mt-1 text-xs text-red-300">
+                          {item.error}
+                        </p>
+                      )}
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <input
+                          type="password"
+                          placeholder="Document password"
+                          value={passwordDrafts[item.id] ?? ''}
+                          onChange={(e) =>
+                            setPasswordDrafts((prev) => ({
+                              ...prev,
+                              [item.id]: e.target.value,
+                            }))
+                          }
+                          className={inputClass}
+                        />
+                        <button
+                          type="button"
+                          disabled={busyId === item.id}
+                          onClick={() => void submitPassword(item.id)}
+                          className={buttonClass}
+                        >
+                          Unlock
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.status === 'awaiting_review' &&
+                    item.documentType === 'contract' && (
+                      <div className="mt-2">
+                        {item.error && !item.extractedContract && (
+                          <p className="text-xs text-amber-200">
+                            Automatic extraction failed ({item.error}) — enter
+                            the details manually below.
+                          </p>
+                        )}
+                        {item.extractedContract && (
+                          <span
+                            className={`mb-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${confidenceTone[item.extractedContract.confidence]}`}
+                          >
+                            {item.extractedContract.confidence} confidence
+                          </span>
+                        )}
+                        {item.extractedContract && (
+                          <div className="mb-3 rounded-xl border border-[var(--theme-border)]/60 bg-black/20 p-3">
+                            <p className="text-xs font-semibold text-[var(--theme-text)]">
+                              AI contract review
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                              {item.extractedContract.riskSummary}
+                            </p>
+                            {item.extractedContract.risks.length > 0 && (
+                              <div className="mt-2 grid gap-1.5">
+                                {item.extractedContract.risks.map((risk, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex flex-wrap items-start gap-2"
+                                  >
+                                    <span
+                                      className={`shrink-0 rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${severityTone[risk.severity]}`}
+                                    >
+                                      {risk.severity}
+                                    </span>
+                                    <span className="text-xs text-[var(--theme-muted)]">
+                                      <strong className="text-[var(--theme-text)]">
+                                        {risk.clause}:
+                                      </strong>{' '}
+                                      {risk.concern}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <p className="mt-2 text-[10px] italic text-[var(--theme-muted)]">
+                              AI-generated review — not legal advice; confirm
+                              important terms yourself before signing or acting
+                              on this.
+                            </p>
+                          </div>
+                        )}
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          <input
+                            type="text"
+                            placeholder="Employer name"
+                            defaultValue={item.extractedContract?.employerName}
+                            onChange={(e) =>
+                              updateContractDraft(item.id, {
+                                employerName: e.target.value,
+                              })
+                            }
+                            className={inputClass}
+                          />
+                          <select
+                            value={
+                              (contractDrafts[item.id] ?? {}).employmentType ??
+                              item.extractedContract?.employmentType ??
+                              'other'
+                            }
+                            onChange={(e) =>
+                              updateContractDraft(item.id, {
+                                employmentType: e.target
+                                  .value as ExtractedContract['employmentType'],
+                              })
+                            }
+                            className={inputClass}
+                          >
+                            <option value="full_time">Full-time</option>
+                            <option value="contract">Contract</option>
+                            <option value="freelance">Freelance</option>
+                            <option value="other">Other</option>
+                          </select>
+                          <input
+                            type="text"
+                            placeholder="Job title (optional)"
+                            defaultValue={item.extractedContract?.jobTitle}
+                            onChange={(e) =>
+                              updateContractDraft(item.id, {
+                                jobTitle: e.target.value,
+                              })
+                            }
+                            className={inputClass}
+                          />
+                          <input
+                            type="number"
+                            placeholder="Monthly amount (optional)"
+                            defaultValue={
+                              item.extractedContract?.monthlyIncomeAmount
+                            }
+                            onChange={(e) =>
+                              updateContractDraft(item.id, {
+                                monthlyIncomeAmount: Number(e.target.value),
+                              })
+                            }
+                            className={`${inputClass} w-40`}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Currency"
+                            defaultValue={
+                              item.extractedContract?.currency ?? 'LKR'
+                            }
+                            onChange={(e) =>
+                              updateContractDraft(item.id, {
+                                currency: e.target.value,
+                              })
+                            }
+                            className={`${inputClass} w-20`}
+                          />
+                          <input
+                            type="date"
+                            defaultValue={
+                              item.extractedContract?.contractStartDate
+                            }
+                            onChange={(e) =>
+                              updateContractDraft(item.id, {
+                                contractStartDate: e.target.value,
+                              })
+                            }
+                            className={inputClass}
+                            title="Contract start date"
+                          />
+                          <input
+                            type="date"
+                            defaultValue={
+                              item.extractedContract?.contractEndDate
+                            }
+                            onChange={(e) =>
+                              updateContractDraft(item.id, {
+                                contractEndDate: e.target.value,
+                              })
+                            }
+                            className={inputClass}
+                            title="Contract end date"
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            max={31}
+                            placeholder="Payday (day, optional)"
+                            defaultValue={
+                              item.extractedContract?.paydayDayOfMonth
+                            }
+                            onChange={(e) =>
+                              updateContractDraft(item.id, {
+                                paydayDayOfMonth: e.target.value
+                                  ? Number(e.target.value)
+                                  : undefined,
+                              })
+                            }
+                            className={`${inputClass} w-36`}
+                            title="Expected day of month pay lands"
+                          />
+                        </div>
+                        {item.extractedContract?.paySchedule && (
+                          <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
+                            Pay schedule from contract:{' '}
+                            {item.extractedContract.paySchedule}
+                          </p>
+                        )}
+                        <div className="mt-2">
+                          <select
+                            value={targetJobDrafts[item.id] ?? ''}
+                            onChange={(e) =>
+                              setTargetJobDrafts((prev) => ({
+                                ...prev,
+                                [item.id]: e.target.value,
+                              }))
+                            }
+                            className={inputClass}
+                          >
+                            <option value="">Create new job</option>
+                            {payload.data.income_sources.map((job) => {
+                              const jobId =
+                                typeof job.id === 'string' ? job.id : ''
+                              const employerName =
+                                typeof job.employerName === 'string'
+                                  ? job.employerName
+                                  : 'Job'
+                              return (
+                                <option key={jobId} value={jobId}>
+                                  Update existing job: {employerName}
+                                </option>
+                              )
+                            })}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                  {item.status === 'awaiting_review' &&
+                    item.documentType !== 'contract' && (
+                      <div className="mt-2">
+                        {item.error && !item.extracted && (
+                          <p className="text-xs text-amber-200">
+                            Automatic extraction failed ({item.error}) — enter
+                            the details manually below.
+                          </p>
+                        )}
+                        {item.extracted && (
+                          <span
+                            className={`mb-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${confidenceTone[item.extracted.confidence]}`}
+                          >
+                            {item.extracted.confidence} confidence
+                          </span>
+                        )}
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          <select
+                            value={
+                              (editDrafts[item.id] ?? {}).kind ??
+                              item.extracted?.kind ??
+                              'expense'
+                            }
+                            onChange={(e) =>
+                              updateDraft(item.id, {
+                                kind: e.target.value as 'income' | 'expense',
+                              })
+                            }
+                            className={inputClass}
+                          >
+                            <option value="expense">Expense</option>
+                            <option value="income">Income</option>
+                          </select>
+                          <input
+                            type="number"
+                            placeholder="Amount"
+                            defaultValue={item.extracted?.amount}
+                            onChange={(e) =>
+                              updateDraft(item.id, {
+                                amount: Number(e.target.value),
+                              })
+                            }
+                            className={`${inputClass} w-28`}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Currency"
+                            defaultValue={item.extracted?.currency ?? 'LKR'}
+                            onChange={(e) =>
+                              updateDraft(item.id, { currency: e.target.value })
+                            }
+                            className={`${inputClass} w-20`}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Vendor / source"
+                            defaultValue={item.extracted?.vendorOrSource}
+                            onChange={(e) =>
+                              updateDraft(item.id, {
+                                vendorOrSource: e.target.value,
+                              })
+                            }
+                            className={inputClass}
+                          />
+                          <input
+                            type="date"
+                            defaultValue={item.extracted?.date}
+                            onChange={(e) =>
+                              updateDraft(item.id, { date: e.target.value })
+                            }
+                            className={inputClass}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Category"
+                            defaultValue={item.extracted?.category}
+                            onChange={(e) =>
+                              updateDraft(item.id, { category: e.target.value })
+                            }
+                            className={inputClass}
+                          />
+                        </div>
+                        {hasDuplicateWarning && (
+                          <p className="mt-2 text-xs text-amber-200">
+                            Possible duplicate: an existing record for "
+                            {duplicateWarning.vendorOrSource}" on{' '}
+                            {duplicateWarning.date} for{' '}
+                            {duplicateWarning.amount} already exists.
+                          </p>
+                        )}
+                      </div>
+                    )}
                 </div>
 
-                {item.status === 'awaiting_password' && (
-                  <div className="mt-2">
-                    {item.passwordHint && (
-                      <p className="text-xs text-[var(--theme-muted)]">Hint: {item.passwordHint}</p>
-                    )}
-                    {item.error && <p className="mt-1 text-xs text-red-300">{item.error}</p>}
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <input
-                        type="password"
-                        placeholder="Document password"
-                        value={passwordDrafts[item.id] ?? ''}
-                        onChange={(e) => setPasswordDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                        className={inputClass}
-                      />
+                <div className="flex gap-2">
+                  {item.status === 'awaiting_review' &&
+                    item.documentType === 'contract' && (
                       <button
                         type="button"
                         disabled={busyId === item.id}
-                        onClick={() => void submitPassword(item.id)}
-                        className={buttonClass}
+                        onClick={() => void confirmContractItem(item)}
+                        className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
                       >
-                        Unlock
+                        Confirm
                       </button>
-                    </div>
-                  </div>
-                )}
-
-                {item.status === 'awaiting_review' && item.documentType === 'contract' && (
-                  <div className="mt-2">
-                    {item.error && !item.extractedContract && (
-                      <p className="text-xs text-amber-200">
-                        Automatic extraction failed ({item.error}) — enter the details manually below.
-                      </p>
                     )}
-                    {item.extractedContract && (
-                      <span
-                        className={`mb-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${confidenceTone[item.extractedContract.confidence]}`}
-                      >
-                        {item.extractedContract.confidence} confidence
-                      </span>
-                    )}
-                    {item.extractedContract && (
-                      <div className="mb-3 rounded-xl border border-[var(--theme-border)]/60 bg-black/20 p-3">
-                        <p className="text-xs font-semibold text-[var(--theme-text)]">AI contract review</p>
-                        <p className="mt-1 text-xs text-[var(--theme-muted)]">{item.extractedContract.riskSummary}</p>
-                        {item.extractedContract.risks.length > 0 && (
-                          <div className="mt-2 grid gap-1.5">
-                            {item.extractedContract.risks.map((risk, i) => (
-                              <div key={i} className="flex flex-wrap items-start gap-2">
-                                <span
-                                  className={`shrink-0 rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${severityTone[risk.severity]}`}
-                                >
-                                  {risk.severity}
-                                </span>
-                                <span className="text-xs text-[var(--theme-muted)]">
-                                  <strong className="text-[var(--theme-text)]">{risk.clause}:</strong> {risk.concern}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <p className="mt-2 text-[10px] italic text-[var(--theme-muted)]">
-                          AI-generated review — not legal advice; confirm important terms yourself before signing or
-                          acting on this.
-                        </p>
-                      </div>
-                    )}
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      <input
-                        type="text"
-                        placeholder="Employer name"
-                        defaultValue={item.extractedContract?.employerName}
-                        onChange={(e) => updateContractDraft(item.id, { employerName: e.target.value })}
-                        className={inputClass}
-                      />
-                      <select
-                        value={
-                          (contractDrafts[item.id] ?? {}).employmentType ?? item.extractedContract?.employmentType ?? 'other'
+                  {item.status === 'awaiting_review' &&
+                    item.documentType !== 'contract' && (
+                      <button
+                        type="button"
+                        disabled={busyId === item.id}
+                        onClick={() =>
+                          void confirmItem(item, hasDuplicateWarning)
                         }
-                        onChange={(e) =>
-                          updateContractDraft(item.id, {
-                            employmentType: e.target.value as ExtractedContract['employmentType'],
-                          })
-                        }
-                        className={inputClass}
+                        className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
                       >
-                        <option value="full_time">Full-time</option>
-                        <option value="contract">Contract</option>
-                        <option value="freelance">Freelance</option>
-                        <option value="other">Other</option>
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="Job title (optional)"
-                        defaultValue={item.extractedContract?.jobTitle}
-                        onChange={(e) => updateContractDraft(item.id, { jobTitle: e.target.value })}
-                        className={inputClass}
-                      />
-                      <input
-                        type="number"
-                        placeholder="Monthly amount (optional)"
-                        defaultValue={item.extractedContract?.monthlyIncomeAmount}
-                        onChange={(e) => updateContractDraft(item.id, { monthlyIncomeAmount: Number(e.target.value) })}
-                        className={`${inputClass} w-40`}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Currency"
-                        defaultValue={item.extractedContract?.currency ?? 'LKR'}
-                        onChange={(e) => updateContractDraft(item.id, { currency: e.target.value })}
-                        className={`${inputClass} w-20`}
-                      />
-                      <input
-                        type="date"
-                        defaultValue={item.extractedContract?.contractStartDate}
-                        onChange={(e) => updateContractDraft(item.id, { contractStartDate: e.target.value })}
-                        className={inputClass}
-                        title="Contract start date"
-                      />
-                      <input
-                        type="date"
-                        defaultValue={item.extractedContract?.contractEndDate}
-                        onChange={(e) => updateContractDraft(item.id, { contractEndDate: e.target.value })}
-                        className={inputClass}
-                        title="Contract end date"
-                      />
-                      <input
-                        type="number"
-                        min={1}
-                        max={31}
-                        placeholder="Payday (day, optional)"
-                        defaultValue={item.extractedContract?.paydayDayOfMonth}
-                        onChange={(e) =>
-                          updateContractDraft(item.id, {
-                            paydayDayOfMonth: e.target.value ? Number(e.target.value) : undefined,
-                          })
-                        }
-                        className={`${inputClass} w-36`}
-                        title="Expected day of month pay lands"
-                      />
-                    </div>
-                    {item.extractedContract?.paySchedule && (
-                      <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
-                        Pay schedule from contract: {item.extractedContract.paySchedule}
-                      </p>
+                        {hasDuplicateWarning ? 'Confirm anyway' : 'Confirm'}
+                      </button>
                     )}
-                    <div className="mt-2">
-                      <select
-                        value={targetJobDrafts[item.id] ?? ''}
-                        onChange={(e) => setTargetJobDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                        className={inputClass}
-                      >
-                        <option value="">Create new job</option>
-                        {payload.data.income_sources.map((job) => {
-                          const jobId = typeof job.id === 'string' ? job.id : ''
-                          const employerName = typeof job.employerName === 'string' ? job.employerName : 'Job'
-                          return (
-                            <option key={jobId} value={jobId}>
-                              Update existing job: {employerName}
-                            </option>
-                          )
-                        })}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {item.status === 'awaiting_review' && item.documentType !== 'contract' && (
-                  <div className="mt-2">
-                    {item.error && !item.extracted && (
-                      <p className="text-xs text-amber-200">
-                        Automatic extraction failed ({item.error}) — enter the details manually below.
-                      </p>
-                    )}
-                    {item.extracted && (
-                      <span
-                        className={`mb-2 inline-block rounded-lg border px-2 py-0.5 text-[10px] uppercase tracking-wide ${confidenceTone[item.extracted.confidence]}`}
-                      >
-                        {item.extracted.confidence} confidence
-                      </span>
-                    )}
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      <select
-                        value={(editDrafts[item.id] ?? {}).kind ?? item.extracted?.kind ?? 'expense'}
-                        onChange={(e) => updateDraft(item.id, { kind: e.target.value as 'income' | 'expense' })}
-                        className={inputClass}
-                      >
-                        <option value="expense">Expense</option>
-                        <option value="income">Income</option>
-                      </select>
-                      <input
-                        type="number"
-                        placeholder="Amount"
-                        defaultValue={item.extracted?.amount}
-                        onChange={(e) => updateDraft(item.id, { amount: Number(e.target.value) })}
-                        className={`${inputClass} w-28`}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Currency"
-                        defaultValue={item.extracted?.currency ?? 'LKR'}
-                        onChange={(e) => updateDraft(item.id, { currency: e.target.value })}
-                        className={`${inputClass} w-20`}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Vendor / source"
-                        defaultValue={item.extracted?.vendorOrSource}
-                        onChange={(e) => updateDraft(item.id, { vendorOrSource: e.target.value })}
-                        className={inputClass}
-                      />
-                      <input
-                        type="date"
-                        defaultValue={item.extracted?.date}
-                        onChange={(e) => updateDraft(item.id, { date: e.target.value })}
-                        className={inputClass}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Category"
-                        defaultValue={item.extracted?.category}
-                        onChange={(e) => updateDraft(item.id, { category: e.target.value })}
-                        className={inputClass}
-                      />
-                    </div>
-                    {hasDuplicateWarning && (
-                      <p className="mt-2 text-xs text-amber-200">
-                        Possible duplicate: an existing record for "{duplicateWarning.vendorOrSource}" on{' '}
-                        {duplicateWarning.date} for {duplicateWarning.amount} already exists.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                {item.status === 'awaiting_review' && item.documentType === 'contract' && (
                   <button
                     type="button"
                     disabled={busyId === item.id}
-                    onClick={() => void confirmContractItem(item)}
-                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                    onClick={() => void reject(item.id)}
+                    className="rounded-xl border border-red-400/30 bg-red-500/15 px-4 py-2 text-sm font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
                   >
-                    Confirm
+                    Reject
                   </button>
-                )}
-                {item.status === 'awaiting_review' && item.documentType !== 'contract' && (
-                  <button
-                    type="button"
-                    disabled={busyId === item.id}
-                    onClick={() => void confirmItem(item, hasDuplicateWarning)}
-                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
-                  >
-                    {hasDuplicateWarning ? 'Confirm anyway' : 'Confirm'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  disabled={busyId === item.id}
-                  onClick={() => void reject(item.id)}
-                  className="rounded-xl border border-red-400/30 bg-red-500/15 px-4 py-2 text-sm font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
-                >
-                  Reject
-                </button>
+                </div>
               </div>
-            </div>
             )
           })}
         </div>

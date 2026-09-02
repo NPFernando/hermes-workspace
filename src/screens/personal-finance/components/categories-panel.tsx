@@ -1,12 +1,9 @@
 import { useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
+import { buttonClass, inputClass } from '../shared-styles'
+import { stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
-
-const inputClass =
-  'min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
-const buttonClass =
-  'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40'
 
 const CATEGORY_KINDS = [
   { value: 'both', label: 'Both' },
@@ -16,11 +13,6 @@ const CATEGORY_KINDS = [
 
 function kindLabel(kind: string): string {
   return CATEGORY_KINDS.find((k) => k.value === kind)?.label ?? kind
-}
-
-function stringField(row: Record<string, unknown>, key: string): string {
-  const value = row[key]
-  return typeof value === 'string' ? value : ''
 }
 
 type EditDraft = {
@@ -44,7 +36,12 @@ export function CategoriesPanel({
   payload: PersonalFinancePayload
   onPayload: (p: PersonalFinancePayload) => void
 }) {
-  const { run: post, busy, error: err, setError: setErr } = useFinanceAction<PersonalFinancePayload>(onPayload)
+  const {
+    run: post,
+    busy,
+    error: err,
+    setError: setErr,
+  } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<Record<string, EditDraft>>({})
@@ -54,8 +51,12 @@ export function CategoriesPanel({
   const [color, setColor] = useState('')
   const [notes, setNotes] = useState('')
 
-  const [confirmDeleteSubId, setConfirmDeleteSubId] = useState<string | null>(null)
-  const [subInputByCategory, setSubInputByCategory] = useState<Record<string, string>>({})
+  const [confirmDeleteSubId, setConfirmDeleteSubId] = useState<string | null>(
+    null,
+  )
+  const [subInputByCategory, setSubInputByCategory] = useState<
+    Record<string, string>
+  >({})
 
   const categories = payload.data.categories
   const subcategories = payload.data.subcategories
@@ -128,7 +129,10 @@ export function CategoriesPanel({
   }
 
   async function deleteCategory(id: string) {
-    const data = await post({ action: 'delete_record', kind: 'category', id }, `delete-${id}`)
+    const data = await post(
+      { action: 'delete_record', kind: 'category', id },
+      `delete-${id}`,
+    )
     if (data) setConfirmDeleteId(null)
   }
 
@@ -137,14 +141,22 @@ export function CategoriesPanel({
     if (!finalName) return
     const busyKey = `subcategory-${parentCategory}`
     const data = await post(
-      { action: 'add_record', kind: 'subcategory_entry', payload: { name: finalName, parentCategory } },
+      {
+        action: 'add_record',
+        kind: 'subcategory_entry',
+        payload: { name: finalName, parentCategory },
+      },
       busyKey,
     )
-    if (data) setSubInputByCategory((prev) => ({ ...prev, [parentCategory]: '' }))
+    if (data)
+      setSubInputByCategory((prev) => ({ ...prev, [parentCategory]: '' }))
   }
 
   async function deleteSubcategory(id: string) {
-    const data = await post({ action: 'delete_record', kind: 'subcategory_entry', id }, `delete-sub-${id}`)
+    const data = await post(
+      { action: 'delete_record', kind: 'subcategory_entry', id },
+      `delete-sub-${id}`,
+    )
     if (data) setConfirmDeleteSubId(null)
   }
 
@@ -163,7 +175,11 @@ export function CategoriesPanel({
       if (c) counts.set(c, (counts.get(c) ?? 0) + 1)
     }
     return counts
-  }, [payload.data.expense_records, payload.data.income_records, payload.data.budget_categories])
+  }, [
+    payload.data.expense_records,
+    payload.data.income_records,
+    payload.data.budget_categories,
+  ])
 
   const unmanaged = useMemo(() => {
     const known = new Set(categories.map((c) => stringField(c, 'name')))
@@ -181,7 +197,12 @@ export function CategoriesPanel({
       if (c && !known.has(c) && !found.has(c)) found.set(c, 'expense')
     }
     return Array.from(found.entries())
-  }, [categories, payload.data.expense_records, payload.data.income_records, payload.data.budget_categories])
+  }, [
+    categories,
+    payload.data.expense_records,
+    payload.data.income_records,
+    payload.data.budget_categories,
+  ])
 
   const subUsageCounts = useMemo(() => {
     const counts = new Map<string, number>()
@@ -197,7 +218,8 @@ export function CategoriesPanel({
     const found = new Map<string, string>()
     for (const exp of payload.data.expense_records) {
       const s = stringField(exp, 'subcategory')
-      if (s && !known.has(s) && !found.has(s)) found.set(s, stringField(exp, 'category') || 'Other')
+      if (s && !known.has(s) && !found.has(s))
+        found.set(s, stringField(exp, 'category') || 'Other')
     }
     return Array.from(found.entries())
   }, [subcategories, payload.data.expense_records])
@@ -206,19 +228,26 @@ export function CategoriesPanel({
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <datalist id="pf-known-categories">
         {categories.map((c, index) => (
-          <option key={stringField(c, 'id') || String(index)} value={stringField(c, 'name')} />
+          <option
+            key={stringField(c, 'id') || String(index)}
+            value={stringField(c, 'name')}
+          />
         ))}
       </datalist>
       <datalist id="pf-known-subcategories">
         {subcategories.map((s, index) => (
-          <option key={stringField(s, 'id') || String(index)} value={stringField(s, 'name')} />
+          <option
+            key={stringField(s, 'id') || String(index)}
+            value={stringField(s, 'name')}
+          />
         ))}
       </datalist>
 
       <h2 className="text-lg font-semibold">Categories</h2>
       <p className="text-xs text-[var(--theme-muted)]">
-        A managed list of income/expense categories — expense and budget matching still uses the free-text name you
-        see here, so renaming a category here does not retroactively update past records.
+        A managed list of income/expense categories — expense and budget
+        matching still uses the free-text name you see here, so renaming a
+        category here does not retroactively update past records.
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -229,7 +258,11 @@ export function CategoriesPanel({
           onChange={(e) => setName(e.target.value)}
           className={inputClass}
         />
-        <select value={kind} onChange={(e) => setKind(e.target.value)} className={inputClass}>
+        <select
+          value={kind}
+          onChange={(e) => setKind(e.target.value)}
+          className={inputClass}
+        >
           {CATEGORY_KINDS.map((k) => (
             <option key={k.value} value={k.value}>
               {k.label}
@@ -250,7 +283,12 @@ export function CategoriesPanel({
           onChange={(e) => setNotes(e.target.value)}
           className={inputClass}
         />
-        <button type="button" disabled={busy === 'category'} onClick={() => void submitCategory()} className={buttonClass}>
+        <button
+          type="button"
+          disabled={busy === 'category'}
+          onClick={() => void submitCategory()}
+          className={buttonClass}
+        >
           {busy === 'category' ? 'Saving…' : 'Add category'}
         </button>
       </div>
@@ -258,7 +296,11 @@ export function CategoriesPanel({
       {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
 
       <div className="mt-4 grid gap-2">
-        {categories.length === 0 && <p className="text-sm text-[var(--theme-muted)]">No categories added yet.</p>}
+        {categories.length === 0 && (
+          <p className="text-sm text-[var(--theme-muted)]">
+            No categories added yet.
+          </p>
+        )}
         {categories.map((category, index) => {
           const id = stringField(category, 'id') || String(index)
           const isEditing = editOpenId === id
@@ -267,19 +309,32 @@ export function CategoriesPanel({
           const count = usageCounts.get(categoryName) ?? 0
 
           return (
-            <div key={id} className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+            <div
+              key={id}
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+            >
               {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="text"
                     placeholder="Category name"
                     value={editDrafts[id].name}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], name: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], name: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <select
                     value={editDrafts[id].kind}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], kind: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], kind: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   >
                     {CATEGORY_KINDS.map((k) => (
@@ -292,14 +347,24 @@ export function CategoriesPanel({
                     type="text"
                     placeholder="Color"
                     value={editDrafts[id].color}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], color: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], color: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <input
                     type="text"
                     placeholder="Notes"
                     value={editDrafts[id].notes}
-                    onChange={(e) => setEditDrafts((prev) => ({ ...prev, [id]: { ...prev[id], notes: e.target.value } }))}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], notes: e.target.value },
+                      }))
+                    }
                     className={inputClass}
                   />
                   <button
@@ -310,7 +375,11 @@ export function CategoriesPanel({
                   >
                     {busy === `edit-${id}` ? 'Saving…' : 'Save'}
                   </button>
-                  <button type="button" onClick={cancelEdit} className={buttonClass}>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className={buttonClass}
+                  >
                     Cancel
                   </button>
                 </div>
@@ -320,16 +389,25 @@ export function CategoriesPanel({
                     {stringField(category, 'color') && (
                       <span
                         className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle"
-                        style={{ backgroundColor: stringField(category, 'color') }}
+                        style={{
+                          backgroundColor: stringField(category, 'color'),
+                        }}
                       />
                     )}
-                    <span className="font-medium text-[var(--theme-text)]">{categoryName}</span>{' '}
+                    <span className="font-medium text-[var(--theme-text)]">
+                      {categoryName}
+                    </span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
-                      · {kindLabel(categoryKind)} · used {count} time{count === 1 ? '' : 's'}
+                      · {kindLabel(categoryKind)} · used {count} time
+                      {count === 1 ? '' : 's'}
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => startEdit(category)} className={buttonClass}>
+                    <button
+                      type="button"
+                      onClick={() => startEdit(category)}
+                      className={buttonClass}
+                    >
                       Edit
                     </button>
                     <button
@@ -347,7 +425,9 @@ export function CategoriesPanel({
               {!isEditing && (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-[var(--theme-border)]/40 pt-2">
                   {subcategories
-                    .filter((s) => stringField(s, 'parentCategory') === categoryName)
+                    .filter(
+                      (s) => stringField(s, 'parentCategory') === categoryName,
+                    )
                     .map((s, subIndex) => {
                       const subId = stringField(s, 'id') || String(subIndex)
                       const subName = stringField(s, 'name')
@@ -375,17 +455,27 @@ export function CategoriesPanel({
                     placeholder="Add subcategory"
                     value={subInputByCategory[categoryName] ?? ''}
                     onChange={(e) =>
-                      setSubInputByCategory((prev) => ({ ...prev, [categoryName]: e.target.value }))
+                      setSubInputByCategory((prev) => ({
+                        ...prev,
+                        [categoryName]: e.target.value,
+                      }))
                     }
                     className={`${inputClass} w-32`}
                   />
                   <button
                     type="button"
                     disabled={busy === `subcategory-${categoryName}`}
-                    onClick={() => void submitSubcategory(subInputByCategory[categoryName] ?? '', categoryName)}
+                    onClick={() =>
+                      void submitSubcategory(
+                        subInputByCategory[categoryName] ?? '',
+                        categoryName,
+                      )
+                    }
                     className={buttonClass}
                   >
-                    {busy === `subcategory-${categoryName}` ? 'Saving…' : '+ Sub'}
+                    {busy === `subcategory-${categoryName}`
+                      ? 'Saving…'
+                      : '+ Sub'}
                   </button>
                 </div>
               )}
@@ -396,14 +486,18 @@ export function CategoriesPanel({
 
       {unmanaged.length > 0 && (
         <div className="mt-4 border-t border-[var(--theme-border)]/50 pt-3">
-          <p className="text-xs font-medium text-[var(--theme-muted)]">In use, not yet a category</p>
+          <p className="text-xs font-medium text-[var(--theme-muted)]">
+            In use, not yet a category
+          </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {unmanaged.map(([catName, guessedKind]) => (
               <button
                 key={catName}
                 type="button"
                 disabled={busy === 'category'}
-                onClick={() => void submitCategory({ name: catName, kind: guessedKind })}
+                onClick={() =>
+                  void submitCategory({ name: catName, kind: guessedKind })
+                }
                 className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1 text-xs text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40"
               >
                 + {catName}
@@ -415,7 +509,9 @@ export function CategoriesPanel({
 
       {unmanagedSub.length > 0 && (
         <div className="mt-4 border-t border-[var(--theme-border)]/50 pt-3">
-          <p className="text-xs font-medium text-[var(--theme-muted)]">In use, not yet a subcategory</p>
+          <p className="text-xs font-medium text-[var(--theme-muted)]">
+            In use, not yet a subcategory
+          </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {unmanagedSub.map(([subName, parentCategory]) => (
               <button

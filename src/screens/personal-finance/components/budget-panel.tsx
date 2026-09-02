@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { StatCard } from '../../finance/components/stat-card'
 import { formatLkr } from '../utils'
+import { buttonClass, inputClass } from '../shared-styles'
 import type { PersonalFinancePayload } from '../types'
 
 function budgetTone(percentUsed: number): 'good' | 'warn' | 'danger' {
@@ -18,7 +19,12 @@ export function BudgetPanel({
   onPayload: (p: PersonalFinancePayload) => void
 }) {
   const currentMonth = new Date().toISOString().slice(0, 7)
-  const { run: post, busy, error: err, setError: setErr } = useFinanceAction<PersonalFinancePayload>(onPayload)
+  const {
+    run: post,
+    busy,
+    error: err,
+    setError: setErr,
+  } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const [budgetMonth, setBudgetMonth] = useState(currentMonth)
   const [budgetCategory, setBudgetCategory] = useState('')
   const [budgetAmount, setBudgetAmount] = useState('')
@@ -81,20 +87,15 @@ export function BudgetPanel({
     }
   }
 
-  const inputClass =
-    'min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
-  const buttonClass =
-    'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40'
-
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Budget vs. actual spending</h2>
           <p className="text-xs text-[var(--theme-muted)]">
-            Set a monthly budget per category, log expenses, and see how
-            actual spending compares — updates instantly below. Enter budgets
-            in LKR; actual spend is always compared in LKR-converted terms.
+            Set a monthly budget per category, log expenses, and see how actual
+            spending compares — updates instantly below. Enter budgets in LKR;
+            actual spend is always compared in LKR-converted terms.
           </p>
         </div>
       </div>
@@ -199,13 +200,11 @@ export function BudgetPanel({
       {err && <p className="mt-3 text-xs text-red-300">{err}</p>}
 
       <div className="mt-4">
-        <h3 className="text-sm font-semibold">
-          This month ({currentMonth})
-        </h3>
+        <h3 className="text-sm font-semibold">This month ({currentMonth})</h3>
         {payload.budgetVsActual.length === 0 ? (
           <p className="mt-2 text-sm text-[var(--theme-muted)]">
-            No budgets set for this month yet — add one above to see how
-            actual spending compares.
+            No budgets set for this month yet — add one above to see how actual
+            spending compares.
           </p>
         ) : (
           <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">

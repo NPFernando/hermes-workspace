@@ -1,12 +1,7 @@
 import { useState } from 'react'
 import { formatLkr } from '../utils'
+import { toneFor } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
-
-function toneFor(percent: number): { bar: string; text: string } {
-  if (percent >= 100) return { bar: 'bg-emerald-400', text: 'text-emerald-200' }
-  if (percent >= 50) return { bar: 'bg-sky-400', text: 'text-sky-200' }
-  return { bar: 'bg-amber-400', text: 'text-amber-200' }
-}
 
 /**
  * PF-303/1005/1006: emergency fund target, tracked against real liquid cash
@@ -45,9 +40,12 @@ export function EmergencyFundCard({
   if (ef.targetMonths === 0) {
     return (
       <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
-        <h2 className="text-lg font-semibold text-[var(--theme-text)]">Emergency fund</h2>
+        <h2 className="text-lg font-semibold text-[var(--theme-text)]">
+          Emergency fund
+        </h2>
         <p className="mt-1 text-xs text-[var(--theme-muted)]">
-          No target set yet. Choose how many months of average expenses you want covered.
+          No target set yet. Choose how many months of average expenses you want
+          covered.
         </p>
         <div className="mt-3 flex items-center gap-2">
           <input
@@ -78,19 +76,25 @@ export function EmergencyFundCard({
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--theme-text)]">Emergency fund</h2>
+        <h2 className="text-lg font-semibold text-[var(--theme-text)]">
+          Emergency fund
+        </h2>
         <span className={tone.text}>{percent}%</span>
       </div>
       <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-black/20">
-        <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${Math.min(100, percent)}%` }} />
+        <div
+          className={`h-full rounded-full ${tone.bar}`}
+          style={{ width: `${Math.min(100, percent)}%` }}
+        />
       </div>
       <p className="mt-2 text-xs text-[var(--theme-muted)]">
-        {formatLkr(ef.currentLkr)} / {formatLkr(ef.targetLkr)} — {ef.coverageMonths.toFixed(1)} of {ef.targetMonths}{' '}
-        months covered
+        {formatLkr(ef.currentLkr)} / {formatLkr(ef.targetLkr)} —{' '}
+        {ef.coverageMonths.toFixed(1)} of {ef.targetMonths} months covered
       </p>
       {ef.avgMonthlyExpensesLkr === 0 && (
         <p className="mt-1 text-xs text-amber-300/80">
-          No complete month of expense history yet — target amount will fill in once one is available.
+          No complete month of expense history yet — target amount will fill in
+          once one is available.
         </p>
       )}
     </section>

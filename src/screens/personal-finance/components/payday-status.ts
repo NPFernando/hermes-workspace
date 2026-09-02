@@ -5,7 +5,10 @@ function stringField(row: Record<string, unknown>, key: string): string {
   return typeof value === 'string' ? value : ''
 }
 
-function optionalNumberField(row: Record<string, unknown>, key: string): number | undefined {
+function optionalNumberField(
+  row: Record<string, unknown>,
+  key: string,
+): number | undefined {
   const value = row[key]
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
@@ -21,7 +24,11 @@ function startOfDay(d: Date): Date {
 }
 
 /** Clamps to the last real day of the month (e.g. day 31 in Feb -> 28/29). */
-function paydayDateFor(year: number, monthIndex: number, dayOfMonth: number): Date {
+function paydayDateFor(
+  year: number,
+  monthIndex: number,
+  dayOfMonth: number,
+): Date {
   const lastDayOfMonth = new Date(year, monthIndex + 1, 0).getDate()
   return new Date(year, monthIndex, Math.min(dayOfMonth, lastDayOfMonth))
 }
@@ -40,7 +47,11 @@ export function getPaydayStatus(
   const status = stringField(job, 'status') || 'active'
   const monthlyIncomeAmount = optionalNumberField(job, 'monthlyIncomeAmount')
   const paydayDay = optionalNumberField(job, 'expectedPaydayDayOfMonth')
-  if (status !== 'active' || monthlyIncomeAmount === undefined || paydayDay === undefined) {
+  if (
+    status !== 'active' ||
+    monthlyIncomeAmount === undefined ||
+    paydayDay === undefined
+  ) {
     return { state: 'not_tracked' }
   }
 
@@ -55,7 +66,9 @@ export function getPaydayStatus(
     const linkedId = stringField(record, 'incomeSourceId')
     if (linkedId) return linkedId === jobId
     // Legacy fallback for income logged before this feature existed.
-    return stringField(record, 'sourceName').trim().toLowerCase() === employerName
+    return (
+      stringField(record, 'sourceName').trim().toLowerCase() === employerName
+    )
   })
 
   if (matches.length > 0) {
@@ -67,7 +80,9 @@ export function getPaydayStatus(
   }
 
   const payday = paydayDateFor(now.getFullYear(), now.getMonth(), paydayDay)
-  const daysDiff = Math.round((payday.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+  const daysDiff = Math.round(
+    (payday.getTime() - now.getTime()) / (24 * 60 * 60 * 1000),
+  )
 
   if (daysDiff < -GRACE_DAYS) {
     return { state: 'overdue', daysOverdue: -daysDiff }

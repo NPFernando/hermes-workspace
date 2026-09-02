@@ -26,7 +26,11 @@ export type PersonalFinancePayload = {
     overBudget: boolean
   }>
   transactions: Array<Record<string, unknown>>
-  alerts: Array<{ level: 'info' | 'warning' | 'critical'; title: string; detail: string }>
+  alerts: Array<{
+    level: 'info' | 'warning' | 'critical'
+    title: string
+    detail: string
+  }>
   emergencyFund: {
     targetMonths: number
     avgMonthlyExpensesLkr: number
@@ -60,7 +64,12 @@ export type PersonalFinancePayload = {
       lastWriteError?: string
     }
     health: {
-      status: 'healthy' | 'json_primary' | 'postgres_unavailable' | 'postgres_behind' | 'mirror_mismatch'
+      status:
+        | 'healthy'
+        | 'json_primary'
+        | 'postgres_unavailable'
+        | 'postgres_behind'
+        | 'mirror_mismatch'
       warnings: Array<string>
       jsonUpdatedAt: string | null
       postgresUpdatedAt: string | null
