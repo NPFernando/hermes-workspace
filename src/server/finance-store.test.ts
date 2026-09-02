@@ -1474,3 +1474,90 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     expect(summary.unrealizedStockPnlPct).toBe(0)
   })
 })
+
+// Postgres Migration Phase C: overlaySplitStores() now tries Postgres first
+// for personal-finance collections/settings. Mock readPersonalFinancePostgresStore
+// (real Postgres access is already disabled under VITEST by that module's own
+// guard, so without this mock these tests would just exercise the pre-Phase-C
+// JSON-only path) and isolate HOME so writeFinanceStore()/readFinanceStore()
+// never touch the real ~/.hermes/finance store.
+describe('overlaySplitStores (Postgres Migration Phase C)', () => {
+  let tmp: string
+  let realHome: string | undefined
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-pg-overlay-'))
+    realHome = process.env.HOME
+    process.env.HOME = tmp
+    vi.resetModules()
+  })
+  afterEach(() => {
+    if (realHome === undefined) delete process.env.HOME
+    else process.env.HOME = realHome
+    delete process.env.HERMES_PERSONAL_FINANCE_READ_SOURCE
+    fs.rmSync(tmp, { recursive: true, force: true })
+    vi.doUnmock('./personal-finance-postgres-store')
+  })
+
+  it('uses the Postgres result for personal-finance collections and settings when it succeeds', async () => {
+    vi.doMock('./personal-finance-postgres-store', () => ({
+      readPersonalFinancePostgresStore: () => ({
+        finance_accounts: [{ id: 'pg-acc-1', name: 'From Postgres' }],
+        income_records: [],
+        expense_records: [],
+        budget_categories: [],
+        savings_goals: [],
+        tax_records: [],
+        exchange_rates: [],
+        investment_accounts: [],
+        pending_ingestions: [],
+        income_sources: [],
+        stock_holdings: [],
+        fixed_deposits: [],
+        personalFinanceSettings: {
+          savingsRateTargetPct: 42,
+          financeQaHistory: [{ at: 1, question: 'Q', answer: 'A' }],
+        },
+      }),
+      writePersonalFinancePostgresStore: () => true,
+    }))
+    const store = await import('./finance-store')
+    store.writeFinanceStore(store.createEmptyFinanceDatabase())
+
+    const db = store.readFinanceStore()
+    expect(db.finance_accounts).toEqual([{ id: 'pg-acc-1', name: 'From Postgres' }])
+    expect(db.settings.savingsRateTargetPct).toBe(42)
+    expect(db.settings.financeQaHistory).toEqual([{ at: 1, question: 'Q', answer: 'A' }])
+  })
+
+  it('falls back to the JSON split store when the Postgres read returns null', async () => {
+    vi.doMock('./personal-finance-postgres-store', () => ({
+      readPersonalFinancePostgresStore: () => null,
+      writePersonalFinancePostgresStore: () => true,
+    }))
+    const store = await import('./finance-store')
+    store.addFinanceRecord('account', { name: 'From JSON fallback', type: 'bank', currency: 'LKR', balance: 100 })
+
+    const db = store.readFinanceStore()
+    expect(db.finance_accounts).toHaveLength(1)
+    expect(db.finance_accounts[0].name).toBe('From JSON fallback')
+  })
+
+  it('HERMES_PERSONAL_FINANCE_READ_SOURCE=json bypasses Postgres even when it would succeed', async () => {
+    process.env.HERMES_PERSONAL_FINANCE_READ_SOURCE = 'json'
+    vi.doMock('./personal-finance-postgres-store', () => ({
+      readPersonalFinancePostgresStore: () => ({
+        finance_accounts: [{ id: 'pg-acc-1', name: 'Should be ignored' }],
+        income_records: [], expense_records: [], budget_categories: [], savings_goals: [],
+        tax_records: [], exchange_rates: [], investment_accounts: [], pending_ingestions: [],
+        income_sources: [], stock_holdings: [], fixed_deposits: [],
+      }),
+      writePersonalFinancePostgresStore: () => true,
+    }))
+    const store = await import('./finance-store')
+    store.addFinanceRecord('account', { name: 'From JSON via kill switch', type: 'bank', currency: 'LKR', balance: 100 })
+
+    const db = store.readFinanceStore()
+    expect(db.finance_accounts.some((a) => a.name === 'Should be ignored')).toBe(false)
+    expect(db.finance_accounts.some((a) => a.name === 'From JSON via kill switch')).toBe(true)
+  })
+})

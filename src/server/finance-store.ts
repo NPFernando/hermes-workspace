@@ -12,6 +12,7 @@ import {
   readPersonalFinanceStore,
   writePersonalFinanceStore,
 } from './personal-finance-store'
+import { readPersonalFinancePostgresStore } from './personal-finance-postgres-store'
 import { readTradingStore, writeTradingStore } from './trading-store'
 import type { ConnectivityBreakerState } from './connectivity-breaker'
 
@@ -1038,48 +1039,78 @@ function readFinanceJsonStore(): FinanceDatabase | null {
  * mirrorIntoSplitStores() writes the split stores from this same base
  * file's own data on every write, so in the normal case they're never
  * staler than it — overlay them here so callers gradually source
- * personal/trading collections from the split files, while settings and
- * the still-unsplit misc collections (trading_platforms, api_connections,
- * agent_memory, audit_logs, error_logs) keep coming from this shared base
- * file (never split — see the plan's own rationale).
+ * personal/trading collections from the split files, while the
+ * trading-shared remainder of settings and the still-unsplit misc
+ * collections (trading_platforms, api_connections, agent_memory,
+ * audit_logs, error_logs) keep coming from this shared base file (never
+ * split — see the plan's own rationale).
+ *
+ * Postgres Migration Phase C: for personal-finance collections, Postgres
+ * (via readPersonalFinancePostgresStore()) is now tried FIRST and used
+ * whenever it returns a result — three-tier fallback: Postgres -> JSON
+ * split store (with its own freshness check, same as before this phase) ->
+ * base file. Writes are unchanged (still go to the base file, the JSON
+ * split store, AND Postgres every time — see mirrorIntoSplitStores()), so
+ * the JSON split store stays a fully valid fallback throughout this phase,
+ * not a decaying snapshot. Set HERMES_PERSONAL_FINANCE_READ_SOURCE=json to
+ * disable the Postgres read path instantly without a redeploy.
  *
  * The mirror write is deliberately best-effort and can silently fail (must
  * never block a real trade write) — if it failed on the most recent write
  * while the base file succeeded, the split store would hold OLDER data
  * than the base file for that collection. Guard against serving that stale
- * data: only overlay a split store if its own updatedAt is not older than
- * the base file's.
+ * data: only overlay the JSON split store if its own updatedAt is not
+ * older than the base file's (irrelevant to the Postgres path, which is
+ * always a live query, never a cached/stale copy by definition).
  */
 function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
   const baseUpdatedMs = updatedAtMs(base)
+  const postgresPersonal =
+    process.env.HERMES_PERSONAL_FINANCE_READ_SOURCE === 'json' ? null : readPersonalFinancePostgresStore()
   const personal = readPersonalFinanceStore()
   const trading = readTradingStore()
   const personalFresh = personal && Date.parse(personal.updatedAt) >= baseUpdatedMs
   const tradingFresh = trading && Date.parse(trading.updatedAt) >= baseUpdatedMs
+  const personalSource = postgresPersonal ?? (personalFresh ? personal : null)
+  const postgresSettings = postgresPersonal?.personalFinanceSettings
 
   return {
     ...base,
-    ...(personalFresh
+    ...(personalSource
       ? {
-          finance_accounts: personal.finance_accounts,
-          income_records: personal.income_records,
-          expense_records: personal.expense_records,
-          budget_categories: personal.budget_categories,
-          categories: personal.categories ?? [],
-          subcategories: personal.subcategories ?? [],
-          merchants: personal.merchants ?? [],
-          tags: personal.tags ?? [],
-          savings_goals: personal.savings_goals,
-          tax_records: personal.tax_records,
-          exchange_rates: personal.exchange_rates,
-          investment_accounts: personal.investment_accounts,
-          pending_ingestions: personal.pending_ingestions,
-          income_sources: personal.income_sources,
-          stock_holdings: personal.stock_holdings,
-          fixed_deposits: personal.fixed_deposits,
-          loans: personal.loans ?? [],
-          properties: personal.properties ?? [],
-          beneficiaries: personal.beneficiaries ?? [],
+          finance_accounts: personalSource.finance_accounts,
+          income_records: personalSource.income_records,
+          expense_records: personalSource.expense_records,
+          budget_categories: personalSource.budget_categories,
+          categories: personalSource.categories ?? [],
+          subcategories: personalSource.subcategories ?? [],
+          merchants: personalSource.merchants ?? [],
+          tags: personalSource.tags ?? [],
+          savings_goals: personalSource.savings_goals,
+          tax_records: personalSource.tax_records,
+          exchange_rates: personalSource.exchange_rates,
+          investment_accounts: personalSource.investment_accounts,
+          pending_ingestions: personalSource.pending_ingestions,
+          income_sources: personalSource.income_sources,
+          stock_holdings: personalSource.stock_holdings,
+          fixed_deposits: personalSource.fixed_deposits,
+          loans: personalSource.loans ?? [],
+          properties: personalSource.properties ?? [],
+          beneficiaries: personalSource.beneficiaries ?? [],
+        }
+      : {}),
+    ...(postgresSettings
+      ? {
+          settings: {
+            ...base.settings,
+            emergencyFundTargetMonths: postgresSettings.emergencyFundTargetMonths,
+            savingsRateTargetPct: postgresSettings.savingsRateTargetPct,
+            wealthGoalTargetLkr: postgresSettings.wealthGoalTargetLkr,
+            wealthGoalTargetDate: postgresSettings.wealthGoalTargetDate,
+            financeQaHistory: postgresSettings.financeQaHistory,
+            gmailIngest: postgresSettings.gmailIngestState,
+            categoryCorrections: postgresSettings.categoryCorrections,
+          } as FinanceSettings,
         }
       : {}),
     ...(tradingFresh
