@@ -9,11 +9,11 @@ export function StatCard({
 }) {
   const toneClass =
     tone === 'good'
-      ? 'text-emerald-200 border-emerald-400/25 bg-emerald-500/10'
+      ? 'text-[var(--theme-success)] border-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)]'
       : tone === 'warn'
-        ? 'text-amber-200 border-amber-400/25 bg-amber-500/10'
+        ? 'text-[var(--theme-warning)] border-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)]'
         : tone === 'danger'
-          ? 'text-red-200 border-red-400/25 bg-red-500/10'
+          ? 'text-[var(--theme-danger)] border-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)]'
           : 'text-[var(--theme-text)] border-[var(--theme-border)] bg-[var(--theme-panel)]/70'
   return (
     <div className={`rounded-2xl border p-4 shadow-sm ${toneClass}`}>

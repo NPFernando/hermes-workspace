@@ -228,7 +228,7 @@ export function FinanceAnalystCard({
                   }}
                   formatter={(value: number) => value.toLocaleString()}
                 />
-                <Bar dataKey="value" fill="#38bdf8" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="value" fill="var(--theme-accent)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

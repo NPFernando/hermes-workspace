@@ -187,19 +187,23 @@ export function PersonalFinanceScreen() {
     {
       name: 'Cash',
       value: Math.max(0, summary.cashBalanceLkr),
-      fill: '#38bdf8',
+      fill: 'var(--theme-accent)',
     },
     {
       name: 'Stocks',
       value: Math.max(0, summary.stockHoldingsValueLkr),
-      fill: '#38bdf8',
+      fill: 'var(--theme-accent-secondary)',
     },
     {
       name: 'Fixed deposits',
       value: Math.max(0, summary.fixedDepositsValueLkr),
-      fill: '#38bdf8',
+      fill: 'var(--theme-success)',
     },
-    { name: 'Debt', value: Math.max(0, summary.debtLkr), fill: '#f87171' },
+    {
+      name: 'Debt',
+      value: Math.max(0, summary.debtLkr),
+      fill: 'var(--theme-danger)',
+    },
   ].filter((entry) => entry.value > 0)
 
   const overBudgetCount = payload.budgetVsActual.filter(

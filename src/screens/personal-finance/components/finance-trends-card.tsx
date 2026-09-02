@@ -152,12 +152,12 @@ export function FinanceTrendsCard({
               >
                 <defs>
                   <linearGradient id="pfIncome" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#34d399" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--theme-success)" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="var(--theme-success)" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="pfExpense" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f87171" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#f87171" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--theme-danger)" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="var(--theme-danger)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -197,7 +197,7 @@ export function FinanceTrendsCard({
                   type="monotone"
                   dataKey="income"
                   name="Income"
-                  stroke="#34d399"
+                  stroke="var(--theme-success)"
                   fill="url(#pfIncome)"
                   strokeWidth={1.6}
                   dot={false}
@@ -206,7 +206,7 @@ export function FinanceTrendsCard({
                   type="monotone"
                   dataKey="expense"
                   name="Expense"
-                  stroke="#f87171"
+                  stroke="var(--theme-danger)"
                   fill="url(#pfExpense)"
                   strokeWidth={1.6}
                   dot={false}
@@ -215,7 +215,7 @@ export function FinanceTrendsCard({
                   type="monotone"
                   dataKey="net"
                   name="Net"
-                  stroke="#38bdf8"
+                  stroke="var(--theme-accent)"
                   strokeWidth={2}
                   strokeDasharray="4 2"
                   dot={false}
@@ -277,7 +277,7 @@ export function FinanceTrendsCard({
                   }}
                   formatter={(value: number) => formatLkr(value)}
                 />
-                <Bar dataKey="amount" fill="#38bdf8" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="amount" fill="var(--theme-accent)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

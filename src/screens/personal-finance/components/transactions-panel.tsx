@@ -743,19 +743,19 @@ export function TransactionsPanel({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <span
-                      className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${kind === 'income' ? 'bg-emerald-500/25 text-emerald-100' : 'bg-black/20 text-[var(--theme-muted)]'}`}
+                      className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${kind === 'income' ? 'bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] text-[var(--theme-success)]' : 'bg-black/20 text-[var(--theme-muted)]'}`}
                     >
                       {kind === 'income' ? 'Income' : 'Expense'}
                     </span>
                     {txnStatus !== 'cleared' && (
                       <span
-                        className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${txnStatus === 'pending' ? 'bg-amber-500/25 text-amber-100' : 'bg-indigo-500/25 text-indigo-100'}`}
+                        className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${txnStatus === 'pending' ? 'bg-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] text-[var(--theme-warning)]' : 'bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] text-[var(--theme-success)]'}`}
                       >
                         {txnStatus === 'pending' ? 'Pending' : 'Reconciled'}
                       </span>
                     )}
                     {txnSource !== 'manual' && (
-                      <span className="mr-1.5 rounded-full bg-sky-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-sky-100">
+                      <span className="mr-1.5 rounded-full bg-[color-mix(in_srgb,var(--theme-accent-secondary)_25%,transparent)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--theme-accent-secondary)]">
                         {txnSource === 'gmail'
                           ? 'via Gmail'
                           : txnSource === 'upload'

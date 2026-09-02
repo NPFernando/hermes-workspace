@@ -17,10 +17,23 @@ export const buttonClass =
  * owns its own business-state -> tone mapping (e.g. `{ ok: neutralTone,
  * soon: warningTone, overdue: dangerTone }`), since the state names differ
  * per feature, but the actual class strings are no longer duplicated.
+ *
+ * Built from --theme-success/warning/danger/accent-secondary via color-mix()
+ * rather than literal Tailwind palette classes (emerald-*, amber-*, red-*).
+ * Those literal classes only track the active theme in the app's two SciFi
+ * variants (scifi-theme.css remaps Tailwind's raw color tokens); every other
+ * theme (Matrix, Hermes, Nous, Slate, Odysseus, ...) left them rendering as
+ * plain default Tailwind colors, disconnected from the theme's own palette.
+ * color-mix() against the theme variable makes every tone correct in every
+ * theme, including future ones, with no per-theme CSS to maintain.
  */
 export const neutralTone =
   'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]'
 export const positiveTone =
-  'border-emerald-400/30 bg-emerald-500/15 text-emerald-100'
-export const warningTone = 'border-amber-400/30 bg-amber-500/15 text-amber-100'
-export const dangerTone = 'border-red-400/30 bg-red-500/15 text-red-100'
+  'border-[color-mix(in_srgb,var(--theme-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] text-[var(--theme-success)]'
+export const warningTone =
+  'border-[color-mix(in_srgb,var(--theme-warning)_35%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_15%,transparent)] text-[var(--theme-warning)]'
+export const dangerTone =
+  'border-[color-mix(in_srgb,var(--theme-danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] text-[var(--theme-danger)]'
+export const infoTone =
+  'border-[color-mix(in_srgb,var(--theme-accent-secondary)_35%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent-secondary)_15%,transparent)] text-[var(--theme-accent-secondary)]'

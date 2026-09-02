@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   buttonClass,
   dangerTone,
+  infoTone,
   inputClass,
   positiveTone,
   warningTone,
@@ -24,7 +25,7 @@ const confidenceTone: Record<ExtractedTransaction['confidence'], string> = {
 const severityTone: Record<'high' | 'medium' | 'low', string> = {
   high: dangerTone,
   medium: warningTone,
-  low: 'border-sky-400/30 bg-sky-500/15 text-sky-100',
+  low: infoTone,
 }
 
 /** AI-307: rank items needing the most attention first — missing confidence (extraction failed) ranks with 'low'. */
