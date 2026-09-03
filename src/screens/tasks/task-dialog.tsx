@@ -146,14 +146,14 @@ function ClarificationPanel({
   const hasThread = serverAnswered.length > 0 || locallyAnswered.length > 0
 
   return (
-    <div className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3 space-y-3 mt-3">
+    <div className="rounded-lg border border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_5%,transparent)] p-3 space-y-3 mt-3">
       {/* Answered thread — compact read-only */}
       {hasThread && (
-        <div className="space-y-1 pb-2 border-b border-amber-400/15">
+        <div className="space-y-1 pb-2 border-b border-[color-mix(in_srgb,var(--theme-warning)_15%,transparent)]">
           {serverAnswered.map((q, i) => (
             <div key={q.id} className="flex gap-1.5 text-[11px]">
-              <span className="text-amber-400/40 shrink-0 w-4">{i + 1}.</span>
-              <span className="text-amber-400/50 truncate">{q.question}</span>
+              <span className="text-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] shrink-0 w-4">{i + 1}.</span>
+              <span className="text-[color-mix(in_srgb,var(--theme-warning)_50%,transparent)] truncate">{q.question}</span>
               <span className="text-[var(--theme-muted)] ml-auto shrink-0 max-w-[45%] truncate">
                 → {q.answer}
               </span>
@@ -161,10 +161,10 @@ function ClarificationPanel({
           ))}
           {locallyAnswered.map((q, i) => (
             <div key={q.id} className="flex gap-1.5 text-[11px] items-center">
-              <span className="text-amber-400/50 shrink-0 w-4">
+              <span className="text-[color-mix(in_srgb,var(--theme-warning)_50%,transparent)] shrink-0 w-4">
                 {serverAnswered.length + i + 1}.
               </span>
-              <span className="text-amber-400/60 truncate">{q.question}</span>
+              <span className="text-[color-mix(in_srgb,var(--theme-warning)_60%,transparent)] truncate">{q.question}</span>
               <span className="text-[var(--theme-muted)] ml-auto shrink-0 max-w-[40%] truncate">
                 → {localAnswers[q.id]}
               </span>
@@ -183,7 +183,7 @@ function ClarificationPanel({
 
       {/* Progress */}
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wide">
+        <span className="text-[10px] font-semibold text-[var(--theme-warning)] uppercase tracking-wide">
           Question {serverAnswered.length + currentIdx + 1} of{' '}
           {questions.length}
         </span>
@@ -195,10 +195,10 @@ function ClarificationPanel({
                 className={cn(
                   'inline-block w-1.5 h-1.5 rounded-full transition-colors duration-200',
                   i < currentIdx
-                    ? 'bg-amber-500'
+                    ? 'bg-[var(--theme-warning)]'
                     : i === currentIdx
-                      ? 'bg-amber-400'
-                      : 'bg-amber-400/20',
+                      ? 'bg-[var(--theme-warning)]'
+                      : 'bg-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)]',
                 )}
               />
             ))}
@@ -222,8 +222,8 @@ function ClarificationPanel({
               className={cn(
                 'rounded-md px-3 py-1.5 text-xs border transition-all duration-150',
                 selectedOpt === opt
-                  ? 'bg-amber-500 text-white border-amber-500 scale-[1.03]'
-                  : 'bg-transparent text-amber-400 border-amber-400/40 hover:border-amber-400 hover:bg-amber-400/5',
+                  ? 'bg-[var(--theme-warning)] text-white border-[var(--theme-warning)] scale-[1.03]'
+                  : 'bg-transparent text-[var(--theme-warning)] border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] hover:border-[var(--theme-warning)] hover:bg-[color-mix(in_srgb,var(--theme-warning)_5%,transparent)]',
               )}
             >
               {opt}
@@ -235,8 +235,8 @@ function ClarificationPanel({
             className={cn(
               'rounded-md px-3 py-1.5 text-xs border transition-all duration-150',
               isCustomMode
-                ? 'bg-amber-400/15 text-amber-400 border-amber-400'
-                : 'bg-transparent text-amber-400/50 border-amber-400/20 hover:border-amber-400/50 hover:text-amber-400/80',
+                ? 'bg-[color-mix(in_srgb,var(--theme-warning)_15%,transparent)] text-[var(--theme-warning)] border-[var(--theme-warning)]'
+                : 'bg-transparent text-[color-mix(in_srgb,var(--theme-warning)_50%,transparent)] border-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)] hover:border-[color-mix(in_srgb,var(--theme-warning)_50%,transparent)] hover:text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)]',
             )}
           >
             Custom…
@@ -251,7 +251,7 @@ function ClarificationPanel({
           rows={2}
           className={cn(
             inputClass,
-            'resize-none border-amber-400/20 focus:ring-amber-400/40 text-xs py-1.5',
+            'resize-none border-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)] focus:ring-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] text-xs py-1.5',
           )}
           placeholder={
             hasOptions
@@ -286,18 +286,18 @@ function ClarificationPanel({
           size="sm"
           onClick={() => void handleSubmit()}
           disabled={!currentIsValid || submitting}
-          className="w-full bg-amber-500 text-white disabled:opacity-40"
+          className="w-full bg-[var(--theme-warning)] text-white disabled:opacity-40"
         >
           {submitting ? 'Sending…' : 'Submit & resume agent'}
         </Button>
       ) : (
         <div className="flex items-center justify-between">
           {hasOptions && !isCustomMode ? (
-            <span className="text-[10px] text-amber-400/40">
+            <span className="text-[10px] text-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)]">
               Select an option to continue
             </span>
           ) : (
-            <span className="text-[10px] text-amber-400/40">
+            <span className="text-[10px] text-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)]">
               Enter to continue
             </span>
           )}
@@ -308,7 +308,7 @@ function ClarificationPanel({
                 if (currentIsValid) advance()
               }}
               disabled={!currentIsValid}
-              className="text-[10px] text-amber-400/60 hover:text-amber-400 disabled:opacity-30 transition-colors"
+              className="text-[10px] text-[color-mix(in_srgb,var(--theme-warning)_60%,transparent)] hover:text-[var(--theme-warning)] disabled:opacity-30 transition-colors"
             >
               Next →
             </button>
@@ -332,13 +332,13 @@ function ExecLogTail({ taskId }: { taskId: string }) {
       <button
         type="button"
         onClick={() => setShow((s) => !s)}
-        className="text-[10px] text-violet-400/60 hover:text-violet-400 transition-colors"
+        className="text-[10px] text-[color-mix(in_srgb,var(--theme-accent-secondary)_60%,transparent)] hover:text-[var(--theme-accent-secondary)] transition-colors"
       >
         {show ? '▲ hide log' : '▼ view log'}
       </button>
       {show && (
         <pre
-          className="mt-1 max-h-36 overflow-y-auto text-[10px] leading-relaxed text-violet-300/70 whitespace-pre-wrap break-all"
+          className="mt-1 max-h-36 overflow-y-auto text-[10px] leading-relaxed text-[color-mix(in_srgb,var(--theme-accent-secondary)_70%,transparent)] whitespace-pre-wrap break-all"
           style={{ scrollbarWidth: 'thin' }}
         >
           {log}
@@ -584,8 +584,8 @@ export function TaskDialog({
                     disabled={isBreakingDown}
                     className={
                       isBreakingDown
-                        ? 'bg-violet-700 text-white opacity-70'
-                        : 'bg-violet-500 text-white'
+                        ? 'bg-[var(--theme-accent-secondary)] text-white opacity-70'
+                        : 'bg-[var(--theme-accent-secondary)] text-white'
                     }
                   >
                     {isBreakingDown ? '⏳ Breaking down…' : '✦ Break Down'}
@@ -597,7 +597,7 @@ export function TaskDialog({
                     size="sm"
                     onClick={() => void onExecute()}
                     disabled={isExecuting || task?.agent_state === 'working'}
-                    className={`bg-amber-500 text-white ${isExecuting || task?.agent_state === 'working' ? 'opacity-70' : ''}`}
+                    className={`bg-[var(--theme-warning)] text-white ${isExecuting || task?.agent_state === 'working' ? 'opacity-70' : ''}`}
                   >
                     {isExecuting
                       ? '⏳ Executing…'
@@ -643,9 +643,9 @@ export function TaskDialog({
               {/* Waiting for user input banner — only shown when no structured questions */}
               {task?.agent_state === 'waiting_for_input' &&
                 !task.clarification_questions?.length && (
-                  <div className="flex items-center gap-2 mb-3 rounded-md border border-amber-300/25 bg-amber-400/8 px-2.5 py-2">
+                  <div className="flex items-center gap-2 mb-3 rounded-md border border-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_8%,transparent)] px-2.5 py-2">
                     <span className="text-base shrink-0">💬</span>
-                    <span className="text-xs font-medium text-amber-500">
+                    <span className="text-xs font-medium text-[var(--theme-warning)]">
                       Astra is waiting for your reply — answer below to
                       continue.
                     </span>
@@ -656,10 +656,10 @@ export function TaskDialog({
               {(isExecuting ||
                 (task?.agent_state &&
                   task.agent_state !== 'waiting_for_input')) && (
-                <div className="mb-3 rounded-md border border-violet-400/20 bg-violet-400/8 px-2.5 py-2">
+                <div className="mb-3 rounded-md border border-[color-mix(in_srgb,var(--theme-accent-secondary)_20%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent-secondary)_8%,transparent)] px-2.5 py-2">
                   <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full animate-ping shrink-0 bg-violet-400" />
-                    <span className="text-xs animate-pulse text-violet-400">
+                    <span className="w-1.5 h-1.5 rounded-full animate-ping shrink-0 bg-[var(--theme-accent-secondary)]" />
+                    <span className="text-xs animate-pulse text-[var(--theme-accent-secondary)]">
                       {isExecuting
                         ? 'Sending task to agent…'
                         : task?.agent_state === 'reviewing'
@@ -697,8 +697,10 @@ export function TaskDialog({
                           style={
                             isQuestion
                               ? {
-                                  background: '#f59e0b0d',
-                                  border: '1px solid #f59e0b33',
+                                  background:
+                                    'color-mix(in srgb, var(--theme-warning) 5%, transparent)',
+                                  border:
+                                    '1px solid color-mix(in srgb, var(--theme-warning) 20%, transparent)',
                                   padding: '6px 8px',
                                 }
                               : undefined
@@ -712,7 +714,7 @@ export function TaskDialog({
                               <span
                                 className={
                                   isQuestion
-                                    ? 'text-amber-500 font-medium capitalize'
+                                    ? 'text-[var(--theme-warning)] font-medium capitalize'
                                     : 'font-medium capitalize text-[var(--theme-text)]'
                                 }
                               >
@@ -724,7 +726,7 @@ export function TaskDialog({
                               <span
                                 className={
                                   isQuestion
-                                    ? 'text-amber-500 capitalize'
+                                    ? 'text-[var(--theme-warning)] capitalize'
                                     : 'text-[var(--theme-muted)] capitalize'
                                 }
                               >
@@ -738,7 +740,7 @@ export function TaskDialog({
                               </span>
                             </div>
                             <p
-                              className={`mt-0.5 leading-relaxed ${isQuestion ? 'text-amber-500' : 'text-[var(--theme-muted)]'}`}
+                              className={`mt-0.5 leading-relaxed ${isQuestion ? 'text-[var(--theme-warning)]' : 'text-[var(--theme-muted)]'}`}
                             >
                               {entry.note}
                             </p>
@@ -765,8 +767,7 @@ export function TaskDialog({
               {/* Freeform comment / reply input — hidden during structured clarification */}
               {onComment &&
                 !(
-                  task?.waiting_for_user &&
-                  task.clarification_questions?.length
+                  task?.waiting_for_user && task.clarification_questions?.length
                 ) && (
                   <div className="flex gap-2 mt-3">
                     <input

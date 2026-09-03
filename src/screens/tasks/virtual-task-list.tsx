@@ -22,7 +22,14 @@ const CARD_ESTIMATE_PX = 96
 
 export type VirtualRow =
   | { kind: 'task'; task: ClaudeTask }
-  | { kind: 'group-header'; label: string; count: number; groupId: string; collapsed: boolean; onToggle: () => void }
+  | {
+      kind: 'group-header'
+      label: string
+      count: number
+      groupId: string
+      collapsed: boolean
+      onToggle: () => void
+    }
   | { kind: 'divider'; label?: string }
 
 export function VirtualTaskList({
@@ -41,7 +48,13 @@ export function VirtualTaskList({
   const parentRef = useRef<HTMLDivElement>(null)
 
   if (rows) {
-    return <VirtualRowList parentRef={parentRef} rows={rows} renderCard={renderCard} />
+    return (
+      <VirtualRowList
+        parentRef={parentRef}
+        rows={rows}
+        renderCard={renderCard}
+      />
+    )
   }
 
   return (
@@ -68,7 +81,8 @@ function FlatVirtualTaskList({
   sectionBreak?: number
   sectionLabels?: [string, string]
 }) {
-  const hasDivider = sectionBreak != null && sectionBreak > 0 && sectionBreak < tasks.length
+  const hasDivider =
+    sectionBreak != null && sectionBreak > 0 && sectionBreak < tasks.length
   const totalItems = tasks.length + (hasDivider ? 1 : 0)
   const virtualizer = useVirtualizer({
     count: totalItems,
@@ -83,13 +97,29 @@ function FlatVirtualTaskList({
   const items = virtualizer.getVirtualItems()
 
   return (
-    <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-2">
+    <div
+      ref={parentRef}
+      className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-2"
+    >
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, transform: `translateY(${items[0]?.start ?? 0}px)` }}>
-          {items.map(vItem => {
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            transform: `translateY(${items[0]?.start ?? 0}px)`,
+          }}
+        >
+          {items.map((vItem) => {
             if (hasDivider && vItem.index === sectionBreak) {
               return (
-                <div key="__divider__" data-index={vItem.index} ref={virtualizer.measureElement} className="mt-2 mb-1">
+                <div
+                  key="__divider__"
+                  data-index={vItem.index}
+                  ref={virtualizer.measureElement}
+                  className="mt-2 mb-1"
+                >
                   <div className="flex items-center gap-2 px-1">
                     <div className="flex-1 h-px bg-[var(--theme-border)]" />
                     <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 whitespace-nowrap">
@@ -100,10 +130,19 @@ function FlatVirtualTaskList({
                 </div>
               )
             }
-            const taskIdx = hasDivider && vItem.index > (sectionBreak ?? 0) ? vItem.index - 1 : vItem.index
+            const taskIdx =
+              hasDivider && vItem.index > sectionBreak
+                ? vItem.index - 1
+                : vItem.index
             const task = tasks[taskIdx]
+            if (!task) return null
             return (
-              <div key={task.id} data-index={vItem.index} ref={virtualizer.measureElement} className={vItem.index > 0 ? 'mt-2' : ''}>
+              <div
+                key={task.id}
+                data-index={vItem.index}
+                ref={virtualizer.measureElement}
+                className={vItem.index > 0 ? 'mt-2' : ''}
+              >
                 {renderCard(task)}
               </div>
             )
@@ -114,7 +153,11 @@ function FlatVirtualTaskList({
   )
 }
 
-function VirtualRowList({ parentRef, rows, renderCard }: {
+function VirtualRowList({
+  parentRef,
+  rows,
+  renderCard,
+}: {
   parentRef: React.RefObject<HTMLDivElement | null>
   rows: Array<VirtualRow>
   renderCard: (task: ClaudeTask) => React.ReactNode
@@ -135,40 +178,84 @@ function VirtualRowList({ parentRef, rows, renderCard }: {
   const items = virtualizer.getVirtualItems()
 
   return (
-    <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-2">
+    <div
+      ref={parentRef}
+      className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-2"
+    >
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, transform: `translateY(${items[0]?.start ?? 0}px)` }}>
-          {items.map(vItem => {
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            transform: `translateY(${items[0]?.start ?? 0}px)`,
+          }}
+        >
+          {items.map((vItem) => {
             const row = rows[vItem.index]
             if (!row) return null
             if (row.kind === 'group-header') {
               return (
-                <div key={`gh-${row.groupId}`} data-index={vItem.index} ref={virtualizer.measureElement} className="mt-1 mb-0.5">
+                <div
+                  key={`gh-${row.groupId}`}
+                  data-index={vItem.index}
+                  ref={virtualizer.measureElement}
+                  className="mt-1 mb-0.5"
+                >
                   <button
                     type="button"
                     onClick={row.onToggle}
                     className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--theme-hover)] transition-colors group"
                   >
-                    <span className="text-[10px] text-[var(--theme-muted)] transition-transform" style={{ display: 'inline-block', transform: row.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
-                    <span className="flex-1 text-left text-[10px] font-semibold text-[var(--theme-text)] truncate">{row.label}</span>
-                    <span className="text-[9px] text-[var(--theme-muted)] opacity-60 shrink-0">{row.count}</span>
+                    <span
+                      className="text-[10px] text-[var(--theme-muted)] transition-transform"
+                      style={{
+                        display: 'inline-block',
+                        transform: row.collapsed
+                          ? 'rotate(-90deg)'
+                          : 'rotate(0deg)',
+                      }}
+                    >
+                      ▾
+                    </span>
+                    <span className="flex-1 text-left text-[10px] font-semibold text-[var(--theme-text)] truncate">
+                      {row.label}
+                    </span>
+                    <span className="text-[9px] text-[var(--theme-muted)] opacity-60 shrink-0">
+                      {row.count}
+                    </span>
                   </button>
                 </div>
               )
             }
             if (row.kind === 'divider') {
               return (
-                <div key={`div-${vItem.index}`} data-index={vItem.index} ref={virtualizer.measureElement} className="mt-2 mb-1">
+                <div
+                  key={`div-${vItem.index}`}
+                  data-index={vItem.index}
+                  ref={virtualizer.measureElement}
+                  className="mt-2 mb-1"
+                >
                   <div className="flex items-center gap-2 px-1">
                     <div className="flex-1 h-px bg-[var(--theme-border)]" />
-                    {row.label && <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 whitespace-nowrap">{row.label}</span>}
+                    {row.label && (
+                      <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 whitespace-nowrap">
+                        {row.label}
+                      </span>
+                    )}
                     <div className="flex-1 h-px bg-[var(--theme-border)]" />
                   </div>
                 </div>
               )
             }
             return (
-              <div key={row.task.id} data-index={vItem.index} ref={virtualizer.measureElement} className={vItem.index > 0 ? 'mt-2' : ''}>
+              <div
+                key={row.task.id}
+                data-index={vItem.index}
+                ref={virtualizer.measureElement}
+                className={vItem.index > 0 ? 'mt-2' : ''}
+              >
                 {renderCard(row.task)}
               </div>
             )
@@ -179,14 +266,24 @@ function VirtualRowList({ parentRef, rows, renderCard }: {
   )
 }
 
-export function RunningTaskRow({ task, onOpen }: { task: ClaudeTask; onOpen: () => void }) {
+export function RunningTaskRow({
+  task,
+  onOpen,
+}: {
+  task: ClaudeTask
+  onOpen: () => void
+}) {
   const fullLog = useTaskExecLog(task.id)
   const log = fullLog.split('\n').slice(-4).join('\n')
 
   return (
     <div className="px-3 py-2 flex gap-3 items-start">
       <div className="flex-1 min-w-0">
-        <button type="button" onClick={onOpen} className="text-[10px] font-medium text-violet-300 hover:text-violet-200 truncate max-w-full text-left transition-colors">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="text-[10px] font-medium text-[var(--theme-accent-secondary)] hover:text-[var(--theme-accent-secondary)] truncate max-w-full text-left transition-colors"
+        >
           {task.title.slice(0, 70)}
         </button>
         {log && (
@@ -195,7 +292,9 @@ export function RunningTaskRow({ task, onOpen }: { task: ClaudeTask; onOpen: () 
           </pre>
         )}
       </div>
-      <span className="shrink-0 text-[9px] text-violet-500 opacity-60 capitalize">{task.assignee ?? 'astra'}</span>
+      <span className="shrink-0 text-[9px] text-[var(--theme-accent-secondary)] opacity-60 capitalize">
+        {task.assignee ?? 'astra'}
+      </span>
     </div>
   )
 }

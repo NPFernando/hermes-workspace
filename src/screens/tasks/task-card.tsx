@@ -1,13 +1,34 @@
 import { memo, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Delete01Icon, MoreVerticalIcon, PlayIcon, Rocket01Icon, SplitIcon } from '@hugeicons/core-free-icons'
-import type { ClaudeTask, TaskAgentState, TaskColumn, TaskPriority } from '@/lib/tasks-api'
+import {
+  Delete01Icon,
+  MoreVerticalIcon,
+  PlayIcon,
+  Rocket01Icon,
+  SplitIcon,
+} from '@hugeicons/core-free-icons'
+import type {
+  ClaudeTask,
+  TaskAgentState,
+  TaskColumn,
+  TaskPriority,
+} from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
-import { COLUMN_LABELS, COLUMN_ORDER, PRIORITY_COLORS, isOverdue, relativeTime } from '@/lib/tasks-api'
-import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from '@/components/ui/menu'
+import {
+  COLUMN_LABELS,
+  COLUMN_ORDER,
+  PRIORITY_COLORS,
+  isOverdue,
+  relativeTime,
+} from '@/lib/tasks-api'
+import {
+  MenuContent,
+  MenuItem,
+  MenuRoot,
+  MenuTrigger,
+} from '@/components/ui/menu'
 
-
-function isStuckAgent(task: ClaudeTask): boolean {
+export function isStuckAgent(task: ClaudeTask): boolean {
   if (!task.agent_state || !task.agent_action_at) return false
   return Date.now() - new Date(task.agent_action_at).getTime() > 10 * 60_000
 }
@@ -47,12 +68,17 @@ export function formatTaskAssigneeLabel(
   return assignee ? (assigneeLabels[assignee] ?? assignee) : ''
 }
 
-export function formatTaskDependencyLabel(dependencyCount: number): string | null {
+export function formatTaskDependencyLabel(
+  dependencyCount: number,
+): string | null {
   if (dependencyCount <= 0) return null
   return `waiting on ${dependencyCount} prerequisite${dependencyCount === 1 ? '' : 's'}`
 }
 
-export function formatTaskSelectionToggleLabel(title: string, isSelected: boolean): string {
+export function formatTaskSelectionToggleLabel(
+  title: string,
+  isSelected: boolean,
+): string {
   return `${isSelected ? 'Deselect' : 'Select'} task: ${title}`
 }
 
@@ -60,20 +86,47 @@ const AGENT_STATE_CONFIG: Record<
   NonNullable<TaskAgentState>,
   { label: string; color: string; pulse: boolean }
 > = {
-  reviewing: { label: 'Astra reviewing…', color: '#a855f7', pulse: true },
-  delegating: { label: 'Delegating…', color: '#f59e0b', pulse: true },
-  working: { label: 'Agent working…', color: '#3b82f6', pulse: true },
-  waiting_for_input: { label: 'Waiting for your reply', color: '#f59e0b', pulse: false },
+  reviewing: {
+    label: 'Astra reviewing…',
+    color: 'var(--theme-accent-secondary)',
+    pulse: true,
+  },
+  delegating: {
+    label: 'Delegating…',
+    color: 'var(--theme-warning)',
+    pulse: true,
+  },
+  working: {
+    label: 'Agent working…',
+    color: 'var(--theme-accent)',
+    pulse: true,
+  },
+  waiting_for_input: {
+    label: 'Waiting for your reply',
+    color: 'var(--theme-warning)',
+    pulse: false,
+  },
 }
 
-function AgentStateBadge({ state, agentName }: { state: TaskAgentState; agentName?: string | null }) {
+function AgentStateBadge({
+  state,
+  agentName,
+}: {
+  state: TaskAgentState
+  agentName?: string | null
+}) {
   if (!state) return null
   const cfg = AGENT_STATE_CONFIG[state]
-  const label = state === 'delegating' && agentName ? `→ ${agentName}` : cfg.label
+  const label =
+    state === 'delegating' && agentName ? `→ ${agentName}` : cfg.label
   return (
     <span
       className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium"
-      style={{ background: `${cfg.color}22`, color: cfg.color, border: `1px solid ${cfg.color}44` }}
+      style={{
+        background: `color-mix(in srgb, ${cfg.color} 13%, transparent)`,
+        color: cfg.color,
+        border: `1px solid color-mix(in srgb, ${cfg.color} 27%, transparent)`,
+      }}
     >
       {cfg.pulse && (
         <span
@@ -90,13 +143,13 @@ function SourceBadge({ source }: { source: ClaudeTask['source'] }) {
   if (!source || source === 'human') return null
   if (source === 'idea_job') {
     return (
-      <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">
+      <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)] border border-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)]">
         💡 idea
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
+    <span className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-[color-mix(in_srgb,var(--theme-accent-secondary)_10%,transparent)] text-[var(--theme-accent-secondary)] border border-[color-mix(in_srgb,var(--theme-accent-secondary)_20%,transparent)]">
       ✦ astra
     </span>
   )
@@ -141,11 +194,18 @@ export const TaskCard = memo(function TaskCardComponent({
   const extraTagCount = task.tags.length - 2
   const assigneeLabel = formatTaskAssigneeLabel(task.assignee, assigneeLabels)
   const isAgentActive = Boolean(task.agent_state)
-  const dependencyLabel = formatTaskDependencyLabel(task.depends_on?.length ?? 0)
-  const selectionToggleLabel = formatTaskSelectionToggleLabel(task.title, Boolean(isSelected))
+  const dependencyLabel = formatTaskDependencyLabel(
+    task.depends_on?.length ?? 0,
+  )
+  const selectionToggleLabel = formatTaskSelectionToggleLabel(
+    task.title,
+    Boolean(isSelected),
+  )
   const hasHistory = (task.agent_history?.length ?? 0) > 0
   const stuck = isStuckAgent(task)
-  const isDimmed = Boolean(activeTagFilter && !task.tags.includes(activeTagFilter))
+  const isDimmed = Boolean(
+    activeTagFilter && !task.tags.includes(activeTagFilter),
+  )
 
   if (dense) {
     return (
@@ -168,29 +228,64 @@ export const TaskCard = memo(function TaskCardComponent({
           'hover:border-[var(--theme-accent)]',
           isDragging ? 'opacity-40' : '',
           isSelected && 'ring-1 ring-[var(--theme-accent)]',
-          isAgentActive && 'ring-1 ring-violet-500/30',
+          isAgentActive && 'ring-1 ring-[color-mix(in_srgb,var(--theme-accent-secondary)_30%,transparent)]',
           isDimmed && 'opacity-40',
         )}
-        style={{ borderLeftWidth: 2, borderLeftColor: priorityColor, minHeight: 32 }}
+        style={{
+          borderLeftWidth: 2,
+          borderLeftColor: priorityColor,
+          minHeight: 32,
+        }}
       >
         {onToggleSelect && (
           <button
             type="button"
-            className={cn('shrink-0 transition-opacity', isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60 focus-visible:opacity-100')}
+            className={cn(
+              'shrink-0 transition-opacity',
+              isSelected
+                ? 'opacity-100'
+                : 'opacity-0 group-hover:opacity-60 focus-visible:opacity-100',
+            )}
             aria-label={selectionToggleLabel}
             aria-pressed={Boolean(isSelected)}
-            onClick={e => { e.stopPropagation(); onToggleSelect(task.id) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleSelect(task.id)
+            }}
           >
-            <span className={cn('w-3 h-3 rounded border flex items-center justify-center',
-              isSelected ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)]' : 'border-[var(--theme-border)]')}>
-              {isSelected && <span className="text-[7px] font-bold text-[var(--theme-bg)]">✓</span>}
+            <span
+              className={cn(
+                'w-3 h-3 rounded border flex items-center justify-center',
+                isSelected
+                  ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)]'
+                  : 'border-[var(--theme-border)]',
+              )}
+            >
+              {isSelected && (
+                <span className="text-[7px] font-bold text-[var(--theme-bg)]">
+                  ✓
+                </span>
+              )}
             </span>
           </button>
         )}
-        <span className="flex-1 text-[11px] text-[var(--theme-text)] truncate">{task.title}</span>
-        {isAgentActive && <span className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse" style={{ background: '#a855f7' }} />}
-        {assigneeLabel && <span className="shrink-0 text-[9px] text-[var(--theme-muted)] opacity-60">{assigneeLabel.slice(0, 6)}</span>}
-        {overdue && <span className="shrink-0 text-[9px] text-rose-400">!</span>}
+        <span className="flex-1 text-[11px] text-[var(--theme-text)] truncate">
+          {task.title}
+        </span>
+        {isAgentActive && (
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse"
+            style={{ background: 'var(--theme-accent-secondary)' }}
+          />
+        )}
+        {assigneeLabel && (
+          <span className="shrink-0 text-[9px] text-[var(--theme-muted)] opacity-60">
+            {assigneeLabel.slice(0, 6)}
+          </span>
+        )}
+        {overdue && (
+          <span className="shrink-0 text-[9px] text-[var(--theme-danger)]">!</span>
+        )}
       </div>
     )
   }
@@ -213,11 +308,17 @@ export const TaskCard = memo(function TaskCardComponent({
         'relative rounded-lg border p-3 cursor-pointer transition-all select-none group',
         'bg-[var(--theme-card)] border-[var(--theme-border)]',
         'hover:border-[var(--theme-accent)]',
-        isDragging ? 'opacity-40 rotate-1 shadow-2xl' : 'hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]',
-        isSelected && 'ring-2 ring-[var(--theme-accent)] border-[var(--theme-accent)]',
-        isExecuting && 'ring-2 ring-amber-500/50',
-        isBreakingDown && !isExecuting && 'ring-2 ring-violet-500/50',
-        isAgentActive && !isExecuting && !isBreakingDown && 'ring-1 ring-violet-500/30',
+        isDragging
+          ? 'opacity-40 rotate-1 shadow-2xl'
+          : 'hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]',
+        isSelected &&
+          'ring-2 ring-[var(--theme-accent)] border-[var(--theme-accent)]',
+        isExecuting && 'ring-2 ring-[color-mix(in_srgb,var(--theme-warning)_50%,transparent)]',
+        isBreakingDown && !isExecuting && 'ring-2 ring-[color-mix(in_srgb,var(--theme-accent-secondary)_50%,transparent)]',
+        isAgentActive &&
+          !isExecuting &&
+          !isBreakingDown &&
+          'ring-1 ring-[color-mix(in_srgb,var(--theme-accent-secondary)_30%,transparent)]',
         isDimmed && 'opacity-40',
       )}
       style={{ borderLeftWidth: 3, borderLeftColor: priorityColor }}
@@ -228,19 +329,30 @@ export const TaskCard = memo(function TaskCardComponent({
           type="button"
           className={cn(
             'absolute top-1.5 left-1.5 z-10 transition-opacity',
-            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-60 focus-visible:opacity-100',
+            isSelected
+              ? 'opacity-100'
+              : 'opacity-0 group-hover:opacity-60 focus-visible:opacity-100',
           )}
           aria-label={selectionToggleLabel}
           aria-pressed={Boolean(isSelected)}
-          onClick={e => { e.stopPropagation(); onToggleSelect(task.id) }}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleSelect(task.id)
+          }}
         >
-          <span className={cn(
-            'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
-            isSelected
-              ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)]'
-              : 'border-[var(--theme-border)] bg-[var(--theme-card)]',
-          )}>
-            {isSelected && <span className="text-[8px] font-bold text-[var(--theme-bg)]">✓</span>}
+          <span
+            className={cn(
+              'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
+              isSelected
+                ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)]'
+                : 'border-[var(--theme-border)] bg-[var(--theme-card)]',
+            )}
+          >
+            {isSelected && (
+              <span className="text-[8px] font-bold text-[var(--theme-bg)]">
+                ✓
+              </span>
+            )}
           </span>
         </button>
       )}
@@ -249,20 +361,28 @@ export const TaskCard = memo(function TaskCardComponent({
       {isAgentActive && (
         <div
           className="absolute inset-x-0 top-0 h-1 rounded-t-lg w-full pointer-events-none"
-          style={{ background: stuck ? 'linear-gradient(90deg, #ef4444, #f97316)' : 'linear-gradient(90deg, #a855f7, #3b82f6, #a855f7)', backgroundSize: '200%' }}
+          style={{
+            background: stuck
+              ? 'linear-gradient(90deg, var(--theme-danger), var(--theme-warning))'
+              : 'linear-gradient(90deg, var(--theme-accent-secondary), var(--theme-accent), var(--theme-accent-secondary))',
+            backgroundSize: '200%',
+          }}
         />
       )}
 
       {/* Hover action buttons (▶ launch + ⋮ menu) */}
       <div
         className="absolute top-1.5 right-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* ▶ Launch Session */}
         {onLaunch && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onLaunch() }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onLaunch()
+            }}
             disabled={isLaunching}
             title="Launch chat session for this task"
             className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
@@ -270,7 +390,10 @@ export const TaskCard = memo(function TaskCardComponent({
             <HugeiconsIcon
               icon={PlayIcon}
               size={13}
-              className={cn(isLaunching ? 'animate-pulse' : '', 'text-[var(--theme-accent)]')}
+              className={cn(
+                isLaunching ? 'animate-pulse' : '',
+                'text-[var(--theme-accent)]',
+              )}
             />
           </button>
         )}
@@ -278,7 +401,10 @@ export const TaskCard = memo(function TaskCardComponent({
         {onExecute && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onExecute() }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onExecute()
+            }}
             disabled={isExecuting}
             title="Execute task with AI agent"
             className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
@@ -286,7 +412,10 @@ export const TaskCard = memo(function TaskCardComponent({
             <HugeiconsIcon
               icon={Rocket01Icon}
               size={13}
-              className={cn(isExecuting ? 'animate-pulse' : '', 'text-amber-500')}
+              className={cn(
+                isExecuting ? 'animate-pulse' : '',
+                'text-[var(--theme-warning)]',
+              )}
             />
           </button>
         )}
@@ -296,37 +425,50 @@ export const TaskCard = memo(function TaskCardComponent({
             className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
             aria-label="Task options"
           >
-            <HugeiconsIcon icon={MoreVerticalIcon} size={13} className="text-[var(--theme-muted)]" />
+            <HugeiconsIcon
+              icon={MoreVerticalIcon}
+              size={13}
+              className="text-[var(--theme-muted)]"
+            />
           </MenuTrigger>
           <MenuContent side="bottom" align="end">
-            <div
-              className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-[var(--theme-muted)]"
-            >
+            <div className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-[var(--theme-muted)]">
               Priority
             </div>
-            {(['high', 'medium', 'low'] as Array<TaskPriority>).map(p => (
+            {(['high', 'medium', 'low'] as Array<TaskPriority>).map((p) => (
               <MenuItem
                 key={p}
-                onClick={(e) => { e.stopPropagation(); onChangePriority(p) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onChangePriority(p)
+                }}
                 className="text-xs capitalize flex items-center gap-2"
               >
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: PRIORITY_COLORS[p] }} />
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: PRIORITY_COLORS[p] }}
+                />
                 {p}
-                {task.priority === p && <span className="ml-auto text-[10px]">✓</span>}
+                {task.priority === p && (
+                  <span className="ml-auto text-[10px]">✓</span>
+                )}
               </MenuItem>
             ))}
 
             <hr className="border-[var(--theme-border)] my-1" />
 
-            <div
-              className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-[var(--theme-muted)]"
-            >
+            <div className="px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-[var(--theme-muted)]">
               Move to
             </div>
-            {COLUMN_ORDER.filter(c => c !== task.column && c !== 'deleted').map(col => (
+            {COLUMN_ORDER.filter(
+              (c) => c !== task.column && c !== 'deleted',
+            ).map((col) => (
               <MenuItem
                 key={col}
-                onClick={(e) => { e.stopPropagation(); onMoveToColumn(col) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onMoveToColumn(col)
+                }}
                 className="text-xs"
               >
                 {COLUMN_LABELS[col]}
@@ -337,11 +479,21 @@ export const TaskCard = memo(function TaskCardComponent({
 
             {onBreakdown && (
               <MenuItem
-                onClick={(e) => { e.stopPropagation(); if (!isBreakingDown) onBreakdown() }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!isBreakingDown) onBreakdown()
+                }}
                 className="text-xs flex items-center gap-2"
-                style={{ opacity: isBreakingDown ? 0.5 : 1, cursor: isBreakingDown ? 'wait' : 'pointer' }}
+                style={{
+                  opacity: isBreakingDown ? 0.5 : 1,
+                  cursor: isBreakingDown ? 'wait' : 'pointer',
+                }}
               >
-                <HugeiconsIcon icon={SplitIcon} size={12} className="text-violet-500" />
+                <HugeiconsIcon
+                  icon={SplitIcon}
+                  size={12}
+                  className="text-[var(--theme-accent-secondary)]"
+                />
                 {isBreakingDown ? 'Breaking down…' : 'Break Down'}
               </MenuItem>
             )}
@@ -349,30 +501,36 @@ export const TaskCard = memo(function TaskCardComponent({
             <hr className="border-[var(--theme-border)] my-1" />
 
             <MenuItem
-              onClick={(e) => { e.stopPropagation(); onDelete() }}
-              className="text-xs flex items-center gap-2 text-red-400"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete()
+              }}
+              className="text-xs flex items-center gap-2 text-[var(--theme-danger)]"
             >
               <HugeiconsIcon icon={Delete01Icon} size={12} />
               Delete
             </MenuItem>
           </MenuContent>
         </MenuRoot>
-      </div>{/* end hover actions */}
+      </div>
+      {/* end hover actions */}
 
       <div className="flex items-start gap-1.5 mb-1 pr-12">
-        {queuePosition != null && !task.agent_state && (task.column === 'todo' || task.column === 'backlog') && (
-          <span
-            title={`Queue position ${queuePosition} — processed in priority order (high → medium → low, oldest first)`}
-            className={cn(
-              'shrink-0 mt-0.5 inline-flex items-center rounded px-1 py-0 text-[9px] font-bold tabular-nums border',
-              queuePosition === 1
-                ? 'bg-violet-500/15 text-violet-400 border-violet-500/30'
-                : 'bg-[var(--theme-hover)] text-[var(--theme-muted)] border-[var(--theme-border)]',
-            )}
-          >
-            #{queuePosition}
-          </span>
-        )}
+        {queuePosition != null &&
+          !task.agent_state &&
+          (task.column === 'todo' || task.column === 'backlog') && (
+            <span
+              title={`Queue position ${queuePosition} — processed in priority order (high → medium → low, oldest first)`}
+              className={cn(
+                'shrink-0 mt-0.5 inline-flex items-center rounded px-1 py-0 text-[9px] font-bold tabular-nums border',
+                queuePosition === 1
+                  ? 'bg-[color-mix(in_srgb,var(--theme-accent-secondary)_15%,transparent)] text-[var(--theme-accent-secondary)] border-[color-mix(in_srgb,var(--theme-accent-secondary)_30%,transparent)]'
+                  : 'bg-[var(--theme-hover)] text-[var(--theme-muted)] border-[var(--theme-border)]',
+              )}
+            >
+              #{queuePosition}
+            </span>
+          )}
         <p className="text-sm font-medium text-[var(--theme-text)] leading-snug line-clamp-2">
           {task.title}
         </p>
@@ -386,24 +544,40 @@ export const TaskCard = memo(function TaskCardComponent({
 
       <div className="flex flex-col gap-1.5 mt-2">
         {/* Agent state + source badges */}
-        {(isAgentActive || hasHistory || (task.source && task.source !== 'human')) && (
+        {(isAgentActive ||
+          hasHistory ||
+          (task.source && task.source !== 'human')) && (
           <div className="flex items-center gap-1.5 flex-wrap">
             {isAgentActive && (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setActivityOpen(v => { if (!v) onRequestRefresh?.(); return !v }) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActivityOpen((v) => {
+                    if (!v) onRequestRefresh?.()
+                    return !v
+                  })
+                }}
                 className="flex items-center"
-                title={activityOpen ? 'Hide agent activity' : 'Show agent activity'}
+                title={
+                  activityOpen ? 'Hide agent activity' : 'Show agent activity'
+                }
               >
-                <AgentStateBadge state={task.agent_state ?? null} agentName={task.agent_name} />
+                <AgentStateBadge
+                  state={task.agent_state ?? null}
+                  agentName={task.agent_name}
+                />
               </button>
             )}
             {stuck && onResetAgent && (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onResetAgent() }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onResetAgent()
+                }}
                 title="Agent appears stuck — click to reset"
-                className="text-[9px] px-1.5 py-0.5 rounded-md border transition-colors border-red-500/40 text-red-500 bg-red-500/7"
+                className="text-[9px] px-1.5 py-0.5 rounded-md border transition-colors border-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] text-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_7%,transparent)]"
               >
                 ✕ reset
               </button>
@@ -415,7 +589,7 @@ export const TaskCard = memo(function TaskCardComponent({
         {/* Dependency chip — shown when task is waiting on a prerequisite */}
         {dependencyLabel && task.column !== 'done' && (
           <div
-            className="flex items-center gap-1 text-[9px] text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5 w-fit"
+            className="flex items-center gap-1 text-[9px] text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)] rounded px-1.5 py-0.5 w-fit"
             title={dependencyLabel}
           >
             <span aria-hidden="true">⏳</span>
@@ -424,28 +598,34 @@ export const TaskCard = memo(function TaskCardComponent({
         )}
 
         {/* Agent comment — latest reasoning shown at a glance (when panel is closed) */}
-        {task.agent_comment && !isAgentActive && !activityOpen && task.column !== 'review' && (
-          <p className="text-[10px] leading-relaxed line-clamp-2 text-[var(--theme-muted)]">
-            <span className="text-purple-500">✦</span> {task.agent_comment}
-          </p>
-        )}
+        {task.agent_comment &&
+          !isAgentActive &&
+          !activityOpen &&
+          task.column !== 'review' && (
+            <p className="text-[10px] leading-relaxed line-clamp-2 text-[var(--theme-muted)]">
+              <span className="text-purple-500">✦</span> {task.agent_comment}
+            </p>
+          )}
 
         {/* Last activity timestamp — quick scan for when something last happened */}
         {(() => {
           const history = task.agent_history ?? []
           if (history.length === 0) return null
-          const last = history[history.length - 1] as { action: string; at?: string; by?: string }
+          const last = history[history.length - 1] as {
+            action: string
+            at?: string
+            by?: string
+          }
           if (!last.at) return null
           const ageMs = Date.now() - new Date(last.at).getTime()
           if (ageMs > 7 * 24 * 3600_000) return null // hide if >7d
-          const ageStr = ageMs < 3600_000
-            ? `${Math.round(ageMs / 60_000)}m ago`
-            : ageMs < 86_400_000
-            ? `${Math.round(ageMs / 3600_000)}h ago`
-            : `${Math.round(ageMs / 86_400_000)}d ago`
+          const ageStr = relativeTime(last.at)
           const actionColor: Record<string, string> = {
-            completed: 'text-emerald-500', blocked: 'text-red-400', timed_out: 'text-orange-400',
-            planned: 'text-violet-400', question: 'text-amber-400',
+            completed: 'text-[var(--theme-success)]',
+            blocked: 'text-[var(--theme-danger)]',
+            timed_out: 'text-[var(--theme-warning)]',
+            planned: 'text-[var(--theme-accent-secondary)]',
+            question: 'text-[var(--theme-warning)]',
           }
           const col = actionColor[last.action] ?? 'text-[var(--theme-muted)]'
           if (isAgentActive) return null
@@ -458,48 +638,57 @@ export const TaskCard = memo(function TaskCardComponent({
 
         {/* Plan-ready banner — shown when task is in review with a sister's plan.
             Replaces the buried "expand history → find planned entry" workflow. */}
-        {task.column === 'review' && !isAgentActive && (() => {
-          const planEntry = [...(task.agent_history ?? [])].reverse().find(e => e.action === 'planned')
-          if (!planEntry) return null
-          return (
-            <div
-              className="rounded-md p-2 space-y-1.5 bg-violet-500/5 border border-violet-500/20"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-violet-400">
-                <span>{planEntry.byEmoji}</span>
-                <span>{planEntry.by} · plan ready</span>
+        {task.column === 'review' &&
+          !isAgentActive &&
+          (() => {
+            const planEntry = [...(task.agent_history ?? [])]
+              .reverse()
+              .find((e) => e.action === 'planned')
+            if (!planEntry) return null
+            return (
+              <div
+                className="rounded-md p-2 space-y-1.5 bg-[color-mix(in_srgb,var(--theme-accent-secondary)_5%,transparent)] border border-[color-mix(in_srgb,var(--theme-accent-secondary)_20%,transparent)]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-accent-secondary)]">
+                  <span>{planEntry.byEmoji}</span>
+                  <span>{planEntry.by} · plan ready</span>
+                </div>
+                <p className="text-[10px] text-[var(--theme-muted)] leading-relaxed line-clamp-5 whitespace-pre-line">
+                  {planEntry.note}
+                </p>
+                {onExecute && (
+                  <button
+                    type="button"
+                    onClick={() => onExecute()}
+                    disabled={isExecuting}
+                    className={cn(
+                      'w-full rounded py-1 text-[10px] font-medium border transition-colors',
+                      isExecuting
+                        ? 'border-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_5%,transparent)] text-[color-mix(in_srgb,var(--theme-warning)_50%,transparent)] cursor-wait'
+                        : 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)] hover:bg-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)]',
+                    )}
+                  >
+                    {isExecuting ? '🚀 Executing…' : '🚀 Execute this plan'}
+                  </button>
+                )}
               </div>
-              <p className="text-[10px] text-[var(--theme-muted)] leading-relaxed line-clamp-5 whitespace-pre-line">
-                {planEntry.note}
-              </p>
-              {onExecute && (
-                <button
-                  type="button"
-                  onClick={() => onExecute()}
-                  disabled={isExecuting}
-                  className={cn(
-                    'w-full rounded py-1 text-[10px] font-medium border transition-colors',
-                    isExecuting
-                      ? 'border-amber-500/20 bg-amber-500/5 text-amber-400/50 cursor-wait'
-                      : 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20',
-                  )}
-                >
-                  {isExecuting ? '🚀 Executing…' : '🚀 Execute this plan'}
-                </button>
-              )}
-            </div>
-          )
-        })()}
+            )
+          })()}
 
         {/* History note count — clickable to expand panel */}
         {hasHistory && !isAgentActive && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); setActivityOpen(v => !v) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              setActivityOpen((v) => !v)
+            }}
             className="text-[9px] text-left hover:underline text-[var(--theme-muted)]"
           >
-            {activityOpen ? '▲ hide' : `💬 ${task.agent_history!.length} note${task.agent_history!.length !== 1 ? 's' : ''} — click to reply`}
+            {activityOpen
+              ? '▲ hide'
+              : `💬 ${task.agent_history!.length} note${task.agent_history!.length !== 1 ? 's' : ''} — click to reply`}
           </button>
         )}
 
@@ -510,48 +699,94 @@ export const TaskCard = memo(function TaskCardComponent({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Live status indicator (only when active) */}
-            {isAgentActive && (() => {
-              const cfg = AGENT_STATE_CONFIG[task.agent_state!]
-              return (
-                <div className="flex items-center gap-1.5 text-[10px] pb-1 border-b border-[var(--theme-border)]" style={{ color: cfg.color }}>
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.pulse ? 'animate-ping' : ''}`}
-                    style={{ background: cfg.color }}
-                  />
-                  <span className={cfg.pulse ? 'animate-pulse' : ''}>{cfg.label}</span>
-                </div>
-              )
-            })()}
+            {isAgentActive &&
+              (() => {
+                const cfg = AGENT_STATE_CONFIG[task.agent_state!]
+                return (
+                  <div
+                    className="flex items-center gap-1.5 text-[10px] pb-1 border-b border-[var(--theme-border)]"
+                    style={{ color: cfg.color }}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.pulse ? 'animate-ping' : ''}`}
+                      style={{ background: cfg.color }}
+                    />
+                    <span className={cfg.pulse ? 'animate-pulse' : ''}>
+                      {cfg.label}
+                    </span>
+                  </div>
+                )
+              })()}
 
             {/* Activity entries */}
-            {hasHistory && task.agent_history!.slice(-4).map((entry) => (
-              <div key={entry.id} className="flex gap-1.5 text-[10px]">
-                <span className="shrink-0 leading-none mt-0.5">{entry.byEmoji}</span>
-                <div className="min-w-0">
-                  <span className={cn('font-medium capitalize', entry.action === 'question' ? 'text-amber-500' : 'text-[var(--theme-text)]')}>{entry.by}</span>
-                  <span className="text-[var(--theme-muted)]"> · {entry.action === 'question' ? 'asked' : entry.action} · {relativeTime(entry.at)}</span>
-                  {entry.note && (
-                    <p className={cn('mt-0.5 leading-relaxed line-clamp-3', entry.action === 'question' ? 'text-amber-500' : 'text-[var(--theme-muted)]')}>
-                      {entry.note}
-                    </p>
-                  )}
+            {hasHistory &&
+              task.agent_history!.slice(-4).map((entry) => (
+                <div key={entry.id} className="flex gap-1.5 text-[10px]">
+                  <span className="shrink-0 leading-none mt-0.5">
+                    {entry.byEmoji}
+                  </span>
+                  <div className="min-w-0">
+                    <span
+                      className={cn(
+                        'font-medium capitalize',
+                        entry.action === 'question'
+                          ? 'text-[var(--theme-warning)]'
+                          : 'text-[var(--theme-text)]',
+                      )}
+                    >
+                      {entry.by}
+                    </span>
+                    <span className="text-[var(--theme-muted)]">
+                      {' '}
+                      · {entry.action === 'question'
+                        ? 'asked'
+                        : entry.action} · {relativeTime(entry.at)}
+                    </span>
+                    {entry.note && (
+                      <p
+                        className={cn(
+                          'mt-0.5 leading-relaxed line-clamp-3',
+                          entry.action === 'question'
+                            ? 'text-[var(--theme-warning)]'
+                            : 'text-[var(--theme-muted)]',
+                        )}
+                      >
+                        {entry.note}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
             {/* View log — shown when there are execution entries */}
-            {task.agent_history?.some(e => ['completed', 'attempted', 'blocked'].includes(e.action) && e.by !== 'user') && (
+            {task.agent_history?.some(
+              (e) =>
+                ['completed', 'attempted', 'blocked'].includes(e.action) &&
+                e.by !== 'user',
+            ) && (
               <div className="pt-1 border-t border-[var(--theme-border)]">
                 <button
                   type="button"
                   onClick={async (e) => {
                     e.stopPropagation()
-                    if (logContent !== null) { setLogContent(null); return }
+                    if (logContent !== null) {
+                      setLogContent(null)
+                      return
+                    }
                     setLogLoading(true)
                     try {
-                      const res = await fetch(`/api/hermes-tasks/${task.id}?action=log`)
-                      const data = await res.json() as { found: boolean; log: string }
-                      setLogContent(data.found ? data.log : '(no log file found for this task)')
+                      const res = await fetch(
+                        `/api/hermes-tasks/${task.id}?action=log`,
+                      )
+                      const data = (await res.json()) as {
+                        found: boolean
+                        log: string
+                      }
+                      setLogContent(
+                        data.found
+                          ? data.log
+                          : '(no log file found for this task)',
+                      )
                     } catch {
                       setLogContent('(failed to fetch log)')
                     } finally {
@@ -560,7 +795,11 @@ export const TaskCard = memo(function TaskCardComponent({
                   }}
                   className="text-[9px] text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:underline transition-colors"
                 >
-                  {logLoading ? 'loading…' : logContent !== null ? '▲ hide log' : '📋 view execution log'}
+                  {logLoading
+                    ? 'loading…'
+                    : logContent !== null
+                      ? '▲ hide log'
+                      : '📋 view execution log'}
                 </button>
                 {logContent !== null && (
                   <pre className="mt-1.5 text-[9px] leading-relaxed text-[var(--theme-muted)] bg-black/20 rounded p-2 overflow-auto max-h-48 whitespace-pre-wrap break-all">
@@ -571,25 +810,56 @@ export const TaskCard = memo(function TaskCardComponent({
             )}
 
             {/* Inline reply input — hidden when structured clarification questions are pending */}
-            {onComment && task.waiting_for_user && task.clarification_questions?.length && (
-              <div className="flex items-center gap-1.5 pt-1 border-t border-[var(--theme-border)]">
-                <span className="text-[10px] text-amber-400">❓</span>
-                <span className="text-[10px] text-amber-400/80">
-                  {task.clarification_questions.length} question{task.clarification_questions.length !== 1 ? 's' : ''} — open task to answer
-                </span>
-              </div>
-            )}
-            {onComment && !(task.waiting_for_user && task.clarification_questions?.length) && (
-              <div className="flex gap-1.5 pt-1 border-t border-[var(--theme-border)]">
-                <input
-                  ref={replyInputRef}
-                  className="flex-1 rounded px-2 py-1 text-[10px] min-w-0 bg-[var(--theme-input)] border border-[var(--theme-border)] text-[var(--theme-text)] outline-none"
-                  placeholder={task.agent_state === 'waiting_for_input' ? 'Reply to Astra…' : 'Continue…'}
-                  value={replyText}
-                  onChange={e => setReplyText(e.target.value)}
-                  onKeyDown={async (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && replyText.trim() && !replySending) {
-                      e.preventDefault()
+            {onComment &&
+              task.waiting_for_user &&
+              task.clarification_questions?.length && (
+                <div className="flex items-center gap-1.5 pt-1 border-t border-[var(--theme-border)]">
+                  <span className="text-[10px] text-[var(--theme-warning)]">❓</span>
+                  <span className="text-[10px] text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)]">
+                    {task.clarification_questions.length} question
+                    {task.clarification_questions.length !== 1 ? 's' : ''} —
+                    open task to answer
+                  </span>
+                </div>
+              )}
+            {onComment &&
+              !(
+                task.waiting_for_user && task.clarification_questions?.length
+              ) && (
+                <div className="flex gap-1.5 pt-1 border-t border-[var(--theme-border)]">
+                  <input
+                    ref={replyInputRef}
+                    className="flex-1 rounded px-2 py-1 text-[10px] min-w-0 bg-[var(--theme-input)] border border-[var(--theme-border)] text-[var(--theme-text)] outline-none"
+                    placeholder={
+                      task.agent_state === 'waiting_for_input'
+                        ? 'Reply to Astra…'
+                        : 'Continue…'
+                    }
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    onKeyDown={async (e) => {
+                      if (
+                        e.key === 'Enter' &&
+                        !e.shiftKey &&
+                        replyText.trim() &&
+                        !replySending
+                      ) {
+                        e.preventDefault()
+                        setReplySending(true)
+                        try {
+                          await onComment(task.id, replyText.trim())
+                          setReplyText('')
+                        } finally {
+                          setReplySending(false)
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={!replyText.trim() || replySending}
+                    onClick={async () => {
+                      if (!replyText.trim() || replySending) return
                       setReplySending(true)
                       try {
                         await onComment(task.id, replyText.trim())
@@ -597,42 +867,37 @@ export const TaskCard = memo(function TaskCardComponent({
                       } finally {
                         setReplySending(false)
                       }
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={!replyText.trim() || replySending}
-                  onClick={async () => {
-                    if (!replyText.trim() || replySending) return
-                    setReplySending(true)
-                    try {
-                      await onComment(task.id, replyText.trim())
-                      setReplyText('')
-                    } finally {
-                      setReplySending(false)
-                    }
-                  }}
-                  className={cn('rounded px-2 py-1 text-[10px] shrink-0 transition-opacity text-white', replySending ? 'bg-purple-500/20' : 'bg-purple-500')}
-                  style={{
-                    opacity: (!replyText.trim() || replySending) ? 0.5 : 1,
-                    cursor: (!replyText.trim() || replySending) ? 'default' : 'pointer',
-                  }}
-                >
-                  {replySending ? '…' : '↵'}
-                </button>
-              </div>
-            )}
+                    }}
+                    className={cn(
+                      'rounded px-2 py-1 text-[10px] shrink-0 transition-opacity text-white',
+                      replySending ? 'bg-purple-500/20' : 'bg-purple-500',
+                    )}
+                    style={{
+                      opacity: !replyText.trim() || replySending ? 0.5 : 1,
+                      cursor:
+                        !replyText.trim() || replySending
+                          ? 'default'
+                          : 'pointer',
+                    }}
+                  >
+                    {replySending ? '…' : '↵'}
+                  </button>
+                </div>
+              )}
           </div>
         )}
 
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
-            {task.assignee && assigneeLabel && (
-              onAssigneeClick ? (
+            {task.assignee &&
+              assigneeLabel &&
+              (onAssigneeClick ? (
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); onAssigneeClick(task.assignee!) }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onAssigneeClick(task.assignee!)
+                  }}
                   className="text-[10px] px-1.5 py-0.5 rounded-md transition-colors hover:outline hover:outline-1 hover:outline-[var(--theme-accent)] bg-[var(--theme-hover)] text-[var(--theme-muted)]"
                   title="Filter by this assignee"
                 >
@@ -642,13 +907,15 @@ export const TaskCard = memo(function TaskCardComponent({
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--theme-hover)] text-[var(--theme-muted)]">
                   {assigneeLabel}
                 </span>
-              )
-            )}
+              ))}
             {visibleTags.map((tag) => (
               <button
                 key={tag}
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onTagClick(tag) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onTagClick(tag)
+                }}
                 className={cn(
                   'text-[10px] px-1.5 py-0.5 rounded-md transition-colors',
                   activeTagFilter === tag
@@ -670,15 +937,24 @@ export const TaskCard = memo(function TaskCardComponent({
             <div className="flex items-center gap-1 text-[10px] tabular-nums">
               {overdue && (
                 <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                  <span className="text-red-400 font-semibold">Overdue</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--theme-danger)] shrink-0" />
+                  <span className="text-[var(--theme-danger)] font-semibold">Overdue</span>
                   <span className="text-[var(--theme-muted)] mx-0.5">·</span>
                 </>
               )}
-              <span className={overdue ? 'text-red-400 font-semibold' : 'text-[var(--theme-muted)]'}>
+              <span
+                className={
+                  overdue
+                    ? 'text-[var(--theme-danger)] font-semibold'
+                    : 'text-[var(--theme-muted)]'
+                }
+              >
                 {(() => {
                   const [y, m, d] = task.due_date.split('-').map(Number)
-                  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })
                 })()}
               </span>
             </div>

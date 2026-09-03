@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatTaskAssigneeLabel, formatTaskDependencyLabel, formatTaskSelectionToggleLabel } from './task-card'
+import {
+  formatTaskAssigneeLabel,
+  formatTaskDependencyLabel,
+  formatTaskSelectionToggleLabel,
+} from './task-card'
 import {
   TASKS_BOARD_HELP_TEXT,
   TASK_STATS_ROW_CLASS,
@@ -12,7 +16,6 @@ import {
   formatTaskFilterAriaLabel,
   formatTaskFilterSummary,
   formatTaskRefreshStatus,
-  formatTaskStatFilterButtonLabel,
 } from './format-utils'
 
 describe('tasks UX copy', () => {
@@ -23,7 +26,9 @@ describe('tasks UX copy', () => {
   })
 
   it('formats assignee labels for assigned tasks and returns empty string for unassigned', () => {
-    expect(formatTaskAssigneeLabel('jarvis', { jarvis: 'Jarvis' })).toBe('Jarvis')
+    expect(formatTaskAssigneeLabel('jarvis', { jarvis: 'Jarvis' })).toBe(
+      'Jarvis',
+    )
     expect(formatTaskAssigneeLabel(null, {})).toBe('')
   })
 
@@ -34,8 +39,12 @@ describe('tasks UX copy', () => {
   })
 
   it('formats task selection toggle labels from selected state', () => {
-    expect(formatTaskSelectionToggleLabel('Review deployment plan', false)).toBe('Select task: Review deployment plan')
-    expect(formatTaskSelectionToggleLabel('Review deployment plan', true)).toBe('Deselect task: Review deployment plan')
+    expect(
+      formatTaskSelectionToggleLabel('Review deployment plan', false),
+    ).toBe('Select task: Review deployment plan')
+    expect(formatTaskSelectionToggleLabel('Review deployment plan', true)).toBe(
+      'Deselect task: Review deployment plan',
+    )
   })
 
   it('formats filter result summaries with clear zero-match and plural copy', () => {
@@ -46,14 +55,15 @@ describe('tasks UX copy', () => {
   })
 
   it('formats filter toggle aria labels from active state', () => {
-    expect(formatTaskFilterAriaLabel('Overdue', false)).toBe('Enable overdue task filter')
-    expect(formatTaskFilterAriaLabel('Active Agent', true)).toBe('Disable active agent task filter')
-    expect(formatTaskFilterAriaLabel('high priority', false)).toBe('Enable high priority task filter')
-  })
-
-  it('formats task stat filter button labels from active state', () => {
-    expect(formatTaskStatFilterButtonLabel('Blocked', false)).toBe('Enable blocked task filter')
-    expect(formatTaskStatFilterButtonLabel('Blocked', true)).toBe('Disable blocked task filter')
+    expect(formatTaskFilterAriaLabel('Overdue', false)).toBe(
+      'Enable overdue task filter',
+    )
+    expect(formatTaskFilterAriaLabel('Active Agent', true)).toBe(
+      'Disable active agent task filter',
+    )
+    expect(formatTaskFilterAriaLabel('high priority', false)).toBe(
+      'Enable high priority task filter',
+    )
   })
 
   it('keeps compact task stats readable without horizontal scrolling', () => {
@@ -73,34 +83,72 @@ describe('tasks UX copy', () => {
     expect(formatBlockedTaskBreakdownLabel(1, 0)).toBe('needs input')
     expect(formatBlockedTaskBreakdownLabel(0, 3)).toBe('exec error')
     expect(formatBlockedTaskBreakdownLabel(0, 0)).toBeNull()
-    expect(formatBlockedTaskBreakdownTitle(1, 2)).toBe('1 waiting for input, 2 execution failures')
+    expect(formatBlockedTaskBreakdownTitle(1, 2)).toBe(
+      '1 waiting for input, 2 execution failures',
+    )
   })
 
   it('formats compact column labels for empty and populated columns', () => {
-    expect(formatCompactTaskColumnAriaLabel('Backlog', 0)).toBe('Backlog column is empty. Add a task or drop one here.')
-    expect(formatCompactTaskColumnAriaLabel('In Progress', 2)).toBe('In Progress column with 2 tasks')
-    expect(formatCompactTaskColumnActionLabel('Review')).toBe('Add a task to the Review column')
+    expect(formatCompactTaskColumnAriaLabel('Backlog', 0)).toBe(
+      'Backlog column is empty. Add a task or drop one here.',
+    )
+    expect(formatCompactTaskColumnAriaLabel('In Progress', 2)).toBe(
+      'In Progress column with 2 tasks',
+    )
+    expect(formatCompactTaskColumnActionLabel('Review')).toBe(
+      'Add a task to the Review column',
+    )
   })
 
   it('counts only review tasks with usable execution plans', () => {
-    const plannedHistory = [{
-      id: 'h1',
-      action: 'planned',
-      note: '1. Inspect the target files. 2. Apply the requested code change. 3. Run focused verification and report the result.',
-      by: 'astra',
-      byEmoji: '🌟',
-      at: '2026-01-01T00:00:00Z',
-    }]
-    const stubHistory = [{ id: 'h3', action: 'planned', note: '1. Do the work', by: 'astra', byEmoji: '🌟', at: '2026-01-01T00:00:00Z' }]
-    const unavailableHistory = [{ id: 'h2', action: 'planned', note: 'Plan unavailable — press Execute to proceed.', by: 'astra', byEmoji: '🌟', at: '2026-01-01T00:00:00Z' }]
+    const plannedHistory = [
+      {
+        id: 'h1',
+        action: 'planned',
+        note: '1. Inspect the target files. 2. Apply the requested code change. 3. Run focused verification and report the result.',
+        by: 'astra',
+        byEmoji: '🌟',
+        at: '2026-01-01T00:00:00Z',
+      },
+    ]
+    const stubHistory = [
+      {
+        id: 'h3',
+        action: 'planned',
+        note: '1. Do the work',
+        by: 'astra',
+        byEmoji: '🌟',
+        at: '2026-01-01T00:00:00Z',
+      },
+    ]
+    const unavailableHistory = [
+      {
+        id: 'h2',
+        action: 'planned',
+        note: 'Plan unavailable — press Execute to proceed.',
+        by: 'astra',
+        byEmoji: '🌟',
+        at: '2026-01-01T00:00:00Z',
+      },
+    ]
 
-    expect(countExecutableReviewTasks([
-      { column: 'review', agent_state: null, agent_history: plannedHistory },
-      { column: 'review', agent_state: 'working', agent_history: plannedHistory },
-      { column: 'review', agent_state: null, agent_history: unavailableHistory },
-      { column: 'review', agent_state: null, agent_history: stubHistory },
-      { column: 'todo', agent_state: null, agent_history: plannedHistory },
-      { column: 'review', agent_state: null, agent_history: [] },
-    ])).toBe(1)
+    expect(
+      countExecutableReviewTasks([
+        { column: 'review', agent_state: null, agent_history: plannedHistory },
+        {
+          column: 'review',
+          agent_state: 'working',
+          agent_history: plannedHistory,
+        },
+        {
+          column: 'review',
+          agent_state: null,
+          agent_history: unavailableHistory,
+        },
+        { column: 'review', agent_state: null, agent_history: stubHistory },
+        { column: 'todo', agent_state: null, agent_history: plannedHistory },
+        { column: 'review', agent_state: null, agent_history: [] },
+      ]),
+    ).toBe(1)
   })
 })

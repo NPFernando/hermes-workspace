@@ -26,16 +26,26 @@ export function useTaskFilters(initialAssignee: string | null) {
   const [filterActiveAgent, setFilterActiveAgent] = useState(false)
   const [filterInReview, setFilterInReview] = useState(false)
   const [filterTimedOut, setFilterTimedOut] = useState(false)
-  const [ageFilter, setAgeFilter] = useState<'fresh' | 'aging' | 'stale' | null>(null)
-  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | null>(null)
+  const [ageFilter, setAgeFilter] = useState<
+    'fresh' | 'aging' | 'stale' | null
+  >(null)
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | null>(
+    null,
+  )
   const [tagFilter, setTagFilter] = useState<string | null>(null)
-  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(initialAssignee)
+  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(
+    initialAssignee,
+  )
   const [hideSubtasks, setHideSubtasks] = useState(false)
   const [showFilterPopover, setShowFilterPopover] = useState(false)
 
   const [hiddenColumns, setHiddenColumns] = useState<Set<TaskColumn>>(() => {
     try {
-      return new Set(JSON.parse(localStorage.getItem('hermes-hidden-cols') ?? '[]') as Array<TaskColumn>)
+      return new Set(
+        JSON.parse(
+          localStorage.getItem('hermes-hidden-cols') ?? '[]',
+        ) as Array<TaskColumn>,
+      )
     } catch {
       return new Set()
     }
@@ -50,13 +60,17 @@ export function useTaskFilters(initialAssignee: string | null) {
     })
   }, [])
 
-  const [filterPresets, setFilterPresets] = useState<Array<FilterPreset>>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('hermes-filter-presets') ?? '[]') as Array<FilterPreset>
-    } catch {
-      return []
-    }
-  })
+  const [filterPresets, setFilterPresets] = useState<Array<FilterPreset>>(
+    () => {
+      try {
+        return JSON.parse(
+          localStorage.getItem('hermes-filter-presets') ?? '[]',
+        ) as Array<FilterPreset>
+      } catch {
+        return []
+      }
+    },
+  )
 
   const saveFilterPreset = useCallback(
     (name: string) => {
@@ -79,7 +93,18 @@ export function useTaskFilters(initialAssignee: string | null) {
         return next
       })
     },
-    [assigneeFilter, searchQuery, filterOverdue, filterBlocked, filterActiveAgent, filterInReview, filterTimedOut, ageFilter, priorityFilter, tagFilter],
+    [
+      assigneeFilter,
+      searchQuery,
+      filterOverdue,
+      filterBlocked,
+      filterActiveAgent,
+      filterInReview,
+      filterTimedOut,
+      ageFilter,
+      priorityFilter,
+      tagFilter,
+    ],
   )
 
   const applyFilterPreset = useCallback((p: FilterPreset) => {
@@ -118,20 +143,36 @@ export function useTaskFilters(initialAssignee: string | null) {
   }, [])
 
   return {
-    searchQuery, setSearchQuery,
-    filterOverdue, setFilterOverdue,
-    filterBlocked, setFilterBlocked,
-    filterActiveAgent, setFilterActiveAgent,
-    filterInReview, setFilterInReview,
-    filterTimedOut, setFilterTimedOut,
-    ageFilter, setAgeFilter,
-    priorityFilter, setPriorityFilter,
-    tagFilter, setTagFilter,
-    assigneeFilter, setAssigneeFilter,
-    hideSubtasks, setHideSubtasks,
-    showFilterPopover, setShowFilterPopover,
-    hiddenColumns, toggleHideColumn,
-    filterPresets, saveFilterPreset, applyFilterPreset, deleteFilterPreset,
+    searchQuery,
+    setSearchQuery,
+    filterOverdue,
+    setFilterOverdue,
+    filterBlocked,
+    setFilterBlocked,
+    filterActiveAgent,
+    setFilterActiveAgent,
+    filterInReview,
+    setFilterInReview,
+    filterTimedOut,
+    setFilterTimedOut,
+    ageFilter,
+    setAgeFilter,
+    priorityFilter,
+    setPriorityFilter,
+    tagFilter,
+    setTagFilter,
+    assigneeFilter,
+    setAssigneeFilter,
+    hideSubtasks,
+    setHideSubtasks,
+    showFilterPopover,
+    setShowFilterPopover,
+    hiddenColumns,
+    toggleHideColumn,
+    filterPresets,
+    saveFilterPreset,
+    applyFilterPreset,
+    deleteFilterPreset,
     clearAllFilters,
   }
 }
