@@ -88,6 +88,10 @@ function createClientTaskId(): string {
   return `TASK-${Date.now().toString(36).toUpperCase()}`
 }
 
+function normalizeTitle(title: string): string {
+  return title.trim().toLowerCase()
+}
+
 async function readApiError(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as Record<string, unknown>
@@ -142,6 +146,50 @@ export const useTaskStore = create<TaskStore>()(
       },
       addTask: async (taskData) => {
         const now = new Date().toISOString()
+        // Check for existing active tasks with matching normalized title
+        const normalizedTitle = normalizeTitle(taskData.title)
+        const existingTask = get().tasks.find(
+          (t) => 
+            t.status !== 'done' && 
+            (t.status as string) !== 'deleted' &&
+            normalizeTitle(t.title) === normalizedTitle
+        )
+
+        if (existingTask) {
+          // Update existing task instead of creating duplicate
+          const updatedTask: Task = {
+            ...existingTask,
+            ...taskData,
+            updatedAt: now,
+          }
+          set((state) => ({
+            tasks: state.tasks.map((t) => 
+              t.id === existingTask.id ? updatedTask : t
+            ),
+          }))
+
+          // Still sync with API to persist the update
+          const response = await fetch(`/api/tasks/${existingTask.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...taskData,
+              updatedAt: now,
+            }),
+          }).catch(() => null)
+
+          if (!response) {
+            throw new Error('Failed to update task')
+          }
+
+          if (!response.ok) {
+            const message = await readApiError(response)
+            throw new Error(message)
+          }
+
+          return
+        }
+
         const task: Task = {
           ...taskData,
           id: createClientTaskId(),
