@@ -64,12 +64,6 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { StatusDot } from '@/components/status-indicator'
-import {
-  MenuContent,
-  MenuItem,
-  MenuRoot,
-  MenuTrigger,
-} from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 
 const SettingsDialog = lazy(() =>
@@ -612,7 +606,8 @@ function ChatSidebarComponent({
   const isCommandActive = pathname.startsWith('/command')
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
   const isResearchActive = pathname.startsWith('/research')
-  const isTradingActive = pathname.startsWith('/trading') || pathname.startsWith('/finance')
+  const isTradingActive =
+    pathname.startsWith('/trading') || pathname.startsWith('/finance')
   const isPersonalFinanceActive = pathname.startsWith('/personal-finance')
   const isOpsCostActive = pathname.startsWith('/ops-cost')
   const echoStudioEnabled = useSettingsStore(
@@ -1182,61 +1177,56 @@ function ChatSidebarComponent({
             isVisuallyCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
           )}
         >
-          {/* User menu trigger */}
-          <MenuRoot>
-            <MenuTrigger
+          {/* User avatar. Settings access is the dedicated gear button
+              below; that button is hidden when the sidebar is collapsed,
+              so the avatar itself opens settings directly in that state
+              (it's the only entry point then). When expanded, the avatar
+              is purely informational — no redundant second settings
+              trigger alongside the gear button. */}
+          {isVisuallyCollapsed ? (
+            <button
+              type="button"
               data-tour="settings"
-              className={cn(
-                'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-[var(--theme-hover)] flex-1 min-w-0',
-                isVisuallyCollapsed ? 'justify-center px-0' : 'px-1.5',
-              )}
+              onClick={() => handleOpenSettings('claude')}
+              className="flex flex-1 min-w-0 items-center justify-center rounded-lg px-0 py-1 transition-colors hover:bg-[var(--theme-hover)]"
+              aria-label="Settings"
             >
               <UserAvatar
                 size={28}
                 src={profileAvatarDataUrl}
                 alt={profileDisplayName}
               />
+            </button>
+          ) : (
+            <div className="flex flex-1 min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-1">
+              <UserAvatar
+                size={28}
+                src={profileAvatarDataUrl}
+                alt={profileDisplayName}
+              />
               <AnimatePresence initial={false} mode="wait">
-                {!isVisuallyCollapsed && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={transition}
-                    className="flex-1 min-w-0 flex items-center gap-1.5"
-                  >
-                    <span className="block truncate text-sm font-medium text-[var(--theme-text)]">
-                      {profileDisplayName}
-                    </span>
-                    <StatusDot />
-                  </motion.div>
-                )}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="flex-1 min-w-0 flex items-center gap-1.5"
+                >
+                  <span className="block truncate text-sm font-medium text-[var(--theme-text)]">
+                    {profileDisplayName}
+                  </span>
+                  <StatusDot />
+                </motion.div>
               </AnimatePresence>
-            </MenuTrigger>
-            <MenuContent side="top" align="start" className="min-w-[200px]">
-              <MenuItem
-                onClick={function onOpenSettings() {
-                  handleOpenSettings('claude')
-                }}
-                className="justify-between"
-              >
-                <span className="flex items-center gap-2">
-                  <HugeiconsIcon
-                    icon={Settings01Icon}
-                    size={20}
-                    strokeWidth={1.5}
-                  />
-                  Settings
-                </span>
-              </MenuItem>
-            </MenuContent>
-          </MenuRoot>
+            </div>
+          )}
 
           {/* Settings + Theme toggle */}
           {!isVisuallyCollapsed && (
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
+                data-tour="settings"
                 onClick={() => handleOpenSettings('claude')}
                 className="shrink-0 rounded-lg p-1.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors"
                 aria-label="Settings"
