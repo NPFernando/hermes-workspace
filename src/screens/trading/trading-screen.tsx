@@ -280,17 +280,6 @@ type FinancePayload = {
   security: Record<string, boolean>
   connectors: Record<string, Record<string, unknown>>
   summary: {
-    totalIncomeLkr: number
-    totalExpensesLkr: number
-    netSavingsLkr: number
-    savingsRate: number
-    cashBalanceLkr: number
-    taxReserveLkr: number
-    debtLkr: number
-    netWorthLkr: number
-    accountCount: number
-    goalCount: number
-    taxRecordCount: number
     openPlans: number
     blockedPlans: number
     tradingMode: string
@@ -381,14 +370,6 @@ const phases = [
   'Phase 4: paper trading and shadow learning loop — active',
   'Phase 5+: Binance testnet/live modes — gated by explicit approval',
 ]
-
-function formatLkr(value: number): string {
-  return `LKR ${Math.round(value).toLocaleString('en-LK')}`
-}
-
-function formatPct(value: number): string {
-  return `${value.toFixed(1)}%`
-}
 
 function formatDateTime(value: string): string {
   const date = new Date(value)
@@ -2826,40 +2807,6 @@ export function TradingScreen() {
       <IntelligenceSummaryPanel onPayload={setPayload} />
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Total income"
-          value={formatLkr(summary.totalIncomeLkr)}
-          tone="good"
-        />
-        <StatCard
-          label="Total expenses"
-          value={formatLkr(summary.totalExpensesLkr)}
-          tone={
-            summary.totalExpensesLkr > summary.totalIncomeLkr &&
-            summary.totalIncomeLkr > 0
-              ? 'danger'
-              : 'neutral'
-          }
-        />
-        <StatCard
-          label="Net savings"
-          value={formatLkr(summary.netSavingsLkr)}
-          tone={summary.netSavingsLkr >= 0 ? 'good' : 'danger'}
-        />
-        <StatCard
-          label="Savings rate"
-          value={formatPct(summary.savingsRate)}
-          tone={summary.savingsRate >= 20 ? 'good' : 'warn'}
-        />
-        <StatCard
-          label="Cash balance"
-          value={formatLkr(summary.cashBalanceLkr)}
-        />
-        <StatCard
-          label="Tax reserve"
-          value={formatLkr(summary.taxReserveLkr)}
-        />
-        <StatCard label="Net worth" value={formatLkr(summary.netWorthLkr)} />
         <StatCard
           label="Trading safety"
           value={summary.liveTradingEnabled ? 'Live enabled' : 'Live blocked'}
