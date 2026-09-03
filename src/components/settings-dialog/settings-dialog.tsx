@@ -2,8 +2,10 @@
 
 import {
   ArrowLeft01Icon,
+  BubbleChatDoneIcon,
   Cancel01Icon,
   CloudIcon,
+  LanguageCircleIcon,
   MessageMultiple01Icon,
   Notification03Icon,
   PaintBoardIcon,
@@ -20,7 +22,6 @@ import { AgentBehaviorContent } from './sections/agent-behavior-content'
 import { VoiceContent } from './sections/voice-content'
 import { DisplayContent } from './sections/display-content'
 import { LanguageContent } from './sections/language-content'
-import type { ThemeId } from '@/lib/theme'
 import type * as React from 'react'
 import {
   DialogClose,
@@ -46,26 +47,12 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
   { id: 'claude', label: 'Model & Provider', icon: CloudIcon },
   { id: 'agent', label: 'Agent', icon: Settings02Icon },
   { id: 'voice', label: 'Voice', icon: VolumeHighIcon },
-  { id: 'display', label: 'Display', icon: PaintBoardIcon },
+  { id: 'display', label: 'Display', icon: BubbleChatDoneIcon },
   { id: 'appearance', label: 'Theme', icon: PaintBoardIcon },
   { id: 'chat', label: 'Chat', icon: MessageMultiple01Icon },
   { id: 'notifications', label: 'Alerts', icon: Notification03Icon },
-  { id: 'language', label: 'Language', icon: MessageMultiple01Icon },
+  { id: 'language', label: 'Language', icon: LanguageCircleIcon },
 ]
-
-const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
-  'claude-nous',
-  'claude-official',
-  'claude-classic',
-  'claude-slate',
-])
-
-function _isDarkEnterpriseTheme(theme: string | null): theme is ThemeId {
-  if (!theme) return false
-  return DARK_ENTERPRISE_THEMES.has(theme as ThemeId)
-}
-void _isDarkEnterpriseTheme
-
 
 class SettingsErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -82,7 +69,7 @@ class SettingsErrorBoundary extends Component<
       return (
         <div className="flex h-full items-center justify-center p-8 text-center">
           <div>
-            <p className="mb-2 text-sm font-medium text-red-500">
+            <p className="mb-2 text-sm font-medium text-[var(--theme-danger)]">
               Settings failed to load
             </p>
             <button
@@ -226,10 +213,11 @@ export function SettingsDialog({
           </SettingsErrorBoundary>
 
           <div className="sticky bottom-0 z-10 border-t border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-3 text-xs text-[var(--theme-muted)] md:rounded-b-2xl md:px-5">
-            Most changes save automatically; the default model commits only when you click Set as default.{' '}
+            Most changes save automatically; the default model commits only when
+            you click Set as default.{' '}
             <a
               href="/settings"
-              className="ml-2 font-medium underline underline-offset-2 hover:text-[var(--theme-muted)] dark:hover:text-neutral-200"
+              className="ml-2 font-medium underline underline-offset-2 hover:text-[var(--theme-text)]"
             >
               All settings →
             </a>

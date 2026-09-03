@@ -19,7 +19,7 @@ export function LanguageContent() {
             setLocale(e.target.value as LocaleId)
             window.location.reload()
           }}
-          className="h-9 w-full rounded-lg border border-[var(--theme-border)] border-[var(--theme-border)] bg-[var(--theme-input)] px-3 text-sm text-[var(--theme-text)] outline-none md:max-w-xs"
+          className="h-9 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-3 text-sm text-[var(--theme-text)] outline-none md:max-w-xs"
         >
           {(Object.entries(LOCALE_LABELS) as Array<[LocaleId, string]>).map(
             ([id, label]) => (

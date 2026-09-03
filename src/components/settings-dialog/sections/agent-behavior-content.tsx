@@ -1,35 +1,22 @@
-import { useEffect, useState } from 'react'
-import { Row, SETTINGS_CARD_CLASS, SectionHeader } from './settings-dialog-primitives'
+import {
+  Row,
+  SETTINGS_CARD_CLASS,
+  SETTINGS_SELECT_CLASS,
+  SavedMessageBanner,
+  SectionHeader,
+} from './settings-dialog-primitives'
 import { cn } from '@/lib/utils'
+import {
+  useHermesConfigSection,
+  useSavedMessage,
+} from '@/hooks/use-hermes-config-section'
 
 export function AgentBehaviorContent() {
-  const [config, setConfig] = useState<Record<string, unknown>>({})
-  const [msg, setMsg] = useState<string | null>(null)
+  const { config, save: rawSave } = useHermesConfigSection('agent')
+  const { msg, runWithSavedMessage } = useSavedMessage()
 
-  useEffect(() => {
-    fetch('/api/hermes-config')
-      .then((r) => r.json())
-      .then((d: any) => {
-        setConfig(d.config?.agent ? (d.config.agent as Record<string, unknown>) : {})
-      })
-      .catch(() => {})
-  }, [])
-
-  const save = async (key: string, value: unknown) => {
-    setMsg(null)
-    try {
-      await fetch('/api/hermes-config', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: { agent: { [key]: value } } }),
-      })
-      setConfig((prev) => ({ ...prev, [key]: value }))
-      setMsg('Saved')
-      setTimeout(() => setMsg(null), 2000)
-    } catch {
-      setMsg('Failed')
-    }
-  }
+  const save = (key: string, value: unknown) =>
+    runWithSavedMessage(() => rawSave(key, value))
 
   return (
     <div className="space-y-4">
@@ -37,18 +24,7 @@ export function AgentBehaviorContent() {
         title="Agent Behavior"
         description="Execution limits and tool access."
       />
-      {msg && (
-        <div
-          className={cn(
-            'rounded-lg px-3 py-1.5 text-xs font-medium',
-            msg === 'Saved'
-              ? 'bg-green-500/15 text-green-400'
-              : 'bg-red-500/15 text-red-400',
-          )}
-        >
-          {msg}
-        </div>
-      )}
+      <SavedMessageBanner msg={msg} />
       <div className={SETTINGS_CARD_CLASS}>
         <Row
           label="Max turns"
@@ -60,7 +36,7 @@ export function AgentBehaviorContent() {
             max={100}
             value={Number(config.max_turns) || 50}
             onChange={(e) => save('max_turns', Number(e.target.value))}
-            className="h-8 w-20 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-center text-[var(--theme-text)] outline-none"
+            className={cn(SETTINGS_SELECT_CLASS, 'w-20 text-center')}
           />
         </Row>
         <Row label="Gateway timeout" description="Seconds before timeout">
@@ -70,14 +46,14 @@ export function AgentBehaviorContent() {
             max={600}
             value={Number(config.gateway_timeout) || 120}
             onChange={(e) => save('gateway_timeout', Number(e.target.value))}
-            className="h-8 w-20 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-center text-[var(--theme-text)] outline-none"
+            className={cn(SETTINGS_SELECT_CLASS, 'w-20 text-center')}
           />
         </Row>
         <Row label="Tool enforcement" description="When agent must use tools">
           <select
             value={String(config.tool_use_enforcement || 'auto')}
             onChange={(e) => save('tool_use_enforcement', e.target.value)}
-            className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
+            className={SETTINGS_SELECT_CLASS}
           >
             <option value="auto">Auto</option>
             <option value="required">Required</option>
@@ -88,4 +64,3 @@ export function AgentBehaviorContent() {
     </div>
   )
 }
-

@@ -1,14 +1,14 @@
-import {
-  ComputerIcon,
-  Moon01Icon,
-  Sun01Icon,
-} from '@hugeicons/core-free-icons'
+import { ComputerIcon, Moon01Icon, Sun01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useEffect, useState } from 'react'
-import { Row, SETTINGS_CARD_CLASS, SectionHeader } from './settings-dialog-primitives'
-import type { AccentColor, SettingsThemeMode } from '@/hooks/use-settings'
+import { useState } from 'react'
+import {
+  Row,
+  SETTINGS_CARD_CLASS,
+  SectionHeader,
+} from './settings-dialog-primitives'
+import type { SettingsThemeMode } from '@/hooks/use-settings'
 import type { ThemeId } from '@/lib/theme'
-import { applyTheme, useSettings } from '@/hooks/use-settings'
+import { applyTheme, resolveTheme, useSettings } from '@/hooks/use-settings'
 import {
   THEMES,
   getTheme,
@@ -18,32 +18,21 @@ import {
 } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
-import { applyAccentColor } from '@/lib/accent-colors'
 
 export function AppearanceContent() {
   const { settings, updateSettings } = useSettings()
+  const [activeTheme, setActiveTheme] = useState<ThemeId>(() =>
+    typeof window === 'undefined' ? 'odysseus' : getTheme(),
+  )
 
   function handleThemeChange(value: string) {
     const theme = value as SettingsThemeMode
+    const resolvedMode = theme === 'system' ? resolveTheme(theme) : theme
+    const nextThemeId = getThemeVariant(activeTheme, resolvedMode)
+    setTheme(nextThemeId)
+    setActiveTheme(nextThemeId)
     applyTheme(theme)
-    if (theme === 'light' || theme === 'dark') {
-      setTheme(getThemeVariant(getTheme(), theme))
-    }
     updateSettings({ theme })
-  }
-
-  function _badgeClass(color: AccentColor): string {
-    if (color === 'orange') return 'bg-orange-500'
-    if (color === 'purple') return 'bg-purple-500'
-    if (color === 'blue') return 'bg-blue-500'
-    return 'bg-green-500'
-  }
-
-  function _handleAccentColorChange(selectedAccent: AccentColor) {
-    localStorage.setItem('claude-accent', selectedAccent)
-    document.documentElement.setAttribute('data-accent', selectedAccent)
-    applyAccentColor(selectedAccent)
-    updateSettings({ accentColor: selectedAccent })
   }
 
   return (
@@ -79,12 +68,14 @@ export function AppearanceContent() {
           ))}
         </div>
       </div>
-      {/* Accent color removed — themes control accent */}
       <div className={SETTINGS_CARD_CLASS}>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
           Enterprise Theme
         </p>
-        <EnterpriseThemePicker />
+        <EnterpriseThemePicker
+          activeTheme={activeTheme}
+          onActiveThemeChange={setActiveTheme}
+        />
       </div>
       <div className={SETTINGS_CARD_CLASS}>
         <Row
@@ -99,8 +90,6 @@ export function AppearanceContent() {
             aria-label="Show system metrics footer"
           />
         </Row>
-
-        {/* Mobile chat nav removed — not relevant for Hermes */}
       </div>
     </div>
   )
@@ -112,91 +101,118 @@ const ENTERPRISE_THEME_FAMILIES: Array<ThemeId> = [
   'claude-official',
   'claude-classic',
   'claude-slate',
+  'scifi',
+  'odysseus',
 ]
+
+type ThemePreview = {
+  bg: string
+  panel: string
+  border: string
+  accent: string
+  text: string
+}
+
+/** Hand-tuned swatch preview colors, one entry per ThemeId — every theme in
+ * THEMES must have an entry here, or it silently falls through to nothing. */
+const THEME_PREVIEWS: Record<ThemeId, ThemePreview> = {
+  'claude-nous': {
+    bg: '#041C1C',
+    panel: '#06282A',
+    border: 'rgba(255,230,203,0.2)',
+    accent: '#FFAC02',
+    text: '#FFE6CB',
+  },
+  'claude-nous-light': {
+    bg: '#F8FAF8',
+    panel: '#FBFDFB',
+    border: 'rgba(30,74,92,0.18)',
+    accent: '#2557B7',
+    text: '#16315F',
+  },
+  matrix: {
+    bg: '#020804',
+    panel: '#07130A',
+    border: 'rgba(0,255,65,0.28)',
+    accent: '#00FF41',
+    text: '#D8FFE3',
+  },
+  'matrix-light': {
+    bg: '#F4FFF6',
+    panel: '#FFFFFF',
+    border: 'rgba(0,126,34,0.2)',
+    accent: '#008F2D',
+    text: '#062A12',
+  },
+  'claude-official': {
+    bg: '#0A0E1A',
+    panel: '#11182A',
+    border: '#24304A',
+    accent: '#6366F1',
+    text: '#E6EAF2',
+  },
+  'claude-official-light': {
+    bg: '#F7F7F1',
+    panel: '#FAFBF6',
+    border: '#CDD5DA',
+    accent: '#2557B7',
+    text: '#16315F',
+  },
+  'claude-classic': {
+    bg: '#0d0f12',
+    panel: '#1a1f26',
+    border: '#2a313b',
+    accent: '#b98a44',
+    text: '#eceff4',
+  },
+  'claude-classic-light': {
+    bg: '#F5F2ED',
+    panel: '#FCFAF7',
+    border: '#D8CCBC',
+    accent: '#b98a44',
+    text: '#1a1f26',
+  },
+  'claude-slate': {
+    bg: '#0d1117',
+    panel: '#1c2128',
+    border: '#30363d',
+    accent: '#7eb8f6',
+    text: '#c9d1d9',
+  },
+  'claude-slate-light': {
+    bg: '#F6F8FA',
+    panel: '#EEF2F6',
+    border: '#D0D7DE',
+    accent: '#3b82f6',
+    text: '#24292f',
+  },
+  scifi: {
+    bg: '#060b18',
+    panel: '#0d1b2a',
+    border: '#1a3a5c',
+    accent: '#00f0ff',
+    text: '#e0f7fa',
+  },
+  'scifi-light': {
+    bg: '#eef1f5',
+    panel: '#e8ecf2',
+    border: '#c4cdd8',
+    accent: '#0097a7',
+    text: '#0a1628',
+  },
+  odysseus: {
+    bg: '#282c34',
+    panel: '#111111',
+    border: 'rgba(53,90,102,0.5)',
+    accent: '#f08090',
+    text: '#9cdef2',
+  },
+}
 
 const ENTERPRISE_THEMES = THEMES.map((theme) => ({
   ...theme,
   desc: theme.description,
-  preview:
-    theme.id === 'claude-nous'
-      ? {
-          bg: '#041C1C',
-          panel: '#06282A',
-          border: 'rgba(255,230,203,0.2)',
-          accent: '#FFAC02',
-          text: '#FFE6CB',
-        }
-      : theme.id === 'claude-nous-light'
-        ? {
-            bg: '#F8FAF8',
-            panel: '#FBFDFB',
-            border: 'rgba(30,74,92,0.18)',
-            accent: '#2557B7',
-            text: '#16315F',
-          }
-        : theme.id === 'matrix'
-          ? {
-              bg: '#020804',
-              panel: '#07130A',
-              border: 'rgba(0,255,65,0.28)',
-              accent: '#00FF41',
-              text: '#D8FFE3',
-            }
-          : theme.id === 'matrix-light'
-            ? {
-                bg: '#F4FFF6',
-                panel: '#FFFFFF',
-                border: 'rgba(0,126,34,0.2)',
-                accent: '#008F2D',
-                text: '#062A12',
-              }
-            : theme.id === 'claude-official'
-              ? {
-                  bg: '#0A0E1A',
-                  panel: '#11182A',
-                  border: '#24304A',
-                  accent: '#6366F1',
-                  text: '#E6EAF2',
-                }
-              : theme.id === 'claude-official-light'
-                ? {
-                    bg: '#F7F7F1',
-                    panel: '#FAFBF6',
-                    border: '#CDD5DA',
-                    accent: '#2557B7',
-                    text: '#16315F',
-                  }
-                : theme.id === 'claude-classic'
-              ? {
-                  bg: '#0d0f12',
-                  panel: '#1a1f26',
-                  border: '#2a313b',
-                  accent: '#b98a44',
-                  text: '#eceff4',
-                }
-              : theme.id === 'claude-classic-light'
-                ? {
-                    bg: '#F5F2ED',
-                    panel: '#FCFAF7',
-                    border: '#D8CCBC',
-                    accent: '#b98a44',
-                    text: '#1a1f26',
-                  }
-                : theme.id === 'claude-slate'
-                  ? {
-                      bg: '#0d1117',
-                      panel: '#1c2128',
-                      border: '#30363d',
-                      accent: '#7eb8f6',
-                      text: '#c9d1d9',
-                    }
-                  : {
-                      bg: '#F6F8FA',
-                      panel: '#FFFFFF',
-                      border: '#D0D7DE',
-                      accent: '#3b82f6',
-                      text: '#24292f',
-                    },
+  preview: THEME_PREVIEWS[theme.id],
 }))
 
 function ThemeSwatch({
@@ -239,22 +255,21 @@ function ThemeSwatch({
   )
 }
 
-function EnterpriseThemePicker() {
+function EnterpriseThemePicker({
+  activeTheme,
+  onActiveThemeChange,
+}: {
+  activeTheme: ThemeId
+  onActiveThemeChange: (id: ThemeId) => void
+}) {
   const { updateSettings } = useSettings()
-  const [current, setCurrent] = useState(() => {
-    if (typeof window === 'undefined') return 'claude-nous'
-    return getTheme()
-  })
+  const current = activeTheme
   const currentMode = isDarkTheme(current) ? 'dark' : 'light'
-
-  useEffect(() => {
-    setCurrent(getTheme())
-  }, [])
 
   function applyEnterpriseTheme(id: ThemeId) {
     setTheme(id)
     updateSettings({ theme: isDarkTheme(id) ? 'dark' : 'light' })
-    setCurrent(id)
+    onActiveThemeChange(id)
   }
 
   function toggleEnterpriseThemeMode() {

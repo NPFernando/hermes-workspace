@@ -1,61 +1,31 @@
-import { useEffect, useState } from 'react'
-import { Row, SETTINGS_CARD_CLASS, SectionHeader } from './settings-dialog-primitives'
+import {
+  Row,
+  SETTINGS_CARD_CLASS,
+  SETTINGS_SELECT_CLASS,
+  SavedMessageBanner,
+  SectionHeader,
+} from './settings-dialog-primitives'
 import { GROQ_STT_MODELS, STT_PROVIDER_OPTIONS } from '@/lib/stt-config'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
+import {
+  useHermesConfigSection,
+  useSavedMessage,
+} from '@/hooks/use-hermes-config-section'
 
 export function VoiceContent() {
-  const [tts, setTts] = useState<Record<string, unknown>>({})
-  const [stt, setStt] = useState<Record<string, unknown>>({})
-  const [msg, setMsg] = useState<string | null>(null)
+  const { config: tts, save: rawSaveTts } = useHermesConfigSection('tts')
+  const { config: stt, save: rawSaveStt } = useHermesConfigSection('stt')
+  const { msg, runWithSavedMessage } = useSavedMessage()
 
-  useEffect(() => {
-    fetch('/api/hermes-config')
-      .then((r) => r.json())
-      .then((d: any) => {
-        setTts(d.config?.tts ? (d.config.tts as Record<string, unknown>) : {})
-        setStt(d.config?.stt ? (d.config.stt as Record<string, unknown>) : {})
-      })
-      .catch(() => {})
-  }, [])
-
-  const saveTts = async (key: string, value: unknown) => {
-    setMsg(null)
-    try {
-      await fetch('/api/hermes-config', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: { tts: { [key]: value } } }),
-      })
-      setTts((prev) => ({ ...prev, [key]: value }))
-      setMsg('Saved')
-      setTimeout(() => setMsg(null), 2000)
-    } catch {
-      setMsg('Failed')
-    }
-  }
-
-  const saveStt = async (key: string, value: unknown) => {
-    setMsg(null)
-    try {
-      await fetch('/api/hermes-config', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: { stt: { [key]: value } } }),
-      })
-      setStt((prev) => ({ ...prev, [key]: value }))
-      setMsg('Saved')
-      setTimeout(() => setMsg(null), 2000)
-    } catch {
-      setMsg('Failed')
-    }
-  }
+  const saveTts = (key: string, value: unknown) =>
+    runWithSavedMessage(() => rawSaveTts(key, value))
+  const saveStt = (key: string, value: unknown) =>
+    runWithSavedMessage(() => rawSaveStt(key, value))
 
   const ttsProvider = String(tts.provider || 'edge')
   const sttProvider = String(stt.provider || 'local')
-  const sttGroq =
-    (stt.groq as Record<string, unknown> | undefined) || {}
+  const sttGroq = (stt.groq as Record<string, unknown> | undefined) || {}
 
   return (
     <div className="space-y-4">
@@ -63,18 +33,7 @@ export function VoiceContent() {
         title="Voice"
         description="Text-to-speech and speech-to-text."
       />
-      {msg && (
-        <div
-          className={cn(
-            'rounded-lg px-3 py-1.5 text-xs font-medium',
-            msg === 'Saved'
-              ? 'bg-green-500/15 text-green-400'
-              : 'bg-red-500/15 text-red-400',
-          )}
-        >
-          {msg}
-        </div>
-      )}
+      <SavedMessageBanner msg={msg} />
       <div className={SETTINGS_CARD_CLASS}>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
           Text-to-Speech
@@ -83,7 +42,7 @@ export function VoiceContent() {
           <select
             value={ttsProvider}
             onChange={(e) => saveTts('provider', e.target.value)}
-            className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
+            className={SETTINGS_SELECT_CLASS}
           >
             <option value="edge">Edge TTS</option>
             <option value="elevenlabs">ElevenLabs</option>
@@ -101,11 +60,13 @@ export function VoiceContent() {
               )}
               onChange={(e) =>
                 saveTts('openai', {
-                  ...(tts.openai ? (tts.openai as Record<string, unknown>) : {}),
+                  ...(tts.openai
+                    ? (tts.openai as Record<string, unknown>)
+                    : {}),
                   voice: e.target.value,
                 })
               }
-              className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
+              className={SETTINGS_SELECT_CLASS}
             >
               {['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map(
                 (v) => (
@@ -132,7 +93,7 @@ export function VoiceContent() {
           <select
             value={sttProvider}
             onChange={(e) => saveStt('provider', e.target.value)}
-            className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
+            className={SETTINGS_SELECT_CLASS}
           >
             {STT_PROVIDER_OPTIONS.map((provider) => (
               <option key={provider.value} value={provider.value}>
@@ -152,7 +113,7 @@ export function VoiceContent() {
                     model: e.target.value,
                   })
                 }
-                className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
+                className={SETTINGS_SELECT_CLASS}
               >
                 {GROQ_STT_MODELS.map((model) => (
                   <option key={model} value={model}>
@@ -161,7 +122,10 @@ export function VoiceContent() {
                 ))}
               </select>
             </Row>
-            <Row label="Language" description="Optional BCP-47 code, e.g. en or en-US.">
+            <Row
+              label="Language"
+              description="Optional BCP-47 code, e.g. en or en-US."
+            >
               <Input
                 value={String(stt.language || '')}
                 onChange={(e) => saveStt('language', e.target.value)}
@@ -175,4 +139,3 @@ export function VoiceContent() {
     </div>
   )
 }
-

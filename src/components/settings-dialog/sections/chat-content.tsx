@@ -1,4 +1,8 @@
-import { Row, SETTINGS_CARD_CLASS, SectionHeader } from './settings-dialog-primitives'
+import {
+  Row,
+  SETTINGS_CARD_CLASS,
+  SectionHeader,
+} from './settings-dialog-primitives'
 import { Switch } from '@/components/ui/switch'
 import { useChatSettingsStore } from '@/hooks/use-chat-settings'
 

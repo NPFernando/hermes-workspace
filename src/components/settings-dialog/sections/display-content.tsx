@@ -1,36 +1,22 @@
-import { useEffect, useState } from 'react'
-import { Row, SETTINGS_CARD_CLASS, SectionHeader } from './settings-dialog-primitives'
+import {
+  Row,
+  SETTINGS_CARD_CLASS,
+  SETTINGS_SELECT_CLASS,
+  SavedMessageBanner,
+  SectionHeader,
+} from './settings-dialog-primitives'
 import { Switch } from '@/components/ui/switch'
-import { cn } from '@/lib/utils'
+import {
+  useHermesConfigSection,
+  useSavedMessage,
+} from '@/hooks/use-hermes-config-section'
 
 export function DisplayContent() {
-  const [config, setConfig] = useState<Record<string, unknown>>({})
-  const [msg, setMsg] = useState<string | null>(null)
+  const { config, save: rawSave } = useHermesConfigSection('display')
+  const { msg, runWithSavedMessage } = useSavedMessage()
 
-  useEffect(() => {
-    fetch('/api/hermes-config')
-      .then((r) => r.json())
-      .then((d: any) => {
-        setConfig(d.config?.display ? (d.config.display as Record<string, unknown>) : {})
-      })
-      .catch(() => {})
-  }, [])
-
-  const save = async (key: string, value: unknown) => {
-    setMsg(null)
-    try {
-      await fetch('/api/hermes-config', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: { display: { [key]: value } } }),
-      })
-      setConfig((prev) => ({ ...prev, [key]: value }))
-      setMsg('Saved')
-      setTimeout(() => setMsg(null), 2000)
-    } catch {
-      setMsg('Failed')
-    }
-  }
+  const save = (key: string, value: unknown) =>
+    runWithSavedMessage(() => rawSave(key, value))
 
   return (
     <div className="space-y-4">
@@ -38,24 +24,13 @@ export function DisplayContent() {
         title="Display"
         description="Agent response style and output preferences."
       />
-      {msg && (
-        <div
-          className={cn(
-            'rounded-lg px-3 py-1.5 text-xs font-medium',
-            msg === 'Saved'
-              ? 'bg-green-500/15 text-green-400'
-              : 'bg-red-500/15 text-red-400',
-          )}
-        >
-          {msg}
-        </div>
-      )}
+      <SavedMessageBanner msg={msg} />
       <div className={SETTINGS_CARD_CLASS}>
         <Row label="Personality" description="Agent response style">
           <select
             value={String(config.personality || 'default')}
             onChange={(e) => save('personality', e.target.value)}
-            className="h-8 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-input)] px-2 text-sm text-[var(--theme-text)] outline-none"
+            className={SETTINGS_SELECT_CLASS}
           >
             <option value="default">Default</option>
             <option value="concise">Concise</option>
