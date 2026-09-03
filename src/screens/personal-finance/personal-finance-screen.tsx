@@ -174,7 +174,7 @@ export function PersonalFinanceScreen() {
 
   if (error || !payload) {
     return (
-      <main className="min-h-dvh bg-[var(--theme-bg)] p-6 text-red-200">
+      <main className="min-h-dvh bg-[var(--theme-bg)] p-6 text-[var(--theme-danger)]">
         <h1 className="text-2xl font-semibold">Personal finance unavailable</h1>
         <p className="mt-2 text-sm">{error ?? 'No payload returned.'}</p>
       </main>
@@ -216,7 +216,7 @@ export function PersonalFinanceScreen() {
       <section className="rounded-[2rem] border border-[var(--theme-border)] bg-gradient-to-br from-[var(--theme-panel)] via-[var(--theme-panel)] to-emerald-950/20 p-6 shadow-xl">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200/80">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color-mix(in_srgb,var(--theme-success)_80%,transparent)]">
               DollarWise-style personal finance
             </p>
             <h1 className="mt-2 text-3xl font-semibold md:text-4xl">
@@ -367,12 +367,12 @@ export function PersonalFinanceScreen() {
           >
             {t.label}
             {t.id === 'ingestion' && pendingIngestionCount > 0 && (
-              <span className="ml-1.5 rounded-full bg-amber-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-amber-100">
+              <span className="ml-1.5 rounded-full bg-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--theme-warning)]">
                 {pendingIngestionCount}
               </span>
             )}
             {t.id === 'records' && overBudgetCount > 0 && (
-              <span className="ml-1.5 rounded-full bg-red-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-red-100">
+              <span className="ml-1.5 rounded-full bg-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--theme-danger)]">
                 {overBudgetCount}
               </span>
             )}
@@ -465,7 +465,7 @@ export function PersonalFinanceScreen() {
             onChanged={(p) => setPayload(p as PersonalFinancePayload)}
             searchable
           />
-          <p className="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">
+          <p className="rounded-2xl border border-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] p-4 text-sm text-[var(--theme-warning)]">
             Tax figures are estimates; confirm them against official sources
             before filing.
           </p>

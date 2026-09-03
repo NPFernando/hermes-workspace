@@ -182,7 +182,7 @@ export function FinanceAnalystCard({
           </button>
         )}
       </div>
-      {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
+      {error && <p className="mt-2 text-xs text-[var(--theme-danger)]">{error}</p>}
       {answer && (
         <p className="mt-2 text-sm text-[var(--theme-text)]">{answer}</p>
       )}

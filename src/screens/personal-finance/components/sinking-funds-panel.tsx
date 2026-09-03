@@ -127,7 +127,7 @@ export function SinkingFundsPanel({
 
           let scheduleLine: { text: string; tone: string } | null = null
           if (remaining <= 0) {
-            scheduleLine = { text: 'Fully funded', tone: 'text-emerald-300' }
+            scheduleLine = { text: 'Fully funded', tone: 'text-[var(--theme-success)]' }
           } else if (targetDate) {
             const daysUntil = Math.ceil(
               (Date.parse(targetDate) - Date.now()) / (24 * 60 * 60 * 1000),
@@ -136,7 +136,7 @@ export function SinkingFundsPanel({
               if (daysUntil <= 0) {
                 scheduleLine = {
                   text: 'Target date passed',
-                  tone: 'text-red-300',
+                  tone: 'text-[var(--theme-danger)]',
                 }
               } else {
                 const monthsUntil = Math.max(1, Math.ceil(daysUntil / 30))
@@ -144,7 +144,7 @@ export function SinkingFundsPanel({
                 const onTrack = monthlyContribution >= requiredMonthlyLkr
                 scheduleLine = {
                   text: `Needs ${formatLkr(requiredMonthlyLkr)}/mo by ${targetDate} — contributing ${formatLkr(monthlyContribution)}/mo`,
-                  tone: onTrack ? 'text-emerald-300' : 'text-amber-300',
+                  tone: onTrack ? 'text-[var(--theme-success)]' : 'text-[var(--theme-warning)]',
                 }
               }
             }

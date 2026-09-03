@@ -92,7 +92,7 @@ export function WealthGoalCard({
     )
     if (Number.isFinite(daysUntil)) {
       if (daysUntil <= 0) {
-        requiredLine = { text: 'Target date passed', tone: 'text-red-300' }
+        requiredLine = { text: 'Target date passed', tone: 'text-[var(--theme-danger)]' }
       } else {
         const monthsUntil = Math.max(1, Math.ceil(daysUntil / 30))
         requiredLine = {

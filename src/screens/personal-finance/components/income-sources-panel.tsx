@@ -2,14 +2,7 @@ import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatLkr, formatMoney } from '../utils'
-import {
-  buttonClass,
-  dangerTone,
-  inputClass,
-  neutralTone,
-  positiveTone,
-  warningTone,
-} from '../shared-styles'
+import { buttonClass, confirmButtonClass, dangerButtonClass, dangerTone, inputClass, neutralTone, positiveTone, warningTone } from '../shared-styles'
 import { stringField } from '../field-helpers'
 import { getPaydayStatus } from './payday-status'
 import type { PersonalFinancePayload } from '../types'
@@ -293,7 +286,7 @@ export function IncomeSourcesPanel({
       {activeMonthlyTotalText && (
         <p className="mt-2 text-sm font-medium text-[var(--theme-text)]">
           Active monthly income:{' '}
-          <span className="text-emerald-300">{activeMonthlyTotalText}</span>/mo
+          <span className="text-[var(--theme-success)]">{activeMonthlyTotalText}</span>/mo
         </p>
       )}
 
@@ -372,8 +365,8 @@ export function IncomeSourcesPanel({
       </div>
 
       {duplicateWarningName && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 p-2">
-          <p className="text-xs text-amber-100">
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] p-2">
+          <p className="text-xs text-[var(--theme-warning)]">
             A job for "{duplicateWarningName}" already exists — add this one
             anyway?
           </p>
@@ -381,7 +374,7 @@ export function IncomeSourcesPanel({
             type="button"
             disabled={busy === 'job'}
             onClick={() => void submitJob(true)}
-            className="rounded-xl border border-amber-400/40 bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/30 disabled:opacity-50"
+            className="rounded-xl border border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--theme-warning)] hover:bg-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] disabled:opacity-50"
           >
             Add anyway
           </button>
@@ -395,7 +388,7 @@ export function IncomeSourcesPanel({
         </div>
       )}
 
-      {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
+      {err && <p className="mt-2 text-xs text-[var(--theme-danger)]">{err}</p>}
       {reanalyzeNote && (
         <p className="mt-2 text-xs text-[var(--theme-muted)]">
           {reanalyzeNote}
@@ -514,7 +507,7 @@ export function IncomeSourcesPanel({
                     type="button"
                     disabled={busy === `delete-${id}`}
                     onClick={() => setConfirmDeleteId(id)}
-                    className="rounded-xl border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
+                    className={dangerButtonClass}
                   >
                     Delete
                   </button>
@@ -561,7 +554,7 @@ export function IncomeSourcesPanel({
                     type="button"
                     disabled={busy === `log-payment-${id}`}
                     onClick={() => void logPayment(job)}
-                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                    className={confirmButtonClass}
                   >
                     {busy === `log-payment-${id}`
                       ? 'Saving…'

@@ -2,13 +2,7 @@ import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatMoney } from '../utils'
-import {
-  buttonClass,
-  dangerTone,
-  inputClass,
-  neutralTone,
-  warningTone,
-} from '../shared-styles'
+import { buttonClass, dangerButtonClass, dangerTone, inputClass, neutralTone, warningTone } from '../shared-styles'
 import { numberField, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
@@ -211,7 +205,7 @@ export function FixedDepositsPanel({
         </button>
       </div>
 
-      {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
+      {err && <p className="mt-2 text-xs text-[var(--theme-danger)]">{err}</p>}
 
       <div className="mt-4 grid gap-2">
         {deposits.length === 0 && (
@@ -283,7 +277,7 @@ export function FixedDepositsPanel({
                   type="button"
                   disabled={busy === `delete-${id}`}
                   onClick={() => setConfirmDeleteId(id)}
-                  className="rounded-xl border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
+                  className={dangerButtonClass}
                 >
                   Delete
                 </button>

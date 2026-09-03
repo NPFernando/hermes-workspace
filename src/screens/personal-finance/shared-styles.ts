@@ -47,3 +47,17 @@ export const dangerTone =
   'border-[color-mix(in_srgb,var(--theme-danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] text-[var(--theme-danger)]'
 export const infoTone =
   'border-[color-mix(in_srgb,var(--theme-accent-secondary)_35%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent-secondary)_15%,transparent)] text-[var(--theme-accent-secondary)]'
+
+/**
+ * Shared Save/Confirm and Delete/Reject action-button classes. Redefined
+ * identically (byte-for-byte, in two size variants) across ~15 panel files
+ * using literal emerald-* / red-* classes before being converted here.
+ */
+export const confirmButtonClass =
+  'rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] disabled:opacity-50'
+export const confirmButtonClassLarge =
+  'rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] disabled:opacity-50'
+export const dangerButtonClass =
+  'rounded-xl border border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)] disabled:opacity-50'
+export const dangerButtonClassLarge =
+  'rounded-xl border border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)] disabled:opacity-50'

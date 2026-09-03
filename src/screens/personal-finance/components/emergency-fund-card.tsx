@@ -92,7 +92,7 @@ export function EmergencyFundCard({
         {ef.coverageMonths.toFixed(1)} of {ef.targetMonths} months covered
       </p>
       {ef.avgMonthlyExpensesLkr === 0 && (
-        <p className="mt-1 text-xs text-amber-300/80">
+        <p className="mt-1 text-xs text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)]">
           No complete month of expense history yet — target amount will fill in
           once one is available.
         </p>

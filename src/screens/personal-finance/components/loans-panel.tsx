@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatMoney } from '../utils'
-import { buttonClass, inputClass } from '../shared-styles'
+import { buttonClass, confirmButtonClass, dangerButtonClass, inputClass } from '../shared-styles'
 import { numberField, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
@@ -304,7 +304,7 @@ export function LoansPanel({
         </button>
       </div>
 
-      {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
+      {err && <p className="mt-2 text-xs text-[var(--theme-danger)]">{err}</p>}
 
       <div className="mt-4 grid gap-2">
         {loans.length === 0 && (
@@ -451,7 +451,7 @@ export function LoansPanel({
                     type="button"
                     disabled={busy === `edit-${id}`}
                     onClick={() => void saveEdit(id)}
-                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                    className={confirmButtonClass}
                   >
                     {busy === `edit-${id}` ? 'Saving…' : 'Save'}
                   </button>
@@ -490,7 +490,7 @@ export function LoansPanel({
                     )}
                     {projection &&
                       (projection.insufficientPayment ? (
-                        <p className="mt-1 text-xs text-amber-300/80">
+                        <p className="mt-1 text-xs text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)]">
                           Monthly payment doesn't cover interest — balance will
                           grow.
                         </p>
@@ -515,7 +515,7 @@ export function LoansPanel({
                       type="button"
                       disabled={busy === `delete-${id}`}
                       onClick={() => setConfirmDeleteId(id)}
-                      className="rounded-xl border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
+                      className={dangerButtonClass}
                     >
                       Delete
                     </button>

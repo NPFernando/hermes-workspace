@@ -197,7 +197,7 @@ export function BudgetPanel({
         </div>
       </div>
 
-      {err && <p className="mt-3 text-xs text-red-300">{err}</p>}
+      {err && <p className="mt-3 text-xs text-[var(--theme-danger)]">{err}</p>}
 
       <div className="mt-4">
         <h3 className="text-sm font-semibold">This month ({currentMonth})</h3>

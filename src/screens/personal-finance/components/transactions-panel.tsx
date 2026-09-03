@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatMoney } from '../utils'
-import { buttonClass, inputClass } from '../shared-styles'
+import { buttonClass, confirmButtonClass, dangerButtonClass, inputClass } from '../shared-styles'
 import { numberField, splitTags, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
@@ -311,7 +311,7 @@ export function TransactionsPanel({
         {totalsText && (
           <>
             {' '}
-            · net <span className="text-emerald-300">{totalsText}</span>
+            · net <span className="text-[var(--theme-success)]">{totalsText}</span>
           </>
         )}
       </p>
@@ -321,14 +321,14 @@ export function TransactionsPanel({
           <button
             type="button"
             onClick={() => setAddKind('income')}
-            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'income' ? 'bg-emerald-500/25 text-emerald-100' : 'bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'}`}
+            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'income' ? 'bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] text-[var(--theme-success)]' : 'bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'}`}
           >
             Income
           </button>
           <button
             type="button"
             onClick={() => setAddKind('expense')}
-            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'expense' ? 'bg-red-500/25 text-red-100' : 'bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'}`}
+            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'expense' ? 'bg-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)] text-[var(--theme-danger)]' : 'bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'}`}
           >
             Expense
           </button>
@@ -457,7 +457,7 @@ export function TransactionsPanel({
         </button>
       </div>
 
-      {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
+      {err && <p className="mt-2 text-xs text-[var(--theme-danger)]">{err}</p>}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <input
@@ -727,7 +727,7 @@ export function TransactionsPanel({
                     type="button"
                     disabled={busy === `edit-${id}`}
                     onClick={() => void saveEdit(id, kind)}
-                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                    className={confirmButtonClass}
                   >
                     {busy === `edit-${id}` ? 'Saving…' : 'Save'}
                   </button>
@@ -808,7 +808,7 @@ export function TransactionsPanel({
                       type="button"
                       disabled={busy === `delete-${id}`}
                       onClick={() => setConfirmDeleteId(id)}
-                      className="rounded-xl border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
+                      className={dangerButtonClass}
                     >
                       Delete
                     </button>

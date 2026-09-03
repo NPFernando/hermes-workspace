@@ -90,7 +90,7 @@ export function SavingsRateTargetCard({
         {sr.actualPct.toFixed(1)}% of {sr.targetPct}% target (last 3 months)
       </p>
       {!sr.hasData && (
-        <p className="mt-1 text-xs text-amber-300/80">
+        <p className="mt-1 text-xs text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)]">
           No complete month of income/expense history yet — actual rate will
           fill in once one is available.
         </p>

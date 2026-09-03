@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  buttonClass,
-  dangerTone,
-  infoTone,
-  inputClass,
-  positiveTone,
-  warningTone,
-} from '../shared-styles'
+import { buttonClass, confirmButtonClassLarge, dangerButtonClassLarge, dangerTone, infoTone, inputClass, positiveTone, warningTone } from '../shared-styles'
 import type {
   ExtractedContract,
   ExtractedTransaction,
@@ -424,7 +417,7 @@ export function PendingIngestionPanel({
         </div>
       )}
 
-      {note && <p className="mt-2 text-xs text-red-300">{note}</p>}
+      {note && <p className="mt-2 text-xs text-[var(--theme-danger)]">{note}</p>}
 
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-[var(--theme-muted)]">
@@ -479,7 +472,7 @@ export function PendingIngestionPanel({
                         </p>
                       )}
                       {item.error && (
-                        <p className="mt-1 text-xs text-red-300">
+                        <p className="mt-1 text-xs text-[var(--theme-danger)]">
                           {item.error}
                         </p>
                       )}
@@ -512,7 +505,7 @@ export function PendingIngestionPanel({
                     item.documentType === 'contract' && (
                       <div className="mt-2">
                         {item.error && !item.extractedContract && (
-                          <p className="text-xs text-amber-200">
+                          <p className="text-xs text-[var(--theme-warning)]">
                             Automatic extraction failed ({item.error}) — enter
                             the details manually below.
                           </p>
@@ -714,7 +707,7 @@ export function PendingIngestionPanel({
                     item.documentType !== 'contract' && (
                       <div className="mt-2">
                         {item.error && !item.extracted && (
-                          <p className="text-xs text-amber-200">
+                          <p className="text-xs text-[var(--theme-warning)]">
                             Automatic extraction failed ({item.error}) — enter
                             the details manually below.
                           </p>
@@ -793,7 +786,7 @@ export function PendingIngestionPanel({
                           />
                         </div>
                         {hasDuplicateWarning && (
-                          <p className="mt-2 text-xs text-amber-200">
+                          <p className="mt-2 text-xs text-[var(--theme-warning)]">
                             Possible duplicate: an existing record for "
                             {duplicateWarning.vendorOrSource}" on{' '}
                             {duplicateWarning.date} for{' '}
@@ -811,7 +804,7 @@ export function PendingIngestionPanel({
                         type="button"
                         disabled={busyId === item.id}
                         onClick={() => void confirmContractItem(item)}
-                        className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                        className={confirmButtonClassLarge}
                       >
                         Confirm
                       </button>
@@ -824,7 +817,7 @@ export function PendingIngestionPanel({
                         onClick={() =>
                           void confirmItem(item, hasDuplicateWarning)
                         }
-                        className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                        className={confirmButtonClassLarge}
                       >
                         {hasDuplicateWarning ? 'Confirm anyway' : 'Confirm'}
                       </button>
@@ -833,7 +826,7 @@ export function PendingIngestionPanel({
                     type="button"
                     disabled={busyId === item.id}
                     onClick={() => void reject(item.id)}
-                    className="rounded-xl border border-red-400/30 bg-red-500/15 px-4 py-2 text-sm font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
+                    className={dangerButtonClassLarge}
                   >
                     Reject
                   </button>

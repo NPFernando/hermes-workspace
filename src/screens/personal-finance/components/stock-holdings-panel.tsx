@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatMoney, formatPct } from '../utils'
-import { buttonClass, inputClass } from '../shared-styles'
+import { buttonClass, confirmButtonClass, dangerButtonClass, inputClass } from '../shared-styles'
 import { numberField, optionalNumberField, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
@@ -310,7 +310,7 @@ export function StockHoldingsPanel({
         </button>
       </div>
 
-      {err && <p className="mt-2 text-xs text-red-300">{err}</p>}
+      {err && <p className="mt-2 text-xs text-[var(--theme-danger)]">{err}</p>}
 
       <div className="mt-4 grid gap-2">
         {holdings.length === 0 && (
@@ -442,7 +442,7 @@ export function StockHoldingsPanel({
                     type="button"
                     disabled={busy === `edit-${id}`}
                     onClick={() => void saveEdit(id)}
-                    className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                    className={confirmButtonClass}
                   >
                     {busy === `edit-${id}` ? 'Saving…' : 'Save'}
                   </button>
@@ -472,7 +472,7 @@ export function StockHoldingsPanel({
                     </span>
                     {gainLoss !== undefined && (
                       <span
-                        className={`ml-2 text-xs font-medium ${gainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                        className={`ml-2 text-xs font-medium ${gainLoss >= 0 ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'}`}
                       >
                         {gainLoss >= 0 ? '+' : ''}
                         {formatMoney(gainLoss, holdingCurrency)}
@@ -505,7 +505,7 @@ export function StockHoldingsPanel({
                       type="button"
                       disabled={busy === `delete-${id}`}
                       onClick={() => setConfirmDeleteId(id)}
-                      className="rounded-xl border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
+                      className={dangerButtonClass}
                     >
                       Delete
                     </button>
@@ -514,7 +514,7 @@ export function StockHoldingsPanel({
               )}
               {refreshFailedIds[id] && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <p className="text-xs text-amber-200">
+                  <p className="text-xs text-[var(--theme-warning)]">
                     Automatic price fetch failed — enter the current price
                     manually:
                   </p>
