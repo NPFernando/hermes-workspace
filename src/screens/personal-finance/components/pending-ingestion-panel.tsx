@@ -441,11 +441,11 @@ export function PendingIngestionPanel({
             return (
               <div
                 key={item.id}
-                className="flex flex-wrap items-start gap-3 rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+                className="flex flex-wrap items-start gap-3 rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
               >
                 {item.rawPreviewImagePath &&
                   (previewFailedIds[item.id] ? (
-                    <div className="flex h-24 w-24 items-center justify-center rounded-xl border border-[var(--theme-border)]/60 bg-black/20 p-2 text-center text-[10px] text-[var(--theme-muted)]">
+                    <div className="flex h-24 w-24 items-center justify-center rounded-xl border border-[var(--theme-border)]/60 bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] p-2 text-center text-[10px] text-[var(--theme-muted)]">
                       Preview not available for this format
                     </div>
                   ) : (
@@ -525,7 +525,7 @@ export function PendingIngestionPanel({
                           </span>
                         )}
                         {item.extractedContract && (
-                          <div className="mb-3 rounded-xl border border-[var(--theme-border)]/60 bg-black/20 p-3">
+                          <div className="mb-3 rounded-xl border border-[var(--theme-border)]/60 bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] p-3">
                             <p className="text-xs font-semibold text-[var(--theme-text)]">
                               AI contract review
                             </p>

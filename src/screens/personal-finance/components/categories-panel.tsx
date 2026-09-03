@@ -311,7 +311,7 @@ export function CategoriesPanel({
           return (
             <div
               key={id}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
               {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -435,7 +435,7 @@ export function CategoriesPanel({
                       return (
                         <span
                           key={subId}
-                          className="flex items-center gap-1 rounded-full border border-[var(--theme-border)]/60 bg-black/10 px-2 py-0.5 text-[10px] text-[var(--theme-muted)]"
+                          className="flex items-center gap-1 rounded-full border border-[var(--theme-border)]/60 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-2 py-0.5 text-[10px] text-[var(--theme-muted)]"
                         >
                           {subName} ({subCount})
                           <button
@@ -498,7 +498,7 @@ export function CategoriesPanel({
                 onClick={() =>
                   void submitCategory({ name: catName, kind: guessedKind })
                 }
-                className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1 text-xs text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40"
+                className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1 text-xs text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] disabled:opacity-40"
               >
                 + {catName}
               </button>
@@ -519,7 +519,7 @@ export function CategoriesPanel({
                 type="button"
                 disabled={busy === `subcategory-${parentCategory}`}
                 onClick={() => void submitSubcategory(subName, parentCategory)}
-                className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1 text-xs text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40"
+                className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1 text-xs text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] disabled:opacity-40"
               >
                 + {subName} ({parentCategory})
               </button>

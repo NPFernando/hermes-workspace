@@ -54,14 +54,14 @@ export function EmergencyFundCard({
             max={24}
             value={draftMonths}
             onChange={(e) => setDraftMonths(e.target.value)}
-            className="w-20 rounded-lg border border-[var(--theme-border)] bg-black/20 px-2 py-1 text-sm text-[var(--theme-text)]"
+            className="w-20 rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-2 py-1 text-sm text-[var(--theme-text)]"
           />
           <span className="text-xs text-[var(--theme-muted)]">months</span>
           <button
             type="button"
             disabled={saving}
             onClick={() => void saveTarget()}
-            className="rounded-lg border border-[var(--theme-border)] bg-black/20 px-3 py-1 text-xs font-medium text-[var(--theme-text)] hover:bg-black/30 disabled:opacity-50"
+            className="rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-3 py-1 text-xs font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_24%,transparent)] disabled:opacity-50"
           >
             Set target
           </button>
@@ -81,7 +81,7 @@ export function EmergencyFundCard({
         </h2>
         <span className={tone.text}>{percent}%</span>
       </div>
-      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-black/20">
+      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)]">
         <div
           className={`h-full rounded-full ${tone.bar}`}
           style={{ width: `${Math.min(100, percent)}%` }}

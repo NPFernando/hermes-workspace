@@ -321,14 +321,14 @@ export function TransactionsPanel({
           <button
             type="button"
             onClick={() => setAddKind('income')}
-            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'income' ? 'bg-emerald-500/25 text-emerald-100' : 'bg-black/10 text-[var(--theme-muted)]'}`}
+            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'income' ? 'bg-emerald-500/25 text-emerald-100' : 'bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'}`}
           >
             Income
           </button>
           <button
             type="button"
             onClick={() => setAddKind('expense')}
-            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'expense' ? 'bg-red-500/25 text-red-100' : 'bg-black/10 text-[var(--theme-muted)]'}`}
+            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'expense' ? 'bg-red-500/25 text-red-100' : 'bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'}`}
           >
             Expense
           </button>
@@ -539,7 +539,7 @@ export function TransactionsPanel({
           return (
             <div
               key={id}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
               {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -743,7 +743,7 @@ export function TransactionsPanel({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <span
-                      className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${kind === 'income' ? 'bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] text-[var(--theme-success)]' : 'bg-black/20 text-[var(--theme-muted)]'}`}
+                      className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${kind === 'income' ? 'bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] text-[var(--theme-success)]' : 'bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] text-[var(--theme-muted)]'}`}
                     >
                       {kind === 'income' ? 'Income' : 'Expense'}
                     </span>
@@ -778,7 +778,7 @@ export function TransactionsPanel({
                         {splitTags(stringField(txn, 'tags')).map((t) => (
                           <span
                             key={t}
-                            className="rounded-full border border-[var(--theme-border)]/60 bg-black/10 px-2 py-0.5 text-[10px] text-[var(--theme-muted)]"
+                            className="rounded-full border border-[var(--theme-border)]/60 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-2 py-0.5 text-[10px] text-[var(--theme-muted)]"
                           >
                             {t}
                           </span>

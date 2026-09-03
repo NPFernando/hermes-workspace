@@ -362,7 +362,7 @@ export function PersonalFinanceScreen() {
             className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
               tab === t.id
                 ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent)]'
-                : 'text-[var(--theme-muted)] hover:bg-black/10 hover:text-[var(--theme-text)]'
+                : 'text-[var(--theme-muted)] hover:bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] hover:text-[var(--theme-text)]'
             }`}
           >
             {t.label}

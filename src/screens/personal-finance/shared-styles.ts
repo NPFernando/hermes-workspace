@@ -1,13 +1,23 @@
-/** Shared Tailwind class strings for Personal Finance panel form controls. */
+/**
+ * Shared Tailwind class strings for Personal Finance panel form controls.
+ *
+ * The surface tint (inputs, buttons, neutral pills) uses color-mix() against
+ * --theme-text rather than a flat bg-black/N — a flat black overlay reads
+ * fine on dark themes but shows as a plain muddy gray on light themes,
+ * disconnected from the theme's own ink color. Mixing in --theme-text keeps
+ * the same "distinct surface" effect while picking up each theme's actual
+ * color cast (it lightens on dark themes, darkens on light ones, since
+ * --theme-text is always the theme's own high-contrast color).
+ */
 
 export const inputClass =
-  'min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
+  'min-w-[140px] rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
 
 export const wideInputClass =
-  'min-w-[200px] flex-1 rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
+  'min-w-[200px] flex-1 rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
 
 export const buttonClass =
-  'rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40'
+  'rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] disabled:opacity-40'
 
 /**
  * Shared status-pill tone classes. Every panel independently redefined the
@@ -28,7 +38,7 @@ export const buttonClass =
  * theme, including future ones, with no per-theme CSS to maintain.
  */
 export const neutralTone =
-  'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]'
+  'border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'
 export const positiveTone =
   'border-[color-mix(in_srgb,var(--theme-success)_35%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] text-[var(--theme-success)]'
 export const warningTone =

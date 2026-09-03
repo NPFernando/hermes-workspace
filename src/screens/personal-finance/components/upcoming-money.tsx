@@ -100,7 +100,7 @@ export function UpcomingMoney({
         {events.map((e) => (
           <div
             key={e.key}
-            className="flex items-center justify-between rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+            className="flex items-center justify-between rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
           >
             <div>
               <p className="text-sm font-medium text-[var(--theme-text)]">

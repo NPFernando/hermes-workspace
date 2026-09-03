@@ -92,7 +92,7 @@ export function RecurringBillsInsight({
         {recurring.map((r) => (
           <span
             key={r.vendor}
-            className="rounded-xl border border-[var(--theme-border)]/70 bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)]"
+            className="rounded-xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs text-[var(--theme-text)]"
           >
             <span className="capitalize">{r.vendor}</span> · {r.category} · ~
             {formatLkr(r.averageAmount)} · {r.monthsSeen} months

@@ -420,7 +420,7 @@ export function IncomeSourcesPanel({
           return (
             <div
               key={id}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -521,7 +521,7 @@ export function IncomeSourcesPanel({
                 </div>
               </div>
               {payLogOpenId === id && (
-                <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--theme-border)]/60 bg-black/20 p-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--theme-border)]/60 bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] p-2">
                   <input
                     type="number"
                     placeholder="Amount"

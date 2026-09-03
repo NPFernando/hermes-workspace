@@ -229,7 +229,7 @@ export function FixedDepositsPanel({
           return (
             <div
               key={id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
               <div>
                 <span className="font-medium text-[var(--theme-text)]">

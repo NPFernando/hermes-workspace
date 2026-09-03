@@ -208,7 +208,7 @@ export function MerchantsPanel({
           return (
             <div
               key={id}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
               {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -314,7 +314,7 @@ export function MerchantsPanel({
                 type="button"
                 disabled={busy === 'merchant'}
                 onClick={() => void submitMerchant({ name: vendorName })}
-                className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1 text-xs text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40"
+                className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1 text-xs text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] disabled:opacity-40"
               >
                 + {vendorName}
               </button>

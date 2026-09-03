@@ -101,7 +101,7 @@ export function BudgetPanel({
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
           <h3 className="text-sm font-semibold">Add a budget</h3>
           <div className="mt-2 flex flex-wrap gap-2">
             <input
@@ -145,7 +145,7 @@ export function BudgetPanel({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
           <h3 className="text-sm font-semibold">Log an expense</h3>
           <div className="mt-2 flex flex-wrap gap-2">
             <input

@@ -321,7 +321,7 @@ export function LoansPanel({
           return (
             <div
               key={id}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
               {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">

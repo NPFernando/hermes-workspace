@@ -69,7 +69,7 @@ function LinkedAccountControl({
     <select
       value={linkedAccountId}
       onChange={(e) => void setLinkedAccount(e.target.value)}
-      className="mt-1 rounded-lg border border-[var(--theme-border)] bg-black/10 px-2 py-0.5 text-xs text-[var(--theme-text)] outline-none"
+      className="mt-1 rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-2 py-0.5 text-xs text-[var(--theme-text)] outline-none"
     >
       <option value="">— No linked account —</option>
       {accounts.map((account, index) => {
@@ -141,7 +141,7 @@ export function SavingsGoalsProgress({
           return (
             <div
               key={String(goal.id ?? index)}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium text-[var(--theme-text)]">
@@ -149,7 +149,7 @@ export function SavingsGoalsProgress({
                 </span>
                 <span className={tone.text}>{percent}%</span>
               </div>
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-black/20">
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)]">
                 <div
                   className={`h-full rounded-full ${tone.bar}`}
                   style={{ width: `${percent}%` }}

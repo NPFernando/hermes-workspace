@@ -68,7 +68,7 @@ function LinkedLoanControl({
     <select
       value={linkedLoanId}
       onChange={(e) => void setLinkedLoan(e.target.value)}
-      className="mt-1 rounded-lg border border-[var(--theme-border)] bg-black/10 px-2 py-0.5 text-xs text-[var(--theme-text)] outline-none"
+      className="mt-1 rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-2 py-0.5 text-xs text-[var(--theme-text)] outline-none"
     >
       <option value="">— No linked loan —</option>
       {loans.map((loan, index) => {
@@ -306,7 +306,7 @@ export function PropertiesPanel({
           return (
             <div
               key={id}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
               {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
