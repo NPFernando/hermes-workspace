@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import { MiniStat } from './components/mini-stat'
+import { formatSignedAmount } from './format-helpers'
 
 interface StrategyScore {
   strategyId: string
@@ -147,35 +149,8 @@ interface SettingsForm {
   symbols: string
 }
 
-const money = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}`
+const money = formatSignedAmount
 const usd = (n: number) => `${n.toFixed(2)}`
-
-function MiniStat({
-  label,
-  value,
-  tone = 'neutral',
-}: {
-  label: string
-  value: string
-  tone?: 'neutral' | 'good' | 'bad'
-}) {
-  const cls =
-    tone === 'good'
-      ? 'text-emerald-400'
-      : tone === 'bad'
-        ? 'text-red-400'
-        : 'text-[var(--theme-text)]'
-  return (
-    <div className="rounded-xl border border-[var(--theme-border)]/60 bg-black/10 p-2.5">
-      <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-        {label}
-      </div>
-      <div className={`mt-1 text-sm font-semibold tabular-nums ${cls}`}>
-        {value}
-      </div>
-    </div>
-  )
-}
 
 function sparkPoints(vals: Array<number>, w = 120, h = 28): string {
   if (vals.length < 2) return ''
@@ -345,8 +320,8 @@ export function DemoTradingPanel() {
             <strong
               className={
                 state && state.dailyPnlQuote >= 0
-                  ? 'text-emerald-400'
-                  : 'text-red-400'
+                  ? 'text-[var(--theme-success)]'
+                  : 'text-[var(--theme-danger)]'
               }
             >
               {state ? money(state.dailyPnlQuote) : '—'} USDT
@@ -357,7 +332,7 @@ export function DemoTradingPanel() {
           type="button"
           onClick={runCycle}
           disabled={running}
-          className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+          className="rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] disabled:opacity-50"
         >
           {running ? 'Running…' : 'Run one cycle'}
         </button>
@@ -431,9 +406,9 @@ export function DemoTradingPanel() {
                     <span
                       className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
                         m.signal === 'BUY'
-                          ? 'bg-emerald-500/15 text-emerald-300'
+                          ? 'bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] text-[var(--theme-success)]'
                           : m.signal === 'SELL'
-                            ? 'bg-red-500/15 text-red-300'
+                            ? 'bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] text-[var(--theme-danger)]'
                             : 'bg-[var(--theme-border)]/30 text-[var(--theme-muted)]'
                       }`}
                     >
@@ -448,8 +423,8 @@ export function DemoTradingPanel() {
                       <span
                         className={
                           m.unrealizedPnlQuote >= 0
-                            ? 'text-emerald-400'
-                            : 'text-red-400'
+                            ? 'text-[var(--theme-success)]'
+                            : 'text-[var(--theme-danger)]'
                         }
                       >
                         held {money(m.unrealizedPnlQuote)}
@@ -466,13 +441,13 @@ export function DemoTradingPanel() {
       </div>
 
       {/* Performance trend / improving? */}
-      <div className="mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-[var(--theme-border)]/60 bg-black/10 p-3">
+      <div className="mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-[var(--theme-border)]/60 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
         <div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
             Cumulative P/L ({n} closed)
           </div>
           <div
-            className={`text-lg font-semibold tabular-nums ${totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+            className={`text-lg font-semibold tabular-nums ${totalPnl >= 0 ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'}`}
           >
             {money(totalPnl)} USDT
           </div>
@@ -489,7 +464,7 @@ export function DemoTradingPanel() {
               fill="none"
               strokeWidth="1.5"
               className={
-                totalPnl >= 0 ? 'stroke-emerald-400' : 'stroke-red-400'
+                totalPnl >= 0 ? 'stroke-[var(--theme-success)]' : 'stroke-[var(--theme-danger)]'
               }
             />
           </svg>
@@ -501,11 +476,11 @@ export function DemoTradingPanel() {
               not enough trades yet
             </span>
           ) : trend === 'improving' ? (
-            <span className="font-semibold text-emerald-400">↑ improving</span>
+            <span className="font-semibold text-[var(--theme-success)]">↑ improving</span>
           ) : trend === 'declining' ? (
-            <span className="font-semibold text-red-400">↓ declining</span>
+            <span className="font-semibold text-[var(--theme-danger)]">↓ declining</span>
           ) : (
-            <span className="font-semibold text-amber-400">→ flat</span>
+            <span className="font-semibold text-[var(--theme-warning)]">→ flat</span>
           )}
           {n >= 1 && (
             <span className="ml-2 text-xs text-[var(--theme-muted)]">
@@ -516,7 +491,7 @@ export function DemoTradingPanel() {
       </div>
 
       {learning && (
-        <div className="mt-4 rounded-xl border border-[var(--theme-border)]/60 bg-black/10 p-3">
+        <div className="mt-4 rounded-xl border border-[var(--theme-border)]/60 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
@@ -542,8 +517,8 @@ export function DemoTradingPanel() {
               <strong
                 className={
                   learning.recommendedAdjustments.pauseLive
-                    ? 'text-amber-400'
-                    : 'text-emerald-400'
+                    ? 'text-[var(--theme-warning)]'
+                    : 'text-[var(--theme-success)]'
                 }
               >
                 {learning.recommendedAdjustments.pauseLive
@@ -580,10 +555,10 @@ export function DemoTradingPanel() {
                   key={`${finding.severity}-${finding.title}`}
                   className={`rounded-lg border p-2 text-xs ${
                     finding.severity === 'critical'
-                      ? 'border-red-500/30 bg-red-500/10 text-red-200'
+                      ? 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]'
                       : finding.severity === 'warning'
-                        ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
-                        : 'border-[var(--theme-border)]/50 bg-black/10 text-[var(--theme-muted)]'
+                        ? 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]'
+                        : 'border-[var(--theme-border)]/50 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'
                   }`}
                 >
                   <strong>{finding.title}</strong> · {finding.detail}
@@ -595,7 +570,7 @@ export function DemoTradingPanel() {
       )}
 
       {marketLearning && (
-        <div className="mt-4 rounded-xl border border-[var(--theme-border)]/60 bg-black/10 p-3">
+        <div className="mt-4 rounded-xl border border-[var(--theme-border)]/60 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
@@ -628,7 +603,7 @@ export function DemoTradingPanel() {
               return (
                 <div
                   key={symbol.symbol}
-                  className="rounded-lg border border-[var(--theme-border)]/50 bg-black/10 p-2 text-xs"
+                  className="rounded-lg border border-[var(--theme-border)]/50 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-2 text-xs"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <strong className="text-[var(--theme-text)]">
@@ -637,10 +612,10 @@ export function DemoTradingPanel() {
                     <span
                       className={
                         blocked
-                          ? 'text-red-300'
+                          ? 'text-[var(--theme-danger)]'
                           : symbol.status === 'caution'
-                            ? 'text-amber-300'
-                            : 'text-emerald-300'
+                            ? 'text-[var(--theme-warning)]'
+                            : 'text-[var(--theme-success)]'
                       }
                     >
                       {symbol.status.replace(/_/g, ' ')}
@@ -655,7 +630,7 @@ export function DemoTradingPanel() {
                   {(symbol.blockers[0] || symbol.warnings[0]) && (
                     <div
                       className={
-                        blocked ? 'mt-1 text-red-200' : 'mt-1 text-amber-200'
+                        blocked ? 'mt-1 text-[var(--theme-danger)]' : 'mt-1 text-[var(--theme-warning)]'
                       }
                     >
                       {symbol.blockers[0] ?? symbol.warnings[0]}
@@ -666,7 +641,7 @@ export function DemoTradingPanel() {
             })}
           </div>
           {lastWarmup && (
-            <div className="mt-3 rounded-lg border border-[var(--theme-border)]/50 bg-black/10 p-2 text-xs">
+            <div className="mt-3 rounded-lg border border-[var(--theme-border)]/50 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-2 text-xs">
               <div className="flex flex-wrap items-center justify-between gap-2 text-[var(--theme-muted)]">
                 <span>
                   Last warmup target {lastWarmup.targetCandles} bars ·{' '}
@@ -687,9 +662,9 @@ export function DemoTradingPanel() {
                     <span
                       className={
                         symbol.status === 'failed'
-                          ? 'text-red-300'
+                          ? 'text-[var(--theme-danger)]'
                           : symbol.status === 'warmed'
-                            ? 'text-emerald-300'
+                            ? 'text-[var(--theme-success)]'
                             : 'text-[var(--theme-muted)]'
                       }
                     >
@@ -739,7 +714,7 @@ export function DemoTradingPanel() {
                           {s.strategyId}
                           {s.cooldownUntil &&
                             new Date(s.cooldownUntil) > new Date() && (
-                              <span className="ml-1 text-[10px] text-amber-400">
+                              <span className="ml-1 text-[10px] text-[var(--theme-warning)]">
                                 cooldown
                               </span>
                             )}
@@ -749,12 +724,12 @@ export function DemoTradingPanel() {
                           {(s.winRate * 100).toFixed(0)}%
                         </td>
                         <td
-                          className={`px-2 tabular-nums ${s.score >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                          className={`px-2 tabular-nums ${s.score >= 0 ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'}`}
                         >
                           {s.score.toFixed(2)}
                         </td>
                         <td
-                          className={`px-2 tabular-nums ${s.totalPnlQuote >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                          className={`px-2 tabular-nums ${s.totalPnlQuote >= 0 ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'}`}
                         >
                           {money(s.totalPnlQuote)}
                         </td>
@@ -775,7 +750,7 @@ export function DemoTradingPanel() {
               state!.positions.map((p) => (
                 <div
                   key={p.id}
-                  className="rounded-lg border border-[var(--theme-border)]/50 bg-black/10 p-2 text-xs"
+                  className="rounded-lg border border-[var(--theme-border)]/50 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-2 text-xs"
                 >
                   {p.symbol} · {p.strategyId} · {p.executionMode ?? 'testnet'} ·
                   entry {p.entryPrice.toFixed(2)} · {p.entryQuote.toFixed(2)}{' '}
@@ -799,14 +774,14 @@ export function DemoTradingPanel() {
               state!.trades.map((t) => (
                 <div
                   key={t.id}
-                  className="flex items-center justify-between rounded-lg border border-[var(--theme-border)]/50 bg-black/10 p-2 text-xs"
+                  className="flex items-center justify-between rounded-lg border border-[var(--theme-border)]/50 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-2 text-xs"
                 >
                   <span>
                     {t.symbol} · {t.strategyId}
                   </span>
                   <span
                     className={
-                      t.pnlQuote >= 0 ? 'text-emerald-400' : 'text-red-400'
+                      t.pnlQuote >= 0 ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'
                     }
                   >
                     {money(t.pnlQuote)} USDT
@@ -825,7 +800,7 @@ export function DemoTradingPanel() {
                 {state!.guardianBlocks.slice(0, 5).map((b, i) => (
                   <div
                     key={`${b.at}-${i}`}
-                    className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-200/90"
+                    className="rounded-lg border border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_5%,transparent)] p-2 text-xs text-[color-mix(in_srgb,var(--theme-warning)_90%,transparent)]"
                   >
                     <strong>{b.rule}</strong> · {b.symbol}: {b.detail}
                   </div>
@@ -849,7 +824,7 @@ export function DemoTradingPanel() {
                 step="0.1"
                 value={form.tp}
                 onChange={(e) => setForm({ ...form, tp: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-black/20 px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
+                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
               />
             </label>
             <label className="text-xs text-[var(--theme-muted)]">
@@ -859,7 +834,7 @@ export function DemoTradingPanel() {
                 step="0.1"
                 value={form.sl}
                 onChange={(e) => setForm({ ...form, sl: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-black/20 px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
+                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
               />
             </label>
             <label className="text-xs text-[var(--theme-muted)]">
@@ -869,7 +844,7 @@ export function DemoTradingPanel() {
                 step="1"
                 value={form.size}
                 onChange={(e) => setForm({ ...form, size: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-black/20 px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
+                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
               />
             </label>
             <label className="text-xs text-[var(--theme-muted)]">
@@ -879,7 +854,7 @@ export function DemoTradingPanel() {
                 step="1"
                 value={form.maxPos}
                 onChange={(e) => setForm({ ...form, maxPos: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-black/20 px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
+                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-2 py-1 text-sm tabular-nums text-[var(--theme-text)]"
               />
             </label>
             <label className="col-span-2 text-xs text-[var(--theme-muted)] sm:col-span-4">
@@ -887,7 +862,7 @@ export function DemoTradingPanel() {
               <input
                 value={form.symbols}
                 onChange={(e) => setForm({ ...form, symbols: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-black/20 px-2 py-1 text-sm text-[var(--theme-text)]"
+                className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-2 py-1 text-sm text-[var(--theme-text)]"
               />
             </label>
           </div>
@@ -895,7 +870,7 @@ export function DemoTradingPanel() {
             type="button"
             onClick={saveSettings}
             disabled={saving}
-            className="mt-3 rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+            className="mt-3 rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save settings'}
           </button>

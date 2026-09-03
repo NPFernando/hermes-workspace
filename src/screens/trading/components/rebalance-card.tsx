@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { MiniStat } from './mini-stat'
 
 interface RebalanceConfig {
   enabled: boolean
@@ -33,15 +34,6 @@ interface RebalanceResponse {
   error?: string
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-[var(--theme-border)]/60 bg-black/10 p-2.5">
-      <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">{label}</div>
-      <div className="mt-1 text-sm font-semibold tabular-nums text-[var(--theme-text)]">{value}</div>
-    </div>
-  )
-}
-
 export function RebalanceCard() {
   const [data, setData] = useState<RebalanceResponse | null>(null)
   const [plan, setPlan] = useState<Array<RebalancePlanItem> | null>(null)
@@ -51,7 +43,9 @@ export function RebalanceCard() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/demo-trading-rebalance', { cache: 'no-store' })
+      const res = await fetch('/api/demo-trading-rebalance', {
+        cache: 'no-store',
+      })
       if (res.ok) setData((await res.json()) as RebalanceResponse)
     } catch {
       /* transient */
@@ -75,12 +69,18 @@ export function RebalanceCard() {
       })
       const result = await res.json()
       if (!result.ok) setNote(result.error || 'Cycle failed')
-      else if (!result.result?.ran) setNote(`Idle: ${result.result?.reason ?? 'not run'}`)
+      else if (!result.result?.ran)
+        setNote(`Idle: ${result.result?.reason ?? 'not run'}`)
       else {
         const count = result.result.trades?.length ?? 0
-        setNote(count ? `${count} rebalance trade(s) this cycle` : 'Ran — no trades needed')
+        setNote(
+          count
+            ? `${count} rebalance trade(s) this cycle`
+            : 'Ran — no trades needed',
+        )
       }
-      if (result.result?.plan) setPlan(result.result.plan as Array<RebalancePlanItem>)
+      if (result.result?.plan)
+        setPlan(result.result.plan as Array<RebalancePlanItem>)
       await load()
     } catch (e) {
       setNote(e instanceof Error ? e.message : 'Request failed')
@@ -98,7 +98,10 @@ export function RebalanceCard() {
       const res = await fetch('/api/finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'set_rebalance_config', config: { enabled: nextEnabled } }),
+        body: JSON.stringify({
+          action: 'set_rebalance_config',
+          config: { enabled: nextEnabled },
+        }),
       })
       const result = await res.json()
       if (result.ok === false) setNote(result.error || 'Failed to update')
@@ -118,11 +121,13 @@ export function RebalanceCard() {
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--theme-text)]">Rebalance engine</h2>
+          <h2 className="text-lg font-semibold text-[var(--theme-text)]">
+            Rebalance engine
+          </h2>
           <p className="text-xs text-[var(--theme-muted)]">
-            Portfolio-level drift rebalancer — buys underweight / sells overweight symbols
-            against a target allocation. Not a directional strategy, so it has no P&L concept
-            of its own.
+            Portfolio-level drift rebalancer — buys underweight / sells
+            overweight symbols against a target allocation. Not a directional
+            strategy, so it has no P&L concept of its own.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -132,8 +137,8 @@ export function RebalanceCard() {
             disabled={toggling || !config}
             className={`rounded-xl border px-4 py-2 text-sm font-medium disabled:opacity-50 ${
               config?.enabled
-                ? 'border-red-400/30 bg-red-500/15 text-red-100 hover:bg-red-500/25'
-                : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-text)] hover:bg-black/20'
+                ? 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)]'
+                : 'border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)]'
             }`}
           >
             {toggling ? 'Updating…' : config?.enabled ? 'Disable' : 'Enable'}
@@ -142,7 +147,7 @@ export function RebalanceCard() {
             type="button"
             onClick={() => void runCycle()}
             disabled={running}
-            className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+            className="rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] disabled:opacity-50"
           >
             {running ? 'Running…' : 'Run one cycle'}
           </button>
@@ -151,14 +156,21 @@ export function RebalanceCard() {
       {note && <p className="mt-2 text-xs text-[var(--theme-muted)]">{note}</p>}
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MiniStat label="Enabled" value={config ? (config.enabled ? 'yes' : 'no') : '—'} />
+        <MiniStat
+          label="Enabled"
+          value={config ? (config.enabled ? 'yes' : 'no') : '—'}
+        />
         <MiniStat
           label="Drift threshold"
           value={config ? `${config.driftThresholdPct.toFixed(1)}%` : '—'}
         />
         <MiniStat
           label="Last rebalanced"
-          value={state?.lastRebalanceAt ? new Date(state.lastRebalanceAt).toLocaleString() : 'never'}
+          value={
+            state?.lastRebalanceAt
+              ? new Date(state.lastRebalanceAt).toLocaleString()
+              : 'never'
+          }
         />
         <MiniStat label="Trades logged" value={String(trades.length)} />
       </div>
@@ -178,8 +190,13 @@ export function RebalanceCard() {
           </thead>
           <tbody>
             {(plan ?? []).map((p) => (
-              <tr key={p.symbol} className="border-t border-[var(--theme-border)]/40">
-                <td className="py-1.5 pr-4 text-[var(--theme-text)]">{p.symbol}</td>
+              <tr
+                key={p.symbol}
+                className="border-t border-[var(--theme-border)]/40"
+              >
+                <td className="py-1.5 pr-4 text-[var(--theme-text)]">
+                  {p.symbol}
+                </td>
                 <td className="py-1.5 pr-4 tabular-nums text-[var(--theme-text)]">
                   {(p.actualWeight * 100).toFixed(1)}%
                 </td>
@@ -188,7 +205,7 @@ export function RebalanceCard() {
                 </td>
                 <td
                   className={`py-1.5 tabular-nums ${
-                    p.diffQuote >= 0 ? 'text-emerald-400' : 'text-red-400'
+                    p.diffQuote >= 0 ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'
                   }`}
                 >
                   {p.diffQuote >= 0 ? '+' : ''}
@@ -207,7 +224,9 @@ export function RebalanceCard() {
         </table>
       </div>
 
-      <h3 className="mt-4 text-sm font-semibold text-[var(--theme-text)]">Recent trades</h3>
+      <h3 className="mt-4 text-sm font-semibold text-[var(--theme-text)]">
+        Recent trades
+      </h3>
       <div className="mt-2 overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead>
@@ -220,9 +239,16 @@ export function RebalanceCard() {
           </thead>
           <tbody>
             {trades.slice(0, 10).map((t) => (
-              <tr key={t.id} className="border-t border-[var(--theme-border)]/40">
-                <td className="py-1.5 pr-4 text-[var(--theme-text)]">{t.symbol}</td>
-                <td className={`py-1.5 pr-4 ${t.side === 'BUY' ? 'text-emerald-400' : 'text-red-400'}`}>
+              <tr
+                key={t.id}
+                className="border-t border-[var(--theme-border)]/40"
+              >
+                <td className="py-1.5 pr-4 text-[var(--theme-text)]">
+                  {t.symbol}
+                </td>
+                <td
+                  className={`py-1.5 pr-4 ${t.side === 'BUY' ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'}`}
+                >
                   {t.side}
                 </td>
                 <td className="py-1.5 pr-4 tabular-nums text-[var(--theme-text)]">

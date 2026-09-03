@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Area, AreaChart, ResponsiveContainer } from 'recharts'
 import { useFinanceAction } from '../finance/hooks/use-finance-action'
 import { StatCard } from '../finance/components/stat-card'
-import { DataTable } from '../finance/components/data-table'
 import { TradingSummaryStrip } from './components/trading-summary-strip'
 import { RebalanceCard } from './components/rebalance-card'
 import { LlmSignalCard } from './components/llm-signal-card'
 import { DemoTradingPanel } from './demo-trading-panel'
 import { GridTradingPanel } from './grid-trading-panel'
+import { formatFractionPct, formatUsdt } from './format-helpers'
 
 type DecisionQualityFinding = {
   severity: 'info' | 'warning' | 'critical'
@@ -30,7 +30,6 @@ type PaperDecisionQualityReport = {
     sampleCount: number
     directionalHitRate: number | null
   }>
-  sideEffects: false
 }
 
 type DecisionQualityReport = {
@@ -391,10 +390,6 @@ function formatPct(value: number): string {
   return `${value.toFixed(1)}%`
 }
 
-function formatUsdt(value: number): string {
-  return `${value < 0 ? '-' : ''}${Math.abs(value).toFixed(2)} USDT`
-}
-
 function formatDateTime(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
@@ -445,7 +440,6 @@ function csvDateSuffix() {
   return new Date().toISOString().slice(0, 10)
 }
 
-
 function SafeguardHistoryPanel({
   rows,
 }: {
@@ -491,7 +485,7 @@ function SafeguardHistoryPanel({
             type="button"
             disabled={rows.length === 0}
             onClick={exportRows}
-            className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40"
+            className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] disabled:opacity-40"
           >
             Export CSV
           </button>
@@ -499,7 +493,7 @@ function SafeguardHistoryPanel({
       </div>
 
       {rows.length === 0 ? (
-        <p className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-black/10 p-3 text-sm text-[var(--theme-muted)]">
+        <p className="mt-4 rounded-2xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3 text-sm text-[var(--theme-muted)]">
           No safeguards have been applied yet.
         </p>
       ) : (
@@ -545,7 +539,7 @@ function SafeguardHistoryPanel({
                   <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
                     {row.appliedTradingMode}
                     {row.liveRecommendationDeferred ? (
-                      <span className="ml-2 rounded-full border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">
+                      <span className="ml-2 rounded-full border border-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-2 py-0.5 text-[10px] text-[var(--theme-warning)]">
                         live deferred
                       </span>
                     ) : null}
@@ -678,7 +672,7 @@ function StrategyOverridePanel({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-muted)]">
+          <label className="flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs text-[var(--theme-muted)]">
             Duration
             <select
               value={expiresAfterDays}
@@ -700,7 +694,7 @@ function StrategyOverridePanel({
             type="button"
             disabled={state.history.length === 0}
             onClick={exportHistory}
-            className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-black/20 disabled:opacity-40"
+            className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] disabled:opacity-40"
           >
             Export CSV
           </button>
@@ -709,7 +703,7 @@ function StrategyOverridePanel({
 
       {(message || error) && (
         <p
-          className={`mt-3 rounded-xl border p-2 text-sm ${error ? 'border-red-400/30 bg-red-500/10 text-red-200' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'}`}
+          className={`mt-3 rounded-xl border p-2 text-sm ${error ? 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]' : 'border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'}`}
         >
           {error ?? message}
         </p>
@@ -722,7 +716,7 @@ function StrategyOverridePanel({
           return (
             <div
               key={strategy.id}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-4"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -734,10 +728,10 @@ function StrategyOverridePanel({
                 <span
                   className={`rounded-full border px-2.5 py-1 text-xs ${
                     override?.mode === 'disabled'
-                      ? 'border-red-400/30 bg-red-500/10 text-red-100'
+                      ? 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]'
                       : override?.mode === 'reduce_size'
-                        ? 'border-amber-400/30 bg-amber-500/10 text-amber-100'
-                        : 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100'
+                        ? 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]'
+                        : 'border-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'
                   }`}
                 >
                   {modeLabel(override)}
@@ -761,7 +755,7 @@ function StrategyOverridePanel({
                   onClick={() =>
                     void setOverride(strategy.id, 'reduce_size', 0.5)
                   }
-                  className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-100 hover:bg-amber-500/20 disabled:opacity-50"
+                  className="rounded-xl border border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-3 py-2 text-xs font-medium text-[var(--theme-warning)] hover:bg-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)] disabled:opacity-50"
                 >
                   50% size
                 </button>
@@ -771,7 +765,7 @@ function StrategyOverridePanel({
                   onClick={() =>
                     void setOverride(strategy.id, 'reduce_size', 0.25)
                   }
-                  className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-100 hover:bg-amber-500/20 disabled:opacity-50"
+                  className="rounded-xl border border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-3 py-2 text-xs font-medium text-[var(--theme-warning)] hover:bg-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)] disabled:opacity-50"
                 >
                   25% size
                 </button>
@@ -779,7 +773,7 @@ function StrategyOverridePanel({
                   type="button"
                   disabled={disabled}
                   onClick={() => void setOverride(strategy.id, 'disabled')}
-                  className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-100 hover:bg-red-500/20 disabled:opacity-50"
+                  className="rounded-xl border border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-3 py-2 text-xs font-medium text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_20%,transparent)] disabled:opacity-50"
                 >
                   Disable
                 </button>
@@ -787,7 +781,7 @@ function StrategyOverridePanel({
                   type="button"
                   disabled={disabled || !override}
                   onClick={() => void setOverride(strategy.id, 'clear')}
-                  className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-40"
+                  className="rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] px-3 py-2 text-xs font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_20%,transparent)] disabled:opacity-40"
                 >
                   Re-enable
                 </button>
@@ -885,7 +879,11 @@ function SignalSettingsPanel({
   demoTrading: Record<string, unknown>
   onPayload: (p: FinancePayload) => void
 }) {
-  const { run: post, busy, error: err } = useFinanceAction<FinancePayload>(onPayload)
+  const {
+    run: post,
+    busy,
+    error: err,
+  } = useFinanceAction<FinancePayload>(onPayload)
   const atrSizeBaselinePct =
     typeof demoTrading.atrSizeBaselinePct === 'number'
       ? demoTrading.atrSizeBaselinePct
@@ -909,30 +907,30 @@ function SignalSettingsPanel({
     'rounded-xl border px-3 py-1.5 text-xs font-medium transition disabled:opacity-40'
   const toneClass = (tone: 'good' | 'neutral') =>
     tone === 'good'
-      ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25'
-      : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-text)] hover:bg-black/20'
+      ? 'border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)]'
+      : 'border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)]'
   const inputClass =
-    'w-20 rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
+    'w-20 rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs text-[var(--theme-text)] outline-none'
 
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <div>
         <h2 className="text-lg font-semibold">Signal settings</h2>
         <p className="text-xs text-[var(--theme-muted)]">
-          Optional council-engine levers built and backtested this session.
-          Each is independent and off by default — read the caption before
-          turning one on.
+          Optional council-engine levers built and backtested this session. Each
+          is independent and off by default — read the caption before turning
+          one on.
         </p>
       </div>
 
-      {err && <p className="mt-3 text-xs text-red-300">{err}</p>}
+      {err && <p className="mt-3 text-xs text-[var(--theme-danger)]">{err}</p>}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
           <h3 className="text-sm font-semibold">ATR-based position sizing</h3>
           <p className="mt-1 text-xs text-[var(--theme-muted)]">
-            Only the 1% baseline improved backtest P&amp;L (-40→-29 quote)
-            and drawdown (53%→46%); 2%/4% made both worse.
+            Only the 1% baseline improved backtest P&amp;L (-40→-29 quote) and
+            drawdown (53%→46%); 2%/4% made both worse.
           </p>
           <div className="mt-2 flex items-center gap-2">
             <input
@@ -941,7 +939,9 @@ function SignalSettingsPanel({
               onChange={(e) => setAtrInput(e.target.value)}
               className={inputClass}
             />
-            <span className="text-xs text-[var(--theme-muted)]">% baseline</span>
+            <span className="text-xs text-[var(--theme-muted)]">
+              % baseline
+            </span>
             <button
               type="button"
               disabled={busy === 'atr'}
@@ -958,7 +958,7 @@ function SignalSettingsPanel({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
           <h3 className="text-sm font-semibold">Kelly-criterion sizing</h3>
           <p className="mt-1 text-xs text-[var(--theme-muted)]">
             Safe to enable — self-gates behind 30 closed trades per strategy
@@ -969,19 +969,20 @@ function SignalSettingsPanel({
               type="button"
               disabled={busy === 'kelly'}
               onClick={() =>
-                setConfig(
-                  { kellySizingEnabled: !kellySizingEnabled },
-                  'kelly',
-                )
+                setConfig({ kellySizingEnabled: !kellySizingEnabled }, 'kelly')
               }
               className={`${buttonClass} ${toneClass(toggleTone(kellySizingEnabled))}`}
             >
-              {busy === 'kelly' ? '...' : kellySizingEnabled ? 'Enabled' : 'Disabled'}
+              {busy === 'kelly'
+                ? '...'
+                : kellySizingEnabled
+                  ? 'Enabled'
+                  : 'Disabled'}
             </button>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
           <h3 className="text-sm font-semibold">Pattern-bucket veto</h3>
           <p className="mt-1 text-xs text-[var(--theme-muted)]">
             Safe to enable — self-gates behind 20 samples in a strategy/RSI/
@@ -992,19 +993,20 @@ function SignalSettingsPanel({
               type="button"
               disabled={busy === 'veto'}
               onClick={() =>
-                setConfig(
-                  { patternVetoEnabled: !patternVetoEnabled },
-                  'veto',
-                )
+                setConfig({ patternVetoEnabled: !patternVetoEnabled }, 'veto')
               }
               className={`${buttonClass} ${toneClass(toggleTone(patternVetoEnabled))}`}
             >
-              {busy === 'veto' ? '...' : patternVetoEnabled ? 'Enabled' : 'Disabled'}
+              {busy === 'veto'
+                ? '...'
+                : patternVetoEnabled
+                  ? 'Enabled'
+                  : 'Disabled'}
             </button>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
           <h3 className="text-sm font-semibold">ADX trend-strength gate</h3>
           <p className="mt-1 text-xs text-[var(--theme-muted)]">
             Caution: one backtest showed threshold 25 flip -40→+15 quote, but
@@ -1033,8 +1035,10 @@ function SignalSettingsPanel({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
-          <h3 className="text-sm font-semibold">Fibonacci-extension take-profit</h3>
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
+          <h3 className="text-sm font-semibold">
+            Fibonacci-extension take-profit
+          </h3>
           <p className="mt-1 text-xs text-[var(--theme-muted)]">
             Roughly halves losses vs. the fixed-% take-profit in backtest, but
             stays net-negative overall — an improvement, not a standalone edge.
@@ -1051,12 +1055,16 @@ function SignalSettingsPanel({
               }
               className={`${buttonClass} ${toneClass(toggleTone(fibTakeProfitEnabled))}`}
             >
-              {busy === 'fib' ? '...' : fibTakeProfitEnabled ? 'Enabled' : 'Disabled'}
+              {busy === 'fib'
+                ? '...'
+                : fibTakeProfitEnabled
+                  ? 'Enabled'
+                  : 'Disabled'}
             </button>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
           <h3 className="text-sm font-semibold">Long/short sentiment</h3>
           <p className="mt-1 text-xs text-[var(--theme-muted)]">
             No backtest possible yet (Binance only retains ~30 days) — a live,
@@ -1117,7 +1125,11 @@ function TradingControls({
   summary: FinancePayload['summary']
   onPayload: (p: FinancePayload) => void
 }) {
-  const { run: post, busy, error: err } = useFinanceAction<FinancePayload>(onPayload)
+  const {
+    run: post,
+    busy,
+    error: err,
+  } = useFinanceAction<FinancePayload>(onPayload)
 
   const cutoffOn = summary.emergencyKillSwitch
 
@@ -1171,8 +1183,8 @@ function TradingControls({
         <span
           className={`rounded-full border px-3 py-1 text-xs font-medium ${
             cutoffOn
-              ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
-              : 'border-red-400/30 bg-red-500/10 text-red-200'
+              ? 'border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'
+              : 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]'
           }`}
         >
           Cutoff:{' '}
@@ -1183,7 +1195,7 @@ function TradingControls({
       </div>
 
       {err && (
-        <p className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 p-2 text-sm text-red-200">
+        <p className="mt-3 rounded-xl border border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] p-2 text-sm text-[var(--theme-danger)]">
           {err}
         </p>
       )}
@@ -1203,8 +1215,8 @@ function TradingControls({
                 onClick={() => selectMode(mode.id)}
                 className={`rounded-2xl border px-3.5 py-2 text-left text-sm transition disabled:opacity-50 ${
                   active
-                    ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100'
-                    : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-text)] hover:border-emerald-400/30'
+                    ? 'border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] text-[var(--theme-success)]'
+                    : 'border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-text)] hover:border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)]'
                 }`}
               >
                 <div className="font-medium">
@@ -1239,7 +1251,7 @@ function TradingControls({
             onClick={() =>
               void post({ action: 'set_kill_switch', engaged: true }, 'cutoff')
             }
-            className="rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-500/25 disabled:opacity-40"
+            className="rounded-2xl border border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-success)] transition hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] disabled:opacity-40"
           >
             {busy === 'cutoff' ? '…' : 'Arm cutoff (safe)'}
           </button>
@@ -1247,7 +1259,7 @@ function TradingControls({
             type="button"
             disabled={busy !== null || !cutoffOn}
             onClick={disarmCutoff}
-            className="rounded-2xl border border-red-400/40 bg-red-500/15 px-4 py-2 text-sm font-medium text-red-100 transition hover:bg-red-500/25 disabled:opacity-40"
+            className="rounded-2xl border border-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-danger)] transition hover:bg-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)] disabled:opacity-40"
           >
             {busy === 'cutoff' ? '…' : 'Disarm cutoff (enable trading)'}
           </button>
@@ -1255,7 +1267,7 @@ function TradingControls({
             type="button"
             disabled={busy !== null}
             onClick={() => void post({ action: 'emergency_stop' }, 'estop')}
-            className="rounded-2xl border border-red-400/50 bg-red-600/20 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-600/30 disabled:opacity-40"
+            className="rounded-2xl border border-[color-mix(in_srgb,var(--theme-danger)_50%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_20%,transparent)] px-4 py-2 text-sm font-semibold text-[var(--theme-danger)] transition hover:bg-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] disabled:opacity-40"
           >
             {busy === 'estop' ? '…' : 'EMERGENCY STOP'}
           </button>
@@ -1281,9 +1293,8 @@ function PerformancePanel({
       </section>
     )
   }
-  const pct = (value: number) => `${(value * 100).toFixed(1)}%`
-  const usdt = (value: number) =>
-    `${value < 0 ? '−' : ''}${Math.abs(value).toFixed(2)} USDT`
+  const pct = formatFractionPct
+  const usdt = formatUsdt
   const num = (value: number) => value.toFixed(2)
 
   return (
@@ -1383,7 +1394,7 @@ function PaperDecisionQualityPanel({
         </span>
       </div>
 
-      <p className="mt-3 rounded-2xl border border-[var(--theme-border)] bg-black/10 p-3 text-sm text-[var(--theme-muted)]">
+      <p className="mt-3 rounded-2xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3 text-sm text-[var(--theme-muted)]">
         {evidenceMessage}
       </p>
 
@@ -1399,7 +1410,10 @@ function PaperDecisionQualityPanel({
           value={`${rate(report.abstentionRate)} · ${report.abstainedSampleCount}`}
           tone={report.abstainedSampleCount > 0 ? 'warn' : 'neutral'}
         />
-        <StatCard label="Directional hit rate" value={rate(report.directionalHitRate)} />
+        <StatCard
+          label="Directional hit rate"
+          value={rate(report.directionalHitRate)}
+        />
         <StatCard
           label="Average adverse move"
           value={adverseMove(report.averageAdverseMovePct)}
@@ -1413,12 +1427,14 @@ function PaperDecisionQualityPanel({
       </div>
 
       <div className="mt-4">
-        <h3 className="text-sm font-semibold">Calibration by score magnitude</h3>
+        <h3 className="text-sm font-semibold">
+          Calibration by score magnitude
+        </h3>
         <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {report.calibrationBuckets.map((bucket) => (
             <div
               key={bucket.label}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
               <div className="text-xs text-[var(--theme-muted)]">
                 Score {bucket.label}
@@ -1446,7 +1462,11 @@ function DecisionQualityPanel({
   overrides: FinancePayload['strategyOverrides']
   onPayload: (payload: FinancePayload) => void
 }) {
-  const { run, isBusy: busy, error } = useFinanceAction<
+  const {
+    run,
+    isBusy: busy,
+    error,
+  } = useFinanceAction<
     FinancePayload & {
       appliedSafeguards?: {
         tradingMode: string
@@ -1467,9 +1487,8 @@ function DecisionQualityPanel({
       ),
     [overrides.active],
   )
-  const pct = (value: number) => `${(value * 100).toFixed(1)}%`
-  const usdt = (value: number) =>
-    `${value < 0 ? '−' : ''}${Math.abs(value).toFixed(2)} USDT`
+  const pct = formatFractionPct
+  const usdt = formatUsdt
   const statusTone =
     report.status === 'ready_for_manual_live_review' ||
     report.status === 'ready_for_testnet'
@@ -1482,10 +1501,10 @@ function DecisionQualityPanel({
   const statusLabel = report.status.replace(/_/g, ' ')
   const findingTone = (severity: DecisionQualityFinding['severity']) =>
     severity === 'critical'
-      ? 'border-red-400/30 bg-red-500/10 text-red-100'
+      ? 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]'
       : severity === 'warning'
-        ? 'border-amber-400/30 bg-amber-500/10 text-amber-100'
-        : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]'
+        ? 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]'
+        : 'border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'
   const checks: Array<[string, boolean]> = [
     ['Paper data', report.validations.enoughPaperData],
     ['Shadow data', report.validations.enoughShadowData],
@@ -1503,8 +1522,8 @@ function DecisionQualityPanel({
       : `override: ${override.multiplier.toFixed(2)}x size`
   const overrideTone = (override: StrategyOverride) =>
     override.mode === 'disabled'
-      ? 'border-red-400/30 bg-red-500/10 text-red-100'
-      : 'border-amber-400/30 bg-amber-500/10 text-amber-100'
+      ? 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]'
+      : 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]'
 
   async function applySafeguards() {
     setMessage(null)
@@ -1550,7 +1569,7 @@ function DecisionQualityPanel({
       </div>
       {(message || error) && (
         <p
-          className={`mt-3 rounded-xl border p-2 text-sm ${error ? 'border-red-400/30 bg-red-500/10 text-red-200' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'}`}
+          className={`mt-3 rounded-xl border p-2 text-sm ${error ? 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]' : 'border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'}`}
         >
           {error ?? message}
         </p>
@@ -1618,7 +1637,7 @@ function DecisionQualityPanel({
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-4">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4">
           <h3 className="text-sm font-semibold">Recommended adjustment</h3>
           <div className="mt-2 text-sm text-[var(--theme-text)]">
             Mode:{' '}
@@ -1645,7 +1664,7 @@ function DecisionQualityPanel({
             type="button"
             onClick={applySafeguards}
             disabled={busy}
-            className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+            className="mt-4 rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] disabled:opacity-50"
           >
             {busy ? 'Applying…' : 'Apply recommended safeguards'}
           </button>
@@ -1653,7 +1672,7 @@ function DecisionQualityPanel({
             type="button"
             onClick={applyStrategyRecommendations}
             disabled={busy || overrideRecommendationCount === 0}
-            className="ml-2 mt-4 rounded-xl border border-amber-400/30 bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-100 hover:bg-amber-500/25 disabled:opacity-50"
+            className="ml-2 mt-4 rounded-xl border border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-warning)] hover:bg-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] disabled:opacity-50"
           >
             {busy
               ? 'Applying…'
@@ -1661,13 +1680,13 @@ function DecisionQualityPanel({
           </button>
         </div>
 
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-4">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4">
           <h3 className="text-sm font-semibold">Checks</h3>
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
             {checks.map(([label, ok]) => (
               <div
                 key={String(label)}
-                className={`rounded-xl border px-3 py-2 ${ok ? 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100' : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]'}`}
+                className={`rounded-xl border px-3 py-2 ${ok ? 'border-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]' : 'border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'}`}
               >
                 {label}: {ok ? 'yes' : 'no'}
               </div>
@@ -1681,7 +1700,7 @@ function DecisionQualityPanel({
           <h3 className="text-sm font-semibold">Findings</h3>
           <div className="mt-2 space-y-2">
             {report.findings.length === 0 ? (
-              <p className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+              <p className="rounded-2xl border border-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] p-3 text-sm text-[var(--theme-success)]">
                 No validation issues found in the current sample.
               </p>
             ) : (
@@ -1704,7 +1723,7 @@ function DecisionQualityPanel({
           <h3 className="text-sm font-semibold">Strategy validation</h3>
           <div className="mt-2 space-y-2">
             {report.byStrategy.length === 0 ? (
-              <p className="rounded-2xl border border-[var(--theme-border)] bg-black/10 p-3 text-sm text-[var(--theme-muted)]">
+              <p className="rounded-2xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3 text-sm text-[var(--theme-muted)]">
                 No strategy has enough outcomes yet.
               </p>
             ) : (
@@ -1715,7 +1734,7 @@ function DecisionQualityPanel({
                 return (
                   <div
                     key={strategy.strategyId}
-                    className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3 text-sm"
+                    className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3 text-sm"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-medium">{strategy.strategyId}</span>
@@ -1781,7 +1800,7 @@ function SelfImprovementPanel({
   const paperMode = summary.tradingMode === 'paper_trade'
   const testnetMode = summary.tradingMode === 'testnet_execute'
   const canApplyInCurrentMode = paperMode || testnetMode
-  const pct = (value: number) => `${(value * 100).toFixed(1)}%`
+  const pct = formatFractionPct
   const statusLabel = (status: LearningCandidateStatus) =>
     status.replace(/_/g, ' ')
   const candidateTone = (
@@ -1802,12 +1821,12 @@ function SelfImprovementPanel({
     status === 'testnet_applied' ||
     status === 'testnet_ready' ||
     status === 'live_review_ready'
-      ? 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100'
+      ? 'border-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'
       : status === 'proposed'
-        ? 'border-amber-400/25 bg-amber-500/10 text-amber-100'
+        ? 'border-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]'
         : status === 'rejected'
-          ? 'border-red-400/25 bg-red-500/10 text-red-100'
-          : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]'
+          ? 'border-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]'
+          : 'border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'
   const patchLabel = (candidate: LearningCandidate) => {
     const parts: Array<string> = []
     if (candidate.configPatch.quotePerTrade !== undefined) {
@@ -1876,7 +1895,7 @@ function SelfImprovementPanel({
           type="button"
           onClick={runLearningCycle}
           disabled={busy !== null}
-          className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+          className="rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] disabled:opacity-50"
         >
           {busy === 'run' ? 'Running…' : 'Run learning cycle'}
         </button>
@@ -1884,7 +1903,7 @@ function SelfImprovementPanel({
 
       {(message || error) && (
         <p
-          className={`mt-3 rounded-xl border p-2 text-sm ${error ? 'border-red-400/30 bg-red-500/10 text-red-200' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'}`}
+          className={`mt-3 rounded-xl border p-2 text-sm ${error ? 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]' : 'border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'}`}
         >
           {error ?? message}
         </p>
@@ -1940,15 +1959,15 @@ function SelfImprovementPanel({
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-4">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4">
           <h3 className="text-sm font-semibold">Gate checks</h3>
           <div className="mt-3 grid gap-2 text-xs">
             <div
               className={`rounded-xl border px-3 py-2 ${
                 report.stability.maxDrawdown <=
                 report.stability.maxDrawdownLimit
-                  ? 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100'
-                  : 'border-red-400/25 bg-red-500/10 text-red-100'
+                  ? 'border-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'
+                  : 'border-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]'
               }`}
             >
               Drawdown {formatUsdt(report.stability.maxDrawdown)} /{' '}
@@ -1957,22 +1976,22 @@ function SelfImprovementPanel({
             <div
               className={`rounded-xl border px-3 py-2 ${
                 report.stability.hasCriticalFinding
-                  ? 'border-red-400/25 bg-red-500/10 text-red-100'
-                  : 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100'
+                  ? 'border-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]'
+                  : 'border-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'
               }`}
             >
               Critical finding:{' '}
               {report.stability.hasCriticalFinding ? 'yes' : 'no'}
             </div>
             {report.stability.reasons.length === 0 ? (
-              <div className="rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-emerald-100">
+              <div className="rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] px-3 py-2 text-[var(--theme-success)]">
                 Conservative gate passed.
               </div>
             ) : (
               report.stability.reasons.map((reason) => (
                 <div
                   key={reason}
-                  className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-2 text-[var(--theme-muted)]"
+                  className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-2 text-[var(--theme-muted)]"
                 >
                   {reason}
                 </div>
@@ -1981,7 +2000,7 @@ function SelfImprovementPanel({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-4">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold">Latest candidate</h3>
             {latest ? (
@@ -1998,19 +2017,19 @@ function SelfImprovementPanel({
                 {latest.reason}
               </p>
               <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
-                <div className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-2 text-[var(--theme-muted)]">
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-2 text-[var(--theme-muted)]">
                   Created {formatDateTime(latest.createdAt)}
                 </div>
-                <div className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-2 text-[var(--theme-muted)]">
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-2 text-[var(--theme-muted)]">
                   Mode {latest.modeAtCreation}
                 </div>
-                <div className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-2 text-[var(--theme-muted)]">
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-2 text-[var(--theme-muted)]">
                   Patch {patchLabel(latest)}
                 </div>
-                <div className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-2 text-[var(--theme-muted)]">
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-2 text-[var(--theme-muted)]">
                   Promotion {latest.promotion.eligibleFor}
                 </div>
-                <div className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-2 text-[var(--theme-muted)] sm:col-span-2">
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-2 text-[var(--theme-muted)] sm:col-span-2">
                   Validation: {latest.validation.reason}
                 </div>
               </div>
@@ -2019,7 +2038,7 @@ function SelfImprovementPanel({
                   type="button"
                   onClick={() => void applyCandidate(latest.id)}
                   disabled={busy !== null || !canApplyCandidate(latest)}
-                  className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                  className="mt-4 rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] disabled:opacity-50"
                 >
                   {busy === latest.id
                     ? 'Applying…'
@@ -2100,7 +2119,7 @@ function SelfImprovementPanel({
                         disabled={
                           busy !== null || !canApplyCandidate(candidate)
                         }
-                        className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+                        className="rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] disabled:opacity-50"
                       >
                         {busy === candidate.id
                           ? 'Applying…'
@@ -2214,8 +2233,8 @@ function LivePriceTicker({ symbols }: { symbols: Array<string> }) {
         <span
           className={`rounded-full border px-2.5 py-1 text-xs ${
             connected
-              ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'
-              : 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]'
+              ? 'border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'
+              : 'border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'
           }`}
         >
           {connected ? 'Live' : 'Connecting...'}
@@ -2230,14 +2249,14 @@ function LivePriceTicker({ symbols }: { symbols: Array<string> }) {
           const state = prices.get(symbol)
           const changeTone =
             state && state.changePercent > 0
-              ? 'text-emerald-300'
+              ? 'text-[var(--theme-success)]'
               : state && state.changePercent < 0
-                ? 'text-red-300'
+                ? 'text-[var(--theme-danger)]'
                 : 'text-[var(--theme-muted)]'
           return (
             <div
               key={symbol}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold">{symbol}</span>
@@ -2262,14 +2281,22 @@ function LivePriceTicker({ symbols }: { symbols: Array<string> }) {
                           x2="0"
                           y2="1"
                         >
-                          <stop offset="0%" stopColor="#34d399" stopOpacity={0.4} />
-                          <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                          <stop
+                            offset="0%"
+                            stopColor="var(--theme-success)"
+                            stopOpacity={0.4}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="var(--theme-success)"
+                            stopOpacity={0}
+                          />
                         </linearGradient>
                       </defs>
                       <Area
                         type="monotone"
                         dataKey="price"
-                        stroke="#34d399"
+                        stroke="var(--theme-success)"
                         strokeWidth={1.5}
                         fill={`url(#spark-${symbol})`}
                         isAnimationActive={false}
@@ -2459,12 +2486,12 @@ function NewsResearchPanel({
 
   return (
     <section
-      className="mt-6 rounded-3xl border border-sky-400/25 bg-[var(--theme-panel)]/70 p-5"
+      className="mt-6 rounded-3xl border border-[color-mix(in_srgb,var(--theme-accent-secondary)_25%,transparent)] bg-[var(--theme-panel)]/70 p-5"
       aria-label="Trading news research"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/80">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color-mix(in_srgb,var(--theme-accent-secondary)_80%,transparent)]">
             Research only
           </p>
           <h2 className="mt-1 text-lg font-semibold">News Research</h2>
@@ -2480,7 +2507,7 @@ function NewsResearchPanel({
               list="finance-news-symbols"
               value={symbolInput}
               onChange={(event) => setSymbolInput(event.target.value)}
-              className="w-36 rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-2 text-sm text-[var(--theme-text)]"
+              className="w-36 rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-2 text-sm text-[var(--theme-text)]"
               aria-invalid={!isValidSymbol}
               aria-describedby="finance-news-symbol-help"
               placeholder="BTCUSDT"
@@ -2495,7 +2522,7 @@ function NewsResearchPanel({
             type="button"
             onClick={() => void fetchNews()}
             disabled={busy || !isValidSymbol}
-            className="rounded-xl bg-sky-500/20 px-4 py-2 text-sm font-semibold text-sky-100 transition-colors hover:bg-sky-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl bg-[color-mix(in_srgb,var(--theme-accent-secondary)_20%,transparent)] px-4 py-2 text-sm font-semibold text-[var(--theme-accent-secondary)] transition-colors hover:bg-[color-mix(in_srgb,var(--theme-accent-secondary)_30%,transparent)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? 'Fetching…' : 'Fetch news'}
           </button>
@@ -2510,7 +2537,7 @@ function NewsResearchPanel({
       </p>
       {error && (
         <p
-          className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-100"
+          className="mt-3 rounded-xl border border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-3 py-2 text-sm text-[var(--theme-danger)]"
           role="alert"
         >
           {error}
@@ -2518,7 +2545,7 @@ function NewsResearchPanel({
       )}
       {result && (
         <p
-          className="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100"
+          className="mt-3 rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] px-3 py-2 text-sm text-[var(--theme-success)]"
           role="status"
         >
           Research refreshed for {symbol}: fetched {result.fetched}, stored{' '}
@@ -2527,7 +2554,7 @@ function NewsResearchPanel({
       )}
       <div className="mt-4 space-y-2" aria-live="polite">
         {newsItems.length === 0 ? (
-          <p className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3 text-sm text-[var(--theme-muted)]">
+          <p className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3 text-sm text-[var(--theme-muted)]">
             No normalized news items stored for {symbol}. Fetch research to
             refresh this list.
           </p>
@@ -2535,7 +2562,7 @@ function NewsResearchPanel({
           newsItems.map((item) => (
             <article
               key={item.id}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
               <p className="text-sm leading-5 text-[var(--theme-text)]">
                 {item.summary}
@@ -2550,7 +2577,7 @@ function NewsResearchPanel({
                     href={item.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sky-200 underline underline-offset-2 hover:text-sky-100"
+                    className="text-[var(--theme-accent-secondary)] underline underline-offset-2 hover:text-[var(--theme-accent-secondary)]"
                   >
                     Open publisher
                   </a>
@@ -2607,24 +2634,27 @@ function IntelligenceSummaryPanel({
   const composite = intelligence?.composite
   return (
     <section
-      className="mt-6 rounded-3xl border border-violet-400/25 bg-[var(--theme-panel)]/70 p-5"
+      className="mt-6 rounded-3xl border border-[color-mix(in_srgb,var(--theme-accent)_25%,transparent)] bg-[var(--theme-panel)]/70 p-5"
       aria-label="Intelligence summary"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-200/80">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color-mix(in_srgb,var(--theme-accent)_80%,transparent)]">
             Research only
           </p>
           <h2 className="mt-1 text-lg font-semibold">Intelligence Summary</h2>
           <p className="mt-1 text-sm text-[var(--theme-muted)]">
-            Derived from stored news. It does not create plans, orders, or executions.
+            Derived from stored news. It does not create plans, orders, or
+            executions.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <select
             value={symbol}
-            onChange={(event) => setSymbol(normalizeBinanceSymbol(event.target.value))}
-            className="rounded-xl border border-[var(--theme-border)] bg-black/10 px-3 py-2 text-sm text-[var(--theme-text)]"
+            onChange={(event) =>
+              setSymbol(normalizeBinanceSymbol(event.target.value))
+            }
+            className="rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-2 text-sm text-[var(--theme-text)]"
             aria-label="Intelligence symbol"
           >
             {DEFAULT_NEWS_SYMBOLS.map((option) => (
@@ -2637,23 +2667,44 @@ function IntelligenceSummaryPanel({
             type="button"
             onClick={() => void refresh()}
             disabled={busy}
-            className="rounded-xl bg-violet-500/20 px-4 py-2 text-sm font-semibold text-violet-100 transition-colors hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl bg-[color-mix(in_srgb,var(--theme-accent)_20%,transparent)] px-4 py-2 text-sm font-semibold text-[var(--theme-accent)] transition-colors hover:bg-[color-mix(in_srgb,var(--theme-accent)_30%,transparent)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
       </div>
-      {error && <p className="mt-3 text-sm text-red-200" role="alert">{error}</p>}
+      {error && (
+        <p className="mt-3 text-sm text-[var(--theme-danger)]" role="alert">
+          {error}
+        </p>
+      )}
       {composite ? (
         <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
-          <p>Sentiment: <strong>{composite.label}</strong> ({composite.score ?? 'unavailable'})</p>
-          <p>Confidence: <strong>{Math.round(composite.confidence * 100)}%</strong></p>
-          <p>Freshness: <strong>{Math.round(composite.freshness * 100)}%</strong></p>
-          <p>Research risk: <strong>{intelligence.stored.risk.riskLevel}</strong></p>
-          <p className="sm:col-span-2">Evidence: {composite.sourceIds.length} stored source{composite.sourceIds.length === 1 ? '' : 's'}</p>
-          <p className="sm:col-span-2">Updated: {formatDateTime(composite.observedAt)}</p>
+          <p>
+            Sentiment: <strong>{composite.label}</strong> (
+            {composite.score ?? 'unavailable'})
+          </p>
+          <p>
+            Confidence:{' '}
+            <strong>{Math.round(composite.confidence * 100)}%</strong>
+          </p>
+          <p>
+            Freshness: <strong>{Math.round(composite.freshness * 100)}%</strong>
+          </p>
+          <p>
+            Research risk: <strong>{intelligence.stored.risk.riskLevel}</strong>
+          </p>
+          <p className="sm:col-span-2">
+            Evidence: {composite.sourceIds.length} stored source
+            {composite.sourceIds.length === 1 ? '' : 's'}
+          </p>
+          <p className="sm:col-span-2">
+            Updated: {formatDateTime(composite.observedAt)}
+          </p>
           {composite.blockers.length > 0 && (
-            <p className="sm:col-span-2 text-amber-100">Caution: {composite.blockers.join('; ')}.</p>
+            <p className="sm:col-span-2 text-[var(--theme-warning)]">
+              Caution: {composite.blockers.join('; ')}.
+            </p>
           )}
         </div>
       ) : (
@@ -2718,7 +2769,7 @@ export function TradingScreen() {
 
   if (error || !payload || !summary) {
     return (
-      <main className="min-h-dvh bg-[var(--theme-bg)] p-6 text-red-200">
+      <main className="min-h-dvh bg-[var(--theme-bg)] p-6 text-[var(--theme-danger)]">
         <h1 className="text-2xl font-semibold">Trading unavailable</h1>
         <p className="mt-2 text-sm">{error ?? 'No payload returned.'}</p>
       </main>
@@ -2730,7 +2781,7 @@ export function TradingScreen() {
       <section className="rounded-[2rem] border border-[var(--theme-border)] bg-gradient-to-br from-[var(--theme-panel)] via-[var(--theme-panel)] to-emerald-950/20 p-6 shadow-xl">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-emerald-200/80">
+            <p className="text-xs uppercase tracking-[0.28em] text-[color-mix(in_srgb,var(--theme-success)_80%,transparent)]">
               Hermes Trading
             </p>
             <h1 className="mt-2 text-3xl font-semibold md:text-4xl">
@@ -2742,7 +2793,7 @@ export function TradingScreen() {
               learning.
             </p>
           </div>
-          <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+          <div className="rounded-2xl border border-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] px-4 py-3 text-sm text-[var(--theme-success)]">
             Mode: <strong>{summary.tradingMode}</strong>
             <br />
             Account: <strong>{summary.executionAccount}</strong>
@@ -2756,15 +2807,17 @@ export function TradingScreen() {
       </section>
 
       <TradingSummaryStrip />
-          <LivePriceTicker
+      <LivePriceTicker
         symbols={
           Array.isArray(
-            (payload.settings.demoTrading as Record<string, unknown> | undefined)
-              ?.symbols,
+            (
+              payload.settings.demoTrading as
+                | Record<string, unknown>
+                | undefined
+            )?.symbols,
           )
-            ? ((
-                payload.settings.demoTrading as Record<string, unknown>
-              ).symbols as Array<string>)
+            ? ((payload.settings.demoTrading as Record<string, unknown>)
+                .symbols as Array<string>)
             : []
         }
       />
@@ -2814,7 +2867,6 @@ export function TradingScreen() {
         />
       </section>
 
-
       <TradingControls summary={summary} onPayload={setPayload} />
 
       <PerformancePanel perf={payload.demoPerformance} />
@@ -2843,7 +2895,9 @@ export function TradingScreen() {
 
       <SignalSettingsPanel
         demoTrading={
-          (payload.settings.demoTrading as Record<string, unknown> | undefined) ?? {}
+          (payload.settings.demoTrading as
+            | Record<string, unknown>
+            | undefined) ?? {}
         }
         onPayload={setPayload}
       />
@@ -2855,7 +2909,7 @@ export function TradingScreen() {
             {modules.map((item) => (
               <div
                 key={item}
-                className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3 text-sm text-[var(--theme-muted)]"
+                className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3 text-sm text-[var(--theme-muted)]"
               >
                 {item}
               </div>
@@ -2868,7 +2922,7 @@ export function TradingScreen() {
             {payload.alerts.map((alert) => (
               <div
                 key={`${alert.title}-${alert.detail}`}
-                className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3"
+                className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
               >
                 <div className="text-sm font-medium">{alert.title}</div>
                 <div className="text-xs text-[var(--theme-muted)]">
@@ -2891,7 +2945,7 @@ export function TradingScreen() {
           {phases.map((phase) => (
             <li
               key={phase}
-              className="rounded-2xl border border-[var(--theme-border)]/70 bg-black/10 p-3 text-sm text-[var(--theme-muted)]"
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3 text-sm text-[var(--theme-muted)]"
             >
               {phase}
             </li>
@@ -2912,8 +2966,8 @@ export function TradingScreen() {
         </p>
         {payload.storage.health &&
           payload.storage.health.warnings.length > 0 && (
-            <div className="mt-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3 text-amber-100">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-200">
+            <div className="mt-3 rounded-2xl border border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] p-3 text-[var(--theme-warning)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-warning)]">
                 Storage mirror warning
               </div>
               <div className="mt-1 space-y-1">
@@ -2921,13 +2975,13 @@ export function TradingScreen() {
                   <p key={warning}>{warning}</p>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-amber-200/80">
+              <p className="mt-2 text-xs text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)]">
                 JSON updated:{' '}
                 {payload.storage.health.jsonUpdatedAt ?? 'unknown'} · Postgres
                 updated: {payload.storage.health.postgresUpdatedAt ?? 'unknown'}
               </p>
               {payload.storage.health.selfHeal.attempted && (
-                <p className="mt-1 text-xs text-amber-200/80">
+                <p className="mt-1 text-xs text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)]">
                   Self-heal:{' '}
                   {payload.storage.health.selfHeal.succeeded
                     ? 'resolved'

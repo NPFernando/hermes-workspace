@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { StatCard } from '../../finance/components/stat-card'
+import { formatUsdt } from '../format-helpers'
 
 type TradingEngineArmState = 'live' | 'paper' | 'gated' | 'disabled'
 
@@ -20,10 +21,6 @@ type TradingSummary = {
   engines: Array<TradingEngineStatus>
 }
 
-function formatUsdt(value: number): string {
-  return `${value < 0 ? '−' : ''}${Math.abs(value).toFixed(2)} USDT`
-}
-
 function pnlTone(value: number): 'good' | 'warn' | 'neutral' {
   if (value > 0) return 'good'
   if (value < 0) return 'warn'
@@ -31,10 +28,11 @@ function pnlTone(value: number): 'good' | 'warn' | 'neutral' {
 }
 
 const CHIP_STYLE: Record<TradingEngineArmState, string> = {
-  live: 'border-red-400/40 bg-red-500/15 text-red-100',
-  paper: 'border-amber-400/30 bg-amber-500/10 text-amber-100',
-  gated: 'border-[var(--theme-border)] bg-black/10 text-[var(--theme-muted)]',
-  disabled: 'border-[var(--theme-border)] bg-black/5 text-[var(--theme-muted)]/60',
+  live: 'border-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] text-[var(--theme-danger)]',
+  paper: 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]',
+  gated: 'border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]',
+  disabled:
+    'border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_4%,transparent)] text-[var(--theme-muted)]/60',
 }
 
 export function TradingSummaryStrip() {
@@ -47,15 +45,24 @@ export function TradingSummaryStrip() {
       try {
         const res = await fetch('/api/trading/summary', { cache: 'no-store' })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = (await res.json()) as { ok: boolean; summary?: TradingSummary; error?: string }
-        if (!data.ok || !data.summary) throw new Error(data.error || 'Trading summary unavailable')
+        const data = (await res.json()) as {
+          ok: boolean
+          summary?: TradingSummary
+          error?: string
+        }
+        if (!data.ok || !data.summary)
+          throw new Error(data.error || 'Trading summary unavailable')
         if (!cancelled) {
           setSummary(data.summary)
           setError(null)
         }
       } catch (nextError) {
         if (!cancelled) {
-          setError(nextError instanceof Error ? nextError.message : 'Trading summary unavailable')
+          setError(
+            nextError instanceof Error
+              ? nextError.message
+              : 'Trading summary unavailable',
+          )
         }
       }
     }
@@ -69,7 +76,7 @@ export function TradingSummaryStrip() {
 
   if (error) {
     return (
-      <section className="mt-6 rounded-3xl border border-red-400/25 bg-red-500/10 p-4 text-sm text-red-200">
+      <section className="mt-6 rounded-3xl border border-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] p-4 text-sm text-[var(--theme-danger)]">
         Trading summary unavailable: {error}
       </section>
     )
@@ -85,12 +92,27 @@ export function TradingSummaryStrip() {
   return (
     <section className="mt-6">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="Today's P&L" value={formatUsdt(summary.todayPnlQuote)} tone={pnlTone(summary.todayPnlQuote)} />
-        <StatCard label="Total P&L" value={formatUsdt(summary.totalPnlQuote)} tone={pnlTone(summary.totalPnlQuote)} />
-        <StatCard label="Open positions" value={String(summary.openPositions)} />
+        <StatCard
+          label="Today's P&L"
+          value={formatUsdt(summary.todayPnlQuote)}
+          tone={pnlTone(summary.todayPnlQuote)}
+        />
+        <StatCard
+          label="Total P&L"
+          value={formatUsdt(summary.totalPnlQuote)}
+          tone={pnlTone(summary.totalPnlQuote)}
+        />
+        <StatCard
+          label="Open positions"
+          value={String(summary.openPositions)}
+        />
         <StatCard
           label="Win rate"
-          value={summary.winRate === null ? '—' : `${(summary.winRate * 100).toFixed(1)}%`}
+          value={
+            summary.winRate === null
+              ? '—'
+              : `${(summary.winRate * 100).toFixed(1)}%`
+          }
         />
       </div>
       <div className="mt-3 flex flex-wrap gap-2">

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import { MiniStat } from './components/mini-stat'
+import { formatSignedAmount } from './format-helpers'
 
 interface GridLevelState {
   held: boolean
@@ -40,36 +42,12 @@ interface GridState {
   performance: GridPerformance
 }
 
-const money = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}`
+const money = formatSignedAmount
 
-function MiniStat({
-  label,
-  value,
-  tone = 'neutral',
-}: {
+function symbolStatus(s: GridSymbolState): {
   label: string
-  value: string
-  tone?: 'neutral' | 'good' | 'bad'
-}) {
-  const cls =
-    tone === 'good'
-      ? 'text-emerald-400'
-      : tone === 'bad'
-        ? 'text-red-400'
-        : 'text-[var(--theme-text)]'
-  return (
-    <div className="rounded-xl border border-[var(--theme-border)]/60 bg-black/10 p-2.5">
-      <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-        {label}
-      </div>
-      <div className={`mt-1 text-sm font-semibold tabular-nums ${cls}`}>
-        {value}
-      </div>
-    </div>
-  )
-}
-
-function symbolStatus(s: GridSymbolState): { label: string; tone: 'good' | 'bad' | 'neutral' } {
+  tone: 'good' | 'bad' | 'neutral'
+} {
   if (s.halted) return { label: 'Halted', tone: 'bad' }
   if (s.pausedForChop) return { label: 'Paused (choppy)', tone: 'neutral' }
   if (s.armed) return { label: 'Armed', tone: 'good' }
@@ -107,7 +85,8 @@ export function GridTradingPanel() {
       })
       const data = await res.json()
       if (!data.ok) setNote(data.error || 'Cycle failed')
-      else if (!data.result?.ran) setNote(`Idle: ${data.result?.reason ?? 'busy'}`)
+      else if (!data.result?.ran)
+        setNote(`Idle: ${data.result?.reason ?? 'busy'}`)
       else {
         const count = data.result.trades?.length ?? 0
         setNote(count ? `${count} grid fill(s) this cycle` : 'Ran — no fills')
@@ -140,7 +119,7 @@ export function GridTradingPanel() {
           type="button"
           onClick={runCycle}
           disabled={running}
-          className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-50"
+          className="rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] px-4 py-2 text-sm font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] disabled:opacity-50"
         >
           {running ? 'Running…' : 'Run one cycle'}
         </button>
@@ -148,10 +127,17 @@ export function GridTradingPanel() {
       {note && <p className="mt-2 text-xs text-[var(--theme-muted)]">{note}</p>}
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MiniStat label="Closed trades" value={perf ? String(perf.totalTrades) : '—'} />
+        <MiniStat
+          label="Closed trades"
+          value={perf ? String(perf.totalTrades) : '—'}
+        />
         <MiniStat
           label="Win rate"
-          value={perf && perf.totalTrades > 0 ? `${(perf.winRate * 100).toFixed(0)}%` : '—'}
+          value={
+            perf && perf.totalTrades > 0
+              ? `${(perf.winRate * 100).toFixed(0)}%`
+              : '—'
+          }
         />
         <MiniStat
           label="Net P/L"
@@ -183,12 +169,15 @@ export function GridTradingPanel() {
               const held = s.levels.filter((l) => l.held).length
               const tone =
                 status.tone === 'good'
-                  ? 'text-emerald-400'
+                  ? 'text-[var(--theme-success)]'
                   : status.tone === 'bad'
-                    ? 'text-red-400'
+                    ? 'text-[var(--theme-danger)]'
                     : 'text-[var(--theme-muted)]'
               return (
-                <tr key={s.symbol} className="border-t border-[var(--theme-border)]/40">
+                <tr
+                  key={s.symbol}
+                  className="border-t border-[var(--theme-border)]/40"
+                >
                   <td className="py-1.5 pr-4 font-medium text-[var(--theme-text)]">
                     {s.symbol}
                   </td>
@@ -227,11 +216,16 @@ export function GridTradingPanel() {
           </thead>
           <tbody>
             {recentTrades.slice(0, 10).map((t) => (
-              <tr key={t.id} className="border-t border-[var(--theme-border)]/40">
-                <td className="py-1.5 pr-4 text-[var(--theme-text)]">{t.symbol}</td>
+              <tr
+                key={t.id}
+                className="border-t border-[var(--theme-border)]/40"
+              >
+                <td className="py-1.5 pr-4 text-[var(--theme-text)]">
+                  {t.symbol}
+                </td>
                 <td
                   className={`py-1.5 pr-4 tabular-nums ${
-                    t.pnlQuote >= 0 ? 'text-emerald-400' : 'text-red-400'
+                    t.pnlQuote >= 0 ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'
                   }`}
                 >
                   {money(t.pnlQuote)} USDT
