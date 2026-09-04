@@ -103,28 +103,28 @@ function ContextBarComponent({
   const isWarning = clampedPct >= 50 && clampedPct < 75
 
   const barColor = isCritical
-    ? 'bg-red-500'
+    ? 'bg-[var(--theme-danger)]'
     : isDanger
-      ? 'bg-orange-500'
+      ? 'bg-[var(--theme-warning)]'
       : isWarning
         ? 'bg-yellow-400'
-        : 'bg-emerald-500'
+        : 'bg-[var(--theme-success)]'
 
   const barBg = isCritical
-    ? 'bg-red-100'
+    ? 'bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)]'
     : isDanger
-      ? 'bg-orange-100'
+      ? 'bg-[color-mix(in_srgb,var(--theme-warning)_15%,transparent)]'
       : isWarning
         ? 'bg-yellow-100'
-        : 'bg-emerald-100'
+        : 'bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)]'
 
   const textColor = isCritical
-    ? 'text-red-600'
+    ? 'text-[var(--theme-danger)]'
     : isDanger
-      ? 'text-orange-600'
+      ? 'text-[var(--theme-warning)]'
       : isWarning
         ? 'text-yellow-600'
-        : 'text-emerald-600'
+        : 'text-[var(--theme-success)]'
 
   if (isMobile) {
     return (
@@ -221,7 +221,7 @@ function ContextBarComponent({
             )}
           </div>
           {isCritical && (
-            <p className="text-[10px] text-red-600 font-medium">
+            <p className="text-[10px] text-[var(--theme-danger)] font-medium">
               Context almost full — consider starting a new chat
             </p>
           )}

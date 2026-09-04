@@ -148,7 +148,10 @@ function SessionItemComponent({
     const parts: Array<string> = []
     const formatted = formatSessionTimestamp(updatedAt)
     if (formatted) parts.push(formatted)
-    if (session.friendlyId && shouldShowFriendlyId(baseTitle, session.friendlyId)) {
+    if (
+      session.friendlyId &&
+      shouldShowFriendlyId(baseTitle, session.friendlyId)
+    ) {
       parts.push(getFriendlyIdLabel(session.friendlyId))
     }
     return parts.join(' • ')
@@ -187,7 +190,7 @@ function SessionItemComponent({
         <div
           className={cn(
             'mt-0.5 text-[11px] text-[var(--theme-muted)] truncate',
-            isError ? 'text-red-600' : undefined,
+            isError ? 'text-[var(--theme-danger)]' : undefined,
           )}
         >
           {subtitle}
@@ -242,7 +245,7 @@ function SessionItemComponent({
               event.stopPropagation()
               onDelete(session)
             }}
-            className="text-red-700 gap-2 hover:bg-red-50 dark:hover:bg-red-900/30/80 data-highlighted:bg-red-50/80"
+            className="text-[var(--theme-danger)] gap-2 hover:bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] data-highlighted:bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)]"
           >
             <HugeiconsIcon icon={Delete01Icon} size={20} strokeWidth={1.5} />{' '}
             Delete

@@ -93,8 +93,6 @@ type ChatComposerProps = {
   composerRef?: Ref<ChatComposerHandle>
   focusKey?: string
   onNewSession?: () => void
-  onToggleWebSearch?: (enabled: boolean) => void
-  webSearchEnabled?: boolean
   /** Current thinking level for this session */
   thinkingLevel?: ThinkingLevel
   /** Called when user changes thinking level */
@@ -177,13 +175,6 @@ type ModelInfoApiResponse = {
   gatewayMode?: string | null
   supportsRuntimeSwitching?: boolean | null
   vanillaAgent?: boolean | null
-}
-
-type ModelSwitchNotice = {
-  tone: 'success' | 'error'
-  message: string
-  retryModel?: string
-  retryProvider?: string
 }
 
 // Models are fetched through the workspace API proxy (/api/models, /api/claude-proxy)
@@ -902,8 +893,6 @@ function ChatComposerComponent({
   composerRef,
   focusKey,
   onNewSession,
-  onToggleWebSearch: _onToggleWebSearch,
-  webSearchEnabled,
   thinkingLevel: externalThinkingLevel,
   onThinkingLevelChange,
   onAbort,
@@ -961,10 +950,9 @@ function ChatComposerComponent({
     modelSelectorRef,
     thinkingMenuRef,
     controlsMenuRef,
+    workspaceMenuRef,
   } = useComposerMenus()
-  const [isWebSearchMode, _setIsWebSearchMode] = useState(false)
   const [isSlashMenuDismissed, setIsSlashMenuDismissed] = useState(false)
-  const [modelNotice, setModelNotice] = useState<ModelSwitchNotice | null>(null)
   const [fastMode, setFastMode] = useState(false)
   // Per-session thinking level — controlled externally (chat-screen owns the state)
   // Falls back to internal state if no external controller provided
@@ -1171,7 +1159,6 @@ function ChatComposerComponent({
         setIsModelMenuOpen(false)
         return
       }
-      setModelNotice(null)
       const resolved = getResolvedModelKey(model, provider)
       // Per-session, browser-local persistence. No global config write —
       // picking a model here only affects this chat. The actual model is
@@ -1780,8 +1767,6 @@ function ChatComposerComponent({
     reset()
   }, [reset])
 
-  const _isWebSearchActive = webSearchEnabled ?? isWebSearchMode
-  void _isWebSearchActive // retained for future use / external prop
 
   const sttConfig =
     (sttConfigQuery.data?.config?.stt as Record<string, unknown> | undefined) ||
@@ -2351,7 +2336,7 @@ function ChatComposerComponent({
                     type="button"
                     onClick={handleAbort}
                     aria-label="Stop generation"
-                    className="size-9 rounded-full bg-red-500 flex items-center justify-center text-white transition-all duration-150"
+                    className="size-9 rounded-full bg-[var(--theme-danger)] flex items-center justify-center text-white transition-all duration-150"
                   >
                     <HugeiconsIcon icon={StopIcon} size={18} strokeWidth={2} />
                   </button>
@@ -2399,11 +2384,11 @@ function ChatComposerComponent({
                     className={cn(
                       'size-9 rounded-full flex items-center justify-center relative transition-all duration-150 select-none',
                       voiceRecorder.isRecording
-                        ? 'text-red-600 bg-red-100 animate-pulse'
+                        ? 'text-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] animate-pulse'
                         : voiceInput.state === 'processing'
-                          ? 'text-amber-500 bg-amber-50 animate-pulse'
+                          ? 'text-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] animate-pulse'
                           : voiceInput.isListening
-                            ? 'text-red-500 bg-red-50 animate-pulse'
+                            ? 'text-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] animate-pulse'
                             : 'text-[var(--theme-muted)] bg-[var(--theme-card)]',
                     )}
                   >
@@ -2414,13 +2399,13 @@ function ChatComposerComponent({
                     />
                     {voiceRecorder.isRecording ? (
                       <span className="absolute -top-1 -right-1 flex size-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                        <span className="relative inline-flex size-3 rounded-full bg-red-500" />
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--theme-danger)] opacity-75" />
+                        <span className="relative inline-flex size-3 rounded-full bg-[var(--theme-danger)]" />
                       </span>
                     ) : voiceInput.state === 'processing' ? (
                       <span className="absolute -top-1 -right-1 flex size-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                        <span className="relative inline-flex size-3 rounded-full bg-amber-500" />
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--theme-warning)] opacity-75" />
+                        <span className="relative inline-flex size-3 rounded-full bg-[var(--theme-warning)]" />
                       </span>
                     ) : null}
                   </button>
@@ -2475,7 +2460,7 @@ function ChatComposerComponent({
                           }}
                           className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <span className="rounded-lg bg-orange-100 dark:bg-orange-900/30 p-1.5 text-orange-600 dark:text-orange-400">
+                          <span className="rounded-lg bg-[color-mix(in_srgb,var(--theme-warning)_12%,transparent)] dark:bg-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] p-1.5 text-[var(--theme-warning)]">
                             <HugeiconsIcon
                               icon={AttachmentIcon}
                               size={24}
@@ -2507,7 +2492,7 @@ function ChatComposerComponent({
                               voiceInput.isListening ||
                                 voiceRecorder.isRecording ||
                                 voiceInput.state === 'processing'
-                                ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800'
+                                ? 'bg-[color-mix(in_srgb,var(--theme-danger)_12%,transparent)] dark:bg-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] border-[var(--theme-danger)]'
                                 : 'bg-[var(--theme-card)]',
                             )}
                           >
@@ -2516,9 +2501,9 @@ function ChatComposerComponent({
                                 'rounded-lg p-1.5',
                                 voiceInput.isListening ||
                                   voiceRecorder.isRecording
-                                  ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                                  ? 'bg-[color-mix(in_srgb,var(--theme-danger)_12%,transparent)] dark:bg-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] text-[var(--theme-danger)]'
                                   : voiceInput.state === 'processing'
-                                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                                    ? 'bg-[color-mix(in_srgb,var(--theme-warning)_12%,transparent)] dark:bg-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] text-[var(--theme-warning)]'
                                     : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
                               )}
                             >
@@ -2553,7 +2538,7 @@ function ChatComposerComponent({
                           }}
                           className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <span className="rounded-lg bg-indigo-100 dark:bg-indigo-900/30 p-1.5 text-indigo-600 dark:text-indigo-400">
+                          <span className="rounded-lg bg-[color-mix(in_srgb,var(--theme-accent-secondary)_12%,transparent)] dark:bg-[color-mix(in_srgb,var(--theme-accent-secondary)_30%,transparent)] p-1.5 text-[var(--theme-accent-secondary)]">
                             <HugeiconsIcon
                               icon={ArrowDown01Icon}
                               size={24}
@@ -2574,7 +2559,7 @@ function ChatComposerComponent({
                             }}
                             className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 flex flex-col items-start gap-2 text-left"
                           >
-                            <span className="rounded-lg bg-red-100 dark:bg-red-900/30 p-1.5 text-red-600 dark:text-red-400">
+                            <span className="rounded-lg bg-[color-mix(in_srgb,var(--theme-danger)_12%,transparent)] dark:bg-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] p-1.5 text-[var(--theme-danger)]">
                               <HugeiconsIcon
                                 icon={Delete01Icon}
                                 size={24}
@@ -2888,7 +2873,7 @@ function ChatComposerComponent({
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      className="rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-red-600"
+                      className="rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-danger)]"
                       aria-label="Clear draft"
                       onClick={handleClearDraft}
                     >
@@ -2920,7 +2905,7 @@ function ChatComposerComponent({
                         setIsThinkingMenuOpen(false)
                         setIsModelMenuOpen(false)
                       }}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/90"
                       title={`Chat controls · ${modelButtonLabel}`}
                       aria-label={`Chat controls, current model: ${modelButtonLabel}`}
                     >
@@ -3060,7 +3045,7 @@ function ChatComposerComponent({
                                   },
                                 )}
                                 {profilesQuery.isError ? (
-                                  <div className="px-3 py-2 text-xs text-red-500">
+                                  <div className="px-3 py-2 text-xs text-[var(--theme-danger)]">
                                     Failed to load profiles
                                   </div>
                                 ) : null}
@@ -3080,7 +3065,7 @@ function ChatComposerComponent({
                                 setIsModelMenuOpen(false)
                               }}
                               className={cn(
-                                'inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60',
+                                'inline-flex h-8 items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/90',
                                 thinkingLevel === 'off' && 'opacity-70',
                               )}
                               title={`Reasoning effort: ${thinkingLabel(thinkingLevel)}`}
@@ -3128,7 +3113,7 @@ function ChatComposerComponent({
                                   >
                                     <span>{label}</span>
                                     {thinkingLevel === level ? (
-                                      <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
+                                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--theme-accent)]" />
                                     ) : null}
                                   </button>
                                 ))}
@@ -3136,13 +3121,16 @@ function ChatComposerComponent({
                             )}
                           </div>
 
-                          <div className="relative flex min-w-0 items-center">
+                          <div
+                            ref={workspaceMenuRef}
+                            className="relative flex min-w-0 items-center"
+                          >
                             <button
                               type="button"
                               onClick={() =>
                                 setIsWorkspaceMenuOpen((open) => !open)
                               }
-                              className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/80/60"
+                              className="inline-flex h-8 max-w-[8rem] items-center gap-1.5 rounded-full bg-[var(--theme-hover)]/70 px-2.5 text-xs font-medium text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]/90"
                               title={workspaceButtonLabel}
                             >
                               <span className="truncate">
@@ -3200,7 +3188,7 @@ function ChatComposerComponent({
                                 setIsThinkingMenuOpen(false)
                               }}
                               disabled={isModelSwitcherDisabled}
-                              className="inline-flex h-8 max-w-[9rem] items-center rounded-full bg-[var(--theme-hover)]/70 px-2 md:max-w-none md:px-3 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]/80/60 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex h-8 max-w-[9rem] items-center rounded-full bg-[var(--theme-hover)]/70 px-2 md:max-w-none md:px-3 text-xs font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]/90 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                               title={modelButtonLabel}
                             >
                               <span className="max-w-[5.5rem] truncate sm:max-w-[8.5rem] md:max-w-[12rem]">
@@ -3435,11 +3423,11 @@ function ChatComposerComponent({
                       className={cn(
                         'rounded-lg transition-colors select-none',
                         voiceRecorder.isRecording
-                          ? 'text-red-600 bg-red-100 hover:bg-red-200 animate-pulse'
+                          ? 'text-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_20%,transparent)] animate-pulse'
                           : voiceInput.state === 'processing'
-                            ? 'text-amber-500 bg-amber-50 hover:bg-amber-100 animate-pulse'
+                            ? 'text-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--theme-warning)_15%,transparent)] animate-pulse'
                             : voiceInput.isListening
-                              ? 'text-red-500 bg-red-50 hover:bg-red-100 animate-pulse'
+                              ? 'text-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] animate-pulse'
                               : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)]',
                       )}
                       aria-label={
@@ -3460,13 +3448,13 @@ function ChatComposerComponent({
                       />
                       {voiceRecorder.isRecording ? (
                         <span className="absolute -top-1 -right-1 flex size-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                          <span className="relative inline-flex size-3 rounded-full bg-red-500" />
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--theme-danger)] opacity-75" />
+                          <span className="relative inline-flex size-3 rounded-full bg-[var(--theme-danger)]" />
                         </span>
                       ) : voiceInput.state === 'processing' ? (
                         <span className="absolute -top-1 -right-1 flex size-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                          <span className="relative inline-flex size-3 rounded-full bg-amber-500" />
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--theme-warning)] opacity-75" />
+                          <span className="relative inline-flex size-3 rounded-full bg-[var(--theme-warning)]" />
                         </span>
                       ) : null}
                     </Button>

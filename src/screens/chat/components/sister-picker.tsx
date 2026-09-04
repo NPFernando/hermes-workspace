@@ -34,7 +34,9 @@ export function dedupeSistersForPicker(
 ): Array<SisterOption> {
   const aiSisterNames = new Set(
     sisters
-      .filter((s) => s.type !== 'delegation_profile' && s.type !== 'business_agent')
+      .filter(
+        (s) => s.type !== 'delegation_profile' && s.type !== 'business_agent',
+      )
       .map((s) => s.name.toLowerCase()),
   )
   return sisters.filter(
@@ -65,19 +67,25 @@ export function SisterPicker({
 
   return (
     <div className="flex items-center gap-1 px-2 py-1 flex-wrap">
-      <span className="text-xs text-muted-foreground mr-1 shrink-0">Agent:</span>
+      <span className="text-xs text-muted-foreground mr-1 shrink-0">
+        Agent:
+      </span>
       {orchestrating && !orchestratingSisterIds?.length && (
-        <span className="text-xs text-muted-foreground animate-pulse mr-1">🌟 Astra orchestrating…</span>
+        <span className="text-xs text-muted-foreground animate-pulse mr-1">
+          🌟 Astra orchestrating…
+        </span>
       )}
       {visibleSisters.map((s) => {
         const isManual = selectedId === s.id
         const isAuto = !isManual && autoSelectedId === s.id
-        const isOrchestrating = orchestrating && orchestratingSisterIds?.includes(s.id)
+        const isOrchestrating =
+          orchestrating && orchestratingSisterIds?.includes(s.id)
         // Delegation profiles can share a display name with an AI sister
         // (e.g. the "researcher" profile is also named Luna) — surface the
         // profile role so the two pills are distinguishable.
         const isProfile = s.type === 'delegation_profile'
-        const fullName = isProfile && s.role ? `${s.name} (${s.role} profile)` : s.name
+        const fullName =
+          isProfile && s.role ? `${s.name} (${s.role} profile)` : s.name
         return (
           <button
             key={s.id}
@@ -92,10 +100,17 @@ export function SisterPicker({
             onClick={() => onSelect(selectedId === s.id ? null : s.id)}
             className={cn(
               'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors border',
-              isManual && 'bg-primary/10 border-primary/30 text-primary font-medium',
-              isOrchestrating && 'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 animate-pulse',
-              isAuto && !isOrchestrating && 'bg-muted border-dashed border-muted-foreground/40 text-foreground',
-              !isManual && !isAuto && !isOrchestrating && 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted hover:border-border',
+              isManual &&
+                'bg-primary/10 border-primary/30 text-primary font-medium',
+              isOrchestrating &&
+                'bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] text-[var(--theme-warning)] dark:text-[var(--theme-warning)] animate-pulse',
+              isAuto &&
+                !isOrchestrating &&
+                'bg-muted border-dashed border-muted-foreground/40 text-foreground',
+              !isManual &&
+                !isAuto &&
+                !isOrchestrating &&
+                'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted hover:border-border',
             )}
           >
             <span>{s.emoji}</span>
@@ -103,8 +118,12 @@ export function SisterPicker({
             {isProfile && s.role && (
               <span className="text-[9px] opacity-60">· {s.role}</span>
             )}
-            {isAuto && !isOrchestrating && <span className="text-[9px] opacity-60 ml-0.5">auto</span>}
-            {isOrchestrating && <span className="text-[9px] opacity-70 ml-0.5">✦</span>}
+            {isAuto && !isOrchestrating && (
+              <span className="text-[9px] opacity-60 ml-0.5">auto</span>
+            )}
+            {isOrchestrating && (
+              <span className="text-[9px] opacity-70 ml-0.5">✦</span>
+            )}
           </button>
         )
       })}

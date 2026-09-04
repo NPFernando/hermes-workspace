@@ -1,5 +1,3 @@
-// Module-level local model override — set by composer when user picks a local model
-// Avoids prop threading. Reset when switching back to cloud models.
 import {
   useCallback,
   useEffect,
@@ -18,12 +16,11 @@ import {
   textFromMessage,
 } from './utils'
 import {
-  
   advanceStickyStreamingText,
   createOptimisticMessage,
   createResponseWaitSnapshot,
   isTerminalActiveRunStatus,
-  shouldClearWaitingForAssistantMessage
+  shouldClearWaitingForAssistantMessage,
 } from './chat-screen-utils'
 import {
   appendHistoryMessage,
@@ -34,6 +31,7 @@ import {
   updateHistoryMessageByClientIdEverywhere,
   updateSessionLastMessage,
 } from './chat-queries'
+import { _localModelOverride } from './local-model-override'
 import { ChatHeader } from './components/chat-header'
 import { ChatMessageList } from './components/chat-message-list'
 import { ChatEmptyState } from './components/chat-empty-state'
@@ -69,16 +67,13 @@ import {
   CHAT_SUBMIT_SELECTION_EVENT,
 } from './chat-events'
 import { ArtifactPanel } from './components/artifact-panel'
-import {
-  ArtifactPanelContext
-  
-} from './contexts/artifact-panel-context'
+import { ArtifactPanelContext } from './contexts/artifact-panel-context'
 import type { SisterOption } from './components/sister-picker'
 import type {
   ChatRunCommandDetail,
   ChatSubmitSelectionDetail,
 } from './chat-events'
-import type {ResponseWaitSnapshot} from './chat-screen-utils';
+import type { ResponseWaitSnapshot } from './chat-screen-utils'
 import type {
   ChatComposerAttachment,
   ChatComposerHandle,
@@ -87,8 +82,8 @@ import type {
 } from './components/chat-composer'
 import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
-import type {AgentActivity} from '@/stores/chat-activity-store';
-import type {ArtifactPanelState} from './contexts/artifact-panel-context';
+import type { AgentActivity } from '@/stores/chat-activity-store'
+import type { ArtifactPanelState } from './contexts/artifact-panel-context'
 import type { InlineArtifact } from './components/message-item'
 import { createTask } from '@/lib/tasks-api'
 import { classifyMultiple, classifyOne } from '@/lib/sister-routing'
@@ -122,11 +117,8 @@ import { useSessionModelStore } from '@/stores/session-model-store'
 import { setActiveResearch, useResearchCard } from '@/hooks/use-research-card'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useChatMode } from '@/hooks/use-chat-mode'
-import {  useChatActivityStore } from '@/stores/chat-activity-store'
+import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { safeErrorMessage } from '@/lib/error-utils'
-
-export let _localModelOverride = ''
-export function setLocalModelOverride(model: string) { _localModelOverride = model }
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -412,9 +404,7 @@ function getMessageAttachmentSignature(message: ChatMessage): string {
       const size =
         typeof attachment.size === 'number' ? String(attachment.size) : ''
       const type =
-        typeof attachment.contentType === 'string'
-          ? attachment.contentType
-          : ''
+        typeof attachment.contentType === 'string' ? attachment.contentType : ''
       return `${name}:${size}:${type}`
     })
     .sort()
@@ -514,11 +504,16 @@ export function ChatScreen({
     Array<ApprovalRequest>
   >([])
   const [isCompacting, setIsCompacting] = useState(false)
-  const [artifactPanelState, setArtifactPanelState] = useState<ArtifactPanelState | null>(null)
+  const [artifactPanelState, setArtifactPanelState] =
+    useState<ArtifactPanelState | null>(null)
   const [selectedSisterId, setSelectedSisterId] = useState<string | null>(null)
-  const [autoRoutedSisterId, setAutoRoutedSisterId] = useState<string | null>(null)
+  const [autoRoutedSisterId, setAutoRoutedSisterId] = useState<string | null>(
+    null,
+  )
   const [isOrchestrating, setIsOrchestrating] = useState(false)
-  const [orchestratingSisterIds, setOrchestratingSisterIds] = useState<Array<string>>([])
+  const [orchestratingSisterIds, setOrchestratingSisterIds] = useState<
+    Array<string>
+  >([])
   const selectedSisterSystemPromptRef = useRef<string | undefined>(undefined)
   const selectedSisterIdRef = useRef<string | null>(null)
   const sistersQuery = useQuery<{ sisters: Array<SisterOption> }>({
@@ -526,7 +521,10 @@ export function ChatScreen({
     queryFn: async () => {
       const res = await fetch('/api/sisters')
       if (!res.ok) return { sisters: [] }
-      const data = await res.json() as { ok: boolean; sisters: Array<SisterOption> }
+      const data = (await res.json()) as {
+        ok: boolean
+        sisters: Array<SisterOption>
+      }
       return { sisters: data.sisters ?? [] }
     },
     staleTime: 5 * 60 * 1000,
@@ -548,7 +546,13 @@ export function ChatScreen({
     if (typeof window === 'undefined') return 'low'
     const key = `claude-thinking-${activeFriendlyId || 'new'}`
     const stored = window.sessionStorage.getItem(key)
-    if (stored === 'off' || stored === 'low' || stored === 'medium' || stored === 'high' || stored === 'adaptive')
+    if (
+      stored === 'off' ||
+      stored === 'low' ||
+      stored === 'medium' ||
+      stored === 'high' ||
+      stored === 'adaptive'
+    )
       return stored
     return 'low'
   })
@@ -558,7 +562,8 @@ export function ChatScreen({
   useEffect(() => {
     if (typeof window === 'undefined') return
     const key = `claude-thinking-${activeFriendlyId || 'new'}`
-    thinkingInitializedByUserRef.current = window.sessionStorage.getItem(key) !== null
+    thinkingInitializedByUserRef.current =
+      window.sessionStorage.getItem(key) !== null
   }, [activeFriendlyId])
   const { alertOpen, alertThreshold, alertPercent, dismissAlert } =
     useContextAlert()
@@ -701,7 +706,8 @@ export function ChatScreen({
   // If so, re-set waitingForResponse in the store so the UI shows the spinner.
   useActiveRunCheck({
     sessionKey: resolvedSessionKey ?? '',
-    enabled: !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
+    enabled:
+      !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
     onCheckComplete: useCallback(() => {
       setActiveRunCheckDone(true)
     }, []),
@@ -727,9 +733,9 @@ export function ChatScreen({
       : isNewChat
         ? 'new'
         : resolvedSessionKey ||
-        sessionKeyForHistory ||
-        activeCanonicalKey ||
-        'main',
+          sessionKeyForHistory ||
+          activeCanonicalKey ||
+          'main',
     friendlyId: portableChatFriendlyId,
     historyMessages,
     portableMode: isPortableMode,
@@ -761,7 +767,9 @@ export function ChatScreen({
       if (
         approvalId &&
         currentApprovals.some((entry) => {
-          return entry.status === 'pending' && entry.gatewayApprovalId === approvalId
+          return (
+            entry.status === 'pending' && entry.gatewayApprovalId === approvalId
+          )
         })
       ) {
         setPendingApprovals(
@@ -951,10 +959,7 @@ export function ChatScreen({
     // hasn't processed the user's POST yet, the optimistic message vanishes.
     const historySessionKey = isPortableMode
       ? 'main'
-      : activeSessionKey ||
-        sessionKeyForHistory ||
-        resolvedSessionKey ||
-        'main'
+      : activeSessionKey || sessionKeyForHistory || resolvedSessionKey || 'main'
     const reInjectOptimistic = snapshotOptimisticUserMessages(
       queryClient,
       portableChatFriendlyId,
@@ -1044,7 +1049,8 @@ export function ChatScreen({
     ],
     queryFn: async () => {
       try {
-        const statusSessionKey = resolvedSessionKey || activeFriendlyId || 'main'
+        const statusSessionKey =
+          resolvedSessionKey || activeFriendlyId || 'main'
         const query = statusSessionKey
           ? `?sessionKey=${encodeURIComponent(statusSessionKey)}`
           : ''
@@ -1076,11 +1082,22 @@ export function ChatScreen({
       try {
         const res = await fetch('/api/hermes-config')
         if (!res.ok) return 'low'
-        const data = await res.json() as { config?: Record<string, unknown> }
+        const data = (await res.json()) as { config?: Record<string, unknown> }
         const agentSection = data?.config?.agent
-        if (agentSection && typeof agentSection === 'object' && !Array.isArray(agentSection)) {
-          const effort = (agentSection as Record<string, unknown>).reasoning_effort
-          if (effort === 'off' || effort === 'low' || effort === 'medium' || effort === 'high') return effort
+        if (
+          agentSection &&
+          typeof agentSection === 'object' &&
+          !Array.isArray(agentSection)
+        ) {
+          const effort = (agentSection as Record<string, unknown>)
+            .reasoning_effort
+          if (
+            effort === 'off' ||
+            effort === 'low' ||
+            effort === 'medium' ||
+            effort === 'high'
+          )
+            return effort
         }
         return 'low'
       } catch {
@@ -1141,7 +1158,7 @@ export function ChatScreen({
     const raw = modelsQuery.data
     const models: Array<any> = Array.isArray(raw)
       ? raw
-      : raw?.models ?? raw?.data ?? []
+      : (raw?.models ?? raw?.data ?? [])
     if (!models.length) return ''
     const first = models[0]
     return typeof first === 'string' ? first : first.id || first.name || ''
@@ -1186,7 +1203,12 @@ export function ChatScreen({
     if (thinkingInitializedByUserRef.current) return
     const configEffort = reasoningEffortQuery.data
     if (!configEffort) return
-    if (configEffort === 'off' || configEffort === 'low' || configEffort === 'medium' || configEffort === 'high') {
+    if (
+      configEffort === 'off' ||
+      configEffort === 'low' ||
+      configEffort === 'medium' ||
+      configEffort === 'high'
+    ) {
       setThinkingLevel(configEffort)
     }
   }, [reasoningEffortQuery.data])
@@ -1270,36 +1292,39 @@ export function ChatScreen({
       },
       [queryClient],
     ),
-    onComplete: useCallback((message: ChatMessage) => {
-      const activeSend = activeSendRef.current
-      if (activeSend?.clientId) {
-        updateHistoryMessageByClientIdEverywhere(
-          queryClient,
-          activeSend.clientId,
-          (message) => ({
-            ...message,
-            status: 'done',
-          }),
-        )
-      }
-      if (activeSend?.sessionKey) {
-        persistRecoveryMessage(activeSend.sessionKey, message)
-        clearPendingSendForSession(
-          activeSend.sessionKey,
-          activeSend.friendlyId,
-        )
-      }
-      activeSendRef.current = null
-      refreshHistoryRef.current()
-      setSending(false)
-      // Clear waitingForResponse so ThinkingBubble hides and message renders
-      streamFinish()
-      // Play notification sound if the user opted in (Settings → Chat).
-      // Read directly from the store to avoid re-creating this callback on every settings change.
-      if (useChatSettingsStore.getState().settings.soundOnChatComplete) {
-        playChatComplete()
-      }
-    }, [queryClient, streamFinish]),
+    onComplete: useCallback(
+      (message: ChatMessage) => {
+        const activeSend = activeSendRef.current
+        if (activeSend?.clientId) {
+          updateHistoryMessageByClientIdEverywhere(
+            queryClient,
+            activeSend.clientId,
+            (message) => ({
+              ...message,
+              status: 'done',
+            }),
+          )
+        }
+        if (activeSend?.sessionKey) {
+          persistRecoveryMessage(activeSend.sessionKey, message)
+          clearPendingSendForSession(
+            activeSend.sessionKey,
+            activeSend.friendlyId,
+          )
+        }
+        activeSendRef.current = null
+        refreshHistoryRef.current()
+        setSending(false)
+        // Clear waitingForResponse so ThinkingBubble hides and message renders
+        streamFinish()
+        // Play notification sound if the user opted in (Settings → Chat).
+        // Read directly from the store to avoid re-creating this callback on every settings change.
+        if (useChatSettingsStore.getState().settings.soundOnChatComplete) {
+          playChatComplete()
+        }
+      },
+      [queryClient, streamFinish],
+    ),
     onError: useCallback(
       (messageText: string) => {
         const activeSend = activeSendRef.current
@@ -1403,10 +1428,12 @@ export function ChatScreen({
     activeRealtimeStreamingText,
     activeIsRealtimeStreaming,
   )
-  const stickyStreamingTextRef = useRef<{ runId: string | null; text: string }>({
-    runId: null,
-    text: '',
-  })
+  const stickyStreamingTextRef = useRef<{ runId: string | null; text: string }>(
+    {
+      runId: null,
+      text: '',
+    },
+  )
   stickyStreamingTextRef.current = advanceStickyStreamingText({
     isStreaming: activeIsRealtimeStreaming,
     runId: streamingRunId ?? null,
@@ -1542,11 +1569,12 @@ export function ChatScreen({
       // message is potentially the same response — match by text overlap
       if (streamingText.length > 0) {
         const msgText = textFromMessage(msg).trim()
-        if (msgText.length > 0 && (
-          msgText === streamingText ||
-          msgText.startsWith(streamingText) ||
-          streamingText.startsWith(msgText)
-        )) {
+        if (
+          msgText.length > 0 &&
+          (msgText === streamingText ||
+            msgText.startsWith(streamingText) ||
+            streamingText.startsWith(msgText))
+        ) {
           return true
         }
       }
@@ -1554,10 +1582,15 @@ export function ChatScreen({
       // calls as the streaming placeholder, it's the same response
       if (streamToolCalls.length > 0) {
         const msgContent = Array.isArray(msg.content) ? msg.content : []
-        const msgToolCalls = msgContent.filter((p: any) => p.type === 'toolCall')
-        if (msgToolCalls.length > 0 && msgToolCalls.length === streamToolCalls.length) {
+        const msgToolCalls = msgContent.filter(
+          (p: any) => p.type === 'toolCall',
+        )
+        if (
+          msgToolCalls.length > 0 &&
+          msgToolCalls.length === streamToolCalls.length
+        ) {
           return streamToolCalls.every((stc: any) =>
-            msgToolCalls.some((mtc: any) => mtc.name === stc.name)
+            msgToolCalls.some((mtc: any) => mtc.name === stc.name),
           )
         }
       }
@@ -1707,16 +1740,14 @@ export function ChatScreen({
         // Optionally show success toast or update UI
       }
     } catch (err) {
-      setError(
-        `Failed to switch model. ${safeErrorMessage(err)}`,
-      )
+      setError(`Failed to switch model. ${safeErrorMessage(err)}`)
     }
   }, [suggestion, resolvedSessionKey, dismiss])
 
   // Sync chat activity to global store for sidebar orchestrator avatar
-  const setLocalActivity = useChatActivityStore(
-    (s) => s.setLocalActivity,
-  ) as (next: AgentActivity) => void
+  const setLocalActivity = useChatActivityStore((s) => s.setLocalActivity) as (
+    next: AgentActivity,
+  ) => void
   useEffect(() => {
     if (liveToolActivity.length > 0) {
       setLocalActivity('tool-use')
@@ -2157,8 +2188,10 @@ export function ChatScreen({
           //   orchestrated: true  → multi-sister response, inject and return early
           //   orchestrated: false → sister_id included for single-sister routing
           // Delay the ThinkingBubble so instant single-topic routes don't flash.
-          let orchTimer: ReturnType<typeof setTimeout> | null =
-            setTimeout(() => setIsOrchestrating(true), 300)
+          let orchTimer: ReturnType<typeof setTimeout> | null = setTimeout(
+            () => setIsOrchestrating(true),
+            300,
+          )
           try {
             const orchRes = await fetch('/api/orchestrate', {
               method: 'POST',
@@ -2167,7 +2200,7 @@ export function ChatScreen({
               signal: AbortSignal.timeout(90_000),
             })
             if (orchRes.ok) {
-              const orchData = await orchRes.json() as {
+              const orchData = (await orchRes.json()) as {
                 orchestrated: boolean
                 content?: string
                 sister_id?: string
@@ -2179,7 +2212,12 @@ export function ChatScreen({
                   content: [{ type: 'text', text: orchData.content }],
                   __optimisticId: `orch-${Date.now()}`,
                 }
-                appendHistoryMessage(queryClient, friendlyId, sessionKey, syntheticMsg as any)
+                appendHistoryMessage(
+                  queryClient,
+                  friendlyId,
+                  sessionKey,
+                  syntheticMsg as any,
+                )
                 setIsOrchestrating(false)
                 setOrchestratingSisterIds([])
                 streamFinish()
@@ -2199,7 +2237,10 @@ export function ChatScreen({
           } catch {
             // Orchestration timed out or failed — Astra handles it
           } finally {
-            if (orchTimer) { clearTimeout(orchTimer); orchTimer = null }
+            if (orchTimer) {
+              clearTimeout(orchTimer)
+              orchTimer = null
+            }
             setIsOrchestrating(false)
             setOrchestratingSisterIds([])
           }
@@ -2883,53 +2924,35 @@ export function ChatScreen({
     )
   }, [serverError, serverErrorStatus, handleRefetch, showErrorNotice])
 
-  const mobileHeaderStatus: 'connected' | 'connecting' | 'disconnected' =
-    connectionState === 'connected'
-      ? 'connected'
-      : statusQuery.data?.ok === false || statusQuery.isError
-        ? 'disconnected'
-        : 'connecting'
-
-  const activeHeaderToolName =
-    liveToolActivity[0]?.name || activeToolCalls[0]?.name || undefined
-  const headerStatusMode: 'idle' | 'sending' | 'streaming' | 'tool' =
-    activeHeaderToolName
-      ? 'tool'
-      : derivedStreamingInfo.isStreaming
-        ? 'streaming'
-        : sending || waitingForResponse
-          ? 'sending'
-          : 'idle'
   const researchCard = useResearchCard({
     sessionKey: resolvedSessionKey || activeCanonicalKey,
     isStreaming: derivedStreamingInfo.isStreaming,
     resetKey: `${resolvedSessionKey || activeCanonicalKey || 'main'}:${researchResetKey}`,
   })
 
-  const handleResearch = useCallback(async (query: string) => {
-    const key = resolvedSessionKey || activeCanonicalKey || 'main'
-    try {
-      const res = await fetch('/api/odysseus/research/start', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ query, max_rounds: 0, max_time: 300 }),
-      })
-      if (res.ok) {
-        const data = (await res.json()) as { session_id?: string }
-        if (data.session_id) {
-          setActiveResearch(key, data.session_id)
+  const handleResearch = useCallback(
+    async (query: string) => {
+      const key = resolvedSessionKey || activeCanonicalKey || 'main'
+      try {
+        const res = await fetch('/api/odysseus/research/start', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ query, max_rounds: 0, max_time: 300 }),
+        })
+        if (res.ok) {
+          const data = (await res.json()) as { session_id?: string }
+          if (data.session_id) {
+            setActiveResearch(key, data.session_id)
+          }
         }
+      } catch {
+        // ignore — research is best-effort from chat
       }
-    } catch {
-      // ignore — research is best-effort from chat
-    }
-  }, [resolvedSessionKey, activeCanonicalKey])
+    },
+    [resolvedSessionKey, activeCanonicalKey],
+  )
 
   // Pull-to-refresh offset removed
-
-  const handleOpenAgentDetails = useCallback(() => {
-    // agent view panel removed
-  }, [])
 
   const handleRenameActiveSessionTitle = useCallback(
     async (nextTitle: string) => {
@@ -2967,301 +2990,298 @@ export function ChatScreen({
   }
   return (
     <ArtifactPanelContext.Provider value={artifactPanelContextValue}>
-    <div
-      className={cn(
-        'relative min-w-0 flex flex-col overflow-hidden bg-[var(--theme-bg)]',
-        compact ? 'h-full flex-1 min-h-0' : 'h-full',
-      )}
-    >
-    <KeyboardShortcuts />
       <div
         className={cn(
-          'flex-1 min-h-0 overflow-hidden',
-          compact
-            ? 'flex min-h-0 w-full flex-col'
-            : isMobile
-              ? 'flex flex-col'
-              : 'grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[minmax(0,1fr)]',
+          'relative min-w-0 flex flex-col overflow-hidden bg-[var(--theme-bg)]',
+          compact ? 'h-full flex-1 min-h-0' : 'h-full',
         )}
       >
-        {hideUi || compact || isFocusMode ? null : isMobile ? null : (
-          <FileExplorerSidebar
-            collapsed={fileExplorerCollapsed}
-            onToggle={handleToggleFileExplorer}
-            onInsertReference={handleInsertFileReference}
+        <KeyboardShortcuts />
+        <div
+          className={cn(
+            'flex-1 min-h-0 overflow-hidden',
+            compact
+              ? 'flex min-h-0 w-full flex-col'
+              : isMobile
+                ? 'flex flex-col'
+                : 'grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[minmax(0,1fr)]',
+          )}
+        >
+          {hideUi || compact || isFocusMode ? null : isMobile ? null : (
+            <FileExplorerSidebar
+              collapsed={fileExplorerCollapsed}
+              onToggle={handleToggleFileExplorer}
+              onInsertReference={handleInsertFileReference}
+            />
+          )}
+
+          <main
+            className={cn(
+              'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-bottom] duration-200',
+              (activeIsRealtimeStreaming || hasPendingGeneration()) &&
+                'chat-streaming-glow',
+            )}
+            style={{
+              marginBottom:
+                terminalPanelInset > 0
+                  ? `calc(${terminalPanelInset}px + var(--metrics-footer-h, 0px))`
+                  : 'var(--metrics-footer-h, 0px)',
+            }}
+            ref={mainRef}
+          >
+            {!compact && (
+              <ChatHeader
+                activeTitle={activeTitle}
+                onRenameTitle={handleRenameActiveSessionTitle}
+                renamingTitle={renamingSessionTitle}
+                wrapperRef={headerRef}
+                onOpenSessions={() => setSessionsOpen(true)}
+                sessions={sessions ?? []}
+                activeFriendlyId={activeFriendlyId}
+                onSelectSession={(key) =>
+                  void navigate({
+                    to: '/chat/$sessionKey',
+                    params: { sessionKey: key },
+                  })
+                }
+                showFileExplorerButton={!isMobile && !isFocusMode}
+                fileExplorerCollapsed={fileExplorerCollapsed}
+                onToggleFileExplorer={handleToggleFileExplorer}
+                dataUpdatedAt={historyQuery.dataUpdatedAt}
+                onRefresh={handleRefreshHistory}
+                pullOffset={0}
+                thinkingLevel={thinkingLevel}
+                isFocusMode={isFocusMode}
+                onToggleFocusMode={handleToggleFocusMode}
+                onUndo={undefined}
+                onClear={undefined}
+                onExport={handleExport}
+              />
+            )}
+
+            {errorNotice && (
+              <div className="sticky top-0 z-20 px-4 py-2">{errorNotice}</div>
+            )}
+            {pendingApprovals.length > 0 && (
+              <div className="mx-4 mb-2 rounded-xl border border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-4 py-3 dark:border-[color-mix(in_srgb,var(--theme-warning)_50%,transparent)] dark:bg-[color-mix(in_srgb,var(--theme-warning)_15%,transparent)]">
+                <div className="space-y-2">
+                  {pendingApprovals.map((approval) => (
+                    <div
+                      key={approval.id}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-[var(--theme-warning)] dark:text-[var(--theme-warning)]">
+                          {'\uD83D\uDD10'} Approval Required -{' '}
+                          {approval.agentName || 'Agent'}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-[var(--theme-warning)] dark:text-[var(--theme-warning)]">
+                          {approval.action}
+                        </p>
+                        {approval.context ? (
+                          <p className="mt-0.5 truncate text-[10px] font-mono text-[var(--theme-warning)] dark:text-[var(--theme-warning)]">
+                            {approval.context.slice(0, 100)}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void resolvePendingApproval(approval, 'approved')
+                          }}
+                          className="rounded-lg bg-[var(--theme-success)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void resolvePendingApproval(approval, 'denied')
+                          }}
+                          className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-3 py-1.5 text-xs font-medium text-[var(--theme-danger)] hover:bg-[var(--theme-danger-soft-strong)]"
+                        >
+                          Deny
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {hideUi ? null : (
+              <ContextBar
+                sessionId={
+                  resolvedSessionKey ||
+                  activeCanonicalKey ||
+                  activeSession?.key ||
+                  activeSessionKey
+                }
+              />
+            )}
+
+            {hideUi ? null : (
+              <ChatMessageList
+                messages={finalDisplayMessages}
+                onRetryMessage={handleRetryMessage}
+                onRefresh={handleRefreshHistory}
+                loading={historyLoading}
+                empty={historyEmpty}
+                emptyState={
+                  <ChatEmptyState
+                    compact={compact}
+                    runtimeModel={runtimeModelLabel}
+                    recentSessions={sessions}
+                    onOpenSession={(key) => {
+                      void navigate({
+                        to: '/chat/$sessionKey',
+                        params: { sessionKey: key },
+                      })
+                    }}
+                    onStartBlank={() => {
+                      composerHandleRef.current?.setValue('')
+                    }}
+                    onSuggestionClick={(prompt) => {
+                      composerHandleRef.current?.setValue(prompt + ' ')
+                    }}
+                  />
+                }
+                notice={null}
+                noticePosition="end"
+                waitingForResponse={waitingForResponse || isOrchestrating}
+                sessionKey={activeCanonicalKey}
+                pinToTop={false}
+                pinGroupMinHeight={pinGroupMinHeight}
+                headerHeight={headerHeight}
+                contentStyle={stableContentStyle}
+                bottomOffset={
+                  isMobile ? mobileScrollBottomOffset : terminalPanelInset
+                }
+                isStreaming={derivedStreamingInfo.isStreaming}
+                streamingMessageId={derivedStreamingInfo.streamingMessageId}
+                streamingText={
+                  stableActiveStreamingText ||
+                  completedStreamingText.current ||
+                  undefined
+                }
+                streamingThinking={
+                  realtimeStreamingThinking ||
+                  completedStreamingThinking.current ||
+                  undefined
+                }
+                lifecycleEvents={realtimeLifecycleEvents}
+                hideSystemMessages
+                activeToolCalls={activeToolCalls}
+                liveToolActivity={liveToolActivity}
+                researchCard={researchCard}
+                isCompacting={isCompacting}
+                sending={sending}
+                onRegenerate={handleRegenerate}
+              />
+            )}
+            {showComposer && sisters.length > 0 && (
+              <SisterPicker
+                sisters={sisters}
+                selectedId={selectedSisterId}
+                autoSelectedId={autoRoutedSisterId}
+                orchestrating={isOrchestrating}
+                orchestratingSisterIds={orchestratingSisterIds}
+                onSelect={(id) => {
+                  setSelectedSisterId(id)
+                  setAutoRoutedSisterId(null)
+                }}
+              />
+            )}
+            {showComposer ? (
+              <ChatComposer
+                onSubmit={send}
+                onAbort={handleAbortStreaming}
+                onResearch={handleResearch}
+                isLoading={sending || waitingForResponse}
+                disabled={sending || hideUi}
+                sessionKey={
+                  isNewChat
+                    ? undefined
+                    : forcedSessionKey ||
+                      resolvedSessionKey ||
+                      activeCanonicalKey ||
+                      activeSessionKey
+                }
+                wrapperRef={composerRef}
+                composerRef={composerHandleRef}
+                embedded={embedded}
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+                focusKey={`${isNewChat ? 'new' : activeFriendlyId}:${activeCanonicalKey ?? ''}`}
+                thinkingLevel={thinkingLevel}
+                onThinkingLevelChange={handleThinkingLevelChange}
+              />
+            ) : null}
+          </main>
+          {!compact &&
+            !isFocusMode &&
+            (artifactPanelState ? (
+              <div className="h-full w-[480px] shrink-0">
+                <ArtifactPanel
+                  artifacts={artifactPanelState.artifacts}
+                  activeIndex={artifactPanelState.activeIndex}
+                  onTabChange={(index) =>
+                    setArtifactPanelState((s) =>
+                      s ? { ...s, activeIndex: index } : null,
+                    )
+                  }
+                  onClose={() => setArtifactPanelState(null)}
+                />
+              </div>
+            ) : (
+              <AgentViewPanel />
+            ))}
+        </div>
+        {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
+
+        {suggestion && (
+          <ModelSuggestionToast
+            suggestedModel={suggestion.suggestedModel}
+            reason={suggestion.reason}
+            costImpact={suggestion.costImpact}
+            onSwitch={handleSwitchModel}
+            onDismiss={dismiss}
+            onDismissForSession={dismissForSession}
           />
         )}
 
-        <main
-          className={cn(
-            'flex h-full flex-1 min-h-0 min-w-0 flex-col overflow-hidden transition-[margin-bottom] duration-200',
-            (activeIsRealtimeStreaming || hasPendingGeneration()) &&
-              'chat-streaming-glow',
-          )}
-          style={{
-            marginBottom:
-              terminalPanelInset > 0
-                ? `calc(${terminalPanelInset}px + var(--metrics-footer-h, 0px))`
-                : 'var(--metrics-footer-h, 0px)',
-          }}
-          ref={mainRef}
-        >
-          {!compact && (
-            <ChatHeader
-              activeTitle={activeTitle}
-              onRenameTitle={handleRenameActiveSessionTitle}
-              renamingTitle={renamingSessionTitle}
-              wrapperRef={headerRef}
-              onOpenSessions={() => setSessionsOpen(true)}
-              sessions={sessions ?? []}
-              activeFriendlyId={activeFriendlyId}
-              onSelectSession={(key) =>
-                void navigate({
-                  to: '/chat/$sessionKey',
-                  params: { sessionKey: key },
-                })
-              }
-              showFileExplorerButton={!isMobile && !isFocusMode}
-              fileExplorerCollapsed={fileExplorerCollapsed}
-              onToggleFileExplorer={handleToggleFileExplorer}
-              dataUpdatedAt={historyQuery.dataUpdatedAt}
-              onRefresh={handleRefreshHistory}
-              agentModel={currentModel}
-              agentConnected={mobileHeaderStatus === 'connected'}
-              onOpenAgentDetails={handleOpenAgentDetails}
-              pullOffset={0}
-              statusMode={headerStatusMode}
-              activeToolName={activeHeaderToolName}
-              thinkingLevel={thinkingLevel}
-              isFocusMode={isFocusMode}
-              onToggleFocusMode={handleToggleFocusMode}
-              onUndo={undefined}
-              onClear={undefined}
-              onExport={handleExport}
-            />
-          )}
-
-          {errorNotice && (
-            <div className="sticky top-0 z-20 px-4 py-2">{errorNotice}</div>
-          )}
-          {pendingApprovals.length > 0 && (
-            <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-900/15">
-              <div className="space-y-2">
-                {pendingApprovals.map((approval) => (
-                  <div
-                    key={approval.id}
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
-                        {'\uD83D\uDD10'} Approval Required -{' '}
-                        {approval.agentName || 'Agent'}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-amber-600 dark:text-amber-500">
-                        {approval.action}
-                      </p>
-                      {approval.context ? (
-                        <p className="mt-0.5 truncate text-[10px] font-mono text-amber-500 dark:text-amber-600">
-                          {approval.context.slice(0, 100)}
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="flex shrink-0 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void resolvePendingApproval(approval, 'approved')
-                        }}
-                        className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void resolvePendingApproval(approval, 'denied')
-                        }}
-                        className="rounded-lg border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-[var(--theme-danger-soft-strong)]"
-                      >
-                        Deny
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {hideUi ? null : (
-            <ContextBar
-              sessionId={
-                resolvedSessionKey ||
-                activeCanonicalKey ||
-                activeSession?.key ||
-                activeSessionKey
-              }
-            />
-          )}
-
-          {hideUi ? null : (
-            <ChatMessageList
-              messages={finalDisplayMessages}
-              onRetryMessage={handleRetryMessage}
-              onRefresh={handleRefreshHistory}
-              loading={historyLoading}
-              empty={historyEmpty}
-              emptyState={
-                <ChatEmptyState
-                  compact={compact}
-                  runtimeModel={runtimeModelLabel}
-                  recentSessions={sessions}
-                  onOpenSession={(key) => {
-                    void navigate({
-                      to: '/chat/$sessionKey',
-                      params: { sessionKey: key },
-                    })
-                  }}
-                  onStartBlank={() => {
-                    composerHandleRef.current?.setValue('')
-                  }}
-                  onSuggestionClick={(prompt) => {
-                    composerHandleRef.current?.setValue(prompt + ' ')
-                  }}
-                />
-              }
-              notice={null}
-              noticePosition="end"
-              waitingForResponse={waitingForResponse || isOrchestrating}
-              sessionKey={activeCanonicalKey}
-              pinToTop={false}
-              pinGroupMinHeight={pinGroupMinHeight}
-              headerHeight={headerHeight}
-              contentStyle={stableContentStyle}
-              bottomOffset={
-                isMobile ? mobileScrollBottomOffset : terminalPanelInset
-              }
-              isStreaming={derivedStreamingInfo.isStreaming}
-              streamingMessageId={derivedStreamingInfo.streamingMessageId}
-              streamingText={
-                stableActiveStreamingText ||
-                completedStreamingText.current ||
-                undefined
-              }
-              streamingThinking={
-                realtimeStreamingThinking ||
-                completedStreamingThinking.current ||
-                undefined
-              }
-              lifecycleEvents={realtimeLifecycleEvents}
-              hideSystemMessages
-              activeToolCalls={activeToolCalls}
-              liveToolActivity={liveToolActivity}
-              researchCard={researchCard}
-              isCompacting={isCompacting}
-              sending={sending}
-              onRegenerate={handleRegenerate}
-            />
-          )}
-          {showComposer && sisters.length > 0 && (
-            <SisterPicker
-              sisters={sisters}
-              selectedId={selectedSisterId}
-              autoSelectedId={autoRoutedSisterId}
-              orchestrating={isOrchestrating}
-              orchestratingSisterIds={orchestratingSisterIds}
-              onSelect={(id) => {
-                setSelectedSisterId(id)
-                setAutoRoutedSisterId(null)
-              }}
-            />
-          )}
-          {showComposer ? (
-            <ChatComposer
-              onSubmit={send}
-              onAbort={handleAbortStreaming}
-              onResearch={handleResearch}
-              isLoading={sending || waitingForResponse}
-              disabled={sending || hideUi}
-              sessionKey={
-                isNewChat
-                  ? undefined
-                  : forcedSessionKey ||
-                    resolvedSessionKey ||
-                    activeCanonicalKey ||
-                    activeSessionKey
-              }
-              wrapperRef={composerRef}
-              composerRef={composerHandleRef}
-              embedded={embedded}
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-              focusKey={`${isNewChat ? 'new' : activeFriendlyId}:${activeCanonicalKey ?? ''}`}
-              thinkingLevel={thinkingLevel}
-              onThinkingLevelChange={handleThinkingLevelChange}
-            />
-          ) : null}
-        </main>
-        {!compact && !isFocusMode && (
-          artifactPanelState ? (
-            <div className="h-full w-[480px] shrink-0">
-              <ArtifactPanel
-                artifacts={artifactPanelState.artifacts}
-                activeIndex={artifactPanelState.activeIndex}
-                onTabChange={(index) =>
-                  setArtifactPanelState((s) => s ? { ...s, activeIndex: index } : null)
-                }
-                onClose={() => setArtifactPanelState(null)}
-              />
-            </div>
-          ) : (
-            <AgentViewPanel />
-          )
+        {isMobile && (
+          <MobileSessionsPanel
+            open={sessionsOpen}
+            onClose={() => setSessionsOpen(false)}
+            sessions={sessions}
+            activeFriendlyId={activeFriendlyId}
+            onSelectSession={(friendlyId) => {
+              setSessionsOpen(false)
+              void navigate({
+                to: '/chat/$sessionKey',
+                params: { sessionKey: friendlyId },
+              })
+            }}
+            onNewChat={() => {
+              setSessionsOpen(false)
+              void navigate({
+                to: '/chat/$sessionKey',
+                params: { sessionKey: 'new' },
+              })
+            }}
+          />
         )}
+
+        <ContextAlertModal
+          open={alertOpen}
+          onClose={dismissAlert}
+          threshold={alertThreshold}
+          contextPercent={alertPercent}
+        />
+
+        <ErrorToastContainer />
       </div>
-      {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
-
-      {suggestion && (
-        <ModelSuggestionToast
-          suggestedModel={suggestion.suggestedModel}
-          reason={suggestion.reason}
-          costImpact={suggestion.costImpact}
-          onSwitch={handleSwitchModel}
-          onDismiss={dismiss}
-          onDismissForSession={dismissForSession}
-        />
-      )}
-
-      {isMobile && (
-        <MobileSessionsPanel
-          open={sessionsOpen}
-          onClose={() => setSessionsOpen(false)}
-          sessions={sessions}
-          activeFriendlyId={activeFriendlyId}
-          onSelectSession={(friendlyId) => {
-            setSessionsOpen(false)
-            void navigate({
-              to: '/chat/$sessionKey',
-              params: { sessionKey: friendlyId },
-            })
-          }}
-          onNewChat={() => {
-            setSessionsOpen(false)
-            void navigate({
-              to: '/chat/$sessionKey',
-              params: { sessionKey: 'new' },
-            })
-          }}
-        />
-      )}
-
-      <ContextAlertModal
-        open={alertOpen}
-        onClose={dismissAlert}
-        threshold={alertThreshold}
-        contextPercent={alertPercent}
-      />
-
-      <ErrorToastContainer />
-    </div>
     </ArtifactPanelContext.Provider>
   )
 }

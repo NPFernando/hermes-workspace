@@ -113,7 +113,12 @@ function getToolVerb(name: string): string {
   return 'Working'
 }
 
-type LiveEvent = { text: string; emoji: string; timestamp: number; isError: boolean }
+type LiveEvent = {
+  text: string
+  emoji: string
+  timestamp: number
+  isError: boolean
+}
 
 function LiveEventLog({ events }: { events: Array<LiveEvent> }) {
   const visible = events.filter((e) => !e.isError).slice(-3)
@@ -125,7 +130,9 @@ function LiveEventLog({ events }: { events: Array<LiveEvent> }) {
           key={`${event.timestamp}-${i}`}
           className="lifecycle-entry flex items-center gap-1.5 text-[10px] text-[var(--theme-muted)]"
         >
-          <span className="text-[11px] leading-none shrink-0">{event.emoji}</span>
+          <span className="text-[11px] leading-none shrink-0">
+            {event.emoji}
+          </span>
           <span className="truncate">{event.text}</span>
         </li>
       ))}
@@ -167,8 +174,14 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
       className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] text-[11px] overflow-hidden"
       style={{
         borderLeftWidth: '3px',
-        borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
-        boxShadow: isRunning ? '0 0 8px rgba(99,102,241,0.12)' : 'none',
+        borderLeftColor: isRunning
+          ? 'var(--theme-accent-secondary)'
+          : isDone
+            ? 'var(--theme-success)'
+            : 'var(--theme-danger)',
+        boxShadow: isRunning
+          ? '0 0 8px color-mix(in srgb, var(--theme-accent-secondary) 12%, transparent)'
+          : 'none',
       }}
     >
       <div className="flex items-center gap-1.5 px-2.5 py-1.5">
@@ -181,9 +194,9 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
           </span>
         )}
         {isDone && <span className="text-xs text-green-500">✅</span>}
-        {isError && <span className="text-xs text-red-500">❌</span>}
+        {isError && <span className="text-xs text-[var(--theme-danger)]">❌</span>}
         {isRunning && (
-          <span className="size-1.5 rounded-full animate-pulse bg-indigo-500" />
+          <span className="size-1.5 rounded-full animate-pulse bg-[var(--theme-accent-secondary)]" />
         )}
       </div>
       {isRunning && (
@@ -196,7 +209,12 @@ function ToolCallCard({ name, phase }: { name: string; phase: string }) {
   )
 }
 
-type ResponsePhase = 'queued' | 'thinking' | 'using_tools' | 'responding' | 'compacting'
+type ResponsePhase =
+  | 'queued'
+  | 'thinking'
+  | 'using_tools'
+  | 'responding'
+  | 'compacting'
 
 type ThinkingBubbleProps = {
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
@@ -231,7 +249,10 @@ function ResponsePhaseRail({ phase }: { phase: ResponsePhase }) {
   const activeIndex = getResponsePhaseIndex(phase)
 
   return (
-    <div className="mt-2 flex items-center gap-1.5" aria-label="Response progress">
+    <div
+      className="mt-2 flex items-center gap-1.5"
+      aria-label="Response progress"
+    >
       {RESPONSE_PHASES.map((item, index) => {
         const isActive = index === activeIndex
         const isComplete = index < activeIndex
@@ -289,7 +310,12 @@ function ThinkingBubble({
 
   // Build a meaningful status label from live activity
   const activeToolNames = activeToolCalls
-    .filter((tc) => tc.phase !== 'done' && tc.phase !== 'complete' && tc.phase !== 'completed')
+    .filter(
+      (tc) =>
+        tc.phase !== 'done' &&
+        tc.phase !== 'complete' &&
+        tc.phase !== 'completed',
+    )
     .map((tc) => tc.name.replace(/_/g, ' '))
   const liveToolNames = liveToolActivity.map((a) => a.name.replace(/_/g, ' '))
   const uniqueNames = [...new Set([...activeToolNames, ...liveToolNames])]
@@ -301,7 +327,7 @@ function ThinkingBubble({
   // Last lifecycle event as an informative fallback (e.g. "Delegating to agent…")
   const lastLifecycleText =
     lifecycleEvents.length > 0
-      ? lifecycleEvents.filter((e) => !e.isError).at(-1)?.text ?? null
+      ? (lifecycleEvents.filter((e) => !e.isError).at(-1)?.text ?? null)
       : null
 
   // Activity-store label for states not covered by tool calls or events
@@ -316,7 +342,11 @@ function ThinkingBubble({
     ? 'Compacting context...'
     : forceSimple
       ? 'Thinking…'
-      : activityLabel || lastLifecycleText || heartbeatActivity || activityStoreLabel || 'Thinking…'
+      : activityLabel ||
+        lastLifecycleText ||
+        heartbeatActivity ||
+        activityStoreLabel ||
+        'Thinking…'
 
   // Elapsed time counter — counts from bubble mount, not from last label change
   const [elapsed, setElapsed] = useState(0)
@@ -394,7 +424,7 @@ function ThinkingBubble({
                   className={cn(
                     'thinking-label ml-1.5 text-xs font-medium transition-opacity duration-300',
                     isStale
-                      ? 'text-amber-500 dark:text-amber-400'
+                      ? 'text-[var(--theme-warning)] dark:text-[var(--theme-warning)]'
                       : 'text-[var(--theme-muted)]',
                   )}
                   style={{ opacity: visible ? 1 : 0 }}
@@ -462,7 +492,7 @@ function ThinkingBubble({
             <LiveEventLog events={lifecycleEvents} />
           ) : null}
           {isStale ? (
-            <span className="text-[11px] text-amber-500 dark:text-amber-400 animate-pulse">
+            <span className="text-[11px] text-[var(--theme-warning)] dark:text-[var(--theme-warning)] animate-pulse">
               {isVeryStale
                 ? 'Still thinking… this is taking a while'
                 : 'Taking longer than usual…'}
@@ -495,11 +525,11 @@ function StatusLine() {
 
   return (
     <div className="flex items-center gap-2 text-[11px] text-[var(--theme-muted)] py-0.5">
-      <span className="inline-block size-1.5 rounded-full bg-amber-400 animate-pulse" />
-      <span className="opacity-80">
-        {heartbeatActivity || 'Working…'}
+      <span className="inline-block size-1.5 rounded-full bg-[var(--theme-warning)] animate-pulse" />
+      <span className="opacity-80">{heartbeatActivity || 'Working…'}</span>
+      <span aria-hidden="true" className="opacity-40">
+        ·
       </span>
-      <span aria-hidden="true" className="opacity-40">·</span>
       <span className="tabular-nums opacity-50 font-mono">{elapsedLabel}</span>
     </div>
   )
@@ -532,7 +562,9 @@ function shouldHideSystemInjectedUserMessage(text: string): boolean {
   // Only hide messages that begin with known system-injected prompts. User
   // context summaries may quote these phrases later in the message and must
   // remain visible/persistent in the chat UI.
-  return HIDDEN_SYSTEM_USER_PREFIXES.some((prefix) => trimmed.startsWith(prefix))
+  return HIDDEN_SYSTEM_USER_PREFIXES.some((prefix) =>
+    trimmed.startsWith(prefix),
+  )
 }
 
 function getChronologyRank(message: ChatMessage): number {
@@ -637,7 +669,10 @@ export function buildDisplayEntries(
     }
 
     if (message.role === 'tool' || message.role === 'toolResult') {
-      if (entries.length > 0 && entries[entries.length - 1].message.role === 'assistant') {
+      if (
+        entries.length > 0 &&
+        entries[entries.length - 1].message.role === 'assistant'
+      ) {
         entries[entries.length - 1].attachedToolMessages.push(message)
       } else if (pendingAssistantToolMessages.length > 0) {
         pendingAssistantToolMessages.push(message)
@@ -651,7 +686,10 @@ export function buildDisplayEntries(
       attachedToolMessages: [],
     }
 
-    if (message.role === 'assistant' && pendingAssistantToolMessages.length > 0) {
+    if (
+      message.role === 'assistant' &&
+      pendingAssistantToolMessages.length > 0
+    ) {
       entry.attachedToolMessages.push(...pendingAssistantToolMessages)
       pendingAssistantToolMessages = []
     }
@@ -660,44 +698,6 @@ export function buildDisplayEntries(
   })
 
   return entries
-}
-
-export function getTrailingToolOnlyTurnSummary(
-  messages: Array<ChatMessage>,
-): { count: number; toolNames: Array<string>; hasFinalAssistantText: boolean } | null {
-  let trailingStart = messages.length
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]
-    if (msg.role === 'tool' || msg.role === 'toolResult') {
-      trailingStart = i
-    } else if (isAssistantToolCallOnlyMessage(msg)) {
-      trailingStart = i
-    } else {
-      break
-    }
-  }
-
-
-  if (trailingStart === messages.length || trailingStart === 0) {
-    return null
-  }
-  const lastVisible = messages[trailingStart - 1]
-  if (lastVisible.role !== 'assistant' || isAssistantToolCallOnlyMessage(lastVisible)) {
-    return null
-  }
-  const trailing = messages.slice(trailingStart)
-  const toolNames = Array.from(
-    new Set(
-      trailing.flatMap((msg) => {
-        if (isAssistantToolCallOnlyMessage(msg)) {
-          return getToolCallsFromMessage(msg).map((tc) => tc.name).filter((n): n is string => n != null)
-        }
-        return []
-      }),
-    ),
-  )
-
-  return { count: trailing.length, toolNames, hasFinalAssistantText: true }
 }
 
 function escapeAttributeSelector(value: string): string {
@@ -780,12 +780,10 @@ function ChatMessageListComponent({
   const lastUserRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const prevSessionKeyRef = useRef<string | undefined>(sessionKey)
+  const prevVisibleCountRef = useRef(0)
   const stickToBottomRef = useRef(true)
   const messageSignatureRef = useRef<Map<string, string>>(new Map())
   const initialRenderRef = useRef(true)
-  const streamingTargetsClearRef = useRef<(() => void) | null>(null)
-  const [streamingCleared, setStreamingCleared] = useState(0)
-  streamingTargetsClearRef.current = () => setStreamingCleared((c) => c + 1)
   const lastScrollTopRef = useRef(0)
   const isNearBottomRef = useRef(true)
   const [isNearBottom, setIsNearBottom] = useState(true)
@@ -813,11 +811,6 @@ function ChatMessageListComponent({
     return window.matchMedia('(max-width: 767px)').matches
   })
   // Pull-to-refresh removed (was buggy on mobile)
-  const [scrollMetrics] = useState({
-    scrollTop: 0,
-    scrollHeight: 0,
-    clientHeight: 0,
-  })
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1074,7 +1067,8 @@ function ChatMessageListComponent({
     [messageSearchMatches],
   )
 
-  const activeSearchMatch = messageSearchMatches.at(activeSearchMatchIndex) ?? null
+  const activeSearchMatch =
+    messageSearchMatches.at(activeSearchMatchIndex) ?? null
 
   const focusSearchInput = useCallback(function focusSearchInputFieldSoon() {
     window.requestAnimationFrame(function focusSearchInputField() {
@@ -1203,10 +1197,8 @@ function ChatMessageListComponent({
     return count
   }, [messages])
 
-
   // Virtualization disabled — causes scroll glitches
   const shouldVirtualize = false
-
 
   const showToolOnlyNotice =
     !loading &&
@@ -1244,7 +1236,7 @@ function ChatMessageListComponent({
       streamingTargets: new Set<string>(),
       signatureById: nextSignatures,
     }
-  }, [displayEntries, streamingCleared])
+  }, [displayEntries])
 
   const lastAssistantIndex = visibleEntries
     .filter(({ message }) => message.role === 'assistant')
@@ -1258,20 +1250,20 @@ function ChatMessageListComponent({
 
   const lastAssistantMessageHasToolSectionsAndText = () => {
     for (let i = visibleEntries.length - 1; i >= 0; i--) {
-      const entry = visibleEntries[i];
+      const entry = visibleEntries[i]
       if (entry.message.role === 'assistant') {
         const hasToolSections =
           getToolCallsFromMessage(entry.message).length > 0 ||
-          entry.attachedToolMessages.length > 0;
-        const hasText = textFromMessage(entry.message).length > 0;
+          entry.attachedToolMessages.length > 0
+        const hasText = textFromMessage(entry.message).length > 0
         if (hasToolSections && hasText) {
-          return true;
+          return true
         }
-        break;
+        break
       }
     }
-    return false;
-  };
+    return false
+  }
   // Show typing indicator when waiting for response and no visible text yet.
   // Bug 2 fix: also show during grace period (thinkingGrace) so there's no
   // blank-space flash between waitingForResponse clearing and the response
@@ -1418,19 +1410,13 @@ function ChatMessageListComponent({
                 ? 'calling'
                 : toolCall.phase === 'failed' || toolCall.phase === 'error'
                   ? 'error'
-                  : toolCall.phase === 'calling' ||
-                      toolCall.phase === 'running'
+                  : toolCall.phase === 'calling' || toolCall.phase === 'running'
                     ? toolCall.phase
                     : 'calling',
           args: tcAny.args,
           preview:
-            typeof tcAny.preview === 'string'
-              ? (tcAny.preview)
-              : undefined,
-          result:
-            typeof tcAny.result === 'string'
-              ? (tcAny.result)
-              : undefined,
+            typeof tcAny.preview === 'string' ? tcAny.preview : undefined,
+          result: typeof tcAny.result === 'string' ? tcAny.result : undefined,
         }
       })
     }
@@ -1453,8 +1439,8 @@ function ChatMessageListComponent({
       endIndex: visibleEntries.length,
       topSpacerHeight: 0,
       bottomSpacerHeight: 0,
-    };
-  }, [scrollMetrics, visibleEntries.length])
+    }
+  }, [visibleEntries.length])
 
   function isMessageStreaming(message: ChatMessage, index: number) {
     if (!isStreaming || !streamingMessageId) return false
@@ -1533,9 +1519,9 @@ function ChatMessageListComponent({
             wrapperDataMessageId={stableId}
             bubbleClassName={
               isActiveMatch
-                ? 'ring-2 ring-amber-400 bg-amber-50/50'
+                ? 'ring-2 ring-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_50%,transparent)]'
                 : isSearchMatch
-                  ? 'bg-amber-50/30'
+                  ? 'bg-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)]'
                   : undefined
             }
             toolCalls={normalizedStreamingToolCalls}
@@ -1564,9 +1550,9 @@ function ChatMessageListComponent({
         wrapperDataMessageId={stableId}
         bubbleClassName={
           isActiveMatch
-            ? 'ring-2 ring-amber-400 bg-amber-50/50'
+            ? 'ring-2 ring-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_50%,transparent)]'
             : isSearchMatch
-              ? 'bg-amber-50/30'
+              ? 'bg-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)]'
               : undefined
         }
         isStreaming={messageIsStreaming}
@@ -1599,6 +1585,8 @@ function ChatMessageListComponent({
     // Always scroll on session change (instant)
     if (sessionChanged) {
       stickToBottomRef.current = true
+      prevVisibleCountRef.current = visibleEntries.length
+      setUnreadCount(0)
       frameId = window.requestAnimationFrame(() => scrollToBottom('auto'))
       return () => {
         if (frameId !== null) window.cancelAnimationFrame(frameId)
@@ -1611,7 +1599,12 @@ function ChatMessageListComponent({
       // use instant scroll during streaming to avoid choppiness.
       const behavior: ScrollBehavior = !isStreaming ? 'smooth' : 'auto'
       frameId = window.requestAnimationFrame(() => scrollToBottom(behavior))
+    } else {
+      // User is scrolled up — surface the arrival via the unread badge instead.
+      const delta = visibleEntries.length - prevVisibleCountRef.current
+      if (delta > 0) setUnreadCount((c) => c + delta)
     }
+    prevVisibleCountRef.current = visibleEntries.length
 
     return () => {
       if (frameId !== null) window.cancelAnimationFrame(frameId)
@@ -1884,24 +1877,24 @@ function ChatMessageListComponent({
               <div className="flex-1" aria-hidden="true" />
             ) : null}
             {showToolOnlyNotice ? (
-              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="mb-4 rounded-xl border border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-4 py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-2.5">
                     <HugeiconsIcon
                       icon={Robot01Icon}
                       size={20}
                       strokeWidth={1.5}
-                      className="mt-0.5 shrink-0 text-amber-600"
+                      className="mt-0.5 shrink-0 text-[var(--theme-warning)]"
                     />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-amber-800 text-balance">
+                      <p className="text-sm font-medium text-[var(--theme-warning)] text-balance">
                         This session contains{' '}
                         <span className="tabular-nums">
                           {toolInteractionCount}
                         </span>{' '}
                         tool interactions
                       </p>
-                      <p className="mt-1 text-sm text-amber-700 text-pretty">
+                      <p className="mt-1 text-sm text-[var(--theme-warning)] text-pretty">
                         Most content is AI agent tool usage (file reads, code
                         execution, etc.)
                       </p>
@@ -1914,8 +1907,8 @@ function ChatMessageListComponent({
                     className={cn(
                       'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
                       expandAllToolSections
-                        ? 'border-amber-300 bg-amber-100 text-amber-700 cursor-default'
-                        : 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 dark:hover:bg-amber-900/30 hover:border-amber-400',
+                        ? 'border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_15%,transparent)] text-[var(--theme-warning)] cursor-default'
+                        : 'border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_12%,transparent)] text-[var(--theme-warning)] hover:bg-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] hover:border-[var(--theme-warning)]',
                     )}
                     aria-label={
                       expandAllToolSections
@@ -2019,7 +2012,9 @@ function ChatMessageListComponent({
                         streamingKey={signature}
                         expandAllToolSections={expandAllToolSections}
                         isLastAssistant={forceActionsVisible}
-                        onRegenerate={forceActionsVisible ? onRegenerate : undefined}
+                        onRegenerate={
+                          forceActionsVisible ? onRegenerate : undefined
+                        }
                       />
                     )
                   })}
@@ -2081,37 +2076,39 @@ function ChatMessageListComponent({
                     <div className="min-w-0 flex-1 pt-1">
                       {normalizedStreamingToolCalls.length > 0 ? (
                         <TuiActivityCard
-                          toolSections={normalizedStreamingToolCalls.slice(-3).map((tc) => {
-                            const phase = tc.phase
-                            const state =
-                              phase === 'error'
-                                ? ('output-error' as const)
-                                : phase === 'done'
-                                  ? ('output-available' as const)
-                                  : phase === 'running'
-                                    ? ('input-streaming' as const)
-                                    : ('input-available' as const)
-                            return {
-                              key: tc.id,
-                              type: tc.name,
-                              input:
-                                tc.args &&
-                                typeof tc.args === 'object' &&
-                                !Array.isArray(tc.args)
-                                  ? (tc.args as Record<string, unknown>)
-                                  : undefined,
-                              preview: tc.preview,
-                              outputText:
-                                state === 'output-available'
-                                  ? tc.result || ''
-                                  : '',
-                              errorText:
-                                state === 'output-error'
-                                  ? tc.result || 'Tool failed'
-                                  : undefined,
-                              state,
-                            }
-                          })}
+                          toolSections={normalizedStreamingToolCalls
+                            .slice(-3)
+                            .map((tc) => {
+                              const phase = tc.phase
+                              const state =
+                                phase === 'error'
+                                  ? ('output-error' as const)
+                                  : phase === 'done'
+                                    ? ('output-available' as const)
+                                    : phase === 'running'
+                                      ? ('input-streaming' as const)
+                                      : ('input-available' as const)
+                              return {
+                                key: tc.id,
+                                type: tc.name,
+                                input:
+                                  tc.args &&
+                                  typeof tc.args === 'object' &&
+                                  !Array.isArray(tc.args)
+                                    ? (tc.args as Record<string, unknown>)
+                                    : undefined,
+                                preview: tc.preview,
+                                outputText:
+                                  state === 'output-available'
+                                    ? tc.result || ''
+                                    : '',
+                                errorText:
+                                  state === 'output-error'
+                                    ? tc.result || 'Tool failed'
+                                    : undefined,
+                                state,
+                              }
+                            })}
                           thinking={null}
                           isStreaming={true}
                           formatLabel={(name) => name.replace(/_/g, ' ')}

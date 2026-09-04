@@ -6,7 +6,6 @@ import {
   ArrowRight01Icon,
   BrainIcon,
   ChartCandleIcon,
-  Chat01Icon,
   CheckListIcon,
   Clock01Icon,
   ComputerTerminal01Icon,
@@ -204,7 +203,7 @@ function NavItem({
           strokeWidth={1.5}
           className="size-5 shrink-0"
         />
-        <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500" />
+        <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-[var(--theme-danger)]" />
       </span>
     ) : (
       <HugeiconsIcon
@@ -1073,7 +1072,7 @@ function ChatSidebarComponent({
               buttonVariants({ variant: 'ghost', size: 'sm' }),
               'w-full justify-start gap-2.5 px-3 py-2 text-[var(--theme-text)] hover:bg-[var(--theme-hover)]',
               isNewSessionActive &&
-                'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
+                'bg-[color-mix(in_srgb,var(--theme-accent)_10%,transparent)] text-[var(--theme-accent)] hover:bg-[color-mix(in_srgb,var(--theme-accent)_15%,transparent)]',
             )}
             data-tour="new-session"
           >

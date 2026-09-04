@@ -10,9 +10,11 @@ export function useComposerMenus() {
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false)
+  const workspaceMenuRef = useRef<HTMLDivElement | null>(null)
   const [isThinkingMenuOpen, setIsThinkingMenuOpen] = useState(false)
   const [isControlsMenuOpen, setIsControlsMenuOpen] = useState(false)
-  const [isProviderSwitcherExpanded, setIsProviderSwitcherExpanded] = useState(false)
+  const [isProviderSwitcherExpanded, setIsProviderSwitcherExpanded] =
+    useState(false)
   const [isMobileActionsMenuOpen, setIsMobileActionsMenuOpen] = useState(false)
 
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
@@ -25,7 +27,8 @@ export function useComposerMenus() {
       !isModelMenuOpen &&
       !isProfileMenuOpen &&
       !isThinkingMenuOpen &&
-      !isControlsMenuOpen
+      !isControlsMenuOpen &&
+      !isWorkspaceMenuOpen
     )
       return
     function handleOutsideClick(event: MouseEvent) {
@@ -34,11 +37,13 @@ export function useComposerMenus() {
       if (modelSelectorRef.current?.contains(target)) return
       if (profileMenuRef.current?.contains(target)) return
       if (thinkingMenuRef.current?.contains(target)) return
+      if (workspaceMenuRef.current?.contains(target)) return
       setIsControlsMenuOpen(false)
       setIsModelMenuOpen(false)
       setIsProviderSwitcherExpanded(false)
       setIsProfileMenuOpen(false)
       setIsThinkingMenuOpen(false)
+      setIsWorkspaceMenuOpen(false)
     }
 
     document.addEventListener('mousedown', handleOutsideClick)
@@ -50,16 +55,28 @@ export function useComposerMenus() {
     isProfileMenuOpen,
     isThinkingMenuOpen,
     isControlsMenuOpen,
+    isWorkspaceMenuOpen,
   ])
 
   return {
-    isModelMenuOpen, setIsModelMenuOpen,
-    isProfileMenuOpen, setIsProfileMenuOpen,
-    isWorkspaceMenuOpen, setIsWorkspaceMenuOpen,
-    isThinkingMenuOpen, setIsThinkingMenuOpen,
-    isControlsMenuOpen, setIsControlsMenuOpen,
-    isProviderSwitcherExpanded, setIsProviderSwitcherExpanded,
-    isMobileActionsMenuOpen, setIsMobileActionsMenuOpen,
-    profileMenuRef, modelSelectorRef, thinkingMenuRef, controlsMenuRef,
+    isModelMenuOpen,
+    setIsModelMenuOpen,
+    isProfileMenuOpen,
+    setIsProfileMenuOpen,
+    isWorkspaceMenuOpen,
+    setIsWorkspaceMenuOpen,
+    isThinkingMenuOpen,
+    setIsThinkingMenuOpen,
+    isControlsMenuOpen,
+    setIsControlsMenuOpen,
+    isProviderSwitcherExpanded,
+    setIsProviderSwitcherExpanded,
+    isMobileActionsMenuOpen,
+    setIsMobileActionsMenuOpen,
+    profileMenuRef,
+    modelSelectorRef,
+    thinkingMenuRef,
+    controlsMenuRef,
+    workspaceMenuRef,
   }
 }

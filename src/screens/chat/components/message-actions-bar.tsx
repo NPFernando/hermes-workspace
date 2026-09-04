@@ -1,10 +1,6 @@
 import { useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  Copy01Icon,
-  RefreshIcon,
-  Tick02Icon,
-} from '@hugeicons/core-free-icons'
+import { Copy01Icon, RefreshIcon, Tick02Icon } from '@hugeicons/core-free-icons'
 import { MessageTimestamp } from './message-timestamp'
 import {
   TooltipContent,
@@ -81,7 +77,9 @@ export function MessageActionsBar({
     <div
       className={cn(
         'flex items-center gap-1.5 text-xs text-[var(--theme-muted)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 duration-100 ease-out',
-        forceVisible || isQueued || isFailed ? 'opacity-100' : 'opacity-100 md:opacity-0',
+        forceVisible || isQueued || isFailed
+          ? 'opacity-100'
+          : 'opacity-100 md:opacity-0',
         positionClass,
       )}
     >
@@ -91,7 +89,7 @@ export function MessageActionsBar({
             <TooltipTrigger
               type="button"
               onClick={onRetry}
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_12%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] transition-colors"
             >
               <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.6} />
               <span className="text-[11px] font-medium">Retry</span>

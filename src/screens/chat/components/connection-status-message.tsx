@@ -39,7 +39,8 @@ function classifyConnectionError(
     return {
       title: 'Authentication required',
       description: 'Hermes Agent rejected the connection token.',
-      action: 'Go to Settings -> Advanced -> Hermes Agent to update your token.',
+      action:
+        'Go to Settings -> Advanced -> Hermes Agent to update your token.',
     }
   }
 
@@ -59,7 +60,8 @@ function classifyConnectionError(
     return {
       title: 'Hermes Agent gateway not running',
       description: 'The Hermes Agent gateway is not running on port 8642.',
-      action: 'Run the official Hermes installer, then start the gateway with: hermes gateway run',
+      action:
+        'Run the official Hermes installer, then start the gateway with: hermes gateway run',
     }
   }
 
@@ -115,7 +117,7 @@ export function ConnectionStatusMessage({
         'mx-auto max-w-lg rounded-lg border px-3 py-2 transition-all duration-300',
         isChecking
           ? 'border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)]'
-          : 'border-amber-200 bg-amber-50 text-amber-800',
+          : 'border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]',
         fadingOut && 'opacity-0 translate-y-[-4px]',
         className,
       )}
@@ -128,7 +130,7 @@ export function ConnectionStatusMessage({
           strokeWidth={1.5}
           className={cn(
             'mt-0.5 shrink-0',
-            isChecking ? 'text-[var(--theme-muted)]' : 'text-amber-600',
+            isChecking ? 'text-[var(--theme-muted)]' : 'text-[var(--theme-warning)]',
           )}
         />
         <div className="flex-1 text-xs">
@@ -137,8 +139,8 @@ export function ConnectionStatusMessage({
           </p>
           {!isChecking ? (
             <>
-              <p className="mt-0.5 text-amber-700">{errorInfo.description}</p>
-              <p className="mt-1 font-medium text-amber-800">
+              <p className="mt-0.5 text-[var(--theme-warning)]">{errorInfo.description}</p>
+              <p className="mt-1 font-medium text-[var(--theme-warning)]">
                 {errorInfo.action}
               </p>
             </>
@@ -148,7 +150,7 @@ export function ConnectionStatusMessage({
           <button
             type="button"
             onClick={onRetry}
-            className="shrink-0 rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-200 dark:hover:bg-amber-900/30"
+            className="shrink-0 rounded-md border border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_12%,transparent)] px-2 py-0.5 text-xs font-medium text-[var(--theme-warning)] transition-colors hover:bg-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)]"
           >
             Retry
           </button>

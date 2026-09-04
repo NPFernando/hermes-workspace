@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown01Icon, Idea01Icon } from '@hugeicons/core-free-icons'
+import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   getMessageTimestamp,
@@ -31,11 +31,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import {
-  Collapsible,
-  CollapsiblePanel,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 import {
   selectChatProfileAvatarDataUrl,
   selectChatProfileDisplayName,
@@ -1092,12 +1087,6 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
   const detail = result.slice(0, 500)
   const hasMore = result.length > 500
 
-  const borderColor = isDone
-    ? 'color-mix(in srgb, var(--theme-success) 35%, var(--theme-border))'
-    : isError
-      ? 'color-mix(in srgb, var(--theme-danger) 35%, var(--theme-border))'
-      : 'color-mix(in srgb, var(--theme-accent) 50%, var(--theme-border))'
-
   const leftAccent = isRunning
     ? 'var(--theme-accent)'
     : isDone
@@ -1109,9 +1098,11 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
       className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] text-[11px] max-w-full overflow-hidden"
       style={{
         borderLeftWidth: '3px',
-        borderLeftColor: isRunning ? '#6366f1' : isDone ? '#22c55e' : '#ef4444',
+        borderLeftColor: leftAccent,
         transition: 'border-color 0.3s',
-        boxShadow: isRunning ? '0 0 8px rgba(99,102,241,0.15)' : 'none',
+        boxShadow: isRunning
+          ? '0 0 8px color-mix(in srgb, var(--theme-accent) 15%, transparent)'
+          : 'none',
       }}
     >
       {/* Header row — always clickable */}
@@ -1138,8 +1129,16 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
             {elapsed}
           </span>
         )}
-        {isDone && <span className="shrink-0 text-xs text-green-500">✅</span>}
-        {isError && <span className="shrink-0 text-xs text-red-500">❌</span>}
+        {isDone && (
+          <span className="shrink-0 text-xs text-[var(--theme-success)]">
+            ✅
+          </span>
+        )}
+        {isError && (
+          <span className="shrink-0 text-xs text-[var(--theme-danger)]">
+            ❌
+          </span>
+        )}
         {isRunning && (
           <span className="shrink-0 size-1.5 rounded-full animate-pulse bg-[var(--theme-accent)]" />
         )}
@@ -1195,10 +1194,10 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
           {/* Show error */}
           {isError && result && (
             <div className="px-2.5 py-1.5">
-              <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5">
+              <div className="text-[9px] uppercase tracking-widest text-[var(--theme-danger)] mb-0.5">
                 Error
               </div>
-              <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto text-red-500">
+              <pre className="text-[10px] font-mono whitespace-pre-wrap break-words max-h-48 overflow-y-auto text-[var(--theme-danger)]">
                 {result}
               </pre>
             </div>
@@ -1215,7 +1214,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
         </div>
       )}
       {!expanded && isError && result && (
-        <div className="px-2.5 pb-1.5 text-[10px] font-mono truncate text-red-500">
+        <div className="px-2.5 pb-1.5 text-[10px] font-mono truncate text-[var(--theme-danger)]">
           {result.slice(0, 80)}
         </div>
       )}
@@ -1855,8 +1854,8 @@ function InlineToolSectionItem({
               isRunning
                 ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
                 : isDone
-                  ? 'bg-emerald-500/10 text-emerald-600'
-                  : 'bg-red-500/10 text-red-500',
+                  ? 'bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'
+                  : 'bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]',
             )}
           >
             {isRunning ? 'Running' : isDone ? 'Done' : 'Error'}
@@ -1947,7 +1946,7 @@ function InlineToolSectionItem({
                 Input
               </div>
               {toolSection.type === 'exec' && headerArg ? (
-                <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded px-2 py-1 text-[10px] font-mono text-amber-500 bg-[var(--code-bg,var(--theme-card))]">
+                <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded px-2 py-1 text-[10px] font-mono text-[var(--theme-warning)] bg-[var(--code-bg,var(--theme-card))]">
                   $ {headerArg}
                 </pre>
               ) : (
@@ -1967,10 +1966,10 @@ function InlineToolSectionItem({
           {!showRawJson && !isArtifact ? (
             isError && toolSection.errorText ? (
               <div>
-                <div className="text-[9px] uppercase tracking-widest text-red-500 mb-0.5 font-sans">
+                <div className="text-[9px] uppercase tracking-widest text-[var(--theme-danger)] mb-0.5 font-sans">
                   Error
                 </div>
-                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono text-red-400 bg-[var(--code-bg,var(--theme-card))]">
+                <pre className="max-h-48 overflow-x-auto whitespace-pre-wrap break-words rounded p-2 text-[10px] font-mono text-[var(--theme-danger)] bg-[var(--code-bg,var(--theme-card))]">
                   {displayedOutputText}
                 </pre>
               </div>
@@ -2081,10 +2080,10 @@ function ToolCallGroup({
                 className={cn(
                   'rounded-md px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em]',
                   summary.errorCount > 0
-                    ? 'bg-red-500/8 text-red-500'
+                    ? 'bg-[color-mix(in_srgb,var(--theme-danger)_8%,transparent)] text-[var(--theme-danger)]'
                     : summary.runningCount > 0 || isStreaming
                       ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-strong)]'
-                      : 'bg-emerald-500/8 text-emerald-600',
+                      : 'bg-[color-mix(in_srgb,var(--theme-success)_8%,transparent)] text-[var(--theme-success)]',
                 )}
               >
                 {summary.statusLabel}
@@ -2804,7 +2803,7 @@ function MessageItemComponent({
                 ? 'chat-message-bubble-user text-white rounded-2xl rounded-br-[2px]'
                 : 'chat-message-bubble-assistant border rounded-2xl rounded-bl-[2px]',
               isQueued && isUser && !isFailed && 'opacity-70',
-              isFailed && isUser && 'bg-red-50/50 border border-red-300',
+              isFailed && isUser && 'bg-[color-mix(in_srgb,var(--theme-danger)_50%,transparent)] border border-[var(--theme-danger)]',
               bubbleClassName,
             )}
             style={

@@ -1,6 +1,11 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { DownloadIcon, Folder01Icon } from '@hugeicons/core-free-icons'
+import {
+  DownloadIcon,
+  Folder01Icon,
+  FullScreenIcon,
+  Minimize01Icon,
+} from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import {
   TooltipContent,
@@ -90,16 +95,8 @@ type ChatHeaderProps = {
   onRefresh?: () => void
   /** Current thinking level for this session */
   thinkingLevel?: ThinkingLevel
-  /** Current model id/name for compact mobile status */
-  agentModel?: string
-  /** Whether agent connection is healthy */
-  agentConnected?: boolean
-  /** Open agent details panel on mobile status tap */
-  onOpenAgentDetails?: () => void
   /** Pull-to-refresh offset in px — header slides down */
   pullOffset?: number
-  statusMode?: 'idle' | 'sending' | 'streaming' | 'tool'
-  activeToolName?: string
   isFocusMode?: boolean
   onToggleFocusMode?: () => void
   onUndo?: () => void
@@ -121,12 +118,7 @@ function ChatHeaderComponent({
   onToggleFileExplorer,
   dataUpdatedAt = 0,
   onRefresh,
-  agentModel: _agentModel = '',
-  agentConnected = true,
-  onOpenAgentDetails,
   pullOffset = 0,
-  statusMode = 'idle',
-  activeToolName,
   thinkingLevel = 'low',
   isFocusMode = false,
   onToggleFocusMode,
@@ -165,12 +157,6 @@ function ChatHeaderComponent({
 
   const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
   const mobileTitle = formatMobileSessionTitle(activeTitle)
-  void _agentModel
-  void agentConnected
-  void statusMode
-  void activeToolName
-  void isFocusMode
-  void onToggleFocusMode // kept for prop compat
   const showThinkingIndicator = thinkingLevel === 'adaptive'
 
   const handleRefresh = useCallback(() => {
@@ -179,14 +165,6 @@ function ChatHeaderComponent({
     onRefresh()
     setTimeout(() => setIsRefreshing(false), 600)
   }, [onRefresh])
-
-  const handleOpenAgentDetails = useCallback(() => {
-    if (onOpenAgentDetails) {
-      onOpenAgentDetails()
-      return
-    }
-    window.dispatchEvent(new CustomEvent('claude:chat-agent-details'))
-  }, [onOpenAgentDetails])
 
   useEffect(() => {
     if (isEditingTitle) return
@@ -301,7 +279,6 @@ function ChatHeaderComponent({
           </button>
 
           <div className="flex-1" />
-
         </div>
       </div>
     )
@@ -387,9 +364,7 @@ function ChatHeaderComponent({
               )}
               {sessionPopoverOpen && (
                 <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-80 overflow-hidden rounded-xl border border-[var(--theme-border)] shadow-2xl">
-                  <div
-                    className="border-b border-[var(--theme-border)] px-3 py-2 bg-[var(--theme-card)]"
-                  >
+                  <div className="border-b border-[var(--theme-border)] px-3 py-2 bg-[var(--theme-card)]">
                     <div className="flex items-center gap-2">
                       <svg
                         width="13"
@@ -457,9 +432,7 @@ function ChatHeaderComponent({
                               isActive && 'bg-[var(--theme-card2)] font-medium',
                             )}
                           >
-                            <span
-                              className="flex-1 min-w-0 truncate text-[var(--theme-text)]"
-                            >
+                            <span className="flex-1 min-w-0 truncate text-[var(--theme-text)]">
                               {label}
                             </span>
                             {isActive && (
@@ -491,10 +464,13 @@ function ChatHeaderComponent({
               <TooltipTrigger
                 render={
                   <span
-                    className="mr-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    className="mr-2 inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--theme-warning)_12%,transparent)] px-2 py-0.5 text-[11px] font-medium text-[var(--theme-warning)] dark:bg-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)]"
                     aria-label="Thinking: Adaptive"
                     role="status"
-                    style={{ boxShadow: '0 0 6px 1px rgba(251,191,36,0.4)' }}
+                    style={{
+                      boxShadow:
+                        '0 0 6px 1px color-mix(in srgb, var(--theme-warning) 40%, transparent)',
+                    }}
                   >
                     🧠
                   </span>
@@ -526,7 +502,9 @@ function ChatHeaderComponent({
                     <span
                       className={cn(
                         'block size-2 rounded-full transition-colors duration-500',
-                        isStale ? 'bg-amber-400' : 'bg-emerald-500',
+                        isStale
+                          ? 'bg-[var(--theme-warning)]'
+                          : 'bg-[var(--theme-success)]',
                       )}
                     />
                   </button>
@@ -538,6 +516,41 @@ function ChatHeaderComponent({
             </TooltipRoot>
           </TooltipProvider>
         ) : null}
+        {/* Focus mode */}
+        {onToggleFocusMode && (
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                onClick={onToggleFocusMode}
+                render={
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className={cn(
+                      'hover:bg-[var(--theme-hover)]',
+                      isFocusMode
+                        ? 'text-[var(--theme-accent)]'
+                        : 'text-[var(--theme-muted)]',
+                    )}
+                    aria-label={
+                      isFocusMode ? 'Exit focus mode' : 'Enter focus mode'
+                    }
+                    aria-pressed={isFocusMode}
+                  >
+                    <HugeiconsIcon
+                      icon={isFocusMode ? Minimize01Icon : FullScreenIcon}
+                      size={16}
+                      strokeWidth={1.6}
+                    />
+                  </Button>
+                }
+              />
+              <TooltipContent side="bottom">
+                {isFocusMode ? 'Exit focus mode' : 'Focus mode'}
+              </TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+        )}
         {/* Export */}
         {onExport && (
           <TooltipProvider>
@@ -551,11 +564,17 @@ function ChatHeaderComponent({
                     className="text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
                     aria-label="Export conversation"
                   >
-                    <HugeiconsIcon icon={DownloadIcon} size={16} strokeWidth={1.6} />
+                    <HugeiconsIcon
+                      icon={DownloadIcon}
+                      size={16}
+                      strokeWidth={1.6}
+                    />
                   </Button>
                 }
               />
-              <TooltipContent side="bottom">Export conversation (.md)</TooltipContent>
+              <TooltipContent side="bottom">
+                Export conversation (.md)
+              </TooltipContent>
             </TooltipRoot>
           </TooltipProvider>
         )}
@@ -599,7 +618,9 @@ function ChatHeaderComponent({
                     variant="ghost"
                     className={cn(
                       'hover:bg-[var(--theme-hover)]',
-                      clearConfirm ? 'text-red-500' : 'text-[var(--theme-muted)]',
+                      clearConfirm
+                        ? 'text-[var(--theme-danger)]'
+                        : 'text-[var(--theme-muted)]',
                     )}
                     aria-label={
                       clearConfirm ? 'Confirm clear' : 'Clear session'
