@@ -1,5 +1,12 @@
-import { Fragment,  useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type {ReactNode} from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { usePageTitle } from '@/hooks/use-page-title'
 import {
@@ -39,8 +46,8 @@ type FilesListResponse = {
   entries: Array<FileEntry>
 }
 
-export const FILE_BROWSER_MODE_LABEL = 'Server workspace'
-export const FILE_BROWSER_REMOTE_HELP =
+const FILE_BROWSER_MODE_LABEL = 'Server workspace'
+const FILE_BROWSER_REMOTE_HELP =
   'Files are loaded from the Workspace server via /api/files, so remote deployments show files created by the agent.'
 
 type FileReadResponse = {
@@ -52,7 +59,6 @@ type FileReadResponse = {
 type PromptState = {
   mode: 'rename' | 'new-folder'
   targetPath: string
-  defaultValue?: string
 }
 
 type ContextMenuState = {
@@ -288,7 +294,10 @@ type HighlightToken = {
   kind: HighlightKind
 }
 
-const HIGHLIGHT_CLASS_BY_KIND: Record<Exclude<HighlightKind, 'plain'>, string> = {
+const HIGHLIGHT_CLASS_BY_KIND: Record<
+  Exclude<HighlightKind, 'plain'>,
+  string
+> = {
   comment: 'hl-comment',
   jsonKey: 'hl-key',
   keyword: 'hl-kw',
@@ -297,14 +306,19 @@ const HIGHLIGHT_CLASS_BY_KIND: Record<Exclude<HighlightKind, 'plain'>, string> =
   type: 'hl-type',
 }
 
-function pushHighlightToken(tokens: Array<HighlightToken>, text: string, kind: HighlightKind = 'plain') {
+function pushHighlightToken(
+  tokens: Array<HighlightToken>,
+  text: string,
+  kind: HighlightKind = 'plain',
+) {
   if (!text) return
   tokens.push({ text, kind })
 }
 
 function tokenizeJson(code: string): Array<HighlightToken> {
   const tokens: Array<HighlightToken> = []
-  const pattern = /("(?:[^"\\]|\\.)*")(\s*:)?|-?\d+\.?\d*|\b(?:true|false|null)\b/g
+  const pattern =
+    /("(?:[^"\\]|\\.)*")(\s*:)?|-?\d+\.?\d*|\b(?:true|false|null)\b/g
   let lastIndex = 0
 
   for (const match of code.matchAll(pattern)) {
@@ -341,7 +355,11 @@ function tokenizeCode(code: string): Array<HighlightToken> {
 
     if (value.startsWith('//') || value.startsWith('/*')) {
       pushHighlightToken(tokens, value, 'comment')
-    } else if (value.startsWith('"') || value.startsWith("'") || value.startsWith('`')) {
+    } else if (
+      value.startsWith('"') ||
+      value.startsWith("'") ||
+      value.startsWith('`')
+    ) {
       pushHighlightToken(tokens, value, 'string')
     } else if (/^-?\d+\.?\d*$/.test(value)) {
       pushHighlightToken(tokens, value, 'number')
@@ -433,11 +451,11 @@ function DiffModal({
                 Review changes — {fileName}
               </DialogTitle>
               <DialogDescription className="mt-0.5 text-xs text-[var(--theme-muted)]">
-                <span className="text-emerald-600 font-medium">
+                <span className="text-[var(--theme-success)] font-medium">
                   +{addedCount} added
                 </span>
                 {' · '}
-                <span className="text-red-600 font-medium">
+                <span className="text-[var(--theme-danger)] font-medium">
                   −{removedCount} removed
                 </span>
               </DialogDescription>
@@ -467,7 +485,7 @@ function DiffModal({
                       className={cn(
                         'flex items-start gap-0',
                         line.kind === 'removed'
-                          ? 'bg-red-50 dark:bg-red-950/25'
+                          ? 'bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--theme-danger)_25%,transparent)]'
                           : '',
                       )}
                     >
@@ -478,7 +496,7 @@ function DiffModal({
                         className={cn(
                           'shrink-0 w-5 select-none text-center leading-relaxed',
                           line.kind === 'removed'
-                            ? 'text-red-500'
+                            ? 'text-[var(--theme-danger)]'
                             : 'text-transparent',
                         )}
                       >
@@ -488,7 +506,7 @@ function DiffModal({
                         className={cn(
                           'flex-1 whitespace-pre-wrap break-all px-1',
                           line.kind === 'removed'
-                            ? 'text-red-800 dark:text-red-300'
+                            ? 'text-[var(--theme-danger)] dark:text-[var(--theme-danger)]'
                             : 'text-[var(--theme-text)]',
                         )}
                       >
@@ -513,7 +531,7 @@ function DiffModal({
                       className={cn(
                         'flex items-start gap-0',
                         line.kind === 'added'
-                          ? 'bg-emerald-50 dark:bg-emerald-950/25'
+                          ? 'bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)]'
                           : '',
                       )}
                     >
@@ -524,7 +542,7 @@ function DiffModal({
                         className={cn(
                           'shrink-0 w-5 select-none text-center leading-relaxed',
                           line.kind === 'added'
-                            ? 'text-emerald-600'
+                            ? 'text-[var(--theme-success)]'
                             : 'text-transparent',
                         )}
                       >
@@ -534,7 +552,7 @@ function DiffModal({
                         className={cn(
                           'flex-1 whitespace-pre-wrap break-all px-1',
                           line.kind === 'added'
-                            ? 'text-emerald-800 dark:text-emerald-300'
+                            ? 'text-[var(--theme-success)] dark:text-[var(--theme-success)]'
                             : 'text-[var(--theme-text)]',
                         )}
                       >
@@ -651,9 +669,7 @@ function Breadcrumb({ path }: { path: string }) {
       <span className="shrink-0">workspace</span>
       {parts.map((part, i) => (
         <span key={i} className="flex items-center gap-1 min-w-0">
-          <span className="shrink-0 text-[var(--theme-muted)]">
-            /
-          </span>
+          <span className="shrink-0 text-[var(--theme-muted)]">/</span>
           <span
             className={cn(
               'truncate',
@@ -702,7 +718,8 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
   const isEditable = isEditableFile(fileName)
 
   const highlighted = useMemo<Array<ReactNode>>(
-    () => (isCode && !isMd && content ? highlightCodeContent(content, ext) : []),
+    () =>
+      isCode && !isMd && content ? highlightCodeContent(content, ext) : [],
     [isCode, isMd, content, ext],
   )
 
@@ -837,7 +854,13 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
             variant="outline"
             onClick={() => setRawMode((v) => !v)}
           >
-            {rawMode ? (isHtml ? 'Preview HTML' : 'Preview') : (isHtml ? 'Raw HTML' : 'Raw')}
+            {rawMode
+              ? isHtml
+                ? 'Preview HTML'
+                : 'Preview'
+              : isHtml
+                ? 'Raw HTML'
+                : 'Raw'}
           </Button>
         )}
         {isEditable && (
@@ -891,7 +914,7 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
         {diffModal}
         <div className="flex h-full flex-col">
           {header}
-          <div className="flex flex-1 items-center justify-center p-4 text-sm text-red-600 dark:text-red-400">
+          <div className="flex flex-1 items-center justify-center p-4 text-sm text-[var(--theme-danger)] dark:text-[var(--theme-danger)]">
             {fileError}
           </div>
           {footer}
@@ -916,7 +939,9 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
                 className="max-h-full max-w-full rounded-lg border border-[var(--theme-border)] shadow-sm object-contain"
               />
             ) : (
-              <div className="text-sm text-[var(--theme-muted)]">No preview</div>
+              <div className="text-sm text-[var(--theme-muted)]">
+                No preview
+              </div>
             )}
           </div>
           {footer}
@@ -975,7 +1000,9 @@ function FilePanel({ selectedEntry }: FilePanelProps) {
   // ── Code viewer (syntax highlighted) — also raw mode for md ───────────────
 
   if (isCode) {
-    const displayContent = isMd ? highlightCodeContent(content, 'md') : highlighted
+    const displayContent = isMd
+      ? highlightCodeContent(content, 'md')
+      : highlighted
     return (
       <>
         {diffModal}
@@ -1151,11 +1178,7 @@ export function FilesScreen() {
   }, [])
 
   const openRenamePrompt = useCallback((entry: FileEntry) => {
-    setPromptState({
-      mode: 'rename',
-      targetPath: entry.path,
-      defaultValue: entry.name,
-    })
+    setPromptState({ mode: 'rename', targetPath: entry.path })
     setPromptValue(entry.name)
   }, [])
 
@@ -1248,15 +1271,17 @@ export function FilesScreen() {
                 Loading server workspace…
               </div>
             ) : treeError ? (
-              <div className="space-y-1 px-3 py-2 text-xs text-red-500">
+              <div className="space-y-1 px-3 py-2 text-xs text-[var(--theme-danger)]">
                 <div>{treeError}</div>
                 <div className="text-[var(--theme-muted)]">
-                  Check the server workspace catalog or HERMES_WORKSPACE_DIR; this browser no longer needs local folder access.
+                  Check the server workspace catalog or HERMES_WORKSPACE_DIR;
+                  this browser no longer needs local folder access.
                 </div>
               </div>
             ) : entries.length === 0 ? (
               <div className="px-3 py-2 text-xs text-[var(--theme-muted)]">
-                Server workspace is empty. Agent-created files will appear here after they are written to the configured workspace path.
+                Server workspace is empty. Agent-created files will appear here
+                after they are written to the configured workspace path.
               </div>
             ) : (
               entries
@@ -1336,7 +1361,7 @@ export function FilesScreen() {
             </button>
           )}
           <button
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_12%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)]"
             onClick={() => {
               setDeleteConfirm(contextMenu.entry)
               setContextMenu(null)
@@ -1368,7 +1393,8 @@ export function FilesScreen() {
               value={promptValue}
               onChange={(e) => setPromptValue(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handlePromptSubmit()
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing)
+                  void handlePromptSubmit()
               }}
               className="w-full rounded-md border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-sm text-[var(--theme-text)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)]"
               autoFocus

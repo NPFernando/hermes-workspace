@@ -33,8 +33,6 @@ export type ClaudeJob = {
   jobId?: string
 }
 
-export type HermesJob = ClaudeJob
-
 export type JobOutput = {
   filename: string
   timestamp: string
@@ -55,14 +53,6 @@ export function normalizeJobsResponse(data: unknown): Array<ClaudeJob> {
   return []
 }
 
-export function findJobById(
-  jobs: Array<ClaudeJob>,
-  jobId: string | null | undefined,
-): ClaudeJob | null {
-  if (!jobId) return null
-  return jobs.find((job) => job.id === jobId) ?? null
-}
-
 export function normalizeJobState(state: unknown): string | null {
   return typeof state === 'string' && state.trim()
     ? state.trim().toLowerCase()
@@ -79,38 +69,6 @@ export function isFailedJobState(state: unknown): boolean {
     normalized === 'canceled' ||
     normalized === 'aborted'
   )
-}
-
-export function isTerminalJobState(state: unknown): boolean {
-  const normalized = normalizeJobState(state)
-  return (
-    normalized === 'completed' ||
-    normalized === 'complete' ||
-    normalized === 'succeeded' ||
-    normalized === 'success' ||
-    normalized === 'finished' ||
-    normalized === 'done' ||
-    isFailedJobState(normalized)
-  )
-}
-
-export function getLatestJobOutputText(outputs: Array<JobOutput>): string {
-  let latestContent = ''
-  let latestTimestamp = Number.NEGATIVE_INFINITY
-
-  for (const output of outputs) {
-    const content =
-      typeof output.content === 'string' ? output.content.trim() : ''
-    if (!content) continue
-
-    const timestamp = new Date(output.timestamp).getTime()
-    if (!Number.isFinite(timestamp) || timestamp < latestTimestamp) continue
-
-    latestTimestamp = timestamp
-    latestContent = content
-  }
-
-  return latestContent
 }
 
 export function getJobErrorText(
@@ -186,7 +144,9 @@ type JobMutationInput = {
   profile?: string
 }
 
-function serializeDeliveryTargets(deliver?: string | Array<string>): string | undefined {
+function serializeDeliveryTargets(
+  deliver?: string | Array<string>,
+): string | undefined {
   if (typeof deliver === 'string') {
     const normalized = deliver.trim()
     return normalized || undefined
