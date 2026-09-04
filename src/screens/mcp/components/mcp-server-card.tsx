@@ -19,9 +19,9 @@ interface Props {
 
 const STATUS_COLORS: Record<McpServer['status'], string> = {
   connected:
-    'border border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200',
+    'border border-[var(--theme-success)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]',
   failed:
-    'border border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200',
+    'border border-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]',
   unknown:
     'border border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
 }
@@ -67,7 +67,9 @@ export function McpServerCard({ server, onEdit }: Props) {
             <h3 className="truncate text-sm font-medium text-ink">
               {server.name}
             </h3>
-            <Badge className={STATUS_COLORS[server.status]}>{server.status}</Badge>
+            <Badge className={STATUS_COLORS[server.status]}>
+              {server.status}
+            </Badge>
             <Badge className="border border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]">
               {server.transportType}
             </Badge>
@@ -100,7 +102,7 @@ export function McpServerCard({ server, onEdit }: Props) {
       </dl>
 
       {server.lastError ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-[11px] text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200">
+        <p className="rounded-md border border-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-2 py-1.5 text-[11px] text-[var(--theme-danger)] dark:border-[var(--theme-danger)] dark:bg-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] dark:text-[var(--theme-danger)]">
           {server.lastError}
         </p>
       ) : null}
@@ -160,7 +162,7 @@ export function McpServerCard({ server, onEdit }: Props) {
           <Button
             variant="outline"
             size="sm"
-            className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/40"
+            className="border-[var(--theme-danger)] text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_12%,transparent)] dark:border-[var(--theme-danger)] dark:text-[var(--theme-danger)] dark:hover:bg-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)]"
             onClick={() => setConfirmDelete(true)}
           >
             Delete
@@ -175,34 +177,36 @@ export function McpServerCard({ server, onEdit }: Props) {
             : `Failed: ${testResult.error || 'unknown error'}`}
         </p>
       ) : null}
-      {testResult && !testResult.ok && testResult.error ? (
-        (() => {
-          const stdioErrorRe = /Connection closed|EACCES|ENOENT|exited unexpectedly/i
-          const httpErrorRe = /fetch failed|network error|ENOTFOUND/i
-          const hasStdioPlaceholder =
-            server.transportType === 'stdio' &&
-            server.args.some((a) => isArgPlaceholder(a))
-          const hasHttpPlaceholder =
-            server.transportType === 'http' &&
-            Boolean(server.url && isUrlPlaceholder(server.url))
-          const showHint =
-            (stdioErrorRe.test(testResult.error) && hasStdioPlaceholder) ||
-            (httpErrorRe.test(testResult.error) && hasHttpPlaceholder)
-          if (!showHint) return null
-          return (
-            <p className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
-              Edit server args/url — looks like a placeholder. Click Edit to fix.
-            </p>
-          )
-        })()
-      ) : null}
+      {testResult && !testResult.ok && testResult.error
+        ? (() => {
+            const stdioErrorRe =
+              /Connection closed|EACCES|ENOENT|exited unexpectedly/i
+            const httpErrorRe = /fetch failed|network error|ENOTFOUND/i
+            const hasStdioPlaceholder =
+              server.transportType === 'stdio' &&
+              server.args.some((a) => isArgPlaceholder(a))
+            const hasHttpPlaceholder =
+              server.transportType === 'http' &&
+              Boolean(server.url && isUrlPlaceholder(server.url))
+            const showHint =
+              (stdioErrorRe.test(testResult.error) && hasStdioPlaceholder) ||
+              (httpErrorRe.test(testResult.error) && hasHttpPlaceholder)
+            if (!showHint) return null
+            return (
+              <p className="rounded-md border border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-2 py-1.5 text-[11px] text-[var(--theme-warning)] dark:border-[var(--theme-warning)] dark:bg-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] dark:text-[var(--theme-warning)]">
+                Edit server args/url — looks like a placeholder. Click Edit to
+                fix.
+              </p>
+            )
+          })()
+        : null}
       {oauth.isError && oauth.error ? (
-        <p className="text-xs text-red-700 dark:text-red-300">
+        <p className="text-xs text-[var(--theme-danger)] dark:text-[var(--theme-danger)]">
           Reauth failed: {oauth.error.message}
         </p>
       ) : null}
       {oauth.data?.status === 'connected' ? (
-        <p className="text-xs text-emerald-700 dark:text-emerald-300">
+        <p className="text-xs text-[var(--theme-success)] dark:text-[var(--theme-success)]">
           Reauth succeeded.
         </p>
       ) : null}

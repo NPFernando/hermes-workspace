@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import type { McpListResponse } from '@/types/mcp'
 
 export interface UseMcpServersParams {
-  tab: 'installed' | 'catalog' | 'all'
   category: string
   search: string
 }
@@ -16,7 +15,9 @@ export function useMcpServers(params: UseMcpServersParams) {
       if (params.category && params.category !== 'All') {
         url.searchParams.set('category', params.category)
       }
-      const res = await fetch(url.toString().replace(window.location.origin, ''))
+      const res = await fetch(
+        url.toString().replace(window.location.origin, ''),
+      )
       if (!res.ok) throw new Error(`MCP list failed (${res.status})`)
       const body = (await res.json()) as Partial<McpListResponse> & {
         ok?: boolean

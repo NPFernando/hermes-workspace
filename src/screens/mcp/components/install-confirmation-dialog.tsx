@@ -21,6 +21,7 @@ import {
   detectPlaceholders,
   isStillPlaceholder,
 } from '../lib/placeholder-detect'
+import { TRUST_PILL } from '../lib/trust-pill'
 import type { HubMcpEntry } from '../hooks/use-mcp-hub'
 import type { McpClientInput } from '@/types/mcp'
 import type { PlaceholderField } from '../lib/placeholder-detect'
@@ -37,24 +38,6 @@ interface Props {
   entry: HubMcpEntry | null
   onClose: () => void
   onInstalled?: () => void
-}
-
-const TRUST_PILL: Record<
-  string,
-  { label: string; className: string }
-> = {
-  official: {
-    label: 'Official',
-    className: 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300',
-  },
-  community: {
-    label: 'Community',
-    className: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300',
-  },
-  unverified: {
-    label: 'Unverified',
-    className: 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300',
-  },
 }
 
 const FIELD =
@@ -92,11 +75,16 @@ function applyOverrides(
   return out
 }
 
-export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props) {
+export function InstallConfirmationDialog({
+  entry,
+  onClose,
+  onInstalled,
+}: Props) {
   const [installing, setInstalling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Detected placeholders on first click
-  const [placeholders, setPlaceholders] = useState<Array<PlaceholderField> | null>(null)
+  const [placeholders, setPlaceholders] =
+    useState<Array<PlaceholderField> | null>(null)
   // User-provided override values, keyed by PlaceholderField.path
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -181,7 +169,9 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
     }
   }
 
-  const trustConfig = entry ? (TRUST_PILL[entry.trust] ?? TRUST_PILL.unverified) : null
+  const trustConfig = entry
+    ? (TRUST_PILL[entry.trust] ?? TRUST_PILL.unverified)
+    : null
   const template = entry?.template
   const envKeys = template?.env ? Object.keys(template.env) : []
 
@@ -223,7 +213,9 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
                   <p className="mb-1 text-xs font-medium uppercase text-[var(--theme-muted)] tracking-wide">
                     Command
                   </p>
-                  <p className="font-mono text-ink break-all">{template.command}</p>
+                  <p className="font-mono text-ink break-all">
+                    {template.command}
+                  </p>
                 </div>
               ) : null}
 
@@ -275,25 +267,34 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
             {/* Placeholder fill form — shown after first Install click when placeholders detected */}
             {placeholders && placeholders.length > 0 ? (
               <div
-                className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 space-y-3 dark:border-amber-700 dark:bg-amber-950/20"
+                className="rounded-xl border border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_60%,transparent)] p-4 space-y-3 dark:border-[var(--theme-warning)] dark:bg-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)]"
                 data-testid="placeholder-fill-form"
               >
-                <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                  This template contains placeholder values. Fill in the fields below before installing.
+                <p className="text-xs font-medium text-[var(--theme-warning)] dark:text-[var(--theme-warning)]">
+                  This template contains placeholder values. Fill in the fields
+                  below before installing.
                 </p>
                 {placeholders.map((ph) => (
-                  <label key={ph.path} className="flex flex-col gap-1 text-sm text-[var(--theme-muted)]">
+                  <label
+                    key={ph.path}
+                    className="flex flex-col gap-1 text-sm text-[var(--theme-muted)]"
+                  >
                     <span className="font-mono text-xs text-[var(--theme-muted)]">
                       {ph.path}
                       {ph.currentValue ? (
-                        <span className="ml-1 text-[var(--theme-muted)]">(was: {ph.currentValue})</span>
+                        <span className="ml-1 text-[var(--theme-muted)]">
+                          (was: {ph.currentValue})
+                        </span>
                       ) : null}
                     </span>
                     <input
                       className={FIELD}
                       value={overrides[ph.path] ?? ''}
                       onChange={(e) =>
-                        setOverrides((prev) => ({ ...prev, [ph.path]: e.target.value }))
+                        setOverrides((prev) => ({
+                          ...prev,
+                          [ph.path]: e.target.value,
+                        }))
                       }
                       placeholder={`Replace ${ph.currentValue || ph.path}`}
                       data-testid={`placeholder-input-${ph.path}`}
@@ -326,14 +327,19 @@ export function InstallConfirmationDialog({ entry, onClose, onInstalled }: Props
 
             {/* Error */}
             {error ? (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+              <p className="rounded-lg border border-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-3 py-2 text-sm text-[var(--theme-danger)] dark:border-[var(--theme-danger)] dark:bg-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] dark:text-[var(--theme-danger)]">
                 {error}
               </p>
             ) : null}
 
             {/* Footer actions */}
             <div className="flex items-center justify-end gap-2 border-t border-[var(--theme-border)] pt-3">
-              <Button variant="ghost" size="sm" onClick={onClose} disabled={installing}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                disabled={installing}
+              >
                 Cancel
               </Button>
               <Button

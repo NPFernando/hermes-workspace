@@ -18,6 +18,7 @@ import {
   UserStar01Icon,
 } from '@hugeicons/core-free-icons'
 import { useProfileWizard } from './use-profile-wizard'
+import { readJson } from '@/lib/memory-screen-utils'
 import { Button } from '@/components/ui/button'
 import { DialogContent, DialogRoot, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -37,12 +38,35 @@ type SisterEntry = {
   growthEntryCount?: number
 }
 
-const SISTER_BADGE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  astra:    { bg: 'bg-violet-500/15',  text: 'text-violet-400',  border: 'border-violet-400/30' },
-  novus:    { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-400/30' },
-  nova:     { bg: 'bg-sky-500/15',     text: 'text-sky-400',     border: 'border-sky-400/30' },
-  business: { bg: 'bg-amber-500/15',   text: 'text-amber-400',   border: 'border-amber-400/30' },
-  default:  { bg: 'bg-[var(--theme-panel)]0/10', text: 'text-[var(--theme-muted)]', border: 'border-[var(--theme-border)]/20' },
+const SISTER_BADGE_STYLES: Record<
+  string,
+  { bg: string; text: string; border: string }
+> = {
+  astra: {
+    bg: 'bg-violet-500/15',
+    text: 'text-violet-400',
+    border: 'border-violet-400/30',
+  },
+  novus: {
+    bg: 'bg-emerald-500/15',
+    text: 'text-emerald-400',
+    border: 'border-emerald-400/30',
+  },
+  nova: {
+    bg: 'bg-sky-500/15',
+    text: 'text-sky-400',
+    border: 'border-sky-400/30',
+  },
+  business: {
+    bg: 'bg-amber-500/15',
+    text: 'text-amber-400',
+    border: 'border-amber-400/30',
+  },
+  default: {
+    bg: 'bg-[var(--theme-panel)]/10',
+    text: 'text-[var(--theme-muted)]',
+    border: 'border-[var(--theme-border)]/20',
+  },
 }
 
 function sisterBadgeStyle(s: SisterEntry) {
@@ -54,10 +78,15 @@ function sisterBadgeStyle(s: SisterEntry) {
 function SisterBadge({ sister }: { sister: SisterEntry }) {
   const style = sisterBadgeStyle(sister)
   return (
-    <span className={cn(
-      'mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
-      style.bg, style.text, style.border,
-    )} title={sister.description || sister.role}>
+    <span
+      className={cn(
+        'mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+        style.bg,
+        style.text,
+        style.border,
+      )}
+      title={sister.description || sister.role}
+    >
       {sister.emoji} {sister.name}
       {(sister.growthEntryCount ?? 0) > 0 && sister.growthEmoji ? (
         <span className="opacity-60">{sister.growthEmoji}</span>
@@ -92,15 +121,6 @@ type ProfileDetail = {
   skillsDir?: string
 }
 
-async function readJson<T>(url: string): Promise<T> {
-  const response = await fetch(url)
-  if (!response.ok) {
-    const text = await response.text().catch(() => '')
-    throw new Error(text || `Request failed (${response.status})`)
-  }
-  return (await response.json()) as T
-}
-
 function formatDate(value?: string): string {
   if (!value) return '—'
   const parsed = Date.parse(value)
@@ -112,14 +132,6 @@ function formatDate(value?: string): string {
     hour: 'numeric',
     minute: '2-digit',
   }).format(parsed)
-}
-
-function StatChip({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
-      <span className="font-semibold text-[var(--theme-text)]">{value}</span> {label}
-    </div>
-  )
 }
 
 function ProfileStat({
@@ -155,19 +167,28 @@ export function ProfilesScreen() {
   const [detailsName, setDetailsName] = useState<string | null>(null)
   const [renameTarget, setRenameTarget] = useState<ProfileSummary | null>(null)
   const {
-    newProfileName, setNewProfileName,
-    wizardStep, setWizardStep,
-    cloneFrom, setCloneFrom,
-    wizardProvider, setWizardProvider,
-    wizardModel, setWizardModel,
-    allModels, setAllModels,
+    newProfileName,
+    setNewProfileName,
+    wizardStep,
+    setWizardStep,
+    cloneFrom,
+    setCloneFrom,
+    wizardProvider,
+    setWizardProvider,
+    wizardModel,
+    setWizardModel,
+    allModels,
     loadingModels,
-    wizardPersonality, setWizardPersonality,
-    wizardSelectedPreset, setWizardSelectedPreset,
-    wizardEnableSwarm, setWizardEnableSwarm,
-    swarmData, setSwarmData,
+    wizardPersonality,
+    setWizardPersonality,
+    wizardSelectedPreset,
+    setWizardSelectedPreset,
+    wizardEnableSwarm,
+    setWizardEnableSwarm,
+    swarmData,
     loadingSwarm,
-    workerPresets, setWorkerPresets,
+    workerPresets,
+    setWorkerPresets,
     resetWizard,
   } = useProfileWizard(createOpen)
   const [renameValue, setRenameValue] = useState('')
@@ -188,7 +209,10 @@ export function ProfilesScreen() {
     queryFn: async () => {
       const res = await fetch('/api/sisters')
       if (!res.ok) return []
-      const payload = (await res.json()) as { ok?: boolean; sisters?: Array<SisterEntry> }
+      const payload = (await res.json()) as {
+        ok?: boolean
+        sisters?: Array<SisterEntry>
+      }
       return Array.isArray(payload.sisters) ? payload.sisters : []
     },
     staleTime: 60_000,
@@ -256,12 +280,13 @@ export function ProfilesScreen() {
       // Personality + swarm distribution
       const personalityText = wizardPersonality.trim()
       if (personalityText) {
-        const workers = wizardEnableSwarm && swarmData
-          ? swarmData.recommendations.map((rec) => ({
-              workerId: rec.workerId,
-              presetKey: workerPresets[rec.workerId] ?? rec.recommendedPreset,
-            }))
-          : []
+        const workers =
+          wizardEnableSwarm && swarmData
+            ? swarmData.recommendations.map((rec) => ({
+                workerId: rec.workerId,
+                presetKey: workerPresets[rec.workerId] ?? rec.recommendedPreset,
+              }))
+            : []
         try {
           await postJson('/api/personality-swarm', {
             name: newProfileName.trim(),
@@ -270,7 +295,9 @@ export function ProfilesScreen() {
           })
         } catch {
           // non-fatal — profile is created, personality failed
-          toast('Profile created but personality distribution had errors', { type: 'warning' })
+          toast('Profile created but personality distribution had errors', {
+            type: 'warning',
+          })
         }
       }
 
@@ -360,7 +387,9 @@ export function ProfilesScreen() {
       toast(`Saved description for ${detailsName}`, { type: 'success' })
       await Promise.all([
         refreshProfiles(),
-        queryClient.invalidateQueries({ queryKey: ['profiles', 'read', detailsName] }),
+        queryClient.invalidateQueries({
+          queryKey: ['profiles', 'read', detailsName],
+        }),
       ])
       await detailQuery.refetch()
     } catch (error) {
@@ -374,12 +403,17 @@ export function ProfilesScreen() {
   }
 
   return (
-    <div data-route-page className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 md:px-6">
+    <div
+      data-route-page
+      className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 md:px-6"
+    >
       <div className="flex flex-col gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm md:flex-row md:items-center md:justify-between">
         <div>
           <div className="hidden items-center gap-2 md:flex">
             <HugeiconsIcon icon={UserGroupIcon} size={22} strokeWidth={1.7} />
-            <h1 className="text-lg font-semibold text-[var(--theme-text)]">Profiles</h1>
+            <h1 className="text-lg font-semibold text-[var(--theme-text)]">
+              Profiles
+            </h1>
           </div>
           <p className="mt-1 text-sm text-[var(--theme-muted)]">
             Browse and manage Hermes profiles stored under{' '}
@@ -402,7 +436,7 @@ export function ProfilesScreen() {
             >
               {/* Active glow accent */}
               {profile.active && (
-                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-accent-500 to-emerald-400" />
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[var(--theme-success)] via-accent-500 to-[var(--theme-success)]" />
               )}
 
               {/* Centered avatar hero */}
@@ -412,7 +446,7 @@ export function ProfilesScreen() {
                     className={cn(
                       'rounded-full p-1',
                       profile.active
-                        ? 'bg-gradient-to-br from-emerald-400 via-accent-500 to-emerald-500 shadow-lg shadow-emerald-500/20'
+                        ? 'bg-gradient-to-br from-[var(--theme-success)] via-accent-500 to-[var(--theme-success)] shadow-lg shadow-emerald-500/20'
                         : 'bg-gradient-to-br from-[var(--theme-muted)]/30 to-[var(--theme-muted)]/50',
                     )}
                   >
@@ -433,7 +467,7 @@ export function ProfilesScreen() {
                     />
                   </div>
                   {profile.active && (
-                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full border-2 border-white bg-emerald-500 px-2 py-0.5">
+                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full border-2 border-white bg-[var(--theme-success)] px-2 py-0.5">
                       <HugeiconsIcon
                         icon={CheckmarkCircle02Icon}
                         size={10}
@@ -538,7 +572,7 @@ export function ProfilesScreen() {
                     'flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs font-semibold transition-colors',
                     profile.active
                       ? 'cursor-default text-[var(--theme-muted)]'
-                      : 'text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20',
+                      : 'text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_12%,transparent)] dark:text-[var(--theme-danger)] dark:hover:bg-[color-mix(in_srgb,var(--theme-danger)_20%,transparent)]',
                   )}
                 >
                   <HugeiconsIcon
@@ -599,7 +633,7 @@ export function ProfilesScreen() {
                     className={cn(
                       'flex size-7 items-center justify-center rounded-full text-xs font-bold transition-colors',
                       wizardStep > step
-                        ? 'bg-emerald-500 text-white'
+                        ? 'bg-[var(--theme-success)] text-white'
                         : wizardStep === step
                           ? 'bg-accent-500 text-white'
                           : 'border border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
@@ -620,7 +654,7 @@ export function ProfilesScreen() {
                       className={cn(
                         'h-0.5 flex-1 rounded-full transition-colors',
                         wizardStep > step
-                          ? 'bg-emerald-400'
+                          ? 'bg-[var(--theme-success)]'
                           : 'bg-[var(--theme-hover)]',
                       )}
                     />
@@ -646,12 +680,12 @@ export function ProfilesScreen() {
                     autoFocus
                   />
                   {newProfileName.trim() && !nameValid ? (
-                    <p className="text-xs text-red-500">
+                    <p className="text-xs text-[var(--theme-danger)]">
                       Use letters, numbers, underscores, or hyphens. Cannot be
                       &quot;default&quot;.
                     </p>
                   ) : newProfileName.trim() && nameValid ? (
-                    <p className="text-xs text-emerald-600">✓ Valid name</p>
+                    <p className="text-xs text-[var(--theme-success)]">✓ Valid name</p>
                   ) : (
                     <p className="text-xs text-[var(--theme-muted)]">
                       Choose a short, memorable identifier
@@ -712,9 +746,9 @@ export function ProfilesScreen() {
                       Loading configured models…
                     </div>
                   ) : allModels.length === 0 ? (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-                      No models found. Make sure Hermes Agent is running and
-                      has models configured.
+                    <div className="rounded-xl border border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_60%,transparent)] p-3 text-xs text-[var(--theme-warning)] dark:border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] dark:bg-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)] dark:text-[var(--theme-warning)]">
+                      No models found. Make sure Hermes Agent is running and has
+                      models configured.
                     </div>
                   ) : (
                     <select
@@ -737,7 +771,7 @@ export function ProfilesScreen() {
                     </select>
                   )}
                   {wizardModel && (
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                    <p className="text-xs text-[var(--theme-success)] dark:text-[var(--theme-success)]">
                       ✓ {wizardModel}
                       {wizardProvider ? ` via ${wizardProvider}` : ''}
                     </p>
@@ -762,32 +796,48 @@ export function ProfilesScreen() {
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                     <span className="flex items-center gap-1.5">
-                      <HugeiconsIcon icon={UserStar01Icon} size={13} strokeWidth={1.8} />
+                      <HugeiconsIcon
+                        icon={UserStar01Icon}
+                        size={13}
+                        strokeWidth={1.8}
+                      />
                       Personality preset
                     </span>
                   </label>
                   {loadingSwarm ? (
-                    <p className="text-xs text-[var(--theme-muted)]">Loading presets…</p>
+                    <p className="text-xs text-[var(--theme-muted)]">
+                      Loading presets…
+                    </p>
                   ) : (
                     <select
                       value={wizardSelectedPreset}
                       onChange={(e) => {
                         const key = e.target.value
                         setWizardSelectedPreset(key)
-                        const preset = swarmData?.presets.find((p) => p.key === key)
+                        const preset = swarmData?.presets.find(
+                          (p) => p.key === key,
+                        )
                         if (preset) setWizardPersonality(preset.prompt)
                       }}
                       className="h-11 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
                     >
-                      <option value="">— Choose a preset or write custom —</option>
+                      <option value="">
+                        — Choose a preset or write custom —
+                      </option>
                       {(swarmData?.presets ?? []).map((p) => (
-                        <option key={p.key} value={p.key}>{p.label}</option>
+                        <option key={p.key} value={p.key}>
+                          {p.label}
+                        </option>
                       ))}
                     </select>
                   )}
                   {wizardSelectedPreset && swarmData && (
                     <p className="text-[11px] text-[var(--theme-muted)]">
-                      {swarmData.presets.find((p) => p.key === wizardSelectedPreset)?.description}
+                      {
+                        swarmData.presets.find(
+                          (p) => p.key === wizardSelectedPreset,
+                        )?.description
+                      }
                     </p>
                   )}
                 </div>
@@ -796,7 +846,9 @@ export function ProfilesScreen() {
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
                     System prompt
-                    <span className="ml-1 font-normal text-[var(--theme-muted)]">(optional — skip to inherit default)</span>
+                    <span className="ml-1 font-normal text-[var(--theme-muted)]">
+                      (optional — skip to inherit default)
+                    </span>
                   </label>
                   <textarea
                     value={wizardPersonality}
@@ -829,9 +881,12 @@ export function ProfilesScreen() {
                         strokeWidth={1.6}
                       />
                       <div className="text-left">
-                        <div className="font-medium">Distribute to swarm workers</div>
+                        <div className="font-medium">
+                          Distribute to swarm workers
+                        </div>
                         <div className="text-[11px] opacity-70">
-                          Push role-appropriate personalities to each worker profile
+                          Push role-appropriate personalities to each worker
+                          profile
                         </div>
                       </div>
                     </button>
@@ -843,36 +898,52 @@ export function ProfilesScreen() {
                         </p>
                         <div className="space-y-1.5 max-h-52 overflow-y-auto">
                           {swarmData.recommendations.map((rec) => (
-                            <div key={rec.workerId} className="flex items-center gap-2">
+                            <div
+                              key={rec.workerId}
+                              className="flex items-center gap-2"
+                            >
                               <div className="w-24 shrink-0">
-                                <span className={cn(
-                                  'inline-block rounded-md px-2 py-0.5 text-[10px] font-medium',
-                                  rec.isMain
-                                    ? 'bg-accent-100 text-accent-700 dark:bg-accent-950/40 dark:text-accent-300'
-                                    : 'bg-[var(--theme-hover)] text-[var(--theme-muted)]',
-                                )}>
+                                <span
+                                  className={cn(
+                                    'inline-block rounded-md px-2 py-0.5 text-[10px] font-medium',
+                                    rec.isMain
+                                      ? 'bg-accent-100 text-accent-700 dark:bg-accent-950/40 dark:text-accent-300'
+                                      : 'bg-[var(--theme-hover)] text-[var(--theme-muted)]',
+                                  )}
+                                >
                                   {rec.name || rec.workerId}
                                 </span>
                                 {rec.isMain && (
-                                  <span className="ml-1 text-[9px] text-accent-500">★ main</span>
+                                  <span className="ml-1 text-[9px] text-accent-500">
+                                    ★ main
+                                  </span>
                                 )}
                               </div>
                               <select
-                                value={workerPresets[rec.workerId] ?? rec.recommendedPreset}
+                                value={
+                                  workerPresets[rec.workerId] ??
+                                  rec.recommendedPreset
+                                }
                                 onChange={(e) =>
-                                  setWorkerPresets((prev) => ({ ...prev, [rec.workerId]: e.target.value }))
+                                  setWorkerPresets((prev) => ({
+                                    ...prev,
+                                    [rec.workerId]: e.target.value,
+                                  }))
                                 }
                                 className="h-7 flex-1 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-[11px] outline-none focus:border-accent-400"
                               >
                                 {(swarmData.presets ?? []).map((p) => (
-                                  <option key={p.key} value={p.key}>{p.label}</option>
+                                  <option key={p.key} value={p.key}>
+                                    {p.label}
+                                  </option>
                                 ))}
                               </select>
                             </div>
                           ))}
                         </div>
                         <p className="text-[10px] text-[var(--theme-muted)]">
-                          Astra (orchestrator) uses the primary personality above. Other workers get their selected preset.
+                          Astra (orchestrator) uses the primary personality
+                          above. Other workers get their selected preset.
                         </p>
                       </div>
                     )}
@@ -907,7 +978,9 @@ export function ProfilesScreen() {
                       label="Personality"
                       value={
                         wizardSelectedPreset
-                          ? (swarmData?.presets.find((p) => p.key === wizardSelectedPreset)?.label ?? 'Custom')
+                          ? (swarmData?.presets.find(
+                              (p) => p.key === wizardSelectedPreset,
+                            )?.label ?? 'Custom')
                           : wizardPersonality.trim()
                             ? 'Custom'
                             : 'Default'
@@ -923,18 +996,24 @@ export function ProfilesScreen() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
-                  <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                <div className="rounded-xl border border-[var(--theme-success)] bg-[color-mix(in_srgb,var(--theme-success)_60%,transparent)] p-3 dark:border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)] dark:bg-[color-mix(in_srgb,var(--theme-success)_20%,transparent)]">
+                  <p className="text-xs text-[var(--theme-success)] dark:text-[var(--theme-success)]">
                     This will create{' '}
-                    <code className="rounded bg-emerald-100 px-1 py-0.5 font-mono text-[11px] dark:bg-emerald-900/40">
+                    <code className="rounded bg-[var(--theme-success)] px-1 py-0.5 font-mono text-[11px] dark:bg-[color-mix(in_srgb,var(--theme-success)_40%,transparent)]">
                       ~/.hermes/profiles/{newProfileName.trim()}/
                     </code>{' '}
                     with config.yaml
                     {cloneFrom ? ` cloned from ${cloneFrom}` : ''}, skills/, and
                     sessions/ directories.
                     {wizardPersonality.trim() && (
-                      <> Personality will be applied to <strong>~/.hermes/config.yaml</strong>
-                      {wizardEnableSwarm ? ' and all swarm worker profiles' : ''}.
+                      <>
+                        {' '}
+                        Personality will be applied to{' '}
+                        <strong>~/.hermes/config.yaml</strong>
+                        {wizardEnableSwarm
+                          ? ' and all swarm worker profiles'
+                          : ''}
+                        .
                       </>
                     )}
                   </p>
@@ -1043,7 +1122,7 @@ export function ProfilesScreen() {
               />
               {renameValue.trim() &&
                 !/^[A-Za-z0-9_-]+$/.test(renameValue.trim()) && (
-                  <p className="text-xs text-red-500">
+                  <p className="text-xs text-[var(--theme-danger)]">
                     Use letters, numbers, underscores, or hyphens.
                   </p>
                 )}
@@ -1164,12 +1243,15 @@ export function ProfilesScreen() {
                   </div>
                   <textarea
                     value={descriptionDraft}
-                    onChange={(event) => setDescriptionDraft(event.target.value)}
+                    onChange={(event) =>
+                      setDescriptionDraft(event.target.value)
+                    }
                     placeholder="What this profile is for, how it should behave, or what makes it different"
                     className="min-h-[96px] w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
                   />
                   <p className="mt-2 text-xs text-[var(--theme-muted)]">
-                    Saved into the profile config, so manual file edits show up here after refresh.
+                    Saved into the profile config, so manual file edits show up
+                    here after refresh.
                   </p>
                 </div>
                 <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
@@ -1188,10 +1270,10 @@ export function ProfilesScreen() {
               </div>
             ) : detailQuery.isLoading ? (
               <div className="flex min-h-[120px] items-center justify-center text-sm text-[var(--theme-muted)]">
-                Loading profile\u2026
+                Loading profile…
               </div>
             ) : (
-              <div className="flex min-h-[120px] items-center justify-center text-sm text-red-500">
+              <div className="flex min-h-[120px] items-center justify-center text-sm text-[var(--theme-danger)]">
                 Failed to load profile.
               </div>
             )}
@@ -1230,9 +1312,7 @@ function SummaryField({
       <div
         className={cn(
           'mt-0.5 text-sm font-medium',
-          muted
-            ? 'text-[var(--theme-muted)]'
-            : 'text-[var(--theme-text)]',
+          muted ? 'text-[var(--theme-muted)]' : 'text-[var(--theme-text)]',
         )}
       >
         {value}
@@ -1247,22 +1327,15 @@ function DetailField({
   mono,
   muted,
   accent,
-  full,
 }: {
   label: string
   value: string
   mono?: boolean
   muted?: boolean
   accent?: boolean
-  full?: boolean
 }) {
   return (
-    <div
-      className={cn(
-        'rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3',
-        full && 'sm:col-span-2',
-      )}
-    >
+    <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
         {label}
       </div>
@@ -1273,7 +1346,7 @@ function DetailField({
           muted
             ? 'text-[var(--theme-muted)]'
             : accent
-              ? 'font-semibold text-emerald-600 dark:text-emerald-400'
+              ? 'font-semibold text-[var(--theme-success)]'
               : 'text-[var(--theme-text)]',
         )}
       >

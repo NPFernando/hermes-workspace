@@ -8,6 +8,7 @@ import { useMcpCapabilityMode } from './hooks/use-mcp-capability-mode'
 import { useMcpServers } from './hooks/use-mcp-servers'
 import { useMcpHub } from './hooks/use-mcp-hub'
 import { SourcesManagerDialog } from './components/sources-manager-dialog'
+import { TRUST_PILL } from './lib/trust-pill'
 import type { HubMcpEntry } from './hooks/use-mcp-hub'
 import type { McpClientInput, McpServer } from '@/types/mcp'
 import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs'
@@ -33,8 +34,7 @@ export function McpScreen() {
   const { mode: capabilityMode } = useMcpCapabilityMode()
   // Marketplace tab uses useMcpHub instead; coerce to 'installed' so the
   // server-list query stays valid but its results aren't rendered there.
-  const serverListTab = tab === 'marketplace' ? 'installed' : tab
-  const query = useMcpServers({ tab: serverListTab, category, search })
+  const query = useMcpServers({ category, search })
   const servers = query.data?.servers ?? []
   const categories = query.data?.categories ?? ['All']
 
@@ -53,7 +53,10 @@ export function McpScreen() {
       : `${servers.length.toLocaleString()} servers`
 
   return (
-    <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
+    <div
+      data-route-page
+      className="min-h-full overflow-y-auto bg-surface text-ink"
+    >
       <div className="flex w-full flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
         <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/85 p-4 backdrop-blur-xl">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -83,7 +86,7 @@ export function McpScreen() {
           {capabilityMode === 'fallback' ? (
             <div
               role="status"
-              className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+              className="mt-3 rounded-lg border border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-3 py-2 text-xs text-[var(--theme-warning)] dark:border-[var(--theme-warning)] dark:bg-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] dark:text-[var(--theme-warning)]"
             >
               ⚠ Local fallback mode — using config.yaml. Test, Discover, and
               Logs require the new hermes-agent /api/mcp endpoints.
@@ -162,21 +165,21 @@ export function McpScreen() {
 
               {hubQuery.data?.warnings && hubQuery.data.warnings.length > 0 ? (
                 hubQuery.data.results && hubQuery.data.results.length > 0 ? (
-                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                  <p className="text-xs text-[var(--theme-warning)] dark:text-[var(--theme-warning)]">
                     ⚠ One or more sources unavailable; showing local results.
                     <span className="ml-1 text-[11px] text-[var(--theme-muted)]">
                       ({hubQuery.data.warnings[0]})
                     </span>
                   </p>
                 ) : (
-                  <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                  <div className="rounded-xl border border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-4 py-3 text-sm text-[var(--theme-warning)] dark:border-[var(--theme-warning)] dark:bg-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] dark:text-[var(--theme-warning)]">
                     {hubQuery.data.warnings[0]}
                   </div>
                 )
               ) : null}
 
               {hubQuery.error ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                <div className="rounded-xl border border-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-4 py-3 text-sm text-[var(--theme-danger)] dark:border-[var(--theme-danger)] dark:bg-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] dark:text-[var(--theme-danger)]">
                   {hubQuery.error instanceof Error
                     ? hubQuery.error.message
                     : 'Failed to load marketplace.'}
@@ -268,7 +271,7 @@ function ServerList({ query, onEdit }: ServerListProps) {
     return (
       <EmptyCard
         title="No MCP servers configured"
-        description="Add a server from the My Presets tab or click Add Server above."
+        description="Click Add Server above to install one from the marketplace."
       />
     )
   }
@@ -290,7 +293,7 @@ interface EmptyCardProps {
 function EmptyCard({ title, description, tone = 'neutral' }: EmptyCardProps) {
   const toneClasses =
     tone === 'danger'
-      ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200'
+      ? 'border-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]'
       : 'border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)]'
   return (
     <div
@@ -307,24 +310,6 @@ function EmptyCard({ title, description, tone = 'neutral' }: EmptyCardProps) {
 // ---------------------------------------------------------------------------
 // MarketplaceGrid — Phase 3.0 Marketplace tab
 // ---------------------------------------------------------------------------
-
-const TRUST_PILL: Record<string, { label: string; className: string }> = {
-  official: {
-    label: 'Official',
-    className:
-      'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300',
-  },
-  community: {
-    label: 'Community',
-    className:
-      'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300',
-  },
-  unverified: {
-    label: 'Unverified',
-    className:
-      'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300',
-  },
-}
 
 const SOURCE_LABEL: Record<string, string> = {
   'mcp-get': 'mcp.run',
@@ -390,14 +375,6 @@ function MarketplaceGrid({
                     <h3 className="text-base font-medium text-ink text-balance line-clamp-1">
                       {entry.name}
                     </h3>
-                    {entry.installed ? (
-                      <span
-                        className="shrink-0 rounded-md border border-primary/40 bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary"
-                        aria-label="Installed"
-                      >
-                        Installed
-                      </span>
-                    ) : null}
                   </div>
                   <p className="line-clamp-2 text-xs text-[var(--theme-muted)] text-pretty">
                     {entry.description || 'No description.'}
@@ -425,19 +402,13 @@ function MarketplaceGrid({
               </div>
 
               <div className="mt-auto flex items-center justify-end gap-2 pt-2">
-                {entry.installed ? (
-                  <span className="text-xs text-[var(--theme-muted)]">
-                    Already installed
-                  </span>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onInstall(entry)}
-                  >
-                    Install
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onInstall(entry)}
+                >
+                  Install
+                </Button>
               </div>
             </motion.article>
           )

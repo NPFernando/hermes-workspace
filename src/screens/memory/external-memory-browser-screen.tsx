@@ -2,6 +2,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { BrainIcon, Search01Icon } from '@hugeicons/core-free-icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { readJson } from '@/lib/memory-screen-utils'
 import { cn } from '@/lib/utils'
 import { safeErrorMessage } from '@/lib/error-utils'
 
@@ -83,16 +84,9 @@ async function mutateCandidate(options: {
     const payload = await response.json().catch(() => null)
     throw new Error(payload?.error || `Action failed (${response.status})`)
   }
-  return response.json().catch(() => ({})) as Promise<{ hindsight_operation_id?: string }>
-}
-
-async function readJson<T>(url: string): Promise<T> {
-  const response = await fetch(url)
-  if (!response.ok) {
-    const text = await response.text().catch(() => '')
-    throw new Error(text || `Request failed (${response.status})`)
-  }
-  return (await response.json()) as T
+  return response.json().catch(() => ({})) as Promise<{
+    hindsight_operation_id?: string
+  }>
 }
 
 function formatTimestamp(value: number): string {
@@ -109,10 +103,10 @@ function formatTimestamp(value: number): string {
 
 function stateClasses(state: string): string {
   if (state === 'approved')
-    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    return 'border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)] dark:text-[var(--theme-success)]'
   if (state === 'rejected')
-    return 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300'
-  return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+    return 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)] dark:text-[var(--theme-danger)]'
+  return 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)] dark:text-[var(--theme-warning)]'
 }
 
 function metadataPreview(metadata: Record<string, unknown>): string {
@@ -270,8 +264,8 @@ export function ExternalMemoryBrowserScreen() {
             No external memory providers
           </h2>
           <p className="mt-2 text-center text-sm text-[var(--theme-muted)]">
-            This tab shows a human review queue for memories the agent has flagged
-            before committing them to long-term storage.
+            This tab shows a human review queue for memories the agent has
+            flagged before committing them to long-term storage.
           </p>
           <div className="mt-4 space-y-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4">
             <p className="text-xs font-medium text-[var(--theme-muted)]">
@@ -289,8 +283,9 @@ export function ExternalMemoryBrowserScreen() {
   }]
 }`}</pre>
             <p className="text-xs text-[var(--theme-muted)]">
-              Memories written by Astra during sessions will appear here as candidates
-              for you to approve, reject, or edit before they enter long-term recall.
+              Memories written by Astra during sessions will appear here as
+              candidates for you to approve, reject, or edit before they enter
+              long-term recall.
             </p>
           </div>
         </div>
@@ -299,7 +294,10 @@ export function ExternalMemoryBrowserScreen() {
   }
 
   return (
-    <div data-route-page className="grid h-full min-h-0 grid-cols-1 gap-0 lg:grid-cols-[380px_minmax(0,1fr)]">
+    <div
+      data-route-page
+      className="grid h-full min-h-0 grid-cols-1 gap-0 lg:grid-cols-[380px_minmax(0,1fr)]"
+    >
       <aside className="flex min-h-0 flex-col border-b border-[var(--theme-border)] bg-[var(--theme-bg)] lg:border-r lg:border-b-0">
         <div className="space-y-3 border-b border-[var(--theme-border)] p-4">
           <div>
@@ -358,12 +356,10 @@ export function ExternalMemoryBrowserScreen() {
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {isLoading ? (
-            <p className="p-3 text-sm text-[var(--theme-muted)]">
-              Loading...
-            </p>
+            <p className="p-3 text-sm text-[var(--theme-muted)]">Loading...</p>
           ) : null}
           {error ? (
-            <p className="p-3 text-sm text-rose-600">
+            <p className="p-3 text-sm text-[var(--theme-danger)]">
               {safeErrorMessage(error)}
             </p>
           ) : null}
@@ -374,7 +370,8 @@ export function ExternalMemoryBrowserScreen() {
               </p>
               {state === 'candidate' ? (
                 <p className="mt-1 text-xs text-[var(--theme-muted)]">
-                  Memory candidates appear here as Astra saves notes during sessions.
+                  Memory candidates appear here as Astra saves notes during
+                  sessions.
                 </p>
               ) : null}
             </div>
@@ -427,7 +424,7 @@ export function ExternalMemoryBrowserScreen() {
                     {selected.id}
                   </p>
                   {activeProvider?.kind === 'hindsight' ? (
-                    <span className="rounded-full border border-violet-400/40 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:text-violet-300">
+                    <span className="rounded-full border border-[color-mix(in_srgb,var(--theme-accent-secondary)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent-secondary)_10%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[var(--theme-accent-secondary)] dark:text-[var(--theme-accent-secondary)]">
                       Hindsight
                     </span>
                   ) : null}
@@ -445,33 +442,37 @@ export function ExternalMemoryBrowserScreen() {
                 >
                   {selected.state}
                 </span>
-                {candidateActionLabels(selected, activeProvider?.kind).map((label) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() =>
-                      runAction(
-                        (label.startsWith('Approve') ? 'approve' : label.toLowerCase()) as CandidateAction,
-                      )
-                    }
-                    className={cn(
-                      'rounded-lg border px-3 py-1 text-xs transition',
-                      label === 'Delete'
-                        ? 'border-rose-500/40 text-rose-600 hover:bg-rose-500/10 dark:text-rose-300'
-                        : label.startsWith('Approve')
-                          ? 'border-violet-400/40 text-violet-700 hover:bg-violet-500/10 dark:border-violet-700 dark:text-violet-300 dark:hover:bg-violet-500/10'
-                          : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]',
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
+                {candidateActionLabels(selected, activeProvider?.kind).map(
+                  (label) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() =>
+                        runAction(
+                          (label.startsWith('Approve')
+                            ? 'approve'
+                            : label.toLowerCase()) as CandidateAction,
+                        )
+                      }
+                      className={cn(
+                        'rounded-lg border px-3 py-1 text-xs transition',
+                        label === 'Delete'
+                          ? 'border-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] dark:text-[var(--theme-danger)]'
+                          : label.startsWith('Approve')
+                            ? 'border-[color-mix(in_srgb,var(--theme-accent-secondary)_40%,transparent)] text-[var(--theme-accent-secondary)] hover:bg-[color-mix(in_srgb,var(--theme-accent-secondary)_10%,transparent)] dark:border-[var(--theme-accent-secondary)] dark:text-[var(--theme-accent-secondary)] dark:hover:bg-[color-mix(in_srgb,var(--theme-accent-secondary)_10%,transparent)]'
+                            : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:bg-[var(--theme-panel)]',
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ),
+                )}
               </div>
             </div>
             {lastRetainOpId ? (
-              <div className="flex items-start gap-2 rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-xs text-violet-800 dark:text-violet-200">
+              <div className="flex items-start gap-2 rounded-xl border border-[color-mix(in_srgb,var(--theme-accent-secondary)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent-secondary)_10%,transparent)] px-4 py-3 text-xs text-[var(--theme-accent-secondary)] dark:text-[var(--theme-accent-secondary)]">
                 <span className="font-medium">Committed to Hindsight.</span>
-                <span className="font-mono text-violet-600 dark:text-violet-400">
+                <span className="font-mono text-[var(--theme-accent-secondary)] dark:text-[var(--theme-accent-secondary)]">
                   op:{lastRetainOpId.slice(0, 16)}…
                 </span>
               </div>
@@ -508,10 +509,10 @@ export function ExternalMemoryBrowserScreen() {
               </div>
               {selected.metadata.hindsight_operation_id ? (
                 <div className="md:col-span-2">
-                  <dt className="text-xs uppercase tracking-wide text-violet-500 dark:text-violet-400">
+                  <dt className="text-xs uppercase tracking-wide text-[var(--theme-accent-secondary)] dark:text-[var(--theme-accent-secondary)]">
                     Hindsight operation
                   </dt>
-                  <dd className="mt-1 font-mono text-xs text-violet-700 dark:text-violet-300">
+                  <dd className="mt-1 font-mono text-xs text-[var(--theme-accent-secondary)] dark:text-[var(--theme-accent-secondary)]">
                     {String(selected.metadata.hindsight_operation_id)}
                   </dd>
                 </div>

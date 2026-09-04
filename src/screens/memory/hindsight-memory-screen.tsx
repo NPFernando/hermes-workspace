@@ -12,6 +12,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useState } from 'react'
+import { readJson } from '@/lib/memory-screen-utils'
 import { cn } from '@/lib/utils'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -84,15 +85,6 @@ type OperationsData = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-async function readJson<T>(url: string): Promise<T> {
-  const res = await fetch(url)
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(text || `Request failed (${res.status})`)
-  }
-  return res.json() as Promise<T>
-}
-
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
   return new Intl.DateTimeFormat(undefined, {
@@ -117,7 +109,7 @@ function getSisterName(tags: Array<string>): string | null {
 
 function factTypeBadge(type: string): string {
   if (type === 'observation')
-    return 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300'
+    return 'border-[color-mix(in_srgb,var(--theme-accent-secondary)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent-secondary)_10%,transparent)] text-[var(--theme-accent-secondary)] dark:text-[var(--theme-accent-secondary)]'
   if (type === 'world')
     return 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300'
   return 'border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)]'
@@ -125,15 +117,21 @@ function factTypeBadge(type: string): string {
 
 function opStatusBadge(status: string): string {
   if (status === 'completed')
-    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    return 'border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)] dark:text-[var(--theme-success)]'
   if (status === 'failed')
-    return 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300'
-  return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+    return 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)] dark:text-[var(--theme-danger)]'
+  return 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)] dark:text-[var(--theme-warning)]'
 }
 
 // ── Status bar ─────────────────────────────────────────────────────────────
 
-function StatusBar({ data, isLoading }: { data: StatusData | undefined; isLoading: boolean }) {
+function StatusBar({
+  data,
+  isLoading,
+}: {
+  data: StatusData | undefined
+  isLoading: boolean
+}) {
   const healthy =
     data?.daemon.status === 'healthy' && data.daemon.database === 'connected'
 
@@ -147,12 +145,16 @@ function StatusBar({ data, isLoading }: { data: StatusData | undefined; isLoadin
             isLoading
               ? 'bg-[var(--theme-muted)]'
               : healthy
-                ? 'bg-emerald-500'
-                : 'bg-rose-500',
+                ? 'bg-[var(--theme-success)]'
+                : 'bg-[var(--theme-danger)]',
           )}
         />
         <span className="text-[var(--theme-muted)]">
-          {isLoading ? 'Checking…' : healthy ? 'Daemon healthy' : 'Daemon offline'}
+          {isLoading
+            ? 'Checking…'
+            : healthy
+              ? 'Daemon healthy'
+              : 'Daemon offline'}
         </span>
       </div>
 
@@ -166,13 +168,13 @@ function StatusBar({ data, isLoading }: { data: StatusData | undefined; isLoadin
 
       {data?.stats?.total_nodes !== undefined ? (
         <div className="text-[var(--theme-muted)]">
-          <span className="opacity-40">|</span>{' '}
-          {data.stats.total_nodes} memories
+          <span className="opacity-40">|</span> {data.stats.total_nodes}{' '}
+          memories
         </div>
       ) : null}
 
       {(data?.dlqCount ?? 0) > 0 ? (
-        <div className="flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-300">
+        <div className="flex items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-2 py-0.5 text-[var(--theme-warning)] dark:text-[var(--theme-warning)]">
           <HugeiconsIcon icon={AlertCircleIcon} className="size-3" />
           DLQ: {data!.dlqCount} pending
         </div>
@@ -208,7 +210,8 @@ export function HindsightMemoryScreen() {
   // Status — poll every 30s; scoped to active bank for node counts
   const statusQuery = useQuery({
     queryKey: ['hindsight', 'status', primaryBank],
-    queryFn: () => readJson<StatusData>(`/api/hindsight/status?bank=${primaryBank}`),
+    queryFn: () =>
+      readJson<StatusData>(`/api/hindsight/status?bank=${primaryBank}`),
     refetchInterval: 30_000,
   })
 
@@ -237,7 +240,8 @@ export function HindsightMemoryScreen() {
   // Operations list
   const operationsQuery = useQuery({
     queryKey: ['hindsight', 'operations'],
-    queryFn: () => readJson<OperationsData>('/api/hindsight/operations?limit=30'),
+    queryFn: () =>
+      readJson<OperationsData>('/api/hindsight/operations?limit=30'),
     enabled: panel === 'operations',
     refetchInterval: panel === 'operations' ? 15_000 : false,
   })
@@ -259,28 +263,42 @@ export function HindsightMemoryScreen() {
       fetch('/api/hindsight/retain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, context: context || undefined, bank: primaryBank }),
+        body: JSON.stringify({
+          content,
+          context: context || undefined,
+          bank: primaryBank,
+        }),
       }).then((r) => r.json()),
     onSuccess: () => {
       setAddOpen(false)
       setAddContent('')
       setAddContext('')
-      void queryClient.invalidateQueries({ queryKey: ['hindsight', 'memories'] })
+      void queryClient.invalidateQueries({
+        queryKey: ['hindsight', 'memories'],
+      })
       void queryClient.invalidateQueries({ queryKey: ['hindsight', 'status'] })
     },
   })
 
   // Delete memory mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) =>
+    mutationFn: ({
+      id,
+      bank: itemBank,
+    }: {
+      id: string
+      bank: 'hermes' | 'agents'
+    }) =>
       fetch('/api/hindsight/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, bank: primaryBank }),
+        body: JSON.stringify({ id, bank: itemBank }),
       }).then((r) => r.json()),
     onSuccess: () => {
       setSelectedId(null)
-      void queryClient.invalidateQueries({ queryKey: ['hindsight', 'memories'] })
+      void queryClient.invalidateQueries({
+        queryKey: ['hindsight', 'memories'],
+      })
       void queryClient.invalidateQueries({ queryKey: ['hindsight', 'status'] })
     },
   })
@@ -302,57 +320,67 @@ export function HindsightMemoryScreen() {
 
   const hermesItems = memoriesQuery.data?.items ?? []
   const agentItems = agentsMemoriesQuery.data?.items ?? []
-  const memories =
+  const memories: Array<HindsightMemory & { _bank: 'hermes' | 'agents' }> =
     bank === 'all'
-      ? [...hermesItems, ...agentItems].sort(
-          (a, b) => new Date(b.mentioned_at).getTime() - new Date(a.mentioned_at).getTime(),
+      ? [
+          ...hermesItems.map((m) => ({ ...m, _bank: 'hermes' as const })),
+          ...agentItems.map((m) => ({ ...m, _bank: 'agents' as const })),
+        ].sort(
+          (a, b) =>
+            new Date(b.mentioned_at).getTime() -
+            new Date(a.mentioned_at).getTime(),
         )
-      : hermesItems
+      : hermesItems.map((m) => ({ ...m, _bank: 'hermes' as const }))
   const recallResults = recallMutation.data?.results ?? []
   const operations = operationsQuery.data?.operations ?? []
 
-  const listItems: Array<{ id: string; text: string; badge: string; sub: string; sisterTag: string | null }> =
-    recallMode
-      ? recallResults.map((r) => ({
-          id: r.id,
-          text: r.text,
-          badge: r.type,
-          sub: fmtDate(r.mentioned_at),
-          sisterTag: getSisterName(r.tags),
-        }))
-      : memories.map((m) => ({
-          id: m.id,
-          text: m.text,
-          badge: m.fact_type,
-          sub: fmtDate(m.mentioned_at),
-          sisterTag: getSisterName(m.tags),
-        }))
+  const listItems: Array<{
+    id: string
+    text: string
+    badge: string
+    sub: string
+    sisterTag: string | null
+  }> = recallMode
+    ? recallResults.map((r) => ({
+        id: r.id,
+        text: r.text,
+        badge: r.type,
+        sub: fmtDate(r.mentioned_at),
+        sisterTag: getSisterName(r.tags),
+      }))
+    : memories.map((m) => ({
+        id: m.id,
+        text: m.text,
+        badge: m.fact_type,
+        sub: fmtDate(m.mentioned_at),
+        sisterTag: getSisterName(m.tags),
+      }))
 
   const selectedMemory =
     !recallMode && selectedId
-      ? memories.find((m) => m.id === selectedId) ?? null
+      ? (memories.find((m) => m.id === selectedId) ?? null)
       : null
 
   const selectedRecall =
     recallMode && selectedId
-      ? recallResults.find((r) => r.id === selectedId) ?? null
+      ? (recallResults.find((r) => r.id === selectedId) ?? null)
       : null
 
   const daemonOffline =
-    !statusQuery.isLoading &&
-    statusQuery.data?.daemon.status !== 'healthy'
+    !statusQuery.isLoading && statusQuery.data?.daemon.status !== 'healthy'
 
   return (
     <div data-route-page className="flex h-full min-h-0 flex-col">
       <StatusBar data={statusQuery.data} isLoading={statusQuery.isLoading} />
 
       {daemonOffline ? (
-        <div className="m-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-700 dark:text-rose-300">
+        <div className="m-4 rounded-xl border border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] p-4 text-sm text-[var(--theme-danger)] dark:text-[var(--theme-danger)]">
           Hindsight daemon is offline. Run{' '}
-          <code className="rounded bg-rose-500/10 px-1 font-mono text-xs">
+          <code className="rounded bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-1 font-mono text-xs">
             hermes gateway run
           </code>{' '}
-          to restart it — the memory plugin will relaunch the daemon automatically.
+          to restart it — the memory plugin will relaunch the daemon
+          automatically.
         </div>
       ) : null}
 
@@ -365,7 +393,10 @@ export function HindsightMemoryScreen() {
               <button
                 key={b}
                 type="button"
-                onClick={() => { setBank(b); clearRecall() }}
+                onClick={() => {
+                  setBank(b)
+                  clearRecall()
+                }}
                 className={cn(
                   'rounded-md px-3 py-1 text-xs font-medium transition-all',
                   bank === b
@@ -425,7 +456,11 @@ export function HindsightMemoryScreen() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => { setAddOpen(false); setAddContent(''); setAddContext('') }}
+                    onClick={() => {
+                      setAddOpen(false)
+                      setAddContent('')
+                      setAddContext('')
+                    }}
                     className="text-[var(--theme-muted)] hover:text-[var(--theme-text)]"
                   >
                     <HugeiconsIcon icon={Cancel01Icon} className="size-3.5" />
@@ -447,13 +482,20 @@ export function HindsightMemoryScreen() {
                 <button
                   type="button"
                   disabled={!addContent.trim() || addMutation.isPending}
-                  onClick={() => addMutation.mutate({ content: addContent, context: addContext })}
+                  onClick={() =>
+                    addMutation.mutate({
+                      content: addContent,
+                      context: addContext,
+                    })
+                  }
                   className="w-full rounded-lg border border-[var(--theme-accent)] bg-[var(--theme-accent)]/20 py-1.5 text-xs font-medium text-[var(--theme-text)] transition hover:bg-[var(--theme-accent)]/30 disabled:opacity-50"
                 >
                   {addMutation.isPending ? 'Saving…' : 'Save to Hindsight'}
                 </button>
                 {addMutation.isError ? (
-                  <p className="text-xs text-rose-600">{String(addMutation.error)}</p>
+                  <p className="text-xs text-[var(--theme-danger)]">
+                    {String(addMutation.error)}
+                  </p>
                 ) : null}
               </div>
             ) : null}
@@ -495,16 +537,20 @@ export function HindsightMemoryScreen() {
             {panel === 'memories' ? (
               <>
                 {memoriesQuery.isLoading || recallMutation.isPending ? (
-                  <p className="p-3 text-sm text-[var(--theme-muted)]">Loading…</p>
+                  <p className="p-3 text-sm text-[var(--theme-muted)]">
+                    Loading…
+                  </p>
                 ) : null}
                 {memoriesQuery.error ? (
-                  <p className="p-3 text-sm text-rose-600">
+                  <p className="p-3 text-sm text-[var(--theme-danger)]">
                     {memoriesQuery.error instanceof Error
                       ? memoriesQuery.error.message
                       : 'Failed to load memories'}
                   </p>
                 ) : null}
-                {!memoriesQuery.isLoading && !recallMutation.isPending && listItems.length === 0 ? (
+                {!memoriesQuery.isLoading &&
+                !recallMutation.isPending &&
+                listItems.length === 0 ? (
                   <p className="p-3 text-sm text-[var(--theme-muted)]">
                     No memories found.
                   </p>
@@ -552,10 +598,12 @@ export function HindsightMemoryScreen() {
             ) : (
               <>
                 {operationsQuery.isLoading ? (
-                  <p className="p-3 text-sm text-[var(--theme-muted)]">Loading…</p>
+                  <p className="p-3 text-sm text-[var(--theme-muted)]">
+                    Loading…
+                  </p>
                 ) : null}
                 {operationsQuery.error ? (
-                  <p className="p-3 text-sm text-rose-600">
+                  <p className="p-3 text-sm text-[var(--theme-danger)]">
                     {operationsQuery.error instanceof Error
                       ? operationsQuery.error.message
                       : 'Failed to load operations'}
@@ -582,11 +630,15 @@ export function HindsightMemoryScreen() {
                       </div>
                       <p className="text-xs text-[var(--theme-muted)]">
                         {fmtDate(op.created_at)}
-                        {op.items_count > 0 ? ` · ${op.items_count} item(s)` : ''}
-                        {op.retry_count > 0 ? ` · retried ${op.retry_count}×` : ''}
+                        {op.items_count > 0
+                          ? ` · ${op.items_count} item(s)`
+                          : ''}
+                        {op.retry_count > 0
+                          ? ` · retried ${op.retry_count}×`
+                          : ''}
                       </p>
                       {op.error_message ? (
-                        <p className="mt-1 text-xs text-rose-600 dark:text-rose-400 line-clamp-2">
+                        <p className="mt-1 text-xs text-[var(--theme-danger)] dark:text-[var(--theme-danger)] line-clamp-2">
                           {op.error_message}
                         </p>
                       ) : null}
@@ -609,8 +661,15 @@ export function HindsightMemoryScreen() {
             <MemoryDetail
               memory={selectedMemory}
               onDelete={() => {
-                if (window.confirm('Delete this memory? This removes all its observations from Hindsight.')) {
-                  deleteMutation.mutate(selectedMemory.id)
+                if (
+                  window.confirm(
+                    'Delete this memory? This removes all its observations from Hindsight.',
+                  )
+                ) {
+                  deleteMutation.mutate({
+                    id: selectedMemory.id,
+                    bank: selectedMemory._bank,
+                  })
                 }
               }}
               isDeleting={deleteMutation.isPending}
@@ -641,7 +700,9 @@ function MemoryDetail({
     <article className="mx-auto max-w-4xl space-y-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--theme-border)] pb-4">
         <div>
-          <p className="font-mono text-xs text-[var(--theme-muted)]">{memory.id}</p>
+          <p className="font-mono text-xs text-[var(--theme-muted)]">
+            {memory.id}
+          </p>
           <div className="mt-1 flex items-center gap-2">
             <span
               className={cn(
@@ -652,8 +713,11 @@ function MemoryDetail({
               {memory.fact_type}
             </span>
             {memory.consolidated_at ? (
-              <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} className="size-3" />
+              <span className="flex items-center gap-1 text-xs text-[var(--theme-success)] dark:text-[var(--theme-success)]">
+                <HugeiconsIcon
+                  icon={CheckmarkCircle01Icon}
+                  className="size-3"
+                />
                 consolidated
               </span>
             ) : null}
@@ -669,7 +733,7 @@ function MemoryDetail({
             title="Delete memory"
             disabled={isDeleting}
             onClick={onDelete}
-            className="rounded-lg border border-rose-300 p-1.5 text-rose-500 transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-900/20"
+            className="rounded-lg border border-[var(--theme-danger)] p-1.5 text-[var(--theme-danger)] transition hover:bg-[color-mix(in_srgb,var(--theme-danger)_12%,transparent)] disabled:opacity-50 dark:border-[var(--theme-danger)] dark:text-[var(--theme-danger)] dark:hover:bg-[color-mix(in_srgb,var(--theme-danger)_20%,transparent)]"
           >
             <HugeiconsIcon icon={Delete01Icon} className="size-3.5" />
           </button>
@@ -693,7 +757,9 @@ function MemoryDetail({
           <dt className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
             Proof count
           </dt>
-          <dd className="mt-1 text-[var(--theme-text)]">{memory.proof_count}</dd>
+          <dd className="mt-1 text-[var(--theme-text)]">
+            {memory.proof_count}
+          </dd>
         </div>
         {memory.tags.length > 0 ? (
           <div className="md:col-span-2">
@@ -778,7 +844,11 @@ function EmptyDetail() {
           className="mx-auto mb-3 size-8 text-[var(--theme-muted)]"
         />
         <p className="text-sm text-[var(--theme-muted)]">
-          Select a memory to inspect, or press <kbd className="rounded border border-[var(--theme-border)] px-1 font-mono text-xs">Enter</kbd> in the search box to recall.
+          Select a memory to inspect, or press{' '}
+          <kbd className="rounded border border-[var(--theme-border)] px-1 font-mono text-xs">
+            Enter
+          </kbd>{' '}
+          in the search box to recall.
         </p>
       </div>
     </div>
