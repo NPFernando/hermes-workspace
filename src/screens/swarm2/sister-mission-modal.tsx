@@ -1,13 +1,14 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { MagicWand01Icon } from '@hugeicons/core-free-icons'
 import type { SisterOption } from '@/screens/chat/components/sister-picker'
-import { SisterPicker, dedupeSistersForPicker } from '@/screens/chat/components/sister-picker'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import {
+  SisterPicker,
+  dedupeSistersForPicker,
+} from '@/screens/chat/components/sister-picker'
 
 type SisterMissionModalProps = {
   open: boolean
@@ -31,7 +32,11 @@ async function fetchSisters(): Promise<Array<SisterOption>> {
   }))
 }
 
-export function SisterMissionModal({ open, onClose, onSelect }: SisterMissionModalProps) {
+export function SisterMissionModal({
+  open,
+  onClose,
+  onSelect,
+}: SisterMissionModalProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [prompt, setPrompt] = useState('')
   const [error, setError] = useState<string | null>(null)

@@ -12,7 +12,9 @@ type Swarm2WiresProps = {
   /** The container the wires draw inside (positioned `relative`). */
   containerRef: React.RefObject<HTMLDivElement | null>
   /** Anchor at the bottom of the orchestrator card. */
-  anchorRef: React.RefObject<HTMLDivElement | null> | { current: HTMLDivElement | null }
+  anchorRef:
+    | React.RefObject<HTMLDivElement | null>
+    | { current: HTMLDivElement | null }
   /** Each worker card root element keyed by worker id. */
   workerRefs: Map<string, HTMLElement>
   workers: Array<WireTarget>
@@ -69,6 +71,7 @@ export function Swarm2Wires({
   anchorRef,
   workerRefs,
   workers,
+  version,
 }: Swarm2WiresProps) {
   const [geom, setGeom] = useState<Geom>(EMPTY_GEOM)
   const rafRef = useRef<number | null>(null)
@@ -89,7 +92,7 @@ export function Swarm2Wires({
   useLayoutEffect(() => {
     schedule()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workers.length])
+  }, [workers.length, version])
 
   useEffect(() => {
     schedule()
@@ -108,7 +111,7 @@ export function Swarm2Wires({
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workers.length])
+  }, [workers.length, version])
 
   if (geom.width === 0 || !geom.origin) return null
 
@@ -122,13 +125,28 @@ export function Swarm2Wires({
     >
       <defs>
         <linearGradient id="swarm2-wire" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="rgba(251,191,36,0.62)" />
-          <stop offset="100%" stopColor="rgba(52,211,153,0.32)" />
+          <stop
+            offset="0%"
+            stopColor="color-mix(in srgb, var(--theme-warning) 62%, transparent)"
+          />
+          <stop
+            offset="100%"
+            stopColor="color-mix(in srgb, var(--theme-success) 32%, transparent)"
+          />
         </linearGradient>
         <linearGradient id="swarm2-hot-wire" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="rgba(251,191,36,0.98)" />
-          <stop offset="50%" stopColor="rgba(245,158,11,0.82)" />
-          <stop offset="100%" stopColor="rgba(52,211,153,0.52)" />
+          <stop
+            offset="0%"
+            stopColor="color-mix(in srgb, var(--theme-warning) 98%, transparent)"
+          />
+          <stop
+            offset="50%"
+            stopColor="color-mix(in srgb, var(--theme-warning) 82%, transparent)"
+          />
+          <stop
+            offset="100%"
+            stopColor="color-mix(in srgb, var(--theme-success) 52%, transparent)"
+          />
         </linearGradient>
         <style>{`
           @keyframes swarm2-flow {
@@ -159,7 +177,7 @@ export function Swarm2Wires({
               stroke="url(#swarm2-wire)"
               strokeWidth={isHot ? 2.2 : 1.5}
               strokeLinecap="round"
-              strokeDasharray={isHot ? undefined : "5 10"}
+              strokeDasharray={isHot ? undefined : '5 10'}
               opacity={isHot ? 0.82 : 0.64}
             />
             {isHot ? (
