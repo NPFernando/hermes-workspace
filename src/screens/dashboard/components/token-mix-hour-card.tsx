@@ -1,13 +1,6 @@
 import { useMemo } from 'react'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
-
-function formatTokens(n: number): string {
-  if (!n || n <= 0) return '0'
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
-}
+import { formatTokens } from '@/screens/dashboard/lib/formatters'
 
 function formatHour(h: number): string {
   if (h === 0) return '12a'
@@ -109,15 +102,11 @@ export function TokenMixHourCard({
       }}
     >
       <div className="flex items-center justify-between gap-2">
-        <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-        >
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
           Mix &amp; rhythm
           {analytics ? ` · ${analytics.windowDays}d` : ''}
         </h3>
-        <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-        >
+        <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
           {totalTokens > 0 ? `out/in ${ratio.toFixed(1)}%` : ''}
           {totalTokens > 0 && totalSessions > 0 ? ' · ' : ''}
           {totalSessions > 0
@@ -167,13 +156,9 @@ export function TokenMixHourCard({
                       {s.label}
                     </span>
                   </span>
-                  <span
-                    className="shrink-0 font-mono tabular-nums text-[var(--theme-text)]"
-                  >
+                  <span className="shrink-0 font-mono tabular-nums text-[var(--theme-text)]">
                     {formatTokens(s.value)}
-                    <span
-                      className="ml-1 text-[var(--theme-muted)]"
-                    >
+                    <span className="ml-1 text-[var(--theme-muted)]">
                       · {widthPct.toFixed(0)}%
                     </span>
                   </span>
@@ -202,8 +187,7 @@ export function TokenMixHourCard({
                         : isPeak
                           ? 'var(--theme-accent)'
                           : `color-mix(in srgb, var(--theme-accent) ${Math.max(20, heightPct)}%, transparent)`,
-                    height:
-                      count === 0 ? 4 : `${Math.max(8, heightPct)}%`,
+                    height: count === 0 ? 4 : `${Math.max(8, heightPct)}%`,
                     minHeight: 4,
                   }}
                   title={`${formatHour(hour)} · ${count} session${count === 1 ? '' : 's'}`}
@@ -211,9 +195,7 @@ export function TokenMixHourCard({
               )
             })}
           </div>
-          <div
-            className="flex justify-between font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-          >
+          <div className="flex justify-between font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
             <span>12a</span>
             <span>6a</span>
             <span>12p</span>

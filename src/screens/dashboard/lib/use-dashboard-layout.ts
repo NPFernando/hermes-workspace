@@ -63,16 +63,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
   {
     id: 'cache_efficiency',
     label: 'Cache efficiency',
-    description:
-      'Cache-hit rate with daily sparkline. Higher = lower cost.',
+    description: 'Cache-hit rate with daily sparkline. Higher = lower cost.',
     column: 'main',
     hideable: true,
   },
   {
     id: 'velocity',
     label: 'Velocity',
-    description:
-      'Sessions/day average + delta vs prior period + sparkline.',
+    description: 'Sessions/day average + delta vs prior period + sparkline.',
     column: 'main',
     hideable: true,
   },
@@ -132,14 +130,16 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
   {
     id: 'finance_overview',
     label: 'Finance overview',
-    description: 'Net worth, savings rate, and the current controlled-trading mode.',
+    description:
+      'Net worth, savings rate, and the current controlled-trading mode.',
     column: 'main',
     hideable: true,
   },
   {
     id: 'trading_overview',
     label: 'Trading overview',
-    description: "Today's/total P&L, open positions, win rate, and per-engine status.",
+    description:
+      "Today's/total P&L, open positions, win rate, and per-engine status.",
     column: 'main',
     hideable: true,
   },
@@ -196,9 +196,7 @@ function readLayout(): StoredLayout {
     }
     const valid = new Set<WidgetId>(WIDGET_CATALOG.map((w) => w.id))
     const incoming = Array.isArray(parsed.hidden) ? parsed.hidden : []
-    const filtered = incoming.filter((id): id is WidgetId =>
-      valid.has(id),
-    )
+    const filtered = incoming.filter((id): id is WidgetId => valid.has(id))
     // Schema migration: when we introduce new widgets that should be
     // off-by-default, bump STORAGE_VERSION and union the prior user
     // hides with the new defaults so existing installs don't suddenly
@@ -276,15 +274,9 @@ export function useDashboardLayout() {
   // Reset returns to the iteration-006 defaults rather than "show
   // literally everything" so first-time users hitting Reset don't
   // suddenly see Logs they never asked for.
-  const reset = useCallback(
-    () => setHidden(new Set(DEFAULT_HIDDEN)),
-    [],
-  )
+  const reset = useCallback(() => setHidden(new Set(DEFAULT_HIDDEN)), [])
 
-  const isVisible = useCallback(
-    (id: WidgetId) => !hidden.has(id),
-    [hidden],
-  )
+  const isVisible = useCallback((id: WidgetId) => !hidden.has(id), [hidden])
 
   const counts = useMemo(() => {
     const total = WIDGET_CATALOG.length
@@ -299,7 +291,6 @@ export function useDashboardLayout() {
     editMode,
     toggleEdit,
     setEditMode,
-    hidden,
     hide,
     show,
     reset,

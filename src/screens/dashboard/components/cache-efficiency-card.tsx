@@ -1,13 +1,6 @@
 import { useMemo } from 'react'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
-
-function formatTokens(n: number): string {
-  if (!n || n <= 0) return '0'
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
-}
+import { formatTokens } from '@/screens/dashboard/lib/formatters'
 
 /**
  * Cache efficiency tile.
@@ -68,26 +61,20 @@ export function CacheEfficiencyCard({
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-25 blur-2xl bg-[var(--theme-success,#50fa7b)]"
+        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-25 blur-2xl bg-[var(--theme-success)]"
       />
 
       <div className="flex items-center justify-between">
-        <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-        >
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
           Cache efficiency
         </h3>
-        <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-        >
+        <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
           {analytics.windowDays}d
         </span>
       </div>
 
       <div className="flex items-baseline gap-2">
-        <span
-          className="font-mono text-2xl font-bold leading-none tracking-tight tabular-nums text-[var(--theme-text)]"
-        >
+        <span className="font-mono text-2xl font-bold leading-none tracking-tight tabular-nums text-[var(--theme-text)]">
           {ratePct.toFixed(1)}%
         </span>
         <span
@@ -99,9 +86,7 @@ export function CacheEfficiencyCard({
       </div>
 
       <div className="flex items-end justify-between gap-2">
-        <div
-          className="font-mono text-[10px] leading-snug text-[var(--theme-muted)]"
-        >
+        <div className="font-mono text-[10px] leading-snug text-[var(--theme-muted)]">
           <span className="text-[var(--theme-text)]">
             {formatTokens(cache)}
           </span>{' '}
@@ -127,8 +112,7 @@ export function CacheEfficiencyCard({
           aria-hidden
         >
           {dailyRates.map((rate, idx) => {
-            const heightPct =
-              max > 0 ? Math.max(6, (rate / max) * 100) : 6
+            const heightPct = max > 0 ? Math.max(6, (rate / max) * 100) : 6
             return (
               <div
                 key={idx}

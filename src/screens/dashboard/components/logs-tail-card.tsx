@@ -30,11 +30,7 @@ function lineTone(line: string): string {
  * Hides itself when the dashboard isn't returning logs (vanilla install
  * with auth disabled, or running without a dashboard).
  */
-export function LogsTailCard({
-  logs,
-}: {
-  logs: DashboardOverview['logs']
-}) {
+export function LogsTailCard({ logs }: { logs: DashboardOverview['logs'] }) {
   const [showModal, setShowModal] = useState(false)
   if (!logs) return null
 
@@ -57,9 +53,7 @@ export function LogsTailCard({
               strokeWidth={1.5}
               className="text-[var(--theme-muted)]"
             />
-            <h3
-              className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-            >
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]">
               Logs · {logs.file}
             </h3>
           </div>
@@ -181,7 +175,7 @@ function LogsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
@@ -190,9 +184,7 @@ function LogsModal({
         className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="flex items-center justify-between border-b px-4 py-3 border-[var(--theme-border)]"
-        >
+        <div className="flex items-center justify-between border-b px-4 py-3 border-[var(--theme-border)]">
           <div className="flex items-center gap-3">
             <HugeiconsIcon
               icon={TerminalIcon}
@@ -201,14 +193,10 @@ function LogsModal({
               className="text-[var(--theme-text)]"
             />
             <div>
-              <h2
-                className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-              >
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
                 Live tail · {logs.file}
               </h2>
-              <p
-                className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-              >
+              <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
                 {logs.lines.length} lines · {logs.errorCount} errors ·{' '}
                 {logs.warnCount} warns
                 {loading ? ' · refreshing…' : ''}
@@ -260,9 +248,7 @@ function LogsModal({
           }}
         >
           {filtered.length === 0 ? (
-            <div
-              className="py-6 text-center text-[11px] text-[var(--theme-muted)]"
-            >
+            <div className="py-6 text-center text-[11px] text-[var(--theme-muted)]">
               No matching log lines.
             </div>
           ) : (

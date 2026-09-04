@@ -11,32 +11,17 @@ import {
   YAxis,
 } from 'recharts'
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  CancelIcon,
-  ChartLineData01Icon,
-} from '@hugeicons/core-free-icons'
+import { CancelIcon, ChartLineData01Icon } from '@hugeicons/core-free-icons'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
-import { formatModelName } from '@/screens/dashboard/lib/formatters'
+import {
+  formatCost,
+  formatModelName,
+  formatTokens,
+} from '@/screens/dashboard/lib/formatters'
 
 export type AnalyticsPeriod = 7 | 14 | 30
 
 const PERIODS: Array<AnalyticsPeriod> = [7, 14, 30]
-
-function formatTokens(n: number): string {
-  if (!n || n <= 0) return '0'
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
-}
-
-function formatCost(usd: number): string {
-  if (!usd || usd <= 0) return '$0'
-  if (usd < 0.01) return '<$0.01'
-  if (usd < 1) return `$${usd.toFixed(3)}`
-  if (usd < 100) return `$${usd.toFixed(2)}`
-  return `$${Math.round(usd).toLocaleString()}`
-}
 
 function shortDay(day: string): string {
   const ts = Date.parse(day)
@@ -122,14 +107,10 @@ export function AnalyticsChartCard({
               className="text-[var(--theme-accent)]"
             />
             <div>
-              <h3
-                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-              >
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
                 Usage trend · {period}d
               </h3>
-              <p
-                className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-              >
+              <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
                 {formatTokens(analytics.totalTokens)} tokens ·{' '}
                 {analytics.totalApiCalls.toLocaleString()} calls ·{' '}
                 {formatCost(analytics.estimatedCostUsd ?? 0)}
@@ -138,10 +119,7 @@ export function AnalyticsChartCard({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <PeriodSwitch
-              value={period}
-              onChange={onPeriodChange}
-            />
+            <PeriodSwitch value={period} onChange={onPeriodChange} />
             {hasData ? (
               <button
                 type="button"
@@ -155,7 +133,8 @@ export function AnalyticsChartCard({
         </div>
 
         {insights.length > 0 ? (
-          <ul className="flex flex-col gap-1 rounded-md border border-[var(--theme-border)] p-2 text-[11px]"
+          <ul
+            className="flex flex-col gap-1 rounded-md border border-[var(--theme-border)] p-2 text-[11px]"
             style={{
               background:
                 'color-mix(in srgb, var(--theme-card) 92%, transparent)',
@@ -290,10 +269,7 @@ export function AnalyticsChartCard({
         {hasData ? (
           <div className="flex items-center gap-4 text-[10px]">
             <Legend tone="var(--theme-accent)" label="tokens (in+out)" />
-            <Legend
-              tone="var(--theme-accent-secondary)"
-              label="cache reads"
-            />
+            <Legend tone="var(--theme-accent-secondary)" label="cache reads" />
           </div>
         ) : null}
       </div>
@@ -354,9 +330,7 @@ function PeriodSwitch({
 
 function Legend({ tone, label }: { tone: string; label: string }) {
   return (
-    <span
-      className="flex items-center gap-1.5 text-[var(--theme-muted)]"
-    >
+    <span className="flex items-center gap-1.5 text-[var(--theme-muted)]">
       <span
         className="size-2 rounded-full"
         style={{ background: tone }}
@@ -380,7 +354,7 @@ function AnalyticsModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
@@ -389,18 +363,12 @@ function AnalyticsModal({
         className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="flex items-center justify-between border-b px-5 py-3 border-[var(--theme-border)]"
-        >
+        <div className="flex items-center justify-between border-b px-5 py-3 border-[var(--theme-border)]">
           <div>
-            <h2
-              className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-            >
+            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
               Usage trend · last {period}d
             </h2>
-            <p
-              className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-            >
+            <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
               {formatTokens(analytics.totalTokens)} tokens ·{' '}
               {analytics.totalSessions.toLocaleString()} sessions ·{' '}
               {analytics.totalApiCalls.toLocaleString()} calls ·{' '}
@@ -424,9 +392,7 @@ function AnalyticsModal({
 
         <div className="grid flex-1 grid-cols-1 gap-4 overflow-y-auto p-5 lg:grid-cols-12">
           <div className="lg:col-span-8">
-            <h3
-              className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-            >
+            <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]">
               Daily token mix
             </h3>
             <div className="h-[260px] w-full">
@@ -498,9 +464,7 @@ function AnalyticsModal({
           </div>
 
           <div className="lg:col-span-4">
-            <h3
-              className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-            >
+            <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]">
               Models · ranked by tokens
             </h3>
             <div className="space-y-2">
@@ -510,19 +474,13 @@ function AnalyticsModal({
                   className="rounded border px-3 py-2 border-[var(--theme-border)]"
                 >
                   <div className="flex items-center justify-between">
-                    <span
-                      className="font-mono text-[12px] font-semibold text-[var(--theme-text)]"
-                    >
-                      <span
-                        className="mr-1.5 inline-block w-4 text-right tabular-nums text-[var(--theme-muted)]"
-                      >
+                    <span className="font-mono text-[12px] font-semibold text-[var(--theme-text)]">
+                      <span className="mr-1.5 inline-block w-4 text-right tabular-nums text-[var(--theme-muted)]">
                         {i + 1}
                       </span>
                       {formatModelName(m.id)}
                     </span>
-                    <span
-                      className="font-mono text-[10px] tabular-nums text-[var(--theme-muted)]"
-                    >
+                    <span className="font-mono text-[10px] tabular-nums text-[var(--theme-muted)]">
                       {formatTokens(m.tokens)}
                     </span>
                   </div>

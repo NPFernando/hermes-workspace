@@ -58,7 +58,7 @@ export function ModelInfoCard({
   const supportsReasoning = readBoolCap(caps, 'supports_reasoning')
   const family =
     caps && typeof caps['model_family'] === 'string'
-      ? (caps['model_family'])
+      ? caps['model_family']
       : null
 
   // Operational line: share of API calls served by this model in the
@@ -66,9 +66,7 @@ export function ModelInfoCard({
   // summary so the card never looks half-empty.
   const opsLine = useMemo(() => {
     if (modelInfo && analytics && analytics.totalApiCalls > 0) {
-      const match = analytics.topModels.find(
-        (m) => m.id === modelInfo.model,
-      )
+      const match = analytics.topModels.find((m) => m.id === modelInfo.model)
       if (match) {
         const pct = Math.round((match.calls / analytics.totalApiCalls) * 100)
         return `${pct}% of calls · ${match.sessions.toLocaleString()} sessions · ${analytics.windowDays}d`
@@ -85,9 +83,7 @@ export function ModelInfoCard({
 
   return (
     <>
-      <div
-        className="relative flex h-full flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
-      >
+      <div className="relative flex h-full flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
@@ -164,18 +160,10 @@ export function ModelInfoCard({
               <CapabilityChip label="tools" value="✓" tone={palette.success} />
             ) : null}
             {supportsVision ? (
-              <CapabilityChip
-                label="vision"
-                value="✓"
-                tone={palette.success}
-              />
+              <CapabilityChip label="vision" value="✓" tone={palette.success} />
             ) : null}
             {supportsReasoning ? (
-              <CapabilityChip
-                label="reason"
-                value="✓"
-                tone={palette.success}
-              />
+              <CapabilityChip label="reason" value="✓" tone={palette.success} />
             ) : null}
           </div>
 
@@ -210,9 +198,7 @@ function CapabilityChip({
   tone: string
 }) {
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-    >
+    <span className="inline-flex items-center gap-1 rounded border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
       <span>{label}</span>
       <span style={{ color: tone }}>{value}</span>
     </span>
@@ -290,7 +276,7 @@ function ModelInventoryModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
@@ -299,18 +285,12 @@ function ModelInventoryModal({
         className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="flex items-center justify-between gap-3 border-b px-4 py-3 border-[var(--theme-border)]"
-        >
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-3 border-[var(--theme-border)]">
           <div>
-            <h2
-              className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-            >
+            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
               Model inventory
             </h2>
-            <p
-              className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-            >
+            <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
               {models.length} models from {grouped.length || '—'} providers
             </p>
           </div>
@@ -340,29 +320,21 @@ function ModelInventoryModal({
 
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
-            <div
-              className="py-8 text-center text-[11px] text-[var(--theme-muted)]"
-            >
+            <div className="py-8 text-center text-[11px] text-[var(--theme-muted)]">
               Loading models…
             </div>
           ) : error ? (
-            <div
-              className="py-8 text-center text-[11px] text-[var(--theme-danger,#ef4444)]"
-            >
+            <div className="py-8 text-center text-[11px] text-[var(--theme-danger)]">
               {error}
             </div>
           ) : grouped.length === 0 ? (
-            <div
-              className="py-8 text-center text-[11px] text-[var(--theme-muted)]"
-            >
+            <div className="py-8 text-center text-[11px] text-[var(--theme-muted)]">
               No matching models.
             </div>
           ) : (
             grouped.map(([provider, list]) => (
               <div key={provider} className="mb-4">
-                <h3
-                  className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]"
-                >
+                <h3 className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
                   {provider} · {list.length}
                 </h3>
                 <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">

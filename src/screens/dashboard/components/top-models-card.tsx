@@ -1,23 +1,11 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ChartBarLineIcon } from '@hugeicons/core-free-icons'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
-import { formatModelName } from '@/screens/dashboard/lib/formatters'
-
-function formatTokens(n: number): string {
-  if (!n || n <= 0) return '0'
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
-}
-
-function formatCost(usd: number): string {
-  if (!usd || usd <= 0) return '$0'
-  if (usd < 0.01) return '<$0.01'
-  if (usd < 1) return `$${usd.toFixed(3)}`
-  if (usd < 100) return `$${usd.toFixed(2)}`
-  return `$${Math.round(usd).toLocaleString()}`
-}
+import {
+  formatCost,
+  formatModelName,
+  formatTokens,
+} from '@/screens/dashboard/lib/formatters'
 
 /**
  * Standalone top-models card. Previously this was the right column
@@ -51,15 +39,11 @@ export function TopModelsCard({
             strokeWidth={1.5}
             className="text-[var(--theme-accent-secondary,var(--theme-accent))]"
           />
-          <h3
-            className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-          >
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
             Top models · {analytics.windowDays}d
           </h3>
         </div>
-        <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-        >
+        <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
           {analytics.topModels.length} ranked
         </span>
       </div>
@@ -82,16 +66,12 @@ export function TopModelsCard({
                   className="flex min-w-0 items-center gap-1.5 truncate font-mono text-[var(--theme-text)]"
                   title={m.id}
                 >
-                  <span
-                    className="inline-block w-3 text-right tabular-nums text-[var(--theme-muted)]"
-                  >
+                  <span className="inline-block w-3 text-right tabular-nums text-[var(--theme-muted)]">
                     {i + 1}
                   </span>
                   {formatModelName(m.id)}
                 </span>
-                <span
-                  className="font-mono text-[10px] tabular-nums text-[var(--theme-muted)]"
-                >
+                <span className="font-mono text-[10px] tabular-nums text-[var(--theme-muted)]">
                   {formatTokens(m.tokens)}
                 </span>
               </div>
@@ -110,9 +90,7 @@ export function TopModelsCard({
                   }}
                 />
               </div>
-              <div
-                className="mt-0.5 flex items-center justify-between gap-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-              >
+              <div className="mt-0.5 flex items-center justify-between gap-2 font-mono text-[9px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
                 <span>
                   {sharePct}% of calls · {m.sessions.toLocaleString()} sessions
                 </span>

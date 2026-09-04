@@ -1,14 +1,7 @@
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
-
-function formatTokens(n: number): string {
-  if (!n || n <= 0) return '0'
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
-}
+import { formatTokens } from '@/screens/dashboard/lib/formatters'
 
 function formatCount(n: number): string {
   if (!n || n <= 0) return '0'
@@ -64,7 +57,13 @@ function Spark({
       aria-hidden
     >
       <defs>
-        <linearGradient id={`spark-grad-${tone.replace('#', '')}`} x1="0" x2="0" y1="0" y2="1">
+        <linearGradient
+          id={`spark-grad-${tone.replace('#', '')}`}
+          x1="0"
+          x2="0"
+          y1="0"
+          y2="1"
+        >
           <stop offset="0%" stopColor={tone} stopOpacity={0.35} />
           <stop offset="100%" stopColor={tone} stopOpacity={0} />
         </linearGradient>
@@ -95,7 +94,15 @@ type HeroTileProps = {
   icon: string
 }
 
-function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps) {
+function HeroTile({
+  label,
+  value,
+  sub,
+  delta,
+  spark,
+  tone,
+  icon,
+}: HeroTileProps) {
   const deltaText = (() => {
     if (delta === null || delta === undefined) return null
     const sign = delta > 0 ? '+' : ''
@@ -120,7 +127,7 @@ function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
         style={{
-          background: `linear-gradient(90deg, ${tone}, ${tone}55, transparent)`,
+          background: `linear-gradient(90deg, ${tone}, color-mix(in srgb, ${tone} 33%, transparent), transparent)`,
         }}
       />
       <div
@@ -129,9 +136,7 @@ function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps
         style={{ background: tone }}
       />
       <div className="flex items-center justify-between">
-        <span
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]"
-        >
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
           {label}
         </span>
         <span
@@ -146,18 +151,14 @@ function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps
         </span>
       </div>
       <div className="flex items-end justify-between gap-2">
-        <span
-          className="font-mono text-3xl font-bold tabular-nums leading-none tracking-tight text-[var(--theme-text)]"
-        >
+        <span className="font-mono text-3xl font-bold tabular-nums leading-none tracking-tight text-[var(--theme-text)]">
           {value}
         </span>
         {spark ? <Spark values={spark} tone={tone} /> : null}
       </div>
       <div className="flex items-center justify-between gap-2 text-[10px]">
         {sub ? (
-          <span
-            className="truncate font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]"
-          >
+          <span className="truncate font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]">
             {sub}
           </span>
         ) : (
@@ -215,9 +216,7 @@ export function HeroMetrics({
   const dailySessions = useAnalytics
     ? analytics.daily.map((d) => d.sessions)
     : []
-  const dailyCalls = useAnalytics
-    ? analytics.daily.map((d) => d.apiCalls)
-    : []
+  const dailyCalls = useAnalytics ? analytics.daily.map((d) => d.apiCalls) : []
 
   // Period-over-period deltas: split daily into the latter half vs the prior half.
   const splitSum = (arr: Array<number>): [number, number] => {
@@ -231,15 +230,11 @@ export function HeroMetrics({
   const [sessCurr, sessPrev] = splitSum(dailySessions)
   const [tokCurr, tokPrev] = splitSum(dailyTokens)
 
-  const tokensTotal = useAnalytics
-    ? analytics.totalTokens
-    : fallback.tokens
+  const tokensTotal = useAnalytics ? analytics.totalTokens : fallback.tokens
   const sessionsTotal = useAnalytics
     ? analytics.totalSessions
     : fallback.sessions
-  const apiCalls = useAnalytics
-    ? analytics.totalApiCalls
-    : fallback.toolCalls
+  const apiCalls = useAnalytics ? analytics.totalApiCalls : fallback.toolCalls
 
   const window = useAnalytics ? `${analytics.windowDays}d` : 'all time'
 
@@ -274,7 +269,6 @@ export function HeroMetrics({
         tone: 'var(--theme-success)',
         icon: '🔧',
       },
-
     ],
     [
       analytics,
