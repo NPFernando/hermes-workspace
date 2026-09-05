@@ -1,0 +1,51 @@
+# Manually-triggered Windows Electron build, run on a real x64 Windows
+# runner. This avoids the ARM64-dev-VM blocker documented in
+# docs/personal-finance-os-roadmap.md ("Verified (blocked): Windows
+# Electron build") -- electron-builder's rcedit tool needs a native x86
+# Windows host (or heavy emulation) to embed the .exe icon/version info,
+# which a real windows-latest runner provides for free.
+
+name: Electron Windows Build
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build-windows:
+    name: Build Windows Electron app
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build web app + server bundle
+        run: |
+          pnpm build
+          pnpm electron:bundle-server
+
+      - name: Build Windows Electron package (unsigned, never publishes)
+        run: pnpm exec electron-builder --win --config electron-builder.config.cjs --publish never
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-workspace-windows
+          path: |
+            release/*.exe
+            release/latest.yml
+          if-no-files-found: error

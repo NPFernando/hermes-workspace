@@ -1,0 +1,58 @@
+{
+  "name": "Fernando Family Hermes Workspace",
+  "short_name": "Hermes",
+  "description": "Installable AI workspace for Hermes Agent chat, tools, files, memory, jobs, and agent workflows.",
+  "id": "/?app=hermes-workspace",
+  "start_url": "/chat/new?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
+  "orientation": "any",
+  "background_color": "#282c34",
+  "theme_color": "#282c34",
+  "categories": ["productivity", "utilities", "developer"],
+  "icons": [
+    {
+      "src": "/claude-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/claude-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "com.fernandofamily.hermes"
+    }
+  ],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "New Chat",
+      "short_name": "Chat",
+      "description": "Start a new Hermes Agent session",
+      "url": "/chat/new?source=pwa-shortcut",
+      "icons": [{ "src": "/claude-icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Command Center",
+      "short_name": "Command",
+      "description": "Open Command Center: agent sisters, swarm, and operations",
+      "url": "/command?source=pwa-shortcut",
+      "icons": [{ "src": "/claude-icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Tasks",
+      "short_name": "Tasks",
+      "description": "Open Hermes tasks",
+      "url": "/tasks?source=pwa-shortcut",
+      "icons": [{ "src": "/claude-icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

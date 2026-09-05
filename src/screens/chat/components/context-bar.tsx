@@ -1,0 +1,234 @@
+'use client'
+
+import { memo, useCallback, useEffect, useState } from 'react'
+import { cn } from '@/lib/utils'
+import {
+  PreviewCard,
+  PreviewCardPopup,
+  PreviewCardTrigger,
+} from '@/components/ui/preview-card'
+
+const POLL_MS = 15_000
+
+type ContextData = {
+  contextPercent: number
+  model: string
+  maxTokens: number
+  usedTokens: number
+}
+
+const EMPTY: ContextData = {
+  contextPercent: 0,
+  model: '',
+  maxTokens: 0,
+  usedTokens: 0,
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
+  return String(n)
+}
+
+/**
+ * The meter only carries information once tokens have been consumed; on a
+ * fresh session a full-width colored track reads as a stray strip, so stay
+ * hidden until there is real usage (also covers the pre-load state).
+ */
+export function shouldRenderContextBar(ctx: ContextData): boolean {
+  return ctx.usedTokens > 0
+}
+
+// Neutral track so only the fill carries the usage color.
+const TRACK_BG = 'bg-[var(--theme-border)]/50'
+
+function ContextBarComponent({
+  compact: _compact,
+  sessionId,
+}: {
+  compact?: boolean
+  sessionId?: string
+}) {
+  const [ctx, setCtx] = useState<ContextData>(EMPTY)
+  const [showLabel, setShowLabel] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const update = () => setIsMobile(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  const refresh = useCallback(async () => {
+    try {
+      const params = sessionId
+        ? `?sessionId=${encodeURIComponent(sessionId)}`
+        : ''
+      const res = await fetch(`/api/context-usage${params}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.ok) {
+        setCtx({
+          contextPercent: data.contextPercent ?? 0,
+          model: data.model ?? '',
+          maxTokens: data.maxTokens ?? 0,
+          usedTokens: data.usedTokens ?? 0,
+        })
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [sessionId])
+
+  useEffect(() => {
+    void refresh()
+    const id = window.setInterval(refresh, POLL_MS)
+    return () => window.clearInterval(id)
+  }, [refresh])
+
+  useEffect(() => {
+    if (!showLabel) return
+    const id = setTimeout(() => setShowLabel(false), 3000)
+    return () => clearTimeout(id)
+  }, [showLabel])
+
+  const pct = ctx.contextPercent
+  const clampedPct = Math.min(Math.max(pct, 0), 100)
+
+  if (!shouldRenderContextBar(ctx)) return null
+  const isCritical = clampedPct > 90
+  const isDanger = clampedPct >= 75 && clampedPct <= 90
+  const isWarning = clampedPct >= 50 && clampedPct < 75
+
+  const barColor = isCritical
+    ? 'bg-[var(--theme-danger)]'
+    : isDanger
+      ? 'bg-[var(--theme-warning)]'
+      : isWarning
+        ? 'bg-yellow-400'
+        : 'bg-[var(--theme-success)]'
+
+  const barBg = isCritical
+    ? 'bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)]'
+    : isDanger
+      ? 'bg-[color-mix(in_srgb,var(--theme-warning)_15%,transparent)]'
+      : isWarning
+        ? 'bg-yellow-100'
+        : 'bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)]'
+
+  const textColor = isCritical
+    ? 'text-[var(--theme-danger)]'
+    : isDanger
+      ? 'text-[var(--theme-warning)]'
+      : isWarning
+        ? 'text-yellow-600'
+        : 'text-[var(--theme-success)]'
+
+  if (isMobile) {
+    return (
+      <div className="relative w-full">
+        {/* Invisible tap target */}
+        <button
+          type="button"
+          className="absolute inset-x-0 -top-2 -bottom-2 z-10"
+          onClick={() => setShowLabel((prev) => !prev)}
+          aria-label={`Context: ${Math.round(clampedPct)}% used`}
+        />
+        {/* Bar — always 3px, never moves */}
+        <div className={cn('w-full h-[3px]', TRACK_BG)}>
+          <div
+            className={cn(
+              'h-full transition-all duration-700 ease-out',
+              barColor,
+            )}
+            style={{ width: `${clampedPct}%` }}
+          />
+        </div>
+        {/* Label floats below bar on tap */}
+        {showLabel && (
+          <div className="absolute right-2 top-[5px] z-20 flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--theme-bg)]/85 shadow-sm animate-in fade-in duration-150">
+            <span className="text-[10px] font-semibold tabular-nums text-white">
+              {Math.round(clampedPct)}%
+            </span>
+            <span className="text-[9px] text-white/70 tabular-nums">
+              {formatTokens(ctx.usedTokens)}/{formatTokens(ctx.maxTokens)}
+            </span>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <PreviewCard>
+      <PreviewCardTrigger className="block w-full cursor-pointer">
+        <div
+          className={cn(
+            'shrink-0 w-full h-[3px] transition-colors duration-300 relative',
+            TRACK_BG,
+          )}
+        >
+          <div
+            className={cn(
+              'h-full transition-all duration-700 ease-out',
+              barColor,
+            )}
+            style={{ width: `${clampedPct}%` }}
+          />
+          {/* % shown on hover via popup only */}
+        </div>
+      </PreviewCardTrigger>
+
+      <PreviewCardPopup
+        align="center"
+        sideOffset={2}
+        className="w-64 px-3 py-2.5 rounded-lg"
+      >
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-medium text-[var(--theme-text)]">
+              Context Window
+            </span>
+            <span
+              className={cn(
+                'text-[11px] font-semibold tabular-nums',
+                textColor,
+              )}
+            >
+              {Math.round(clampedPct)}%
+            </span>
+          </div>
+          <div className={cn('w-full h-2 rounded-full overflow-hidden', barBg)}>
+            <div
+              className={cn(
+                'h-full rounded-full transition-all duration-500',
+                barColor,
+              )}
+              style={{ width: `${clampedPct}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-[var(--theme-muted)] tabular-nums">
+              {formatTokens(ctx.usedTokens)} / {formatTokens(ctx.maxTokens)}{' '}
+              tokens
+            </span>
+            {ctx.model && (
+              <span className="text-[10px] text-[var(--theme-muted)] truncate max-w-[100px]">
+                {ctx.model}
+              </span>
+            )}
+          </div>
+          {isCritical && (
+            <p className="text-[10px] text-[var(--theme-danger)] font-medium">
+              Context almost full — consider starting a new chat
+            </p>
+          )}
+        </div>
+      </PreviewCardPopup>
+    </PreviewCard>
+  )
+}
+
+export const ContextBar = memo(ContextBarComponent)

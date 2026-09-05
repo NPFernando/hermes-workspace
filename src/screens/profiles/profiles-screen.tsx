@@ -1,0 +1,1284 @@
+import { useEffect, useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { HugeiconsIcon } from '@hugeicons/react'
+import {
+  Add01Icon,
+  ArrowRight01Icon,
+  CheckmarkCircle02Icon,
+  Clock01Icon,
+  Copy01Icon,
+  Delete02Icon,
+  Edit02Icon,
+  Folder01Icon,
+  Key01Icon,
+  SparklesIcon,
+  ToggleOffIcon,
+  ToggleOnIcon,
+  UserGroupIcon,
+  UserStar01Icon,
+} from '@hugeicons/core-free-icons'
+import { useProfileWizard } from './use-profile-wizard'
+import { Button } from '@/components/ui/button'
+import { DialogContent, DialogRoot, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { toast } from '@/components/ui/toast'
+import { cn } from '@/lib/utils'
+
+type SisterEntry = {
+  id: string
+  name: string
+  emoji: string
+  role: string
+  type: 'ai_sister' | 'business_agent' | 'delegation_profile'
+  description?: string
+  modelPreference?: string
+  growthLabel?: string
+  growthEmoji?: string
+  growthEntryCount?: number
+}
+
+const SISTER_BADGE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  astra:    { bg: 'bg-violet-500/15',  text: 'text-violet-400',  border: 'border-violet-400/30' },
+  novus:    { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-400/30' },
+  nova:     { bg: 'bg-sky-500/15',     text: 'text-sky-400',     border: 'border-sky-400/30' },
+  business: { bg: 'bg-amber-500/15',   text: 'text-amber-400',   border: 'border-amber-400/30' },
+  default:  { bg: 'bg-[var(--theme-panel)]0/10', text: 'text-[var(--theme-muted)]', border: 'border-[var(--theme-border)]/20' },
+}
+
+function sisterBadgeStyle(s: SisterEntry) {
+  if (SISTER_BADGE_STYLES[s.id]) return SISTER_BADGE_STYLES[s.id]
+  if (s.type === 'business_agent') return SISTER_BADGE_STYLES.business
+  return SISTER_BADGE_STYLES.default
+}
+
+function SisterBadge({ sister }: { sister: SisterEntry }) {
+  const style = sisterBadgeStyle(sister)
+  return (
+    <span className={cn(
+      'mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+      style.bg, style.text, style.border,
+    )} title={sister.description || sister.role}>
+      {sister.emoji} {sister.name}
+      {(sister.growthEntryCount ?? 0) > 0 && sister.growthEmoji ? (
+        <span className="opacity-60">{sister.growthEmoji}</span>
+      ) : null}
+    </span>
+  )
+}
+
+type ProfileSummary = {
+  name: string
+  path: string
+  active: boolean
+  exists: boolean
+  model?: string
+  provider?: string
+  description?: string
+  skillCount: number
+  sessionCount: number
+  hasEnv: boolean
+  updatedAt?: string
+}
+
+type ProfileDetail = {
+  name: string
+  path: string
+  active: boolean
+  config: Record<string, unknown>
+  description: string
+  envPath?: string
+  hasEnv: boolean
+  sessionsDir?: string
+  skillsDir?: string
+}
+
+async function readJson<T>(url: string): Promise<T> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw new Error(text || `Request failed (${response.status})`)
+  }
+  return (await response.json()) as T
+}
+
+function formatDate(value?: string): string {
+  if (!value) return '—'
+  const parsed = Date.parse(value)
+  if (Number.isNaN(parsed)) return value
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(parsed)
+}
+
+function StatChip({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
+      <span className="font-semibold text-[var(--theme-text)]">{value}</span> {label}
+    </div>
+  )
+}
+
+function ProfileStat({
+  label,
+  value,
+  truncate,
+}: {
+  label: string
+  value: string | number
+  truncate?: boolean
+}) {
+  return (
+    <div className="flex flex-col items-center py-2.5 px-1">
+      <div
+        title={truncate ? String(value) : undefined}
+        className={cn(
+          'text-sm font-bold text-[var(--theme-text)]',
+          truncate && 'max-w-[72px] truncate text-xs',
+        )}
+      >
+        {value}
+      </div>
+      <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--theme-muted)]">
+        {label}
+      </div>
+    </div>
+  )
+}
+
+export function ProfilesScreen() {
+  const queryClient = useQueryClient()
+  const [createOpen, setCreateOpen] = useState(false)
+  const [detailsName, setDetailsName] = useState<string | null>(null)
+  const [renameTarget, setRenameTarget] = useState<ProfileSummary | null>(null)
+  const {
+    newProfileName, setNewProfileName,
+    wizardStep, setWizardStep,
+    cloneFrom, setCloneFrom,
+    wizardProvider, setWizardProvider,
+    wizardModel, setWizardModel,
+    allModels, setAllModels,
+    loadingModels,
+    wizardPersonality, setWizardPersonality,
+    wizardSelectedPreset, setWizardSelectedPreset,
+    wizardEnableSwarm, setWizardEnableSwarm,
+    swarmData, setSwarmData,
+    loadingSwarm,
+    workerPresets, setWorkerPresets,
+    resetWizard,
+  } = useProfileWizard(createOpen)
+  const [renameValue, setRenameValue] = useState('')
+  const [busyName, setBusyName] = useState<string | null>(null)
+  const [descriptionDraft, setDescriptionDraft] = useState('')
+  const [savingDescription, setSavingDescription] = useState(false)
+
+  const profilesQuery = useQuery({
+    queryKey: ['profiles', 'list'],
+    queryFn: () =>
+      readJson<{ profiles: Array<ProfileSummary>; activeProfile: string }>(
+        '/api/profiles/list',
+      ),
+  })
+
+  const sistersQuery = useQuery({
+    queryKey: ['sisters'],
+    queryFn: async () => {
+      const res = await fetch('/api/sisters')
+      if (!res.ok) return []
+      const payload = (await res.json()) as { ok?: boolean; sisters?: Array<SisterEntry> }
+      return Array.isArray(payload.sisters) ? payload.sisters : []
+    },
+    staleTime: 60_000,
+  })
+
+  const sisterMap = useMemo(() => {
+    const map: Record<string, SisterEntry> = {}
+    for (const s of sistersQuery.data ?? []) {
+      map[s.id] = s
+      if (s.id === 'astra') map['default'] = s
+    }
+    return map
+  }, [sistersQuery.data])
+
+  const detailQuery = useQuery({
+    queryKey: ['profiles', 'read', detailsName],
+    queryFn: () =>
+      readJson<{ profile: ProfileDetail }>(
+        `/api/profiles/read?name=${encodeURIComponent(detailsName || '')}`,
+      ),
+    enabled: Boolean(detailsName),
+  })
+
+  const profiles = profilesQuery.data?.profiles ?? []
+  const activeProfile = profilesQuery.data?.activeProfile ?? 'default'
+
+  const sorted = useMemo(() => profiles, [profiles])
+
+  async function refreshProfiles() {
+    await queryClient.invalidateQueries({ queryKey: ['profiles'] })
+  }
+
+  async function postJson(url: string, body: Record<string, unknown>) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok || payload?.error) {
+      throw new Error(payload?.error || `Request failed (${response.status})`)
+    }
+    return payload
+  }
+
+  useEffect(() => {
+    setDescriptionDraft(detailQuery.data?.profile?.description ?? '')
+  }, [detailQuery.data?.profile?.description, detailsName])
+
+  const nameValid =
+    /^[A-Za-z0-9_-]+$/.test(newProfileName.trim()) &&
+    newProfileName.trim() !== 'default'
+
+  async function handleCreate() {
+    if (!newProfileName.trim()) return
+    setBusyName('__create__')
+    try {
+      await postJson('/api/profiles/create', {
+        name: newProfileName.trim(),
+        ...(cloneFrom ? { cloneFrom } : {}),
+        ...(wizardModel ? { model: wizardModel } : {}),
+        ...(wizardProvider ? { provider: wizardProvider } : {}),
+      })
+
+      // Personality + swarm distribution
+      const personalityText = wizardPersonality.trim()
+      if (personalityText) {
+        const workers = wizardEnableSwarm && swarmData
+          ? swarmData.recommendations.map((rec) => ({
+              workerId: rec.workerId,
+              presetKey: workerPresets[rec.workerId] ?? rec.recommendedPreset,
+            }))
+          : []
+        try {
+          await postJson('/api/personality-swarm', {
+            name: newProfileName.trim(),
+            primaryPersonality: personalityText,
+            workers,
+          })
+        } catch {
+          // non-fatal — profile is created, personality failed
+          toast('Profile created but personality distribution had errors', { type: 'warning' })
+        }
+      }
+
+      toast(`Created profile ${newProfileName.trim()}`, { type: 'success' })
+      setCreateOpen(false)
+      resetWizard()
+      await refreshProfiles()
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : 'Failed to create profile',
+        { type: 'error' },
+      )
+    } finally {
+      setBusyName(null)
+    }
+  }
+
+  async function handleActivate(name: string) {
+    setBusyName(name)
+    try {
+      await postJson('/api/profiles/activate', { name })
+      toast(`Activated profile ${name}`, { type: 'success' })
+      await refreshProfiles()
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : 'Failed to activate profile',
+        { type: 'error' },
+      )
+    } finally {
+      setBusyName(null)
+    }
+  }
+
+  async function handleDelete(name: string) {
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(`Delete profile ${name}?`)
+    )
+      return
+    setBusyName(name)
+    try {
+      await postJson('/api/profiles/delete', { name })
+      toast(`Deleted profile ${name}`, { type: 'success' })
+      await refreshProfiles()
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : 'Failed to delete profile',
+        { type: 'error' },
+      )
+    } finally {
+      setBusyName(null)
+    }
+  }
+
+  async function handleRename() {
+    if (!renameTarget || !renameValue.trim()) return
+    setBusyName(renameTarget.name)
+    try {
+      await postJson('/api/profiles/rename', {
+        oldName: renameTarget.name,
+        newName: renameValue.trim(),
+      })
+      toast(`Renamed ${renameTarget.name} → ${renameValue.trim()}`, {
+        type: 'success',
+      })
+      setRenameTarget(null)
+      setRenameValue('')
+      await refreshProfiles()
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : 'Failed to rename profile',
+        { type: 'error' },
+      )
+    } finally {
+      setBusyName(null)
+    }
+  }
+
+  async function handleSaveDescription() {
+    if (!detailsName) return
+    setSavingDescription(true)
+    try {
+      await postJson('/api/profiles/update', {
+        name: detailsName,
+        patch: { description: descriptionDraft.trim() || null },
+      })
+      toast(`Saved description for ${detailsName}`, { type: 'success' })
+      await Promise.all([
+        refreshProfiles(),
+        queryClient.invalidateQueries({ queryKey: ['profiles', 'read', detailsName] }),
+      ])
+      await detailQuery.refetch()
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : 'Failed to save description',
+        { type: 'error' },
+      )
+    } finally {
+      setSavingDescription(false)
+    }
+  }
+
+  return (
+    <div data-route-page className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 md:px-6">
+      <div className="flex flex-col gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="hidden items-center gap-2 md:flex">
+            <HugeiconsIcon icon={UserGroupIcon} size={22} strokeWidth={1.7} />
+            <h1 className="text-lg font-semibold text-[var(--theme-text)]">Profiles</h1>
+          </div>
+          <p className="mt-1 text-sm text-[var(--theme-muted)]">
+            Browse and manage Hermes profiles stored under{' '}
+            <span className="font-mono">~/.hermes/profiles</span>.
+          </p>
+        </div>
+        <Button onClick={() => setCreateOpen(true)} className="gap-2">
+          <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.8} />
+          Create profile
+        </Button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {sorted.map((profile) => {
+          const busy = busyName === profile.name
+          return (
+            <article
+              key={profile.name}
+              className="group relative overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-sm"
+            >
+              {/* Active glow accent */}
+              {profile.active && (
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-accent-500 to-emerald-400" />
+              )}
+
+              {/* Centered avatar hero */}
+              <div className="flex flex-col items-center pt-6 pb-1">
+                <div className="relative">
+                  <div
+                    className={cn(
+                      'rounded-full p-1',
+                      profile.active
+                        ? 'bg-gradient-to-br from-emerald-400 via-accent-500 to-emerald-500 shadow-lg shadow-emerald-500/20'
+                        : 'bg-gradient-to-br from-[var(--theme-muted)]/30 to-[var(--theme-muted)]/50',
+                    )}
+                  >
+                    <img
+                      src="/claude-avatar.webp"
+                      alt={profile.name}
+                      className={cn(
+                        'size-20 rounded-full border-2 object-cover',
+                        profile.active
+                          ? 'border-white'
+                          : 'border-[var(--theme-border)]',
+                      )}
+                      style={{
+                        filter: profile.active
+                          ? 'none'
+                          : 'grayscale(0.5) brightness(0.9)',
+                      }}
+                    />
+                  </div>
+                  {profile.active && (
+                    <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full border-2 border-white bg-emerald-500 px-2 py-0.5">
+                      <HugeiconsIcon
+                        icon={CheckmarkCircle02Icon}
+                        size={10}
+                        strokeWidth={2.5}
+                        className="text-white"
+                      />
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-white">
+                        Active
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Name + provider */}
+                <h2 className="mt-3 text-center text-lg font-bold text-[var(--theme-text)]">
+                  {profile.name}
+                </h2>
+                <span className="mt-1 inline-block rounded-full bg-[var(--theme-hover)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--theme-muted)]">
+                  {profile.provider || 'no provider'}
+                </span>
+                {sisterMap[profile.name] ? (
+                  <SisterBadge sister={sisterMap[profile.name]} />
+                ) : null}
+                <p className="mt-3 line-clamp-2 min-h-[2.5rem] px-6 text-center text-xs text-[var(--theme-muted)]">
+                  {profile.description?.trim() || 'No description yet'}
+                </p>
+              </div>
+
+              {/* Stats ring */}
+              <div className="mx-4 mt-4 grid grid-cols-4 divide-x divide-[var(--theme-border)] rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]">
+                <ProfileStat label="Skills" value={profile.skillCount} />
+                <ProfileStat label="Sessions" value={profile.sessionCount} />
+                <ProfileStat
+                  label="Model"
+                  value={profile.model || '\u2014'}
+                  truncate
+                />
+                <ProfileStat
+                  label="Env"
+                  value={profile.hasEnv ? '\u2713' : '\u2014'}
+                />
+              </div>
+
+              {/* Updated timestamp */}
+              <div className="mx-4 mt-3 flex items-center justify-center gap-1.5 text-xs text-[var(--theme-muted)]">
+                <HugeiconsIcon icon={Clock01Icon} size={12} strokeWidth={1.7} />
+                {formatDate(profile.updatedAt)}
+              </div>
+
+              {/* Actions */}
+              <div className="mt-4 flex border-t border-[var(--theme-border)]">
+                <button
+                  type="button"
+                  onClick={() => void handleActivate(profile.name)}
+                  disabled={profile.active || busy}
+                  className={cn(
+                    'flex flex-1 items-center justify-center gap-1.5 border-r border-[var(--theme-border)] py-2.5 text-xs font-semibold transition-colors',
+                    profile.active
+                      ? 'cursor-default text-[var(--theme-muted)]'
+                      : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
+                  )}
+                >
+                  <HugeiconsIcon
+                    icon={SparklesIcon}
+                    size={13}
+                    strokeWidth={1.8}
+                  />{' '}
+                  Activate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailsName(profile.name)}
+                  className="flex flex-1 items-center justify-center gap-1.5 border-r border-[var(--theme-border)] py-2.5 text-xs font-semibold text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]"
+                >
+                  <HugeiconsIcon
+                    icon={Folder01Icon}
+                    size={13}
+                    strokeWidth={1.8}
+                  />{' '}
+                  Details
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRenameTarget(profile)
+                    setRenameValue(profile.name)
+                  }}
+                  className="flex flex-1 items-center justify-center gap-1.5 border-r border-[var(--theme-border)] py-2.5 text-xs font-semibold text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]"
+                >
+                  <HugeiconsIcon
+                    icon={Edit02Icon}
+                    size={13}
+                    strokeWidth={1.8}
+                  />{' '}
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(profile.name)}
+                  disabled={profile.active || busy}
+                  className={cn(
+                    'flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs font-semibold transition-colors',
+                    profile.active
+                      ? 'cursor-default text-[var(--theme-muted)]'
+                      : 'text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20',
+                  )}
+                >
+                  <HugeiconsIcon
+                    icon={Delete02Icon}
+                    size={13}
+                    strokeWidth={1.8}
+                  />{' '}
+                  Delete
+                </button>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+
+      {sorted.length === 0 && !profilesQuery.isLoading ? (
+        <div className="rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-panel)] p-8 text-center text-sm text-[var(--theme-muted)]">
+          No named profiles found yet. The active profile is{' '}
+          <span className="font-semibold">{activeProfile}</span>.
+        </div>
+      ) : null}
+
+      <DialogRoot
+        open={createOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open)
+          if (!open) resetWizard()
+        }}
+      >
+        <DialogContent className="w-[min(560px,94vw)] max-w-none p-0 max-h-[85vh] flex flex-col">
+          {/* ── Header ─────────────────────────────────── */}
+          <div className="shrink-0 border-b border-[var(--theme-border)] px-6 pb-4 pt-5">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex size-10 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]">
+                <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.7} />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-semibold">
+                  Create profile
+                </DialogTitle>
+                <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
+                  {wizardStep === 1
+                    ? 'Name & template'
+                    : wizardStep === 2
+                      ? 'Choose model'
+                      : wizardStep === 3
+                        ? 'Personality & swarm'
+                        : 'Review & create'}
+                </p>
+              </div>
+            </div>
+
+            {/* Step indicator */}
+            <div className="mt-4 flex items-center gap-2">
+              {[1, 2, 3, 4].map((step) => (
+                <div key={step} className="flex flex-1 items-center gap-2">
+                  <div
+                    className={cn(
+                      'flex size-7 items-center justify-center rounded-full text-xs font-bold transition-colors',
+                      wizardStep > step
+                        ? 'bg-emerald-500 text-white'
+                        : wizardStep === step
+                          ? 'bg-accent-500 text-white'
+                          : 'border border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
+                    )}
+                  >
+                    {wizardStep > step ? (
+                      <HugeiconsIcon
+                        icon={CheckmarkCircle02Icon}
+                        size={16}
+                        strokeWidth={2}
+                      />
+                    ) : (
+                      step
+                    )}
+                  </div>
+                  {step < 4 && (
+                    <div
+                      className={cn(
+                        'h-0.5 flex-1 rounded-full transition-colors',
+                        wizardStep > step
+                          ? 'bg-emerald-400'
+                          : 'bg-[var(--theme-hover)]',
+                      )}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Body ──────────────────────────────────── */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            {wizardStep === 1 && (
+              <div className="space-y-5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+                    Profile name
+                  </label>
+                  <Input
+                    value={newProfileName}
+                    onChange={(e) => setNewProfileName(e.target.value)}
+                    placeholder="e.g. builder, researcher, ops"
+                    className="h-11 text-sm"
+                    autoFocus
+                  />
+                  {newProfileName.trim() && !nameValid ? (
+                    <p className="text-xs text-red-500">
+                      Use letters, numbers, underscores, or hyphens. Cannot be
+                      &quot;default&quot;.
+                    </p>
+                  ) : newProfileName.trim() && nameValid ? (
+                    <p className="text-xs text-emerald-600">✓ Valid name</p>
+                  ) : (
+                    <p className="text-xs text-[var(--theme-muted)]">
+                      Choose a short, memorable identifier
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+                    <span className="flex items-center gap-1.5">
+                      <HugeiconsIcon
+                        icon={Copy01Icon}
+                        size={13}
+                        strokeWidth={1.8}
+                      />
+                      Clone from existing
+                    </span>
+                  </label>
+                  <select
+                    value={cloneFrom}
+                    onChange={(e) => setCloneFrom(e.target.value)}
+                    className="h-11 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
+                  >
+                    <option value="">Start fresh — empty config</option>
+                    {profiles.map((p) => (
+                      <option key={p.name} value={p.name}>
+                        {p.name} {p.model ? `(${p.model})` : ''}{' '}
+                        {p.active ? '• active' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-[var(--theme-muted)]">
+                    Copies config, skills path, and env from the selected
+                    profile
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
+                  <p className="text-xs text-[var(--theme-muted)]">
+                    Profiles are stored under{' '}
+                    <code className="rounded bg-[var(--theme-hover)] px-1 py-0.5 font-mono text-[11px]">
+                      ~/.hermes/profiles/&lt;name&gt;/
+                    </code>{' '}
+                    with their own config, skills, sessions, and env.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {wizardStep === 2 && (
+              <div className="space-y-5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+                    Default model
+                  </label>
+                  {loadingModels ? (
+                    <div className="flex h-11 items-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-sm text-[var(--theme-muted)]">
+                      Loading configured models…
+                    </div>
+                  ) : allModels.length === 0 ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                      No models found. Make sure Hermes Agent is running and
+                      has models configured.
+                    </div>
+                  ) : (
+                    <select
+                      value={wizardModel}
+                      onChange={(e) => {
+                        const modelId = e.target.value
+                        setWizardModel(modelId)
+                        const matched = allModels.find((m) => m.id === modelId)
+                        setWizardProvider(matched?.provider || '')
+                      }}
+                      className="h-11 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
+                    >
+                      <option value="">Skip — configure later</option>
+                      {allModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name || m.id}
+                          {m.provider ? ` (${m.provider})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {wizardModel && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                      ✓ {wizardModel}
+                      {wizardProvider ? ` via ${wizardProvider}` : ''}
+                    </p>
+                  )}
+                </div>
+
+                {!wizardModel && !loadingModels && allModels.length > 0 && (
+                  <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
+                    <p className="text-xs text-[var(--theme-muted)]">
+                      Select a model or skip to configure later from profile
+                      details or config.yaml.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Step 3: Personality & Swarm ───────────────────────── */}
+            {wizardStep === 3 && (
+              <div className="space-y-4">
+                {/* Preset selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+                    <span className="flex items-center gap-1.5">
+                      <HugeiconsIcon icon={UserStar01Icon} size={13} strokeWidth={1.8} />
+                      Personality preset
+                    </span>
+                  </label>
+                  {loadingSwarm ? (
+                    <p className="text-xs text-[var(--theme-muted)]">Loading presets…</p>
+                  ) : (
+                    <select
+                      value={wizardSelectedPreset}
+                      onChange={(e) => {
+                        const key = e.target.value
+                        setWizardSelectedPreset(key)
+                        const preset = swarmData?.presets.find((p) => p.key === key)
+                        if (preset) setWizardPersonality(preset.prompt)
+                      }}
+                      className="h-11 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
+                    >
+                      <option value="">— Choose a preset or write custom —</option>
+                      {(swarmData?.presets ?? []).map((p) => (
+                        <option key={p.key} value={p.key}>{p.label}</option>
+                      ))}
+                    </select>
+                  )}
+                  {wizardSelectedPreset && swarmData && (
+                    <p className="text-[11px] text-[var(--theme-muted)]">
+                      {swarmData.presets.find((p) => p.key === wizardSelectedPreset)?.description}
+                    </p>
+                  )}
+                </div>
+
+                {/* Custom prompt */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+                    System prompt
+                    <span className="ml-1 font-normal text-[var(--theme-muted)]">(optional — skip to inherit default)</span>
+                  </label>
+                  <textarea
+                    value={wizardPersonality}
+                    onChange={(e) => {
+                      setWizardPersonality(e.target.value)
+                      if (wizardSelectedPreset) setWizardSelectedPreset('')
+                    }}
+                    placeholder="You are [name], a [role] assistant. Your goal is…"
+                    rows={5}
+                    className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2.5 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
+                  />
+                </div>
+
+                {/* Swarm distribution toggle */}
+                {swarmData && swarmData.recommendations.length > 0 && (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setWizardEnableSwarm((v) => !v)}
+                      className={cn(
+                        'flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition-colors',
+                        wizardEnableSwarm
+                          ? 'border-accent-300 bg-accent-50/60 text-accent-700 dark:border-accent-700/40 dark:bg-accent-950/20 dark:text-accent-300'
+                          : 'border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)] hover:border-[var(--theme-border)]',
+                      )}
+                    >
+                      <HugeiconsIcon
+                        icon={wizardEnableSwarm ? ToggleOnIcon : ToggleOffIcon}
+                        size={18}
+                        strokeWidth={1.6}
+                      />
+                      <div className="text-left">
+                        <div className="font-medium">Distribute to swarm workers</div>
+                        <div className="text-[11px] opacity-70">
+                          Push role-appropriate personalities to each worker profile
+                        </div>
+                      </div>
+                    </button>
+
+                    {wizardEnableSwarm && (
+                      <div className="space-y-2 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+                          Worker personalities
+                        </p>
+                        <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                          {swarmData.recommendations.map((rec) => (
+                            <div key={rec.workerId} className="flex items-center gap-2">
+                              <div className="w-24 shrink-0">
+                                <span className={cn(
+                                  'inline-block rounded-md px-2 py-0.5 text-[10px] font-medium',
+                                  rec.isMain
+                                    ? 'bg-accent-100 text-accent-700 dark:bg-accent-950/40 dark:text-accent-300'
+                                    : 'bg-[var(--theme-hover)] text-[var(--theme-muted)]',
+                                )}>
+                                  {rec.name || rec.workerId}
+                                </span>
+                                {rec.isMain && (
+                                  <span className="ml-1 text-[9px] text-accent-500">★ main</span>
+                                )}
+                              </div>
+                              <select
+                                value={workerPresets[rec.workerId] ?? rec.recommendedPreset}
+                                onChange={(e) =>
+                                  setWorkerPresets((prev) => ({ ...prev, [rec.workerId]: e.target.value }))
+                                }
+                                className="h-7 flex-1 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-[11px] outline-none focus:border-accent-400"
+                              >
+                                {(swarmData.presets ?? []).map((p) => (
+                                  <option key={p.key} value={p.key}>{p.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-[var(--theme-muted)]">
+                          Astra (orchestrator) uses the primary personality above. Other workers get their selected preset.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Step 4: Review & create ────────────────────────────── */}
+            {wizardStep === 4 && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+                    Profile summary
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <SummaryField label="Name" value={newProfileName.trim()} />
+                    <SummaryField
+                      label="Template"
+                      value={cloneFrom || 'Fresh start'}
+                    />
+                    <SummaryField
+                      label="Model"
+                      value={
+                        wizardModel
+                          ? `${wizardModel}${wizardProvider ? ` (${wizardProvider})` : ''}`
+                          : 'Not set'
+                      }
+                      muted={!wizardModel}
+                    />
+                    <SummaryField
+                      label="Personality"
+                      value={
+                        wizardSelectedPreset
+                          ? (swarmData?.presets.find((p) => p.key === wizardSelectedPreset)?.label ?? 'Custom')
+                          : wizardPersonality.trim()
+                            ? 'Custom'
+                            : 'Default'
+                      }
+                      muted={!wizardPersonality.trim()}
+                    />
+                    {wizardEnableSwarm && (
+                      <SummaryField
+                        label="Swarm"
+                        value={`${swarmData?.recommendations.length ?? 0} workers`}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                    This will create{' '}
+                    <code className="rounded bg-emerald-100 px-1 py-0.5 font-mono text-[11px] dark:bg-emerald-900/40">
+                      ~/.hermes/profiles/{newProfileName.trim()}/
+                    </code>{' '}
+                    with config.yaml
+                    {cloneFrom ? ` cloned from ${cloneFrom}` : ''}, skills/, and
+                    sessions/ directories.
+                    {wizardPersonality.trim() && (
+                      <> Personality will be applied to <strong>~/.hermes/config.yaml</strong>
+                      {wizardEnableSwarm ? ' and all swarm worker profiles' : ''}.
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Footer ─────────────────────────────────── */}
+          <div className="shrink-0 flex items-center justify-between border-t border-[var(--theme-border)] px-6 py-4">
+            <div>
+              {wizardStep > 1 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setWizardStep((s) => (s - 1) as 1 | 2 | 3 | 4)}
+                >
+                  Back
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setCreateOpen(false)
+                  resetWizard()
+                }}
+              >
+                Cancel
+              </Button>
+              {wizardStep < 4 ? (
+                <Button
+                  size="sm"
+                  onClick={() => setWizardStep((s) => (s + 1) as 1 | 2 | 3 | 4)}
+                  disabled={wizardStep === 1 && !nameValid}
+                  className="gap-1.5"
+                >
+                  Next
+                  <HugeiconsIcon
+                    icon={ArrowRight01Icon}
+                    size={14}
+                    strokeWidth={1.8}
+                  />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => void handleCreate()}
+                  disabled={busyName === '__create__'}
+                  className="gap-1.5"
+                >
+                  <HugeiconsIcon
+                    icon={SparklesIcon}
+                    size={14}
+                    strokeWidth={1.8}
+                  />
+                  Create Profile
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </DialogRoot>
+
+      <DialogRoot
+        open={Boolean(renameTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRenameTarget(null)
+            setRenameValue('')
+          }
+        }}
+      >
+        <DialogContent className="w-[min(440px,94vw)] max-w-none p-0">
+          <div className="border-b border-[var(--theme-border)] px-6 pb-4 pt-5">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex size-10 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]">
+                <HugeiconsIcon icon={Edit02Icon} size={20} strokeWidth={1.7} />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-semibold">
+                  Rename profile
+                </DialogTitle>
+                <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
+                  Renaming{' '}
+                  <span className="font-semibold text-[var(--theme-muted)]">
+                    {renameTarget?.name}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+                New name
+              </label>
+              <Input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                placeholder="new-profile-name"
+                className="h-11 text-sm"
+                autoFocus
+              />
+              {renameValue.trim() &&
+                !/^[A-Za-z0-9_-]+$/.test(renameValue.trim()) && (
+                  <p className="text-xs text-red-500">
+                    Use letters, numbers, underscores, or hyphens.
+                  </p>
+                )}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-[var(--theme-border)] px-6 py-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setRenameTarget(null)
+                setRenameValue('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => void handleRename()}
+              disabled={
+                !renameTarget ||
+                !renameValue.trim() ||
+                !/^[A-Za-z0-9_-]+$/.test(renameValue.trim())
+              }
+            >
+              Rename
+            </Button>
+          </div>
+        </DialogContent>
+      </DialogRoot>
+
+      <DialogRoot
+        open={Boolean(detailsName)}
+        onOpenChange={(open) => !open && setDetailsName(null)}
+      >
+        <DialogContent className="w-[min(640px,94vw)] max-w-none p-0 max-h-[85vh] flex flex-col">
+          {/* Header */}
+          <div className="shrink-0 border-b border-[var(--theme-border)] px-6 pb-4 pt-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <img
+                  src="/claude-avatar.webp"
+                  alt={detailsName || ''}
+                  className="size-12 rounded-full border-2 border-[var(--theme-border)] object-cover"
+                />
+                <div className="min-w-0">
+                  <DialogTitle className="text-base font-semibold">
+                    {detailsName}
+                  </DialogTitle>
+                  <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
+                    Profile details &amp; configuration
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void detailQuery.refetch()}
+                disabled={detailQuery.isFetching}
+              >
+                {detailQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Body — scrollable */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            {detailQuery.data?.profile ? (
+              <div className="space-y-4 text-sm">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <DetailField
+                    label="Name"
+                    value={detailQuery.data.profile.name}
+                  />
+                  <DetailField
+                    label="Active"
+                    value={detailQuery.data.profile.active ? 'Yes' : 'No'}
+                    accent={detailQuery.data.profile.active}
+                  />
+                </div>
+                <DetailField
+                  label="Path"
+                  value={detailQuery.data.profile.path}
+                  mono
+                />
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <DetailField
+                    label="Env file"
+                    value={detailQuery.data.profile.envPath || 'Not set'}
+                    mono
+                    muted={!detailQuery.data.profile.envPath}
+                  />
+                  <DetailField
+                    label="Sessions"
+                    value={detailQuery.data.profile.sessionsDir || 'Not set'}
+                    mono
+                    muted={!detailQuery.data.profile.sessionsDir}
+                  />
+                  <DetailField
+                    label="Skills"
+                    value={detailQuery.data.profile.skillsDir || 'Not set'}
+                    mono
+                    muted={!detailQuery.data.profile.skillsDir}
+                  />
+                </div>
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+                      Description
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => void handleSaveDescription()}
+                      disabled={savingDescription}
+                    >
+                      {savingDescription ? 'Saving…' : 'Save'}
+                    </Button>
+                  </div>
+                  <textarea
+                    value={descriptionDraft}
+                    onChange={(event) => setDescriptionDraft(event.target.value)}
+                    placeholder="What this profile is for, how it should behave, or what makes it different"
+                    className="min-h-[96px] w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-3 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-500"
+                  />
+                  <p className="mt-2 text-xs text-[var(--theme-muted)]">
+                    Saved into the profile config, so manual file edits show up here after refresh.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+                  <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+                    <HugeiconsIcon
+                      icon={Key01Icon}
+                      size={14}
+                      strokeWidth={1.8}
+                    />{' '}
+                    Config
+                  </div>
+                  <pre className="max-h-48 overflow-auto rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-3 text-xs leading-relaxed text-[var(--theme-text)]">
+                    {JSON.stringify(detailQuery.data.profile.config, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            ) : detailQuery.isLoading ? (
+              <div className="flex min-h-[120px] items-center justify-center text-sm text-[var(--theme-muted)]">
+                Loading profile\u2026
+              </div>
+            ) : (
+              <div className="flex min-h-[120px] items-center justify-center text-sm text-red-500">
+                Failed to load profile.
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="shrink-0 flex justify-end border-t border-[var(--theme-border)] px-6 py-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDetailsName(null)}
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </DialogRoot>
+    </div>
+  )
+}
+
+function SummaryField({
+  label,
+  value,
+  muted,
+}: {
+  label: string
+  value: string
+  muted?: boolean
+}) {
+  return (
+    <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-2.5">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+        {label}
+      </div>
+      <div
+        className={cn(
+          'mt-0.5 text-sm font-medium',
+          muted
+            ? 'text-[var(--theme-muted)]'
+            : 'text-[var(--theme-text)]',
+        )}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function DetailField({
+  label,
+  value,
+  mono,
+  muted,
+  accent,
+  full,
+}: {
+  label: string
+  value: string
+  mono?: boolean
+  muted?: boolean
+  accent?: boolean
+  full?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3',
+        full && 'sm:col-span-2',
+      )}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+        {label}
+      </div>
+      <div
+        className={cn(
+          'mt-1 text-sm break-all',
+          mono && 'font-mono text-xs',
+          muted
+            ? 'text-[var(--theme-muted)]'
+            : accent
+              ? 'font-semibold text-emerald-600 dark:text-emerald-400'
+              : 'text-[var(--theme-text)]',
+        )}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}

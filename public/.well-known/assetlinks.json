@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.fernandofamily.hermes",
+      "sha256_cert_fingerprints": [
+        "E2:62:6E:09:C1:ED:B8:BE:0B:3C:2A:59:6F:51:F3:48:97:CF:AD:4A:CF:44:36:A8:2A:1F:07:8E:18:3B:80:F5"
+      ]
+    }
+  }
+]

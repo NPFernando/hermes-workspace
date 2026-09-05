@@ -1,0 +1,577 @@
+/**
+ * Tasks API client with automatic backend detection.
+ *
+ * Two backend routes exist for task storage:
+ *   /api/hermes-tasks  — flat-file store at ~/.hermes/tasks.json (used by agents/cron)
+ *   /api/claude-tasks  — kanban-backend abstraction (local JSON, or Hermes Dashboard proxy)
+ *
+ * On first fetch this module probes both in parallel and selects the backend that has
+ * data. If both have data, hermes-tasks wins (it is the canonical agent task store).
+ * The decision is cached for the page session so subsequent calls never re-probe.
+ *
+ * All mutations (create, update, move, delete, launch) route through the same resolved
+ * backend so reads and writes are always consistent.
+ */
+
+const HERMES_BASE = '/api/hermes-tasks'
+const CLAUDE_BASE = '/api/claude-tasks'
+
+export type TasksBackend = 'hermes' | 'claude'
+
+// --- Backend resolution -------------------------------------------------
+
+type BackendResolution = {
+  base: string
+  assigneesBase: string
+  backend: TasksBackend
+}
+
+let _resolved: BackendResolution | null = null
+let _resolving: Promise<BackendResolution> | null = null
+
+async function probeBackend(base: string): Promise<number> {
+  try {
+    const res = await fetch(base, { signal: AbortSignal.timeout(3000) })
+    // Distinguish auth failure (-1) from "route exists but empty" (0).
+    // Callers use -1 to skip caching and re-probe once the user is logged in.
+    if (res.status === 401 || res.status === 403) return -1
+    if (!res.ok) return 0
+    // Guard against HTML catch-all responses (route not found returns 200 HTML)
+    const contentType = res.headers.get('content-type') ?? ''
+    if (!contentType.includes('application/json')) return -1
+    const data = await res.json()
+    return Array.isArray(data.tasks) ? data.tasks.length : 0
+  } catch {
+    return 0
+  }
+}
+
+async function resolveBackend(): Promise<BackendResolution> {
+  if (_resolved) return _resolved
+  if (_resolving) return _resolving
+
+  _resolving = (async () => {
+    const [hermesCount, claudeCount] = await Promise.all([
+      probeBackend(HERMES_BASE),
+      probeBackend(CLAUDE_BASE),
+    ])
+
+    // Both probes returned -1: likely unauthenticated. Don't cache — let the
+    // next fetchTasks() call re-probe once the session cookie is available.
+    // Default to hermes in the meantime (canonical agent task store).
+    if (hermesCount < 0 && claudeCount < 0) {
+      _resolving = null
+      return {
+        base: HERMES_BASE,
+        assigneesBase: '/api/hermes-tasks-assignees',
+        backend: 'hermes',
+      }
+    }
+
+    // Prefer hermes if it has real data (> 0). Fall back to claude only when
+    // hermes is empty/unavailable and claude has tasks.
+    // Default to hermes when both are empty — it is the canonical agent task store.
+    const useHermes =
+      hermesCount >= 0 && (claudeCount < 0 || hermesCount >= claudeCount)
+    _resolved = {
+      base: useHermes ? HERMES_BASE : CLAUDE_BASE,
+      assigneesBase: useHermes
+        ? '/api/hermes-tasks-assignees'
+        : '/api/claude-tasks-assignees',
+      backend: useHermes ? 'hermes' : 'claude',
+    }
+    return _resolved
+  })()
+
+  return _resolving
+}
+
+/** Returns the currently resolved backend id, or null if not yet probed. */
+export function getActiveBackend(): TasksBackend | null {
+  return _resolved?.backend ?? null
+}
+
+/** Force a fresh re-probe on the next fetchTasks() call (e.g. after backend config changes). */
+export function resetBackendResolution(): void {
+  _resolved = null
+  _resolving = null
+}
+
+// --- Types --------------------------------------------------------------
+
+export type TaskColumn =
+  | 'backlog'
+  | 'todo'
+  | 'in_progress'
+  | 'review'
+  | 'blocked'
+  | 'done'
+  | 'deleted'
+export type TaskPriority = 'high' | 'medium' | 'low'
+
+export type TaskAgentState =
+  | 'reviewing'
+  | 'delegating'
+  | 'working'
+  | 'waiting_for_input'
+  | null
+export type TaskSource = 'human' | 'idea_job' | 'astra' | null
+
+export type ActivityEntry = {
+  id: string
+  by: string
+  byEmoji: string
+  action: string
+  note: string
+  at: string
+}
+
+export type ClarificationQuestion = {
+  id: string
+  question: string
+  options?: Array<string>
+  answer?: string
+  asked_at: string
+  answered_at?: string
+}
+
+export type BlockerType =
+  | 'credential'
+  | 'dependency'
+  | 'execution'
+  | 'input'
+  | 'environment'
+  | null
+
+export type CredentialNeeded = {
+  key: string
+  label: string
+  description: string
+  provided: boolean
+  provided_at?: string
+  validated?: boolean
+}
+
+export type ClaudeTask = {
+  id: string
+  title: string
+  description: string
+  column: TaskColumn
+  priority: TaskPriority
+  assignee: string | null
+  tags: Array<string>
+  due_date: string | null
+  position: number
+  created_by: string
+  created_at: string
+  updated_at: string
+  session_id?: string | null
+  agent_state?: TaskAgentState
+  agent_name?: string | null
+  agent_action_at?: string | null
+  source?: TaskSource
+  agent_comment?: string | null
+  agent_history?: Array<ActivityEntry>
+  waiting_for_user?: boolean
+  clarification_questions?: Array<ClarificationQuestion>
+  depends_on?: Array<string>
+  blocker_type?: BlockerType
+  blocker_reason?: string
+  blocked_since?: string
+  credentials_needed?: Array<CredentialNeeded>
+  resolved_by_task?: string
+}
+
+export type CreateTaskInput = {
+  title: string
+  description?: string
+  column?: TaskColumn
+  priority?: TaskPriority
+  assignee?: string | null
+  tags?: Array<string>
+  due_date?: string | null
+  created_by?: string
+}
+
+export type UpdateTaskInput = Partial<Omit<CreateTaskInput, 'created_by'>> & {
+  agent_state?: TaskAgentState | null
+  agent_name?: string | null
+  agent_action_at?: string | null
+}
+
+export function relativeTime(isoStr: string): string {
+  const diff = Date.now() - new Date(isoStr).getTime()
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
+export type TaskAssignee = {
+  id: string
+  label: string
+  isHuman: boolean
+}
+
+export type AssigneesResponse = {
+  assignees: Array<TaskAssignee>
+  humanReviewer: string | null
+}
+
+// --- API functions -------------------------------------------------------
+
+export async function fetchAssignees(): Promise<AssigneesResponse> {
+  const { assigneesBase } = await resolveBackend()
+  const res = await fetch(assigneesBase)
+  if (!res.ok) return { assignees: [], humanReviewer: null }
+  return res.json()
+}
+
+export async function fetchTasks(params?: {
+  column?: TaskColumn
+  assignee?: string
+  priority?: TaskPriority
+  include_done?: boolean
+}): Promise<Array<ClaudeTask>> {
+  const { base } = await resolveBackend()
+  const q = new URLSearchParams()
+  if (params?.column) q.set('column', params.column)
+  if (params?.assignee) q.set('assignee', params.assignee)
+  if (params?.priority) q.set('priority', params.priority)
+  if (params?.include_done) q.set('include_done', 'true')
+  const url = q.toString() ? `${base}?${q}` : base
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`Failed to fetch tasks: ${res.status}`)
+  const data = await res.json()
+  return data.tasks ?? []
+}
+
+export async function createTask(input: CreateTaskInput): Promise<ClaudeTask> {
+  const { base } = await resolveBackend()
+  const res = await fetch(base, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(
+      (body as { detail?: string }).detail ||
+        `Failed to create task: ${res.status}`,
+    )
+  }
+  return (await res.json()).task
+}
+
+export async function updateTask(
+  taskId: string,
+  input: UpdateTaskInput,
+): Promise<ClaudeTask> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) throw new Error(`Failed to update task: ${res.status}`)
+  return (await res.json()).task
+}
+
+export async function deleteTask(taskId: string): Promise<void> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Failed to delete task: ${res.status}`)
+}
+
+export async function linkSession(
+  taskId: string,
+  sessionId: string | null,
+): Promise<ClaudeTask> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId }),
+  })
+  if (!res.ok) throw new Error(`Failed to link session: ${res.status}`)
+  return (await res.json()).task
+}
+
+export async function launchSession(
+  taskId: string,
+): Promise<{ sessionId: string; briefing: string; task: ClaudeTask }> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}?action=launch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+  if (!res.ok) throw new Error(`Failed to launch session: ${res.status}`)
+  return res.json()
+}
+
+export async function breakdownTask(
+  taskId: string,
+): Promise<{ ok: boolean; count: number; titles: Array<string> }> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}?action=breakdown`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(
+      (body as { error?: string }).error || `Breakdown failed: ${res.status}`,
+    )
+  }
+  return res.json()
+}
+
+export async function generateTaskFromText(
+  text: string,
+): Promise<CreateTaskInput> {
+  const res = await fetch('/api/tasks-from-text', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(
+      (body as { error?: string }).error ||
+        `AI task generation failed: ${res.status}`,
+    )
+  }
+  const { suggestion } = (await res.json()) as { suggestion: CreateTaskInput }
+  return suggestion
+}
+
+export async function executeTask(
+  taskId: string,
+): Promise<{ ok: boolean; alreadyRunning?: boolean }> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}?action=execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+  if (!res.ok) throw new Error(`Failed to execute task: ${res.status}`)
+  return res.json()
+}
+
+export async function batchExecuteTasks(
+  limit = 5,
+  taskIds?: Array<string>,
+): Promise<{ ok: boolean; started: number; remaining: number }> {
+  const res = await fetch('/api/tasks-batch-execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ limit, taskIds }),
+  })
+  if (!res.ok) throw new Error(`Failed to batch execute: ${res.status}`)
+  return res.json()
+}
+
+export async function postTaskComment(
+  taskId: string,
+  text: string,
+): Promise<{ resumed: boolean }> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}?action=comment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) throw new Error(`Failed to post comment: ${res.status}`)
+  const data = (await res.json()) as { resumed?: boolean }
+  return { resumed: data.resumed ?? false }
+}
+
+export async function submitClarificationAnswers(
+  taskId: string,
+  answers: Record<string, string>,
+): Promise<{ ok: boolean; resumed: boolean }> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}?action=clarify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers }),
+  })
+  if (!res.ok) throw new Error(`Failed to submit clarification: ${res.status}`)
+  return res.json()
+}
+
+export async function moveTask(
+  taskId: string,
+  column: TaskColumn,
+  movedBy = 'user',
+): Promise<ClaudeTask> {
+  const { base } = await resolveBackend()
+  const res = await fetch(`${base}/${taskId}?action=move`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ column, moved_by: movedBy }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(
+      (body as { detail?: string }).detail ||
+        `Failed to move task: ${res.status}`,
+    )
+  }
+  return (await res.json()).task
+}
+
+// --- Display constants ---------------------------------------------------
+
+export const COLUMN_LABELS: Record<TaskColumn, string> = {
+  backlog: 'Triage',
+  todo: 'Ready',
+  in_progress: 'Running',
+  review: 'Review',
+  blocked: 'Blocked',
+  done: 'Done',
+  deleted: 'Deleted',
+}
+
+export const COLUMN_ORDER: Array<TaskColumn> = [
+  'backlog',
+  'todo',
+  'in_progress',
+  'review',
+  'blocked',
+  'done',
+]
+
+export const PRIORITY_COLORS: Record<TaskPriority, string> = {
+  high: '#ef4444',
+  medium: '#f97316',
+  low: '#6b7280',
+}
+
+export const COLUMN_COLORS: Record<TaskColumn, string> = {
+  backlog: '#6b7280',
+  todo: '#3b82f6',
+  in_progress: '#f97316',
+  review: '#a855f7',
+  blocked: '#ef4444',
+  done: '#22c55e',
+  deleted: '#374151',
+}
+
+export async function askAstra(): Promise<{ sessionId: string }> {
+  const res = await fetch('/api/tasks-ask-astra', { method: 'POST' })
+  if (!res.ok) throw new Error(`Ask Astra failed: ${res.status}`)
+  return res.json() as Promise<{ sessionId: string }>
+}
+
+export function isOverdue(task: ClaudeTask): boolean {
+  if (!task.due_date) return false
+  // Parse YYYY-MM-DD manually to avoid UTC-vs-local offset issues.
+  // new Date("2026-04-02") parses as UTC midnight, which in EST is the
+  // previous evening — causing everything to appear one day early.
+  const [year, month, day] = task.due_date.split('-').map(Number)
+  const due = new Date(year, month - 1, day) // local midnight
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return due < today
+}
+
+// --- Blocker System API ---------------------------------------------------
+
+export type BlockerGroup = {
+  type: string
+  label: string
+  icon: string
+  tasks: Array<ClaudeTask>
+}
+
+export type BlockerOverview = {
+  ok: boolean
+  count: number
+  groups: Array<BlockerGroup>
+  resumable: Array<{
+    id: string
+    title: string
+    blocker_type: string | null
+    blocker_reason: string | null
+  }>
+}
+
+export async function fetchBlockers(): Promise<BlockerOverview> {
+  const res = await fetch('/api/tasks-blockers')
+  if (!res.ok) throw new Error(`Failed to fetch blockers: ${res.status}`)
+  return res.json() as Promise<BlockerOverview>
+}
+
+export async function resolveBlocker(
+  taskId: string,
+): Promise<{ ok: boolean; task: ClaudeTask }> {
+  const res = await fetch('/api/tasks-blockers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'resolve', task_id: taskId }),
+  })
+  if (!res.ok) throw new Error(`Resolve blocker failed: ${res.status}`)
+  return res.json() as Promise<{ ok: boolean; task: ClaudeTask }>
+}
+
+export async function provideCredential(
+  taskId: string,
+  credentialKey: string,
+  credentialValue: string,
+): Promise<{ ok: boolean; all_provided: boolean; task: ClaudeTask }> {
+  const res = await fetch('/api/tasks-blockers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'provide_credential',
+      task_id: taskId,
+      credential_key: credentialKey,
+      credential_value: credentialValue,
+    }),
+  })
+  if (!res.ok) throw new Error(`Provide credential failed: ${res.status}`)
+  return res.json() as Promise<{
+    ok: boolean
+    all_provided: boolean
+    task: ClaudeTask
+  }>
+}
+
+export async function validateCredentials(taskId: string): Promise<{
+  ok: boolean
+  all_valid: boolean
+  results: Array<{ key: string; label: string; exists: boolean }>
+}> {
+  const res = await fetch('/api/tasks-blockers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'validate', task_id: taskId }),
+  })
+  if (!res.ok) throw new Error(`Validate credentials failed: ${res.status}`)
+  return res.json() as Promise<{
+    ok: boolean
+    all_valid: boolean
+    results: Array<{ key: string; label: string; exists: boolean }>
+  }>
+}
+
+export async function autoResumeBlocked(): Promise<{
+  ok: boolean
+  unblocked: Array<{ id: string; title: string }>
+}> {
+  const res = await fetch('/api/tasks-blockers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'auto_resume' }),
+  })
+  if (!res.ok) throw new Error(`Auto-resume failed: ${res.status}`)
+  return res.json() as Promise<{
+    ok: boolean
+    unblocked: Array<{ id: string; title: string }>
+  }>
+}

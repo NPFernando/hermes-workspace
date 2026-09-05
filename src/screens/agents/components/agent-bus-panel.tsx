@@ -1,0 +1,419 @@
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { cn } from '@/lib/utils'
+import { fetchSisters } from '@/screens/agents/hooks/use-operations'
+
+type AgentBusSummary = {
+  total?: number
+  up?: number
+  down?: number
+  no_endpoint?: number
+  non_operational?: number
+  events?: number
+}
+
+type AgentBusAgent = {
+  id?: string
+  name?: string
+  status_config?: string
+  health?: string
+  listener?: string
+  port?: number | null
+  error?: string | null
+}
+
+type AgentBusMission = {
+  mission_type?: string
+  target?: string
+  source_agent?: string
+  brief?: string
+  reason?: string
+  safe_mode?: boolean
+  created_at?: string
+  mission_record_path?: string
+  path?: string
+}
+
+type AgentBusPayload = {
+  ok: boolean
+  status?: {
+    checked_at?: string
+    registry_last_updated?: string
+    summary?: AgentBusSummary
+    agents?: Array<AgentBusAgent>
+  }
+  events?: Array<Record<string, unknown>>
+  missions?: Array<AgentBusMission>
+  issues?: Array<AgentBusAgent>
+  reportPreview?: string
+}
+
+type ActionState =
+  | { status: 'idle'; message: string }
+  | { status: 'running'; message: string }
+  | { status: 'ok'; message: string }
+  | { status: 'error'; message: string }
+
+const initialActionState: ActionState = {
+  status: 'idle',
+  message: 'Safe actions are recorded in the Agent Bus.',
+}
+
+function formatDate(value?: string): string {
+  if (!value) return 'no reading'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+function firstLine(value?: string): string {
+  return (
+    String(value || '')
+      .split('\n')
+      .find(Boolean) || 'no detail'
+  )
+}
+
+function missionTitle(mission: AgentBusMission): string {
+  if (mission.mission_type === 'handoff') {
+    return `${mission.source_agent || 'agent'} -> ${mission.target || 'agent'}`
+  }
+  if (mission.mission_type === 'thumbnail') {
+    return `Thumbnail ${mission.target || ''}`.trim()
+  }
+  return mission.mission_type || 'Mission'
+}
+
+function StatTile({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string
+  value: number | string
+  tone?: 'neutral' | 'good' | 'warn' | 'bad'
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-2xl border px-4 py-3',
+        tone === 'good' &&
+          'border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)] bg-[var(--theme-card)] text-[var(--theme-success)]',
+        tone === 'warn' &&
+          'border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] bg-[var(--theme-card)] text-[var(--theme-warning)]',
+        tone === 'bad' &&
+          'border-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] bg-[var(--theme-card)] text-[var(--theme-danger)]',
+        tone === 'neutral' &&
+          'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]',
+      )}
+    >
+      <div className="text-2xl font-semibold leading-none terminal-glow-soft">
+        {value}
+      </div>
+      <div className="mt-1 text-xs font-medium uppercase tracking-[0.08em] opacity-70">
+        {label}
+      </div>
+    </div>
+  )
+}
+
+export function AgentBusPanel() {
+  const [action, setAction] = useState<ActionState>(initialActionState)
+
+  const sistersQuery = useQuery({
+    queryKey: ['sisters'],
+    queryFn: fetchSisters,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  })
+  const sisters = sistersQuery.data ?? []
+  const businessSisters = useMemo(
+    () => sisters.filter((s) => s.type === 'business_agent'),
+    [sisters],
+  )
+  const creativeSister = useMemo(
+    () => businessSisters.find((s) => s.role === 'creative'),
+    [businessSisters],
+  )
+  const handoffPairs = useMemo(
+    () => businessSisters.filter((s) => s.handoffTo),
+    [businessSisters],
+  )
+
+  const busQuery = useQuery({
+    queryKey: ['agent-bus'],
+    queryFn: async () => {
+      const response = await fetch('/api/agent-bus', {
+        headers: { Accept: 'application/json' },
+      })
+      if (!response.ok)
+        throw new Error(`Agent Bus returned HTTP ${response.status}`)
+      return (await response.json()) as AgentBusPayload
+    },
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  })
+  const data = busQuery.data ?? null
+  const loading = busQuery.isPending
+  const error = busQuery.error instanceof Error ? busQuery.error.message : null
+
+  const summary = data?.status?.summary ?? {}
+  const missions = data?.missions ?? []
+  const issues = data?.issues ?? []
+  const events = data?.events ?? []
+  const visibleIssues = useMemo(() => issues.slice(0, 5), [issues])
+
+  async function runAction(
+    body: Record<string, unknown>,
+    successMessage: string,
+  ) {
+    setAction({ status: 'running', message: 'Running safe action…' })
+    try {
+      const response = await fetch('/api/agent-bus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const payload = (await response.json()) as {
+        ok?: boolean
+        error?: string
+      }
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `HTTP ${response.status}`)
+      }
+      setAction({ status: 'ok', message: successMessage })
+      await busQuery.refetch()
+    } catch (err) {
+      setAction({
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Action failed',
+      })
+    }
+  }
+
+  return (
+    <section className="glass-panel rounded-3xl border border-[var(--theme-border)] p-5 shadow-[0_24px_80px_var(--theme-shadow)]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-accent-strong)]">
+            Agent Bus
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--theme-text)]">
+            Force Status
+          </h2>
+          <p className="mt-1 text-sm text-[var(--theme-muted-2)]">
+            Agent Bus status, missions, and operational issues from Hermes.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-sm text-[var(--theme-muted)]">
+          Last checked: {formatDate(data?.status?.checked_at)}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="mt-5 rounded-2xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-8 text-center text-sm text-[var(--theme-muted)]">
+          Loading Agent Bus…
+        </div>
+      ) : error ? (
+        <div className="mt-5 rounded-2xl border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-4 py-4 text-sm text-[var(--theme-danger)]">
+          {error}
+        </div>
+      ) : (
+        <>
+          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-6">
+            <StatTile label="total" value={summary.total ?? 0} />
+            <StatTile label="online" value={summary.up ?? 0} tone="good" />
+            <StatTile
+              label="down"
+              value={summary.down ?? 0}
+              tone={(summary.down ?? 0) > 0 ? 'bad' : 'good'}
+            />
+            <StatTile
+              label="no endpoint"
+              value={summary.no_endpoint ?? 0}
+              tone={(summary.no_endpoint ?? 0) > 0 ? 'warn' : 'good'}
+            />
+            <StatTile
+              label="off ops."
+              value={summary.non_operational ?? 0}
+              tone={(summary.non_operational ?? 0) > 0 ? 'warn' : 'good'}
+            />
+            <StatTile
+              label="events"
+              value={events.length || summary.events || 0}
+              tone={events.length > 0 ? 'bad' : 'good'}
+            />
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-[var(--theme-text)]">
+                  Active Issues
+                </h3>
+                <span className="text-xs text-[var(--theme-muted)]">
+                  {issues.length} items
+                </span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {visibleIssues.length ? (
+                  visibleIssues.map((agent) => (
+                    <div
+                      key={`${agent.id}-${agent.port ?? 'no-port'}`}
+                      className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium text-[var(--theme-text)]">
+                          {agent.name || agent.id}
+                        </span>
+                        <span className="text-xs text-[var(--theme-muted)]">
+                          {agent.status_config || 'no status'} /{' '}
+                          {agent.health || 'no health'}
+                        </span>
+                      </div>
+                      {agent.error ? (
+                        <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                          {firstLine(agent.error)}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-5 text-sm text-[var(--theme-muted)]">
+                    No operational agents down.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-[var(--theme-text)]">
+                  Latest Missions
+                </h3>
+                <span className="text-xs text-[var(--theme-muted)]">
+                  {missions.length} records
+                </span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {missions.slice(0, 5).map((mission, index) => (
+                  <div
+                    key={`${mission.path || mission.mission_record_path || index}`}
+                    className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-[var(--theme-text)]">
+                        {missionTitle(mission)}
+                      </span>
+                      <span className="text-xs text-[var(--theme-muted)]">
+                        {mission.safe_mode ? 'safe' : 'exec'}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-[var(--theme-muted)]">
+                      {mission.brief || mission.reason || 'mission recorded'}
+                    </p>
+                  </div>
+                ))}
+                {!missions.length ? (
+                  <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-5 text-sm text-[var(--theme-muted)]">
+                    No missions recorded yet.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--theme-text)]">
+                  Safe Actions
+                </h3>
+                <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                  No restarts, no external messaging, no automatic paid
+                  spending.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    runAction(
+                      { action: 'sync-roadmap' },
+                      'Roadmap synced with current events.',
+                    )
+                  }
+                  className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]"
+                >
+                  Sync Roadmap
+                </button>
+                {creativeSister ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      runAction(
+                        {
+                          action: 'thumbnail-mission',
+                          target: creativeSister.id,
+                        },
+                        `Thumbnail mission for ${creativeSister.name} registered.`,
+                      )
+                    }
+                    className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]"
+                  >
+                    {creativeSister.emoji} Thumbnail Mission (
+                    {creativeSister.name})
+                  </button>
+                ) : null}
+                {handoffPairs.length > 0 ? (
+                  handoffPairs.map((source) => {
+                    const target = sisters.find(
+                      (s) => s.id === source.handoffTo,
+                    )
+                    if (!target) return null
+                    return (
+                      <button
+                        key={`${source.id}->${target.id}`}
+                        type="button"
+                        onClick={() =>
+                          runAction(
+                            {
+                              action: 'handoff-mission',
+                              source: source.id,
+                              target: target.id,
+                            },
+                            `Handoff ${source.name} → ${target.name} registered.`,
+                          )
+                        }
+                        className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]"
+                      >
+                        {source.emoji} Handoff {source.name} → {target.name}
+                      </button>
+                    )
+                  })
+                ) : null}
+              </div>
+            </div>
+            <p
+              className={cn(
+                'mt-3 text-sm',
+                action.status === 'ok' && 'text-[var(--theme-success)]',
+                action.status === 'error' && 'text-[var(--theme-danger)]',
+                action.status === 'running' &&
+                  'text-[var(--theme-accent-strong)]',
+                action.status === 'idle' && 'text-[var(--theme-muted)]',
+              )}
+            >
+              {action.message}
+            </p>
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
