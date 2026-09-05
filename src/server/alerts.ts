@@ -35,8 +35,12 @@ const SEVERITY_EMOJI: Record<AlertSeverity, string> = {
 }
 
 function alertsEnabled(): boolean {
-  const settings = readFinanceStore().settings as Record<string, unknown>
-  return settings.alertsEnabled === true
+  try {
+    const settings = readFinanceStore().settings as Record<string, unknown>
+    return settings.alertsEnabled === true
+  } catch {
+    return false
+  }
 }
 
 function deliverTelegram(event: AlertEvent): void {

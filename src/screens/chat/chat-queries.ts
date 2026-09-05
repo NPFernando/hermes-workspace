@@ -18,41 +18,45 @@ type StatusResponse = {
 // This is critical for long conversations (500+ messages) where the old
 // Array.findIndex approach caused noticeable lag.
 
-const _clientIdIndex = new Map<string, Set<number>>();
+const _clientIdIndex = new Map<string, Set<number>>()
 
 function _indexKey(clientId: string, optimisticId: string): string {
-  return `${clientId}::${optimisticId}`;
+  return `${clientId}::${optimisticId}`
 }
 
 function rebuildClientIdIndex(messages: Array<ChatMessage>): void {
-  _clientIdIndex.clear();
+  _clientIdIndex.clear()
   for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i];
-    const cid = getMessageClientId(msg);
-    const oid = getMessageOptimisticId(msg);
+    const msg = messages[i]
+    const cid = getMessageClientId(msg)
+    const oid = getMessageOptimisticId(msg)
     if (cid || oid) {
-      const key = _indexKey(cid, oid);
-      const set = _clientIdIndex.get(key) ?? new Set();
-      set.add(i);
-      _clientIdIndex.set(key, set);
+      const key = _indexKey(cid, oid)
+      const set = _clientIdIndex.get(key) ?? new Set()
+      set.add(i)
+      _clientIdIndex.set(key, set)
     }
   }
 }
 
 function isMessageInIndex(message: ChatMessage): boolean {
-  const cid = getMessageClientId(message);
-  const oid = getMessageOptimisticId(message);
-  if (!cid && !oid) return false;
-  const key = _indexKey(cid, oid);
-  return _clientIdIndex.has(key);
+  const cid = getMessageClientId(message)
+  const oid = getMessageOptimisticId(message)
+  if (!cid && !oid) return false
+  const key = _indexKey(cid, oid)
+  return _clientIdIndex.has(key)
 }
 
 // Rebuild index on every append call (amortized O(n) once, then O(1) lookups)
-function ensureIndexBuilt(friendlyId: string, sessionKey: string, messages: Array<ChatMessage>): void {
-  const cacheKey = `${friendlyId}:${sessionKey}`;
+function ensureIndexBuilt(
+  friendlyId: string,
+  sessionKey: string,
+  messages: Array<ChatMessage>,
+): void {
+  const cacheKey = `${friendlyId}:${sessionKey}`
   // Simple heuristic: if index is empty or messages changed significantly, rebuild
   if (_clientIdIndex.size === 0 || messages.length > _clientIdIndex.size * 2) {
-    rebuildClientIdIndex(messages);
+    rebuildClientIdIndex(messages)
   }
 }
 
@@ -308,7 +312,7 @@ export function appendHistoryMessage(
       const incomingOptimisticId = getMessageOptimisticId(message)
       if (incomingClientId || incomingOptimisticId) {
         // O(1) fast path: check index first
-        if (isMessageInIndex(message)) return messages;
+        if (isMessageInIndex(message)) return messages
         // O(n) fallback: full scan (for edge cases where index is stale)
         const optimisticKey = incomingClientId ? `opt-${incomingClientId}` : ''
         const alreadyExists = messages.some((m) =>
@@ -407,9 +411,11 @@ export function appendHistoryMessage(
     },
   )
   // Rebuild index after mutation for O(1) lookups on next append
-  const updatedMessages = queryClient.getQueryData<HistoryResponse>(chatQueryKeys.history(friendlyId, sessionKey));
+  const updatedMessages = queryClient.getQueryData<HistoryResponse>(
+    chatQueryKeys.history(friendlyId, sessionKey),
+  )
   if (updatedMessages?.messages) {
-    rebuildClientIdIndex(updatedMessages.messages);
+    rebuildClientIdIndex(updatedMessages.messages)
   }
 }
 
@@ -521,7 +527,7 @@ export function moveHistoryMessages(
 ) {
   const fromKey = chatQueryKeys.history(fromFriendlyId, fromSessionKey)
   const toKey = chatQueryKeys.history(toFriendlyId, toSessionKey)
-  const fromData = queryClient.getQueryData<HistoryResponse>(fromKey);
+  const fromData = queryClient.getQueryData<HistoryResponse>(fromKey)
   if (!fromData) return
   const messages = Array.isArray(fromData.messages) ? fromData.messages : []
   queryClient.setQueryData(toKey, {
@@ -586,14 +592,17 @@ export function reconcileSessionDraft(
             key: toSessionKey,
             friendlyId: toFriendlyId,
             lastMessage: source.lastMessage ?? session.lastMessage,
-            updatedAt: Math.max(source.updatedAt ?? 0, session.updatedAt ?? 0) ||
+            updatedAt:
+              Math.max(source.updatedAt ?? 0, session.updatedAt ?? 0) ||
               session.updatedAt ||
               source.updatedAt,
             label: session.label ?? source.label,
             title: session.title ?? source.title,
             derivedTitle: session.derivedTitle ?? source.derivedTitle,
             titleStatus:
-              session.titleStatus === 'idle' ? source.titleStatus : session.titleStatus,
+              session.titleStatus === 'idle'
+                ? source.titleStatus
+                : session.titleStatus,
             titleSource: session.titleSource ?? source.titleSource,
             titleError: session.titleError ?? source.titleError,
           },

@@ -27,7 +27,8 @@ export function useChatMode(): ChatMode {
       return d ? (d.capabilities.health ? 60_000 : 5_000) : 5_000
     },
     retry: 3,
-    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30_000),
+    retryDelay: (attemptIndex: number) =>
+      Math.min(1000 * 2 ** attemptIndex, 30_000),
   })
 
   if (!data?.capabilities) return 'disconnected'

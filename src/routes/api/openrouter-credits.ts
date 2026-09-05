@@ -32,7 +32,10 @@ export const Route = createFileRoute('/api/openrouter-credits')({
         }
 
         if (!apiKey) {
-          return jsonResponse({ error: 'OPENROUTER_API_KEY not configured' }, 503)
+          return jsonResponse(
+            { error: 'OPENROUTER_API_KEY not configured' },
+            503,
+          )
         }
 
         try {
@@ -41,7 +44,10 @@ export const Route = createFileRoute('/api/openrouter-credits')({
             signal: AbortSignal.timeout(10_000),
           })
           if (!resp.ok) {
-            return jsonResponse({ error: `OpenRouter API error: ${resp.status}` }, 502)
+            return jsonResponse(
+              { error: `OpenRouter API error: ${resp.status}` },
+              502,
+            )
           }
           const data = (await resp.json()) as { data?: Record<string, unknown> }
           const d = data.data ?? {}

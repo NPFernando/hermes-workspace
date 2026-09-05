@@ -2,11 +2,10 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { safeErrorMessage } from './rate-limit'
 import {
-  
   getWorkspacePluginRoots,
-  parseSwarmPluginManifest
+  parseSwarmPluginManifest,
 } from './swarm-foundation'
-import type {SwarmPluginDescriptor} from './swarm-foundation';
+import type { SwarmPluginDescriptor } from './swarm-foundation'
 
 export type WorkspacePluginInfo = SwarmPluginDescriptor
 

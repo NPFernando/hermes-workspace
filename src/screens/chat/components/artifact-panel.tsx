@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Cancel01Icon, Copy01Icon, DownloadIcon, PencilEdit01Icon, Tick02Icon } from '@hugeicons/core-free-icons'
+import {
+  Cancel01Icon,
+  Copy01Icon,
+  DownloadIcon,
+  PencilEdit01Icon,
+  Tick02Icon,
+} from '@hugeicons/core-free-icons'
 import type { InlineArtifact } from './message-item'
 import { CodeBlock } from '@/components/prompt-kit/code-block'
 import { Markdown } from '@/components/prompt-kit/markdown'
@@ -16,18 +22,42 @@ function artifactLanguage(type: string): string {
 }
 
 function inferDownloadFilename(title: string, type: string): string {
-  const safe = title.replace(/[^a-z0-9_\-. ]/gi, '').trim().replace(/\s+/g, '-') || 'artifact'
+  const safe =
+    title
+      .replace(/[^a-z0-9_\-. ]/gi, '')
+      .trim()
+      .replace(/\s+/g, '-') || 'artifact'
   const extMap: Record<string, string> = {
-    html: 'html', svg: 'svg', markdown: 'md', md: 'md',
-    javascript: 'js', js: 'js', typescript: 'ts', ts: 'ts',
-    python: 'py', py: 'py', json: 'json', yaml: 'yaml', yml: 'yaml',
-    css: 'css', sql: 'sql', bash: 'sh', sh: 'sh', dockerfile: 'dockerfile',
+    html: 'html',
+    svg: 'svg',
+    markdown: 'md',
+    md: 'md',
+    javascript: 'js',
+    js: 'js',
+    typescript: 'ts',
+    ts: 'ts',
+    python: 'py',
+    py: 'py',
+    json: 'json',
+    yaml: 'yaml',
+    yml: 'yaml',
+    css: 'css',
+    sql: 'sql',
+    bash: 'sh',
+    sh: 'sh',
+    dockerfile: 'dockerfile',
   }
   const ext = extMap[type.toLowerCase()] ?? 'txt'
   return `${safe}.${ext}`
 }
 
-function ArtifactBody({ artifact, showSource }: { artifact: InlineArtifact; showSource: boolean }) {
+function ArtifactBody({
+  artifact,
+  showSource,
+}: {
+  artifact: InlineArtifact
+  showSource: boolean
+}) {
   if ((artifact.type === 'html' || artifact.type === 'svg') && !showSource) {
     return (
       <iframe
@@ -35,7 +65,6 @@ function ArtifactBody({ artifact, showSource }: { artifact: InlineArtifact; show
         sandbox="allow-scripts"
         srcDoc={artifact.content}
         className="h-full w-full border-0"
-        
       />
     )
   }
@@ -66,7 +95,12 @@ type ArtifactPanelProps = {
   onClose: () => void
 }
 
-export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: ArtifactPanelProps) {
+export function ArtifactPanel({
+  artifacts,
+  activeIndex,
+  onTabChange,
+  onClose,
+}: ArtifactPanelProps) {
   const artifact = artifacts[activeIndex]
   const [showSource, setShowSource] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -80,7 +114,11 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
 
   if (!artifact) return null
 
-  const canToggleSource = artifact.type === 'html' || artifact.type === 'svg' || artifact.type === 'markdown' || artifact.type === 'md'
+  const canToggleSource =
+    artifact.type === 'html' ||
+    artifact.type === 'svg' ||
+    artifact.type === 'markdown' ||
+    artifact.type === 'md'
   const activeContent = isEditing ? editedContent : artifact.content
 
   async function handleCopy() {
@@ -105,19 +143,16 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
   }
 
   return (
-    <div
-      className="flex h-full flex-col border-l border-[var(--theme-border)] bg-[var(--theme-bg)]"
-    >
+    <div className="flex h-full flex-col border-l border-[var(--theme-border)] bg-[var(--theme-bg)]">
       {/* Header */}
-      <div
-        className="flex shrink-0 items-center gap-2 border-b px-3 py-2 border-[var(--theme-border)]"
-      >
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold" title={artifact.title}>
+      <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2 border-[var(--theme-border)]">
+        <span
+          className="min-w-0 flex-1 truncate text-sm font-semibold"
+          title={artifact.title}
+        >
           {artifact.title}
         </span>
-        <span
-          className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide shrink-0 bg-[var(--theme-card2)] text-[var(--theme-muted)]"
-        >
+        <span className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide shrink-0 bg-[var(--theme-card2)] text-[var(--theme-muted)]">
           {artifact.type}
         </span>
         <button
@@ -132,9 +167,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
 
       {/* Tab strip for multiple artifacts */}
       {artifacts.length > 1 && (
-        <div
-          className="flex shrink-0 gap-0.5 overflow-x-auto border-b px-2 py-1.5 border-[var(--theme-border)]"
-        >
+        <div className="flex shrink-0 gap-0.5 overflow-x-auto border-b px-2 py-1.5 border-[var(--theme-border)]">
           {artifacts.map((a, i) => (
             <button
               key={i}
@@ -169,9 +202,7 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
       </div>
 
       {/* Footer actions */}
-      <div
-        className="flex shrink-0 items-center gap-1.5 border-t px-3 py-2 border-[var(--theme-border)]"
-      >
+      <div className="flex shrink-0 items-center gap-1.5 border-t px-3 py-2 border-[var(--theme-border)]">
         {!isEditing && canToggleSource && (
           <button
             type="button"
@@ -198,10 +229,16 @@ export function ArtifactPanel({ artifacts, activeIndex, onTabChange, onClose }: 
         <div className="flex-1" />
         <button
           type="button"
-          onClick={() => { handleCopy().catch(() => {}) }}
+          onClick={() => {
+            handleCopy().catch(() => {})
+          }}
           className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
         >
-          <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={14} strokeWidth={1.6} />
+          <HugeiconsIcon
+            icon={copied ? Tick02Icon : Copy01Icon}
+            size={14}
+            strokeWidth={1.6}
+          />
           {copied ? 'Copied' : 'Copy'}
         </button>
         <button

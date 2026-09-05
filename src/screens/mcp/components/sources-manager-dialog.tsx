@@ -7,17 +7,15 @@
  */
 import { useState } from 'react'
 import {
+  
+  
+  
   useAddHubSource,
   useDeleteHubSource,
   useMcpHubSources,
-  useUpdateHubSource,
+  useUpdateHubSource
 } from '../hooks/use-mcp-hub-sources'
-import { TRUST_PILL } from '../lib/trust-pill'
-import type {
-  AddSourceInput,
-  HubSourceEntry,
-  MutationError,
-} from '../hooks/use-mcp-hub-sources'
+import type {AddSourceInput, HubSourceEntry, MutationError} from '../hooks/use-mcp-hub-sources';
 import { Button } from '@/components/ui/button'
 import {
   DialogContent,
@@ -44,15 +42,11 @@ const EMPTY_FORM: AddSourceInput = {
   enabled: true,
 }
 
-const FIELD =
-  'h-9 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-sm text-ink outline-none transition-colors focus:border-[var(--theme-accent)]'
+const FIELD = 'h-9 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-sm text-ink outline-none transition-colors focus:border-[var(--theme-accent)]'
 const LABEL = 'flex flex-col gap-1 text-sm text-[var(--theme-muted)]'
-const ERROR_TEXT = 'mt-0.5 text-xs text-[var(--theme-danger)] dark:text-[var(--theme-danger)]'
+const ERROR_TEXT = 'mt-0.5 text-xs text-red-600 dark:text-red-400'
 
-function fieldError(
-  errors: Array<MutationError>,
-  path: string,
-): string | undefined {
+function fieldError(errors: Array<MutationError>, path: string): string | undefined {
   return errors.find((e) => e.path === path)?.message
 }
 
@@ -65,18 +59,8 @@ interface SourceFormProps {
   serverErrors: Array<MutationError>
 }
 
-function SourceForm({
-  initial,
-  isEdit,
-  onSave,
-  onCancel,
-  saving,
-  serverErrors,
-}: SourceFormProps) {
-  const [form, setForm] = useState<AddSourceInput>({
-    ...EMPTY_FORM,
-    ...initial,
-  })
+function SourceForm({ initial, isEdit, onSave, onCancel, saving, serverErrors }: SourceFormProps) {
+  const [form, setForm] = useState<AddSourceInput>({ ...EMPTY_FORM, ...initial })
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({})
 
   function validate(): boolean {
@@ -105,16 +89,9 @@ function SourceForm({
     onSave(form)
   }
 
-  function set<K extends keyof AddSourceInput>(
-    key: K,
-    value: AddSourceInput[K],
-  ) {
+  function set<K extends keyof AddSourceInput>(key: K, value: AddSourceInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
-    setLocalErrors((prev) => {
-      const next = { ...prev }
-      delete next[key]
-      return next
-    })
+    setLocalErrors((prev) => { const next = { ...prev }; delete next[key]; return next })
   }
 
   const idErr = localErrors.id ?? fieldError(serverErrors, 'id')
@@ -126,9 +103,7 @@ function SourceForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className={LABEL}>
-        <span>
-          Source ID <span className="text-[var(--theme-danger)]">*</span>
-        </span>
+        <span>Source ID <span className="text-red-500">*</span></span>
         <input
           className={FIELD}
           value={form.id}
@@ -138,15 +113,11 @@ function SourceForm({
           autoFocus
         />
         {idErr ? <p className={ERROR_TEXT}>{idErr}</p> : null}
-        <p className="text-[11px] text-[var(--theme-muted)]">
-          Lowercase, alphanumeric + _ -. Cannot be changed after creation.
-        </p>
+        <p className="text-[11px] text-[var(--theme-muted)]">Lowercase, alphanumeric + _ -. Cannot be changed after creation.</p>
       </div>
 
       <div className={LABEL}>
-        <span>
-          Name <span className="text-[var(--theme-danger)]">*</span>
-        </span>
+        <span>Name <span className="text-red-500">*</span></span>
         <input
           className={FIELD}
           value={form.name}
@@ -158,9 +129,7 @@ function SourceForm({
       </div>
 
       <div className={LABEL}>
-        <span>
-          URL <span className="text-[var(--theme-danger)]">*</span>
-        </span>
+        <span>URL <span className="text-red-500">*</span></span>
         <input
           className={FIELD}
           value={form.url}
@@ -170,9 +139,7 @@ function SourceForm({
           type="url"
         />
         {urlErr ? <p className={ERROR_TEXT}>{urlErr}</p> : null}
-        <p className="text-[11px] text-[var(--theme-muted)]">
-          HTTPS only. Must return JSON.
-        </p>
+        <p className="text-[11px] text-[var(--theme-muted)]">HTTPS only. Must return JSON.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -181,15 +148,11 @@ function SourceForm({
           <select
             className={FIELD}
             value={form.trust}
-            onChange={(e) =>
-              set('trust', e.target.value as AddSourceInput['trust'])
-            }
+            onChange={(e) => set('trust', e.target.value as AddSourceInput['trust'])}
             disabled={saving}
           >
             {TRUST_OPTIONS.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
+              <option key={t} value={t}>{t}</option>
             ))}
           </select>
           {trustErr ? <p className={ERROR_TEXT}>{trustErr}</p> : null}
@@ -200,15 +163,11 @@ function SourceForm({
           <select
             className={FIELD}
             value={form.format}
-            onChange={(e) =>
-              set('format', e.target.value as AddSourceInput['format'])
-            }
+            onChange={(e) => set('format', e.target.value as AddSourceInput['format'])}
             disabled={saving}
           >
             {FORMAT_OPTIONS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
+              <option key={f} value={f}>{f}</option>
             ))}
           </select>
           {formatErr ? <p className={ERROR_TEXT}>{formatErr}</p> : null}
@@ -224,30 +183,17 @@ function SourceForm({
           disabled={saving}
           className="h-4 w-4 rounded border-[var(--theme-border)] text-primary accent-primary"
         />
-        <label
-          htmlFor="enabled-toggle"
-          className="text-sm text-ink cursor-pointer"
-        >
+        <label htmlFor="enabled-toggle" className="text-sm text-ink cursor-pointer">
           Enabled
         </label>
       </div>
 
-      {serverErrors
-        .filter((e) => !e.path)
-        .map((e, i) => (
-          <p key={i} className={ERROR_TEXT}>
-            {e.message}
-          </p>
-        ))}
+      {serverErrors.filter((e) => !e.path).map((e, i) => (
+        <p key={i} className={ERROR_TEXT}>{e.message}</p>
+      ))}
 
       <div className="flex items-center justify-end gap-2 pt-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onCancel}
-          disabled={saving}
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={saving}>
@@ -265,17 +211,19 @@ interface SourceRowProps {
   deleting: boolean
 }
 
+const TRUST_PILL: Record<string, string> = {
+  official: 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300',
+  community: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300',
+  unverified: 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300',
+}
+
 function SourceRow({ source, onEdit, onDelete, deleting }: SourceRowProps) {
   return (
     <div className="flex items-start justify-between gap-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)]/40 px-3 py-2.5">
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-sm font-medium text-ink truncate">
-            {source.name}
-          </span>
-          <span
-            className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${(TRUST_PILL[source.trust] ?? TRUST_PILL.unverified).className}`}
-          >
+          <span className="text-sm font-medium text-ink truncate">{source.name}</span>
+          <span className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${TRUST_PILL[source.trust] ?? TRUST_PILL.unverified}`}>
             {source.trust}
           </span>
           {source.builtin ? (
@@ -289,12 +237,8 @@ function SourceRow({ source, onEdit, onDelete, deleting }: SourceRowProps) {
             </span>
           ) : null}
         </div>
-        <p className="text-xs text-[var(--theme-muted)] truncate">
-          {source.url}
-        </p>
-        <p className="text-[11px] text-[var(--theme-muted)]">
-          {source.format} · {source.id}
-        </p>
+        <p className="text-xs text-[var(--theme-muted)] truncate">{source.url}</p>
+        <p className="text-[11px] text-[var(--theme-muted)]">{source.format} · {source.id}</p>
       </div>
       {!source.builtin ? (
         <div className="flex shrink-0 items-center gap-1">
@@ -312,7 +256,7 @@ function SourceRow({ source, onEdit, onDelete, deleting }: SourceRowProps) {
             size="sm"
             onClick={() => onDelete(source.id)}
             disabled={deleting}
-            className="h-7 px-2 text-xs text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_12%,transparent)] hover:text-[var(--theme-danger)] dark:text-[var(--theme-danger)] dark:hover:bg-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)]"
+            className="h-7 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/30"
           >
             {deleting ? '…' : 'Remove'}
           </Button>
@@ -326,9 +270,7 @@ type Mode = 'list' | 'add' | 'edit'
 
 export function SourcesManagerDialog({ open, onClose }: Props) {
   const [mode, setMode] = useState<Mode>('list')
-  const [editingSource, setEditingSource] = useState<HubSourceEntry | null>(
-    null,
-  )
+  const [editingSource, setEditingSource] = useState<HubSourceEntry | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [serverErrors, setServerErrors] = useState<Array<MutationError>>([])
 
@@ -401,31 +343,17 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
     )
   }
 
-  const title =
-    mode === 'add'
-      ? 'Add Source'
-      : mode === 'edit'
-        ? 'Edit Source'
-        : 'Marketplace Sources'
+  const title = mode === 'add' ? 'Add Source' : mode === 'edit' ? 'Edit Source' : 'Marketplace Sources'
   const saving = addMutation.isPending || updateMutation.isPending
 
   return (
-    <DialogRoot
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) handleClose()
-      }}
-    >
+    <DialogRoot open={open} onOpenChange={(o) => { if (!o) handleClose() }}>
       <DialogContent className="w-[min(560px,95vw)] border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-sm">
         <div className="border-b border-[var(--theme-border)] px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             {mode !== 'list' ? (
               <button
-                onClick={() => {
-                  setMode('list')
-                  setEditingSource(null)
-                  setServerErrors([])
-                }}
+                onClick={() => { setMode('list'); setEditingSource(null); setServerErrors([]) }}
                 className="text-sm text-[var(--theme-muted)] hover:text-ink transition-colors"
               >
                 ← Back
@@ -448,11 +376,9 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
           {mode === 'list' ? (
             <div className="flex flex-col gap-3">
               {query.isLoading ? (
-                <p className="text-sm text-[var(--theme-muted)]">
-                  Loading sources…
-                </p>
+                <p className="text-sm text-[var(--theme-muted)]">Loading sources…</p>
               ) : query.error ? (
-                <p className="text-sm text-[var(--theme-danger)]">Failed to load sources.</p>
+                <p className="text-sm text-red-600">Failed to load sources.</p>
               ) : (
                 <div className="flex flex-col gap-2">
                   {sources.map((source) => (
@@ -465,28 +391,21 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
                     />
                   ))}
                   {sources.length === 0 ? (
-                    <p className="text-sm text-[var(--theme-muted)]">
-                      No sources found.
-                    </p>
+                    <p className="text-sm text-[var(--theme-muted)]">No sources found.</p>
                   ) : null}
                 </div>
               )}
 
               {serverErrors.length > 0 ? (
-                <div className="rounded-lg border border-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-3 py-2 text-xs text-[var(--theme-danger)] dark:border-[var(--theme-danger)] dark:bg-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] dark:text-[var(--theme-danger)]">
-                  {serverErrors.map((e, i) => (
-                    <p key={i}>{e.message}</p>
-                  ))}
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+                  {serverErrors.map((e, i) => <p key={i}>{e.message}</p>)}
                 </div>
               ) : null}
 
               <div className="flex items-center justify-between pt-1 border-t border-[var(--theme-border)]">
                 <Button
                   size="sm"
-                  onClick={() => {
-                    setServerErrors([])
-                    setMode('add')
-                  }}
+                  onClick={() => { setServerErrors([]); setMode('add') }}
                 >
                   Add Source
                 </Button>
@@ -498,10 +417,7 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
           ) : mode === 'add' ? (
             <SourceForm
               onSave={handleAdd}
-              onCancel={() => {
-                setMode('list')
-                setServerErrors([])
-              }}
+              onCancel={() => { setMode('list'); setServerErrors([]) }}
               saving={saving}
               serverErrors={serverErrors}
             />
@@ -517,11 +433,7 @@ export function SourcesManagerDialog({ open, onClose }: Props) {
               }}
               isEdit
               onSave={handleUpdate}
-              onCancel={() => {
-                setMode('list')
-                setEditingSource(null)
-                setServerErrors([])
-              }}
+              onCancel={() => { setMode('list'); setEditingSource(null); setServerErrors([]) }}
               saving={saving}
               serverErrors={serverErrors}
             />

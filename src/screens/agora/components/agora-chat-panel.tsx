@@ -12,13 +12,19 @@ interface AgoraChatPanelProps {
   onSend: (body: string) => void
 }
 
-export function AgoraChatPanel({ self, others, messages, onSend }: AgoraChatPanelProps) {
+export function AgoraChatPanel({
+  self,
+  others,
+  messages,
+  onSend,
+}: AgoraChatPanelProps) {
   const [draft, setDraft] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (scrollRef.current)
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages.length, searchTerm])
 
   function handleSubmit(e: React.FormEvent) {
@@ -34,7 +40,7 @@ export function AgoraChatPanel({ self, others, messages, onSend }: AgoraChatPane
   }
 
   // Filter messages based on search term
-  const filteredMessages = messages.filter(m => {
+  const filteredMessages = messages.filter((m) => {
     if (!searchTerm) return true
     const term = searchTerm.toLowerCase()
     const body = m.body.toLowerCase()
@@ -43,14 +49,14 @@ export function AgoraChatPanel({ self, others, messages, onSend }: AgoraChatPane
   })
 
   return (
-    <div
-      className="flex h-full min-h-0 flex-col rounded-2xl bg-[var(--theme-card)] border border-[var(--theme-border)]"
-    >
+    <div className="flex h-full min-h-0 flex-col rounded-2xl bg-[var(--theme-card)] border border-[var(--theme-border)]">
       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--theme-border)]">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">Room Chat</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">
+          Room Chat
+        </span>
         <span className="text-[10px] opacity-50">{messages.length} msg</span>
       </div>
-      
+
       {/* Search bar */}
       <div className="flex items-center px-3 py-2 border-b border-[var(--theme-border)]">
         <input
@@ -72,18 +78,28 @@ export function AgoraChatPanel({ self, others, messages, onSend }: AgoraChatPane
           </button>
         )}
       </div>
-      
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-[12px] leading-snug">
+
+      <div
+        ref={scrollRef}
+        className="flex-1 min-h-0 overflow-y-auto px-3 py-2 text-[12px] leading-snug"
+      >
         {filteredMessages.length === 0 ? (
-          <div className="opacity-50 text-center mt-6 text-[11px]">No messages match your search</div>
+          <div className="opacity-50 text-center mt-6 text-[11px]">
+            No messages match your search
+          </div>
         ) : (
           <div className="space-y-1.5">
             {filteredMessages.map((m) => (
               <div key={m.id} className="mb-1.5">
                 <span
-                  className={cn('font-semibold', m.userId === self.profile.id ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text)]')}
->
-                {nameFor(m.userId)}:
+                  className={cn(
+                    'font-semibold',
+                    m.userId === self.profile.id
+                      ? 'text-[var(--theme-accent)]'
+                      : 'text-[var(--theme-text)]',
+                  )}
+                >
+                  {nameFor(m.userId)}:
                 </span>{' '}
                 <span className="opacity-90">{m.body}</span>
               </div>
@@ -91,8 +107,11 @@ export function AgoraChatPanel({ self, others, messages, onSend }: AgoraChatPane
           </div>
         )}
       </div>
-      
-      <form onSubmit={handleSubmit} className="flex gap-2 border-t p-2 border-[var(--theme-border)]">
+
+      <form
+        onSubmit={handleSubmit}
+        className="flex gap-2 border-t p-2 border-[var(--theme-border)]"
+      >
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

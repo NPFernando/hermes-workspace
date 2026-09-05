@@ -28,7 +28,9 @@ export const Route = createFileRoute('/api/env-reset')({
         }
 
         // 2. Force-reprobe the gateway — clears cached capability state
-        let capabilities: Awaited<ReturnType<typeof forceReprobeGateway>> | null = null
+        let capabilities: Awaited<
+          ReturnType<typeof forceReprobeGateway>
+        > | null = null
         let gatewayError: string | null = null
         try {
           capabilities = await forceReprobeGateway()

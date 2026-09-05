@@ -103,12 +103,16 @@ function AgentRosterItem({ session }: { session: SwarmSession }) {
             )}
           />
         </div>
-        <p className="truncate text-[10px] text-[var(--theme-muted)]">{persona.role}</p>
+        <p className="truncate text-[10px] text-[var(--theme-muted)]">
+          {persona.role}
+        </p>
       </div>
 
       {/* Stats */}
       <div className="shrink-0 text-right">
-        <div className="text-[10px] text-[var(--theme-muted)]">{formatTokens(tokens)}</div>
+        <div className="text-[10px] text-[var(--theme-muted)]">
+          {formatTokens(tokens)}
+        </div>
         <div className="text-[10px] text-[var(--theme-muted)]">
           {formatAge(session.staleness)}
         </div>
@@ -146,7 +150,9 @@ function ActivityFeedItem({
         <span className={cn('text-[11px]', statusColor[session.swarmStatus])}>
           {session.swarmStatus === 'running' ? 'working' : session.swarmStatus}
         </span>
-        <p className="truncate text-[10px] text-[var(--theme-muted)] mt-0.5">{task}</p>
+        <p className="truncate text-[10px] text-[var(--theme-muted)] mt-0.5">
+          {task}
+        </p>
       </div>
       <span className="shrink-0 text-[9px] text-[var(--theme-muted)]">
         {formatAge(session.staleness)}

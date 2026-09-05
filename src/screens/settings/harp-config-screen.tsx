@@ -33,7 +33,9 @@ async function fetchHarpConfig(): Promise<HarpConfigView> {
   return data as HarpConfigView
 }
 
-async function patchHarpConfig(patch: Record<string, unknown>): Promise<HarpConfigView> {
+async function patchHarpConfig(
+  patch: Record<string, unknown>,
+): Promise<HarpConfigView> {
   const res = await fetch('/api/harp-config', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -64,9 +66,13 @@ function SectionCard({
           <HugeiconsIcon icon={icon} size={15} strokeWidth={1.8} />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-[var(--theme-text)]">{title}</h3>
+          <h3 className="text-sm font-semibold text-[var(--theme-text)]">
+            {title}
+          </h3>
           {description && (
-            <p className="mt-0.5 text-xs text-[var(--theme-muted)]">{description}</p>
+            <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
+              {description}
+            </p>
           )}
         </div>
       </div>
@@ -109,11 +115,16 @@ function Toggle({
 function RoleBadge({ role }: { role: string }) {
   const colors: Record<string, string> = {
     primary: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
-    fallback: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
-    claude_primary: 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300',
-    claude_fast: 'bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-300',
-    openrouter_paid: 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300',
-    paid_fallback: 'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-300',
+    fallback:
+      'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+    claude_primary:
+      'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300',
+    claude_fast:
+      'bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-300',
+    openrouter_paid:
+      'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300',
+    paid_fallback:
+      'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-300',
   }
   return (
     <span
@@ -128,8 +139,10 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 function healthStatusClass(status: string): string {
-  if (status === 'ready') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-  if (status === 'cooldown') return 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+  if (status === 'ready')
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+  if (status === 'cooldown')
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
   return 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'
 }
 
@@ -148,7 +161,9 @@ function compactDateTime(value: string | null | undefined): string {
 function HarpHealthPanel({ health }: { health?: HarpHealthView }) {
   if (!health) return null
   const blockedCount = health.cooldowns.length + health.deadCatalogModels.length
-  const primaryStatus = health.routes.find((route) => route.model === health.primaryModel)?.status ?? 'ready'
+  const primaryStatus =
+    health.routes.find((route) => route.model === health.primaryModel)
+      ?.status ?? 'ready'
   return (
     <SectionCard
       title="Live HARP Health"
@@ -157,59 +172,130 @@ function HarpHealthPanel({ health }: { health?: HarpHealthView }) {
     >
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Selected route</p>
-          <p className="mt-1 truncate font-mono text-xs text-[var(--theme-text)]">{health.primaryProvider}/{health.primaryModel}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+            Selected route
+          </p>
+          <p className="mt-1 truncate font-mono text-xs text-[var(--theme-text)]">
+            {health.primaryProvider}/{health.primaryModel}
+          </p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className={cn('rounded-md px-1.5 py-0.5 text-[10px] font-medium', healthStatusClass(primaryStatus))}>{primaryStatus}</span>
-            <span className="rounded-md bg-[var(--theme-hover)] px-1.5 py-0.5 text-[10px] text-[var(--theme-muted)]">{health.routeDecision}</span>
+            <span
+              className={cn(
+                'rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                healthStatusClass(primaryStatus),
+              )}
+            >
+              {primaryStatus}
+            </span>
+            <span className="rounded-md bg-[var(--theme-hover)] px-1.5 py-0.5 text-[10px] text-[var(--theme-muted)]">
+              {health.routeDecision}
+            </span>
           </div>
         </div>
         <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">Blocked candidates</p>
-          <p className={cn('mt-1 text-2xl font-semibold', blockedCount > 0 ? 'text-amber-500' : 'text-emerald-500')}>{blockedCount}</p>
-          <p className="mt-1 text-[11px] text-[var(--theme-muted)]">{health.cooldowns.length} cooldown · {health.deadCatalogModels.length} missing catalog</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+            Blocked candidates
+          </p>
+          <p
+            className={cn(
+              'mt-1 text-2xl font-semibold',
+              blockedCount > 0 ? 'text-amber-500' : 'text-emerald-500',
+            )}
+          >
+            {blockedCount}
+          </p>
+          <p className="mt-1 text-[11px] text-[var(--theme-muted)]">
+            {health.cooldowns.length} cooldown ·{' '}
+            {health.deadCatalogModels.length} missing catalog
+          </p>
         </div>
         <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">OpenRouter credits</p>
-          <p className="mt-1 text-xs text-[var(--theme-text)]">{health.openrouterCredits || 'not checked'}</p>
-          <p className="mt-1 text-[10px] text-[var(--theme-muted)]">Updated {compactDateTime(health.generatedAt)}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+            OpenRouter credits
+          </p>
+          <p className="mt-1 text-xs text-[var(--theme-text)]">
+            {health.openrouterCredits || 'not checked'}
+          </p>
+          <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
+            Updated {compactDateTime(health.generatedAt)}
+          </p>
         </div>
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
         <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-semibold text-[var(--theme-text)]">Route chain</p>
-            <span className="text-[10px] text-[var(--theme-muted)]">debugging / complex</span>
+            <p className="text-xs font-semibold text-[var(--theme-text)]">
+              Route chain
+            </p>
+            <span className="text-[10px] text-[var(--theme-muted)]">
+              debugging / complex
+            </span>
           </div>
           <div className="space-y-1.5">
             {health.routes.slice(0, 8).map((route) => (
-              <div key={`${route.provider}:${route.model}`} className="flex items-center gap-2 rounded-lg bg-[var(--theme-panel)] px-2 py-1.5">
-                <span className={cn('shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium', healthStatusClass(route.status))}>{route.status}</span>
-                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--theme-text)]">{route.provider}/{route.model}</span>
-                <span className="text-[10px] text-[var(--theme-muted)]">{route.tier}</span>
+              <div
+                key={`${route.provider}:${route.model}`}
+                className="flex items-center gap-2 rounded-lg bg-[var(--theme-panel)] px-2 py-1.5"
+              >
+                <span
+                  className={cn(
+                    'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                    healthStatusClass(route.status),
+                  )}
+                >
+                  {route.status}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--theme-text)]">
+                  {route.provider}/{route.model}
+                </span>
+                <span className="text-[10px] text-[var(--theme-muted)]">
+                  {route.tier}
+                </span>
               </div>
             ))}
-            {health.routes.length === 0 && <p className="text-xs text-[var(--theme-muted)]">No route data available.</p>}
+            {health.routes.length === 0 && (
+              <p className="text-xs text-[var(--theme-muted)]">
+                No route data available.
+              </p>
+            )}
           </div>
         </div>
 
         <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-semibold text-[var(--theme-text)]">Active cooldowns</p>
-            <span className="text-[10px] text-[var(--theme-muted)]">runtime DB</span>
+            <p className="text-xs font-semibold text-[var(--theme-text)]">
+              Active cooldowns
+            </p>
+            <span className="text-[10px] text-[var(--theme-muted)]">
+              runtime DB
+            </span>
           </div>
           <div className="space-y-1.5">
             {health.cooldowns.slice(0, 8).map((item) => (
-              <div key={item.modelId} className="rounded-lg bg-[var(--theme-panel)] px-2 py-1.5">
+              <div
+                key={item.modelId}
+                className="rounded-lg bg-[var(--theme-panel)] px-2 py-1.5"
+              >
                 <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--theme-text)]">{item.modelId}</span>
-                  <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">{item.cooldownReason ?? 'cooldown'}</span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--theme-text)]">
+                    {item.modelId}
+                  </span>
+                  <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                    {item.cooldownReason ?? 'cooldown'}
+                  </span>
                 </div>
-                <p className="mt-0.5 text-[10px] text-[var(--theme-muted)]">until {compactDateTime(item.cooldownUntil)} · failures {item.failures} · 429s {item.rateLimitCount}</p>
+                <p className="mt-0.5 text-[10px] text-[var(--theme-muted)]">
+                  until {compactDateTime(item.cooldownUntil)} · failures{' '}
+                  {item.failures} · 429s {item.rateLimitCount}
+                </p>
               </div>
             ))}
-            {health.cooldowns.length === 0 && <p className="text-xs text-[var(--theme-muted)]">No active cooldowns.</p>}
+            {health.cooldowns.length === 0 && (
+              <p className="text-xs text-[var(--theme-muted)]">
+                No active cooldowns.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -285,11 +371,7 @@ function TierModelRow({
   )
 }
 
-function AddModelForm({
-  onAdd,
-}: {
-  onAdd: (model: HarpTierModel) => void
-}) {
+function AddModelForm({ onAdd }: { onAdd: (model: HarpTierModel) => void }) {
   const [open, setOpen] = useState(false)
   const [modelId, setModelId] = useState('')
   const [role, setRole] = useState('fallback')
@@ -298,7 +380,12 @@ function AddModelForm({
 
   function submit() {
     if (!modelId.trim()) return
-    onAdd({ model: modelId.trim(), role, notes: notes.trim() || undefined, provider: provider.trim() || undefined })
+    onAdd({
+      model: modelId.trim(),
+      role,
+      notes: notes.trim() || undefined,
+      provider: provider.trim() || undefined,
+    })
     setModelId('')
     setNotes('')
     setProvider('')
@@ -450,7 +537,10 @@ function BlocklistSection({
 
   function submit() {
     if (!modelId.trim()) return
-    onAdd({ model: modelId.trim(), reason: reason.trim() || 'manually blocked' })
+    onAdd({
+      model: modelId.trim(),
+      reason: reason.trim() || 'manually blocked',
+    })
     setModelId('')
     setReason('')
   }
@@ -462,13 +552,20 @@ function BlocklistSection({
           key={entry.model}
           className="flex items-center gap-2 rounded-xl border border-red-200/60 bg-red-50/50 px-3 py-2 dark:border-red-900/30 dark:bg-red-950/20"
         >
-          <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} className="shrink-0 text-red-400" />
+          <HugeiconsIcon
+            icon={Cancel01Icon}
+            size={13}
+            strokeWidth={2}
+            className="shrink-0 text-red-400"
+          />
           <div className="min-w-0 flex-1">
             <span className="block truncate font-mono text-xs font-medium text-red-700 dark:text-red-300">
               {entry.model}
             </span>
             {entry.reason && (
-              <span className="text-[11px] text-red-500/70 dark:text-red-400/70">{entry.reason}</span>
+              <span className="text-[11px] text-red-500/70 dark:text-red-400/70">
+                {entry.reason}
+              </span>
             )}
           </div>
           <button
@@ -482,7 +579,9 @@ function BlocklistSection({
       ))}
 
       {entries.length === 0 && (
-        <p className="py-1 text-xs text-[var(--theme-muted)]">No blocked models.</p>
+        <p className="py-1 text-xs text-[var(--theme-muted)]">
+          No blocked models.
+        </p>
       )}
 
       <div className="flex gap-2 pt-1">
@@ -517,7 +616,11 @@ function BlocklistSection({
 
 type CapPeriod = 'day' | 'week' | 'month'
 const CAP_MULTIPLIER: Record<CapPeriod, number> = { day: 1, week: 7, month: 30 }
-const CAP_LABELS: Record<CapPeriod, string> = { day: 'Day', week: 'Week', month: 'Month' }
+const CAP_LABELS: Record<CapPeriod, string> = {
+  day: 'Day',
+  week: 'Week',
+  month: 'Month',
+}
 
 function CapWidget({
   dailyValue,
@@ -547,9 +650,7 @@ function CapWidget({
     }
   }
 
-  const dailyHint = period !== 'day'
-    ? `= $${(dailyValue).toFixed(2)}/day`
-    : null
+  const dailyHint = period !== 'day' ? `= $${dailyValue.toFixed(2)}/day` : null
 
   return (
     <div className="flex flex-col gap-1">
@@ -629,23 +730,33 @@ export function HarpConfigScreen() {
       <div data-route-page className="space-y-4">
         <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900/40 dark:bg-amber-950/20">
           <div className="mb-2 flex items-center gap-2 text-amber-700 dark:text-amber-300">
-            <HugeiconsIcon icon={InformationCircleIcon} size={16} strokeWidth={1.8} />
+            <HugeiconsIcon
+              icon={InformationCircleIcon}
+              size={16}
+              strokeWidth={1.8}
+            />
             <span className="text-sm font-semibold">No HARP config found</span>
           </div>
           <p className="mb-3 text-xs text-amber-600 dark:text-amber-400">
-            HARP (tiered model routing) lets you define free-first fallback chains for Hermes Agent.
-            Searched in these locations:
+            HARP (tiered model routing) lets you define free-first fallback
+            chains for Hermes Agent. Searched in these locations:
           </p>
           <ul className="mb-3 space-y-1">
             {(data?.candidatePaths ?? []).map((p) => (
-              <li key={p} className="font-mono text-[11px] text-amber-700 dark:text-amber-300">
+              <li
+                key={p}
+                className="font-mono text-[11px] text-amber-700 dark:text-amber-300"
+              >
                 {p}
               </li>
             ))}
           </ul>
           <p className="text-xs text-amber-500 dark:text-amber-400">
-            Set <code className="rounded bg-amber-100 px-1 font-mono text-[11px] dark:bg-amber-900/40">HARP_CONFIG_PATH</code> to
-            point to an existing file, or create a starter config below.
+            Set{' '}
+            <code className="rounded bg-amber-100 px-1 font-mono text-[11px] dark:bg-amber-900/40">
+              HARP_CONFIG_PATH
+            </code>{' '}
+            to point to an existing file, or create a starter config below.
           </p>
           {error instanceof Error && (
             <p className="mt-2 text-[11px] text-red-500">{error.message}</p>
@@ -653,7 +764,12 @@ export function HarpConfigScreen() {
         </div>
         <button
           type="button"
-          onClick={() => mutation.mutate({ action: 'create-starter' } as Record<string, unknown>)}
+          onClick={() =>
+            mutation.mutate({ action: 'create-starter' } as Record<
+              string,
+              unknown
+            >)
+          }
           disabled={mutation.isPending}
           className="flex items-center gap-2 rounded-xl border border-accent-300 bg-accent-50/60 px-4 py-2.5 text-sm font-medium text-accent-700 transition-colors hover:bg-accent-100 disabled:opacity-50 dark:border-accent-700/40 dark:bg-accent-950/20 dark:text-accent-300"
         >
@@ -705,22 +821,38 @@ export function HarpConfigScreen() {
         <div className="flex flex-wrap gap-2">
           <Toggle
             checked={g.enabled}
-            onChange={(v) => patch({ action: 'set-global', field: 'enabled', value: v })}
+            onChange={(v) =>
+              patch({ action: 'set-global', field: 'enabled', value: v })
+            }
             label="HARP enabled"
           />
           <Toggle
             checked={g.auto_route}
-            onChange={(v) => patch({ action: 'set-global', field: 'auto_route', value: v })}
+            onChange={(v) =>
+              patch({ action: 'set-global', field: 'auto_route', value: v })
+            }
             label="Auto-route"
           />
           <Toggle
             checked={g.allow_paid_benchmarking}
-            onChange={(v) => patch({ action: 'set-global', field: 'allow_paid_benchmarking', value: v })}
+            onChange={(v) =>
+              patch({
+                action: 'set-global',
+                field: 'allow_paid_benchmarking',
+                value: v,
+              })
+            }
             label="Paid benchmarking"
           />
           <Toggle
             checked={g.require_paid_final_review_for_production}
-            onChange={(v) => patch({ action: 'set-global', field: 'require_paid_final_review_for_production', value: v })}
+            onChange={(v) =>
+              patch({
+                action: 'set-global',
+                field: 'require_paid_final_review_for_production',
+                value: v,
+              })
+            }
             label="Paid final review (prod)"
           />
         </div>
@@ -732,10 +864,18 @@ export function HarpConfigScreen() {
             </label>
             <select
               value={g.mode}
-              onChange={(e) => patch({ action: 'set-global', field: 'mode', value: e.target.value })}
+              onChange={(e) =>
+                patch({
+                  action: 'set-global',
+                  field: 'mode',
+                  value: e.target.value,
+                })
+              }
               className="h-8 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-accent-400"
             >
-              <option value="tiered_with_degradation">tiered_with_degradation</option>
+              <option value="tiered_with_degradation">
+                tiered_with_degradation
+              </option>
               <option value="free_only">free_only</option>
               <option value="paid_only">paid_only</option>
               <option value="local_only">local_only</option>
@@ -746,7 +886,13 @@ export function HarpConfigScreen() {
             dailyValue={g.paid_benchmark_daily_cap_usd}
             period={capPeriod}
             onPeriodChange={setCapPeriod}
-            onSave={(daily) => patch({ action: 'set-global', field: 'paid_benchmark_daily_cap_usd', value: daily })}
+            onSave={(daily) =>
+              patch({
+                action: 'set-global',
+                field: 'paid_benchmark_daily_cap_usd',
+                value: daily,
+              })
+            }
           />
         </div>
       </SectionCard>
@@ -759,17 +905,31 @@ export function HarpConfigScreen() {
       >
         <div className="space-y-5 divide-y divide-[var(--theme-border)] dark:divide-neutral-800">
           {tiers.map((tier) => (
-            <div key={tier.key} className={cn('pt-4 first:pt-0', tier.key === 'tier1_free' && 'first:pt-0')}>
+            <div
+              key={tier.key}
+              className={cn(
+                'pt-4 first:pt-0',
+                tier.key === 'tier1_free' && 'first:pt-0',
+              )}
+            >
               <TierSection
                 tier={tier}
                 onReorder={(models) =>
-                  patch({ action: 'reorder-tier-models', tier: tier.key, models })
+                  patch({
+                    action: 'reorder-tier-models',
+                    tier: tier.key,
+                    models,
+                  })
                 }
                 onAdd={(model) =>
                   patch({ action: 'add-tier-model', tier: tier.key, model })
                 }
                 onRemove={(modelId) =>
-                  patch({ action: 'remove-tier-model', tier: tier.key, modelId })
+                  patch({
+                    action: 'remove-tier-model',
+                    tier: tier.key,
+                    modelId,
+                  })
                 }
               />
             </div>
@@ -799,7 +959,9 @@ export function HarpConfigScreen() {
         <div className="space-y-3">
           <Toggle
             checked={autoImprove.enabled}
-            onChange={(v) => patch({ action: 'set-auto-improve', field: 'enabled', value: v })}
+            onChange={(v) =>
+              patch({ action: 'set-auto-improve', field: 'enabled', value: v })
+            }
             label="Auto-improve enabled"
           />
 
@@ -809,14 +971,23 @@ export function HarpConfigScreen() {
                 Cron schedule
               </label>
               <input
-                defaultValue={typeof autoImprove.trigger === 'object' && Array.isArray(autoImprove.trigger)
-                  ? (autoImprove.trigger.find((t: Record<string, unknown>) => t.cron) as Record<string, string> | undefined)?.cron ?? ''
-                  : ''}
+                defaultValue={
+                  typeof autoImprove.trigger === 'object' &&
+                  Array.isArray(autoImprove.trigger)
+                    ? ((
+                        autoImprove.trigger.find(
+                          (t: Record<string, unknown>) => t.cron,
+                        ) as Record<string, string> | undefined
+                      )?.cron ?? '')
+                    : ''
+                }
                 placeholder="0 4 * * 1"
                 className="h-8 rounded-lg border border-[var(--theme-border)] bg-surface px-2 font-mono text-xs outline-none focus:border-accent-400"
                 readOnly
               />
-              <p className="text-[10px] text-[var(--theme-muted)]">Edit in harp-config.yaml to change schedule</p>
+              <p className="text-[10px] text-[var(--theme-muted)]">
+                Edit in harp-config.yaml to change schedule
+              </p>
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[var(--theme-muted)]">
@@ -828,7 +999,12 @@ export function HarpConfigScreen() {
                 defaultValue={autoImprove.min_evals_to_rank}
                 onBlur={(e) => {
                   const v = parseInt(e.target.value, 10)
-                  if (!isNaN(v) && v > 0) patch({ action: 'set-auto-improve', field: 'min_evals_to_rank', value: v })
+                  if (!isNaN(v) && v > 0)
+                    patch({
+                      action: 'set-auto-improve',
+                      field: 'min_evals_to_rank',
+                      value: v,
+                    })
                 }}
                 className="h-8 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-accent-400"
               />
@@ -838,7 +1014,10 @@ export function HarpConfigScreen() {
           {autoImprove.deliver && (
             <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2">
               <span className="text-xs text-[var(--theme-muted)]">
-                Reports delivered to: <code className="font-mono text-[11px]">{autoImprove.deliver}</code>
+                Reports delivered to:{' '}
+                <code className="font-mono text-[11px]">
+                  {autoImprove.deliver}
+                </code>
               </span>
             </div>
           )}

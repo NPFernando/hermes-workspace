@@ -12,12 +12,6 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/toast'
-import {
-  StateBox,
-  formatBytes,
-  highlightMatch,
-  readJson,
-} from '@/lib/memory-screen-utils'
 import { cn } from '@/lib/utils'
 import { Markdown } from '@/components/prompt-kit/markdown'
 
@@ -38,6 +32,21 @@ type ListResponse = { files?: Array<MemoryFileMeta> }
 type ReadResponse = { path?: string; content?: string }
 type SearchResponse = { results?: Array<MemorySearchMatch> }
 type WriteResponse = { success?: boolean; path?: string; error?: string }
+
+async function readJson<T>(url: string): Promise<T> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw new Error(text || `Request failed (${response.status})`)
+  }
+  return (await response.json()) as T
+}
+
+function formatBytes(size: number): string {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
 
 function formatModified(value: string): string {
   const parsed = Date.parse(value)
@@ -73,11 +82,33 @@ function splitFiles(files: Array<MemoryFileMeta>) {
   return { rootMemory, memoryFiles }
 }
 
+function highlightMatch(
+  text: string,
+  query: string,
+): Array<{ text: string; hit: boolean }> {
+  const needle = query.trim()
+  if (!needle) return [{ text, hit: false }]
+  const lower = text.toLowerCase()
+  const matchLower = needle.toLowerCase()
+  const parts: Array<{ text: string; hit: boolean }> = []
+  let cursor = 0
+  while (cursor < text.length) {
+    const index = lower.indexOf(matchLower, cursor)
+    if (index < 0) {
+      parts.push({ text: text.slice(cursor), hit: false })
+      break
+    }
+    if (index > cursor) {
+      parts.push({ text: text.slice(cursor, index), hit: false })
+    }
+    parts.push({ text: text.slice(index, index + needle.length), hit: true })
+    cursor = index + needle.length
+  }
+  return parts.length > 0 ? parts : [{ text, hit: false }]
+}
+
 function renderMemoryContent(content: string): string {
-  return content
-    .replace(/\n§\n/g, '\n\n---\n\n')
-    .replace(/^§\n?/g, '')
-    .replace(/\n?§$/g, '')
+  return content.replace(/\n§\n/g, '\n\n---\n\n').replace(/^§\n?/g, '').replace(/\n?§$/g, '')
 }
 
 export function MemoryBrowserScreen() {
@@ -226,9 +257,13 @@ export function MemoryBrowserScreen() {
       data-route-page
       className="flex h-full min-h-0 flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]"
     >
-      <div className="px-3 py-3 md:px-4 border-b border-[var(--theme-border)] bg-[var(--theme-bg)]">
+      <div
+        className="px-3 py-3 md:px-4 border-b border-[var(--theme-border)] bg-[var(--theme-bg)]"
+      >
         <div className="flex items-center gap-3">
-          <div className="inline-flex size-9 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]">
+          <div
+            className="inline-flex size-9 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]"
+          >
             <HugeiconsIcon icon={BrainIcon} size={18} strokeWidth={1.6} />
           </div>
           <div className="min-w-0 flex-1">
@@ -403,11 +438,7 @@ export function MemoryBrowserScreen() {
                         : 'text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]',
                     )}
                   >
-                    <HugeiconsIcon
-                      icon={CodeCircleIcon}
-                      size={13}
-                      strokeWidth={1.7}
-                    />
+                    <HugeiconsIcon icon={CodeCircleIcon} size={13} strokeWidth={1.7} />
                     Raw
                   </button>
                 </div>
@@ -415,16 +446,10 @@ export function MemoryBrowserScreen() {
               <button
                 type="button"
                 title="Refresh files"
-                onClick={() =>
-                  queryClient.invalidateQueries({ queryKey: ['memory'] })
-                }
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['memory'] })}
                 className="inline-flex items-center justify-center rounded-md border border-[var(--theme-border)] p-1.5 text-[var(--theme-muted)] transition-colors hover:border-[var(--theme-border)] hover:bg-[var(--theme-hover)]"
               >
-                <HugeiconsIcon
-                  icon={CircleArrowReload01Icon}
-                  size={14}
-                  strokeWidth={1.7}
-                />
+                <HugeiconsIcon icon={CircleArrowReload01Icon} size={14} strokeWidth={1.7} />
               </button>
               {selectedPath ? (
                 <>
@@ -449,7 +474,7 @@ export function MemoryBrowserScreen() {
                       {hasUnsavedChanges ? (
                         <span
                           title="Unsaved changes"
-                          className="inline-block size-2 rounded-full bg-[var(--theme-warning)]"
+                          className="inline-block size-2 rounded-full bg-amber-400"
                         />
                       ) : null}
                     </>
@@ -466,7 +491,7 @@ export function MemoryBrowserScreen() {
                       />
                       Edit
                       {hasUnsavedChanges ? (
-                        <span className="absolute -right-1 -top-1 size-2 rounded-full bg-[var(--theme-warning)]" />
+                        <span className="absolute -right-1 -top-1 size-2 rounded-full bg-amber-400" />
                       ) : null}
                     </button>
                   )}
@@ -492,7 +517,9 @@ export function MemoryBrowserScreen() {
             ) : contentQuery.error instanceof Error ? (
               <StateBox label={contentQuery.error.message} error />
             ) : isEditing ? (
-              <div className="h-full rounded-xl p-2 border border-[var(--theme-border)] bg-[var(--theme-card)]">
+              <div
+                className="h-full rounded-xl p-2 border border-[var(--theme-border)] bg-[var(--theme-card)]"
+              >
                 <textarea
                   value={draftContent}
                   onChange={(event) => {
@@ -505,13 +532,17 @@ export function MemoryBrowserScreen() {
                 />
               </div>
             ) : viewMode === 'rendered' ? (
-              <div className="min-h-full rounded-xl p-4 md:p-5 border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]">
+              <div
+                className="min-h-full rounded-xl p-4 md:p-5 border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]"
+              >
                 <Markdown className="prose prose-sm dark:prose-invert max-w-none prose-hr:my-4">
                   {renderMemoryContent(content)}
                 </Markdown>
               </div>
             ) : (
-              <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)]">
+              <div
+                className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)]"
+              >
                 <div className="font-mono text-xs">
                   {lines.map((line, index) => {
                     const lineNumber = index + 1
@@ -581,3 +612,17 @@ function FileRow({
   )
 }
 
+function StateBox({ label, error }: { label: string; error?: boolean }) {
+  return (
+    <div
+      className={cn(
+        'flex min-h-32 items-center justify-center rounded-xl border px-4 text-sm',
+        error
+          ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300'
+          : 'border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-muted)]',
+      )}
+    >
+      {label}
+    </div>
+  )
+}

@@ -16,25 +16,25 @@ Enabling the flag produces **859 errors across ~180 files** (measured after a 12
 pilot batch, `docs/tsconfig-strictness-rollout.md`'s own fixes, already landed — see
 below). Error types, unchanged from an earlier scoping pass, are ~98% two shapes:
 
-| Code | Meaning | Share |
-|---|---|---|
-| TS18048 | `'x' is possibly 'undefined'` | ~49% |
-| TS2532 | `Object is possibly 'undefined'` | ~34% |
-| TS2322 / TS2345 | assignability against a now-`\| undefined` type | ~15% |
-| everything else (TS2538, TS2769, TS2722, TS2339, TS2488, TS7006) | ~2% |
+| Code                                                             | Meaning                                         | Share |
+| ---------------------------------------------------------------- | ----------------------------------------------- | ----- |
+| TS18048                                                          | `'x' is possibly 'undefined'`                   | ~49%  |
+| TS2532                                                           | `Object is possibly 'undefined'`                | ~34%  |
+| TS2322 / TS2345                                                  | assignability against a now-`\| undefined` type | ~15%  |
+| everything else (TS2538, TS2769, TS2722, TS2339, TS2488, TS7006) | ~2%                                             |
 
 By directory:
 
-| Directory | Errors |
-|---|---|
-| `src/server` | ~420 |
-| `src/screens` | ~255 |
-| `src/components` | ~72 |
-| `src/routes` | ~38 |
-| `src/hooks` | ~23 |
-| `scripts` | ~19 |
-| `src/lib` | ~14 |
-| `src/stores` | ~12 |
+| Directory        | Errors |
+| ---------------- | ------ |
+| `src/server`     | ~420   |
+| `src/screens`    | ~255   |
+| `src/components` | ~72    |
+| `src/routes`     | ~38    |
+| `src/hooks`      | ~23    |
+| `scripts`        | ~19    |
+| `src/lib`        | ~14    |
+| `src/stores`     | ~12    |
 
 Heaviest individual files (all in `src/server`, all trading-engine): `grid-backtest.ts`
 (54), `trading-strategies.ts` (43), `grid-paper-engine.ts` (41), `trading-backtest.ts`
@@ -51,7 +51,7 @@ Three options were considered:
 - **(b) Flip now, bridge with `@ts-expect-error`/`eslint-disable` suppressions, clean
   up over many follow-ups.** Rejected as the default — it unblocks the flag
   immediately but creates ~850 pieces of tracked debt with no forcing function to
-  actually pay them down, and (worse) suppressing `TS18048`/`TS2532` at the *use*
+  actually pay them down, and (worse) suppressing `TS18048`/`TS2532` at the _use_
   site risks masking a genuinely unsafe access that a future editor won't recatch.
 - **(c) Fix in directory-sized batches first (this doc's approach), flip the flag once
   batches are done, or once few enough remain that the rest can ride in a single
@@ -100,10 +100,10 @@ engine doing the same.
   an explicit guard; it doubles as documentation).
 - Each fix verified against actual type provenance, not pattern-matched from the error
   message alone — same rule this session's lint-cleanup rounds established.
-- Because current CI runs eslint under the *lax* tsconfig, guards added ahead of the
+- Because current CI runs eslint under the _lax_ tsconfig, guards added ahead of the
   flag being enabled will trip `@typescript-eslint/no-unnecessary-condition` (the lax
   types don't reflect the risk the guard defends against) — bridge with a documented
   `eslint-disable-next-line` pointing back to this doc, as done in the pilot batch.
-- `npx tsc --noEmit` clean under the *current* (non-strict) tsconfig after each batch
+- `npx tsc --noEmit` clean under the _current_ (non-strict) tsconfig after each batch
   — batches hardening code should never themselves depend on the flag being on.
 - Full `npx vitest run` green, scoped `npx eslint` clean, before merging each batch PR.

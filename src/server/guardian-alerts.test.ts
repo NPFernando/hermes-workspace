@@ -35,9 +35,7 @@ describe('guardianBlockAlertSeverity', () => {
   })
 
   it('is warning for routine risk-management rules', () => {
-    expect(guardianBlockAlertSeverity([block('position_cap')])).toBe(
-      'warning',
-    )
+    expect(guardianBlockAlertSeverity([block('position_cap')])).toBe('warning')
     expect(guardianBlockAlertSeverity([block('loss_streak_cooldown')])).toBe(
       'warning',
     )
@@ -67,9 +65,7 @@ describe('shouldAlertGuardianBlock', () => {
 
   it('re-alerts once the cooldown window elapses for an unchanged rule set', () => {
     const key = `test-elapsed-${Math.random()}`
-    expect(shouldAlertGuardianBlock(key, [block('position_cap')], 0)).toBe(
-      true,
-    )
+    expect(shouldAlertGuardianBlock(key, [block('position_cap')], 0)).toBe(true)
     expect(
       shouldAlertGuardianBlock(key, [block('position_cap')], 30 * 60_000),
     ).toBe(true)

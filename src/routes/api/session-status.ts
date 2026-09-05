@@ -95,7 +95,9 @@ export const Route = createFileRoute('/api/session-status')({
             const contextUsage = await readContextUsage('main')
             const localMain = getLocalSession('main')
             const activeRun = await getActiveRunForSession('main')
-            const outputTokens = estimateTokensFromText(activeRun?.assistantText ?? '')
+            const outputTokens = estimateTokensFromText(
+              activeRun?.assistantText ?? '',
+            )
             return json({
               ok: true,
               payload: {
@@ -119,7 +121,9 @@ export const Route = createFileRoute('/api/session-status')({
           if (localSession) {
             const contextUsage = await readContextUsage(sessionKey)
             const activeRun = await getActiveRunForSession(sessionKey)
-            const outputTokens = estimateTokensFromText(activeRun?.assistantText ?? '')
+            const outputTokens = estimateTokensFromText(
+              activeRun?.assistantText ?? '',
+            )
             return json({
               ok: true,
               payload: {
@@ -201,8 +205,7 @@ export const Route = createFileRoute('/api/session-status')({
               },
             })
           } catch (sessionErr) {
-            const message =
-              safeErrorMessage(sessionErr)
+            const message = safeErrorMessage(sessionErr)
             if (!/not found|404/i.test(message)) {
               throw sessionErr
             }

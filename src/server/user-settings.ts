@@ -3,7 +3,9 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 const SETTINGS_FILE = join(
-  process.env.HERMES_HOME ?? process.env.HERMES_AGENT_PATH ?? join(homedir(), '.hermes'),
+  process.env.HERMES_HOME ??
+    process.env.HERMES_AGENT_PATH ??
+    join(homedir(), '.hermes'),
   'workspace-user-settings.json',
 )
 
@@ -38,7 +40,10 @@ export function writeUserSettings(patch: Partial<UserSettings>): void {
         ? { ...(current.chatSettings ?? {}), ...patch.chatSettings }
         : current.chatSettings,
     }
-    writeFileSync(SETTINGS_FILE, JSON.stringify(next), { encoding: 'utf8', mode: 0o600 })
+    writeFileSync(SETTINGS_FILE, JSON.stringify(next), {
+      encoding: 'utf8',
+      mode: 0o600,
+    })
   } catch (e) {
     console.warn('[user-settings] Failed to write:', e)
   }

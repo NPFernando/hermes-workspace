@@ -22,10 +22,7 @@ export const Route = createFileRoute('/api/hindsight/delete')({
           await deleteHindsightMemory(id, bank)
           return json({ ok: true })
         } catch (err) {
-          return json(
-            { error: safeErrorMessage(err) },
-            { status: 500 },
-          )
+          return json({ error: safeErrorMessage(err) }, { status: 500 })
         }
       },
     },

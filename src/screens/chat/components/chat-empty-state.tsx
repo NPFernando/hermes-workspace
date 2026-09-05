@@ -96,11 +96,15 @@ export function ChatEmptyState({
   compact = false,
   runtimeModel,
 }: ChatEmptyStateProps) {
-  const [activeProfile, setActiveProfile] = useState<ProfileSummary | null>(null)
+  const [activeProfile, setActiveProfile] = useState<ProfileSummary | null>(
+    null,
+  )
   const visibleRecentSessions = useMemo(
     () =>
       [...recentSessions]
-        .filter((session) => session.key !== 'new' && session.friendlyId !== 'new')
+        .filter(
+          (session) => session.key !== 'new' && session.friendlyId !== 'new',
+        )
         .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
         .slice(0, compact ? 2 : 3),
     [compact, recentSessions],
@@ -257,7 +261,6 @@ export function ChatEmptyState({
             </div>
           </div>
         </div>
-
       </div>
     </motion.div>
   )

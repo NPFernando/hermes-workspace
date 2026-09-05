@@ -22,7 +22,7 @@ import { writeTextToClipboard } from '@/lib/clipboard'
 import { toast } from '@/components/ui/toast'
 import { safeErrorMessage } from '@/lib/error-utils'
 
-type SkillsTab = 'installed' | 'marketplace' | 'workspace'
+type SkillsTab = 'installed' | 'marketplace' | 'featured' | 'workspace'
 type SkillsSort = 'name' | 'category'
 
 type SecurityRisk = {
@@ -94,6 +94,7 @@ function normalizeProfileSkill(raw: ProfileSkillRaw): SkillSummary {
     sourcePath: raw.path || '',
     installed: true,
     enabled: raw.enabled !== false,
+    featuredGroup: undefined,
     security: { level: 'safe', flags: [], score: 0 },
     origin: 'marketplace',
   }
@@ -115,6 +116,7 @@ type SkillSummary = {
   sourcePath: string
   installed: boolean
   enabled: boolean
+  featuredGroup?: string
   security?: SecurityRisk
   origin?: 'builtin' | 'agent-created' | 'marketplace'
 }
@@ -258,7 +260,7 @@ export function SkillsScreen() {
     }
   }, [searchInput, tab])
 
-  // When viewing a non-active profile, the marketplace tab doesn't
+  // When viewing a non-active profile, the marketplace/featured tabs don't
   // apply — the dashboard's per-profile endpoint only enumerates installed
   // skills inside that profile's own skills/ dir. Snap back to 'installed'
   // so the page stays consistent when the user changes profile.
@@ -458,6 +460,7 @@ export function SkillsScreen() {
             skill.source,
           installed: skill.installed,
           enabled: skill.installed,
+          featuredGroup: undefined,
           security: {
             level:
               skill.trust_level === 'builtin'
@@ -607,6 +610,7 @@ export function SkillsScreen() {
     const parsedTab: SkillsTab =
       nextTab === 'installed' ||
       nextTab === 'marketplace' ||
+      nextTab === 'featured' ||
       nextTab === 'workspace'
         ? nextTab
         : 'installed'
@@ -640,10 +644,7 @@ export function SkillsScreen() {
   }
 
   return (
-    <div
-      data-route-page
-      className="min-h-full overflow-y-auto bg-surface text-ink"
-    >
+    <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
       <div className="flex w-full flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
         <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 backdrop-blur-xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -704,7 +705,9 @@ export function SkillsScreen() {
               {tab === 'installed' ? (
                 <select
                   value={category}
-                  onChange={(event) => handleCategoryChange(event.target.value)}
+                  onChange={(event) =>
+                    handleCategoryChange(event.target.value)
+                  }
                   className="h-9 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-sm text-ink outline-none"
                 >
                   {categories.map((item) => (
@@ -751,10 +754,7 @@ export function SkillsScreen() {
                   Installed
                 </TabsTab>
                 {isOnActiveProfile ? (
-                  <TabsTab
-                    value="marketplace"
-                    className="min-w-0 sm:min-w-[120px]"
-                  >
+                  <TabsTab value="marketplace" className="min-w-0 sm:min-w-[120px]">
                     Marketplace
                   </TabsTab>
                 ) : null}
@@ -799,7 +799,7 @@ export function SkillsScreen() {
               </div>
 
               {hubQuery.error ? (
-                <div className="rounded-xl border border-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-4 py-3 text-sm text-[var(--theme-danger)]">
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {hubQuery.error instanceof Error
                     ? hubQuery.error.message
                     : 'Failed to load marketplace skills.'}
@@ -807,7 +807,7 @@ export function SkillsScreen() {
               ) : hubQuery.data &&
                 (hubQuery.data.source === 'installed-fallback' ||
                   hubQuery.data.source === 'error') ? (
-                <div className="rounded-xl border border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-4 py-3 text-sm text-[var(--theme-warning)]">
+                <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
                   Skills Hub search unavailable — showing installed skills
                   instead. Ensure the Hermes Agent gateway is running.
                 </div>
@@ -846,13 +846,7 @@ export function SkillsScreen() {
             </TabsPanel>
 
             <TabsPanel value="workspace" className="pt-2">
-              <Suspense
-                fallback={
-                  <div className="py-8 text-center text-sm text-[var(--theme-muted)]">
-                    Loading…
-                  </div>
-                }
-              >
+              <Suspense fallback={<div className="py-8 text-center text-sm text-[var(--theme-muted)]">Loading…</div>}>
                 <WorkspaceSkillsScreen />
               </Suspense>
             </TabsPanel>
@@ -976,9 +970,9 @@ export function SkillsScreen() {
                         selectedSkill.origin === 'builtin' &&
                           'border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
                         selectedSkill.origin === 'agent-created' &&
-                          'border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_12%,transparent)] text-[var(--theme-warning)]',
+                          'border-amber-300/70 bg-amber-100/60 text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-200',
                         selectedSkill.origin === 'marketplace' &&
-                          'border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_12%,transparent)] text-[var(--theme-success)]',
+                          'border-emerald-300/70 bg-emerald-100/60 text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-900/30 dark:text-emerald-200',
                       )}
                     >
                       {selectedSkill.origin === 'builtin'
@@ -1058,26 +1052,22 @@ const SECURITY_BADGE: Record<
 > = {
   safe: {
     label: 'Benign',
-    badgeClass:
-      'bg-[color-mix(in_srgb,var(--theme-success)_12%,transparent)] text-[var(--theme-success)] border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)]',
+    badgeClass: 'bg-green-100 text-green-700 border-green-200',
     confidence: 'HIGH CONFIDENCE',
   },
   low: {
     label: 'Benign',
-    badgeClass:
-      'bg-[color-mix(in_srgb,var(--theme-success)_12%,transparent)] text-[var(--theme-success)] border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)]',
+    badgeClass: 'bg-green-100 text-green-700 border-green-200',
     confidence: 'MODERATE',
   },
   medium: {
     label: 'Caution',
-    badgeClass:
-      'bg-[color-mix(in_srgb,var(--theme-warning)_12%,transparent)] text-[var(--theme-warning)] border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)]',
+    badgeClass: 'bg-amber-100 text-amber-700 border-amber-200',
     confidence: 'REVIEW RECOMMENDED',
   },
   high: {
     label: 'Warning',
-    badgeClass:
-      'bg-[color-mix(in_srgb,var(--theme-danger)_12%,transparent)] text-[var(--theme-danger)] border-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)]',
+    badgeClass: 'bg-red-100 text-red-700 border-red-200',
     confidence: 'MANUAL REVIEW',
   },
 }
@@ -1115,7 +1105,9 @@ function SecurityBadge({
           {config.label}
         </button>
         {expanded && (
-          <div className="absolute left-0 bottom-[calc(100%+6px)] z-50 w-72 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-0 shadow-xl">
+          <div
+            className="absolute left-0 bottom-[calc(100%+6px)] z-50 w-72 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-0 shadow-xl"
+          >
             <SecurityScanCard security={security} />
           </div>
         )}
@@ -1189,9 +1181,7 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
                   key={flag}
                   className="flex items-start gap-2 text-[var(--theme-muted)]"
                 >
-                  <span className="mt-0.5 text-[9px] text-[var(--theme-muted)]">
-                    ●
-                  </span>
+                  <span className="mt-0.5 text-[9px] text-[var(--theme-muted)]">●</span>
                   <span>{flag}</span>
                 </div>
               ))}
@@ -1264,10 +1254,7 @@ function SkillsGrid({
                     </h3>
                   </div>
                   {skill.author ? (
-                    <p
-                      title={`by ${skill.author}`}
-                      className="line-clamp-1 text-xs text-[var(--theme-muted)]"
-                    >
+                    <p title={`by ${skill.author}`} className="line-clamp-1 text-xs text-[var(--theme-muted)]">
                       by {skill.author}
                     </p>
                   ) : null}
@@ -1280,9 +1267,9 @@ function SkillsGrid({
                         skill.origin === 'builtin' &&
                           'border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
                         skill.origin === 'agent-created' &&
-                          'border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_12%,transparent)] text-[var(--theme-warning)]',
+                          'border-amber-300/70 bg-amber-100/60 text-amber-700 dark:border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-200',
                         skill.origin === 'marketplace' &&
-                          'border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_12%,transparent)] text-[var(--theme-success)]',
+                          'border-emerald-300/70 bg-emerald-100/60 text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-900/30 dark:text-emerald-200',
                       )}
                     >
                       {skill.origin === 'builtin'
@@ -1305,10 +1292,7 @@ function SkillsGrid({
                 </div>
               </div>
 
-              <p
-                title={skill.description}
-                className="line-clamp-3 min-h-[58px] text-sm text-[var(--theme-muted)] text-pretty"
-              >
+              <p title={skill.description} className="line-clamp-3 min-h-[58px] text-sm text-[var(--theme-muted)] text-pretty">
                 {skill.description}
               </p>
 
@@ -1381,6 +1365,105 @@ function SkillsGrid({
           )
         })}
       </AnimatePresence>
+    </div>
+  )
+}
+
+type FeaturedGridProps = {
+  skills: Array<SkillSummary>
+  loading: boolean
+  actionSkillId: string | null
+  onOpenDetails: (skill: SkillSummary) => void
+  onInstall: (skillId: string) => void
+  onUninstall: (skillId: string) => void
+}
+
+function FeaturedGrid({
+  skills,
+  loading,
+  actionSkillId,
+  onOpenDetails,
+  onInstall,
+  onUninstall,
+}: FeaturedGridProps) {
+  if (loading) {
+    return <SkillsSkeleton count={6} large />
+  }
+
+  if (skills.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-hover)]/40 px-4 py-10 text-center text-sm text-[var(--theme-muted)] text-pretty">
+        Featured picks are currently unavailable.
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 pb-2 lg:grid-cols-2">
+      {skills.map((skill) => {
+        const isActing = actionSkillId === skill.id
+        return (
+          <article
+            key={skill.id}
+            className="flex min-h-0 flex-col rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm backdrop-blur-sm"
+          >
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase text-[var(--theme-muted)] tabular-nums">
+                  {skill.featuredGroup || 'Staff Pick'}
+                </p>
+                <h3 className="text-lg font-medium text-ink text-balance">
+                  {skill.icon} {skill.name}
+                </h3>
+                <p className="text-sm text-[var(--theme-muted)]">by {skill.author}</p>
+              </div>
+
+              <span
+                className={cn(
+                  'rounded-md border px-2 py-0.5 text-xs tabular-nums',
+                  skill.installed
+                    ? 'border-primary/40 bg-primary/15 text-primary'
+                    : 'border-[var(--theme-border)] bg-[var(--theme-hover)] text-[var(--theme-muted)]',
+                )}
+              >
+                {skill.installed ? 'Installed' : 'Staff Pick'}
+              </span>
+            </div>
+
+            <p title={skill.description} className="line-clamp-3 mb-3 text-sm text-[var(--theme-muted)] text-pretty">
+              {skill.description}
+            </p>
+
+            <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenDetails(skill)}
+              >
+                Details
+              </Button>
+              {skill.installed ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isActing}
+                  onClick={() => onUninstall(skill.id)}
+                >
+                  Uninstall
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={isActing}
+                  onClick={() => onInstall(skill.id)}
+                >
+                  Install
+                </Button>
+              )}
+            </div>
+          </article>
+        )
+      })}
     </div>
   )
 }

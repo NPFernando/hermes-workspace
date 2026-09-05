@@ -5,9 +5,17 @@ import { spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { createTask, getTask, listTasks, updateTask } from './tasks-store'
 import { openaiChat } from './openai-compat-api'
-import { sendTelegramClarification, sendTelegramTaskDone } from './telegram-clarify'
+import {
+  sendTelegramClarification,
+  sendTelegramTaskDone,
+} from './telegram-clarify'
 import { safeErrorMessage } from './rate-limit'
-import type { ActivityEntry, TaskColumn, TaskPriority, TaskRecord } from './tasks-store'
+import type {
+  ActivityEntry,
+  TaskColumn,
+  TaskPriority,
+  TaskRecord,
+} from './tasks-store'
 
 // ---------------------------------------------------------------------------
 // directChat — calls OpenRouter directly, bypassing the Hermes gateway.
@@ -25,7 +33,9 @@ function loadOpenRouterKey(): string {
     const content = fs.readFileSync(envPath, 'utf-8')
     const match = content.match(/^OPENROUTER_API_KEY=(.+)$/m)
     return match?.[1]?.trim() ?? ''
-  } catch { return '' }
+  } catch {
+    return ''
+  }
 }
 
 const OR_MODELS = [
@@ -45,7 +55,10 @@ async function directChat(
     try {
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
         body: JSON.stringify({
           model,
           messages,
@@ -59,7 +72,9 @@ async function directChat(
         if (res.status === 429 || res.status === 503) continue
         throw new Error(`OpenRouter ${res.status}: ${text.slice(0, 200)}`)
       }
-      const data = await res.json() as { choices?: Array<{ message?: { content?: string | null } }> }
+      const data = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string | null } }>
+      }
       const content = data.choices?.[0]?.message?.content ?? ''
       if (content.trim()) return content
     } catch (err) {
@@ -79,7 +94,11 @@ function resolveHermesBin(): string {
     'hermes',
   ].filter(Boolean) as Array<string>
   for (const p of candidates) {
-    try { if (fs.existsSync(p)) return p } catch { /* skip */ }
+    try {
+      if (fs.existsSync(p)) return p
+    } catch {
+      /* skip */
+    }
   }
   // Last resort: ask the shell
   const r = spawnSync('which', ['hermes'], { encoding: 'utf-8' })
@@ -98,11 +117,11 @@ const TG_TARGET = 'telegram:2130622225'
 // Called on every runAgentDeployBackground() and periodically via setInterval.
 // ---------------------------------------------------------------------------
 
-const REVIEWING_TIMEOUT_MS     =  4 * 60 * 1000   //  4 min  (each review call is ≤ 90s × 2)
-const WORKING_TIMEOUT_MS       = 25 * 60 * 1000   // 25 min  (hermes -z timeout is 20 min)
-const WAITING_INPUT_TIMEOUT_MS = 60 * 60 * 1000   // 60 min  (user needs time to read & answer via Telegram)
-const AUTO_RETRY_AFTER_MS      =  4 * 60 * 60 * 1000  // 4h before first auto-retry of a blocked task
-const MAX_AUTO_RETRIES         = 2                     // hard cap on auto-retries per task
+const REVIEWING_TIMEOUT_MS = 4 * 60 * 1000 //  4 min  (each review call is ≤ 90s × 2)
+const WORKING_TIMEOUT_MS = 25 * 60 * 1000 // 25 min  (hermes -z timeout is 20 min)
+const WAITING_INPUT_TIMEOUT_MS = 60 * 60 * 1000 // 60 min  (user needs time to read & answer via Telegram)
+const AUTO_RETRY_AFTER_MS = 4 * 60 * 60 * 1000 // 4h before first auto-retry of a blocked task
+const MAX_AUTO_RETRIES = 2 // hard cap on auto-retries per task
 
 export function clearStuckTasks(): number {
   const now = Date.now()
@@ -116,85 +135,110 @@ export function clearStuckTasks(): number {
     if (!task.agent_state || !task.agent_action_at) continue
     const ageMs = now - new Date(task.agent_action_at).getTime()
     const timeout =
-      task.agent_state === 'working'           ? WORKING_TIMEOUT_MS :
-      task.agent_state === 'waiting_for_input' ? WAITING_INPUT_TIMEOUT_MS :
-      REVIEWING_TIMEOUT_MS
+      task.agent_state === 'working'
+        ? WORKING_TIMEOUT_MS
+        : task.agent_state === 'waiting_for_input'
+          ? WAITING_INPUT_TIMEOUT_MS
+          : REVIEWING_TIMEOUT_MS
     if (ageMs <= timeout) continue
 
     const existing = task.agent_history ?? []
-    const ageMin   = Math.round(ageMs / 60_000)
+    const ageMin = Math.round(ageMs / 60_000)
     // waiting_for_input: spinner clears but task stays blocked+waiting — the
     // Telegram keyboard and workspace reply path remain valid.
-    const note = task.agent_state === 'waiting_for_input'
-      ? `No reply received in ${ageMin} min — spinner cleared. Question still open; answer via Telegram or workspace, or press Execute to restart with prior context.`
-      : `Agent state "${task.agent_state}" was stuck for ${ageMin} min — auto-cleared. Press Execute to retry.`
+    const note =
+      task.agent_state === 'waiting_for_input'
+        ? `No reply received in ${ageMin} min — spinner cleared. Question still open; answer via Telegram or workspace, or press Execute to restart with prior context.`
+        : `Agent state "${task.agent_state}" was stuck for ${ageMin} min — auto-cleared. Press Execute to retry.`
 
     updateTask(task.id, {
-      agent_state:     null,
-      agent_name:      null,
+      agent_state: null,
+      agent_name: null,
       agent_action_at: null,
       // For waiting_for_input: keep waiting_for_user=true so the question UI remains visible
-      ...(task.agent_state !== 'waiting_for_input' ? { waiting_for_user: false } : {}),
-      agent_history:   [...existing, {
-        id:      randomUUID(),
-        by:      'astra',
-        byEmoji: '🌟',
-        action:  'timed_out',
-        note,
-        at:      new Date().toISOString(),
-      }],
+      ...(task.agent_state !== 'waiting_for_input'
+        ? { waiting_for_user: false }
+        : {}),
+      agent_history: [
+        ...existing,
+        {
+          id: randomUUID(),
+          by: 'astra',
+          byEmoji: '🌟',
+          action: 'timed_out',
+          note,
+          at: new Date().toISOString(),
+        },
+      ],
     })
     cleared++
   }
 
   // ── Part 2: escalate tasks stuck in 'blocked' without user reply ───────────
-  const ESCALATE_AFTER_MS  = 2 * 60 * 60 * 1000  // alert after 2 h blocked
-  const ESCALATE_REPEAT_MS = 6 * 60 * 60 * 1000  // repeat at most every 6 h
+  const ESCALATE_AFTER_MS = 2 * 60 * 60 * 1000 // alert after 2 h blocked
+  const ESCALATE_REPEAT_MS = 6 * 60 * 60 * 1000 // repeat at most every 6 h
 
   for (const task of all) {
     if (task.column !== 'blocked' || task.agent_state) continue
     const history = task.agent_history ?? []
 
-    const lastUserReply   = [...history].reverse().find(e => e.by === 'user' && e.action === 'replied')
-    const lastEscalation  = [...history].reverse().find(e => e.action === 'escalated')
-    const lastEscalationMs = lastEscalation ? new Date(lastEscalation.at).getTime() : 0
+    const lastUserReply = [...history]
+      .reverse()
+      .find((e) => e.by === 'user' && e.action === 'replied')
+    const lastEscalation = [...history]
+      .reverse()
+      .find((e) => e.action === 'escalated')
+    const lastEscalationMs = lastEscalation
+      ? new Date(lastEscalation.at).getTime()
+      : 0
 
     // Use last user reply, updated_at, or agent_action_at as "last activity" baseline
     const lastActivityMs = Math.max(
-      lastUserReply  ? new Date(lastUserReply.at).getTime()  : 0,
-      task.updated_at     ? new Date(task.updated_at).getTime()     : 0,
+      lastUserReply ? new Date(lastUserReply.at).getTime() : 0,
+      task.updated_at ? new Date(task.updated_at).getTime() : 0,
       task.agent_action_at ? new Date(task.agent_action_at).getTime() : 0,
     )
     if (!lastActivityMs || now - lastActivityMs < ESCALATE_AFTER_MS) continue
     if (now - lastEscalationMs < ESCALATE_REPEAT_MS) continue
 
     const blockedH = Math.round((now - lastActivityMs) / (60 * 60 * 1000))
-    const lastNote = [...history].reverse().find(e => e.by !== 'user' && e.note)?.note ?? '(no details)'
-    const nowIso   = new Date().toISOString()
+    const lastNote =
+      [...history].reverse().find((e) => e.by !== 'user' && e.note)?.note ??
+      '(no details)'
+    const nowIso = new Date().toISOString()
 
     updateTask(task.id, {
-      agent_history: [...history, {
-        id:      randomUUID(),
-        by:      'astra',
-        byEmoji: '🌟',
-        action:  'escalated',
-        note:    `Blocked ${blockedH}h — escalation sent. Reply to unblock or reassign.`,
-        at:      nowIso,
-      }],
+      agent_history: [
+        ...history,
+        {
+          id: randomUUID(),
+          by: 'astra',
+          byEmoji: '🌟',
+          action: 'escalated',
+          note: `Blocked ${blockedH}h — escalation sent. Reply to unblock or reassign.`,
+          at: nowIso,
+        },
+      ],
     })
 
     const tgMsg = `🚫 Still blocked ${blockedH}h: ${task.title}\n${lastNote.slice(0, 220)}\n→ Reply in workspace to unblock or reassign`
     try {
-      spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q', tgMsg], {
-        encoding: 'utf-8',
-        timeout:  15_000,
-      })
-    } catch { /* non-fatal */ }
+      spawnSync(
+        HERMES_BIN,
+        ['send', '--to', 'telegram:2130622225', '-q', tgMsg],
+        {
+          encoding: 'utf-8',
+          timeout: 15_000,
+        },
+      )
+    } catch {
+      /* non-fatal */
+    }
   }
 
   // ── Part 3: alert on review-loop tasks (>40 history entries stuck >48 h) ───
   const LOOP_HISTORY_THRESHOLD = 40
-  const LOOP_AGE_MS    = 48 * 60 * 60 * 1000
+  const LOOP_AGE_MS = 48 * 60 * 60 * 1000
   const LOOP_REPEAT_MS = 24 * 60 * 60 * 1000
 
   for (const task of all) {
@@ -203,35 +247,48 @@ export function clearStuckTasks(): number {
     const history = task.agent_history ?? []
     if (history.length < LOOP_HISTORY_THRESHOLD) continue
 
-    const lastLoopAlert   = [...history].reverse().find(e => e.action === 'loop_alert')
-    const lastLoopAlertMs = lastLoopAlert ? new Date(lastLoopAlert.at).getTime() : 0
+    const lastLoopAlert = [...history]
+      .reverse()
+      .find((e) => e.action === 'loop_alert')
+    const lastLoopAlertMs = lastLoopAlert
+      ? new Date(lastLoopAlert.at).getTime()
+      : 0
     if (now - lastLoopAlertMs < LOOP_REPEAT_MS) continue
 
     const lastActivityMs = Math.max(
-      task.updated_at      ? new Date(task.updated_at).getTime()      : 0,
+      task.updated_at ? new Date(task.updated_at).getTime() : 0,
       task.agent_action_at ? new Date(task.agent_action_at).getTime() : 0,
     )
     if (!lastActivityMs || now - lastActivityMs < LOOP_AGE_MS) continue
 
     const nowIso = new Date().toISOString()
     updateTask(task.id, {
-      agent_history: [...history, {
-        id:      randomUUID(),
-        by:      'astra',
-        byEmoji: '🌟',
-        action:  'loop_alert',
-        note:    `Task has ${history.length} history entries and has been in '${task.column}' >48 h without progress. Consider resolving or pruning.`,
-        at:      nowIso,
-      }],
+      agent_history: [
+        ...history,
+        {
+          id: randomUUID(),
+          by: 'astra',
+          byEmoji: '🌟',
+          action: 'loop_alert',
+          note: `Task has ${history.length} history entries and has been in '${task.column}' >48 h without progress. Consider resolving or pruning.`,
+          at: nowIso,
+        },
+      ],
     })
 
     const tgMsg = `⚠️ Review loop: ${task.title}\n${history.length} history entries stuck in ${task.column} >48h — prune or resolve manually.`
     try {
-      spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q', tgMsg], {
-        encoding: 'utf-8',
-        timeout:  15_000,
-      })
-    } catch { /* non-fatal */ }
+      spawnSync(
+        HERMES_BIN,
+        ['send', '--to', 'telegram:2130622225', '-q', tgMsg],
+        {
+          encoding: 'utf-8',
+          timeout: 15_000,
+        },
+      )
+    } catch {
+      /* non-fatal */
+    }
   }
 
   // ── Part 4: auto-retry execution-blocked tasks (not waiting_for_user) ──────
@@ -241,19 +298,21 @@ export function clearStuckTasks(): number {
   // what was tried. Retries are capped to avoid burning credits in a loop.
   for (const task of all) {
     if (task.column !== 'blocked') continue
-    if (task.agent_state) continue                               // active agent — skip
-    if (task.waiting_for_user) continue                          // question open — don't interrupt
+    if (task.agent_state) continue // active agent — skip
+    if (task.waiting_for_user) continue // question open — don't interrupt
     if ((task.auto_retry_count ?? 0) >= MAX_AUTO_RETRIES) continue
 
     // Must have at least one prior agent execution (blocked entry) to retry
     const history = task.agent_history ?? []
-    const lastBlockedEntry = [...history].reverse().find(e => e.by !== 'user' && e.action === 'blocked')
+    const lastBlockedEntry = [...history]
+      .reverse()
+      .find((e) => e.by !== 'user' && e.action === 'blocked')
     if (!lastBlockedEntry) continue
 
     // Don't retry if blocked by a user action or if the block was from escalation/loop_alert
-    const lastUserActivity = [...history].reverse().find(e => e.by === 'user')
-    const lastBlockedMs    = new Date(lastBlockedEntry.at).getTime()
-    const lastActivityMs   = Math.max(
+    const lastUserActivity = [...history].reverse().find((e) => e.by === 'user')
+    const lastBlockedMs = new Date(lastBlockedEntry.at).getTime()
+    const lastActivityMs = Math.max(
       lastUserActivity ? new Date(lastUserActivity.at).getTime() : 0,
       lastBlockedMs,
     )
@@ -264,24 +323,27 @@ export function clearStuckTasks(): number {
     if (!lastActivityMs || now - lastActivityMs < retryDelayMs) continue
 
     const retryCount = (task.auto_retry_count ?? 0) + 1
-    const ageH       = Math.round((now - lastActivityMs) / (60 * 60 * 1000))
-    const nowIso     = new Date().toISOString()
+    const ageH = Math.round((now - lastActivityMs) / (60 * 60 * 1000))
+    const nowIso = new Date().toISOString()
 
     updateTask(task.id, {
-      column:           'in_progress',
+      column: 'in_progress',
       auto_retry_count: retryCount,
-      auto_retry_at:    nowIso,
-      agent_state:      'working',
-      agent_name:       task.assignee ?? 'astra',
-      agent_action_at:  nowIso,
-      agent_history:    [...history, {
-        id:      randomUUID(),
-        by:      'astra',
-        byEmoji: '🌟',
-        action:  'auto_retry',
-        note:    `Auto-retrying (attempt ${retryCount}/${MAX_AUTO_RETRIES}) after ${ageH}h blocked — prior context included in prompt. No more retries if this fails.`,
-        at:      nowIso,
-      }],
+      auto_retry_at: nowIso,
+      agent_state: 'working',
+      agent_name: task.assignee ?? 'astra',
+      agent_action_at: nowIso,
+      agent_history: [
+        ...history,
+        {
+          id: randomUUID(),
+          by: 'astra',
+          byEmoji: '🌟',
+          action: 'auto_retry',
+          note: `Auto-retrying (attempt ${retryCount}/${MAX_AUTO_RETRIES}) after ${ageH}h blocked — prior context included in prompt. No more retries if this fails.`,
+          at: nowIso,
+        },
+      ],
     })
 
     // Fire execution in a background subprocess — fully detached, non-blocking
@@ -290,7 +352,7 @@ export function clearStuckTasks(): number {
 
   // ── Part 5: auto-archive stale todo/backlog tasks (> 60 days, no activity) ──
   // Prevents the Deploy sweep from being diluted by hundreds of ancient tasks.
-  const STALE_TODO_MS = 60 * 24 * 60 * 60 * 1000  // 60 days
+  const STALE_TODO_MS = 60 * 24 * 60 * 60 * 1000 // 60 days
   let archived = 0
 
   for (const task of all) {
@@ -308,20 +370,25 @@ export function clearStuckTasks(): number {
     const nowIso = new Date().toISOString()
     updateTask(task.id, {
       column: 'done',
-      agent_history: [...history, {
-        id:      randomUUID(),
-        by:      'astra',
-        byEmoji: '🌟',
-        action:  'archived',
-        note:    `Auto-archived after ${ageD} days of inactivity in ${task.column}. Move back to todo to restart.`,
-        at:      nowIso,
-      }],
+      agent_history: [
+        ...history,
+        {
+          id: randomUUID(),
+          by: 'astra',
+          byEmoji: '🌟',
+          action: 'archived',
+          note: `Auto-archived after ${ageD} days of inactivity in ${task.column}. Move back to todo to restart.`,
+          at: nowIso,
+        },
+      ],
     })
     archived++
   }
 
   if (archived > 0) {
-    console.log(`[clearStuckTasks] Auto-archived ${archived} stale tasks (>60 days inactive)`)
+    console.log(
+      `[clearStuckTasks] Auto-archived ${archived} stale tasks (>60 days inactive)`,
+    )
   }
 
   // ── Part 6: auto-breakdown blocked tasks that exhausted all retries ──────
@@ -331,35 +398,52 @@ export function clearStuckTasks(): number {
     if (task.column !== 'blocked') continue
     if (task.agent_state) continue
     if (task.waiting_for_user) continue
-    if ((task.auto_retry_count ?? 0) < MAX_AUTO_RETRIES) continue  // retries not exhausted yet
+    if ((task.auto_retry_count ?? 0) < MAX_AUTO_RETRIES) continue // retries not exhausted yet
 
     const history = task.agent_history ?? []
-    if (history.some((h) => h.action === 'auto_breakdown')) continue  // already attempted
+    if (history.some((h) => h.action === 'auto_breakdown')) continue // already attempted
 
     // Wait the same cooldown before breaking down (avoid thrashing on fresh blocks)
-    const lastRetry = [...history].reverse().find((e) => e.action === 'auto_retry' || e.action === 'blocked')
+    const lastRetry = [...history]
+      .reverse()
+      .find((e) => e.action === 'auto_retry' || e.action === 'blocked')
     if (!lastRetry) continue
     if (now - new Date(lastRetry.at).getTime() < AUTO_RETRY_AFTER_MS) continue
 
     const nowIso = new Date().toISOString()
     updateTask(task.id, {
-      agent_history: [...history, {
-        id: randomUUID(), by: 'astra', byEmoji: '🌟',
-        action: 'auto_breakdown',
-        note: `Max retries (${MAX_AUTO_RETRIES}) exhausted — auto-breaking into subtasks. Original task kept for reference.`,
-        at: nowIso,
-      }],
+      agent_history: [
+        ...history,
+        {
+          id: randomUUID(),
+          by: 'astra',
+          byEmoji: '🌟',
+          action: 'auto_breakdown',
+          note: `Max retries (${MAX_AUTO_RETRIES}) exhausted — auto-breaking into subtasks. Original task kept for reference.`,
+          at: nowIso,
+        },
+      ],
     })
 
     breakdownTaskWithAI(task.id)
       .then((result) => {
         if (result && result.count > 0) {
-          spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q',
-            `🔨 Auto-breakdown: "${task.title.slice(0, 50)}" → ${result.count} subtask${result.count !== 1 ? 's' : ''} created`],
-            { encoding: 'utf-8', timeout: 15_000 })
+          spawnSync(
+            HERMES_BIN,
+            [
+              'send',
+              '--to',
+              TG_TARGET,
+              '-q',
+              `🔨 Auto-breakdown: "${task.title.slice(0, 50)}" → ${result.count} subtask${result.count !== 1 ? 's' : ''} created`,
+            ],
+            { encoding: 'utf-8', timeout: 15_000 },
+          )
         }
       })
-      .catch(() => { /* non-fatal */ })
+      .catch(() => {
+        /* non-fatal */
+      })
   }
 
   return cleared
@@ -379,154 +463,239 @@ setInterval(clearStuckTasks, 10 * 60 * 1000)
 // slipped through (server restart broke a self-chain, tasks moved back to
 // backlog manually, etc.). Only touches tasks no agent has reviewed yet —
 // tasks already in the pipeline are left alone.
-setInterval(() => {
-  if (!TASK_AUTOPILOT_ENABLED) return
-  try { runAgentDeployBackground('auto') } catch { /* non-fatal */ }
-}, 15 * 60 * 1000)
+setInterval(
+  () => {
+    if (!TASK_AUTOPILOT_ENABLED) return
+    try {
+      runAgentDeployBackground('auto')
+    } catch {
+      /* non-fatal */
+    }
+  },
+  15 * 60 * 1000,
+)
 
 // Daily board health summary at 9 AM IST (UTC+5:30 = 03:30 UTC).
 let _boardHealthLastSentDate = ''
-setInterval(() => {
-  try {
-    const nowUtc = new Date()
-    const istMs = nowUtc.getTime() + (5 * 60 + 30) * 60 * 1000
-    const ist = new Date(istMs)
-    const istHour = ist.getUTCHours()
-    const istDate = ist.toISOString().slice(0, 10)
-    if (istHour !== 9) return
-    if (_boardHealthLastSentDate === istDate) return
-    _boardHealthLastSentDate = istDate
+setInterval(
+  () => {
+    try {
+      const nowUtc = new Date()
+      const istMs = nowUtc.getTime() + (5 * 60 + 30) * 60 * 1000
+      const ist = new Date(istMs)
+      const istHour = ist.getUTCHours()
+      const istDate = ist.toISOString().slice(0, 10)
+      if (istHour !== 9) return
+      if (_boardHealthLastSentDate === istDate) return
+      _boardHealthLastSentDate = istDate
 
-    const all = listTasks({ includeDone: true })
-    const cols: Record<string, number> = {}
-    all.forEach((t) => { cols[t.column] = (cols[t.column] ?? 0) + 1 })
-    const reviewReady = all.filter(
-      (t) => t.column === 'review' && !t.agent_state &&
-        (t.agent_history ?? []).some((h) => h.action === 'planned' && !h.note?.includes('Plan unavailable') && (h.note?.length ?? 0) >= 80)
-    ).length
-    const depWaiting = all.filter(
-      (t) => t.column === 'todo' && Array.isArray(t.depends_on) && t.depends_on.length > 0
-    ).length
-    const blockedCount = cols['blocked'] ?? 0
-    // Count tasks moved to 'done' in the last 24 h
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000
-    const doneToday = all.filter(
-      (t) => t.column === 'done' && new Date(t.updated_at).getTime() >= oneDayAgo
-    ).length
-    // Sister load: count active (non-done) tasks by assignee
-    const sisterLoad: Record<string, number> = {}
-    all.filter((t) => t.column !== 'done' && t.column !== 'deleted' && t.assignee).forEach((t) => {
-      sisterLoad[t.assignee!] = (sisterLoad[t.assignee!] ?? 0) + 1
-    })
-    const sisterLine = Object.entries(sisterLoad)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([name, count]) => `${name}:${count}`)
-      .join(' · ')
-    const msg =
-      `📊 Board health ${istDate} (IST)\n` +
-      `Todo: ${cols['todo'] ?? 0} | Review: ${cols['review'] ?? 0} | Blocked: ${blockedCount}\n` +
-      `✅ Done today: ${doneToday} | Ready to execute: ${reviewReady}\n` +
-      (sisterLine ? `👥 ${sisterLine}\n` : '') +
-      (depWaiting > 0 ? `⏳ Waiting on credentials: ${depWaiting}\n` : '') +
-      (blockedCount > 0 ? `⚠️ ${blockedCount} task(s) blocked — check workspace\n` : '') +
-      `→ agent.fernandofamily.com/tasks`
-    spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q', msg], {
-      encoding: 'utf-8', timeout: 15_000,
-    })
-  } catch { /* non-fatal */ }
-}, 30 * 60 * 1000)
+      const all = listTasks({ includeDone: true })
+      const cols: Record<string, number> = {}
+      all.forEach((t) => {
+        cols[t.column] = (cols[t.column] ?? 0) + 1
+      })
+      const reviewReady = all.filter(
+        (t) =>
+          t.column === 'review' &&
+          !t.agent_state &&
+          (t.agent_history ?? []).some(
+            (h) =>
+              h.action === 'planned' &&
+              !h.note?.includes('Plan unavailable') &&
+              (h.note?.length ?? 0) >= 80,
+          ),
+      ).length
+      const depWaiting = all.filter(
+        (t) =>
+          t.column === 'todo' &&
+          Array.isArray(t.depends_on) &&
+          t.depends_on.length > 0,
+      ).length
+      const blockedCount = cols['blocked'] ?? 0
+      // Count tasks moved to 'done' in the last 24 h
+      const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000
+      const doneToday = all.filter(
+        (t) =>
+          t.column === 'done' && new Date(t.updated_at).getTime() >= oneDayAgo,
+      ).length
+      // Sister load: count active (non-done) tasks by assignee
+      const sisterLoad: Record<string, number> = {}
+      all
+        .filter(
+          (t) => t.column !== 'done' && t.column !== 'deleted' && t.assignee,
+        )
+        .forEach((t) => {
+          sisterLoad[t.assignee!] = (sisterLoad[t.assignee!] ?? 0) + 1
+        })
+      const sisterLine = Object.entries(sisterLoad)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([name, count]) => `${name}:${count}`)
+        .join(' · ')
+      const msg =
+        `📊 Board health ${istDate} (IST)\n` +
+        `Todo: ${cols['todo'] ?? 0} | Review: ${cols['review'] ?? 0} | Blocked: ${blockedCount}\n` +
+        `✅ Done today: ${doneToday} | Ready to execute: ${reviewReady}\n` +
+        (sisterLine ? `👥 ${sisterLine}\n` : '') +
+        (depWaiting > 0 ? `⏳ Waiting on credentials: ${depWaiting}\n` : '') +
+        (blockedCount > 0
+          ? `⚠️ ${blockedCount} task(s) blocked — check workspace\n`
+          : '') +
+        `→ agent.fernandofamily.com/tasks`
+      spawnSync(
+        HERMES_BIN,
+        ['send', '--to', 'telegram:2130622225', '-q', msg],
+        {
+          encoding: 'utf-8',
+          timeout: 15_000,
+        },
+      )
+    } catch {
+      /* non-fatal */
+    }
+  },
+  30 * 60 * 1000,
+)
 
 // Weekly board summary every Monday at 9 AM IST — shows 7-day trend.
 let _weeklyHealthLastSentWeek = ''
-setInterval(() => {
-  try {
-    const nowUtc = new Date()
-    const istMs  = nowUtc.getTime() + (5 * 60 + 30) * 60 * 1000
-    const ist    = new Date(istMs)
-    if (ist.getUTCDay() !== 1) return        // Monday only
-    if (ist.getUTCHours() !== 9) return      // 9 AM IST only
-    const weekKey = ist.toISOString().slice(0, 10)
-    if (_weeklyHealthLastSentWeek === weekKey) return
-    _weeklyHealthLastSentWeek = weekKey
+setInterval(
+  () => {
+    try {
+      const nowUtc = new Date()
+      const istMs = nowUtc.getTime() + (5 * 60 + 30) * 60 * 1000
+      const ist = new Date(istMs)
+      if (ist.getUTCDay() !== 1) return // Monday only
+      if (ist.getUTCHours() !== 9) return // 9 AM IST only
+      const weekKey = ist.toISOString().slice(0, 10)
+      if (_weeklyHealthLastSentWeek === weekKey) return
+      _weeklyHealthLastSentWeek = weekKey
 
-    const all = listTasks({ includeDone: true })
-    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-    const doneThisWeek = all.filter(
-      (t) => t.column === 'done' && new Date(t.updated_at).getTime() >= sevenDaysAgo
-    ).length
-    const addedThisWeek = all.filter(
-      (t) => new Date(t.created_at).getTime() >= sevenDaysAgo
-    ).length
-    const net = doneThisWeek - addedThisWeek
-    const netStr = net >= 0 ? `↓ ${net} (shrinking)` : `↑ ${Math.abs(net)} (growing)`
-    const active = all.filter((t) => t.column !== 'done' && t.column !== 'deleted').length
-    const blockedNow = all.filter((t) => t.column === 'blocked').length
+      const all = listTasks({ includeDone: true })
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+      const doneThisWeek = all.filter(
+        (t) =>
+          t.column === 'done' &&
+          new Date(t.updated_at).getTime() >= sevenDaysAgo,
+      ).length
+      const addedThisWeek = all.filter(
+        (t) => new Date(t.created_at).getTime() >= sevenDaysAgo,
+      ).length
+      const net = doneThisWeek - addedThisWeek
+      const netStr =
+        net >= 0 ? `↓ ${net} (shrinking)` : `↑ ${Math.abs(net)} (growing)`
+      const active = all.filter(
+        (t) => t.column !== 'done' && t.column !== 'deleted',
+      ).length
+      const blockedNow = all.filter((t) => t.column === 'blocked').length
 
-    // Sister load for weekly: tasks completed this week per assignee
-    const weekSisterLoad: Record<string, number> = {}
-    all.filter((t) => t.column === 'done' && new Date(t.updated_at).getTime() >= sevenDaysAgo && t.assignee)
-      .forEach((t) => { weekSisterLoad[t.assignee!] = (weekSisterLoad[t.assignee!] ?? 0) + 1 })
-    const weekSisterLine = Object.entries(weekSisterLoad)
-      .sort((a, b) => b[1] - a[1]).slice(0, 6)
-      .map(([name, count]) => `${name}:${count}`).join(' · ')
-    const weekMsg =
-      `📈 Weekly summary — ${weekKey}\n` +
-      `Completed this week: ${doneThisWeek}\n` +
-      `Added this week: ${addedThisWeek} | Net: ${netStr}\n` +
-      `Active tasks: ${active} | Blocked: ${blockedNow}\n` +
-      (weekSisterLine ? `🏆 Top sisters: ${weekSisterLine}\n` : '') +
-      `→ agent.fernandofamily.com/tasks`
-    spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q', weekMsg], {
-      encoding: 'utf-8', timeout: 15_000,
-    })
-  } catch { /* non-fatal */ }
-}, 30 * 60 * 1000)
+      // Sister load for weekly: tasks completed this week per assignee
+      const weekSisterLoad: Record<string, number> = {}
+      all
+        .filter(
+          (t) =>
+            t.column === 'done' &&
+            new Date(t.updated_at).getTime() >= sevenDaysAgo &&
+            t.assignee,
+        )
+        .forEach((t) => {
+          weekSisterLoad[t.assignee!] = (weekSisterLoad[t.assignee!] ?? 0) + 1
+        })
+      const weekSisterLine = Object.entries(weekSisterLoad)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([name, count]) => `${name}:${count}`)
+        .join(' · ')
+      const weekMsg =
+        `📈 Weekly summary — ${weekKey}\n` +
+        `Completed this week: ${doneThisWeek}\n` +
+        `Added this week: ${addedThisWeek} | Net: ${netStr}\n` +
+        `Active tasks: ${active} | Blocked: ${blockedNow}\n` +
+        (weekSisterLine ? `🏆 Top sisters: ${weekSisterLine}\n` : '') +
+        `→ agent.fernandofamily.com/tasks`
+      spawnSync(HERMES_BIN, ['send', '--to', TG_TARGET, '-q', weekMsg], {
+        encoding: 'utf-8',
+        timeout: 15_000,
+      })
+    } catch {
+      /* non-fatal */
+    }
+  },
+  30 * 60 * 1000,
+)
 
 // Description enrichment sweep: every 2 hours, enrich up to 10 todo tasks that have no
 // description (or <30 chars). Nemotron generates a 2-3 sentence context from the title.
 // Better descriptions → better planning prompts → better execution plans.
-setInterval(() => {
-  try {
-    const candidates = listTasks({ column: 'todo' }).filter((t) => {
-      if (t.agent_state) return false
-      if (t.waiting_for_user) return false
-      if (Array.isArray(t.depends_on) && t.depends_on.length > 0) return false  // gated
-      if ((t.description ?? '').trim().length >= 30) return false  // already has description
-      if ((t.agent_history ?? []).some((h) => h.action === 'description_enriched')) return false
-      return true
-    }).slice(0, 10)
-
-    for (const task of candidates) {
-      try {
-        const prompt =
-          `You are a task context generator. Given a task title, write 2-3 concise sentences ` +
-          `that describe what the task involves, its goal, and a clear definition of done. ` +
-          `Be specific and technical. Output only the description text, no labels or prefixes.\n\n` +
-          `Task title: ${task.title}`
-
-        const r = spawnSync(HERMES_BIN, [
-          '-m', 'nvidia/nemotron-3-super-120b-a12b:free', '--provider', 'openrouter',
-          '-z', prompt,
-        ], { encoding: 'utf-8', timeout: 60_000, maxBuffer: 2 * 1024 * 1024 })
-
-        const desc = (r.stdout ?? '').trim().replace(/^["']|["']$/g, '')
-        if (!desc || desc.length < 20) continue
-
-        const nowIso = new Date().toISOString()
-        updateTask(task.id, {
-          description: desc.slice(0, 500),
-          agent_history: [...(task.agent_history ?? []), {
-            id: randomUUID(), by: 'astra', byEmoji: '🌟',
-            action: 'description_enriched',
-            note: 'Description auto-generated from title to improve planning quality.',
-            at: nowIso,
-          }],
+setInterval(
+  () => {
+    try {
+      const candidates = listTasks({ column: 'todo' })
+        .filter((t) => {
+          if (t.agent_state) return false
+          if (t.waiting_for_user) return false
+          if (Array.isArray(t.depends_on) && t.depends_on.length > 0)
+            return false // gated
+          if ((t.description ?? '').trim().length >= 30) return false // already has description
+          if (
+            (t.agent_history ?? []).some(
+              (h) => h.action === 'description_enriched',
+            )
+          )
+            return false
+          return true
         })
-      } catch { /* non-fatal per-task */ }
+        .slice(0, 10)
+
+      for (const task of candidates) {
+        try {
+          const prompt =
+            `You are a task context generator. Given a task title, write 2-3 concise sentences ` +
+            `that describe what the task involves, its goal, and a clear definition of done. ` +
+            `Be specific and technical. Output only the description text, no labels or prefixes.\n\n` +
+            `Task title: ${task.title}`
+
+          const r = spawnSync(
+            HERMES_BIN,
+            [
+              '-m',
+              'nvidia/nemotron-3-super-120b-a12b:free',
+              '--provider',
+              'openrouter',
+              '-z',
+              prompt,
+            ],
+            { encoding: 'utf-8', timeout: 60_000, maxBuffer: 2 * 1024 * 1024 },
+          )
+
+          const desc = (r.stdout ?? '').trim().replace(/^["']|["']$/g, '')
+          if (!desc || desc.length < 20) continue
+
+          const nowIso = new Date().toISOString()
+          updateTask(task.id, {
+            description: desc.slice(0, 500),
+            agent_history: [
+              ...(task.agent_history ?? []),
+              {
+                id: randomUUID(),
+                by: 'astra',
+                byEmoji: '🌟',
+                action: 'description_enriched',
+                note: 'Description auto-generated from title to improve planning quality.',
+                at: nowIso,
+              },
+            ],
+          })
+        } catch {
+          /* non-fatal per-task */
+        }
+      }
+    } catch {
+      /* non-fatal */
     }
-  } catch { /* non-fatal */ }
-}, 2 * 60 * 60 * 1000)
+  },
+  2 * 60 * 60 * 1000,
+)
 
 // Telegram bot command registration — runs once on startup to register /board, /find, /todo
 // with the Telegram Bot API so they appear in the command autocomplete picker.
@@ -546,127 +715,237 @@ setInterval(() => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         commands: [
-          { command: 'board',  description: 'Show task board status (todo/review/blocked/done today)' },
-          { command: 'find',   description: 'Search tasks — /find <keyword>' },
-          { command: 'todo',   description: 'Create a task — /todo <description>' },
+          {
+            command: 'board',
+            description:
+              'Show task board status (todo/review/blocked/done today)',
+          },
+          { command: 'find', description: 'Search tasks — /find <keyword>' },
+          {
+            command: 'todo',
+            description: 'Create a task — /todo <description>',
+          },
         ],
       }),
     })
-  } catch { /* non-fatal — server still runs without command registration */ }
+  } catch {
+    /* non-fatal — server still runs without command registration */
+  }
 })()
 
 // Auto-execute review sweep: tasks with real plans waiting >HERMES_AUTO_EXECUTE_DELAY_H hours.
 const AUTO_EXECUTE_DELAY_MS =
   parseFloat(process.env.HERMES_AUTO_EXECUTE_DELAY_H ?? '0.75') * 60 * 60 * 1000
-const AUTO_EXECUTE_MAX = parseInt(process.env.HERMES_AUTO_EXECUTE_MAX ?? '10', 10)
+const AUTO_EXECUTE_MAX = parseInt(
+  process.env.HERMES_AUTO_EXECUTE_MAX ?? '10',
+  10,
+)
 
-export function drainReadyReview(opts: { limit?: number; ignoreDelay?: boolean } = {}): { queued: number; titles: Array<string> } {
+export function drainReadyReview(
+  opts: { limit?: number; ignoreDelay?: boolean } = {},
+): { queued: number; titles: Array<string> } {
   const now = Date.now()
   const limit = opts.limit ?? AUTO_EXECUTE_MAX
-  const candidates = listTasks({ column: 'review' }).filter((t) => {
-    if (t.agent_state) return false
-    const plannedHistory = (t.agent_history ?? []).filter((h) => h.action === 'planned')
-    if (plannedHistory.length === 0) return false
-    const lastNote = plannedHistory[plannedHistory.length - 1].note
-    if (lastNote.includes('Plan unavailable')) return false
-    if (lastNote.length < 80) return false
-    const running = listTasks({}).filter((x) => x.agent_state === 'working').length
-    if (running >= MAX_CONCURRENT_EXECUTIONS) return false
-    if (!opts.ignoreDelay && now - new Date(t.updated_at).getTime() < AUTO_EXECUTE_DELAY_MS) return false
-    return true
-  }).slice(0, limit)
+  const candidates = listTasks({ column: 'review' })
+    .filter((t) => {
+      if (t.agent_state) return false
+      const plannedHistory = (t.agent_history ?? []).filter(
+        (h) => h.action === 'planned',
+      )
+      if (plannedHistory.length === 0) return false
+      const lastNote = plannedHistory[plannedHistory.length - 1].note
+      if (lastNote.includes('Plan unavailable')) return false
+      if (lastNote.length < 80) return false
+      const running = listTasks({}).filter(
+        (x) => x.agent_state === 'working',
+      ).length
+      if (running >= MAX_CONCURRENT_EXECUTIONS) return false
+      if (
+        !opts.ignoreDelay &&
+        now - new Date(t.updated_at).getTime() < AUTO_EXECUTE_DELAY_MS
+      )
+        return false
+      return true
+    })
+    .slice(0, limit)
 
   if (candidates.length === 0) return { queued: 0, titles: [] }
 
   candidates.forEach((task, i) => {
     setTimeout(() => {
-      try { executeTaskWithHermesBackground(task.id) } catch { /* non-fatal */ }
+      try {
+        executeTaskWithHermesBackground(task.id)
+      } catch {
+        /* non-fatal */
+      }
     }, i * 8_000)
   })
 
   try {
-    const sweepStatsFile = path.join(os.homedir(), '.hermes', 'sweep-stats.json')
+    const sweepStatsFile = path.join(
+      os.homedir(),
+      '.hermes',
+      'sweep-stats.json',
+    )
     const todayDate = new Date().toISOString().slice(0, 10)
-    let stats: { lastSweepAt: string; executedToday: number; executedDate: string } = { lastSweepAt: '', executedToday: 0, executedDate: '' }
-    try { stats = JSON.parse(fs.readFileSync(sweepStatsFile, 'utf-8')) } catch { /* first run */ }
-    if (stats.executedDate !== todayDate) { stats.executedToday = 0; stats.executedDate = todayDate }
+    let stats: {
+      lastSweepAt: string
+      executedToday: number
+      executedDate: string
+    } = { lastSweepAt: '', executedToday: 0, executedDate: '' }
+    try {
+      stats = JSON.parse(fs.readFileSync(sweepStatsFile, 'utf-8'))
+    } catch {
+      /* first run */
+    }
+    if (stats.executedDate !== todayDate) {
+      stats.executedToday = 0
+      stats.executedDate = todayDate
+    }
     stats.lastSweepAt = new Date().toISOString()
     stats.executedToday += candidates.length
     fs.writeFileSync(sweepStatsFile, JSON.stringify(stats))
-  } catch { /* non-fatal */ }
+  } catch {
+    /* non-fatal */
+  }
 
-  return { queued: candidates.length, titles: candidates.map((t) => t.title.slice(0, 60)) }
+  return {
+    queued: candidates.length,
+    titles: candidates.map((t) => t.title.slice(0, 60)),
+  }
 }
 
-setInterval(() => {
-  if (!TASK_AUTOPILOT_ENABLED) return
-  try {
-    const { queued, titles } = drainReadyReview()
-    if (queued === 0) return
-    spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q',
-      `⚡ Auto-executing ${queued} review task${queued > 1 ? 's' : ''} (waited >${Math.round(AUTO_EXECUTE_DELAY_MS / 3600000)}h)\n` +
-      titles.map((t) => `• ${t}`).join('\n'),
-    ], { encoding: 'utf-8', timeout: 15_000 })
-  } catch { /* non-fatal */ }
-}, 30 * 60 * 1000)
+setInterval(
+  () => {
+    if (!TASK_AUTOPILOT_ENABLED) return
+    try {
+      const { queued, titles } = drainReadyReview()
+      if (queued === 0) return
+      spawnSync(
+        HERMES_BIN,
+        [
+          'send',
+          '--to',
+          'telegram:2130622225',
+          '-q',
+          `⚡ Auto-executing ${queued} review task${queued > 1 ? 's' : ''} (waited >${Math.round(AUTO_EXECUTE_DELAY_MS / 3600000)}h)\n` +
+            titles.map((t) => `• ${t}`).join('\n'),
+        ],
+        { encoding: 'utf-8', timeout: 15_000 },
+      )
+    } catch {
+      /* non-fatal */
+    }
+  },
+  30 * 60 * 1000,
+)
 
 // Execution progress pings: tasks executing >8 min get a Telegram log tail.
-setInterval(() => {
-  try {
-    const hermesHome = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
-    const logsDir = path.join(hermesHome, 'logs')
-    const PING_AFTER_MS = 8 * 60 * 1000
-    const now = Date.now()
-    const longRunning = listTasks({}).filter(
-      (t) => t.agent_state === 'working' &&
-             t.agent_action_at &&
-             now - new Date(t.agent_action_at).getTime() > PING_AFTER_MS &&
-             !(t.agent_progress_pinged_at &&
-               now - new Date(t.agent_progress_pinged_at).getTime() < 15 * 60 * 1000)
-    )
-    for (const task of longRunning) {
-      try {
-        const prefix = `exec-${task.id.slice(0, 8)}-`
-        const logs = fs.readdirSync(logsDir).filter((f) => f.startsWith(prefix)).sort().slice(-1)
-        const logTail = logs.length > 0
-          ? fs.readFileSync(path.join(logsDir, logs[0]), 'utf-8').split('\n').filter(Boolean).slice(-8).join('\n')
-          : '(log not found)'
-        const elapsed = Math.round((now - new Date(task.agent_action_at!).getTime()) / 60000)
-        spawnSync(HERMES_BIN, ['send', '--to', 'telegram:2130622225', '-q',
-          `⏳ Still running (${elapsed}min): ${task.title.slice(0, 60)}\n\n${logTail.slice(0, 500)}`,
-        ], { encoding: 'utf-8', timeout: 15_000 })
-        updateTask(task.id, { agent_progress_pinged_at: new Date().toISOString() })
-      } catch { /* skip this task */ }
+setInterval(
+  () => {
+    try {
+      const hermesHome =
+        process.env.HERMES_HOME ??
+        process.env.CLAUDE_HOME ??
+        path.join(os.homedir(), '.hermes')
+      const logsDir = path.join(hermesHome, 'logs')
+      const PING_AFTER_MS = 8 * 60 * 1000
+      const now = Date.now()
+      const longRunning = listTasks({}).filter(
+        (t) =>
+          t.agent_state === 'working' &&
+          t.agent_action_at &&
+          now - new Date(t.agent_action_at).getTime() > PING_AFTER_MS &&
+          !(
+            t.agent_progress_pinged_at &&
+            now - new Date(t.agent_progress_pinged_at).getTime() <
+              15 * 60 * 1000
+          ),
+      )
+      for (const task of longRunning) {
+        try {
+          const prefix = `exec-${task.id.slice(0, 8)}-`
+          const logs = fs
+            .readdirSync(logsDir)
+            .filter((f) => f.startsWith(prefix))
+            .sort()
+            .slice(-1)
+          const logTail =
+            logs.length > 0
+              ? fs
+                  .readFileSync(path.join(logsDir, logs[0]), 'utf-8')
+                  .split('\n')
+                  .filter(Boolean)
+                  .slice(-8)
+                  .join('\n')
+              : '(log not found)'
+          const elapsed = Math.round(
+            (now - new Date(task.agent_action_at!).getTime()) / 60000,
+          )
+          spawnSync(
+            HERMES_BIN,
+            [
+              'send',
+              '--to',
+              'telegram:2130622225',
+              '-q',
+              `⏳ Still running (${elapsed}min): ${task.title.slice(0, 60)}\n\n${logTail.slice(0, 500)}`,
+            ],
+            { encoding: 'utf-8', timeout: 15_000 },
+          )
+          updateTask(task.id, {
+            agent_progress_pinged_at: new Date().toISOString(),
+          })
+        } catch {
+          /* skip this task */
+        }
+      }
+    } catch {
+      /* non-fatal */
     }
-  } catch { /* non-fatal */ }
-}, 10 * 60 * 1000)
+  },
+  10 * 60 * 1000,
+)
 
 // Priority aging: tasks in todo for >7 days with non-high priority get bumped.
-setInterval(() => {
-  try {
-    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
-    const now = Date.now()
-    const stale = listTasks({ column: 'todo' }).filter(
-      (t) => t.priority !== 'high' &&
-             !t.agent_state &&
-             now - new Date(t.created_at).getTime() > SEVEN_DAYS_MS
-    )
-    for (const task of stale) {
-      updateTask(task.id, {
-        priority: 'high',
-        agent_history: [...(task.agent_history ?? []), {
-          id: randomUUID(), by: 'astra', byEmoji: '🌟',
-          action: 'priority_bumped',
-          note: `Auto-bumped to high priority after ${Math.floor((now - new Date(task.created_at).getTime()) / 86400000)} days in todo.`,
-          at: new Date().toISOString(),
-        }],
-      })
+setInterval(
+  () => {
+    try {
+      const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+      const now = Date.now()
+      const stale = listTasks({ column: 'todo' }).filter(
+        (t) =>
+          t.priority !== 'high' &&
+          !t.agent_state &&
+          now - new Date(t.created_at).getTime() > SEVEN_DAYS_MS,
+      )
+      for (const task of stale) {
+        updateTask(task.id, {
+          priority: 'high',
+          agent_history: [
+            ...(task.agent_history ?? []),
+            {
+              id: randomUUID(),
+              by: 'astra',
+              byEmoji: '🌟',
+              action: 'priority_bumped',
+              note: `Auto-bumped to high priority after ${Math.floor((now - new Date(task.created_at).getTime()) / 86400000)} days in todo.`,
+              at: new Date().toISOString(),
+            },
+          ],
+        })
+      }
+      if (stale.length > 0) {
+        console.log(
+          `[astra-tasks] Priority-bumped ${stale.length} stale todo tasks to high`,
+        )
+      }
+    } catch {
+      /* non-fatal */
     }
-    if (stale.length > 0) {
-      console.log(`[astra-tasks] Priority-bumped ${stale.length} stale todo tasks to high`)
-    }
-  } catch { /* non-fatal */ }
-}, 60 * 60 * 1000) // hourly
+  },
+  60 * 60 * 1000,
+) // hourly
 
 // ---------------------------------------------------------------------------
 // markTasksAsReviewing
@@ -688,7 +967,9 @@ export function markTasksAsReviewing(taskIds: Array<string>): void {
 // ---------------------------------------------------------------------------
 
 export function runAstraReviewBackground(): { taskCount: number } {
-  const candidates = listTasks({ column: 'backlog' }).concat(listTasks({ column: 'todo' }))
+  const candidates = listTasks({ column: 'backlog' }).concat(
+    listTasks({ column: 'todo' }),
+  )
 
   if (candidates.length === 0) {
     return { taskCount: 0 }
@@ -718,7 +999,9 @@ Tasks:
 ${JSON.stringify(taskSummary, null, 2)}`
 
   const tasksFilePath = path.join(
-    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes'),
+    process.env.HERMES_HOME ??
+      process.env.CLAUDE_HOME ??
+      path.join(os.homedir(), '.hermes'),
     'tasks.json',
   )
 
@@ -866,38 +1149,45 @@ process.exit(0);
 
 // mode 'auto'  → periodic sweep: only picks tasks no agent has touched yet
 // mode 'manual' (default) → user-triggered: picks any eligible task, re-review OK
-export function runAgentDeployBackground(mode: 'manual' | 'auto' = 'manual'): { taskCount: number } {
+export function runAgentDeployBackground(mode: 'manual' | 'auto' = 'manual'): {
+  taskCount: number
+} {
   clearStuckTasks()
 
   const PRIORITY_SCORE: Record<string, number> = { high: 3, medium: 2, low: 1 }
-  const allEligible = listTasks({ column: 'backlog' }).concat(listTasks({ column: 'todo' }))
+  const allEligible = listTasks({ column: 'backlog' })
+    .concat(listTasks({ column: 'todo' }))
     .sort((a, b) => {
       const pa = PRIORITY_SCORE[a.priority] ?? 2
       const pb = PRIORITY_SCORE[b.priority] ?? 2
-      if (pb !== pa) return pb - pa                       // high priority first
+      if (pb !== pa) return pb - pa // high priority first
       const da = new Date(a.created_at).getTime()
       const db = new Date(b.created_at).getTime()
-      return da - db                                      // older tasks first within same priority
+      return da - db // older tasks first within same priority
     })
   const MAX_PER_CYCLE = 8
 
   // Build a set of done task IDs to resolve depends_on checks
-  const doneTasks = new Set(listTasks({ includeDone: true })
-    .filter(t => t.column === 'done')
-    .map(t => t.id))
+  const doneTasks = new Set(
+    listTasks({ includeDone: true })
+      .filter((t) => t.column === 'done')
+      .map((t) => t.id),
+  )
 
-  const candidates = allEligible.filter((t) => {
-    if (t.agent_state) return false
-    // Skip tasks whose dependencies are not yet done — they should wait silently in todo
-    if (Array.isArray(t.depends_on) && t.depends_on.length > 0) {
-      if (!t.depends_on.every(depId => doneTasks.has(depId))) return false
-    }
-    if (mode === 'auto') {
-      // Skip tasks an agent has already reviewed — they're waiting for Execute
-      return !(t.agent_history ?? []).some((e) => e.by !== 'user')
-    }
-    return true
-  }).slice(0, MAX_PER_CYCLE)
+  const candidates = allEligible
+    .filter((t) => {
+      if (t.agent_state) return false
+      // Skip tasks whose dependencies are not yet done — they should wait silently in todo
+      if (Array.isArray(t.depends_on) && t.depends_on.length > 0) {
+        if (!t.depends_on.every((depId) => doneTasks.has(depId))) return false
+      }
+      if (mode === 'auto') {
+        // Skip tasks an agent has already reviewed — they're waiting for Execute
+        return !(t.agent_history ?? []).some((e) => e.by !== 'user')
+      }
+      return true
+    })
+    .slice(0, MAX_PER_CYCLE)
 
   if (candidates.length === 0) return { taskCount: 0 }
 
@@ -905,7 +1195,9 @@ export function runAgentDeployBackground(mode: 'manual' | 'auto' = 'manual'): { 
   markTasksAsReviewing(candidates.map((c) => c.id))
 
   const hermesHome =
-    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes')
   const tasksFilePath = path.join(hermesHome, 'tasks.json')
 
   const taskPayload = candidates.map((t) => ({
@@ -1435,7 +1727,9 @@ type SisterResolution = {
   workCwd: string
 }
 
-function resolveSisterAndCwd(task: Pick<TaskRecord, 'assignee' | 'tags' | 'column'>): SisterResolution {
+function resolveSisterAndCwd(
+  task: Pick<TaskRecord, 'assignee' | 'tags' | 'column'>,
+): SisterResolution {
   const assignee = (task.assignee ?? '').toLowerCase()
 
   let profileDir = ''
@@ -1444,19 +1738,31 @@ function resolveSisterAndCwd(task: Pick<TaskRecord, 'assignee' | 'tags' | 'colum
 
   if (['ada', 'coder', 'qa', 'reviewer'].includes(assignee)) {
     // Ada: code generation, review, quality assurance
-    profileDir = 'coder'; displayName = 'Ada'; emoji = '💻'
-  } else if (['maya', 'builder', 'maintainer', 'ops-watch'].includes(assignee)) {
+    profileDir = 'coder'
+    displayName = 'Ada'
+    emoji = '💻'
+  } else if (
+    ['maya', 'builder', 'maintainer', 'ops-watch'].includes(assignee)
+  ) {
     // Maya: building, infra, maintenance, ops
-    profileDir = 'builder'; displayName = 'Maya'; emoji = '🔨'
+    profileDir = 'builder'
+    displayName = 'Maya'
+    emoji = '🔨'
   } else if (['luna', 'researcher'].includes(assignee)) {
     // Luna: research, docs, deep synthesis
-    profileDir = 'researcher'; displayName = 'Luna'; emoji = '🌙'
+    profileDir = 'researcher'
+    displayName = 'Luna'
+    emoji = '🌙'
   } else if (assignee === 'nova') {
     // Nova: web research, browser, vision
-    profileDir = 'nova'; displayName = 'Nova'; emoji = '🔬'
+    profileDir = 'nova'
+    displayName = 'Nova'
+    emoji = '🔬'
   } else if (['novus', 'local'].includes(assignee)) {
     // Novus: local/private tasks via Ollama (zero cost)
-    profileDir = 'novus'; displayName = 'Novus'; emoji = '⚙️'
+    profileDir = 'novus'
+    displayName = 'Novus'
+    emoji = '⚙️'
   }
   // orchestrator, strategist, inbox-triage, km-agent → Astra default (no profile change)
 
@@ -1465,10 +1771,16 @@ function resolveSisterAndCwd(task: Pick<TaskRecord, 'assignee' | 'tags' | 'colum
 
   let workCwd = process.cwd()
 
-  if (tags.some(t => t === 'project:hermes-workspace' || hermesTags.includes(t.toLowerCase()))) {
+  if (
+    tags.some(
+      (t) =>
+        t === 'project:hermes-workspace' ||
+        hermesTags.includes(t.toLowerCase()),
+    )
+  ) {
     workCwd = '/home/ubuntu/hermes-workspace'
   } else {
-    const projectTag = tags.find(t => t.startsWith('project:'))
+    const projectTag = tags.find((t) => t.startsWith('project:'))
     if (projectTag) {
       const proj = projectTag.replace('project:', '')
       const c1 = `/srv/projects/${proj}`
@@ -1491,8 +1803,12 @@ function loadAstraPersonality(): string {
     const soul = fs.readFileSync(soulPath, 'utf-8')
     // Extract "Who You Are" + identity section for personality context
     const whoSection = soul.match(/## Who You Are[\s\S]*?(?=\n## )/)?.[0] ?? ''
-    const identitySection = soul.match(/## Identity[\s\S]*?(?=\n## )/)?.[0] ?? ''
-    return [whoSection, identitySection].filter(Boolean).join('\n\n').slice(0, 800)
+    const identitySection =
+      soul.match(/## Identity[\s\S]*?(?=\n## )/)?.[0] ?? ''
+    return [whoSection, identitySection]
+      .filter(Boolean)
+      .join('\n\n')
+      .slice(0, 800)
   } catch {
     return ''
   }
@@ -1511,19 +1827,31 @@ export function executeTaskBackground(taskId: string): void {
 
   let recentCommits = ''
   try {
-    const r = spawnSync('git', ['log', '--oneline', '-5'], { encoding: 'utf-8', cwd: workCwd, timeout: 5000 })
+    const r = spawnSync('git', ['log', '--oneline', '-5'], {
+      encoding: 'utf-8',
+      cwd: workCwd,
+      timeout: 5000,
+    })
     if (r.stdout.trim()) recentCommits = r.stdout.trim()
-  } catch { /* ok */ }
+  } catch {
+    /* ok */
+  }
 
   // Build conversation context from history (agent replies + user replies)
   const history = task.agent_history ?? []
-  const conversationEntries = history.filter(e =>
-    e.action === 'question' || e.action === 'replied' || e.action === 'analyzed' || e.action === 'completed'
-  ).slice(-8)
+  const conversationEntries = history
+    .filter(
+      (e) =>
+        e.action === 'question' ||
+        e.action === 'replied' ||
+        e.action === 'analyzed' ||
+        e.action === 'completed',
+    )
+    .slice(-8)
 
   const hasConversation = conversationEntries.length > 0
   const conversationContext = conversationEntries
-    .map(e => {
+    .map((e) => {
       if (e.by === 'user') return `[Naveen] ${e.note}`
       if (e.action === 'question') return `[Astra asked] ${e.note}`
       return `[Astra] ${e.note}`
@@ -1534,8 +1862,12 @@ export function executeTaskBackground(taskId: string): void {
     `Task: ${task.title}`,
     `Status: ${task.column} | Priority: ${task.priority}${task.tags.length ? ' | Tags: ' + task.tags.join(', ') : ''}`,
     task.description ? `Description: ${task.description}` : '',
-    recentCommits ? `Recent commits: ${recentCommits.split('\n').slice(0, 3).join(' | ')}` : '',
-  ].filter(Boolean).join('\n')
+    recentCommits
+      ? `Recent commits: ${recentCommits.split('\n').slice(0, 3).join(' | ')}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   const personalityBlock = personality
     ? `${personality}\n\nYou are Astra. You run the Hermes Workspace Kanban. Respond in your voice — sharp, direct, decisive.`
@@ -1547,15 +1879,18 @@ export function executeTaskBackground(taskId: string): void {
   if (hasConversation) {
     // Continuation mode — Astra has already worked on this. She sees the thread and continues.
     systemMsg =
-      personalityBlock + '\n\n' +
+      personalityBlock +
+      '\n\n' +
       'You are continuing work on a task. Respond conversationally in your own voice — ' +
-      'acknowledge what Naveen said, then say what you\'re doing or finding. ' +
+      "acknowledge what Naveen said, then say what you're doing or finding. " +
       'End with a WORK_SUMMARY block to update task status.'
 
     userMsg =
-      taskLines + '\n\n' +
+      taskLines +
+      '\n\n' +
       '--- Conversation so far ---\n' +
-      conversationContext + '\n' +
+      conversationContext +
+      '\n' +
       '---\n\n' +
       'Continue from here. Reply in your voice, then end with:\n\n' +
       '<WORK_SUMMARY>\n' +
@@ -1570,11 +1905,13 @@ export function executeTaskBackground(taskId: string): void {
   } else {
     // Initial analysis mode
     systemMsg =
-      personalityBlock + '\n\n' +
+      personalityBlock +
+      '\n\n' +
       'Analyze the task below. Reply ONLY with the WORK_SUMMARY block — nothing before or after it.'
 
     userMsg =
-      taskLines + '\n\n' +
+      taskLines +
+      '\n\n' +
       '<WORK_SUMMARY>\n' +
       'STATUS: partial\n' +
       'SUMMARY: [1-2 sentences on what this involves and the approach]\n' +
@@ -1609,7 +1946,9 @@ export function executeTaskBackground(taskId: string): void {
     } catch (err) {
       const msg = safeErrorMessage(err)
       lastError = msg
-      console.warn(`[executeTaskBackground] OpenRouter direct failed: ${msg} — trying gateway`)
+      console.warn(
+        `[executeTaskBackground] OpenRouter direct failed: ${msg} — trying gateway`,
+      )
       try {
         output = await doGatewayChat(AbortSignal.timeout(60_000))
       } catch {
@@ -1618,7 +1957,10 @@ export function executeTaskBackground(taskId: string): void {
           output = await doDirectChat(AbortSignal.timeout(25_000))
         } catch (err3) {
           lastError = safeErrorMessage(err3)
-          console.error('[executeTaskBackground] all attempts failed:', lastError)
+          console.error(
+            '[executeTaskBackground] all attempts failed:',
+            lastError,
+          )
         }
       }
     }
@@ -1628,12 +1970,19 @@ export function executeTaskBackground(taskId: string): void {
     let changes = ''
     let next = ''
     let question = ''
-    let clarificationQs: Array<{ id: string; q: string; options?: Array<string> }> = []
+    let clarificationQs: Array<{
+      id: string
+      q: string
+      options?: Array<string>
+    }> = []
 
     // Parse WORK_SUMMARY block — accepts both wrapped (<WORK_SUMMARY>…</WORK_SUMMARY>)
     // and unwrapped (bare STATUS:/SUMMARY: lines) since some models drop the XML tags.
-    const block = output.match(/<WORK_SUMMARY>([\s\S]*?)<\/WORK_SUMMARY>/)?.[1] ?? ''
-    const freeText = output.replace(/<WORK_SUMMARY>[\s\S]*?<\/WORK_SUMMARY>/g, '').trim()
+    const block =
+      output.match(/<WORK_SUMMARY>([\s\S]*?)<\/WORK_SUMMARY>/)?.[1] ?? ''
+    const freeText = output
+      .replace(/<WORK_SUMMARY>[\s\S]*?<\/WORK_SUMMARY>/g, '')
+      .trim()
 
     // Parse from the XML block if present; otherwise fall back to the raw output
     const parseSource = block || (output.match(/^STATUS:/im) ? output : '')
@@ -1649,7 +1998,14 @@ export function executeTaskBackground(taskId: string): void {
       // Parse structured QUESTIONS array first; fall back to legacy QUESTION: line
       const qsMatch = parseSource.match(/QUESTIONS:\s*(\[[\s\S]*?\])/i)
       if (qsMatch) {
-        try { clarificationQs = JSON.parse(qsMatch[1]) as Array<{ id: string; q: string }> } catch { /* ignore */ }
+        try {
+          clarificationQs = JSON.parse(qsMatch[1]) as Array<{
+            id: string
+            q: string
+          }>
+        } catch {
+          /* ignore */
+        }
       }
       if (clarificationQs.length === 0) {
         const qMatch = parseSource.match(/QUESTION:\s*(.+)/i)
@@ -1662,15 +2018,24 @@ export function executeTaskBackground(taskId: string): void {
 
     // In continuation mode, the free text is Astra's conversational reply — use it as the note.
     // Also accept free-form output in initial mode when the model ignores the structured format.
-    const rawOutputIsUsable = output.trim().length > 10 && !output.trim().startsWith('You are')
-    const conversationalReply = (hasConversation || (!block && !parseSource)) && rawOutputIsUsable
-      ? freeText || output.trim()
-      : ''
+    const rawOutputIsUsable =
+      output.trim().length > 10 && !output.trim().startsWith('You are')
+    const conversationalReply =
+      (hasConversation || (!block && !parseSource)) && rawOutputIsUsable
+        ? freeText || output.trim()
+        : ''
 
     // Use conversational reply as primary note; fall back to SUMMARY from block;
     // last resort: first 400 chars of whatever the model returned
-    const primaryNote = conversationalReply || summary ||
-      (rawOutputIsUsable ? output.trim().slice(0, 400).replace(/\n{3,}/g, '\n\n') : '')
+    const primaryNote =
+      conversationalReply ||
+      summary ||
+      (rawOutputIsUsable
+        ? output
+            .trim()
+            .slice(0, 400)
+            .replace(/\n{3,}/g, '\n\n')
+        : '')
 
     if (!primaryNote) {
       const current = getTask(taskId)
@@ -1679,14 +2044,17 @@ export function executeTaskBackground(taskId: string): void {
         ? `AI unavailable: ${lastError.slice(0, 150)}. Try again or use Launch Session.`
         : 'AI analysis unavailable — please try again or use Launch Session.'
       updateTask(taskId, {
-        agent_history: [...existing, {
-          id: randomUUID(),
-          by: displayName.toLowerCase(),
-          byEmoji: emoji,
-          action: 'blocked',
-          note: errorNote,
-          at: new Date().toISOString(),
-        }],
+        agent_history: [
+          ...existing,
+          {
+            id: randomUUID(),
+            by: displayName.toLowerCase(),
+            byEmoji: emoji,
+            action: 'blocked',
+            note: errorNote,
+            at: new Date().toISOString(),
+          },
+        ],
         agent_state: null,
         agent_name: null,
         agent_action_at: null,
@@ -1700,34 +2068,48 @@ export function executeTaskBackground(taskId: string): void {
     const freshColumn = current?.column ?? task.column
 
     const newColumn: TaskColumn =
-      status === 'done' ? 'review' :
-      status === 'blocked' ? 'blocked' :
-      status === 'needs_input' ? 'blocked' :
-      freshColumn
+      status === 'done'
+        ? 'review'
+        : status === 'blocked'
+          ? 'blocked'
+          : status === 'needs_input'
+            ? 'blocked'
+            : freshColumn
 
-    if (status === 'needs_input' && (clarificationQs.length > 0 || conversationalReply)) {
+    if (
+      status === 'needs_input' &&
+      (clarificationQs.length > 0 || conversationalReply)
+    ) {
       const now = new Date().toISOString()
       // Build a combined note from all questions for the activity feed
-      const questionNote = clarificationQs.length > 0
-        ? clarificationQs.map((q, i) => `Q${i + 1}: ${q.q}`).join('\n')
-        : (conversationalReply || question)
-      const questionsToSave = clarificationQs.map(q => ({
+      const questionNote =
+        clarificationQs.length > 0
+          ? clarificationQs.map((q, i) => `Q${i + 1}: ${q.q}`).join('\n')
+          : conversationalReply || question
+      const questionsToSave = clarificationQs.map((q) => ({
         id: q.id || randomUUID(),
         question: q.q,
-        options: Array.isArray(q.options) && q.options.length > 0 ? q.options : undefined,
+        options:
+          Array.isArray(q.options) && q.options.length > 0
+            ? q.options
+            : undefined,
         asked_at: now,
       }))
       updateTask(taskId, {
         agent_comment: questionNote,
-        clarification_questions: questionsToSave.length > 0 ? questionsToSave : undefined,
-        agent_history: [...existing, {
-          id: randomUUID(),
-          by: displayName.toLowerCase(),
-          byEmoji: emoji,
-          action: 'question',
-          note: questionNote,
-          at: now,
-        }],
+        clarification_questions:
+          questionsToSave.length > 0 ? questionsToSave : undefined,
+        agent_history: [
+          ...existing,
+          {
+            id: randomUUID(),
+            by: displayName.toLowerCase(),
+            byEmoji: emoji,
+            action: 'question',
+            note: questionNote,
+            at: now,
+          },
+        ],
         agent_state: 'waiting_for_input',
         agent_name: displayName.toLowerCase(),
         agent_action_at: now,
@@ -1756,7 +2138,14 @@ export function executeTaskBackground(taskId: string): void {
     }
     const note = parts.join('\n\n')
 
-    const actionLabel = status === 'done' ? 'completed' : status === 'blocked' ? 'blocked' : hasConversation ? 'replied' : 'analyzed'
+    const actionLabel =
+      status === 'done'
+        ? 'completed'
+        : status === 'blocked'
+          ? 'blocked'
+          : hasConversation
+            ? 'replied'
+            : 'analyzed'
 
     const entry: ActivityEntry = {
       id: randomUUID(),
@@ -1806,22 +2195,49 @@ export function executeTaskBackground(taskId: string): void {
 // "user replied" conversational-continuation path.
 // ---------------------------------------------------------------------------
 
-const MAX_CONCURRENT_EXECUTIONS = parseInt(process.env.HERMES_MAX_CONCURRENT ?? '5', 10)
+const MAX_CONCURRENT_EXECUTIONS = parseInt(
+  process.env.HERMES_MAX_CONCURRENT ?? '5',
+  10,
+)
 
 function isOpenRouterReachable(): boolean {
   try {
-    const r = spawnSync('curl', ['-sf', '--max-time', '5', '-o', '/dev/null',
-      'https://openrouter.ai/api/v1/models'], { encoding: 'utf-8', timeout: 6_000 })
+    const r = spawnSync(
+      'curl',
+      [
+        '-sf',
+        '--max-time',
+        '5',
+        '-o',
+        '/dev/null',
+        'https://openrouter.ai/api/v1/models',
+      ],
+      { encoding: 'utf-8', timeout: 6_000 },
+    )
     return r.status === 0
-  } catch { return true }
+  } catch {
+    return true
+  }
 }
 
 function isGatewayReachable(): boolean {
   try {
-    const r = spawnSync('curl', ['-sf', '--max-time', '3', '-o', '/dev/null',
-      'http://127.0.0.1:8642/health'], { encoding: 'utf-8', timeout: 4_000 })
+    const r = spawnSync(
+      'curl',
+      [
+        '-sf',
+        '--max-time',
+        '3',
+        '-o',
+        '/dev/null',
+        'http://127.0.0.1:8642/health',
+      ],
+      { encoding: 'utf-8', timeout: 4_000 },
+    )
     return r.status === 0
-  } catch { return true }  // fail-open: don't block execution if curl unavailable
+  } catch {
+    return true
+  } // fail-open: don't block execution if curl unavailable
 }
 
 export function executeTaskWithHermesBackground(taskId: string): void {
@@ -1829,15 +2245,22 @@ export function executeTaskWithHermesBackground(taskId: string): void {
   if (!task) return
 
   // Concurrency cap: don't spawn more hermes processes than the VM can handle.
-  const running = listTasks({}).filter((t) => t.agent_state === 'working').length
+  const running = listTasks({}).filter(
+    (t) => t.agent_state === 'working',
+  ).length
   if (running >= MAX_CONCURRENT_EXECUTIONS) {
     updateTask(taskId, {
-      agent_history: [...(task.agent_history ?? []), {
-        id: randomUUID(), by: 'astra', byEmoji: '🌟',
-        action: 'deferred',
-        note: `Deferred: ${running}/${MAX_CONCURRENT_EXECUTIONS} executions already running. Will auto-execute on next sweep.`,
-        at: new Date().toISOString(),
-      }],
+      agent_history: [
+        ...(task.agent_history ?? []),
+        {
+          id: randomUUID(),
+          by: 'astra',
+          byEmoji: '🌟',
+          action: 'deferred',
+          note: `Deferred: ${running}/${MAX_CONCURRENT_EXECUTIONS} executions already running. Will auto-execute on next sweep.`,
+          at: new Date().toISOString(),
+        },
+      ],
     })
     return
   }
@@ -1845,31 +2268,43 @@ export function executeTaskWithHermesBackground(taskId: string): void {
   // Pre-flight: abort early if the hermes gateway or OpenRouter are unreachable.
   if (!isGatewayReachable()) {
     updateTask(taskId, {
-      agent_history: [...(task.agent_history ?? []), {
-        id: randomUUID(), by: 'astra', byEmoji: '🌟',
-        action: 'attempted',
-        note: 'Pre-flight check failed — Hermes gateway (:8642) unreachable. Run `hermes gateway run` to restart.',
-        at: new Date().toISOString(),
-      }],
+      agent_history: [
+        ...(task.agent_history ?? []),
+        {
+          id: randomUUID(),
+          by: 'astra',
+          byEmoji: '🌟',
+          action: 'attempted',
+          note: 'Pre-flight check failed — Hermes gateway (:8642) unreachable. Run `hermes gateway run` to restart.',
+          at: new Date().toISOString(),
+        },
+      ],
     })
     return
   }
 
   if (!isOpenRouterReachable()) {
     updateTask(taskId, {
-      agent_history: [...(task.agent_history ?? []), {
-        id: randomUUID(), by: 'astra', byEmoji: '🌟',
-        action: 'attempted',
-        note: 'Pre-flight check failed — OpenRouter unreachable. Will retry on next deploy cycle.',
-        at: new Date().toISOString(),
-      }],
+      agent_history: [
+        ...(task.agent_history ?? []),
+        {
+          id: randomUUID(),
+          by: 'astra',
+          byEmoji: '🌟',
+          action: 'attempted',
+          note: 'Pre-flight check failed — OpenRouter unreachable. Will retry on next deploy cycle.',
+          at: new Date().toISOString(),
+        },
+      ],
     })
     return
   }
 
   const { workCwd, profileDir, displayName, emoji } = resolveSisterAndCwd(task)
   const hermesHome =
-    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes')
   const tasksFilePath = path.join(hermesHome, 'tasks.json')
 
   // #6: prepend SOUL.md personality; use sister's profile if one is assigned
@@ -1878,19 +2313,21 @@ export function executeTaskWithHermesBackground(taskId: string): void {
   // Build history context (last 6 entries) so Astra sees what was already tried
   const history = task.agent_history ?? []
   const priorContext = history
-    .filter(e => e.action !== 'executed')
+    .filter((e) => e.action !== 'executed')
     .slice(-6)
-    .map(e => {
+    .map((e) => {
       const who = e.by === 'user' ? 'Naveen' : `Astra (${e.action})`
       return `[${who}] ${e.note.slice(0, 300)}`
     })
     .join('\n')
 
-  const isReopen = (task.agent_history ?? []).some(
-    e => e.by === 'user' && e.action === 'replied'
-  ) && (task.agent_history ?? []).some(
-    e => e.by !== 'user' && e.action === 'completed'
-  )
+  const isReopen =
+    (task.agent_history ?? []).some(
+      (e) => e.by === 'user' && e.action === 'replied',
+    ) &&
+    (task.agent_history ?? []).some(
+      (e) => e.by !== 'user' && e.action === 'completed',
+    )
 
   const prompt = [
     personality,
@@ -1918,13 +2355,18 @@ export function executeTaskWithHermesBackground(taskId: string): void {
     '  — only if STATUS is needs_input; omit otherwise. Add "options" array (2-4 short choices) when answers are enumerable.',
     '</WORK_SUMMARY>',
     'STATUS RULES: Use "done" when work is complete. Use "blocked" only for hard technical blockers (missing file, broken dep, permission denied). Use "needs_input" ONLY when a literal secret/credential Naveen must provide is required (API key, password, account ID) — NOT for design decisions or missing context; make reasonable assumptions and proceed. Partial work with no clear blocker → STATUS: partial.',
-  ].filter(Boolean).join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   // Generate paths before building script content so they can be embedded as constants
   const timestamp = Date.now()
   const scriptPath = path.join(os.tmpdir(), `hermes-exec-${timestamp}.mjs`)
   const logsDir = path.join(hermesHome, 'logs')
-  const logPath = path.join(logsDir, `exec-${taskId.slice(0, 8)}-${timestamp}.log`)
+  const logPath = path.join(
+    logsDir,
+    `exec-${taskId.slice(0, 8)}-${timestamp}.log`,
+  )
 
   // #1: ensure logs dir exists before the child tries to write to it
   fs.mkdirSync(logsDir, { recursive: true })
@@ -2345,12 +2787,16 @@ export type GeneratedTaskFields = {
   tags: Array<string>
 }
 
-export async function generateTaskFromText(text: string): Promise<GeneratedTaskFields | null> {
+export async function generateTaskFromText(
+  text: string,
+): Promise<GeneratedTaskFields | null> {
   const prompt =
     'You are converting a natural-language task description into a structured task for the Hermes Workspace Kanban board.\n\n' +
     'Available assignees: orchestrator, builder, researcher, reviewer, qa, ops-watch, maintainer, ada, maya, luna, nova, novus, astra\n\n' +
     'Columns: backlog (not started / unclear), todo (ready to work now), in_progress (actively started)\n\n' +
-    'User input: ' + JSON.stringify(text) + '\n\n' +
+    'User input: ' +
+    JSON.stringify(text) +
+    '\n\n' +
     'Return ONLY valid JSON — no other text:\n' +
     '{\n' +
     '  "title": "Short action-oriented title (max 70 chars)",\n' +
@@ -2363,10 +2809,10 @@ export async function generateTaskFromText(text: string): Promise<GeneratedTaskF
 
   let raw = ''
   try {
-    raw = await openaiChat(
-      [{ role: 'user', content: prompt }],
-      { max_tokens: 600, temperature: 0.3 },
-    )
+    raw = await openaiChat([{ role: 'user', content: prompt }], {
+      max_tokens: 600,
+      temperature: 0.3,
+    })
   } catch {
     return null
   }
@@ -2378,7 +2824,11 @@ export async function generateTaskFromText(text: string): Promise<GeneratedTaskF
   } catch {
     const match = raw.match(/\{[\s\S]*\}/)
     if (match) {
-      try { parsed = JSON.parse(match[0]) } catch { /* skip */ }
+      try {
+        parsed = JSON.parse(match[0])
+      } catch {
+        /* skip */
+      }
     }
   }
 
@@ -2388,16 +2838,29 @@ export async function generateTaskFromText(text: string): Promise<GeneratedTaskF
   const title = typeof p.title === 'string' ? p.title.trim() : ''
   if (!title) return null
 
-  const VALID_COLUMNS: Array<TaskColumn> = ['backlog', 'todo', 'in_progress', 'review', 'blocked', 'done']
+  const VALID_COLUMNS: Array<TaskColumn> = [
+    'backlog',
+    'todo',
+    'in_progress',
+    'review',
+    'blocked',
+    'done',
+  ]
   const VALID_PRIORITIES: Array<TaskPriority> = ['high', 'medium', 'low']
 
   return {
     title,
     description: typeof p.description === 'string' ? p.description.trim() : '',
-    column: VALID_COLUMNS.includes(p.column as TaskColumn) ? (p.column as TaskColumn) : 'backlog',
-    priority: VALID_PRIORITIES.includes(p.priority as TaskPriority) ? (p.priority as TaskPriority) : 'medium',
+    column: VALID_COLUMNS.includes(p.column as TaskColumn)
+      ? (p.column as TaskColumn)
+      : 'backlog',
+    priority: VALID_PRIORITIES.includes(p.priority as TaskPriority)
+      ? (p.priority as TaskPriority)
+      : 'medium',
     assignee: typeof p.assignee === 'string' && p.assignee ? p.assignee : null,
-    tags: Array.isArray(p.tags) ? p.tags.filter((t): t is string => typeof t === 'string') : [],
+    tags: Array.isArray(p.tags)
+      ? p.tags.filter((t): t is string => typeof t === 'string')
+      : [],
   }
 }
 
@@ -2405,16 +2868,28 @@ export async function generateTaskFromText(text: string): Promise<GeneratedTaskF
 // breakdownTaskWithAI — split a complex task into concrete subtasks
 // ---------------------------------------------------------------------------
 
-export async function breakdownTaskWithAI(taskId: string): Promise<{ count: number; titles: Array<string> } | null> {
+export async function breakdownTaskWithAI(
+  taskId: string,
+): Promise<{ count: number; titles: Array<string> } | null> {
   const task = getTask(taskId)
   if (!task) return null
 
   const prompt =
     'You are breaking down a high-level task into concrete subtasks for the Hermes Workspace Kanban board.\n\n' +
     'Parent task:\n' +
-    'Title: ' + task.title + '\n' +
-    'Description: ' + (task.description || '(none)') + '\n' +
-    'Priority: ' + task.priority + ' | Tags: ' + (task.tags.join(', ') || 'none') + ' | Assignee: ' + (task.assignee || 'none') + '\n\n' +
+    'Title: ' +
+    task.title +
+    '\n' +
+    'Description: ' +
+    (task.description || '(none)') +
+    '\n' +
+    'Priority: ' +
+    task.priority +
+    ' | Tags: ' +
+    (task.tags.join(', ') || 'none') +
+    ' | Assignee: ' +
+    (task.assignee || 'none') +
+    '\n\n' +
     'Generate 3-6 subtasks that together complete this parent task. Each subtask must:\n' +
     '- Be completable in one focused work session (1-4 hours)\n' +
     '- Be concrete and actionable\n' +
@@ -2423,19 +2898,23 @@ export async function breakdownTaskWithAI(taskId: string): Promise<{ count: numb
     '[\n' +
     '  {\n' +
     '    "title": "Short action-oriented title (max 70 chars)",\n' +
-    '    "description": "What to do and what done looks like. Part of: ' + task.title + '",\n' +
+    '    "description": "What to do and what done looks like. Part of: ' +
+    task.title +
+    '",\n' +
     '    "priority": "high|medium|low",\n' +
-    '    "assignee": "' + (task.assignee || 'null') + ' or more specific sister",\n' +
+    '    "assignee": "' +
+    (task.assignee || 'null') +
+    ' or more specific sister",\n' +
     '    "tags": ["subtask", "relevant-tag"]\n' +
     '  }\n' +
     ']'
 
   let raw = ''
   try {
-    raw = await openaiChat(
-      [{ role: 'user', content: prompt }],
-      { max_tokens: 1200, temperature: 0.3 },
-    )
+    raw = await openaiChat([{ role: 'user', content: prompt }], {
+      max_tokens: 1200,
+      temperature: 0.3,
+    })
   } catch {
     return null
   }
@@ -2447,20 +2926,28 @@ export async function breakdownTaskWithAI(taskId: string): Promise<{ count: numb
   } catch {
     const match = raw.match(/\[[\s\S]*\]/)
     if (match) {
-      try { parsed = JSON.parse(match[0]) } catch { /* skip */ }
+      try {
+        parsed = JSON.parse(match[0])
+      } catch {
+        /* skip */
+      }
     }
   }
 
   if (!Array.isArray(parsed) || parsed.length === 0) return null
 
   const VALID_PRIORITIES: Array<TaskPriority> = ['high', 'medium', 'low']
-  const subtasks = (parsed as Array<Record<string, unknown>>).filter(s => typeof s.title === 'string' && s.title)
+  const subtasks = (parsed as Array<Record<string, unknown>>).filter(
+    (s) => typeof s.title === 'string' && s.title,
+  )
 
   if (subtasks.length === 0) return null
 
   const MAX_SUBTASKS_TS = 6
   const allExisting = listTasks({ includeDone: false })
-  const existingTitlesSet = new Set(allExisting.map((t) => t.title.toLowerCase().trim()))
+  const existingTitlesSet = new Set(
+    allExisting.map((t) => t.title.toLowerCase().trim()),
+  )
 
   const titles: Array<string> = []
 
@@ -2470,17 +2957,27 @@ export async function breakdownTaskWithAI(taskId: string): Promise<{ count: numb
     if (existingTitlesSet.has(normalized)) continue
 
     const subTags = Array.isArray(sub.tags)
-      ? (sub.tags as Array<string>).filter(t => typeof t === 'string').slice(0, 4)
+      ? (sub.tags as Array<string>)
+          .filter((t) => typeof t === 'string')
+          .slice(0, 4)
       : ['subtask', ...task.tags.slice(0, 2)]
 
     if (!subTags.includes('subtask')) subTags.unshift('subtask')
 
     createTask({
       title: (sub.title as string).trim(),
-      description: typeof sub.description === 'string' ? sub.description.trim() : '',
+      description:
+        typeof sub.description === 'string' ? sub.description.trim() : '',
       column: 'backlog',
-      priority: VALID_PRIORITIES.includes(sub.priority as TaskPriority) ? (sub.priority as TaskPriority) : task.priority,
-      assignee: typeof sub.assignee === 'string' && sub.assignee && sub.assignee !== 'null' ? sub.assignee : task.assignee ?? null,
+      priority: VALID_PRIORITIES.includes(sub.priority as TaskPriority)
+        ? (sub.priority as TaskPriority)
+        : task.priority,
+      assignee:
+        typeof sub.assignee === 'string' &&
+        sub.assignee &&
+        sub.assignee !== 'null'
+          ? sub.assignee
+          : (task.assignee ?? null),
       tags: subTags,
       source: 'astra',
     })
@@ -2526,7 +3023,10 @@ const IDEAS_FILE =
   process.env.HERMES_WORKSPACE_IDEAS_FILE ??
   path.join(process.cwd(), 'IDEAS.json')
 
-export function injectIdeasAsBacklog(): { injected: number; ideas: Array<string> } {
+export function injectIdeasAsBacklog(): {
+  injected: number
+  ideas: Array<string>
+} {
   let ideas: Array<IdeaEntry> = []
   try {
     const raw = fs.readFileSync(IDEAS_FILE, 'utf-8').trim()
@@ -2575,9 +3075,15 @@ export function injectIdeasAsBacklog(): { injected: number; ideas: Array<string>
 // generateIdeasWithAI
 // ---------------------------------------------------------------------------
 
-export function generateIdeasWithAI(): { injected: number; ideas: Array<string>; error?: string } {
+export function generateIdeasWithAI(): {
+  injected: number
+  ideas: Array<string>
+  error?: string
+} {
   const hermesHome =
-    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes')
 
   // ── 1. Gather workspace context ─────────────────────────────────────────
   const allTasks = listTasks({ includeDone: true })
@@ -2588,7 +3094,9 @@ export function generateIdeasWithAI(): { injected: number; ideas: Array<string>;
     const raw = fs.readFileSync(IDEAS_FILE, 'utf-8').trim()
     const parsed = JSON.parse(raw) as unknown
     existingIdeas = Array.isArray(parsed) ? (parsed as Array<IdeaEntry>) : []
-  } catch { /* ok if file doesn't exist */ }
+  } catch {
+    /* ok if file doesn't exist */
+  }
 
   const allSkipTitles = [
     ...existingTaskTitles,
@@ -2604,7 +3112,9 @@ export function generateIdeasWithAI(): { injected: number; ideas: Array<string>;
       timeout: 5000,
     })
     if (r.stdout.trim()) recentCommits = r.stdout.trim()
-  } catch { /* ok */ }
+  } catch {
+    /* ok */
+  }
 
   // App screen list from routes — gives AI a clear map of what exists
   let screenList = ''
@@ -2618,19 +3128,27 @@ export function generateIdeasWithAI(): { injected: number; ideas: Array<string>;
       screenList = r.stdout
         .trim()
         .split('\n')
-        .map((p) => p.replace('src/routes/', '').replace('/index.tsx', '') || '/')
+        .map(
+          (p) => p.replace('src/routes/', '').replace('/index.tsx', '') || '/',
+        )
         .join(', ')
     }
-  } catch { /* ok */ }
+  } catch {
+    /* ok */
+  }
 
   // Top-level src/screens dirs — understand what features exist
   let screenDirs = ''
   try {
-    const r = spawnSync('find', ['src/screens', '-maxdepth', '1', '-mindepth', '1', '-type', 'd'], {
-      encoding: 'utf-8',
-      cwd: process.cwd(),
-      timeout: 5000,
-    })
+    const r = spawnSync(
+      'find',
+      ['src/screens', '-maxdepth', '1', '-mindepth', '1', '-type', 'd'],
+      {
+        encoding: 'utf-8',
+        cwd: process.cwd(),
+        timeout: 5000,
+      },
+    )
     if (r.stdout.trim()) {
       screenDirs = r.stdout
         .trim()
@@ -2638,15 +3156,21 @@ export function generateIdeasWithAI(): { injected: number; ideas: Array<string>;
         .map((p) => path.basename(p))
         .join(', ')
     }
-  } catch { /* ok */ }
+  } catch {
+    /* ok */
+  }
 
   // VM-level: list home dir projects for broader context
   let vmProjects = ''
   try {
-    const r = spawnSync('find', ['/srv/projects', '-maxdepth', '1', '-mindepth', '1', '-type', 'd'], {
-      encoding: 'utf-8',
-      timeout: 5000,
-    })
+    const r = spawnSync(
+      'find',
+      ['/srv/projects', '-maxdepth', '1', '-mindepth', '1', '-type', 'd'],
+      {
+        encoding: 'utf-8',
+        timeout: 5000,
+      },
+    )
     if (r.stdout.trim()) {
       vmProjects = r.stdout
         .trim()
@@ -2654,18 +3178,25 @@ export function generateIdeasWithAI(): { injected: number; ideas: Array<string>;
         .map((p) => path.basename(p))
         .join(', ')
     }
-  } catch { /* ok */ }
+  } catch {
+    /* ok */
+  }
 
   // Hermes sister agents — the AI should know who's available
-  let sisterNames = 'Astra, Novus, Nova, Luna, Ada, Maya, Helena, Larissa, Clara, Bia, Vitória, Daiane'
+  let sisterNames =
+    'Astra, Novus, Nova, Luna, Ada, Maya, Helena, Larissa, Clara, Bia, Vitória, Daiane'
   try {
     const sistersYaml = fs.readFileSync(
       path.join(hermesHome, 'config', 'sisters.yaml'),
       'utf-8',
     )
-    const names = [...sistersYaml.matchAll(/^ {2}name:\s+"?([^"\n]+)"?/gm)].map((m) => m[1])
+    const names = [...sistersYaml.matchAll(/^ {2}name:\s+"?([^"\n]+)"?/gm)].map(
+      (m) => m[1],
+    )
     if (names.length > 0) sisterNames = names.join(', ')
-  } catch { /* ok */ }
+  } catch {
+    /* ok */
+  }
 
   // ── 2. Build prompt ──────────────────────────────────────────────────────
   const prompt = `You are Astra, scanning the Hermes Workspace to suggest genuinely useful feature ideas for the operator Naveen.
@@ -2756,12 +3287,20 @@ Return ONLY a valid JSON array, no explanation before or after:
 
   // ── 5. Merge into IDEAS.json ─────────────────────────────────────────────
   const existingSet = new Set(existingIdeas.map((e) => e.title.toLowerCase()))
-  const toAppend = generated.filter((e) => !existingSet.has(e.title.toLowerCase()))
+  const toAppend = generated.filter(
+    (e) => !existingSet.has(e.title.toLowerCase()),
+  )
   const merged = [...existingIdeas, ...toAppend]
 
   try {
-    fs.writeFileSync(IDEAS_FILE, JSON.stringify(merged, null, 2) + '\n', 'utf-8')
-  } catch { /* non-fatal — still inject what we have */ }
+    fs.writeFileSync(
+      IDEAS_FILE,
+      JSON.stringify(merged, null, 2) + '\n',
+      'utf-8',
+    )
+  } catch {
+    /* non-fatal — still inject what we have */
+  }
 
   // ── 6. Inject into backlog (deduplication vs existing tasks handled inside) ──
   return injectIdeasAsBacklog()
@@ -2788,8 +3327,15 @@ export function runCompletionCheckBackground(): { taskCount: number } {
   ].filter((t) => {
     if (t.agent_state) return false
     // Skip tasks checked recently to avoid spam — one check per 3 hours per task
-    const lastChecked = (t.agent_history ?? []).slice().reverse().find((e) => e.action === 'checked')
-    if (lastChecked && nowMs - new Date(lastChecked.at).getTime() < THREE_HOURS_MS) return false
+    const lastChecked = (t.agent_history ?? [])
+      .slice()
+      .reverse()
+      .find((e) => e.action === 'checked')
+    if (
+      lastChecked &&
+      nowMs - new Date(lastChecked.at).getTime() < THREE_HOURS_MS
+    )
+      return false
     return true
   })
 
@@ -2799,17 +3345,25 @@ export function runCompletionCheckBackground(): { taskCount: number } {
   markTasksAsReviewing(candidates.map((t) => t.id))
 
   const hermesHome =
-    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes')
   const tasksFilePath = path.join(hermesHome, 'tasks.json')
 
   let serviceStatus = ''
   try {
-    const r = spawnSync('systemctl', ['is-active', 'hermes-workspace.service'], {
-      encoding: 'utf-8',
-      timeout: 3_000,
-    })
+    const r = spawnSync(
+      'systemctl',
+      ['is-active', 'hermes-workspace.service'],
+      {
+        encoding: 'utf-8',
+        timeout: 3_000,
+      },
+    )
     serviceStatus = r.stdout.trim()
-  } catch { /* ok */ }
+  } catch {
+    /* ok */
+  }
 
   // Compute per-task workCwd so the script can run git log in the right repo
   const taskPayload = candidates.map((t) => {
@@ -2820,7 +3374,10 @@ export function runCompletionCheckBackground(): { taskCount: number } {
       description: t.description,
       column: t.column,
       agent_comment: t.agent_comment ?? '',
-      last_history: (t.agent_history ?? []).slice(-3).map((e) => `[${e.by}] ${e.action}: ${e.note.slice(0, 120)}`).join('\n'),
+      last_history: (t.agent_history ?? [])
+        .slice(-3)
+        .map((e) => `[${e.by}] ${e.action}: ${e.note.slice(0, 120)}`)
+        .join('\n'),
       workCwd,
     }
   })
@@ -3024,7 +3581,10 @@ for (const task of TASKS) {
 // that have a real plan, up to `limit` at a time, staggered to avoid a
 // thundering herd of hermes processes.
 // ---------------------------------------------------------------------------
-export function batchExecuteBackground(limit = 5, taskIds?: Array<string>): { started: number; remaining: number } {
+export function batchExecuteBackground(
+  limit = 5,
+  taskIds?: Array<string>,
+): { started: number; remaining: number } {
   const PLAN_UNAVAILABLE = 'Plan unavailable'
   const boundedLimit = Math.max(1, Math.min(Math.trunc(limit), 20))
   let candidates: Array<TaskRecord>
@@ -3033,8 +3593,11 @@ export function batchExecuteBackground(limit = 5, taskIds?: Array<string>): { st
     candidates = taskIds
       .map((id) => getTask(id))
       .filter((task): task is TaskRecord => {
-        if (task == null || task.column !== 'review' || task.agent_state) return false
-        const plannedHistory = (task.agent_history ?? []).filter((entry) => entry.action === 'planned')
+        if (task == null || task.column !== 'review' || task.agent_state)
+          return false
+        const plannedHistory = (task.agent_history ?? []).filter(
+          (entry) => entry.action === 'planned',
+        )
         if (plannedHistory.length === 0) return false
         const lastNote = plannedHistory[plannedHistory.length - 1].note
         return !lastNote.includes(PLAN_UNAVAILABLE) && lastNote.length >= 80
@@ -3042,7 +3605,9 @@ export function batchExecuteBackground(limit = 5, taskIds?: Array<string>): { st
   } else {
     candidates = listTasks({ column: 'review' }).filter((task) => {
       if (task.agent_state) return false
-      const plannedHistory = (task.agent_history ?? []).filter((entry) => entry.action === 'planned')
+      const plannedHistory = (task.agent_history ?? []).filter(
+        (entry) => entry.action === 'planned',
+      )
       if (plannedHistory.length === 0) return false
       const lastNote = plannedHistory[plannedHistory.length - 1].note
       return !lastNote.includes(PLAN_UNAVAILABLE) && lastNote.length >= 80
@@ -3054,7 +3619,11 @@ export function batchExecuteBackground(limit = 5, taskIds?: Array<string>): { st
 
   batch.forEach((task, index) => {
     setTimeout(() => {
-      try { executeTaskWithHermesBackground(task.id) } catch { /* non-fatal */ }
+      try {
+        executeTaskWithHermesBackground(task.id)
+      } catch {
+        /* non-fatal */
+      }
     }, index * 4_000)
   })
 

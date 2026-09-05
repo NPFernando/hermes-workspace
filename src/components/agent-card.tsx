@@ -146,9 +146,7 @@ export function AgentCard({
           <p className="truncate text-sm font-semibold text-[var(--theme-text)]">
             {sessionLabel}
           </p>
-          <p className="truncate text-xs text-[var(--theme-muted)]">
-            {model}
-          </p>
+          <p className="truncate text-xs text-[var(--theme-muted)]">{model}</p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
             <StatusIndicator status={status} />
             {hasTokens ? (

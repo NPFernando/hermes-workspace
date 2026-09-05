@@ -128,9 +128,14 @@ async function tryServeStatic(req, res) {
     } catch {
       res.writeHead(404, {
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Cache-Control':
+          'no-store, no-cache, must-revalidate, proxy-revalidate',
       })
-      res.end(JSON.stringify({ error: { code: 'NOT_FOUND', message: 'Asset not found' } }))
+      res.end(
+        JSON.stringify({
+          error: { code: 'NOT_FOUND', message: 'Asset not found' },
+        }),
+      )
       return true
     }
   }
@@ -235,7 +240,11 @@ async function requestHandler(req, res) {
   } catch (err) {
     console.error('Request error:', err)
     res.writeHead(500, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'Internal Server Error' } }))
+    res.end(
+      JSON.stringify({
+        error: { code: 'INTERNAL_ERROR', message: 'Internal Server Error' },
+      }),
+    )
   }
 }
 

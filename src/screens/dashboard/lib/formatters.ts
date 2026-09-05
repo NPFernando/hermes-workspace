@@ -67,7 +67,9 @@ export function formatModelName(raw: string): string {
   if (lower.includes('kimi')) return 'Kimi K2.5'
 
   // Fallback: clean up dashes/underscores and title-case
-  return stripped.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  return stripped
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 /**
@@ -130,34 +132,15 @@ export function formatMoney(amount: number): string {
  * Formats a token count compactly.
  *
  * Examples:
- *   4_700_000_000 → "4.70B"
- *   4_700_000     → "4.7M"
- *   123_000       → "123.0K"
- *   456           → "456"
+ *   4_700_000 → "4.7M"
+ *   123_000   → "123.0K"
+ *   456       → "456"
  */
 export function formatTokens(count: number): string {
   const safe = Math.max(0, Math.round(count))
-  if (safe >= 1_000_000_000) return `${(safe / 1_000_000_000).toFixed(2)}B`
   if (safe >= 1_000_000) return `${(safe / 1_000_000).toFixed(1)}M`
   if (safe >= 1_000) return `${(safe / 1_000).toFixed(1)}K`
   return new Intl.NumberFormat().format(safe)
-}
-
-/**
- * Formats a USD cost compactly, for small/aggregated per-widget amounts.
- *
- * Examples:
- *   0.004   → "<$0.01"
- *   0.42    → "$0.420"
- *   12.5    → "$12.50"
- *   1234    → "$1,234"
- */
-export function formatCost(usd: number): string {
-  if (!usd || usd <= 0) return '$0'
-  if (usd < 0.01) return '<$0.01'
-  if (usd < 1) return `$${usd.toFixed(3)}`
-  if (usd < 100) return `$${usd.toFixed(2)}`
-  return `$${Math.round(usd).toLocaleString()}`
 }
 
 /**

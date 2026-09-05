@@ -23,9 +23,7 @@ const PRODUCTION_HOSTS = new Set([
   'data-api.binance.vision',
 ])
 
-const ALLOWED_LIVE_HOSTS = new Set([
-  'api.binance.com',
-])
+const ALLOWED_LIVE_HOSTS = new Set(['api.binance.com'])
 
 export type OrderSide = 'BUY' | 'SELL'
 export type OrderType = 'MARKET' | 'LIMIT'
@@ -52,7 +50,12 @@ export interface DemoOrderResult {
   type: OrderType
   executedQty: number
   cummulativeQuoteQty: number
-  fills: Array<{ price: number; qty: number; commission: number; commissionAsset: string }>
+  fills: Array<{
+    price: number
+    qty: number
+    commission: number
+    commissionAsset: string
+  }>
   transactTime: number
   avgPrice: number
 }
@@ -104,6 +107,8 @@ export interface BinanceExecutionClient {
       low: number
       close: number
       volume: number
+      /** Binance kline field 9: aggressor buy base-asset volume. */
+      takerBuyVolume?: number
     }>
   >
   getAccount: () => Promise<BinanceAccount>
@@ -111,7 +116,7 @@ export interface BinanceExecutionClient {
   testOrder?: (input: BinanceOrderInput) => Promise<void>
   /** LOT_SIZE/NOTIONAL exchange filters; optional so paper/test fakes can omit it. */
   getSymbolFilters?: (symbol: string) => Promise<SymbolFilters>
-  buildUserDataStreamSubscribeParams: () => Record<string, unknown>;
+  buildUserDataStreamSubscribeParams: () => Record<string, unknown>
 }
 
 export class DemoEnvironmentError extends Error {
@@ -167,7 +172,9 @@ export function assertLiveBaseUrl(baseUrl: string): string {
   return host
 }
 
-function orderParams(input: BinanceOrderInput): Record<string, string | number> {
+function orderParams(
+  input: BinanceOrderInput,
+): Record<string, string | number> {
   const params: Record<string, string | number> = {
     symbol: input.symbol,
     side: input.side,
@@ -183,7 +190,10 @@ function orderParams(input: BinanceOrderInput): Record<string, string | number> 
   } else {
     if (input.quoteOrderQty != null) params.quoteOrderQty = input.quoteOrderQty
     else if (input.quantity != null) params.quantity = input.quantity
-    else throw new DemoEnvironmentError('MARKET order requires quantity or quoteOrderQty.')
+    else
+      throw new DemoEnvironmentError(
+        'MARKET order requires quantity or quoteOrderQty.',
+      )
   }
   return params
 }
@@ -202,7 +212,13 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
     return {}
   }
 
-  constructor(config: { apiKey: string; apiSecret: string; baseUrl: string; recvWindow?: number; fetchImpl?: typeof fetch }) {
+  constructor(config: {
+    apiKey: string
+    apiSecret: string
+    baseUrl: string
+    recvWindow?: number
+    fetchImpl?: typeof fetch
+  }) {
     if (!config.apiKey || !config.apiSecret) {
       throw new DemoEnvironmentError('Binance API key and secret are required.')
     }
@@ -215,7 +231,10 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
   }
 
   private sign(query: string): string {
-    return crypto.createHmac('sha256', this.apiSecret).update(query).digest('hex')
+    return crypto
+      .createHmac('sha256', this.apiSecret)
+      .update(query)
+      .digest('hex')
   }
 
   private async signedRequest(
@@ -226,7 +245,9 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
     this.assertBaseUrl(this.base)
     const timestamp = Date.now()
     const search = new URLSearchParams({
-      ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
+      ...Object.fromEntries(
+        Object.entries(params).map(([k, v]) => [k, String(v)]),
+      ),
       timestamp: String(timestamp),
       recvWindow: String(this.recvWindow),
     })
@@ -240,8 +261,8 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
     })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const code = (body)?.code
-      const msg = (body)?.msg || res.statusText
+      const code = body?.code
+      const msg = body?.msg || res.statusText
       const errorMessage = `${this.errorPrefix()} ${path} failed (${res.status}${code ? ` code ${code}` : ''}): ${msg}`
       recordConnectivityOutcome(errorMessage)
       throw new DemoEnvironmentError(errorMessage)
@@ -260,22 +281,42 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
 
   async getPrice(symbol: string): Promise<number> {
     this.assertBaseUrl(this.base)
-    const res = await this.fetchImpl(`${this.base}/api/v3/ticker/price?symbol=${symbol}`, {
-      signal: AbortSignal.timeout(10_000),
-    })
+    const res = await this.fetchImpl(
+      `${this.base}/api/v3/ticker/price?symbol=${symbol}`,
+      {
+        signal: AbortSignal.timeout(10_000),
+      },
+    )
     const body = await res.json().catch(() => ({}))
-    if (!res.ok) throw new DemoEnvironmentError(`price ${symbol} failed (${res.status})`)
-    return parseFloat((body).price)
+    if (!res.ok)
+      throw new DemoEnvironmentError(`price ${symbol} failed (${res.status})`)
+    return parseFloat(body.price)
   }
 
-  async getKlines(symbol: string, interval = '1h', limit = 100): Promise<Array<{
-    openTime: number; open: number; high: number; low: number; close: number; volume: number
-  }>> {
+  async getKlines(
+    symbol: string,
+    interval = '1h',
+    limit = 100,
+  ): Promise<
+    Array<{
+      openTime: number
+      open: number
+      high: number
+      low: number
+      close: number
+      volume: number
+      /** Binance kline field 9: aggressor buy base-asset volume. */
+      takerBuyVolume?: number
+    }>
+  > {
     this.assertBaseUrl(this.base)
     const url = `${this.base}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
-    const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(12_000) })
+    const res = await this.fetchImpl(url, {
+      signal: AbortSignal.timeout(12_000),
+    })
     const rows = await res.json().catch(() => [])
-    if (!res.ok || !Array.isArray(rows)) throw new DemoEnvironmentError(`klines ${symbol} failed (${res.status})`)
+    if (!res.ok || !Array.isArray(rows))
+      throw new DemoEnvironmentError(`klines ${symbol} failed (${res.status})`)
     return rows.map((r: any) => ({
       openTime: r[0],
       open: parseFloat(r[1]),
@@ -283,6 +324,7 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
       low: parseFloat(r[3]),
       close: parseFloat(r[4]),
       volume: parseFloat(r[5]),
+      takerBuyVolume: parseFloat(r[9]),
     }))
   }
 
@@ -293,12 +335,16 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
     if (cached) return cached
     this.assertBaseUrl(this.base)
     const url = `${this.base}/api/v3/exchangeInfo?symbol=${encodeURIComponent(symbol)}`
-    const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(12_000) })
+    const res = await this.fetchImpl(url, {
+      signal: AbortSignal.timeout(12_000),
+    })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) {
-      throw new DemoEnvironmentError(`exchangeInfo ${symbol} failed (${res.status})`)
+      throw new DemoEnvironmentError(
+        `exchangeInfo ${symbol} failed (${res.status})`,
+      )
     }
-    const info = (body).symbols?.[0]
+    const info = body.symbols?.[0]
     const filters: Array<any> = info?.filters || []
     const lotSize = filters.find((f) => f.filterType === 'LOT_SIZE')
     const notional = filters.find(
@@ -334,7 +380,11 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
   }
 
   async placeOrder(input: BinanceOrderInput): Promise<BinanceOrderResult> {
-    const raw = await this.signedRequest('POST', '/api/v3/order', orderParams(input))
+    const raw = await this.signedRequest(
+      'POST',
+      '/api/v3/order',
+      orderParams(input),
+    )
     const fills = (raw.fills || []).map((f: any) => ({
       price: parseFloat(f.price),
       qty: parseFloat(f.qty),
@@ -435,14 +485,19 @@ export class BinanceLiveClient extends SignedBinanceClient {
  * reason) when demo credentials are absent/misconfigured. Never throws for
  * missing config - callers degrade gracefully.
  */
-export function createDemoClientFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): { client: BinanceDemoClient | null; reason?: string } {
+export function createDemoClientFromEnv(env: NodeJS.ProcessEnv = process.env): {
+  client: BinanceDemoClient | null
+  reason?: string
+} {
   const apiKey = env.BINANCE_TESTNET_API_KEY?.trim()
   const apiSecret = env.BINANCE_TESTNET_API_SECRET?.trim()
-  const baseUrl = env.BINANCE_TESTNET_BASE_URL?.trim() || 'https://demo-api.binance.com'
+  const baseUrl =
+    env.BINANCE_TESTNET_BASE_URL?.trim() || 'https://demo-api.binance.com'
   if (!apiKey || !apiSecret) {
-    return { client: null, reason: 'BINANCE_TESTNET_API_KEY / BINANCE_TESTNET_API_SECRET not set' }
+    return {
+      client: null,
+      reason: 'BINANCE_TESTNET_API_KEY / BINANCE_TESTNET_API_SECRET not set',
+    }
   }
   try {
     const client = new BinanceDemoClient({
@@ -453,21 +508,31 @@ export function createDemoClientFromEnv(
     })
     return { client }
   } catch (err) {
-    return { client: null, reason: err instanceof Error ? err.message : String(err) }
+    return {
+      client: null,
+      reason: err instanceof Error ? err.message : String(err),
+    }
   }
 }
 
-export function createLiveClientFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): { client: BinanceLiveClient | null; reason?: string } {
+export function createLiveClientFromEnv(env: NodeJS.ProcessEnv = process.env): {
+  client: BinanceLiveClient | null
+  reason?: string
+} {
   const apiKey = env.BINANCE_API_KEY?.trim()
   const apiSecret = env.BINANCE_API_SECRET?.trim()
   const baseUrl = env.BINANCE_BASE_URL?.trim() || 'https://api.binance.com'
   if (!apiKey || !apiSecret) {
-    return { client: null, reason: 'BINANCE_API_KEY / BINANCE_API_SECRET not set' }
+    return {
+      client: null,
+      reason: 'BINANCE_API_KEY / BINANCE_API_SECRET not set',
+    }
   }
   if (env.BINANCE_ALLOW_LIVE_TRADING !== 'I_APPROVE_BINANCE_LIVE_TRADING') {
-    return { client: null, reason: 'BINANCE_ALLOW_LIVE_TRADING approval is not set' }
+    return {
+      client: null,
+      reason: 'BINANCE_ALLOW_LIVE_TRADING approval is not set',
+    }
   }
   try {
     const client = new BinanceLiveClient({
@@ -478,6 +543,9 @@ export function createLiveClientFromEnv(
     })
     return { client }
   } catch (err) {
-    return { client: null, reason: err instanceof Error ? err.message : String(err) }
+    return {
+      client: null,
+      reason: err instanceof Error ? err.message : String(err),
+    }
   }
 }

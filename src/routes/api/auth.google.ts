@@ -1,6 +1,10 @@
 import { randomBytes } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
-import { buildGoogleAuthUrl, isGoogleOAuthEnabled, storeOAuthState } from '../../server/google-oauth'
+import {
+  buildGoogleAuthUrl,
+  isGoogleOAuthEnabled,
+  storeOAuthState,
+} from '../../server/google-oauth'
 
 export const Route = createFileRoute('/api/auth/google')({
   server: {

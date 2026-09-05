@@ -1,13 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { hasModelConfigValue, parseModelProvider, parseTimeoutInput, readFallbackModelConfig, readPerformanceConfig, readPrimaryModelConfig, stripProviderPrefix } from './utils'
+import {
+  hasModelConfigValue,
+  parseModelProvider,
+  parseTimeoutInput,
+  readFallbackModelConfig,
+  readPerformanceConfig,
+  readPrimaryModelConfig,
+  stripProviderPrefix,
+} from './utils'
 import {
   DEFAULT_STREAM_READ_TIMEOUT_SECONDS,
   DEFAULT_STREAM_STALE_TIMEOUT_SECONDS,
   MODEL_PRESETS,
   MODEL_PROVIDER_OPTIONS,
 } from './types'
-import type { ClaudeConfig, ModelConfigDraft, PerformanceDraft, SelectOption } from './types'
+import type {
+  ClaudeConfig,
+  ModelConfigDraft,
+  PerformanceDraft,
+  SelectOption,
+} from './types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
@@ -15,11 +28,13 @@ import { toast } from '@/components/ui/toast'
 async function getConfig(): Promise<Record<string, unknown>> {
   const res = await fetch('/api/claude-config')
   if (!res.ok) throw new Error(`Failed to load config: HTTP ${res.status}`)
-  const data = await res.json() as { config?: Record<string, unknown> }
+  const data = (await res.json()) as { config?: Record<string, unknown> }
   return data.config ?? {}
 }
 
-async function patchConfig(patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+async function patchConfig(
+  patch: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
   const res = await fetch('/api/claude-config', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -51,7 +66,9 @@ export function ModelConfigSection(props: {
   return (
     <section className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 shadow-sm">
       <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-[var(--theme-text)]">{title}</h3>
+        <h3 className="text-sm font-semibold text-[var(--theme-text)]">
+          {title}
+        </h3>
         <p className="text-sm text-[var(--theme-muted)]">{description}</p>
       </div>
 
@@ -289,8 +306,8 @@ export function ActiveModelCard({
                   Fallback Model
                 </h3>
                 <p className="text-sm text-[var(--theme-muted)]">
-                  Optional secondary model Hermes Agent can use if the primary path
-                  fails.
+                  Optional secondary model Hermes Agent can use if the primary
+                  path fails.
                 </p>
               </div>
               <Button
@@ -348,7 +365,9 @@ export function ActiveModelCard({
                     }))
                   }}
                 />
-                <p className="text-xs text-[var(--theme-muted)]">Default: 90s</p>
+                <p className="text-xs text-[var(--theme-muted)]">
+                  Default: 90s
+                </p>
               </label>
 
               <label className="space-y-1.5">
@@ -367,7 +386,9 @@ export function ActiveModelCard({
                     }))
                   }}
                 />
-                <p className="text-xs text-[var(--theme-muted)]">Default: 60s</p>
+                <p className="text-xs text-[var(--theme-muted)]">
+                  Default: 60s
+                </p>
               </label>
             </div>
 
@@ -381,4 +402,3 @@ export function ActiveModelCard({
     </section>
   )
 }
-

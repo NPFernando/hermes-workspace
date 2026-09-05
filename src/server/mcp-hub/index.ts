@@ -224,9 +224,7 @@ export async function unifiedSearch(
       allEntries.push(...localRes.entries)
       warnings.push('all remote sources failed — local-file fallback used')
     } catch (err) {
-      warnings.push(
-        `local-file fallback also failed: ${safeErrorMessage(err)}`,
-      )
+      warnings.push(`local-file fallback also failed: ${safeErrorMessage(err)}`)
     }
   }
 

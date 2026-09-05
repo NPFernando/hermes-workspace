@@ -61,7 +61,7 @@ export function ActiveModelKpi({
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
         style={{
-          background: `linear-gradient(90deg, ${tone}, color-mix(in srgb, ${tone} 33%, transparent), transparent)`,
+          background: `linear-gradient(90deg, ${tone}, ${tone}55, transparent)`,
         }}
       />
       <div
@@ -71,7 +71,9 @@ export function ActiveModelKpi({
       />
 
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+        <span
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]"
+        >
           Active Model
         </span>
         <span
@@ -83,10 +85,7 @@ export function ActiveModelKpi({
             color: tone,
           }}
         >
-          <span
-            className="size-1.5 rounded-full"
-            style={{ background: tone }}
-          />
+          <span className="size-1.5 rounded-full" style={{ background: tone }} />
           {connected ? 'Online' : 'Offline'}
         </span>
       </div>
@@ -102,8 +101,7 @@ export function ActiveModelKpi({
           <span
             className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em]"
             style={{
-              background:
-                'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
+              background: 'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
               color: 'var(--theme-accent)',
             }}
             title="Share of API calls in the analytics window."
@@ -114,14 +112,18 @@ export function ActiveModelKpi({
       </div>
 
       <div className="flex items-center justify-between gap-2 text-[10px]">
-        <span className="truncate font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+        <span
+          className="truncate font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]"
+        >
           {provider}
           {sessionsForModel !== null
             ? ` · ${formatCount(sessionsForModel)} sessions`
             : ''}
         </span>
         {modelInfo?.effectiveContextLength ? (
-          <span className="font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+          <span
+            className="font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]"
+          >
             ctx {formatCount(modelInfo.effectiveContextLength)}
           </span>
         ) : null}

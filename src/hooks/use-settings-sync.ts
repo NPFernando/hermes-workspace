@@ -32,51 +32,57 @@ export function useSettingsSync() {
       fetch('/api/user-profile')
         .then((r) => (r.ok ? (r.json() as Promise<GoogleProfile>) : null))
         .catch(() => null),
-    ]).then(([serverSettings, googleProfile]) => {
-      applyingFromServer.current = true
+    ])
+      .then(([serverSettings, googleProfile]) => {
+        applyingFromServer.current = true
 
-      if (serverSettings && typeof serverSettings === 'object') {
-        if (serverSettings.theme && isValidTheme(serverSettings.theme)) {
-          setTheme(serverSettings.theme)
-        }
-        if (serverSettings.studioSettings) {
-          useSettingsStore.getState().updateSettings(serverSettings.studioSettings)
-        }
-        if (serverSettings.chatSettings) {
-          useChatSettingsStore.getState().updateSettings(serverSettings.chatSettings)
-        }
-      }
-
-      // Auto-populate sidebar profile from Google if it's still the default identity
-      if (googleProfile?.name || googleProfile?.picture) {
-        const chat = useChatSettingsStore.getState().settings
-        const updates: Partial<ChatSettings> = {}
-        if (chat.displayName === 'User' && googleProfile.name) {
-          updates.displayName = googleProfile.name
-        }
-        if (chat.avatarDataUrl === null && googleProfile.picture) {
-          updates.avatarDataUrl = googleProfile.picture
-        }
-        if (Object.keys(updates).length > 0) {
-          useChatSettingsStore.getState().updateSettings(updates)
-          // Push merged settings to server; the subscribe guard is active so we do it directly
-          const payload: SyncedSettings = {
-            theme: getTheme(),
-            studioSettings: useSettingsStore.getState().settings,
-            chatSettings: useChatSettingsStore.getState().settings,
+        if (serverSettings && typeof serverSettings === 'object') {
+          if (serverSettings.theme && isValidTheme(serverSettings.theme)) {
+            setTheme(serverSettings.theme)
           }
-          fetch('/api/user-settings', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          }).catch(() => {})
+          if (serverSettings.studioSettings) {
+            useSettingsStore
+              .getState()
+              .updateSettings(serverSettings.studioSettings)
+          }
+          if (serverSettings.chatSettings) {
+            useChatSettingsStore
+              .getState()
+              .updateSettings(serverSettings.chatSettings)
+          }
         }
-      }
 
-      setTimeout(() => {
-        applyingFromServer.current = false
-      }, 200)
-    }).catch(() => {})
+        // Auto-populate sidebar profile from Google if it's still the default identity
+        if (googleProfile?.name || googleProfile?.picture) {
+          const chat = useChatSettingsStore.getState().settings
+          const updates: Partial<ChatSettings> = {}
+          if (chat.displayName === 'User' && googleProfile.name) {
+            updates.displayName = googleProfile.name
+          }
+          if (chat.avatarDataUrl === null && googleProfile.picture) {
+            updates.avatarDataUrl = googleProfile.picture
+          }
+          if (Object.keys(updates).length > 0) {
+            useChatSettingsStore.getState().updateSettings(updates)
+            // Push merged settings to server; the subscribe guard is active so we do it directly
+            const payload: SyncedSettings = {
+              theme: getTheme(),
+              studioSettings: useSettingsStore.getState().settings,
+              chatSettings: useChatSettingsStore.getState().settings,
+            }
+            fetch('/api/user-settings', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            }).catch(() => {})
+          }
+        }
+
+        setTimeout(() => {
+          applyingFromServer.current = false
+        }, 200)
+      })
+      .catch(() => {})
   }, [])
 
   // Subscribe to local store changes → debounce push to server

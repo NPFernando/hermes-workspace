@@ -64,7 +64,9 @@ export function LoginScreen() {
   const [lockedUntil, setLockedUntil] = useState(0)
   const [lockCountdown, setLockCountdown] = useState(0)
   const [shakeKey, setShakeKey] = useState(0)
-  const [gatewayStatus, setGatewayStatus] = useState<'checking' | 'online' | 'offline'>('checking')
+  const [gatewayStatus, setGatewayStatus] = useState<
+    'checking' | 'online' | 'offline'
+  >('checking')
   const [googleEnabled, setGoogleEnabled] = useState(false)
 
   // Where to return the user after a successful login. Captured before the
@@ -97,7 +99,10 @@ export function LoginScreen() {
   useEffect(() => {
     if (lockedUntil <= 0) return
     const iv = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000))
+      const remaining = Math.max(
+        0,
+        Math.ceil((lockedUntil - Date.now()) / 1000),
+      )
       setLockCountdown(remaining)
       if (remaining <= 0) {
         clearInterval(iv)
@@ -112,14 +117,18 @@ export function LoginScreen() {
   // Gateway status + Google OAuth check
   useEffect(() => {
     fetch('/api/auth-check')
-      .then((r) => setGatewayStatus(r.ok || r.status === 401 ? 'online' : 'offline'))
+      .then((r) =>
+        setGatewayStatus(r.ok || r.status === 401 ? 'online' : 'offline'),
+      )
       .catch(() => setGatewayStatus('offline'))
 
     fetch('/api/auth/google?check=1')
       .then((r) => r.json())
       .then((data: unknown) => {
         setGoogleEnabled(
-          typeof data === 'object' && data !== null && (data as { enabled?: boolean }).enabled === true
+          typeof data === 'object' &&
+            data !== null &&
+            (data as { enabled?: boolean }).enabled === true,
         )
       })
       .catch(() => setGoogleEnabled(false))
@@ -197,13 +206,15 @@ export function LoginScreen() {
       <div className="lp-orb lp-orb-2" />
       <div className="lp-orb lp-orb-3" />
 
-      <div key={shakeKey} className={`lp-card${shakeKey > 0 && error ? ' lp-shake' : ''}`}>
-
+      <div
+        key={shakeKey}
+        className={`lp-card${shakeKey > 0 && error ? ' lp-shake' : ''}`}
+      >
         {/* Logo */}
         <div className="lp-logo">
           <div className="lp-logo-icon">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
             </svg>
           </div>
           <div className="lp-logo-title">Hermes Workspace</div>
@@ -213,8 +224,15 @@ export function LoginScreen() {
         {/* Error message */}
         {error && !success && (
           <div className="lp-msg lp-msg-err">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="15" y1="9" x2="9" y2="15" />
+              <line x1="9" y1="9" x2="15" y2="15" />
             </svg>
             <span>{error}</span>
           </div>
@@ -223,8 +241,14 @@ export function LoginScreen() {
         {/* Success message */}
         {success && (
           <div className="lp-msg lp-msg-ok">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
             <span>Authentication successful. Redirecting...</span>
           </div>
@@ -236,13 +260,27 @@ export function LoginScreen() {
             type="button"
             className="lp-google"
             disabled={loading}
-            onClick={() => { window.location.href = '/api/auth/google' }}
+            onClick={() => {
+              window.location.href = '/api/auth/google'
+            }}
           >
             <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
-              <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.4 30.2 0 24 0 14.7 0 6.7 5.4 2.9 13.3l7.8 6C12.5 13 17.8 9.5 24 9.5z"/>
-              <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17z"/>
-              <path fill="#FBBC05" d="M10.7 28.7A14.4 14.4 0 0 1 9.5 24c0-1.6.3-3.2.7-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.9 10.7l7.8-6z"/>
-              <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.2-7.7 2.2-6.2 0-11.5-4.2-13.3-9.9l-7.8 6C6.7 42.6 14.7 48 24 48z"/>
+              <path
+                fill="#EA4335"
+                d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.4 30.2 0 24 0 14.7 0 6.7 5.4 2.9 13.3l7.8 6C12.5 13 17.8 9.5 24 9.5z"
+              />
+              <path
+                fill="#4285F4"
+                d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M10.7 28.7A14.4 14.4 0 0 1 9.5 24c0-1.6.3-3.2.7-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.9 10.7l7.8-6z"
+              />
+              <path
+                fill="#34A853"
+                d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.2-7.7 2.2-6.2 0-11.5-4.2-13.3-9.9l-7.8 6C6.7 42.6 14.7 48 24 48z"
+              />
             </svg>
             Sign in with Google
           </button>
@@ -255,10 +293,19 @@ export function LoginScreen() {
         {/* Password form */}
         <form onSubmit={handleSubmit} autoComplete="off">
           <div style={{ marginBottom: 20 }}>
-            <label className="lp-label" htmlFor="lp-pw">Access Password</label>
+            <label className="lp-label" htmlFor="lp-pw">
+              Access Password
+            </label>
             <div className="lp-input-wrap">
-              <svg className="lp-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              <svg
+                className="lp-input-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
               <input
                 id="lp-pw"
@@ -278,20 +325,33 @@ export function LoginScreen() {
                 aria-label="Toggle password visibility"
               >
                 {showPassword ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
                   </svg>
                 ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
                   </svg>
                 )}
               </button>
             </div>
             <div className="lp-attempts">
               {attemptsLeft < MAX_ATTEMPTS && !isLocked && (
-                <span>{attemptsLeft} attempt{attemptsLeft === 1 ? '' : 's'} left</span>
+                <span>
+                  {attemptsLeft} attempt{attemptsLeft === 1 ? '' : 's'} left
+                </span>
               )}
             </div>
           </div>
@@ -321,7 +381,9 @@ export function LoginScreen() {
         </form>
 
         {/* Status bar */}
-        <div className="lp-divider" style={{ marginTop: 24, marginBottom: 0 }}>System Status</div>
+        <div className="lp-divider" style={{ marginTop: 24, marginBottom: 0 }}>
+          System Status
+        </div>
         <div className="lp-status-bar">
           <div className="lp-status-item">
             <span className="lp-dot lp-dot-online" />
@@ -337,9 +399,7 @@ export function LoginScreen() {
           </div>
         </div>
 
-        <div className="lp-footer">
-          Secured by Hermes Agent &middot; v2.3.0
-        </div>
+        <div className="lp-footer">Secured by Hermes Agent &middot; v2.3.0</div>
       </div>
     </div>
   )

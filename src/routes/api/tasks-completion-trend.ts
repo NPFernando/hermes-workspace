@@ -21,15 +21,20 @@ export const Route = createFileRoute('/api/tasks-completion-trend')({
 
         // Count completions from agent_history 'completed' entries (accurate vs updated_at)
         all.forEach((t) => {
-          (t.agent_history ?? []).forEach((h: { action: string; at?: string }) => {
-            if (h.action === 'completed' && h.at) {
-              const day = h.at.slice(0, 10)
-              if (day in days) days[day]++
-            }
-          })
+          ;(t.agent_history ?? []).forEach(
+            (h: { action: string; at?: string }) => {
+              if (h.action === 'completed' && h.at) {
+                const day = h.at.slice(0, 10)
+                if (day in days) days[day]++
+              }
+            },
+          )
         })
 
-        const trend = Object.entries(days).map(([date, count]) => ({ date, count }))
+        const trend = Object.entries(days).map(([date, count]) => ({
+          date,
+          count,
+        }))
         const total = trend.reduce((s, d) => s + d.count, 0)
         return json({ ok: true, trend, total })
       },

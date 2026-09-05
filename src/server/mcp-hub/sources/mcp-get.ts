@@ -54,7 +54,8 @@ function parseManifestEntries(data: unknown): Array<HubMcpEntry> {
     items = data
   } else if (data && typeof data === 'object') {
     const d = data as Record<string, unknown>
-    const candidate = d.manifests ?? d.servers ?? d.packages ?? d.items ?? d.results
+    const candidate =
+      d.manifests ?? d.servers ?? d.packages ?? d.items ?? d.results
     items = Array.isArray(candidate) ? candidate : []
   } else {
     return []
@@ -69,14 +70,17 @@ function parseManifestEntries(data: unknown): Array<HubMcpEntry> {
     // legacy/manual manifests may use `name`. Prefer qualified, fall back.
     const rawAny = raw as Record<string, unknown>
     const qualified =
-      typeof rawAny.qualifiedName === 'string' ? rawAny.qualifiedName.trim() : ''
+      typeof rawAny.qualifiedName === 'string'
+        ? rawAny.qualifiedName.trim()
+        : ''
     const display =
       typeof rawAny.displayName === 'string' ? rawAny.displayName.trim() : ''
     const fallbackName = typeof raw.name === 'string' ? raw.name.trim() : ''
     const name = qualified || fallbackName || display
     if (!name) continue
 
-    const description = typeof raw.description === 'string' ? raw.description.trim() : ''
+    const description =
+      typeof raw.description === 'string' ? raw.description.trim() : ''
     const homepage =
       typeof raw.homepage === 'string' && raw.homepage.startsWith('http')
         ? raw.homepage
@@ -106,7 +110,10 @@ function parseManifestEntries(data: unknown): Array<HubMcpEntry> {
       transportType: transport,
       command: typeof raw.command === 'string' ? raw.command : undefined,
       args: Array.isArray(raw.args) ? raw.args : undefined,
-      env: raw.env && typeof raw.env === 'object' && !Array.isArray(raw.env) ? raw.env : undefined,
+      env:
+        raw.env && typeof raw.env === 'object' && !Array.isArray(raw.env)
+          ? raw.env
+          : undefined,
       url: typeof raw.url === 'string' ? raw.url : undefined,
     }
 
@@ -154,7 +161,11 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
     const msg = safeErrorMessage(err)
     warnings.push(`mcp-get: network error: ${msg}`)
     if (cached) {
-      return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -170,7 +181,8 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
   if (response.status === 403) {
     const remaining = response.headers.get('X-RateLimit-Remaining')
     const resetAt = response.headers.get('X-RateLimit-Reset')
-    const remainingNum = remaining !== null ? parseInt(remaining, 10) : undefined
+    const remainingNum =
+      remaining !== null ? parseInt(remaining, 10) : undefined
     const resetAtNum = resetAt !== null ? parseInt(resetAt, 10) : undefined
 
     warnings.push(
@@ -181,10 +193,16 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
     if (cached) {
       setCache(SOURCE_ID, {
         ...cached,
-        ...(remainingNum !== undefined ? { rateLimitRemaining: remainingNum } : {}),
+        ...(remainingNum !== undefined
+          ? { rateLimitRemaining: remainingNum }
+          : {}),
         ...(resetAtNum !== undefined ? { rateLimitResetAt: resetAtNum } : {}),
       })
-      return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -193,7 +211,11 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
   if (!response.ok) {
     warnings.push(`mcp-get: unexpected status ${response.status}`)
     if (cached) {
-      return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -206,7 +228,11 @@ export async function fetchMcpGet(signal?: AbortSignal): Promise<McpGetResult> {
     const msg = safeErrorMessage(err)
     warnings.push(`mcp-get: failed to parse JSON: ${msg}`)
     if (cached) {
-      return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }

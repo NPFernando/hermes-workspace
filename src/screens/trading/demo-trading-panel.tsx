@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { MiniStat } from './components/mini-stat'
-import { formatSignedAmount } from './format-helpers'
+import { formatFractionPct, formatSignedAmount } from './format-helpers'
 
 interface StrategyScore {
   strategyId: string
@@ -13,6 +13,8 @@ interface StrategyScore {
   totalPnlQuote: number
   lossStreak: number
   cooldownUntil?: string | null
+  avgWinQuote?: number
+  avgLossQuote?: number
 }
 interface TradeLogEntry {
   id: string
@@ -21,6 +23,7 @@ interface TradeLogEntry {
   pnlQuote: number
   reason: string
   closedAt: string
+  executionMode?: 'paper' | 'testnet' | 'live' | 'shadow_paper'
 }
 interface OpenPosition {
   id: string
@@ -28,7 +31,17 @@ interface OpenPosition {
   strategyId: string
   entryPrice: number
   entryQuote: number
+  openedAt: string
   executionMode?: 'paper' | 'testnet' | 'live' | 'shadow_paper'
+  /** Live display-only fields, populated when the monitor has a fresh price
+   * for this symbol — undefined until then (e.g. right after server start). */
+  currentPrice?: number
+  breakEvenPrice?: number
+  unrealizedPnlQuote?: number
+  unrealizedPnlPct?: number
+  /** True when "patient hold" (no-loss exit mode) is keeping this position
+   * open at a loss this cycle instead of realizing a stop-out/exit. */
+  holdingForRecovery?: boolean
 }
 interface GuardianBlock {
   symbol: string
@@ -59,6 +72,35 @@ interface EngineConfigView {
   stopLossPct: number
   takeProfitPct: number
   guardian: { maxOpenPositions: number }
+  enabledStrategies: Array<string>
+  kellySizingMinClosedTrades: number
+  patternVetoMinSamples: number
+}
+interface RecoveryAnalytics {
+  generatedAt: string
+  sample: {
+    closedTrades: number
+    openPositions: number
+    recoveredTrades: number
+    forcedCloseTrades: number
+  }
+  closed: {
+    recoveryRate: number | null
+    averageHoldMinutes: number | null
+    maxHoldMinutes: number | null
+    capitalHours: number
+    realizedPnlQuote: number
+    realizedLossQuote: number
+  }
+  open: {
+    underwaterCount: number
+    underwaterQuote: number
+    unrealizedPnlQuote: number
+    averageHoldMinutes: number | null
+    maxHoldMinutes: number | null
+    capitalHours: number
+    nearestBreakevenPct: number | null
+  }
 }
 interface LearningFinding {
   severity: 'info' | 'warning' | 'critical'
@@ -134,12 +176,15 @@ interface EngineState {
   scores: Array<StrategyScore>
   positions: Array<OpenPosition>
   trades: Array<TradeLogEntry>
+  archivedPositions?: Array<OpenPosition>
+  archivedTrades?: Array<TradeLogEntry>
   guardianBlocks: Array<GuardianBlock>
   dailyPnlQuote: number
   monitor?: LiveMonitor
   config?: EngineConfigView
   learning?: LearningReport
   marketLearning?: MarketLearningReport
+  recoveryAnalytics?: RecoveryAnalytics
 }
 interface SettingsForm {
   tp: string
@@ -182,6 +227,10 @@ export function DemoTradingPanel() {
 
   useEffect(() => {
     void load()
+    // Council/demo-trading is the baseline (no offset); grid/llm/rebalance
+    // are staggered a few seconds apart from this one and each other so the
+    // 4 independent endpoints don't all get hit in the same instant every
+    // 30s.
     const id = window.setInterval(load, 30_000)
     return () => window.clearInterval(id)
   }, [load])
@@ -279,7 +328,18 @@ export function DemoTradingPanel() {
   }, [form, load])
 
   const scores = state?.scores ?? []
-  const activeScores = scores.filter((s) => s.trades > 0 || s.score !== 0)
+  const scoresWithHistory = scores.filter((s) => s.trades > 0 || s.score !== 0)
+  const enabledStrategySet = new Set(cfg?.enabledStrategies ?? [])
+  const currentStrategyScores = scoresWithHistory.filter((s) =>
+    enabledStrategySet.has(s.strategyId),
+  )
+  const legacyStrategyScores = scoresWithHistory.filter(
+    (s) => !enabledStrategySet.has(s.strategyId),
+  )
+  const minSamplesForFullSizing = Math.max(
+    state?.config?.kellySizingMinClosedTrades ?? 0,
+    state?.config?.patternVetoMinSamples ?? 0,
+  )
 
   const monitor = state?.monitor
   const chrono = [...(state?.trades ?? [])].reverse() // trades arrive newest-first
@@ -306,17 +366,25 @@ export function DemoTradingPanel() {
   const marketLearning = state?.marketLearning
   const marketLearningStatus =
     marketLearning?.overallStatus.replace(/_/g, ' ') ?? 'pending'
+  const recovery = state?.recoveryAnalytics
+  const durationLabel = (minutes: number | null | undefined) =>
+    minutes == null
+      ? '—'
+      : minutes < 60
+        ? `${minutes.toFixed(0)}m`
+        : `${(minutes / 60).toFixed(1)}h`
 
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-[var(--theme-text)]">
-            Binance trading engine
+            Binance execution engine
           </h2>
           <p className="text-xs text-[var(--theme-muted)]">
-            Council of strategies + guardian risk layer for paper, testnet, and
-            gated live Binance. Realized PnL today:{' '}
+            Council of strategies + guardian risk layer across paper trading,
+            Binance sandbox/testnet, and explicitly gated live execution.
+            Realized PnL today:{' '}
             <strong
               className={
                 state && state.dailyPnlQuote >= 0
@@ -679,31 +747,101 @@ export function DemoTradingPanel() {
         </div>
       )}
 
+      {recovery && (
+        <section className="mt-4 rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold">Sandbox recovery outcomes</h3>
+              <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                Realized and open-position evidence for the current execution
+                mode. Open positions never count as recovered until closed.
+              </p>
+            </div>
+            <span className="text-[10px] text-[var(--theme-muted)]">
+              {recovery.sample.closedTrades} closed ·{' '}
+              {recovery.sample.openPositions} open
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <MiniStat
+              label="Recovery rate"
+              value={
+                recovery.closed.recoveryRate == null
+                  ? 'Insufficient data'
+                  : formatFractionPct(recovery.closed.recoveryRate)
+              }
+            />
+            <MiniStat
+              label="Realized P&L"
+              value={`${money(recovery.closed.realizedPnlQuote)} USDT`}
+            />
+            <MiniStat
+              label="Avg hold"
+              value={durationLabel(recovery.closed.averageHoldMinutes)}
+            />
+            <MiniStat
+              label="Capital-hours"
+              value={`${recovery.closed.capitalHours.toFixed(1)}h`}
+            />
+            <MiniStat
+              label="Underwater now"
+              value={`${recovery.open.underwaterCount} · ${money(recovery.open.unrealizedPnlQuote)} USDT`}
+            />
+            <MiniStat
+              label="Capital at risk"
+              value={`${recovery.open.underwaterQuote.toFixed(2)} USDT`}
+            />
+            <MiniStat
+              label="Open avg hold"
+              value={durationLabel(recovery.open.averageHoldMinutes)}
+            />
+            <MiniStat
+              label="Forced closes"
+              value={`${recovery.sample.forcedCloseTrades}`}
+            />
+          </div>
+          <p className="mt-2 text-[10px] text-[var(--theme-muted)]">
+            Sample: {recovery.sample.recoveredTrades} recovered outcomes ·{' '}
+            {recovery.sample.forcedCloseTrades} forced closes · max closed hold{' '}
+            {durationLabel(recovery.closed.maxHoldMinutes)} · last calculated{' '}
+            {new Date(recovery.generatedAt).toLocaleTimeString()}
+          </p>
+        </section>
+      )}
+
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div>
           <h3 className="text-sm font-semibold text-[var(--theme-text)]">
             Strategy scoreboard
           </h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            Active strategies (currently voting/trading) shown first. Sample
+            size below the engine's Kelly-sizing/pattern-veto thresholds (
+            {minSamplesForFullSizing || 'n/a'} trades) is flagged — those
+            rows still trade at full size until enough data comes in.
+          </p>
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full min-w-[26rem] text-left text-xs">
+            <table className="w-full min-w-[32rem] text-left text-xs">
               <thead className="text-[var(--theme-muted)]">
                 <tr>
                   <th className="py-1 pr-2">Strategy</th>
                   <th className="px-2">Trades</th>
                   <th className="px-2">Win%</th>
                   <th className="px-2">Score</th>
+                  <th className="px-2">Avg win</th>
+                  <th className="px-2">Avg loss</th>
                   <th className="px-2">PnL</th>
                 </tr>
               </thead>
               <tbody>
-                {activeScores.length === 0 ? (
+                {currentStrategyScores.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-2 text-[var(--theme-muted)]">
+                    <td colSpan={7} className="py-2 text-[var(--theme-muted)]">
                       No trades yet — scores build as the engine runs.
                     </td>
                   </tr>
                 ) : (
-                  activeScores
+                  currentStrategyScores
                     .sort((a, b) => b.score - a.score)
                     .map((s) => (
                       <tr
@@ -718,6 +856,16 @@ export function DemoTradingPanel() {
                                 cooldown
                               </span>
                             )}
+                          {minSamplesForFullSizing > 0 &&
+                            s.trades < minSamplesForFullSizing && (
+                              <span
+                                className="ml-1 rounded-full border border-[var(--theme-border)]/60 px-1.5 py-0.5 text-[10px] text-[var(--theme-muted)]"
+                                title="Below the engine's Kelly-sizing/pattern-veto sample threshold — trades at full size until enough closed trades accumulate."
+                              >
+                                {s.trades}/{minSamplesForFullSizing} to full
+                                sizing
+                              </span>
+                            )}
                         </td>
                         <td className="px-2 tabular-nums">{s.trades}</td>
                         <td className="px-2 tabular-nums">
@@ -727,6 +875,16 @@ export function DemoTradingPanel() {
                           className={`px-2 tabular-nums ${s.score >= 0 ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'}`}
                         >
                           {s.score.toFixed(2)}
+                        </td>
+                        <td className="px-2 tabular-nums text-[var(--theme-success)]">
+                          {s.avgWinQuote != null
+                            ? money(Math.abs(s.avgWinQuote))
+                            : '—'}
+                        </td>
+                        <td className="px-2 tabular-nums text-[var(--theme-danger)]">
+                          {s.avgLossQuote != null
+                            ? money(-Math.abs(s.avgLossQuote))
+                            : '—'}
                         </td>
                         <td
                           className={`px-2 tabular-nums ${s.totalPnlQuote >= 0 ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'}`}
@@ -740,23 +898,138 @@ export function DemoTradingPanel() {
             </table>
           </div>
 
+          {legacyStrategyScores.length > 0 && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs font-semibold text-[var(--theme-muted)]">
+                Legacy / disabled strategies (history only) —{' '}
+                {legacyStrategyScores.length}
+              </summary>
+              <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                No longer in the active strategy mix — kept here for
+                reference only, not currently voting or trading.
+              </p>
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full min-w-[32rem] text-left text-xs opacity-70">
+                  <thead className="text-[var(--theme-muted)]">
+                    <tr>
+                      <th className="py-1 pr-2">Strategy</th>
+                      <th className="px-2">Trades</th>
+                      <th className="px-2">Win%</th>
+                      <th className="px-2">Avg win</th>
+                      <th className="px-2">Avg loss</th>
+                      <th className="px-2">PnL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {legacyStrategyScores
+                      .sort((a, b) => b.trades - a.trades)
+                      .map((s) => (
+                        <tr
+                          key={s.strategyId}
+                          className="border-t border-[var(--theme-border)]/40"
+                        >
+                          <td className="py-1 pr-2 font-medium">
+                            {s.strategyId}
+                          </td>
+                          <td className="px-2 tabular-nums">{s.trades}</td>
+                          <td className="px-2 tabular-nums">
+                            {(s.winRate * 100).toFixed(0)}%
+                          </td>
+                          <td className="px-2 tabular-nums text-[var(--theme-success)]">
+                            {s.avgWinQuote != null
+                              ? money(Math.abs(s.avgWinQuote))
+                              : '—'}
+                          </td>
+                          <td className="px-2 tabular-nums text-[var(--theme-danger)]">
+                            {s.avgLossQuote != null
+                              ? money(-Math.abs(s.avgLossQuote))
+                              : '—'}
+                          </td>
+                          <td
+                            className={`px-2 tabular-nums ${s.totalPnlQuote >= 0 ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'}`}
+                          >
+                            {money(s.totalPnlQuote)}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
+
           <h3 className="mt-4 text-sm font-semibold text-[var(--theme-text)]">
             Open positions ({state?.positions.length ?? 0})
           </h3>
+          {(() => {
+            const recovering = (state?.positions ?? []).filter(
+              (p) => p.holdingForRecovery,
+            )
+            if (recovering.length === 0) return null
+            const totalUnrealized = recovering.reduce(
+              (sum, p) => sum + (p.unrealizedPnlQuote ?? 0),
+              0,
+            )
+            return (
+              <p className="mt-1 text-xs text-[color-mix(in_srgb,var(--theme-warning)_90%,transparent)]">
+                ⏳ {recovering.length} position
+                {recovering.length === 1 ? '' : 's'} held for recovery · total
+                unrealized {money(totalUnrealized)} USDT · engine will keep
+                trying for breakeven or better instead of cutting a loss.
+              </p>
+            )
+          })()}
           <div className="mt-2 space-y-1">
             {(state?.positions ?? []).length === 0 ? (
               <p className="text-xs text-[var(--theme-muted)]">Flat.</p>
             ) : (
-              state!.positions.map((p) => (
-                <div
-                  key={p.id}
-                  className="rounded-lg border border-[var(--theme-border)]/50 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-2 text-xs"
-                >
-                  {p.symbol} · {p.strategyId} · {p.executionMode ?? 'testnet'} ·
-                  entry {p.entryPrice.toFixed(2)} · {p.entryQuote.toFixed(2)}{' '}
-                  USDT
-                </div>
-              ))
+              state!.positions.map((p) => {
+                const hasLive =
+                  p.currentPrice != null && p.currentPrice > 0
+                const pnlTone = !hasLive
+                  ? 'text-[var(--theme-muted)]'
+                  : p.holdingForRecovery
+                    ? 'text-[color-mix(in_srgb,var(--theme-warning)_90%,transparent)]'
+                    : (p.unrealizedPnlQuote ?? 0) >= 0
+                      ? 'text-[var(--theme-success)]'
+                      : 'text-[var(--theme-danger)]'
+                return (
+                  <div
+                    key={p.id}
+                    className="rounded-lg border border-[var(--theme-border)]/50 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-2 text-xs"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-x-2">
+                      <span>
+                        {p.symbol} · {p.strategyId} ·{' '}
+                        {p.executionMode ?? 'testnet'} · entry{' '}
+                        {p.entryPrice.toFixed(2)} · {p.entryQuote.toFixed(2)}{' '}
+                        USDT
+                      </span>
+                      {p.holdingForRecovery && (
+                        <span className="rounded-full border border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-2 py-0.5 text-[10px] font-medium text-[color-mix(in_srgb,var(--theme-warning)_90%,transparent)]">
+                          ⏳ patient hold — researching recovery
+                        </span>
+                      )}
+                    </div>
+                    {hasLive && (
+                      <div
+                        className={`mt-1 flex flex-wrap items-center gap-x-2 tabular-nums ${pnlTone}`}
+                      >
+                        <span>current {p.currentPrice!.toFixed(2)}</span>
+                        <span className="opacity-30">·</span>
+                        <span>
+                          {money(p.unrealizedPnlQuote ?? 0)} USDT (
+                          {formatFractionPct(p.unrealizedPnlPct ?? 0)})
+                        </span>
+                        <span className="opacity-30">·</span>
+                        <span>
+                          breakeven {p.breakEvenPrice?.toFixed(2) ?? '?'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
             )}
           </div>
         </div>
@@ -807,6 +1080,56 @@ export function DemoTradingPanel() {
                 ))}
               </div>
             </>
+          )}
+
+          {(((state?.archivedPositions?.length ?? 0) > 0) ||
+            ((state?.archivedTrades?.length ?? 0) > 0)) && (
+            <details className="mt-4">
+              <summary className="cursor-pointer text-sm font-semibold text-[var(--theme-muted)]">
+                Archived history — other mode (
+                {state?.archivedPositions?.length ?? 0} position
+                {(state?.archivedPositions?.length ?? 0) === 1 ? '' : 's'},{' '}
+                {state?.archivedTrades?.length ?? 0} trade
+                {(state?.archivedTrades?.length ?? 0) === 1 ? '' : 's'})
+              </summary>
+              <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                Left over from a previous paper/testnet/live mode. Excluded
+                from the current totals above so they don't skew today's
+                numbers — kept here only for reference, nothing here is
+                touched or closed automatically.
+              </p>
+              <div className="mt-2 space-y-1">
+                {(state?.archivedPositions ?? []).map((p) => (
+                  <div
+                    key={p.id}
+                    className="rounded-lg border border-[var(--theme-border)]/50 bg-[color-mix(in_srgb,var(--theme-text)_5%,transparent)] p-2 text-xs opacity-70"
+                  >
+                    {p.symbol} · {p.strategyId} · {p.executionMode ?? '?'} ·
+                    entry {p.entryPrice.toFixed(2)} · {p.entryQuote.toFixed(2)}{' '}
+                    USDT · opened {new Date(p.openedAt).toLocaleDateString()}
+                    {p.currentPrice != null && p.currentPrice > 0 && (
+                      <>
+                        {' '}
+                        · current {p.currentPrice.toFixed(2)} ·{' '}
+                        {money(p.unrealizedPnlQuote ?? 0)} USDT (
+                        {formatFractionPct(p.unrealizedPnlPct ?? 0)})
+                      </>
+                    )}
+                  </div>
+                ))}
+                {(state?.archivedTrades ?? []).map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between rounded-lg border border-[var(--theme-border)]/50 bg-[color-mix(in_srgb,var(--theme-text)_5%,transparent)] p-2 text-xs opacity-70"
+                  >
+                    <span>
+                      {t.symbol} · {t.strategyId} · {t.executionMode ?? '?'}
+                    </span>
+                    <span>{money(t.pnlQuote)} USDT</span>
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
         </div>
       </div>

@@ -37,7 +37,9 @@ function httpsGetText(url: string): Promise<string> {
       (response) => {
         if ((response.statusCode ?? 500) >= 400) {
           response.resume()
-          reject(new Error(`Google News RSS returned HTTP ${response.statusCode}`))
+          reject(
+            new Error(`Google News RSS returned HTTP ${response.statusCode}`),
+          )
           return
         }
         let bytes = 0
@@ -46,7 +48,11 @@ function httpsGetText(url: string): Promise<string> {
         response.on('data', (chunk: string) => {
           bytes += Buffer.byteLength(chunk)
           if (bytes > MAX_RESPONSE_BYTES) {
-            request.destroy(new Error('Google News RSS response exceeded maximum allowed size'))
+            request.destroy(
+              new Error(
+                'Google News RSS response exceeded maximum allowed size',
+              ),
+            )
             return
           }
           body += chunk
@@ -55,9 +61,15 @@ function httpsGetText(url: string): Promise<string> {
       },
     )
     request.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      request.destroy(new Error(`Google News RSS request timed out after ${REQUEST_TIMEOUT_MS}ms`))
+      request.destroy(
+        new Error(
+          `Google News RSS request timed out after ${REQUEST_TIMEOUT_MS}ms`,
+        ),
+      )
     })
-    request.on('error', (error) => reject(new Error(`Failed to fetch Google News RSS: ${error.message}`)))
+    request.on('error', (error) =>
+      reject(new Error(`Failed to fetch Google News RSS: ${error.message}`)),
+    )
   })
 }
 
@@ -74,7 +86,9 @@ function decodeXml(value: string): string {
 }
 
 function tagValue(xml: string, tag: string): string | undefined {
-  const match = xml.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, 'i'))
+  const match = xml.match(
+    new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, 'i'),
+  )
   const value = match?.[1] ? decodeXml(match[1]) : ''
   return value || undefined
 }
@@ -95,13 +109,19 @@ function normalizePublisherUrl(value: string | undefined): string | undefined {
   }
 }
 
-function sourceFromItem(item: string): { sourceName: string; sourceUrl: string } {
+function sourceFromItem(item: string): {
+  sourceName: string
+  sourceUrl: string
+} {
   const sourceMatch = item.match(/<source\b([^>]*)>([\s\S]*?)<\/source>/i)
   const sourceName = decodeXml(sourceMatch?.[2] ?? '') || 'Google News'
-  const urlAttribute = sourceMatch?.[1]?.match(/\burl\s*=\s*["']([^"']+)["']/i)?.[1]
+  const urlAttribute = sourceMatch?.[1]?.match(
+    /\burl\s*=\s*["']([^"']+)["']/i,
+  )?.[1]
   // Google News' item link is a redirect. Store the publisher's URL from
   // <source url>, never the redirect URL, so callers receive a stable source.
-  const sourceUrl = normalizePublisherUrl(urlAttribute) ?? 'https://news.google.com'
+  const sourceUrl =
+    normalizePublisherUrl(urlAttribute) ?? 'https://news.google.com'
   return { sourceName, sourceUrl }
 }
 
@@ -127,9 +147,10 @@ export function parseGoogleNewsRss(
     if (!title) continue
     const { sourceName, sourceUrl } = sourceFromItem(item)
     const published = tagValue(item, 'pubDate')
-    const publishDate = published && !Number.isNaN(Date.parse(published))
-      ? new Date(published).toISOString()
-      : undefined
+    const publishDate =
+      published && !Number.isNaN(Date.parse(published))
+        ? new Date(published).toISOString()
+        : undefined
     const description = tagValue(item, 'description')
     const summary = description ? `${title} — ${description}` : title
     const fingerprint = `${normalizedSymbol}\n${sourceUrl}\n${publishDate ?? ''}\n${title}`
@@ -158,10 +179,17 @@ export function parseGoogleNewsRss(
 export async function fetchAndStoreGoogleNews(
   symbol: string,
   fetchText: (url: string) => Promise<string> = httpsGetText,
-): Promise<{ fetched: number; stored: number; items: Array<GoogleNewsRssItem> }> {
+): Promise<{
+  fetched: number
+  stored: number
+  items: Array<GoogleNewsRssItem>
+}> {
   const normalizedSymbol = symbol.trim().toUpperCase()
   if (!/^[A-Z0-9]{1,20}$/.test(normalizedSymbol))
     throw new Error('symbol must contain only letters and numbers')
-  const items = parseGoogleNewsRss(await fetchText(googleNewsRssUrl(normalizedSymbol)), normalizedSymbol)
+  const items = parseGoogleNewsRss(
+    await fetchText(googleNewsRssUrl(normalizedSymbol)),
+    normalizedSymbol,
+  )
   return { fetched: items.length, stored: storeFinanceNewsItems(items), items }
 }

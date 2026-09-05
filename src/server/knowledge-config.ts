@@ -44,7 +44,13 @@ export function writeKnowledgeBaseConfig(config: KnowledgeBaseConfig): void {
   // Normalize github repo: strip .git suffix if present
   const normalized: KnowledgeBaseConfig =
     config.source.type === 'github'
-      ? { ...config, source: { ...config.source, repo: config.source.repo.replace(/\.git$/i, '') } }
+      ? {
+          ...config,
+          source: {
+            ...config.source,
+            repo: config.source.repo.replace(/\.git$/i, ''),
+          },
+        }
       : config
   fs.writeFileSync(configPath, JSON.stringify(normalized, null, 2), 'utf-8')
 }

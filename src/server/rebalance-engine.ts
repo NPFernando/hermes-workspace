@@ -14,7 +14,11 @@
  */
 import { randomUUID } from 'node:crypto'
 import { createDemoClientFromEnv } from './binance-demo-client'
-import { appendAuditLog, readFinanceStore, writeFinanceStore } from './finance-store'
+import {
+  appendAuditLog,
+  readFinanceStore,
+  writeFinanceStore,
+} from './finance-store'
 import { executionModeAllowed } from './trading-execution-gate'
 import { recordResearchRun } from './research-store'
 import type { BinanceExecutionClient } from './binance-demo-client'
@@ -47,7 +51,9 @@ export const DEFAULT_REBALANCE_CONFIG: RebalanceConfig = {
   minTradeNotionalQuote: 5,
 }
 
-export function resolveRebalanceConfig(settingsOverride: unknown): RebalanceConfig {
+export function resolveRebalanceConfig(
+  settingsOverride: unknown,
+): RebalanceConfig {
   const fromSettings =
     settingsOverride && typeof settingsOverride === 'object'
       ? (settingsOverride as Partial<RebalanceConfig>)
@@ -55,7 +61,9 @@ export function resolveRebalanceConfig(settingsOverride: unknown): RebalanceConf
   return { ...DEFAULT_REBALANCE_CONFIG, ...fromSettings }
 }
 
-export function equalTargetWeights(symbols: Array<string>): Record<string, number> {
+export function equalTargetWeights(
+  symbols: Array<string>,
+): Record<string, number> {
   const w = 1 / symbols.length
   return Object.fromEntries(symbols.map((s) => [s, w]))
 }
@@ -98,11 +106,13 @@ export function planRebalance(
   targetWeights: Record<string, number>,
 ): { totalValueQuote: number; items: Array<RebalancePlanItem> } {
   const totalValueQuote =
-    freeQuoteBalance + Object.values(holdingsValueQuote).reduce((s, v) => s + v, 0)
+    freeQuoteBalance +
+    Object.values(holdingsValueQuote).reduce((s, v) => s + v, 0)
   const items: Array<RebalancePlanItem> = Object.entries(targetWeights).map(
     ([symbol, targetWeight]) => {
       const actualValueQuote = holdingsValueQuote[symbol] ?? 0
-      const actualWeight = totalValueQuote > 0 ? actualValueQuote / totalValueQuote : 0
+      const actualWeight =
+        totalValueQuote > 0 ? actualValueQuote / totalValueQuote : 0
       const targetValueQuote = totalValueQuote * targetWeight
       return {
         symbol,
@@ -118,7 +128,10 @@ export function planRebalance(
 }
 
 export function maxDrift(items: Array<RebalancePlanItem>): number {
-  return items.reduce((m, i) => Math.max(m, Math.abs(i.actualWeight - i.targetWeight)), 0)
+  return items.reduce(
+    (m, i) => Math.max(m, Math.abs(i.actualWeight - i.targetWeight)),
+    0,
+  )
 }
 
 /**
@@ -134,20 +147,39 @@ export function buildTradePlan(
   const sells = items
     .filter((i) => i.diffQuote < -config.minTradeNotionalQuote)
     .sort((a, b) => a.diffQuote - b.diffQuote)
-    .map((i) => ({ symbol: i.symbol, side: 'SELL' as const, notionalQuote: -i.diffQuote }))
+    .map((i) => ({
+      symbol: i.symbol,
+      side: 'SELL' as const,
+      notionalQuote: -i.diffQuote,
+    }))
   const buys = items
     .filter((i) => i.diffQuote > config.minTradeNotionalQuote)
     .sort((a, b) => b.diffQuote - a.diffQuote)
-    .map((i) => ({ symbol: i.symbol, side: 'BUY' as const, notionalQuote: i.diffQuote }))
+    .map((i) => ({
+      symbol: i.symbol,
+      side: 'BUY' as const,
+      notionalQuote: i.diffQuote,
+    }))
 
   const ordered = [...sells, ...buys]
-  const plan: Array<{ symbol: string; side: 'BUY' | 'SELL'; notionalQuote: number }> = []
+  const plan: Array<{
+    symbol: string
+    side: 'BUY' | 'SELL'
+    notionalQuote: number
+  }> = []
   let spent = 0
   for (const trade of ordered) {
     if (spent >= config.maxNotionalPerCycleQuote) break
-    const notional = Math.min(trade.notionalQuote, config.maxNotionalPerCycleQuote - spent)
+    const notional = Math.min(
+      trade.notionalQuote,
+      config.maxNotionalPerCycleQuote - spent,
+    )
     if (notional < config.minTradeNotionalQuote) continue
-    plan.push({ symbol: trade.symbol, side: trade.side, notionalQuote: notional })
+    plan.push({
+      symbol: trade.symbol,
+      side: trade.side,
+      notionalQuote: notional,
+    })
     spent += notional
   }
   return plan
@@ -180,12 +212,14 @@ async function runRebalanceCycleInner(
   )
   if (!gate.allowed) return { ran: false, reason: gate.reason, trades: [] }
 
-  const targetWeights = config.targetWeights ?? equalTargetWeights(config.symbols)
+  const targetWeights =
+    config.targetWeights ?? equalTargetWeights(config.symbols)
 
   let client = options.client
   if (!client) {
     const created = createDemoClientFromEnv()
-    if (!created.client) return { ran: false, reason: created.reason, trades: [] }
+    if (!created.client)
+      return { ran: false, reason: created.reason, trades: [] }
     client = created.client
   }
 
@@ -201,7 +235,8 @@ async function runRebalanceCycleInner(
     : Infinity
 
   const account = await client.getAccount()
-  const freeQuoteBalance = account.balances.find((b) => b.asset === 'USDT')?.free ?? 0
+  const freeQuoteBalance =
+    account.balances.find((b) => b.asset === 'USDT')?.free ?? 0
 
   const holdingsValueQuote: Record<string, number> = {}
   const priceBySymbol: Record<string, number> = {}
@@ -213,7 +248,11 @@ async function runRebalanceCycleInner(
     holdingsValueQuote[symbol] = qty * price
   }
 
-  const { items } = planRebalance(holdingsValueQuote, freeQuoteBalance, targetWeights)
+  const { items } = planRebalance(
+    holdingsValueQuote,
+    freeQuoteBalance,
+    targetWeights,
+  )
   const drift = maxDrift(items)
   const timeTriggered = elapsedMinutes >= config.minRebalanceIntervalMinutes
   const driftTriggered = drift >= config.driftThresholdPct
@@ -250,8 +289,9 @@ async function runRebalanceCycleInner(
         // See docs/tsconfig-strictness-rollout.md — real Record-lookup
         // risk the current lax tsconfig (missing noUncheckedIndexedAccess)
         // doesn't reflect in `price`'s type.
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        const quantity = price !== undefined && price > 0 ? t.notionalQuote / price : 0
+
+        const quantity =
+          price !== undefined && price > 0 ? t.notionalQuote / price : 0
         if (quantity <= 0) continue
         const order = await client.placeOrder({
           symbol: t.symbol,
@@ -286,11 +326,16 @@ async function runRebalanceCycleInner(
     lastRebalanceAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
-  const existingTrades = rows.filter((r) => r.kind === SR_KIND_REBALANCE_TRADE) as unknown as Array<RebalanceTrade>
+  const existingTrades = rows.filter(
+    (r) => r.kind === SR_KIND_REBALANCE_TRADE,
+  ) as unknown as Array<RebalanceTrade>
   const others = rows.filter(
-    (r) => r.kind !== SR_KIND_REBALANCE_STATE && r.kind !== SR_KIND_REBALANCE_TRADE,
+    (r) =>
+      r.kind !== SR_KIND_REBALANCE_STATE && r.kind !== SR_KIND_REBALANCE_TRADE,
   )
-  const mergedTrades = [...existingTrades, ...trades].slice(-REBALANCE_TRADE_LOG_CAP)
+  const mergedTrades = [...existingTrades, ...trades].slice(
+    -REBALANCE_TRADE_LOG_CAP,
+  )
   db.strategy_results = [
     ...others,
     { ...newState },
@@ -301,7 +346,11 @@ async function runRebalanceCycleInner(
 
   if (trades.length > 0) {
     appendAuditLog('rebalance_cycle_executed', {
-      trades: trades.map((t) => ({ symbol: t.symbol, side: t.side, notionalQuote: t.notionalQuote })),
+      trades: trades.map((t) => ({
+        symbol: t.symbol,
+        side: t.side,
+        notionalQuote: t.notionalQuote,
+      })),
       drift,
       triggeredBy: driftTriggered ? 'drift' : 'interval',
     })
@@ -309,7 +358,11 @@ async function runRebalanceCycleInner(
       engine: 'rebalance',
       runType: 'sanity',
       config: { targetWeights, driftThresholdPct: config.driftThresholdPct },
-      result: { drift, trades: trades.length, totalNotional: trades.reduce((s, t) => s + t.notionalQuote, 0) },
+      result: {
+        drift,
+        trades: trades.length,
+        totalNotional: trades.reduce((s, t) => s + t.notionalQuote, 0),
+      },
       notes: 'live rebalance cycle',
     })
   }
@@ -331,6 +384,17 @@ export async function runRebalanceCycle(
   }
 }
 
+/** Uncapped counterpart of `getRebalanceState()`'s trade log — every
+ * executed rebalance order (not just the most recent 50 used for display),
+ * for the read-only trading ledger. */
+export function getAllRebalanceTrades(): Array<RebalanceTrade> {
+  const db = readFinanceStore()
+  const rows = db.strategy_results
+  return rows.filter(
+    (r) => r.kind === SR_KIND_REBALANCE_TRADE,
+  ) as unknown as Array<RebalanceTrade>
+}
+
 export function getRebalanceState(): {
   config: RebalanceConfig
   state: RebalanceState | null
@@ -341,8 +405,15 @@ export function getRebalanceState(): {
   const rows = db.strategy_results
   return {
     config: resolveRebalanceConfig(settings.demoTradingRebalance),
-    state: (rows.find((r) => r.kind === SR_KIND_REBALANCE_STATE) as RebalanceState | undefined) ?? null,
-    trades: (rows.filter((r) => r.kind === SR_KIND_REBALANCE_TRADE) as unknown as Array<RebalanceTrade>)
+    state:
+      (rows.find((r) => r.kind === SR_KIND_REBALANCE_STATE) as
+        | RebalanceState
+        | undefined) ?? null,
+    trades: (
+      rows.filter(
+        (r) => r.kind === SR_KIND_REBALANCE_TRADE,
+      ) as unknown as Array<RebalanceTrade>
+    )
       .slice(-50)
       .reverse(),
   }

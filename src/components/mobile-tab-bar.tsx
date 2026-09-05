@@ -115,7 +115,10 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     label: 'Command',
     icon: UserMultipleIcon,
     to: '/command',
-    match: (p) => p.startsWith('/command') || p.startsWith('/operations') || p.startsWith('/agents'),
+    match: (p) =>
+      p.startsWith('/command') ||
+      p.startsWith('/operations') ||
+      p.startsWith('/agents'),
   },
   {
     id: 'memory',
@@ -250,7 +253,9 @@ export function MobileTabBar() {
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
-    const activeBtn = container.querySelector<HTMLElement>('[aria-current="page"]')
+    const activeBtn = container.querySelector<HTMLElement>(
+      '[aria-current="page"]',
+    )
     if (activeBtn) {
       const prefersReducedMotion = window.matchMedia(
         '(prefers-reduced-motion: reduce)',
@@ -315,7 +320,10 @@ export function MobileTabBar() {
         onTouchMove={handlePillTouchMove}
         onTouchEnd={handlePillTouchEnd}
       >
-        <div ref={scrollRef} className="flex items-center gap-0.5 overflow-x-auto scrollbar-none px-2">
+        <div
+          ref={scrollRef}
+          className="flex items-center gap-0.5 overflow-x-auto scrollbar-none px-2"
+        >
           {MOBILE_NAV_TABS.map((tab) => {
             const isActive = tab.match(pathname)
             const isCenter = tab.id === 'chat'
@@ -334,7 +342,9 @@ export function MobileTabBar() {
                   }
                 }}
                 aria-current={isActive ? 'page' : undefined}
-                aria-label={isActive ? `${tab.label} (current page)` : tab.label}
+                aria-label={
+                  isActive ? `${tab.label} (current page)` : tab.label
+                }
                 className={cn(
                   // 40x40 touch target (slightly smaller to fit 5 tabs)
                   'flex items-center justify-center',

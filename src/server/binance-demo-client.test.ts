@@ -16,41 +16,63 @@ import {
 
 describe('assertDemoBaseUrl', () => {
   it('accepts official demo hosts', () => {
-    expect(assertDemoBaseUrl('https://demo-api.binance.com/api')).toBe('demo-api.binance.com')
-    expect(assertDemoBaseUrl('https://testnet.binance.vision')).toBe('testnet.binance.vision')
+    expect(assertDemoBaseUrl('https://demo-api.binance.com/api')).toBe(
+      'demo-api.binance.com',
+    )
+    expect(assertDemoBaseUrl('https://testnet.binance.vision')).toBe(
+      'testnet.binance.vision',
+    )
   })
 
   it('refuses production hosts', () => {
-    expect(() => assertDemoBaseUrl('https://api.binance.com')).toThrow(DemoEnvironmentError)
-    expect(() => assertDemoBaseUrl('https://data-api.binance.vision')).toThrow(DemoEnvironmentError)
+    expect(() => assertDemoBaseUrl('https://api.binance.com')).toThrow(
+      DemoEnvironmentError,
+    )
+    expect(() => assertDemoBaseUrl('https://data-api.binance.vision')).toThrow(
+      DemoEnvironmentError,
+    )
   })
 
   it('refuses unknown hosts', () => {
-    expect(() => assertDemoBaseUrl('https://evil.example.com')).toThrow(DemoEnvironmentError)
+    expect(() => assertDemoBaseUrl('https://evil.example.com')).toThrow(
+      DemoEnvironmentError,
+    )
   })
 })
 
 describe('BinanceDemoClient construction guards', () => {
-  const base = { apiKey: 'demo-key', apiSecret: 'demo-secret', baseUrl: 'https://demo-api.binance.com/api' }
+  const base = {
+    apiKey: 'demo-key',
+    apiSecret: 'demo-secret',
+    baseUrl: 'https://demo-api.binance.com/api',
+  }
 
   it('builds against a demo host', () => {
     expect(new BinanceDemoClient(base).host).toBe('demo-api.binance.com')
   })
 
   it('throws when pointed at production', () => {
-    expect(() => new BinanceDemoClient({ ...base, baseUrl: 'https://api.binance.com' })).toThrow(
-      DemoEnvironmentError,
-    )
+    expect(
+      () =>
+        new BinanceDemoClient({ ...base, baseUrl: 'https://api.binance.com' }),
+    ).toThrow(DemoEnvironmentError)
   })
 
   it('throws when demo key collides with the production key', () => {
     expect(
-      () => new BinanceDemoClient({ ...base, apiKey: 'same', productionApiKey: 'same' }),
+      () =>
+        new BinanceDemoClient({
+          ...base,
+          apiKey: 'same',
+          productionApiKey: 'same',
+        }),
     ).toThrow(/equals the production key/)
   })
 
   it('requires credentials', () => {
-    expect(() => new BinanceDemoClient({ ...base, apiKey: '' })).toThrow(DemoEnvironmentError)
+    expect(() => new BinanceDemoClient({ ...base, apiKey: '' })).toThrow(
+      DemoEnvironmentError,
+    )
   })
 })
 
@@ -66,12 +88,17 @@ describe('BinanceDemoClient requests hit the normalized demo base', () => {
     process.env.HOME = tmp
     vi.resetModules()
     try {
-      const { BinanceDemoClient: FreshBinanceDemoClient } = await import('./binance-demo-client')
+      const { BinanceDemoClient: FreshBinanceDemoClient } =
+        await import('./binance-demo-client')
       const fetchImpl = vi.fn(async (url: string) => {
         // server time then account
         if (url.includes('/api/v3/account')) {
           return new Response(
-            JSON.stringify({ accountType: 'SPOT', canTrade: true, balances: [{ asset: 'USDT', free: '5000', locked: '0' }] }),
+            JSON.stringify({
+              accountType: 'SPOT',
+              canTrade: true,
+              balances: [{ asset: 'USDT', free: '5000', locked: '0' }],
+            }),
             { status: 200 },
           )
         }
@@ -94,6 +121,49 @@ describe('BinanceDemoClient requests hit the normalized demo base', () => {
       else process.env.HOME = realHome
       fs.rmSync(tmp, { recursive: true, force: true })
     }
+  })
+})
+
+describe('BinanceDemoClient kline parsing', () => {
+  it('preserves Binance aggressor buy volume for taker-imbalance signals', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify([
+            [
+              1,
+              '100',
+              '110',
+              '90',
+              '105',
+              '20',
+              2,
+              '2100',
+              10,
+              '12.5',
+            ],
+          ]),
+          { status: 200 },
+        ),
+    ) as unknown as typeof fetch
+    const client = new BinanceDemoClient({
+      apiKey: 'k',
+      apiSecret: 's',
+      baseUrl: 'https://demo-api.binance.com',
+      fetchImpl,
+    })
+
+    await expect(client.getKlines('BTCUSDT', '1h', 1)).resolves.toEqual([
+      {
+        openTime: 1,
+        open: 100,
+        high: 110,
+        low: 90,
+        close: 105,
+        volume: 20,
+        takerBuyVolume: 12.5,
+      },
+    ])
   })
 })
 
@@ -120,21 +190,27 @@ describe('floorToStep', () => {
 
 describe('getSymbolFilters', () => {
   it('parses LOT_SIZE and NOTIONAL filters and caches per symbol', async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          symbols: [
-            {
-              symbol: 'SOLUSDT',
-              filters: [
-                { filterType: 'LOT_SIZE', minQty: '0.01000000', maxQty: '9000', stepSize: '0.01000000' },
-                { filterType: 'NOTIONAL', minNotional: '5.00000000' },
-              ],
-            },
-          ],
-        }),
-        { status: 200 },
-      ),
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            symbols: [
+              {
+                symbol: 'SOLUSDT',
+                filters: [
+                  {
+                    filterType: 'LOT_SIZE',
+                    minQty: '0.01000000',
+                    maxQty: '9000',
+                    stepSize: '0.01000000',
+                  },
+                  { filterType: 'NOTIONAL', minNotional: '5.00000000' },
+                ],
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
     ) as unknown as typeof fetch
     const client = new BinanceDemoClient({
       apiKey: 'k',
@@ -152,8 +228,12 @@ describe('getSymbolFilters', () => {
   })
 
   it('falls back to zeros when filters are missing and throws on HTTP failure', async () => {
-    const okEmpty = vi.fn(async () =>
-      new Response(JSON.stringify({ symbols: [{ symbol: 'X', filters: [] }] }), { status: 200 }),
+    const okEmpty = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ symbols: [{ symbol: 'X', filters: [] }] }),
+          { status: 200 },
+        ),
     ) as unknown as typeof fetch
     const emptyClient = new BinanceDemoClient({
       apiKey: 'k',
@@ -167,14 +247,18 @@ describe('getSymbolFilters', () => {
       minNotional: 0,
     })
 
-    const failing = vi.fn(async () => new Response('{}', { status: 500 })) as unknown as typeof fetch
+    const failing = vi.fn(
+      async () => new Response('{}', { status: 500 }),
+    ) as unknown as typeof fetch
     const failingClient = new BinanceDemoClient({
       apiKey: 'k',
       apiSecret: 's',
       baseUrl: 'https://demo-api.binance.com',
       fetchImpl: failing,
     })
-    await expect(failingClient.getSymbolFilters('SOLUSDT')).rejects.toThrow('exchangeInfo')
+    await expect(failingClient.getSymbolFilters('SOLUSDT')).rejects.toThrow(
+      'exchangeInfo',
+    )
   })
 })
 
@@ -206,34 +290,56 @@ describe('createDemoClientFromEnv', () => {
   })
 })
 
-
 describe('assertLiveBaseUrl', () => {
   it('accepts only the approved production host', () => {
-    expect(assertLiveBaseUrl('https://api.binance.com/api')).toBe('api.binance.com')
+    expect(assertLiveBaseUrl('https://api.binance.com/api')).toBe(
+      'api.binance.com',
+    )
   })
 
   it('refuses demo, market-data, and unknown hosts', () => {
-    expect(() => assertLiveBaseUrl('https://testnet.binance.vision')).toThrow(DemoEnvironmentError)
-    expect(() => assertLiveBaseUrl('https://data-api.binance.vision')).toThrow(DemoEnvironmentError)
-    expect(() => assertLiveBaseUrl('https://api1.binance.com')).toThrow(DemoEnvironmentError)
+    expect(() => assertLiveBaseUrl('https://testnet.binance.vision')).toThrow(
+      DemoEnvironmentError,
+    )
+    expect(() => assertLiveBaseUrl('https://data-api.binance.vision')).toThrow(
+      DemoEnvironmentError,
+    )
+    expect(() => assertLiveBaseUrl('https://api1.binance.com')).toThrow(
+      DemoEnvironmentError,
+    )
   })
 })
 
 describe('BinanceLiveClient construction guards', () => {
-  const base = { apiKey: 'live-key', apiSecret: 'live-secret', baseUrl: 'https://api.binance.com/api' }
+  const base = {
+    apiKey: 'live-key',
+    apiSecret: 'live-secret',
+    baseUrl: 'https://api.binance.com/api',
+  }
 
   it('builds against the approved live host', () => {
     expect(new BinanceLiveClient(base).host).toBe('api.binance.com')
   })
 
   it('throws when pointed at testnet', () => {
-    expect(() => new BinanceLiveClient({ ...base, baseUrl: 'https://testnet.binance.vision' })).toThrow(
-      DemoEnvironmentError,
-    )
+    expect(
+      () =>
+        new BinanceLiveClient({
+          ...base,
+          baseUrl: 'https://testnet.binance.vision',
+        }),
+    ).toThrow(DemoEnvironmentError)
   })
 
   it('throws when live key collides with the testnet key', () => {
-    expect(() => new BinanceLiveClient({ ...base, apiKey: 'same', testnetApiKey: 'same' })).toThrow(/testnet key/)
+    expect(
+      () =>
+        new BinanceLiveClient({
+          ...base,
+          apiKey: 'same',
+          testnetApiKey: 'same',
+        }),
+    ).toThrow(/testnet key/)
   })
 })
 

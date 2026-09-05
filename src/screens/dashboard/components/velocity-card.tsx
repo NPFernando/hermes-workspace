@@ -6,7 +6,10 @@ function formatNumber(n: number): string {
   return n.toLocaleString()
 }
 
-function deltaText(curr: number, prev: number): {
+function deltaText(
+  curr: number,
+  prev: number,
+): {
   text: string
   tone: string
 } {
@@ -83,28 +86,20 @@ export function VelocityCard({
       />
 
       <div className="flex items-center justify-between">
-        <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-        >
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
           Velocity
         </h3>
-        <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-        >
+        <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
           {analytics.windowDays}d avg
         </span>
       </div>
 
       <div className="flex items-end justify-between gap-2">
         <div className="flex items-baseline gap-2">
-          <span
-            className="font-mono text-2xl font-bold leading-none tabular-nums text-[var(--theme-text)]"
-          >
+          <span className="font-mono text-2xl font-bold leading-none tabular-nums text-[var(--theme-text)]">
             {sessionsPerDay.toFixed(sessionsPerDay < 10 ? 1 : 0)}
           </span>
-          <span
-            className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-          >
+          <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
             sess/day
           </span>
         </div>
@@ -120,9 +115,7 @@ export function VelocityCard({
       </div>
 
       <div className="flex items-center justify-between gap-2 text-[10px]">
-        <span
-          className="font-mono uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-        >
+        <span className="font-mono uppercase tracking-[0.1em] text-[var(--theme-muted)]">
           {formatNumber(callsPerDay)} calls/day
         </span>
         <div

@@ -45,10 +45,9 @@ import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
 import { useFeatureAvailable } from '@/hooks/use-feature-available'
 
+const ActivityChartInner = lazy(() => import('./components/activity-chart-inner'))
 const AnalyticsChartCard = lazy(() =>
-  import('./components/analytics-chart-card').then((m) => ({
-    default: m.AnalyticsChartCard,
-  })),
+  import('./components/analytics-chart-card').then((m) => ({ default: m.AnalyticsChartCard }))
 )
 
 // `IconSvgObject` isn't exported from @hugeicons/react; reuse the
@@ -57,12 +56,31 @@ type HugeIcon = typeof Settings02Icon
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+function timeAgo(ts: number): string {
+  const diff = Date.now() / 1000 - ts
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+function formatNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
+
 function themeColor(name: string, fallback: string): string {
   if (typeof document === 'undefined') return fallback
   const value = getComputedStyle(document.documentElement)
     .getPropertyValue(name)
     .trim()
   return value || fallback
+}
+
+function alpha(color: string, amount: number): string {
+  const pct = Math.max(0, Math.min(100, Math.round(amount * 100)))
+  return `color-mix(in srgb, ${color} ${pct}%, transparent)`
 }
 
 function readDashboardPalette() {
@@ -132,7 +150,7 @@ function GlassCard({
       )}
       {title && (
         <div className="flex items-center justify-between px-5 pt-4 pb-0">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--theme-muted)]">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted">
             {title}
           </h3>
           {titleRight}
@@ -151,10 +169,7 @@ function EnhancedBadge({ label = 'Enhanced API' }: { label?: string }) {
       className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]"
       style={{
         border: `1px solid ${themeColor('--theme-accent-border', 'rgba(245, 158, 11, 0.28)')}`,
-        background: themeColor(
-          '--theme-accent-subtle',
-          'rgba(245, 158, 11, 0.12)',
-        ),
+        background: themeColor('--theme-accent-subtle', 'rgba(245, 158, 11, 0.12)'),
         color: themeColor('--theme-accent', '#f59e0b'),
       }}
     >
@@ -178,9 +193,192 @@ function UnavailableWidget({
       className="h-full"
     >
       <div className="flex h-full min-h-[180px] items-center justify-center rounded-lg border border-dashed border-[var(--theme-border)] bg-[var(--theme-card2)] px-4 text-center">
-        <p className="text-sm text-[var(--theme-muted)]">{description}</p>
+        <p className="text-sm text-muted">{description}</p>
       </div>
     </GlassCard>
+  )
+}
+
+// ── Metric Tile ──────────────────────────────────────────────────
+
+function MetricTile({
+  label,
+  value,
+  sub,
+  icon,
+  accentColor,
+}: {
+  label: string
+  value: string
+  sub?: string
+  icon: string
+  accentColor: string
+}) {
+  return (
+    <GlassCard accentColor={accentColor}>
+      <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-0.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted">
+            {label}
+          </div>
+          <div className="text-2xl font-bold tabular-nums text-ink">
+            {value}
+          </div>
+          {sub && <div className="text-[11px] text-muted">{sub}</div>}
+        </div>
+        <div
+          className="flex size-8 items-center justify-center rounded-lg text-base"
+          style={{ background: `${accentColor}15` }}
+        >
+          {icon}
+        </div>
+      </div>
+    </GlassCard>
+  )
+}
+
+// ── Activity Chart ───────────────────────────────────────────────
+
+function ActivityChart({
+  sessions,
+  palette,
+}: {
+  sessions: Array<ClaudeSession>
+  palette: ReturnType<typeof readDashboardPalette>
+}) {
+  const chartData = useMemo(() => {
+    const dayMap = new Map<string, { sessions: number; messages: number }>()
+    const now = Date.now() / 1000
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date((now - i * 86400) * 1000)
+      const key = d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })
+      dayMap.set(key, { sessions: 0, messages: 0 })
+    }
+    for (const s of sessions) {
+      if (!s.started_at) continue
+      const d = new Date(s.started_at * 1000)
+      const key = d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })
+      const entry = dayMap.get(key)
+      if (entry) {
+        entry.sessions += 1
+        entry.messages += s.message_count ?? 0
+      }
+    }
+    const all = Array.from(dayMap.entries()).map(([date, data]) => ({
+      date,
+      ...data,
+    }))
+    let firstActive = all.findIndex((d) => d.sessions > 0 || d.messages > 0)
+    if (firstActive > 0) firstActive = Math.max(0, firstActive - 1)
+    return firstActive > 0 ? all.slice(firstActive) : all
+  }, [sessions])
+
+  return (
+    <GlassCard
+      title="Activity"
+      titleRight={<span className="text-[10px] text-muted">14 days</span>}
+      accentColor={palette.accent}
+      className="h-full"
+    >
+      <Suspense fallback={<div className="h-[200px] w-full skeleton-shimmer rounded-lg" />}>
+        <ActivityChartInner chartData={chartData} palette={palette} />
+      </Suspense>
+    </GlassCard>
+  )
+}
+
+// ── Skills Widget ────────────────────────────────────────────────
+
+function SkillsWidget({
+  palette,
+  onOpen,
+  usage,
+}: {
+  palette: ReturnType<typeof readDashboardPalette>
+  onOpen: () => void
+  usage: DashboardOverview['skillsUsage']
+}) {
+  const skillsAvailable = useFeatureAvailable('skills')
+  const skillsQuery = useQuery({
+    queryKey: ['claude-skills'],
+    queryFn: async () => {
+      const res = await fetch('/api/skills?tab=installed&limit=200&summary=search')
+      if (!res.ok) return []
+      const data = await res.json()
+      return (data?.skills ?? []) as Array<Record<string, unknown>>
+    },
+    staleTime: 30_000,
+    enabled: skillsAvailable,
+  })
+
+  const skills = skillsQuery.data ?? []
+
+  if (!skillsAvailable) {
+    return (
+      <UnavailableWidget
+        title="Skills"
+        description={getUnavailableReason('skills')}
+      />
+    )
+  }
+
+  // Summary view per Hermes Agent feedback: 'don’t enumerate, summarise.'
+  // Prefer real usage signal from /api/analytics/usage when present
+  // (counts what the agent *actually used*, not just what's installed).
+  const installed = skills.length
+  const enabled = skills.filter((s) => s.enabled !== false).length
+  const usedThisWindow = usage?.distinctSkills ?? null
+  const topUsed = usage?.topSkills[0]
+  const topInstalled =
+    skills.find((s) => s.enabled !== false) ?? skills.at(0)
+  const topName = topUsed?.skill ?? String(topInstalled?.name ?? '—')
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group relative flex w-full flex-col gap-1.5 overflow-hidden rounded-xl border px-4 py-3 text-left transition-colors hover:bg-[var(--theme-card)]/80 bg-[var(--theme-card)] border-[var(--theme-border)]"
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
+        style={{
+          background: `linear-gradient(90deg, ${palette.warning}, ${palette.warning}50, transparent)`,
+        }}
+      />
+      <div className="flex items-center justify-between">
+        <h3
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]"
+        >
+          Skills
+        </h3>
+        <span
+          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
+        >
+          manage →
+        </span>
+      </div>
+      <div
+        className="font-mono text-2xl font-bold tabular-nums leading-none text-[var(--theme-text)]"
+      >
+        {installed}
+      </div>
+      <div
+        className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
+      >
+        {installed === 0
+          ? 'no skills installed'
+          : usedThisWindow !== null && usedThisWindow > 0
+            ? `${enabled} enabled · ${usedThisWindow} used · top: ${topName}`
+            : `${enabled} enabled · top: ${topName}`}
+      </div>
+    </button>
   )
 }
 
@@ -221,6 +419,122 @@ function SecondaryAction({
   )
 }
 
+// ── Quick Action ─────────────────────────────────────────────────
+
+function QuickAction({
+  label,
+  icon,
+  onClick,
+  accentColor,
+  disabled,
+  badge,
+}: {
+  label: string
+  icon: string
+  onClick: () => void
+  accentColor: string
+  disabled?: boolean
+  badge?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'relative overflow-hidden flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-all',
+        'border-[var(--theme-border)] bg-[var(--theme-card)] text-left',
+        disabled
+          ? 'cursor-not-allowed opacity-60'
+          : 'hover:border-[var(--theme-accent-border)] hover:scale-[1.01] active:scale-[0.99]',
+      )}
+    >
+      <div
+        className="flex size-7 shrink-0 items-center justify-center rounded-md text-sm"
+        style={{ background: `${accentColor}18` }}
+      >
+        {icon}
+      </div>
+      <span
+        className="min-w-0 flex-1 text-xs font-semibold text-[var(--theme-text)]"
+      >
+        {label}
+      </span>
+      {badge ? (
+        <span className="ml-auto shrink-0 rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+          {badge}
+        </span>
+      ) : null}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-[2px]"
+        style={{
+          background: `linear-gradient(90deg, ${accentColor}, transparent)`,
+        }}
+      />
+    </button>
+  )
+}
+
+// ── Session Row (minimal) ────────────────────────────────────────
+
+function SessionRow({
+  session,
+  maxTokens,
+  onClick,
+  palette,
+}: {
+  session: ClaudeSession
+  maxTokens: number
+  onClick: () => void
+  palette: ReturnType<typeof readDashboardPalette>
+}) {
+  const tokens = (session.input_tokens ?? 0) + (session.output_tokens ?? 0)
+  const msgs = session.message_count ?? 0
+  const tools = session.tool_call_count ?? 0
+  const barWidth = maxTokens > 0 ? Math.max(1, (tokens / maxTokens) * 100) : 0
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left px-4 py-2.5 rounded-lg hover:bg-[var(--theme-card2)] transition-colors group"
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[13px] font-medium text-ink truncate flex-1 group-hover:text-ink">
+          {session.title || session.id}
+        </span>
+        <span className="text-[10px] tabular-nums text-muted shrink-0">
+          {session.started_at ? timeAgo(session.started_at) : ''}
+        </span>
+      </div>
+      <div className="mb-1.5 flex items-center gap-2 text-[10px] text-[var(--theme-muted)]">
+        {session.model && (
+          <span
+            className="rounded px-1.5 py-0.5 font-mono text-[9px] font-medium"
+            style={{
+              background: alpha(palette.accent, 0.1),
+              color: palette.accent,
+            }}
+          >
+            {session.model}
+          </span>
+        )}
+        <span>{msgs} msgs</span>
+        {tools > 0 && <span>{tools} tools</span>}
+        {tokens > 0 && <span>{formatNumber(tokens)} tok</span>}
+      </div>
+      <div className="h-[3px] rounded-full w-full bg-[var(--theme-border)] overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{
+            width: `${barWidth}%`,
+            background: `linear-gradient(90deg, ${palette.accent}, ${palette.accentSecondary})`,
+          }}
+        />
+      </div>
+    </button>
+  )
+}
 
 // ── Main Dashboard ───────────────────────────────────────────────
 
@@ -304,17 +618,17 @@ export function DashboardScreen() {
           source: (s.source as string | undefined) ?? null,
           model: (s.model as string | undefined) ?? null,
           messageCount:
-            (s.messageCount as number | undefined) ??
-            (s.message_count as number | undefined) ??
-            0,
+            ((s.messageCount as number | undefined) ??
+              (s.message_count as number | undefined) ??
+              0),
           toolCallCount:
-            (s.toolCallCount as number | undefined) ??
-            (s.tool_call_count as number | undefined) ??
-            0,
+            ((s.toolCallCount as number | undefined) ??
+              (s.tool_call_count as number | undefined) ??
+              0),
           tokenCount:
-            (s.tokenCount as number | undefined) ??
-            (s.totalTokens as number | undefined) ??
-            0,
+            ((s.tokenCount as number | undefined) ??
+              (s.totalTokens as number | undefined) ??
+              0),
           startedAt: (s.startedAt as number | undefined) ?? null,
           updatedAt: (s.updatedAt as number | undefined) ?? null,
         })),
@@ -391,7 +705,10 @@ export function DashboardScreen() {
   })
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('dashboard.analyticsPeriod', String(period))
+      window.localStorage.setItem(
+        'dashboard.analyticsPeriod',
+        String(period),
+      )
     }
   }, [period])
 
@@ -427,30 +744,15 @@ export function DashboardScreen() {
   return (
     <div data-route-page className="min-h-full">
       {/* Floating mobile nav: hamburger left, theme toggle right */}
-      <div
-        className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-2 h-12"
-        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
-      >
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-2 h-12" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <button
           type="button"
           aria-label="Open navigation menu"
           onClick={openHamburgerMenu}
           className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation"
         >
-          <svg
-            width="20"
-            height="16"
-            viewBox="0 0 20 16"
-            fill="none"
-            className="opacity-70"
-            style={{ color: 'var(--color-ink, #111)' }}
-          >
-            <path
-              d="M1 1.5H19M1 8H19M1 14.5H13"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            />
+          <svg width="20" height="16" viewBox="0 0 20 16" fill="none" className="opacity-70" style={{ color: 'var(--color-ink, #111)' }}>
+            <path d="M1 1.5H19M1 8H19M1 14.5H13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
         <button
@@ -467,15 +769,9 @@ export function DashboardScreen() {
               'claude-slate': 'claude-slate-light',
               'claude-slate-light': 'claude-slate',
             }
-            const cur =
-              document.documentElement.getAttribute('data-theme') ||
-              'claude-official'
-            const nextDataTheme =
-              LIGHT_DARK_PAIRS[cur] ||
-              (isDark ? 'claude-official-light' : 'claude-official')
-            import('@/lib/theme').then(({ setTheme }) => {
-              setTheme(nextDataTheme as any)
-            })
+            const cur = document.documentElement.getAttribute('data-theme') || 'claude-official'
+            const nextDataTheme = LIGHT_DARK_PAIRS[cur] || (isDark ? 'claude-official-light' : 'claude-official')
+            import('@/lib/theme').then(({ setTheme }) => { setTheme(nextDataTheme as any) })
             const nextMode = nextDataTheme.endsWith('-light') ? 'light' : 'dark'
             applyTheme(nextMode)
             updateSettings({ theme: nextMode })
@@ -483,15 +779,11 @@ export function DashboardScreen() {
           }}
           className="flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation text-[var(--theme-muted)]"
         >
-          <HugeiconsIcon
-            icon={isDark ? Sun02Icon : Moon02Icon}
-            size={20}
-            strokeWidth={1.5}
-          />
+          <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={20} strokeWidth={1.5} />
         </button>
       </div>
       <div className="px-4 pt-14 md:pt-4 py-4 md:px-8 md:py-6 lg:px-10 space-y-5 pb-28">
-        {/* ── Header: brand lockup left, action cluster right.
+      {/* ── Header: brand lockup left, action cluster right.
            Iteration 010: dropped redundant "Dashboard" eyebrow (the
            page IS the dashboard); promoted "Hermes Workspace" to
            the primary heading at a larger weight. Logo bumped from
@@ -501,344 +793,340 @@ export function DashboardScreen() {
            (not centered) on purpose: ops dashboards put brand left
            + actions right because that's the spatial hierarchy
            operators expect (Linear, Vercel, Datadog all do this). */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <span
-              className="relative inline-flex shrink-0 items-center justify-center rounded-xl border"
-              style={{
-                width: 44,
-                height: 44,
-                borderColor:
-                  'color-mix(in srgb, var(--theme-accent) 35%, var(--theme-border))',
-                background:
-                  'linear-gradient(135deg, color-mix(in srgb, var(--theme-accent) 14%, var(--theme-card)), var(--theme-card))',
-                boxShadow:
-                  '0 0 0 4px color-mix(in srgb, var(--theme-accent) 6%, transparent)',
-              }}
-            >
-              <img
-                src="/claude-avatar.webp"
-                alt="Hermes Workspace logo"
-                className="size-8 rounded-md"
-                style={{ background: 'transparent' }}
-              />
-            </span>
-            {/* Iter 011: dropped the 'Operator console · vX.Y.Z'
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3">
+          <span
+            className="relative inline-flex shrink-0 items-center justify-center rounded-xl border"
+            style={{
+              width: 44,
+              height: 44,
+              borderColor:
+                'color-mix(in srgb, var(--theme-accent) 35%, var(--theme-border))',
+              background:
+                'linear-gradient(135deg, color-mix(in srgb, var(--theme-accent) 14%, var(--theme-card)), var(--theme-card))',
+              boxShadow:
+                '0 0 0 4px color-mix(in srgb, var(--theme-accent) 6%, transparent)',
+            }}
+          >
+            <img
+              src="/claude-avatar.webp"
+              alt="Hermes Workspace logo"
+              className="size-8 rounded-md"
+              style={{ background: 'transparent' }}
+            />
+          </span>
+          {/* Iter 011: dropped the 'Operator console · vX.Y.Z'
               eyebrow. The gateway version is already on the OpsStrip
               (♦ GATEWAY V0.12.0), so the eyebrow was duplicating it.
               Single bold lockup feels cleaner; vertical centering on
               the lockup matches the height of the action cluster on
               the right so they don't visually drift. */}
-            <div className="flex flex-col justify-center">
-              <h1
-                className="text-2xl font-bold tracking-tight"
-                style={{
-                  color: 'var(--theme-text)',
-                  letterSpacing: '-0.015em',
-                  lineHeight: 1.1,
-                }}
-              >
-                Hermes Workspace
-              </h1>
-            </div>
-          </div>
-          {/* Action row: hierarchy per Hermes Agent review.
-           New Chat is primary (full button + accent), Terminal +
-           Skills are secondary, Settings collapses to icon-only. */}
-          <div className="flex w-full flex-wrap items-center gap-2 lg:justify-end lg:max-w-xl">
-            <button
-              type="button"
-              onClick={() =>
-                navigate({
-                  to: '/chat/$sessionKey',
-                  params: { sessionKey: 'new' },
-                })
-              }
-              className="group relative inline-flex items-center gap-2 overflow-hidden rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.02] active:scale-[0.99] sm:px-3.5 sm:py-2 sm:text-sm"
+          <div className="flex flex-col justify-center">
+            <h1
+              className="text-2xl font-bold tracking-tight"
               style={{
-                background: `linear-gradient(135deg, ${palette.accent}, ${palette.accentSecondary})`,
-                color: 'var(--theme-on-accent, white)',
-                boxShadow: `0 6px 18px -8px ${palette.accent}aa, inset 0 1px 0 0 rgba(255,255,255,0.18)`,
+                color: 'var(--theme-text)',
+                letterSpacing: '-0.015em',
+                lineHeight: 1.1,
               }}
             >
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100"
-                style={{
-                  background:
-                    'linear-gradient(135deg, rgba(255,255,255,0.15), transparent 60%)',
-                }}
-              />
-              <HugeiconsIcon
-                icon={BubbleChatAddIcon}
-                size={16}
-                strokeWidth={1.8}
-              />
-              <span>New Chat</span>
-            </button>
-            <SecondaryAction
-              label="Terminal"
-              icon={ConsoleIcon}
-              onClick={() => navigate({ to: '/terminal' })}
-            />
-            <SecondaryAction
-              label="Skills"
-              icon={PuzzleIcon}
-              onClick={() => navigate({ to: '/skills' })}
-              disabled={!skillsAvailable}
-            />
-            {/* Edit toggle: enters "layout edit mode" where each widget
-              shows an X button and a banner appears for re-adding
-              hidden widgets. Persisted to localStorage. */}
-            <button
-              type="button"
-              aria-label={
-                layout.editMode ? 'Done editing layout' : 'Edit layout'
-              }
-              aria-pressed={layout.editMode}
-              title={layout.editMode ? 'Done editing layout' : 'Edit layout'}
-              onClick={layout.toggleEdit}
-              className="inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70"
-              style={{
-                borderColor: layout.editMode
-                  ? 'var(--theme-accent)'
-                  : 'var(--theme-border)',
-                background: layout.editMode
-                  ? 'color-mix(in srgb, var(--theme-accent) 14%, transparent)'
-                  : 'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 80%, transparent), transparent)',
-                color: layout.editMode
-                  ? 'var(--theme-accent)'
-                  : 'var(--theme-muted)',
-              }}
-            >
-              <HugeiconsIcon
-                icon={layout.editMode ? CheckmarkCircle02Icon : Edit02Icon}
-                size={15}
-                strokeWidth={1.7}
-              />
-            </button>
-            <button
-              type="button"
-              aria-label="Settings"
-              title="Settings"
-              onClick={() => navigate({ to: '/settings', search: {} })}
-              className="inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70 hover:text-[var(--theme-text)]"
-              style={{
-                borderColor: 'var(--theme-border)',
-                color: 'var(--theme-muted)',
-                background:
-                  'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 80%, transparent), transparent)',
-              }}
-            >
-              <HugeiconsIcon
-                icon={Settings02Icon}
-                size={15}
-                strokeWidth={1.7}
-              />
-            </button>
+              Hermes Workspace
+            </h1>
           </div>
         </div>
+        {/* Action row: hierarchy per Hermes Agent review.
+           New Chat is primary (full button + accent), Terminal +
+           Skills are secondary, Settings collapses to icon-only. */}
+        <div className="flex w-full flex-wrap items-center gap-2 lg:justify-end lg:max-w-xl">
+          <button
+            type="button"
+            onClick={() =>
+              navigate({
+                to: '/chat/$sessionKey',
+                params: { sessionKey: 'new' },
+              })
+            }
+            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.05em] transition-all hover:scale-[1.02] active:scale-[0.99] sm:px-3.5 sm:py-2 sm:text-sm"
+            style={{
+              background: `linear-gradient(135deg, ${palette.accent}, ${palette.accentSecondary})`,
+              color: 'var(--theme-on-accent, white)',
+              boxShadow: `0 6px 18px -8px ${palette.accent}aa, inset 0 1px 0 0 rgba(255,255,255,0.18)`,
+            }}
+          >
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100"
+              style={{
+                background:
+                  'linear-gradient(135deg, rgba(255,255,255,0.15), transparent 60%)',
+              }}
+            />
+            <HugeiconsIcon
+              icon={BubbleChatAddIcon}
+              size={16}
+              strokeWidth={1.8}
+            />
+            <span>New Chat</span>
+          </button>
+          <SecondaryAction
+            label="Terminal"
+            icon={ConsoleIcon}
+            onClick={() => navigate({ to: '/terminal' })}
+          />
+          <SecondaryAction
+            label="Skills"
+            icon={PuzzleIcon}
+            onClick={() => navigate({ to: '/skills' })}
+            disabled={!skillsAvailable}
+          />
+          {/* Edit toggle: enters "layout edit mode" where each widget
+              shows an X button and a banner appears for re-adding
+              hidden widgets. Persisted to localStorage. */}
+          <button
+            type="button"
+            aria-label={layout.editMode ? 'Done editing layout' : 'Edit layout'}
+            aria-pressed={layout.editMode}
+            title={layout.editMode ? 'Done editing layout' : 'Edit layout'}
+            onClick={layout.toggleEdit}
+            className="inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70"
+            style={{
+              borderColor: layout.editMode
+                ? 'var(--theme-accent)'
+                : 'var(--theme-border)',
+              background: layout.editMode
+                ? 'color-mix(in srgb, var(--theme-accent) 14%, transparent)'
+                : 'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 80%, transparent), transparent)',
+              color: layout.editMode
+                ? 'var(--theme-accent)'
+                : 'var(--theme-muted)',
+            }}
+          >
+            <HugeiconsIcon
+              icon={layout.editMode ? CheckmarkCircle02Icon : Edit02Icon}
+              size={15}
+              strokeWidth={1.7}
+            />
+          </button>
+          <button
+            type="button"
+            aria-label="Settings"
+            title="Settings"
+            onClick={() => navigate({ to: '/settings', search: {} })}
+            className="inline-flex size-9 items-center justify-center rounded-lg border transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70 hover:text-[var(--theme-text)]"
+            style={{
+              borderColor: 'var(--theme-border)',
+              color: 'var(--theme-muted)',
+              background:
+                'linear-gradient(135deg, color-mix(in srgb, var(--theme-card) 80%, transparent), transparent)',
+            }}
+          >
+            <HugeiconsIcon
+              icon={Settings02Icon}
+              size={15}
+              strokeWidth={1.7}
+            />
+          </button>
+        </div>
+      </div>
 
-        {/* ── Attention marquee ──
+      {/* ── Attention marquee ──
            Iteration 008: lifted *out* of the OpsStrip into its own
            dedicated row above it. Fixed Eric's 'feels cluttered'
            concern by giving the ticker its own visual chamber
            (warning gradient, separated border) so it doesn't blend
            into the gateway/version/cron line below it. */}
-        {(overview?.incidents.length ?? 0) > 0 ? (
-          <AttentionMarquee overview={overview ?? null} />
-        ) : null}
+      {(overview?.incidents.length ?? 0) > 0 ? (
+        <AttentionMarquee overview={overview ?? null} />
+      ) : null}
 
-        {/* ── Ops strip (gateway + version drift + platforms + cron pulse). ── */}
-        <OpsStrip
-          status={overview?.status ?? null}
-          cron={overview?.cron ?? null}
-          kanban={overview?.kanban ?? null}
-          platforms={overview?.platforms ?? []}
-        />
+      {/* ── Ops strip (gateway + version drift + platforms + cron pulse). ── */}
+      <OpsStrip
+        status={overview?.status ?? null}
+        cron={overview?.cron ?? null}
+        kanban={overview?.kanban ?? null}
+        platforms={overview?.platforms ?? []}
+      />
 
-        {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}
-        <HeroMetrics
-          analytics={overview?.analytics ?? null}
-          fallback={{
-            sessions: stats.totalSessions,
-            messages: stats.totalMessages,
-            toolCalls: stats.totalToolCalls,
-            tokens: stats.totalTokens,
-          }}
-          extraTile={
-            <ActiveModelKpi
-              modelInfo={overview?.modelInfo ?? null}
-              analytics={overview?.analytics ?? null}
-            />
-          }
-        />
+      {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}
+      <HeroMetrics
+        analytics={overview?.analytics ?? null}
+        fallback={{
+          sessions: stats.totalSessions,
+          messages: stats.totalMessages,
+          toolCalls: stats.totalToolCalls,
+          tokens: stats.totalTokens,
+        }}
+        extraTile={
+          <ActiveModelKpi
+            modelInfo={overview?.modelInfo ?? null}
+            analytics={overview?.analytics ?? null}
+          />
+        }
+      />
 
-        {layout.isVisible('finance_overview') ? (
-          <WidgetShell id="finance_overview" layout={layout}>
-            <FinanceOverviewCard
-              onOpen={() => navigate({ to: '/personal-finance' })}
-            />
-          </WidgetShell>
-        ) : null}
+      {layout.isVisible('finance_overview') ? (
+        <WidgetShell id="finance_overview" layout={layout}>
+          <FinanceOverviewCard onOpen={() => navigate({ to: '/personal-finance' })} />
+        </WidgetShell>
+      ) : null}
 
-        {layout.isVisible('trading_overview') ? (
-          <WidgetShell id="trading_overview" layout={layout}>
-            <TradingOverviewCard onOpen={() => navigate({ to: '/trading' })} />
-          </WidgetShell>
-        ) : null}
+      {layout.isVisible('trading_overview') ? (
+        <WidgetShell id="trading_overview" layout={layout}>
+          <TradingOverviewCard onOpen={() => navigate({ to: '/trading' })} />
+        </WidgetShell>
+      ) : null}
 
-        {/* ── Edit-mode banner (only renders when toggled). ── */}
-        <EditModePanel layout={layout} />
+      {/* ── Edit-mode banner (only renders when toggled). ── */}
+      <EditModePanel layout={layout} />
 
-        {/* ── Analytics chart (left) + Top models / Provider mix / Cache
+      {/* ── Analytics chart (left) + Top models / Provider mix / Cache
            efficiency stacked on the right. The right-side stack now
            occupies the full vertical of the chart so we don't get the
            floating-card empty-space Eric flagged in iter 008. ── */}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-          {layout.isVisible('analytics_chart') ? (
-            <div className="lg:col-span-8">
-              <WidgetShell id="analytics_chart" layout={layout}>
-                <Suspense
-                  fallback={
-                    <div className="h-64 skeleton-shimmer rounded-xl" />
-                  }
-                >
-                  <AnalyticsChartCard
-                    analytics={overview?.analytics ?? null}
-                    insights={overview?.insights ?? []}
-                    period={period}
-                    onPeriodChange={setPeriod}
-                    loading={overviewQuery.isFetching}
-                  />
-                </Suspense>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        {layout.isVisible('analytics_chart') ? (
+          <div className="lg:col-span-8">
+            <WidgetShell id="analytics_chart" layout={layout}>
+              <Suspense fallback={<div className="h-64 skeleton-shimmer rounded-xl" />}>
+                <AnalyticsChartCard
+                  analytics={overview?.analytics ?? null}
+                  insights={overview?.insights ?? []}
+                  period={period}
+                  onPeriodChange={setPeriod}
+                  loading={overviewQuery.isFetching}
+                />
+              </Suspense>
+            </WidgetShell>
+          </div>
+        ) : null}
+        {layout.isVisible('top_models') ||
+        layout.isVisible('provider_mix') ||
+        layout.isVisible('cache_efficiency') ||
+        layout.isVisible('velocity') ||
+        layout.isVisible('cost_ledger') ? (
+          <div
+            className={
+              layout.isVisible('analytics_chart')
+                ? 'flex flex-col gap-3 lg:col-span-4'
+                : 'flex flex-col gap-3 lg:col-span-12'
+            }
+          >
+            {layout.isVisible('top_models') ? (
+              <WidgetShell id="top_models" layout={layout}>
+                <TopModelsCard analytics={overview?.analytics ?? null} />
               </WidgetShell>
-            </div>
-          ) : null}
-          {layout.isVisible('top_models') ||
-          layout.isVisible('provider_mix') ||
-          layout.isVisible('cache_efficiency') ||
-          layout.isVisible('velocity') ||
-          layout.isVisible('cost_ledger') ? (
-            <div
-              className={
-                layout.isVisible('analytics_chart')
-                  ? 'flex flex-col gap-3 lg:col-span-4'
-                  : 'flex flex-col gap-3 lg:col-span-12'
-              }
-            >
-              {layout.isVisible('top_models') ? (
-                <WidgetShell id="top_models" layout={layout}>
-                  <TopModelsCard analytics={overview?.analytics ?? null} />
-                </WidgetShell>
-              ) : null}
-              {layout.isVisible('cache_efficiency') ? (
-                <WidgetShell id="cache_efficiency" layout={layout}>
-                  <CacheEfficiencyCard
-                    analytics={overview?.analytics ?? null}
-                  />
-                </WidgetShell>
-              ) : null}
-              {layout.isVisible('provider_mix') ? (
-                <WidgetShell id="provider_mix" layout={layout}>
-                  <ProviderMixCard analytics={overview?.analytics ?? null} />
-                </WidgetShell>
-              ) : null}
-              {layout.isVisible('velocity') ? (
-                <WidgetShell id="velocity" layout={layout}>
-                  <VelocityCard analytics={overview?.analytics ?? null} />
-                </WidgetShell>
-              ) : null}
-              {layout.isVisible('cost_ledger') ? (
-                <WidgetShell id="cost_ledger" layout={layout}>
-                  <CostLedgerCard analytics={overview?.analytics ?? null} />
-                </WidgetShell>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+            ) : null}
+            {layout.isVisible('cache_efficiency') ? (
+              <WidgetShell id="cache_efficiency" layout={layout}>
+                <CacheEfficiencyCard
+                  analytics={overview?.analytics ?? null}
+                />
+              </WidgetShell>
+            ) : null}
+            {layout.isVisible('provider_mix') ? (
+              <WidgetShell id="provider_mix" layout={layout}>
+                <ProviderMixCard analytics={overview?.analytics ?? null} />
+              </WidgetShell>
+            ) : null}
+            {layout.isVisible('velocity') ? (
+              <WidgetShell id="velocity" layout={layout}>
+                <VelocityCard analytics={overview?.analytics ?? null} />
+              </WidgetShell>
+            ) : null}
+            {layout.isVisible('cost_ledger') ? (
+              <WidgetShell id="cost_ledger" layout={layout}>
+                <CostLedgerCard
+                  analytics={overview?.analytics ?? null}
+                />
+              </WidgetShell>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
-        {/* ── Primary content: Sessions Intelligence (replaces 14d Activity) + side rail ──
+      {/* ── Primary content: Sessions Intelligence (replaces 14d Activity) + side rail ──
            Iteration 006 layout per Eric:
            - Attention now rides the OpsStrip marquee, not the rail.
            - Achievements moved up to sit beside Top Models would push the chart out
              of place; instead it now lives at the *top* of the side rail since the
              rail itself is right of the chart, which produces the same visual order.
            - Logs default off; still toggleable from edit mode for power users. */}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-          {/* Iter 013 main column order: Operator Tip first (compact),
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        {/* Iter 013 main column order: Operator Tip first (compact),
             then Sessions Intelligence (the bottom anchor that grows
             to fill the column to match the side rail height), then
             optional Logs Tail at the bottom for power users in edit
             mode. The column itself is `min-h-full flex` so the
             child Sessions card's `flex-1` actually expands. */}
-          <div className="flex min-h-full flex-col gap-3 lg:col-span-8">
-            {layout.isVisible('operator_tip') ? (
-              <WidgetShell id="operator_tip" layout={layout}>
-                <OperatorTipCard overview={overview ?? null} />
+        <div className="flex min-h-full flex-col gap-3 lg:col-span-8">
+          {layout.isVisible('operator_tip') ? (
+            <WidgetShell id="operator_tip" layout={layout}>
+              <OperatorTipCard overview={overview ?? null} />
+            </WidgetShell>
+          ) : null}
+          {layout.isVisible('sessions_intelligence') ? (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <WidgetShell id="sessions_intelligence" layout={layout}>
+                {sessionsQuery.isError || sessionsUnavailable ? (
+                  <UnavailableWidget
+                    title="Recent Sessions"
+                    description={
+                      sessionsQuery.isError
+                        ? getUnavailableReason('sessions')
+                        : sessionsUnavailableMessage
+                    }
+                  />
+                ) : (
+                  <SessionsIntelligenceCard sessions={sessionRows} />
+                )}
               </WidgetShell>
-            ) : null}
-            {layout.isVisible('sessions_intelligence') ? (
-              <div className="flex min-h-0 flex-1 flex-col">
-                <WidgetShell id="sessions_intelligence" layout={layout}>
-                  {sessionsQuery.isError || sessionsUnavailable ? (
-                    <UnavailableWidget
-                      title="Recent Sessions"
-                      description={
-                        sessionsQuery.isError
-                          ? getUnavailableReason('sessions')
-                          : sessionsUnavailableMessage
-                      }
-                    />
-                  ) : (
-                    <SessionsIntelligenceCard sessions={sessionRows} />
-                  )}
-                </WidgetShell>
-              </div>
-            ) : null}
-            {layout.isVisible('logs_tail') ? (
-              <WidgetShell id="logs_tail" layout={layout}>
-                <LogsTailCard logs={overview?.logs ?? null} />
-              </WidgetShell>
-            ) : null}
-          </div>
-          {/* Side rail. Achievements is now first (sits beside Top Models
+            </div>
+          ) : null}
+          {layout.isVisible('logs_tail') ? (
+            <WidgetShell id="logs_tail" layout={layout}>
+              <LogsTailCard logs={overview?.logs ?? null} />
+            </WidgetShell>
+          ) : null}
+        </div>
+        {/* Side rail. Achievements is now first (sits beside Top Models
             visually since the rail is right of the chart row + sessions),
             then Skills, then the rhythm card. Mix & rhythm is the unique
             chart in this column — keeping it.
             `min-h-full` + the trailing `flex-1` rhythm card together
             stretch the rail to match Sessions Intelligence height so
             we don't get the dangling gap Eric flagged in iter 007. */}
-          <div className="flex min-h-full flex-col gap-3 lg:col-span-4">
-            <WidgetShell id="achievements" layout={layout}>
-              <AchievementsCard achievements={overview?.achievements ?? null} />
+        <div className="flex min-h-full flex-col gap-3 lg:col-span-4">
+          <WidgetShell id="achievements" layout={layout}>
+            <AchievementsCard
+              achievements={overview?.achievements ?? null}
+            />
+          </WidgetShell>
+          <WidgetShell id="skills_usage" layout={layout}>
+            <SkillsUsageCard
+              usage={overview?.skillsUsage ?? null}
+              installedCount={skillsInstalled}
+              onOpen={() => navigate({ to: '/skills' })}
+            />
+          </WidgetShell>
+          {layout.isVisible('proactive_suggestions') ? (
+            <WidgetShell id="proactive_suggestions" layout={layout}>
+              <ProactiveSuggestionsCard overview={overview} />
             </WidgetShell>
-            <WidgetShell id="skills_usage" layout={layout}>
-              <SkillsUsageCard
-                usage={overview?.skillsUsage ?? null}
-                installedCount={skillsInstalled}
-                onOpen={() => navigate({ to: '/skills' })}
-              />
-            </WidgetShell>
-            {layout.isVisible('proactive_suggestions') ? (
-              <WidgetShell id="proactive_suggestions" layout={layout}>
-                <ProactiveSuggestionsCard overview={overview} />
-              </WidgetShell>
-            ) : null}
-            {/* `flex-1` here pushes the rhythm card to consume any
+          ) : null}
+          {/* `flex-1` here pushes the rhythm card to consume any
               remaining vertical space so the rail's bottom aligns
               with Sessions Intelligence. The card itself uses
               h-full + flex-1 to honor the stretch. */}
-            <div className="flex min-h-0 flex-1 flex-col">
-              <WidgetShell id="mix_rhythm" layout={layout}>
-                <TokenMixHourCard
-                  analytics={overview?.analytics ?? null}
-                  sessions={sessionRows}
-                />
-              </WidgetShell>
-            </div>
+          <div className="flex min-h-0 flex-1 flex-col">
+            <WidgetShell id="mix_rhythm" layout={layout}>
+              <TokenMixHourCard
+                analytics={overview?.analytics ?? null}
+                sessions={sessionRows}
+              />
+            </WidgetShell>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

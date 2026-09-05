@@ -3,10 +3,22 @@ import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-export type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'blocked' | 'done' | 'deleted'
+export type TaskColumn =
+  | 'backlog'
+  | 'todo'
+  | 'in_progress'
+  | 'review'
+  | 'blocked'
+  | 'done'
+  | 'deleted'
 export type TaskPriority = 'high' | 'medium' | 'low'
 
-export type TaskAgentState = 'reviewing' | 'delegating' | 'working' | 'waiting_for_input' | null
+export type TaskAgentState =
+  | 'reviewing'
+  | 'delegating'
+  | 'working'
+  | 'waiting_for_input'
+  | null
 export type TaskSource = 'human' | 'idea_job' | 'astra' | null
 
 export type ActivityEntry = {
@@ -27,15 +39,21 @@ export type ClarificationQuestion = {
   answered_at?: string
 }
 
-export type BlockerType = 'credential' | 'dependency' | 'execution' | 'input' | 'environment' | null
+export type BlockerType =
+  | 'credential'
+  | 'dependency'
+  | 'execution'
+  | 'input'
+  | 'environment'
+  | null
 
 export type CredentialNeeded = {
-  key: string          // e.g. 'IBKR_ACCOUNT_ID', 'BINANCE_API_KEY'
-  label: string        // human-readable label, e.g. 'IBKR Account ID'
-  description: string  // what this credential is for
-  provided: boolean    // whether it's been provided
+  key: string // e.g. 'IBKR_ACCOUNT_ID', 'BINANCE_API_KEY'
+  label: string // human-readable label, e.g. 'IBKR Account ID'
+  description: string // what this credential is for
+  provided: boolean // whether it's been provided
   provided_at?: string // ISO timestamp
-  validated?: boolean  // whether the credential passed validation
+  validated?: boolean // whether the credential passed validation
 }
 
 export type TaskRecord = {
@@ -64,15 +82,15 @@ export type TaskRecord = {
   clarify_nudged_at?: string
   clarify_nudge_count?: number
   agent_progress_pinged_at?: string
-  auto_retry_count?: number       // # of times the lifecycle auto-retried a blocked task
-  auto_retry_at?: string          // ISO timestamp of last auto-retry
-  depends_on?: Array<string>      // task IDs that must be done before this task can be deployed
+  auto_retry_count?: number // # of times the lifecycle auto-retried a blocked task
+  auto_retry_at?: string // ISO timestamp of last auto-retry
+  depends_on?: Array<string> // task IDs that must be done before this task can be deployed
   // --- Blocker system fields ---
-  blocker_type?: BlockerType      // why the task is blocked
-  blocker_reason?: string         // human-readable description of the blocker
-  blocked_since?: string          // ISO timestamp when first blocked
-  credentials_needed?: Array<CredentialNeeded>  // structured credential requirements
-  resolved_by_task?: string       // task ID that resolves this blocker (for dependency blockers)
+  blocker_type?: BlockerType // why the task is blocked
+  blocker_reason?: string // human-readable description of the blocker
+  blocked_since?: string // ISO timestamp when first blocked
+  credentials_needed?: Array<CredentialNeeded> // structured credential requirements
+  resolved_by_task?: string // task ID that resolves this blocker (for dependency blockers)
 }
 
 type TaskFile = { tasks: Array<TaskRecord> }
@@ -85,11 +103,16 @@ type TaskFilters = {
 }
 
 export type CreateTaskInput = Partial<TaskRecord> & { title: string }
-export type UpdateTaskInput = Partial<Omit<TaskRecord, 'id' | 'created_at' | 'created_by'>>
+export type UpdateTaskInput = Partial<
+  Omit<TaskRecord, 'id' | 'created_at' | 'created_by'>
+>
 
-const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+const CLAUDE_HOME =
+  process.env.HERMES_HOME ??
+  process.env.CLAUDE_HOME ??
+  path.join(os.homedir(), '.hermes')
 const TASKS_FILE = path.join(CLAUDE_HOME, 'tasks.json')
-const LOCK_FILE  = TASKS_FILE + '.lock'
+const LOCK_FILE = TASKS_FILE + '.lock'
 
 // Cross-process advisory lock so background .mjs scripts and the SSR server
 // never write tasks.json at the same time. Lock is a plain exclusive file;
@@ -99,22 +122,36 @@ function withTasksLock<T>(fn: () => T): T {
   const deadline = Date.now() + 5_000
   while (Date.now() < deadline) {
     try {
-      const fd = fs.openSync(LOCK_FILE, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL)
+      const fd = fs.openSync(
+        LOCK_FILE,
+        fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL,
+      )
       fs.closeSync(fd)
       try {
         return fn()
       } finally {
-        try { fs.unlinkSync(LOCK_FILE) } catch { /* non-fatal */ }
+        try {
+          fs.unlinkSync(LOCK_FILE)
+        } catch {
+          /* non-fatal */
+        }
       }
     } catch (e: unknown) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
       // Remove stale locks left by killed processes
       try {
         const stat = fs.statSync(LOCK_FILE)
-        if (Date.now() - stat.mtimeMs > 30_000) { fs.unlinkSync(LOCK_FILE); continue }
-      } catch { /* ok */ }
+        if (Date.now() - stat.mtimeMs > 30_000) {
+          fs.unlinkSync(LOCK_FILE)
+          continue
+        }
+      } catch {
+        /* ok */
+      }
       const end = Date.now() + 50
-      while (Date.now() < end) { /* busy-wait 50 ms */ }
+      while (Date.now() < end) {
+        /* busy-wait 50 ms */
+      }
     }
   }
   // Timeout — proceed without lock rather than deadlock
@@ -124,7 +161,11 @@ function withTasksLock<T>(fn: () => T): T {
 function ensureTasksFile(): void {
   fs.mkdirSync(CLAUDE_HOME, { recursive: true })
   if (!fs.existsSync(TASKS_FILE)) {
-    fs.writeFileSync(TASKS_FILE, JSON.stringify({ tasks: [] }, null, 2) + '\n', 'utf-8')
+    fs.writeFileSync(
+      TASKS_FILE,
+      JSON.stringify({ tasks: [] }, null, 2) + '\n',
+      'utf-8',
+    )
   }
 }
 
@@ -148,7 +189,13 @@ function writeTaskFile(data: TaskFile): void {
   fs.renameSync(tmp, TASKS_FILE)
 }
 
-function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'title' | 'created_at' | 'updated_at' | 'created_by'>): TaskRecord {
+function normalizeTask(
+  task: Partial<TaskRecord> &
+    Pick<
+      TaskRecord,
+      'id' | 'title' | 'created_at' | 'updated_at' | 'created_by'
+    >,
+): TaskRecord {
   return {
     id: task.id,
     title: task.title,
@@ -156,7 +203,9 @@ function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'titl
     column: task.column ?? 'backlog',
     priority: task.priority ?? 'medium',
     assignee: task.assignee ?? null,
-    tags: Array.isArray(task.tags) ? task.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+    tags: Array.isArray(task.tags)
+      ? task.tags.filter((tag): tag is string => typeof tag === 'string')
+      : [],
     due_date: task.due_date ?? null,
     position: typeof task.position === 'number' ? task.position : 0,
     created_by: task.created_by,
@@ -171,20 +220,43 @@ function normalizeTask(task: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'titl
     agent_history: Array.isArray(task.agent_history) ? task.agent_history : [],
     waiting_for_user: task.waiting_for_user ?? false,
     // Optional clarification fields — preserved as-is (undefined omitted from JSON)
-    ...(Array.isArray(task.clarification_questions) ? { clarification_questions: task.clarification_questions } : {}),
+    ...(Array.isArray(task.clarification_questions)
+      ? { clarification_questions: task.clarification_questions }
+      : {}),
     ...(task.clarify_tg != null ? { clarify_tg: task.clarify_tg } : {}),
-    ...(task.clarify_nudged_at != null ? { clarify_nudged_at: task.clarify_nudged_at } : {}),
-    ...(task.clarify_nudge_count != null ? { clarify_nudge_count: task.clarify_nudge_count } : {}),
-    ...(task.agent_progress_pinged_at != null ? { agent_progress_pinged_at: task.agent_progress_pinged_at } : {}),
-    ...(task.auto_retry_count != null ? { auto_retry_count: task.auto_retry_count } : {}),
-    ...(task.auto_retry_at != null ? { auto_retry_at: task.auto_retry_at } : {}),
-    ...(Array.isArray(task.depends_on) && task.depends_on.length > 0 ? { depends_on: task.depends_on } : {}),
+    ...(task.clarify_nudged_at != null
+      ? { clarify_nudged_at: task.clarify_nudged_at }
+      : {}),
+    ...(task.clarify_nudge_count != null
+      ? { clarify_nudge_count: task.clarify_nudge_count }
+      : {}),
+    ...(task.agent_progress_pinged_at != null
+      ? { agent_progress_pinged_at: task.agent_progress_pinged_at }
+      : {}),
+    ...(task.auto_retry_count != null
+      ? { auto_retry_count: task.auto_retry_count }
+      : {}),
+    ...(task.auto_retry_at != null
+      ? { auto_retry_at: task.auto_retry_at }
+      : {}),
+    ...(Array.isArray(task.depends_on) && task.depends_on.length > 0
+      ? { depends_on: task.depends_on }
+      : {}),
     // Blocker fields — preserve as-is
     ...(task.blocker_type != null ? { blocker_type: task.blocker_type } : {}),
-    ...(task.blocker_reason != null ? { blocker_reason: task.blocker_reason } : {}),
-    ...(task.blocked_since != null ? { blocked_since: task.blocked_since } : {}),
-    ...(Array.isArray(task.credentials_needed) && task.credentials_needed.length > 0 ? { credentials_needed: task.credentials_needed } : {}),
-    ...(task.resolved_by_task != null ? { resolved_by_task: task.resolved_by_task } : {}),
+    ...(task.blocker_reason != null
+      ? { blocker_reason: task.blocker_reason }
+      : {}),
+    ...(task.blocked_since != null
+      ? { blocked_since: task.blocked_since }
+      : {}),
+    ...(Array.isArray(task.credentials_needed) &&
+    task.credentials_needed.length > 0
+      ? { credentials_needed: task.credentials_needed }
+      : {}),
+    ...(task.resolved_by_task != null
+      ? { resolved_by_task: task.resolved_by_task }
+      : {}),
   }
 }
 
@@ -202,11 +274,18 @@ export function listTasks(filters: TaskFilters = {}): Array<TaskRecord> {
   if (filters.priority) {
     tasks = tasks.filter((task) => task.priority === filters.priority)
   }
-  return tasks.sort((a, b) => a.position - b.position || a.created_at.localeCompare(b.created_at))
+  return tasks.sort(
+    (a, b) =>
+      a.position - b.position || a.created_at.localeCompare(b.created_at),
+  )
 }
 
 export function getTask(taskId: string): TaskRecord | null {
-  return readTaskFile().tasks.map(normalizeTask).find((task) => task.id === taskId) ?? null
+  return (
+    readTaskFile()
+      .tasks.map(normalizeTask)
+      .find((task) => task.id === taskId) ?? null
+  )
 }
 
 export function createTask(input: CreateTaskInput): TaskRecord {
@@ -223,7 +302,10 @@ export function createTask(input: CreateTaskInput): TaskRecord {
       tags: input.tags,
       due_date: input.due_date,
       position: typeof input.position === 'number' ? input.position : 0,
-      created_by: typeof input.created_by === 'string' && input.created_by ? input.created_by : 'user',
+      created_by:
+        typeof input.created_by === 'string' && input.created_by
+          ? input.created_by
+          : 'user',
       created_at: now,
       updated_at: now,
       source: input.source,
@@ -237,7 +319,10 @@ export function createTask(input: CreateTaskInput): TaskRecord {
   })
 }
 
-export function updateTask(taskId: string, updates: UpdateTaskInput): TaskRecord | null {
+export function updateTask(
+  taskId: string,
+  updates: UpdateTaskInput,
+): TaskRecord | null {
   return withTasksLock(() => {
     const file = readTaskFile()
     const index = file.tasks.findIndex((task) => task.id === taskId)
@@ -270,10 +355,15 @@ export function updateTask(taskId: string, updates: UpdateTaskInput): TaskRecord
           const { maybeAutoResumeAfterCompletion } = require('./astra-tasks')
           const result = maybeAutoResumeAfterCompletion(taskId)
           if (result.unblocked > 0) {
-            console.log(`[tasks] Auto-unblocked ${result.unblocked} task(s) after ${taskId} completed`)
+            console.log(
+              `[tasks] Auto-unblocked ${result.unblocked} task(s) after ${taskId} completed`,
+            )
           }
         } catch (err) {
-          console.warn('[tasks] Auto-resume check failed (non-critical):', (err as Error).message)
+          console.warn(
+            '[tasks] Auto-resume check failed (non-critical):',
+            (err as Error).message,
+          )
         }
       })
     }
@@ -282,7 +372,10 @@ export function updateTask(taskId: string, updates: UpdateTaskInput): TaskRecord
   })
 }
 
-export function moveTask(taskId: string, column: TaskColumn): TaskRecord | null {
+export function moveTask(
+  taskId: string,
+  column: TaskColumn,
+): TaskRecord | null {
   return updateTask(taskId, { column })
 }
 
@@ -296,6 +389,9 @@ export function deleteTask(taskId: string): boolean {
   })
 }
 
-export function linkTaskSession(taskId: string, sessionId: string | null): TaskRecord | null {
+export function linkTaskSession(
+  taskId: string,
+  sessionId: string | null,
+): TaskRecord | null {
   return updateTask(taskId, { session_id: sessionId })
 }

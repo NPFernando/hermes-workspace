@@ -59,8 +59,7 @@ export const Route = createFileRoute('/api/memory/write')({
           fs.writeFileSync(fullPath, content, 'utf-8')
           return json({ success: true, path: relativePath })
         } catch (error) {
-          const message =
-            safeErrorMessage(error)
+          const message = safeErrorMessage(error)
           const status =
             /required|absolute|traversal|outside workspace|\.md/i.test(message)
               ? 400

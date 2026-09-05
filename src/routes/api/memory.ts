@@ -32,10 +32,7 @@ export const Route = createFileRoute('/api/memory')({
         try {
           return json(await getMemory())
         } catch (err) {
-          return json(
-            { error: safeErrorMessage(err) },
-            { status: 500 },
-          )
+          return json({ error: safeErrorMessage(err) }, { status: 500 })
         }
       },
     },

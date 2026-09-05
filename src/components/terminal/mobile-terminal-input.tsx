@@ -46,9 +46,7 @@ export function MobileTerminalInput() {
   }, [])
 
   return (
-    <div
-      className="flex items-center gap-1 px-2 py-1.5 shrink-0 bg-[var(--theme-bg)] border-t border-[var(--theme-border)]"
-    >
+    <div className="flex items-center gap-1 px-2 py-1.5 shrink-0 bg-[var(--theme-bg)] border-t border-[var(--theme-border)]">
       <button
         type="button"
         onClick={() => void paste()}

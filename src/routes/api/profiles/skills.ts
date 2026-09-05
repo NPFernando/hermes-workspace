@@ -86,10 +86,7 @@ export const Route = createFileRoute('/api/profiles/skills')({
           const items = Array.isArray(parsed) ? parsed : []
           return json({ profile, items })
         } catch (err) {
-          return json(
-            { error: safeErrorMessage(err) },
-            { status: 500 },
-          )
+          return json({ error: safeErrorMessage(err) }, { status: 500 })
         }
       },
     },

@@ -61,10 +61,16 @@ export function UpdateDigestModal({
           >
             {/* Header */}
             <div className="flex items-center gap-3 border-b border-[var(--theme-border)] px-5 py-4">
-              <img src="/claude-avatar.webp" alt="Hermes" className="size-9 rounded-xl shrink-0" />
+              <img
+                src="/claude-avatar.webp"
+                alt="Hermes"
+                className="size-9 rounded-xl shrink-0"
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-[var(--theme-text)]">
-                  {sources.length > 1 ? 'Hermes updated' : `What's New — ${sources[0]}`}
+                  {sources.length > 1
+                    ? 'Hermes updated'
+                    : `What's New — ${sources[0]}`}
                 </p>
                 <p className="text-xs text-[var(--theme-muted)] truncate">
                   {sources.length > 1
@@ -89,7 +95,9 @@ export function UpdateDigestModal({
               {agentNotes?.sections.map((section) => (
                 <section key={`${section.product}:${section.to}`}>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold text-[var(--theme-text)]">{section.label}</h3>
+                    <h3 className="text-sm font-semibold text-[var(--theme-text)]">
+                      {section.label}
+                    </h3>
                     <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] bg-[var(--theme-card2)] text-[var(--theme-muted)]">
                       {shortSha(section.from)} → {shortSha(section.to)}
                     </span>

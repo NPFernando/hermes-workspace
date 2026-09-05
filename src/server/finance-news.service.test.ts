@@ -21,7 +21,11 @@ describe('finance-news.service', () => {
   })
 
   it('uses the RSS publisher source, normalizes its URL, and de-duplicates items', () => {
-    const [item] = parseGoogleNewsRss(RSS, 'btcusdt', '2026-08-04T13:00:00.000Z')
+    const [item] = parseGoogleNewsRss(
+      RSS,
+      'btcusdt',
+      '2026-08-04T13:00:00.000Z',
+    )
 
     expect(parseGoogleNewsRss(RSS, 'BTCUSDT')).toHaveLength(1)
     expect(item).toMatchObject({
@@ -38,7 +42,10 @@ describe('finance-news.service', () => {
   })
 
   it('falls back to Google News only when an RSS source is absent', () => {
-    const [item] = parseGoogleNewsRss('<rss><item><title>Headline</title></item></rss>', 'ETHUSDT')
+    const [item] = parseGoogleNewsRss(
+      '<rss><item><title>Headline</title></item></rss>',
+      'ETHUSDT',
+    )
     expect(item).toMatchObject({
       sourceName: 'Google News',
       sourceUrl: 'https://news.google.com',

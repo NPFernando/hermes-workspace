@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { DialogContent, DialogDescription, DialogRoot, DialogTitle } from '@/components/ui/dialog'
+import {
+  DialogContent,
+  DialogDescription,
+  DialogRoot,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from '@/components/ui/toast'
 
 type GuardrailsModalProps = {
@@ -41,9 +46,18 @@ function parseGuardrails(raw: string | null): GuardrailConfig {
   try {
     const parsed = JSON.parse(raw) as Partial<GuardrailConfig>
     return {
-      maxTokens: typeof parsed.maxTokens === 'number' && Number.isFinite(parsed.maxTokens) && parsed.maxTokens >= 0 ? Math.floor(parsed.maxTokens) : null,
+      maxTokens:
+        typeof parsed.maxTokens === 'number' &&
+        Number.isFinite(parsed.maxTokens) &&
+        parsed.maxTokens >= 0
+          ? Math.floor(parsed.maxTokens)
+          : null,
       toolMode: parsed.toolMode === 'blocklist' ? 'blocklist' : 'allowlist',
-      tools: Array.isArray(parsed.tools) ? parsed.tools.map((value) => (typeof value === 'string' ? value.trim() : '')).filter(Boolean) : [],
+      tools: Array.isArray(parsed.tools)
+        ? parsed.tools
+            .map((value) => (typeof value === 'string' ? value.trim() : ''))
+            .filter(Boolean)
+        : [],
       stopOnError: Boolean(parsed.stopOnError),
       stopOnIdle: Boolean(parsed.stopOnIdle),
       stopOnTokenLimit: Boolean(parsed.stopOnTokenLimit),
@@ -53,19 +67,33 @@ function parseGuardrails(raw: string | null): GuardrailConfig {
   }
 }
 
-export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenChange }: GuardrailsModalProps) {
-  const [maxTokens, setMaxTokens] = useState<number | null>(DEFAULT_CONFIG.maxTokens)
-  const [toolMode, setToolMode] = useState<GuardrailConfig['toolMode']>(DEFAULT_CONFIG.toolMode)
+export function GuardrailsModal({
+  open,
+  agentName,
+  agentId,
+  sessionKey,
+  onOpenChange,
+}: GuardrailsModalProps) {
+  const [maxTokens, setMaxTokens] = useState<number | null>(
+    DEFAULT_CONFIG.maxTokens,
+  )
+  const [toolMode, setToolMode] = useState<GuardrailConfig['toolMode']>(
+    DEFAULT_CONFIG.toolMode,
+  )
   const [toolsText, setToolsText] = useState('')
   const [stopOnError, setStopOnError] = useState(DEFAULT_CONFIG.stopOnError)
   const [stopOnIdle, setStopOnIdle] = useState(DEFAULT_CONFIG.stopOnIdle)
-  const [stopOnTokenLimit, setStopOnTokenLimit] = useState(DEFAULT_CONFIG.stopOnTokenLimit)
+  const [stopOnTokenLimit, setStopOnTokenLimit] = useState(
+    DEFAULT_CONFIG.stopOnTokenLimit,
+  )
 
   useEffect(() => {
     if (!open) return
     const normalizedId = agentId.trim()
     const parsed = normalizedId
-      ? parseGuardrails(window.localStorage.getItem(`hermessuite:guardrails:${normalizedId}`))
+      ? parseGuardrails(
+          window.localStorage.getItem(`hermessuite:guardrails:${normalizedId}`),
+        )
       : DEFAULT_CONFIG
     setMaxTokens(parsed.maxTokens)
     setToolMode(parsed.toolMode)
@@ -81,20 +109,42 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
     const config: GuardrailConfig = {
       maxTokens,
       toolMode,
-      tools: toolsText.split('\n').map((value) => value.trim()).filter(Boolean),
+      tools: toolsText
+        .split('\n')
+        .map((value) => value.trim())
+        .filter(Boolean),
       stopOnError,
       stopOnIdle,
       stopOnTokenLimit,
     }
-    window.localStorage.setItem(`hermessuite:guardrails:${normalizedId}`, JSON.stringify(config))
+    window.localStorage.setItem(
+      `hermessuite:guardrails:${normalizedId}`,
+      JSON.stringify(config),
+    )
     toast(`Guardrails updated for ${agentName}`, { type: 'success' })
     onOpenChange(false)
   }
 
-  const stopRows: Array<{ checked: boolean; label: string; onToggle: () => void }> = [
-    { checked: stopOnError, label: 'Stop on error (agent encounters an unrecoverable error)', onToggle: () => setStopOnError((value) => !value) },
-    { checked: stopOnIdle, label: 'Stop on idle (no activity for 5 minutes)', onToggle: () => setStopOnIdle((value) => !value) },
-    { checked: stopOnTokenLimit, label: 'Stop on token limit reached', onToggle: () => setStopOnTokenLimit((value) => !value) },
+  const stopRows: Array<{
+    checked: boolean
+    label: string
+    onToggle: () => void
+  }> = [
+    {
+      checked: stopOnError,
+      label: 'Stop on error (agent encounters an unrecoverable error)',
+      onToggle: () => setStopOnError((value) => !value),
+    },
+    {
+      checked: stopOnIdle,
+      label: 'Stop on idle (no activity for 5 minutes)',
+      onToggle: () => setStopOnIdle((value) => !value),
+    },
+    {
+      checked: stopOnTokenLimit,
+      label: 'Stop on token limit reached',
+      onToggle: () => setStopOnTokenLimit((value) => !value),
+    },
   ]
 
   return (
@@ -102,12 +152,19 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
       <DialogContent className="w-[min(560px,92vw)]">
         <div className="space-y-4 p-5">
           <div className="space-y-1">
-            <DialogTitle className="text-base">Guardrails: {agentName}</DialogTitle>
-            <DialogDescription>Set constraints for this agent&apos;s behavior. Changes are saved locally.</DialogDescription>
+            <DialogTitle className="text-base">
+              Guardrails: {agentName}
+            </DialogTitle>
+            <DialogDescription>
+              Set constraints for this agent&apos;s behavior. Changes are saved
+              locally.
+            </DialogDescription>
           </div>
 
           <section className="space-y-2">
-            <p className="text-xs font-medium text-[var(--theme-muted)]">Max tokens per run</p>
+            <p className="text-xs font-medium text-[var(--theme-muted)]">
+              Max tokens per run
+            </p>
             <div className="inline-flex rounded-lg bg-[var(--theme-card2)] p-1 gap-1">
               {TOKEN_PRESETS.map((preset) => (
                 <button
@@ -128,7 +185,8 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
               onChange={(event) => {
                 if (!event.target.value) return setMaxTokens(null)
                 const parsed = Number(event.target.value)
-                if (Number.isFinite(parsed) && parsed >= 0) setMaxTokens(Math.floor(parsed))
+                if (Number.isFinite(parsed) && parsed >= 0)
+                  setMaxTokens(Math.floor(parsed))
               }}
               className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)]/70 px-3 py-2 text-sm text-[var(--theme-text)] outline-none transition-colors focus:border-accent-400"
             />
@@ -136,7 +194,9 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
 
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-medium text-[var(--theme-muted)]">Mode</p>
+              <p className="text-xs font-medium text-[var(--theme-muted)]">
+                Mode
+              </p>
               <div className="inline-flex rounded-lg bg-[var(--theme-card2)] p-1 gap-1">
                 {(['allowlist', 'blocklist'] as const).map((mode) => (
                   <button
@@ -157,11 +217,15 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
               placeholder={'read\nwrite\nexec\nbrowser'}
               className="w-full resize-y rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)]/70 px-3 py-2 text-sm font-mono text-[var(--theme-text)] outline-none transition-colors focus:border-accent-400"
             />
-            <p className="text-[11px] text-[var(--theme-muted)]">Enter tool names, one per line. Leave empty to allow all.</p>
+            <p className="text-[11px] text-[var(--theme-muted)]">
+              Enter tool names, one per line. Leave empty to allow all.
+            </p>
           </section>
 
           <section className="space-y-1">
-            <p className="text-xs font-medium text-[var(--theme-muted)]">Auto-Stop Triggers</p>
+            <p className="text-xs font-medium text-[var(--theme-muted)]">
+              Auto-Stop Triggers
+            </p>
             {stopRows.map((row) => (
               <button
                 key={row.label}
@@ -170,14 +234,28 @@ export function GuardrailsModal({ open, agentName, agentId, sessionKey, onOpenCh
                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-50 cursor-pointer text-left"
               >
                 <span>{row.checked ? '☑' : '☐'}</span>
-                <span className="text-sm text-[var(--theme-text)]">{row.label}</span>
+                <span className="text-sm text-[var(--theme-text)]">
+                  {row.label}
+                </span>
               </button>
             ))}
           </section>
 
           <div className="flex items-center justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleSave} className="bg-accent-500 text-white hover:bg-accent-600">Save</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              className="bg-accent-500 text-white hover:bg-accent-600"
+            >
+              Save
+            </Button>
           </div>
         </div>
       </DialogContent>

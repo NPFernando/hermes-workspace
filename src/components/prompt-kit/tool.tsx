@@ -117,7 +117,9 @@ function Tool({ toolPart, defaultOpen = false }: ToolProps) {
             )}
 
             {state === 'input-streaming' && (
-              <div className="text-[var(--theme-muted)] text-xs">Processing...</div>
+              <div className="text-[var(--theme-muted)] text-xs">
+                Processing...
+              </div>
             )}
 
             {toolCallId && (

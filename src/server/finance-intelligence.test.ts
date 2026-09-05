@@ -85,6 +85,24 @@ describe('finance intelligence', () => {
     })
   })
 
+  it('defaults missing signals to a conservative no-data abstention', () => {
+    const empty = buildCompositeSentiment({
+      symbol: 'BTCUSDT',
+      items: undefined,
+      sentimentScores: undefined,
+      now,
+    })
+    expect(empty).toMatchObject({
+      symbol: 'BTCUSDT',
+      label: 'unknown',
+      blockers: expect.arrayContaining(['no fresh stored news']),
+    })
+    expect(buildPaperDecision(empty)).toMatchObject({
+      decision: 'HOLD',
+      abstain: true,
+    })
+  })
+
   it('abstains conservatively for stale or conflicting evidence', () => {
     const stale = buildCompositeSentiment({
       symbol: 'BTCUSDT',

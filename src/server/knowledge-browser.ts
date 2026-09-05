@@ -3,11 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
 import { safeErrorMessage } from './rate-limit'
-import {
-  
-  readKnowledgeBaseConfig
-} from './knowledge-config'
-import type {KnowledgeBaseSource} from './knowledge-config';
+import { readKnowledgeBaseConfig } from './knowledge-config'
+import type { KnowledgeBaseSource } from './knowledge-config'
 
 export type WikiPageMeta = {
   path: string
@@ -31,7 +28,12 @@ export type WikiLink = {
 }
 
 export type KnowledgeGraph = {
-  nodes: Array<{ id: string; title: string; type?: string; tags: Array<string> }>
+  nodes: Array<{
+    id: string
+    title: string
+    type?: string
+    tags: Array<string>
+  }>
   edges: Array<{ source: string; target: string }>
 }
 
@@ -149,7 +151,10 @@ function readGitHubToken(): string | null {
       const eqIdx = trimmed.indexOf('=')
       if (eqIdx <= 0) continue
       const key = trimmed.slice(0, eqIdx).trim()
-      const value = trimmed.slice(eqIdx + 1).trim().replace(/^['"]|['"]$/g, '')
+      const value = trimmed
+        .slice(eqIdx + 1)
+        .trim()
+        .replace(/^['"]|['"]$/g, '')
       if ((key === 'GITHUB_TOKEN' || key === 'GH_TOKEN') && value) return value
     }
   } catch {
@@ -171,7 +176,13 @@ class GitHubKnowledgeProvider {
     const safeRepo = this.repo.replace('/', '_')
     const safePath = repoPath.replace(/^\//, '').replace(/\//g, '_')
     this.cacheDir = path.join(
-      os.homedir(), '.claude', 'knowledge-cache', 'github', safeRepo, branch, safePath || '__root__',
+      os.homedir(),
+      '.claude',
+      'knowledge-cache',
+      'github',
+      safeRepo,
+      branch,
+      safePath || '__root__',
     )
   }
 
@@ -189,7 +200,9 @@ class GitHubKnowledgeProvider {
   /** Check whether the local cache is present and non-empty. */
   isCached(): boolean {
     try {
-      return fs.existsSync(this.cacheDir) && fs.readdirSync(this.cacheDir).length > 0
+      return (
+        fs.existsSync(this.cacheDir) && fs.readdirSync(this.cacheDir).length > 0
+      )
     } catch {
       return false
     }
@@ -252,16 +265,22 @@ class GitHubKnowledgeProvider {
     }
   }
 
-  private async fetchFile(entry: { path: string; sha: string }): Promise<string> {
+  private async fetchFile(entry: {
+    path: string
+    sha: string
+  }): Promise<string> {
     const url = `https://api.github.com/repos/${this.repo}/contents/${entry.path}?ref=${this.branch}`
     const res = await fetch(url, { headers: this.githubHeaders() })
     if (!res.ok) {
       throw new Error(`GitHub API ${res.status} for ${entry.path}`)
     }
     const data = (await res.json()) as { content?: string; encoding?: string }
-    if (!data.content) throw new Error(`No content in GitHub response for ${entry.path}`)
+    if (!data.content)
+      throw new Error(`No content in GitHub response for ${entry.path}`)
     if (data.encoding === 'base64') {
-      return Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf-8')
+      return Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString(
+        'utf-8',
+      )
     }
     return data.content.replace(/\n/g, '')
   }
@@ -274,7 +293,11 @@ function getKnowledgeRoot(): string {
   const source = config.source
 
   if (source.type === 'github') {
-    const provider = new GitHubKnowledgeProvider(source.repo, source.branch, source.path)
+    const provider = new GitHubKnowledgeProvider(
+      source.repo,
+      source.branch,
+      source.path,
+    )
     return provider.root
   }
 
@@ -320,7 +343,11 @@ export async function syncKnowledgeSource(): Promise<{
     return { source, success: true }
   }
   try {
-    const provider = new GitHubKnowledgeProvider(source.repo, source.branch, source.path)
+    const provider = new GitHubKnowledgeProvider(
+      source.repo,
+      source.branch,
+      source.path,
+    )
     await provider.sync()
     return { source, success: true }
   } catch (err) {

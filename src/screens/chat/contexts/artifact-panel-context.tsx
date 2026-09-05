@@ -10,7 +10,8 @@ type ArtifactPanelContextValue = {
   open: (artifacts: Array<InlineArtifact>, index: number) => void
 }
 
-export const ArtifactPanelContext = createContext<ArtifactPanelContextValue | null>(null)
+export const ArtifactPanelContext =
+  createContext<ArtifactPanelContextValue | null>(null)
 
 export function useArtifactPanel() {
   return useContext(ArtifactPanelContext)

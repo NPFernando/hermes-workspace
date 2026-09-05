@@ -5,7 +5,11 @@
  * Future: 8-direction sprite frames per avatar (v0.2+).
  */
 import { motion } from 'motion/react'
-import type { AgoraAvatarId, AgoraFacing, AgoraStatus } from '../lib/agora-types'
+import type {
+  AgoraAvatarId,
+  AgoraFacing,
+  AgoraStatus,
+} from '../lib/agora-types'
 
 const STATUS_DOT_COLOR: Record<AgoraStatus, string> = {
   online: '#10b981',
@@ -35,8 +39,7 @@ export function AgoraAvatar({
   speaking = false,
 }: AgoraAvatarProps) {
   // Tilt slightly based on facing direction for personality.
-  const tilt =
-    facing === 'left' ? -6 : facing === 'right' ? 6 : 0
+  const tilt = facing === 'left' ? -6 : facing === 'right' ? 6 : 0
 
   return (
     <div
@@ -51,9 +54,7 @@ export function AgoraAvatar({
       >
         {/* Self ring */}
         {isSelf && (
-          <div
-            className="absolute -inset-1 rounded-full ring-2 ring-[var(--theme-accent)]"
-          />
+          <div className="absolute -inset-1 rounded-full ring-2 ring-[var(--theme-accent)]" />
         )}
         {/* Speaking ring */}
         {speaking && (

@@ -181,7 +181,8 @@ export function ModeSelector({
                         }}
                         className={cn(
                           'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]',
-                          isApplied && 'bg-[var(--theme-hover)] text-[var(--theme-text)]',
+                          isApplied &&
+                            'bg-[var(--theme-hover)] text-[var(--theme-text)]',
                         )}
                         role="menuitem"
                         aria-label={`Apply mode ${mode.name}`}

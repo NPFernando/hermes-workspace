@@ -1,8 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
 
-export type PersonalityPreset = { key: string; label: string; description: string; prompt: string }
-export type WorkerRec = { workerId: string; name: string; role: string; recommendedPreset: string; presetLabel: string; isMain: boolean }
-export type SwarmPersonalityData = { presets: Array<PersonalityPreset>; recommendations: Array<WorkerRec> }
+export type PersonalityPreset = {
+  key: string
+  label: string
+  description: string
+  prompt: string
+}
+export type WorkerRec = {
+  workerId: string
+  name: string
+  role: string
+  recommendedPreset: string
+  presetLabel: string
+  isMain: boolean
+}
+export type SwarmPersonalityData = {
+  presets: Array<PersonalityPreset>
+  recommendations: Array<WorkerRec>
+}
 
 // Extracted from ProfilesScreen: all state + fetch effects for the 4-step
 // Create Profile wizard (name/clone, model, personality+swarm, review).
@@ -86,19 +101,30 @@ export function useProfileWizard(createOpen: boolean) {
   }, [])
 
   return {
-    newProfileName, setNewProfileName,
-    wizardStep, setWizardStep,
-    cloneFrom, setCloneFrom,
-    wizardProvider, setWizardProvider,
-    wizardModel, setWizardModel,
-    allModels, setAllModels,
+    newProfileName,
+    setNewProfileName,
+    wizardStep,
+    setWizardStep,
+    cloneFrom,
+    setCloneFrom,
+    wizardProvider,
+    setWizardProvider,
+    wizardModel,
+    setWizardModel,
+    allModels,
+    setAllModels,
     loadingModels,
-    wizardPersonality, setWizardPersonality,
-    wizardSelectedPreset, setWizardSelectedPreset,
-    wizardEnableSwarm, setWizardEnableSwarm,
-    swarmData, setSwarmData,
+    wizardPersonality,
+    setWizardPersonality,
+    wizardSelectedPreset,
+    setWizardSelectedPreset,
+    wizardEnableSwarm,
+    setWizardEnableSwarm,
+    swarmData,
+    setSwarmData,
     loadingSwarm,
-    workerPresets, setWorkerPresets,
+    workerPresets,
+    setWorkerPresets,
     resetWizard,
   }
 }

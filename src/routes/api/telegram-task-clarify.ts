@@ -1,9 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
-import { executeTaskBackground, executeTaskWithHermesBackground } from '../../server/astra-tasks'
+import {
+  executeTaskBackground,
+  executeTaskWithHermesBackground,
+} from '../../server/astra-tasks'
 import { listTasks, updateTask } from '../../server/tasks-store'
 import { editTelegramClarification } from '../../server/telegram-clarify'
-import type { ActivityEntry, ClarificationQuestion, TaskColumn } from '../../server/tasks-store'
+import type {
+  ActivityEntry,
+  ClarificationQuestion,
+  TaskColumn,
+} from '../../server/tasks-store'
 
 // ---------------------------------------------------------------------------
 // POST /api/telegram-task-clarify
@@ -45,7 +52,10 @@ function finalizeAndResume(
 ): void {
   const now = new Date().toISOString()
   const qaNote = questions
-    .map((q, i) => `Q${i + 1}: ${q.question}\nA${i + 1}: ${q.answer ?? '(no answer)'}`)
+    .map(
+      (q, i) =>
+        `Q${i + 1}: ${q.question}\nA${i + 1}: ${q.answer ?? '(no answer)'}`,
+    )
     .join('\n\n')
 
   const replyEntry: ActivityEntry = {
@@ -58,9 +68,14 @@ function finalizeAndResume(
   }
 
   const hadExecution = existingHistory.some(
-    (e) => e.by !== 'user' && ['attempted', 'completed', 'blocked'].includes(e.action),
+    (e) =>
+      e.by !== 'user' &&
+      ['attempted', 'completed', 'blocked'].includes(e.action),
   )
-  const reopenColumn = currentColumn === 'blocked' || currentColumn === 'review' ? 'in_progress' : currentColumn
+  const reopenColumn =
+    currentColumn === 'blocked' || currentColumn === 'review'
+      ? 'in_progress'
+      : currentColumn
 
   updateTask(taskId, {
     clarification_questions: questions,
@@ -91,7 +106,10 @@ export const Route = createFileRoute('/api/telegram-task-clarify')({
         }
 
         // ── Mode D: clear a saved answer so the user can re-answer it ───────
-        if (body.clear_q_index != null && typeof body.task_id_prefix === 'string') {
+        if (
+          body.clear_q_index != null &&
+          typeof body.task_id_prefix === 'string'
+        ) {
           const clearIdx = Number(body.clear_q_index)
           const prefix = body.task_id_prefix
 
@@ -100,27 +118,41 @@ export const Route = createFileRoute('/api/telegram-task-clarify')({
           }
 
           const allTasksD = listTasks({ includeDone: false })
-          const taskD = allTasksD.find((t) => t.id.replace(/-/g, '').slice(0, 12) === prefix)
+          const taskD = allTasksD.find(
+            (t) => t.id.replace(/-/g, '').slice(0, 12) === prefix,
+          )
           if (!taskD) return jsonResponse({ error: 'task not found' }, 404)
-          if (!taskD.waiting_for_user) return jsonResponse({ ok: false, reason: 'task not awaiting input' })
+          if (!taskD.waiting_for_user)
+            return jsonResponse({
+              ok: false,
+              reason: 'task not awaiting input',
+            })
 
-          const questionsD: Array<ClarificationQuestion> = taskD.clarification_questions ?? []
+          const questionsD: Array<ClarificationQuestion> =
+            taskD.clarification_questions ?? []
           if (clearIdx < 0 || clearIdx >= questionsD.length) {
             return jsonResponse({ error: 'question index out of range' }, 400)
           }
 
-          const updatedQuestionsD = questionsD.map((q, i): ClarificationQuestion => {
-            if (i !== clearIdx) return q
-            // Strip the answer fields to make this question pending again
-            const { answer: _a, answered_at: _at, ...rest } = q
-            return rest as ClarificationQuestion
-          })
+          const updatedQuestionsD = questionsD.map(
+            (q, i): ClarificationQuestion => {
+              if (i !== clearIdx) return q
+              // Strip the answer fields to make this question pending again
+              const { answer: _a, answered_at: _at, ...rest } = q
+              return rest as ClarificationQuestion
+            },
+          )
 
           updateTask(taskD.id, { clarification_questions: updatedQuestionsD })
 
           const tgD = taskD.clarify_tg
           if (tgD) {
-            await editTelegramClarification(tgD, { id: taskD.id, title: taskD.title }, updatedQuestionsD, 'pending')
+            await editTelegramClarification(
+              tgD,
+              { id: taskD.id, title: taskD.title },
+              updatedQuestionsD,
+              'pending',
+            )
           }
 
           return jsonResponse({ ok: true, cleared: clearIdx })
@@ -129,23 +161,46 @@ export const Route = createFileRoute('/api/telegram-task-clarify')({
         // ── Mode C: confirm & resume (all questions already answered) ────────
         if (body.confirm === true && typeof body.task_id_prefix === 'string') {
           const prefix = body.task_id_prefix
-          if (!prefix) return jsonResponse({ error: 'missing task_id_prefix' }, 400)
+          if (!prefix)
+            return jsonResponse({ error: 'missing task_id_prefix' }, 400)
 
           const allTasksC = listTasks({ includeDone: false })
-          const taskC = allTasksC.find((t) => t.id.replace(/-/g, '').slice(0, 12) === prefix)
+          const taskC = allTasksC.find(
+            (t) => t.id.replace(/-/g, '').slice(0, 12) === prefix,
+          )
           if (!taskC) return jsonResponse({ error: 'task not found' }, 404)
-          if (!taskC.waiting_for_user) return jsonResponse({ ok: false, reason: 'task not awaiting input' })
+          if (!taskC.waiting_for_user)
+            return jsonResponse({
+              ok: false,
+              reason: 'task not awaiting input',
+            })
 
-          const questionsC: Array<ClarificationQuestion> = taskC.clarification_questions ?? []
+          const questionsC: Array<ClarificationQuestion> =
+            taskC.clarification_questions ?? []
           const allAnsweredC = questionsC.every((q) => q.answer != null)
-          if (!allAnsweredC) return jsonResponse({ ok: false, reason: 'not all questions answered' })
+          if (!allAnsweredC)
+            return jsonResponse({
+              ok: false,
+              reason: 'not all questions answered',
+            })
 
           const tgC = taskC.clarify_tg
           if (tgC) {
-            await editTelegramClarification(tgC, { id: taskC.id, title: taskC.title }, questionsC, 'done')
+            await editTelegramClarification(
+              tgC,
+              { id: taskC.id, title: taskC.title },
+              questionsC,
+              'done',
+            )
           }
 
-          finalizeAndResume(taskC.id, questionsC, taskC.agent_history ?? [], taskC.column, taskC.agent_name)
+          finalizeAndResume(
+            taskC.id,
+            questionsC,
+            taskC.agent_history ?? [],
+            taskC.column,
+            taskC.agent_name,
+          )
           return jsonResponse({ ok: true, resumed: true })
         }
 
@@ -167,13 +222,19 @@ export const Route = createFileRoute('/api/telegram-task-clarify')({
             return jsonResponse({ handled: false })
           }
 
-          const questions: Array<ClarificationQuestion> = task.clarification_questions ?? []
+          const questions: Array<ClarificationQuestion> =
+            task.clarification_questions ?? []
           // Find the first unanswered question — prefer freeform, fall back to any pending
-          const pendingFreeform = questions.find((q) => !q.answer && (!q.options || q.options.length === 0))
+          const pendingFreeform = questions.find(
+            (q) => !q.answer && (!q.options || q.options.length === 0),
+          )
           const pendingAny = questions.find((q) => !q.answer)
           const target = pendingFreeform ?? pendingAny
           if (!target) {
-            return jsonResponse({ handled: false, reason: 'no pending questions' })
+            return jsonResponse({
+              handled: false,
+              reason: 'no pending questions',
+            })
           }
 
           const now = new Date().toISOString()
@@ -189,16 +250,26 @@ export const Route = createFileRoute('/api/telegram-task-clarify')({
           const tg = task.clarify_tg
 
           if (tg) {
-            await editTelegramClarification(tg, { id: task.id, title: task.title }, updatedQuestions, messageMode)
+            await editTelegramClarification(
+              tg,
+              { id: task.id, title: task.title },
+              updatedQuestions,
+              messageMode,
+            )
           }
 
           // When all answered, show confirm gate instead of auto-resuming.
           // The agent resumes only after the user taps "Confirm & resume" (Mode C).
-          return jsonResponse({ handled: true, all_done: allAnswered, awaiting_confirm: allAnswered })
+          return jsonResponse({
+            handled: true,
+            all_done: allAnswered,
+            awaiting_confirm: allAnswered,
+          })
         }
 
         // ── Mode A: inline keyboard option click ────────────────────────────
-        const taskPrefix = typeof body.task_id_prefix === 'string' ? body.task_id_prefix : ''
+        const taskPrefix =
+          typeof body.task_id_prefix === 'string' ? body.task_id_prefix : ''
         const qIndex = Number(body.q_index)
         const optIndex = Number(body.opt_index)
 
@@ -207,28 +278,40 @@ export const Route = createFileRoute('/api/telegram-task-clarify')({
         }
 
         const allTasks2 = listTasks({ includeDone: false })
-        const task2 = allTasks2.find((t) => t.id.replace(/-/g, '').slice(0, 12) === taskPrefix)
+        const task2 = allTasks2.find(
+          (t) => t.id.replace(/-/g, '').slice(0, 12) === taskPrefix,
+        )
         if (!task2) {
-          return jsonResponse({ error: 'task not found', prefix: taskPrefix }, 404)
+          return jsonResponse(
+            { error: 'task not found', prefix: taskPrefix },
+            404,
+          )
         }
 
-        const questions2: Array<ClarificationQuestion> = task2.clarification_questions ?? []
+        const questions2: Array<ClarificationQuestion> =
+          task2.clarification_questions ?? []
         if (qIndex < 0 || qIndex >= questions2.length) {
           return jsonResponse({ error: 'question index out of range' }, 400)
         }
 
         const question2 = questions2.at(qIndex)
-        if (!question2?.options || optIndex < 0 || optIndex >= question2.options.length) {
+        if (
+          !question2?.options ||
+          optIndex < 0 ||
+          optIndex >= question2.options.length
+        ) {
           return jsonResponse({ error: 'option index out of range' }, 400)
         }
 
         const selectedAnswer = question2.options[optIndex]
         const now2 = new Date().toISOString()
 
-        const updatedQuestions2 = questions2.map((q, i): ClarificationQuestion => {
-          if (i !== qIndex) return q
-          return { ...q, answer: selectedAnswer, answered_at: now2 }
-        })
+        const updatedQuestions2 = questions2.map(
+          (q, i): ClarificationQuestion => {
+            if (i !== qIndex) return q
+            return { ...q, answer: selectedAnswer, answered_at: now2 }
+          },
+        )
 
         updateTask(task2.id, { clarification_questions: updatedQuestions2 })
 
@@ -247,7 +330,12 @@ export const Route = createFileRoute('/api/telegram-task-clarify')({
 
         // When all answered, show confirm gate instead of auto-resuming.
         // The agent resumes only after the user taps "Confirm & resume" (Mode C).
-        return jsonResponse({ ok: true, answered: qIndex, all_done: allAnswered2, awaiting_confirm: allAnswered2 })
+        return jsonResponse({
+          ok: true,
+          answered: qIndex,
+          all_done: allAnswered2,
+          awaiting_confirm: allAnswered2,
+        })
       },
     },
   },

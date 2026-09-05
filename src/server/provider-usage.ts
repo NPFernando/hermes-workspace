@@ -204,7 +204,7 @@ async function refreshClaudeToken(
   if (body.refresh_token)
     creds.oauth.refreshToken = body.refresh_token as string
   if (typeof body.expires_in === 'number') {
-    creds.oauth.expiresAt = Date.now() + (body.expires_in) * 1000
+    creds.oauth.expiresAt = Date.now() + body.expires_in * 1000
   }
   creds.fullData.claudeAiOauth = creds.oauth
   saveClaudeCredentials(creds)
@@ -486,7 +486,7 @@ async function refreshCodexToken(auth: CodexAuth): Promise<string | null> {
     const code =
       typeof errorValue === 'object' && errorValue !== null
         ? (errorValue as Record<string, unknown>).code
-        : errorValue ?? body?.code
+        : (errorValue ?? body?.code)
     if (
       code === 'refresh_token_expired' ||
       code === 'refresh_token_reused' ||
@@ -523,9 +523,7 @@ function getResetsAtIso(
   if (typeof window.reset_at === 'number')
     return new Date(window.reset_at * 1000).toISOString()
   if (typeof window.reset_after_seconds === 'number')
-    return new Date(
-      (nowSec + (window.reset_after_seconds)) * 1000,
-    ).toISOString()
+    return new Date((nowSec + window.reset_after_seconds) * 1000).toISOString()
   return undefined
 }
 
@@ -931,8 +929,7 @@ export async function fetchOpenRouterUsage(): Promise<ProviderUsageResult> {
     const data = (payload.data ?? payload) as Record<string, unknown>
     const usage = (data.usage ?? {}) as Record<string, unknown>
 
-    const costUsd =
-      readNumber(usage.cost ?? data.cost ?? data.usage_cost) ?? 0
+    const costUsd = readNumber(usage.cost ?? data.cost ?? data.usage_cost) ?? 0
     const limitUsd = readNumber(data.limit ?? data.spend_limit)
 
     const lines: Array<UsageLine> = []

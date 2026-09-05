@@ -4,7 +4,13 @@ import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
 
-export type GrowthEntryType = 'note' | 'description' | 'cron' | 'skill' | 'reflection' | 'improvement'
+export type GrowthEntryType =
+  | 'note'
+  | 'description'
+  | 'cron'
+  | 'skill'
+  | 'reflection'
+  | 'improvement'
 
 export type GrowthEntry = {
   ts: number
@@ -47,7 +53,12 @@ type HermesCronJob = {
   last_error: string | null
   last_delivery_error: string | null
   deliver: string
-  origin: { platform: string; chat_id: string; chat_name: string | null; thread_id: null } | null
+  origin: {
+    platform: string
+    chat_id: string
+    chat_name: string | null
+    thread_id: null
+  } | null
   enabled_toolsets: Array<string> | null
   workdir: string | null
   profile: string | null
@@ -64,16 +75,20 @@ export type SisterCronRequest = {
 }
 
 const GROWTH_LEVELS: Array<{ label: string; emoji: string; min: number }> = [
-  { label: 'Seed',         emoji: '🌱', min: 0  },
-  { label: 'Sprout',       emoji: '🌿', min: 1  },
-  { label: 'Growing',      emoji: '🌳', min: 6  },
-  { label: 'Mature',       emoji: '⭐', min: 16 },
-  { label: 'Wise',         emoji: '✨', min: 31 },
+  { label: 'Seed', emoji: '🌱', min: 0 },
+  { label: 'Sprout', emoji: '🌿', min: 1 },
+  { label: 'Growing', emoji: '🌳', min: 6 },
+  { label: 'Mature', emoji: '⭐', min: 16 },
+  { label: 'Wise', emoji: '✨', min: 31 },
   { label: 'Transcendent', emoji: '💫', min: 61 },
 ]
 
 function getHermesRoot(): string {
-  return process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+  return (
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes')
+  )
 }
 
 function growthLogPath(sisterId: string): string {
@@ -99,10 +114,18 @@ export function getGrowthLog(sisterId: string, limit = 50): Array<GrowthEntry> {
   const logPath = growthLogPath(sisterId)
   if (!fs.existsSync(logPath)) return []
   try {
-    const lines = fs.readFileSync(logPath, 'utf-8').trim().split('\n').filter(Boolean)
+    const lines = fs
+      .readFileSync(logPath, 'utf-8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
     const entries = lines
       .map((line) => {
-        try { return JSON.parse(line) as GrowthEntry } catch { return null }
+        try {
+          return JSON.parse(line) as GrowthEntry
+        } catch {
+          return null
+        }
       })
       .filter((e): e is GrowthEntry => e !== null)
     return entries.slice(-limit)
@@ -116,7 +139,10 @@ export function getGrowthLevel(sisterId: string): GrowthLevel {
   const count = entries.length
   let idx = 0
   for (let i = GROWTH_LEVELS.length - 1; i >= 0; i--) {
-    if (count >= GROWTH_LEVELS[i].min) { idx = i; break }
+    if (count >= GROWTH_LEVELS[i].min) {
+      idx = i
+      break
+    }
   }
   return {
     level: idx,
@@ -126,11 +152,18 @@ export function getGrowthLevel(sisterId: string): GrowthLevel {
   }
 }
 
-export function updateSisterDescription(sisterId: string, description: string): void {
+export function updateSisterDescription(
+  sisterId: string,
+  description: string,
+): void {
   const root = getHermesRoot()
   // For Astra: write a sidecar rather than touching root config.yaml
   if (sisterId === 'astra') {
-    fs.writeFileSync(path.join(root, 'astra_growth_description.txt'), description, 'utf-8')
+    fs.writeFileSync(
+      path.join(root, 'astra_growth_description.txt'),
+      description,
+      'utf-8',
+    )
     return
   }
   const configPath = path.join(root, 'profiles', sisterId, 'config.yaml')
@@ -175,7 +208,9 @@ export function registerSisterCron(
   // Prevent duplicate names from same sister
   const dedupName = `sister-${sisterId}:${req.name}`
   if (jobs.some((j) => j.name === dedupName || j.name === req.name)) {
-    const existing = jobs.find((j) => j.name === dedupName || j.name === req.name)!
+    const existing = jobs.find(
+      (j) => j.name === dedupName || j.name === req.name,
+    )!
     return { id: existing.id }
   }
 

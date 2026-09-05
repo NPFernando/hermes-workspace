@@ -380,7 +380,9 @@ export const Route = createFileRoute('/api/files')({
             }
             if (file.size > MAX_UPLOAD_BYTES) {
               return json(
-                { error: `File exceeds ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB limit` },
+                {
+                  error: `File exceeds ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB limit`,
+                },
                 { status: 413 },
               )
             }

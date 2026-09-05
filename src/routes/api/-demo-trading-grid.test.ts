@@ -93,16 +93,20 @@ async function seed(opts: {
 describe('warnIfCrossEngineExposureBreached', () => {
   it('audit-logs a warning when combined council+grid exposure breaches the cap', async () => {
     await seed({ councilEntryQuote: 30, gridEntryQuote: 30 }) // 60 > 50 cap
-    const { warnIfCrossEngineExposureBreached } = await import('./demo-trading-grid')
+    const { warnIfCrossEngineExposureBreached } =
+      await import('./demo-trading-grid')
     warnIfCrossEngineExposureBreached()
     expect(readAuditActions()).toContain('grid_cross_engine_exposure_warning')
   })
 
   it('does not warn when combined exposure stays under the cap', async () => {
     await seed({ councilEntryQuote: 10, gridEntryQuote: 10 }) // 20 < 50 cap
-    const { warnIfCrossEngineExposureBreached } = await import('./demo-trading-grid')
+    const { warnIfCrossEngineExposureBreached } =
+      await import('./demo-trading-grid')
     warnIfCrossEngineExposureBreached()
-    expect(readAuditActions()).not.toContain('grid_cross_engine_exposure_warning')
+    expect(readAuditActions()).not.toContain(
+      'grid_cross_engine_exposure_warning',
+    )
   })
 
   it('does nothing when correlationBucketsEnabled is false (ships disarmed)', async () => {
@@ -111,9 +115,12 @@ describe('warnIfCrossEngineExposureBreached', () => {
       gridEntryQuote: 100,
       guardianOverride: { correlationBucketsEnabled: false },
     })
-    const { warnIfCrossEngineExposureBreached } = await import('./demo-trading-grid')
+    const { warnIfCrossEngineExposureBreached } =
+      await import('./demo-trading-grid')
     warnIfCrossEngineExposureBreached()
-    expect(readAuditActions()).not.toContain('grid_cross_engine_exposure_warning')
+    expect(readAuditActions()).not.toContain(
+      'grid_cross_engine_exposure_warning',
+    )
   })
 
   it('neither engine alone breaching the cap still combines to trigger a warning', async () => {
@@ -121,14 +128,23 @@ describe('warnIfCrossEngineExposureBreached', () => {
     // but their combined exposure (60) is over — this is exactly the gap
     // PR #24 flagged: neither engine's own risk check would have caught it.
     await seed({ councilEntryQuote: 30, gridEntryQuote: 30 })
-    const { warnIfCrossEngineExposureBreached } = await import('./demo-trading-grid')
+    const { warnIfCrossEngineExposureBreached } =
+      await import('./demo-trading-grid')
     warnIfCrossEngineExposureBreached()
     const entries = fs
       .readFileSync(auditPath, 'utf-8')
       .trim()
       .split('\n')
-      .map((line) => JSON.parse(line) as { action: string; details: Record<string, unknown> })
-    const warning = entries.find((e) => e.action === 'grid_cross_engine_exposure_warning')
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            action: string
+            details: Record<string, unknown>
+          },
+      )
+    const warning = entries.find(
+      (e) => e.action === 'grid_cross_engine_exposure_warning',
+    )
     expect(warning?.details.exposureQuote).toBe(60)
     expect(warning?.details.bucket).toBe('majors')
   })

@@ -8,8 +8,8 @@ import {
   requireJsonContentType,
   safeErrorMessage,
 } from '../../../server/rate-limit'
-import {  applyNaveenSmartUpdate } from '../../../server/naveen-update'
-import type {NaveenApplyOptions} from '../../../server/naveen-update';
+import { applyNaveenSmartUpdate } from '../../../server/naveen-update'
+import type { NaveenApplyOptions } from '../../../server/naveen-update'
 
 export const Route = createFileRoute('/api/update/naveen-apply')({
   server: {
@@ -24,7 +24,9 @@ export const Route = createFileRoute('/api/update/naveen-apply')({
           return rateLimitResponse()
         }
         try {
-          const body = (await request.json().catch(() => ({}))) as NaveenApplyOptions
+          const body = (await request
+            .json()
+            .catch(() => ({}))) as NaveenApplyOptions
           const result = applyNaveenSmartUpdate(body)
           return json(result, { status: result.ok ? 200 : 409 })
         } catch (err) {

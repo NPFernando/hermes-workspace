@@ -70,7 +70,11 @@ describe('auditEntryForEvent', () => {
 
   it('maps balanceUpdate to an audit entry', async () => {
     const { auditEntryForEvent } = await import('./binance-user-data-stream')
-    const entry = auditEntryForEvent({ e: 'balanceUpdate', a: 'BTC', d: '100.00000000' })
+    const entry = auditEntryForEvent({
+      e: 'balanceUpdate',
+      a: 'BTC',
+      d: '100.00000000',
+    })
     expect(entry).toEqual({
       action: 'binance_user_data_balance_update',
       details: { asset: 'BTC', delta: '100.00000000' },
@@ -93,9 +97,8 @@ describe('auditEntryForEvent', () => {
 
 describe('startBinanceUserDataStream', () => {
   it('never opens a real connection under the test environment guard', async () => {
-    const { startBinanceUserDataStream, stopBinanceUserDataStream } = await import(
-      './binance-user-data-stream'
-    )
+    const { startBinanceUserDataStream, stopBinanceUserDataStream } =
+      await import('./binance-user-data-stream')
     expect(startBinanceUserDataStream()).toBe(false)
     // Idempotent no-op teardown even though nothing started.
     expect(() => stopBinanceUserDataStream()).not.toThrow()

@@ -29,9 +29,15 @@ import * as path from 'node:path'
 import type { PersonalFinanceSlice } from './personal-finance-store'
 
 const HERMES_HOME =
-  process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
-const PERSONAL_FINANCE_PG_DATABASE = process.env.HERMES_PERSONAL_FINANCE_PG_DATABASE || 'personal_finance'
-const PSQL_CANDIDATES = ['/home/ubuntu/.pg0/installation/18.1.0/bin/psql', 'psql']
+  process.env.HERMES_HOME ??
+  process.env.CLAUDE_HOME ??
+  path.join(os.homedir(), '.hermes')
+const PERSONAL_FINANCE_PG_DATABASE =
+  process.env.HERMES_PERSONAL_FINANCE_PG_DATABASE || 'personal_finance'
+const PSQL_CANDIDATES = [
+  '/home/ubuntu/.pg0/installation/18.1.0/bin/psql',
+  'psql',
+]
 
 interface PgConn {
   host: string
@@ -94,7 +100,8 @@ function sqlText(value: string): string {
 }
 
 function sqlIdentifier(value: string): string {
-  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) throw new Error(`Unsafe Postgres identifier: ${value}`)
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value))
+    throw new Error(`Unsafe Postgres identifier: ${value}`)
   return `"${value.replace(/"/g, '""')}"`
 }
 
@@ -104,12 +111,21 @@ function sqlNullableText(value: unknown): string {
 
 function sqlNumber(value: unknown, fallback = 0): string {
   const number =
-    typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : fallback
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim() !== ''
+        ? Number(value)
+        : fallback
   return Number.isFinite(number) ? String(number) : String(fallback)
 }
 
 function sqlNullableNumber(value: unknown): string {
-  const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : Number.NaN
+  const number =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim() !== ''
+        ? Number(value)
+        : Number.NaN
   return Number.isFinite(number) ? String(number) : 'NULL'
 }
 
@@ -125,25 +141,51 @@ function rows(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? value.filter(isRecord) : []
 }
 
-function firstText(row: Record<string, unknown>, key: string, fallback = ''): string {
+function firstText(
+  row: Record<string, unknown>,
+  key: string,
+  fallback = '',
+): string {
   const value = row[key]
   return typeof value === 'string' ? value : fallback
 }
 
-function insertRows(table: string, columns: Array<string>, values: Array<Array<string>>): string {
+function insertRows(
+  table: string,
+  columns: Array<string>,
+  values: Array<Array<string>>,
+): string {
   if (values.length === 0) return ''
   const columnSql = columns.map(sqlIdentifier).join(', ')
   const valuesSql = values.map((row) => `(${row.join(', ')})`).join(',\n')
   return `INSERT INTO ${sqlIdentifier(table)} (${columnSql}) VALUES\n${valuesSql};`
 }
 
-function runPsql(database: string, sql: string): { ok: true; stdout: string } | { ok: false; reason: string } {
+function runPsql(
+  database: string,
+  sql: string,
+): { ok: true; stdout: string } | { ok: false; reason: string } {
   const conn = pgConn()
-  if (!conn) return { ok: false, reason: 'Postgres credentials are not configured' }
+  if (!conn)
+    return { ok: false, reason: 'Postgres credentials are not configured' }
   for (const psql of PSQL_CANDIDATES) {
     const result = spawnSync(
       psql,
-      ['-h', conn.host, '-p', conn.port, '-U', conn.user, '-d', database, '-tA', '-v', 'ON_ERROR_STOP=1', '-f', '-'],
+      [
+        '-h',
+        conn.host,
+        '-p',
+        conn.port,
+        '-U',
+        conn.user,
+        '-d',
+        database,
+        '-tA',
+        '-v',
+        'ON_ERROR_STOP=1',
+        '-f',
+        '-',
+      ],
       {
         env: { ...process.env, PGPASSWORD: conn.password },
         encoding: 'utf8',
@@ -152,11 +194,18 @@ function runPsql(database: string, sql: string): { ok: true; stdout: string } | 
         maxBuffer: 16 * 1024 * 1024,
       },
     )
-    if (result.error && (result.error as NodeJS.ErrnoException).code === 'ENOENT') continue
+    if (
+      result.error &&
+      (result.error as NodeJS.ErrnoException).code === 'ENOENT'
+    )
+      continue
     const stdout = typeof result.stdout === 'string' ? result.stdout.trim() : ''
     const stderr = typeof result.stderr === 'string' ? result.stderr.trim() : ''
     if (result.status === 0) return { ok: true, stdout }
-    return { ok: false, reason: stderr || result.error?.message || `psql exited ${result.status}` }
+    return {
+      ok: false,
+      reason: stderr || result.error?.message || `psql exited ${result.status}`,
+    }
   }
   return { ok: false, reason: 'psql executable not found' }
 }
@@ -168,13 +217,18 @@ function runPsql(database: string, sql: string): { ok: true; stdout: string } | 
  * trick finance-postgres-store.ts already uses for its own JSONB snapshot.
  * Returns null on any failure; an empty result set returns [].
  */
-function selectJson(database: string, sql: string): Array<Record<string, unknown>> | null {
+function selectJson(
+  database: string,
+  sql: string,
+): Array<Record<string, unknown>> | null {
   const result = runPsql(database, `SELECT json_agg(t) FROM (${sql}) t;`)
   if (!result.ok) return null
   if (!result.stdout) return []
   try {
     const parsed: unknown = JSON.parse(result.stdout)
-    return Array.isArray(parsed) ? (parsed as Array<Record<string, unknown>>) : []
+    return Array.isArray(parsed)
+      ? (parsed as Array<Record<string, unknown>>)
+      : []
   } catch {
     return null
   }
@@ -187,20 +241,30 @@ function selectJson(database: string, sql: string): Array<Record<string, unknown
  * (e.g. investment_accounts.data) that must round-trip untouched, not
  * generic multi-level records to re-key.
  */
-export function snakeRowToCamel(row: Record<string, unknown>): Record<string, unknown> {
+export function snakeRowToCamel(
+  row: Record<string, unknown>,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(row)) {
-    const camelKey = key.replace(/_([a-z0-9])/g, (_match, char: string) => char.toUpperCase())
+    const camelKey = key.replace(/_([a-z0-9])/g, (_match, char: string) =>
+      char.toUpperCase(),
+    )
     out[camelKey] = value
   }
   return out
 }
 
 function ensurePersonalFinanceDatabase(): boolean {
-  const exists = runPsql('postgres', `SELECT 1 FROM pg_database WHERE datname = ${sqlText(PERSONAL_FINANCE_PG_DATABASE)};`)
+  const exists = runPsql(
+    'postgres',
+    `SELECT 1 FROM pg_database WHERE datname = ${sqlText(PERSONAL_FINANCE_PG_DATABASE)};`,
+  )
   if (!exists.ok) return false
   if (exists.stdout.trim() === '1') return true
-  const created = runPsql('postgres', `CREATE DATABASE ${sqlIdentifier(PERSONAL_FINANCE_PG_DATABASE)};`)
+  const created = runPsql(
+    'postgres',
+    `CREATE DATABASE ${sqlIdentifier(PERSONAL_FINANCE_PG_DATABASE)};`,
+  )
   return created.ok
 }
 
@@ -391,7 +455,9 @@ CREATE TABLE IF NOT EXISTS category_correction_hints (
   return result.ok
 }
 
-function financeAccountRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function financeAccountRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'name')),
@@ -408,7 +474,9 @@ function financeAccountRows(rowsIn: Array<Record<string, unknown>>): Array<Array
   ])
 }
 
-function incomeRecordRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function incomeRecordRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'dateReceived')),
@@ -431,7 +499,9 @@ function incomeRecordRows(rowsIn: Array<Record<string, unknown>>): Array<Array<s
   ])
 }
 
-function expenseRecordRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function expenseRecordRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'date')),
@@ -455,7 +525,9 @@ function expenseRecordRows(rowsIn: Array<Record<string, unknown>>): Array<Array<
   ])
 }
 
-function budgetCategoryRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function budgetCategoryRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'month')),
@@ -468,7 +540,9 @@ function budgetCategoryRows(rowsIn: Array<Record<string, unknown>>): Array<Array
   ])
 }
 
-function categoryRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function categoryRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'name')),
@@ -481,7 +555,9 @@ function categoryRows(rowsIn: Array<Record<string, unknown>>): Array<Array<strin
   ])
 }
 
-function subcategoryRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function subcategoryRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'name')),
@@ -492,7 +568,9 @@ function subcategoryRows(rowsIn: Array<Record<string, unknown>>): Array<Array<st
   ])
 }
 
-function merchantRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function merchantRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'name')),
@@ -515,7 +593,9 @@ function tagRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
   ])
 }
 
-function savingsGoalRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function savingsGoalRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'name')),
@@ -534,7 +614,9 @@ function savingsGoalRows(rowsIn: Array<Record<string, unknown>>): Array<Array<st
   ])
 }
 
-function taxRecordRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function taxRecordRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'taxYear')),
@@ -556,7 +638,9 @@ function taxRecordRows(rowsIn: Array<Record<string, unknown>>): Array<Array<stri
   ])
 }
 
-function incomeSourceRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function incomeSourceRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'employerName')),
@@ -577,7 +661,9 @@ function incomeSourceRows(rowsIn: Array<Record<string, unknown>>): Array<Array<s
   ])
 }
 
-function stockHoldingRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function stockHoldingRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'symbol')),
@@ -597,7 +683,9 @@ function stockHoldingRows(rowsIn: Array<Record<string, unknown>>): Array<Array<s
   ])
 }
 
-function fixedDepositRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function fixedDepositRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'bankName')),
@@ -615,7 +703,9 @@ function fixedDepositRows(rowsIn: Array<Record<string, unknown>>): Array<Array<s
   ])
 }
 
-function loanRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function loanRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'lender')),
@@ -634,7 +724,9 @@ function loanRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> 
   ])
 }
 
-function propertyRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function propertyRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'description')),
@@ -651,7 +743,9 @@ function propertyRows(rowsIn: Array<Record<string, unknown>>): Array<Array<strin
   ])
 }
 
-function beneficiaryRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function beneficiaryRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'name')),
@@ -663,7 +757,9 @@ function beneficiaryRows(rowsIn: Array<Record<string, unknown>>): Array<Array<st
   ])
 }
 
-function pendingIngestionRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function pendingIngestionRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row) => [
     sqlText(firstText(row, 'id')),
     sqlText(firstText(row, 'status', 'awaiting_review')),
@@ -678,7 +774,9 @@ function pendingIngestionRows(rowsIn: Array<Record<string, unknown>>): Array<Arr
   ])
 }
 
-function pendingIngestionExtractedTransactionRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function pendingIngestionExtractedTransactionRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   const out: Array<Array<string>> = []
   for (const row of rowsIn) {
     const extracted = row.extracted
@@ -697,7 +795,9 @@ function pendingIngestionExtractedTransactionRows(rowsIn: Array<Record<string, u
   return out
 }
 
-function pendingIngestionExtractedContractRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function pendingIngestionExtractedContractRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   const out: Array<Array<string>> = []
   for (const row of rowsIn) {
     const contract = row.extractedContract
@@ -720,7 +820,9 @@ function pendingIngestionExtractedContractRows(rowsIn: Array<Record<string, unkn
   return out
 }
 
-function pendingIngestionContractRiskRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function pendingIngestionContractRiskRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   const out: Array<Array<string>> = []
   for (const row of rowsIn) {
     const contract = row.extractedContract
@@ -740,7 +842,9 @@ function pendingIngestionContractRiskRows(rowsIn: Array<Record<string, unknown>>
   return out
 }
 
-function exchangeRateRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function exchangeRateRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row, index) => [
     sqlText(firstText(row, 'id') || `rate-${index}`),
     sqlText(firstText(row, 'base')),
@@ -751,7 +855,9 @@ function exchangeRateRows(rowsIn: Array<Record<string, unknown>>): Array<Array<s
 }
 
 /** Kept generic — no CRUD path or defined shape exists anywhere in the app for this collection today. */
-function investmentAccountRows(rowsIn: Array<Record<string, unknown>>): Array<Array<string>> {
+function investmentAccountRows(
+  rowsIn: Array<Record<string, unknown>>,
+): Array<Array<string>> {
   return rowsIn.map((row, index) => [
     sqlText(firstText(row, 'id') || `investment-account-${index}`),
     sqlText(JSON.stringify(row)),
@@ -779,16 +885,29 @@ function personalFinanceSettingsRows(
 function financeQaHistoryRows(
   entries: Array<{ at: number; question: string; answer: string }> | undefined,
 ): Array<Array<string>> {
-  return (entries ?? []).map((entry) => [sqlNumber(entry.at), sqlText(entry.question), sqlText(entry.answer)])
+  return (entries ?? []).map((entry) => [
+    sqlNumber(entry.at),
+    sqlText(entry.question),
+    sqlText(entry.answer),
+  ])
 }
 
-function gmailIngestStateRows(state: { lastSyncedAtSeconds?: number } | undefined): Array<Array<string>> {
+function gmailIngestStateRows(
+  state: { lastSyncedAtSeconds?: number } | undefined,
+): Array<Array<string>> {
   if (!state) return []
   return [[sqlText('default'), sqlNullableNumber(state.lastSyncedAtSeconds)]]
 }
 
 function gmailSyncHistoryRows(
-  entries: Array<{ at: number; found: number; queued: number; skippedAlreadyQueued: number }> | undefined,
+  entries:
+    | Array<{
+        at: number
+        found: number
+        queued: number
+        skippedAlreadyQueued: number
+      }>
+    | undefined,
 ): Array<Array<string>> {
   return (entries ?? []).map((entry) => [
     sqlNumber(entry.at),
@@ -798,8 +917,13 @@ function gmailSyncHistoryRows(
   ])
 }
 
-function categoryCorrectionRows(hints: Record<string, string> | undefined): Array<Array<string>> {
-  return Object.entries(hints ?? {}).map(([vendor, category]) => [sqlText(vendor), sqlText(category)])
+function categoryCorrectionRows(
+  hints: Record<string, string> | undefined,
+): Array<Array<string>> {
+  return Object.entries(hints ?? {}).map(([vendor, category]) => [
+    sqlText(vendor),
+    sqlText(category),
+  ])
 }
 
 function personalFinanceMirrorSql(slice: PersonalFinanceSlice): string {
@@ -835,8 +959,18 @@ DELETE FROM category_correction_hints;
 ${insertRows(
   'finance_accounts',
   [
-    'id', 'name', 'type', 'currency', 'balance', 'opening_balance', 'opening_balance_date',
-    'masked_identifier', 'platform', 'source', 'created_at', 'updated_at',
+    'id',
+    'name',
+    'type',
+    'currency',
+    'balance',
+    'opening_balance',
+    'opening_balance_date',
+    'masked_identifier',
+    'platform',
+    'source',
+    'created_at',
+    'updated_at',
   ],
   financeAccountRows(rows(slice.finance_accounts)),
 )}
@@ -844,9 +978,24 @@ ${insertRows(
 ${insertRows(
   'income_records',
   [
-    'id', 'date_received', 'source_name', 'income_type', 'original_currency', 'original_amount',
-    'exchange_rate_used', 'converted_lkr_amount', 'account_id', 'taxable', 'notes', 'document_ref',
-    'income_source_id', 'tags', 'status', 'source', 'created_at', 'updated_at',
+    'id',
+    'date_received',
+    'source_name',
+    'income_type',
+    'original_currency',
+    'original_amount',
+    'exchange_rate_used',
+    'converted_lkr_amount',
+    'account_id',
+    'taxable',
+    'notes',
+    'document_ref',
+    'income_source_id',
+    'tags',
+    'status',
+    'source',
+    'created_at',
+    'updated_at',
   ],
   incomeRecordRows(rows(slice.income_records)),
 )}
@@ -854,22 +1003,56 @@ ${insertRows(
 ${insertRows(
   'expense_records',
   [
-    'id', 'date', 'vendor', 'category', 'subcategory', 'account_id', 'currency', 'amount',
-    'converted_lkr_amount', 'recurring', 'work_related', 'tax_deductible_possible', 'notes',
-    'document_ref', 'tags', 'status', 'source', 'created_at', 'updated_at',
+    'id',
+    'date',
+    'vendor',
+    'category',
+    'subcategory',
+    'account_id',
+    'currency',
+    'amount',
+    'converted_lkr_amount',
+    'recurring',
+    'work_related',
+    'tax_deductible_possible',
+    'notes',
+    'document_ref',
+    'tags',
+    'status',
+    'source',
+    'created_at',
+    'updated_at',
   ],
   expenseRecordRows(rows(slice.expense_records)),
 )}
 
 ${insertRows(
   'budget_categories',
-  ['id', 'month', 'category', 'currency', 'budget_amount', 'source', 'created_at', 'updated_at'],
+  [
+    'id',
+    'month',
+    'category',
+    'currency',
+    'budget_amount',
+    'source',
+    'created_at',
+    'updated_at',
+  ],
   budgetCategoryRows(rows(slice.budget_categories)),
 )}
 
 ${insertRows(
   'categories',
-  ['id', 'name', 'kind', 'color', 'notes', 'source', 'created_at', 'updated_at'],
+  [
+    'id',
+    'name',
+    'kind',
+    'color',
+    'notes',
+    'source',
+    'created_at',
+    'updated_at',
+  ],
   categoryRows(rows(slice.categories)),
 )}
 
@@ -881,7 +1064,15 @@ ${insertRows(
 
 ${insertRows(
   'merchants',
-  ['id', 'name', 'default_category', 'notes', 'source', 'created_at', 'updated_at'],
+  [
+    'id',
+    'name',
+    'default_category',
+    'notes',
+    'source',
+    'created_at',
+    'updated_at',
+  ],
   merchantRows(rows(slice.merchants)),
 )}
 
@@ -894,8 +1085,20 @@ ${insertRows(
 ${insertRows(
   'savings_goals',
   [
-    'id', 'name', 'target_amount', 'current_amount', 'currency', 'target_date', 'monthly_contribution',
-    'priority', 'linked_account_id', 'status', 'source', 'created_at', 'updated_at', 'goal_kind',
+    'id',
+    'name',
+    'target_amount',
+    'current_amount',
+    'currency',
+    'target_date',
+    'monthly_contribution',
+    'priority',
+    'linked_account_id',
+    'status',
+    'source',
+    'created_at',
+    'updated_at',
+    'goal_kind',
   ],
   savingsGoalRows(rows(slice.savings_goals)),
 )}
@@ -903,9 +1106,23 @@ ${insertRows(
 ${insertRows(
   'tax_records',
   [
-    'id', 'tax_year', 'income_type', 'amount', 'currency', 'converted_lkr_amount', 'exchange_rate_source',
-    'deduction_category', 'estimated_taxable_amount', 'tax_paid', 'tax_due', 'requires_confirmation',
-    'notes', 'supporting_document', 'source', 'created_at', 'updated_at',
+    'id',
+    'tax_year',
+    'income_type',
+    'amount',
+    'currency',
+    'converted_lkr_amount',
+    'exchange_rate_source',
+    'deduction_category',
+    'estimated_taxable_amount',
+    'tax_paid',
+    'tax_due',
+    'requires_confirmation',
+    'notes',
+    'supporting_document',
+    'source',
+    'created_at',
+    'updated_at',
   ],
   taxRecordRows(rows(slice.tax_records)),
 )}
@@ -913,9 +1130,22 @@ ${insertRows(
 ${insertRows(
   'income_sources',
   [
-    'id', 'employer_name', 'employment_type', 'monthly_income_amount', 'currency', 'contract_start_date',
-    'contract_end_date', 'job_title', 'expected_payday_day_of_month', 'pay_schedule', 'status', 'notes',
-    'document_ref', 'source', 'created_at', 'updated_at',
+    'id',
+    'employer_name',
+    'employment_type',
+    'monthly_income_amount',
+    'currency',
+    'contract_start_date',
+    'contract_end_date',
+    'job_title',
+    'expected_payday_day_of_month',
+    'pay_schedule',
+    'status',
+    'notes',
+    'document_ref',
+    'source',
+    'created_at',
+    'updated_at',
   ],
   incomeSourceRows(rows(slice.income_sources)),
 )}
@@ -923,8 +1153,21 @@ ${insertRows(
 ${insertRows(
   'stock_holdings',
   [
-    'id', 'symbol', 'company_name', 'platform', 'quantity', 'buy_price', 'buy_date', 'currency',
-    'last_known_price', 'last_price_updated_at', 'price_source', 'notes', 'source', 'created_at', 'updated_at',
+    'id',
+    'symbol',
+    'company_name',
+    'platform',
+    'quantity',
+    'buy_price',
+    'buy_date',
+    'currency',
+    'last_known_price',
+    'last_price_updated_at',
+    'price_source',
+    'notes',
+    'source',
+    'created_at',
+    'updated_at',
   ],
   stockHoldingRows(rows(slice.stock_holdings)),
 )}
@@ -932,8 +1175,19 @@ ${insertRows(
 ${insertRows(
   'fixed_deposits',
   [
-    'id', 'bank_name', 'principal', 'currency', 'interest_rate_pct', 'interest_payout', 'start_date',
-    'maturity_date', 'status', 'notes', 'source', 'created_at', 'updated_at',
+    'id',
+    'bank_name',
+    'principal',
+    'currency',
+    'interest_rate_pct',
+    'interest_payout',
+    'start_date',
+    'maturity_date',
+    'status',
+    'notes',
+    'source',
+    'created_at',
+    'updated_at',
   ],
   fixedDepositRows(rows(slice.fixed_deposits)),
 )}
@@ -941,8 +1195,20 @@ ${insertRows(
 ${insertRows(
   'loans',
   [
-    'id', 'lender', 'principal', 'current_balance', 'currency', 'interest_rate_pct', 'monthly_payment',
-    'start_date', 'term_months', 'status', 'notes', 'source', 'created_at', 'updated_at',
+    'id',
+    'lender',
+    'principal',
+    'current_balance',
+    'currency',
+    'interest_rate_pct',
+    'monthly_payment',
+    'start_date',
+    'term_months',
+    'status',
+    'notes',
+    'source',
+    'created_at',
+    'updated_at',
   ],
   loanRows(rows(slice.loans)),
 )}
@@ -950,8 +1216,18 @@ ${insertRows(
 ${insertRows(
   'properties',
   [
-    'id', 'description', 'property_type', 'purchase_price', 'current_value', 'currency',
-    'purchase_date', 'notes', 'source', 'created_at', 'updated_at', 'linked_loan_id',
+    'id',
+    'description',
+    'property_type',
+    'purchase_price',
+    'current_value',
+    'currency',
+    'purchase_date',
+    'notes',
+    'source',
+    'created_at',
+    'updated_at',
+    'linked_loan_id',
   ],
   propertyRows(rows(slice.properties)),
 )}
@@ -965,24 +1241,50 @@ ${insertRows(
 ${insertRows(
   'pending_ingestions',
   [
-    'id', 'status', 'source', 'document_type', 'source_ref', 'password_hint', 'raw_preview_image_path',
-    'error', 'created_at', 'updated_at',
+    'id',
+    'status',
+    'source',
+    'document_type',
+    'source_ref',
+    'password_hint',
+    'raw_preview_image_path',
+    'error',
+    'created_at',
+    'updated_at',
   ],
   pendingIngestionRows(rows(slice.pending_ingestions)),
 )}
 
 ${insertRows(
   'pending_ingestion_extracted_transactions',
-  ['pending_ingestion_id', 'kind', 'amount', 'currency', 'vendor_or_source', 'date', 'category', 'confidence'],
+  [
+    'pending_ingestion_id',
+    'kind',
+    'amount',
+    'currency',
+    'vendor_or_source',
+    'date',
+    'category',
+    'confidence',
+  ],
   pendingIngestionExtractedTransactionRows(rows(slice.pending_ingestions)),
 )}
 
 ${insertRows(
   'pending_ingestion_extracted_contracts',
   [
-    'pending_ingestion_id', 'employer_name', 'employment_type', 'monthly_income_amount', 'currency',
-    'contract_start_date', 'contract_end_date', 'job_title', 'payday_day_of_month', 'pay_schedule',
-    'confidence', 'risk_summary',
+    'pending_ingestion_id',
+    'employer_name',
+    'employment_type',
+    'monthly_income_amount',
+    'currency',
+    'contract_start_date',
+    'contract_end_date',
+    'job_title',
+    'payday_day_of_month',
+    'pay_schedule',
+    'confidence',
+    'risk_summary',
   ],
   pendingIngestionExtractedContractRows(rows(slice.pending_ingestions)),
 )}
@@ -1007,7 +1309,13 @@ ${insertRows(
 
 ${insertRows(
   'personal_finance_settings',
-  ['id', 'emergency_fund_target_months', 'savings_rate_target_pct', 'wealth_goal_target_lkr', 'wealth_goal_target_date'],
+  [
+    'id',
+    'emergency_fund_target_months',
+    'savings_rate_target_pct',
+    'wealth_goal_target_lkr',
+    'wealth_goal_target_date',
+  ],
   personalFinanceSettingsRows(slice.personalFinanceSettings),
 )}
 
@@ -1026,7 +1334,9 @@ ${insertRows(
 ${insertRows(
   'gmail_sync_history',
   ['synced_at', 'found', 'queued', 'skipped_already_queued'],
-  gmailSyncHistoryRows(slice.personalFinanceSettings?.gmailIngestState?.syncHistory),
+  gmailSyncHistoryRows(
+    slice.personalFinanceSettings?.gmailIngestState?.syncHistory,
+  ),
 )}
 
 ${insertRows(
@@ -1043,9 +1353,14 @@ ${insertRows(
  * this is now the app's primary write path for personal-finance data, not
  * a secondary mirror alongside a JSON write.
  */
-export function writePersonalFinancePostgresStore(slice: PersonalFinanceSlice): boolean {
+export function writePersonalFinancePostgresStore(
+  slice: PersonalFinanceSlice,
+): boolean {
   if (!ensurePersonalFinancePostgresSchema()) return false
-  const result = runPsql(PERSONAL_FINANCE_PG_DATABASE, `BEGIN;\n${personalFinanceMirrorSql(slice)}\nCOMMIT;`)
+  const result = runPsql(
+    PERSONAL_FINANCE_PG_DATABASE,
+    `BEGIN;\n${personalFinanceMirrorSql(slice)}\nCOMMIT;`,
+  )
   lastWriteError = result.ok ? null : result.reason
   return result.ok
 }
@@ -1084,19 +1399,43 @@ export function personalFinancePostgresStatus(): PersonalFinancePostgresStatus {
 }
 
 const FLAT_TABLES = [
-  'finance_accounts', 'income_records', 'expense_records', 'budget_categories', 'categories',
-  'subcategories', 'merchants', 'tags', 'savings_goals', 'tax_records', 'income_sources',
-  'stock_holdings', 'fixed_deposits', 'loans', 'properties', 'beneficiaries',
+  'finance_accounts',
+  'income_records',
+  'expense_records',
+  'budget_categories',
+  'categories',
+  'subcategories',
+  'merchants',
+  'tags',
+  'savings_goals',
+  'tax_records',
+  'income_sources',
+  'stock_holdings',
+  'fixed_deposits',
+  'loans',
+  'properties',
+  'beneficiaries',
 ] as const
 
-function selectTableRows(database: string, table: string): Array<Record<string, unknown>> | null {
-  const result = selectJson(database, `SELECT * FROM ${sqlIdentifier(table)} ORDER BY created_at`)
+function selectTableRows(
+  database: string,
+  table: string,
+): Array<Record<string, unknown>> | null {
+  const result = selectJson(
+    database,
+    `SELECT * FROM ${sqlIdentifier(table)} ORDER BY created_at`,
+  )
   if (result === null) return null
   return result.map(snakeRowToCamel)
 }
 
-function readExchangeRates(database: string): Array<Record<string, unknown>> | null {
-  const rowsOut = selectJson(database, 'SELECT * FROM exchange_rates ORDER BY date')
+function readExchangeRates(
+  database: string,
+): Array<Record<string, unknown>> | null {
+  const rowsOut = selectJson(
+    database,
+    'SELECT * FROM exchange_rates ORDER BY date',
+  )
   if (rowsOut === null) return null
   return rowsOut.map((row) => {
     const camel = snakeRowToCamel(row)
@@ -1106,25 +1445,60 @@ function readExchangeRates(database: string): Array<Record<string, unknown>> | n
 }
 
 /** Unpacks the generic JSONB blob back into a flat record — the inverse of investmentAccountRows(). */
-function readInvestmentAccounts(database: string): Array<Record<string, unknown>> | null {
-  const rowsOut = selectJson(database, 'SELECT * FROM investment_accounts ORDER BY created_at')
+function readInvestmentAccounts(
+  database: string,
+): Array<Record<string, unknown>> | null {
+  const rowsOut = selectJson(
+    database,
+    'SELECT * FROM investment_accounts ORDER BY created_at',
+  )
   if (rowsOut === null) return null
   return rowsOut.map((row) => {
     const camel = snakeRowToCamel(row)
     const data = isRecord(camel.data) ? camel.data : {}
-    return { ...data, id: camel.id, source: camel.source, createdAt: camel.createdAt, updatedAt: camel.updatedAt }
+    return {
+      ...data,
+      id: camel.id,
+      source: camel.source,
+      createdAt: camel.createdAt,
+      updatedAt: camel.updatedAt,
+    }
   })
 }
 
-function readPendingIngestions(database: string): Array<Record<string, unknown>> | null {
-  const parents = selectJson(database, 'SELECT * FROM pending_ingestions ORDER BY created_at')
-  const transactions = selectJson(database, 'SELECT * FROM pending_ingestion_extracted_transactions')
-  const contracts = selectJson(database, 'SELECT * FROM pending_ingestion_extracted_contracts')
-  const risks = selectJson(database, 'SELECT * FROM pending_ingestion_contract_risks')
-  if (parents === null || transactions === null || contracts === null || risks === null) return null
+function readPendingIngestions(
+  database: string,
+): Array<Record<string, unknown>> | null {
+  const parents = selectJson(
+    database,
+    'SELECT * FROM pending_ingestions ORDER BY created_at',
+  )
+  const transactions = selectJson(
+    database,
+    'SELECT * FROM pending_ingestion_extracted_transactions',
+  )
+  const contracts = selectJson(
+    database,
+    'SELECT * FROM pending_ingestion_extracted_contracts',
+  )
+  const risks = selectJson(
+    database,
+    'SELECT * FROM pending_ingestion_contract_risks',
+  )
+  if (
+    parents === null ||
+    transactions === null ||
+    contracts === null ||
+    risks === null
+  )
+    return null
 
-  const transactionById = new Map(transactions.map((row) => [row.pending_ingestion_id, snakeRowToCamel(row)]))
-  const contractById = new Map(contracts.map((row) => [row.pending_ingestion_id, snakeRowToCamel(row)]))
+  const transactionById = new Map(
+    transactions.map((row) => [row.pending_ingestion_id, snakeRowToCamel(row)]),
+  )
+  const contractById = new Map(
+    contracts.map((row) => [row.pending_ingestion_id, snakeRowToCamel(row)]),
+  )
   const risksByContractId = new Map<unknown, Array<Record<string, unknown>>>()
   for (const risk of risks) {
     const key = risk.pending_ingestion_id
@@ -1143,7 +1517,10 @@ function readPendingIngestions(database: string): Array<Record<string, unknown>>
     const contract = contractById.get(row.id)
     if (contract) {
       const { pendingIngestionId, ...rest } = contract
-      camel.extractedContract = { ...rest, risks: risksByContractId.get(row.id) ?? [] }
+      camel.extractedContract = {
+        ...rest,
+        risks: risksByContractId.get(row.id) ?? [],
+      }
     }
     return camel
   })
@@ -1152,11 +1529,26 @@ function readPendingIngestions(database: string): Array<Record<string, unknown>>
 function readPersonalFinanceSettings(
   database: string,
 ): PersonalFinanceSlice['personalFinanceSettings'] | null {
-  const settingsRows = selectJson(database, 'SELECT * FROM personal_finance_settings')
-  const qaHistoryRows = selectJson(database, 'SELECT * FROM finance_qa_history ORDER BY asked_at')
-  const gmailStateRows = selectJson(database, 'SELECT * FROM gmail_ingest_state')
-  const syncHistoryRows = selectJson(database, 'SELECT * FROM gmail_sync_history ORDER BY synced_at')
-  const correctionRows = selectJson(database, 'SELECT * FROM category_correction_hints')
+  const settingsRows = selectJson(
+    database,
+    'SELECT * FROM personal_finance_settings',
+  )
+  const qaHistoryRows = selectJson(
+    database,
+    'SELECT * FROM finance_qa_history ORDER BY asked_at',
+  )
+  const gmailStateRows = selectJson(
+    database,
+    'SELECT * FROM gmail_ingest_state',
+  )
+  const syncHistoryRows = selectJson(
+    database,
+    'SELECT * FROM gmail_sync_history ORDER BY synced_at',
+  )
+  const correctionRows = selectJson(
+    database,
+    'SELECT * FROM category_correction_hints',
+  )
   if (
     settingsRows === null ||
     qaHistoryRows === null ||
@@ -1177,13 +1569,19 @@ function readPersonalFinanceSettings(
   }
 
   return {
-    emergencyFundTargetMonths: settings.emergencyFundTargetMonths as number | undefined,
+    emergencyFundTargetMonths: settings.emergencyFundTargetMonths as
+      | number
+      | undefined,
     savingsRateTargetPct: settings.savingsRateTargetPct as number | undefined,
     wealthGoalTargetLkr: settings.wealthGoalTargetLkr as number | undefined,
     wealthGoalTargetDate: settings.wealthGoalTargetDate as string | undefined,
     financeQaHistory: qaHistoryRows.map((row) => {
       const camel = snakeRowToCamel(row)
-      return { at: camel.askedAt as number, question: camel.question as string, answer: camel.answer as string }
+      return {
+        at: camel.askedAt as number,
+        question: camel.question as string,
+        answer: camel.answer as string,
+      }
     }),
     gmailIngestState: {
       lastSyncedAtSeconds: gmailState.lastSyncedAtSeconds as number | undefined,
@@ -1227,7 +1625,12 @@ export function readPersonalFinancePostgresStore(): PersonalFinanceSlice | null 
   const investmentAccounts = readInvestmentAccounts(database)
   const pendingIngestions = readPendingIngestions(database)
   const personalFinanceSettings = readPersonalFinanceSettings(database)
-  if (exchangeRates === null || investmentAccounts === null || pendingIngestions === null) return null
+  if (
+    exchangeRates === null ||
+    investmentAccounts === null ||
+    pendingIngestions === null
+  )
+    return null
 
   return {
     finance_accounts: flat.finance_accounts,

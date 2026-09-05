@@ -23,8 +23,7 @@ export const Route = createFileRoute('/api/profiles/activate')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

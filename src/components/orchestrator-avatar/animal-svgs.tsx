@@ -461,7 +461,13 @@ export function ClawCatSVG({
   )
 }
 
-export function RobotSVG({ state, size }: { state: OrchestratorState; size: number }) {
+export function RobotSVG({
+  state,
+  size,
+}: {
+  state: OrchestratorState
+  size: number
+}) {
   ensureStyles()
   const eyeH = state === 'responding' ? 1 : state === 'thinking' ? 2.5 : 2
   return (
@@ -547,7 +553,13 @@ export function RobotSVG({ state, size }: { state: OrchestratorState; size: numb
   )
 }
 
-export function FoxSVG({ state, size }: { state: OrchestratorState; size: number }) {
+export function FoxSVG({
+  state,
+  size,
+}: {
+  state: OrchestratorState
+  size: number
+}) {
   ensureStyles()
   const ey = state === 'thinking' ? 12.5 : 14
   return (
@@ -641,7 +653,13 @@ export function FoxSVG({ state, size }: { state: OrchestratorState; size: number
   )
 }
 
-export function WolfSVG({ state, size }: { state: OrchestratorState; size: number }) {
+export function WolfSVG({
+  state,
+  size,
+}: {
+  state: OrchestratorState
+  size: number
+}) {
   ensureStyles()
   const ey = state === 'thinking' ? 12.5 : 14
   const G = '#9ca3af' // gray-400 wolf body
@@ -781,7 +799,13 @@ export function WolfSVG({ state, size }: { state: OrchestratorState; size: numbe
   )
 }
 
-export function OwlSVG({ state, size }: { state: OrchestratorState; size: number }) {
+export function OwlSVG({
+  state,
+  size,
+}: {
+  state: OrchestratorState
+  size: number
+}) {
   ensureStyles()
   const er = state === 'thinking' ? 3.5 : state === 'responding' ? 2 : 3
   return (
@@ -843,7 +867,13 @@ export function OwlSVG({ state, size }: { state: OrchestratorState; size: number
   )
 }
 
-export function GhostSVG({ state, size }: { state: OrchestratorState; size: number }) {
+export function GhostSVG({
+  state,
+  size,
+}: {
+  state: OrchestratorState
+  size: number
+}) {
   ensureStyles()
   return (
     <svg
@@ -1246,7 +1276,13 @@ export function DragonSVG({
   )
 }
 
-export function PandaSVG({ state, size }: { state: OrchestratorState; size: number }) {
+export function PandaSVG({
+  state,
+  size,
+}: {
+  state: OrchestratorState
+  size: number
+}) {
   ensureStyles()
   const ey = state === 'thinking' ? 12.5 : 14
   const mouth =
@@ -1378,4 +1414,3 @@ export function PandaSVG({ state, size }: { state: OrchestratorState; size: numb
     </svg>
   )
 }
-

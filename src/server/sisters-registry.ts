@@ -93,7 +93,10 @@ function getProfilePath(hermesRoot: string, id: string): string {
   return path.join(hermesRoot, 'profiles', id)
 }
 
-function checkProfileLive(profilePath: string, id?: string): { hasProfile: boolean; isLive: boolean } {
+function checkProfileLive(
+  profilePath: string,
+  id?: string,
+): { hasProfile: boolean; isLive: boolean } {
   if (id === 'astra') {
     // Astra's "profile" is always live — it IS the root hermes config
     return { hasProfile: true, isLive: true }
@@ -107,14 +110,19 @@ function checkProfileLive(profilePath: string, id?: string): { hasProfile: boole
 // ── Source readers ──────────────────────────────────────────────────────────
 
 function readAiSisters(hermesRoot: string): Array<Sister> {
-  const sistersYaml = safeParseYaml(path.join(hermesRoot, 'config', 'sisters.yaml'))
+  const sistersYaml = safeParseYaml(
+    path.join(hermesRoot, 'config', 'sisters.yaml'),
+  )
   const raw = sistersYaml.sisters
 
   // sisters.yaml may use list format [{id, name, ...}] or dict format {id: {...}}
   let entries: Array<[string, Record<string, unknown>]>
   if (Array.isArray(raw)) {
     entries = raw
-      .filter((item): item is Record<string, unknown> => item && typeof item === 'object' && !Array.isArray(item))
+      .filter(
+        (item): item is Record<string, unknown> =>
+          item && typeof item === 'object' && !Array.isArray(item),
+      )
       .filter((item) => typeof item.id === 'string' && item.id)
       .map((item) => [item.id as string, item])
   } else {
@@ -128,10 +136,18 @@ function readAiSisters(hermesRoot: string): Array<Sister> {
     if (entry.enabled === false) continue
     const profilePath = getProfilePath(hermesRoot, id)
     const { hasProfile, isLive } = checkProfileLive(profilePath, id)
-    const role = str(entry.role) || (id === 'astra' ? 'orchestrator' : id === 'novus' ? 'builder' : id === 'nova' ? 'researcher' : 'assistant')
+    const role =
+      str(entry.role) ||
+      (id === 'astra'
+        ? 'orchestrator'
+        : id === 'novus'
+          ? 'builder'
+          : id === 'nova'
+            ? 'researcher'
+            : 'assistant')
     result.push({
       id,
-      name: str(entry.name) || (id.charAt(0).toUpperCase() + id.slice(1)),
+      name: str(entry.name) || id.charAt(0).toUpperCase() + id.slice(1),
       emoji: str(entry.emoji) || emojiForRole(role),
       description: str(entry.description),
       model: str(entry.model) || undefined,
@@ -152,7 +168,9 @@ function readAiSisters(hermesRoot: string): Array<Sister> {
 }
 
 function readBusinessAgents(hermesRoot: string): Array<Sister> {
-  const sistersYaml = safeParseYaml(path.join(hermesRoot, 'config', 'sisters.yaml'))
+  const sistersYaml = safeParseYaml(
+    path.join(hermesRoot, 'config', 'sisters.yaml'),
+  )
   const businessMap = obj(sistersYaml.business_agents)
   const result: Array<Sister> = []
 
@@ -164,7 +182,9 @@ function readBusinessAgents(hermesRoot: string): Array<Sister> {
     const role = str(entry.role) || 'business'
     result.push({
       id,
-      name: str(entry.name) || id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+      name:
+        str(entry.name) ||
+        id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
       emoji: str(entry.emoji) || emojiForRole(role),
       description: str(entry.description),
       role,
@@ -180,7 +200,9 @@ function readBusinessAgents(hermesRoot: string): Array<Sister> {
 }
 
 function readDelegationProfiles(hermesRoot: string): Array<Sister> {
-  const profilesYaml = safeParseYaml(path.join(hermesRoot, 'sister_profiles.yaml'))
+  const profilesYaml = safeParseYaml(
+    path.join(hermesRoot, 'sister_profiles.yaml'),
+  )
   const result: Array<Sister> = []
 
   for (const [id, raw] of Object.entries(profilesYaml)) {
@@ -192,7 +214,7 @@ function readDelegationProfiles(hermesRoot: string): Array<Sister> {
     const profileRole = str(entry.role) || id
     result.push({
       id,
-      name: str(entry.name) || (id.charAt(0).toUpperCase() + id.slice(1)),
+      name: str(entry.name) || id.charAt(0).toUpperCase() + id.slice(1),
       emoji: str(entry.emoji) || emojiForRole(profileRole),
       description: str(entry.description),
       model: str(overrides.model) || undefined,
@@ -236,9 +258,10 @@ export function listSisters(skipCache = false): Array<Sister> {
   const result = deduped.map((s) => {
     try {
       const gl = getGrowthLevel(s.id)
-      const lastEntry = gl.entryCount > 0
-        ? (getGrowthLog(s.id, 1)[0]?.content.slice(0, 120) ?? undefined)
-        : undefined
+      const lastEntry =
+        gl.entryCount > 0
+          ? (getGrowthLog(s.id, 1)[0]?.content.slice(0, 120) ?? undefined)
+          : undefined
       return {
         ...s,
         growthLevel: gl.level,

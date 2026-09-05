@@ -8,14 +8,20 @@ import type { PaperDecisionJournalEntry } from './paper-decision-journal'
 const decisionAt = '2026-08-20T00:00:00.000Z'
 const evaluatedAt = '2026-08-20T05:00:00.000Z'
 
-function decision(overrides: Partial<PaperDecisionJournalEntry> = {}): PaperDecisionJournalEntry {
+function decision(
+  overrides: Partial<PaperDecisionJournalEntry> = {},
+): PaperDecisionJournalEntry {
   return {
     id: 'paper-decision:one',
     kind: 'research_snapshot',
     symbol: 'BTCUSDT',
     compositeIntelligenceId: 'composite:one',
     compositeScore: 60,
-    provenance: { formulaVersion: 'research-v1', sourceIds: [], observedAt: decisionAt },
+    provenance: {
+      formulaVersion: 'research-v1',
+      sourceIds: [],
+      observedAt: decisionAt,
+    },
     recordedAt: decisionAt,
     idempotencyKey: 'one',
     side_effects: false,
@@ -49,8 +55,19 @@ describe('evaluatePaperDecisionQuality', () => {
     const report = evaluatePaperDecisionQuality({
       decisions: [decision()],
       historicalCandles: [
-        candle({ openedAt: decisionAt, closedAt: '2026-08-20T01:00:00.000Z', close: 50 }),
-        candle({ openedAt: '2026-08-20T01:00:00.000Z', closedAt: '2026-08-20T04:00:00.000Z', open: 100, high: 110, low: 90, close: 110 }),
+        candle({
+          openedAt: decisionAt,
+          closedAt: '2026-08-20T01:00:00.000Z',
+          close: 50,
+        }),
+        candle({
+          openedAt: '2026-08-20T01:00:00.000Z',
+          closedAt: '2026-08-20T04:00:00.000Z',
+          open: 100,
+          high: 110,
+          low: 90,
+          close: 110,
+        }),
       ],
       evaluatedAt,
     })
@@ -68,8 +85,22 @@ describe('evaluatePaperDecisionQuality', () => {
     const report = evaluatePaperDecisionQuality({
       decisions: [decision()],
       historicalCandles: [
-        candle({ openedAt: '2026-08-20T01:00:00.000Z', closedAt: '2026-08-20T04:00:00.000Z', open: 100, high: 110, low: 95, close: 110 }),
-        candle({ openedAt: '2026-08-20T04:00:00.001Z', closedAt: '2026-08-20T04:30:00.000Z', open: 110, high: 111, low: 70, close: 80 }),
+        candle({
+          openedAt: '2026-08-20T01:00:00.000Z',
+          closedAt: '2026-08-20T04:00:00.000Z',
+          open: 100,
+          high: 110,
+          low: 95,
+          close: 110,
+        }),
+        candle({
+          openedAt: '2026-08-20T04:00:00.001Z',
+          closedAt: '2026-08-20T04:30:00.000Z',
+          open: 110,
+          high: 111,
+          low: 70,
+          close: 80,
+        }),
       ],
       evaluatedAt,
     })
@@ -81,8 +112,15 @@ describe('evaluatePaperDecisionQuality', () => {
   })
 
   it('abstains for missing, stale, and not-yet-mature outcome data', () => {
-    const stale = decision({ id: 'paper-decision:stale', idempotencyKey: 'stale' })
-    const missing = decision({ id: 'paper-decision:missing', idempotencyKey: 'missing', symbol: 'ETHUSDT' })
+    const stale = decision({
+      id: 'paper-decision:stale',
+      idempotencyKey: 'stale',
+    })
+    const missing = decision({
+      id: 'paper-decision:missing',
+      idempotencyKey: 'missing',
+      symbol: 'ETHUSDT',
+    })
     const immature = decision({
       id: 'paper-decision:immature',
       idempotencyKey: 'immature',
@@ -91,7 +129,12 @@ describe('evaluatePaperDecisionQuality', () => {
     const report = evaluatePaperDecisionQuality({
       decisions: [stale, missing, immature],
       historicalCandles: [
-        candle({ openedAt: '2026-08-20T00:01:00.000Z', closedAt: '2026-08-20T01:00:00.000Z', high: 101, close: 101 }),
+        candle({
+          openedAt: '2026-08-20T00:01:00.000Z',
+          closedAt: '2026-08-20T01:00:00.000Z',
+          high: 101,
+          close: 101,
+        }),
       ],
       evaluatedAt,
     })
@@ -114,7 +157,14 @@ describe('evaluatePaperDecisionQuality', () => {
   it('is repeatable and leaves caller-owned decisions and candles untouched', () => {
     const decisions = [decision({ compositeScore: -80 })]
     const candles = [
-      candle({ openedAt: '2026-08-20T01:00:00.000Z', closedAt: '2026-08-20T04:00:00.000Z', open: 100, high: 110, low: 80, close: 90 }),
+      candle({
+        openedAt: '2026-08-20T01:00:00.000Z',
+        closedAt: '2026-08-20T04:00:00.000Z',
+        open: 100,
+        high: 110,
+        low: 80,
+        close: 90,
+      }),
     ]
     const before = JSON.stringify({ decisions, candles })
     const input = { decisions, historicalCandles: candles, evaluatedAt }

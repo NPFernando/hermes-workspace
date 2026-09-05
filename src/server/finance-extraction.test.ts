@@ -65,7 +65,9 @@ describe('parseExtractionJson', () => {
   })
 
   it('rejects an invalid kind', () => {
-    expect(parseExtractionJson('{"kind":"transfer","amount":10,"currency":"USD"}')).toEqual({
+    expect(
+      parseExtractionJson('{"kind":"transfer","amount":10,"currency":"USD"}'),
+    ).toEqual({
       ok: false,
       reason: 'malformed_response',
     })
@@ -73,16 +75,23 @@ describe('parseExtractionJson', () => {
 
   it('rejects a non-numeric amount', () => {
     expect(
-      parseExtractionJson('{"kind":"expense","amount":"lots","currency":"USD","vendorOrSource":"x","date":"2026-01-01"}'),
+      parseExtractionJson(
+        '{"kind":"expense","amount":"lots","currency":"USD","vendorOrSource":"x","date":"2026-01-01"}',
+      ),
     ).toEqual({ ok: false, reason: 'malformed_response' })
   })
 
   it('returns malformed_response for unparseable content', () => {
-    expect(parseExtractionJson('not json at all')).toEqual({ ok: false, reason: 'malformed_response' })
+    expect(parseExtractionJson('not json at all')).toEqual({
+      ok: false,
+      reason: 'malformed_response',
+    })
   })
 
   it('defaults optional fields when absent', () => {
-    const result = parseExtractionJson('{"kind":"income","amount":500,"currency":"USD","vendorOrSource":"Acme","date":"2026-01-01"}')
+    const result = parseExtractionJson(
+      '{"kind":"income","amount":500,"currency":"USD","vendorOrSource":"Acme","date":"2026-01-01"}',
+    )
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.data.category).toBeUndefined()
@@ -98,14 +107,19 @@ describe('promptWithCategoryHints', () => {
   })
 
   it('appends known vendor -> category corrections to the prompt', () => {
-    const result = promptWithCategoryHints('BASE', { 'keells super': 'Groceries', netflix: 'Subscriptions' })
+    const result = promptWithCategoryHints('BASE', {
+      'keells super': 'Groceries',
+      netflix: 'Subscriptions',
+    })
     expect(result).toContain('BASE')
     expect(result).toContain('"keells super" -> "Groceries"')
     expect(result).toContain('"netflix" -> "Subscriptions"')
   })
 
   it('caps hints at 10 entries', () => {
-    const hints = Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`vendor${i}`, `cat${i}`]))
+    const hints = Object.fromEntries(
+      Array.from({ length: 15 }, (_, i) => [`vendor${i}`, `cat${i}`]),
+    )
     const result = promptWithCategoryHints('BASE', hints)
     expect(result.match(/^- "/gm)?.length).toBe(10)
   })
@@ -123,16 +137,26 @@ describe('buildFinanceAnswerPrompt', () => {
 
   it('folds prior turns into a "Conversation so far" block ahead of Data/Question', () => {
     const result = buildFinanceAnswerPrompt('And last month?', context, [
-      { question: 'How much did I spend this month?', answer: 'You spent 50,000 LKR.' },
+      {
+        question: 'How much did I spend this month?',
+        answer: 'You spent 50,000 LKR.',
+      },
     ])
     expect(result).toContain('Conversation so far:')
-    expect(result).toContain('Q: How much did I spend this month?\nA: You spent 50,000 LKR.')
-    expect(result.indexOf('Conversation so far')).toBeLessThan(result.indexOf('Data:'))
+    expect(result).toContain(
+      'Q: How much did I spend this month?\nA: You spent 50,000 LKR.',
+    )
+    expect(result.indexOf('Conversation so far')).toBeLessThan(
+      result.indexOf('Data:'),
+    )
     expect(result).toContain('Question: And last month?')
   })
 
   it('caps prior turns to the last 3 even if more are passed in', () => {
-    const turns = Array.from({ length: 5 }, (_, i) => ({ question: `Q${i}`, answer: `A${i}` }))
+    const turns = Array.from({ length: 5 }, (_, i) => ({
+      question: `Q${i}`,
+      answer: `A${i}`,
+    }))
     const result = buildFinanceAnswerPrompt('Follow-up', context, turns)
     expect(result).not.toContain('Q0')
     expect(result).not.toContain('Q1')
@@ -144,8 +168,13 @@ describe('buildFinanceAnswerPrompt', () => {
 
 describe('parseFinanceAnswerJson', () => {
   it('parses a valid text-only response', () => {
-    const result = parseFinanceAnswerJson(JSON.stringify({ text: 'Your net worth is 100,000 LKR.', chart: null }))
-    expect(result).toEqual({ text: 'Your net worth is 100,000 LKR.', chart: null })
+    const result = parseFinanceAnswerJson(
+      JSON.stringify({ text: 'Your net worth is 100,000 LKR.', chart: null }),
+    )
+    expect(result).toEqual({
+      text: 'Your net worth is 100,000 LKR.',
+      chart: null,
+    })
   })
 
   it('parses a valid response with chart data', () => {
@@ -172,25 +201,41 @@ describe('parseFinanceAnswerJson', () => {
   })
 
   it('strips markdown fences before parsing', () => {
-    const result = parseFinanceAnswerJson('```json\n{"text": "Fenced answer.", "chart": null}\n```')
+    const result = parseFinanceAnswerJson(
+      '```json\n{"text": "Fenced answer.", "chart": null}\n```',
+    )
     expect(result).toEqual({ text: 'Fenced answer.', chart: null })
   })
 
   it('falls back to the raw response as plain text when parsing fails', () => {
     const result = parseFinanceAnswerJson('I could not find that in your data.')
-    expect(result).toEqual({ text: 'I could not find that in your data.', chart: null })
+    expect(result).toEqual({
+      text: 'I could not find that in your data.',
+      chart: null,
+    })
   })
 
   it('drops a malformed chart but keeps the text', () => {
     const result = parseFinanceAnswerJson(
-      JSON.stringify({ text: 'Here you go.', chart: { title: 'Missing data field' } }),
+      JSON.stringify({
+        text: 'Here you go.',
+        chart: { title: 'Missing data field' },
+      }),
     )
     expect(result).toEqual({ text: 'Here you go.', chart: null })
   })
 
   it('caps chart data at 10 entries', () => {
-    const data = Array.from({ length: 15 }, (_, i) => ({ label: `Vendor ${i}`, value: i }))
-    const result = parseFinanceAnswerJson(JSON.stringify({ text: 'Top vendors.', chart: { title: 'Vendors', data } }))
+    const data = Array.from({ length: 15 }, (_, i) => ({
+      label: `Vendor ${i}`,
+      value: i,
+    }))
+    const result = parseFinanceAnswerJson(
+      JSON.stringify({
+        text: 'Top vendors.',
+        chart: { title: 'Vendors', data },
+      }),
+    )
     expect(result.chart?.data.length).toBe(10)
   })
 })
@@ -207,9 +252,14 @@ describe('parseContractExtractionJson', () => {
         contractEndDate: '2027-01-01',
         jobTitle: 'Software Engineer',
         confidence: 'high',
-        riskSummary: 'Generally standard, but the non-compete is unusually broad.',
+        riskSummary:
+          'Generally standard, but the non-compete is unusually broad.',
         risks: [
-          { severity: 'high', clause: 'Non-compete', concern: 'Covers all of Sri Lanka for 3 years after leaving.' },
+          {
+            severity: 'high',
+            clause: 'Non-compete',
+            concern: 'Covers all of Sri Lanka for 3 years after leaving.',
+          },
         ],
       }),
     )
@@ -224,9 +274,14 @@ describe('parseContractExtractionJson', () => {
         contractEndDate: '2027-01-01',
         jobTitle: 'Software Engineer',
         confidence: 'high',
-        riskSummary: 'Generally standard, but the non-compete is unusually broad.',
+        riskSummary:
+          'Generally standard, but the non-compete is unusually broad.',
         risks: [
-          { severity: 'high', clause: 'Non-compete', concern: 'Covers all of Sri Lanka for 3 years after leaving.' },
+          {
+            severity: 'high',
+            clause: 'Non-compete',
+            concern: 'Covers all of Sri Lanka for 3 years after leaving.',
+          },
         ],
       },
     })
@@ -287,7 +342,10 @@ describe('parseContractExtractionJson', () => {
   })
 
   it('returns the model-reported reason when the document is not a contract', () => {
-    expect(parseContractExtractionJson('{"error":"not_a_contract"}')).toEqual({ ok: false, reason: 'not_a_contract' })
+    expect(parseContractExtractionJson('{"error":"not_a_contract"}')).toEqual({
+      ok: false,
+      reason: 'not_a_contract',
+    })
   })
 
   it('defaults employmentType to other for an unrecognized value', () => {
@@ -299,16 +357,34 @@ describe('parseContractExtractionJson', () => {
   })
 
   it('caps risks at 10 entries and drops malformed ones', () => {
-    const risks = Array.from({ length: 15 }, (_, i) => ({ severity: 'low', clause: `Clause ${i}`, concern: `Concern ${i}` }))
-    risks.push({ severity: 'high', clause: '', concern: 'missing clause label' } as never)
+    const risks = Array.from({ length: 15 }, (_, i) => ({
+      severity: 'low',
+      clause: `Clause ${i}`,
+      concern: `Concern ${i}`,
+    }))
+    risks.push({
+      severity: 'high',
+      clause: '',
+      concern: 'missing clause label',
+    } as never)
     const result = parseContractExtractionJson(
-      JSON.stringify({ employerName: 'Acme', employmentType: 'other', currency: 'LKR', confidence: 'low', riskSummary: '', risks }),
+      JSON.stringify({
+        employerName: 'Acme',
+        employmentType: 'other',
+        currency: 'LKR',
+        confidence: 'low',
+        riskSummary: '',
+        risks,
+      }),
     )
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.data.risks).toHaveLength(10)
   })
 
   it('returns malformed_response for unparseable content', () => {
-    expect(parseContractExtractionJson('not json at all')).toEqual({ ok: false, reason: 'malformed_response' })
+    expect(parseContractExtractionJson('not json at all')).toEqual({
+      ok: false,
+      reason: 'malformed_response',
+    })
   })
 })

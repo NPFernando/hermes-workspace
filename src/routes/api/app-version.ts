@@ -17,7 +17,11 @@ export const Route = createFileRoute('/api/app-version')({
             packageId: m.packageId ?? 'com.fernandofamily.hermes',
           })
         } catch {
-          return json({ versionCode: 1, versionName: '1', packageId: 'com.fernandofamily.hermes' })
+          return json({
+            versionCode: 1,
+            versionName: '1',
+            packageId: 'com.fernandofamily.hermes',
+          })
         }
       },
     },

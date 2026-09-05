@@ -442,7 +442,9 @@ type AgentActivity = {
 }
 
 export function UsageMeter({ visible = true }: { visible?: boolean }) {
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
   const statusSessionKey = useMemo(
     () => resolveUsageMeterSessionKey(pathname),
     [pathname],
@@ -807,7 +809,9 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
           )
         }
         return (
-          <span className="text-[10px] text-[var(--theme-muted)]">No provider data</span>
+          <span className="text-[10px] text-[var(--theme-muted)]">
+            No provider data
+          </span>
         )
       }
 
@@ -882,7 +886,7 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
         <MenuRoot>
           <MenuTrigger
             className={cn(
-              "absolute bottom-2 right-2",
+              'absolute bottom-2 right-2',
               'ml-auto rounded-full border px-3 py-1 text-xs font-medium',
               'flex items-center gap-3 transition hover:bg-[var(--theme-hover)] cursor-pointer',
               alertTone,
@@ -896,18 +900,22 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
             {renderPillContent()}
           </MenuTrigger>
           <MenuContent align="end" className="min-w-[180px]">
-            {(['session', 'provider', 'cost', 'agents'] as const).map((view) => (
-              <MenuItem
-                key={view}
-                onClick={() => handleStatsViewChange(view)}
-                className={cn(
-                  statsView === view && 'bg-amber-100 text-amber-800',
-                )}
-              >
-                <span className="flex-1">{STATS_VIEW_LABELS[view]}</span>
-                {statsView === view && <span className="text-amber-600">✓</span>}
-              </MenuItem>
-            ))}
+            {(['session', 'provider', 'cost', 'agents'] as const).map(
+              (view) => (
+                <MenuItem
+                  key={view}
+                  onClick={() => handleStatsViewChange(view)}
+                  className={cn(
+                    statsView === view && 'bg-amber-100 text-amber-800',
+                  )}
+                >
+                  <span className="flex-1">{STATS_VIEW_LABELS[view]}</span>
+                  {statsView === view && (
+                    <span className="text-amber-600">✓</span>
+                  )}
+                </MenuItem>
+              ),
+            )}
             <div className="my-1 h-px bg-[var(--theme-hover)]" />
             <MenuItem onClick={() => setOpen(true)}>View Details…</MenuItem>
           </MenuContent>

@@ -15,9 +15,9 @@ import { sendTelegramProgressPing } from '../../server/telegram-clarify'
 // a deep-link button directly to the task dialog.
 // ---------------------------------------------------------------------------
 
-const MIN_WORKING_MS  = 3  * 60 * 1000   // wait at least 3 min before first ping
-const PING_INTERVAL_MS = 5  * 60 * 1000  // ping at most every 5 min
-const MAX_WORKING_MS  = 18 * 60 * 1000   // stop pinging near the 20 min hermes timeout
+const MIN_WORKING_MS = 3 * 60 * 1000 // wait at least 3 min before first ping
+const PING_INTERVAL_MS = 5 * 60 * 1000 // ping at most every 5 min
+const MAX_WORKING_MS = 18 * 60 * 1000 // stop pinging near the 20 min hermes timeout
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -38,13 +38,14 @@ export const Route = createFileRoute('/api/tasks-progress-ping')({
           if (!t.agent_action_at) return false
 
           const elapsedMs = now - Date.parse(t.agent_action_at)
-          if (elapsedMs < MIN_WORKING_MS) return false   // too early
-          if (elapsedMs >= MAX_WORKING_MS) return false  // near timeout — let stuck-task sweep handle it
+          if (elapsedMs < MIN_WORKING_MS) return false // too early
+          if (elapsedMs >= MAX_WORKING_MS) return false // near timeout — let stuck-task sweep handle it
 
           const lastPing = t.agent_progress_pinged_at
           // Is this a new execution (no ping yet, or last ping predates the current run)?
-          const isNewRun = !lastPing || Date.parse(lastPing) < Date.parse(t.agent_action_at)
-          if (isNewRun) return true  // first ping for this execution
+          const isNewRun =
+            !lastPing || Date.parse(lastPing) < Date.parse(t.agent_action_at)
+          if (isNewRun) return true // first ping for this execution
 
           // Already pinged this run — check interval
           return now - Date.parse(lastPing) >= PING_INTERVAL_MS
@@ -58,7 +59,9 @@ export const Route = createFileRoute('/api/tasks-progress-ping')({
             { id: task.id, title: task.title, agent_name: task.agent_name },
             elapsedMs,
           )
-          updateTask(task.id, { agent_progress_pinged_at: new Date().toISOString() })
+          updateTask(task.id, {
+            agent_progress_pinged_at: new Date().toISOString(),
+          })
           pinged.push({ id: task.id, title: task.title })
         }
 

@@ -1,10 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import {
-  formatModelName,
-  formatRelativeTime,
-  formatTokens,
-} from '@/screens/dashboard/lib/formatters'
+import { formatModelName } from '@/screens/dashboard/lib/formatters'
 
 export type SessionRowData = {
   key: string
@@ -42,11 +38,9 @@ const KIND_ICONS: Record<string, string> = {
  * and a heuristic on the session key (cron sessions use the canonical
  * `cron_<jobId>_<ts>` key format the agent confirmed).
  */
-function sessionGlyph(s: {
-  kind: string
-  source: string | null
-  key: string
-}): string {
+function sessionGlyph(
+  s: { kind: string; source: string | null; key: string },
+): string {
   if (typeof s.key === 'string' && s.key.startsWith('cron_')) {
     return KIND_ICONS.cron
   }
@@ -59,7 +53,19 @@ function sessionGlyph(s: {
 
 function relativeTime(ms: number | null): string {
   if (!ms) return '—'
-  return formatRelativeTime(ms)
+  const diff = Date.now() - ms
+  if (diff < 0) return 'just now'
+  if (diff < 60_000) return '<1m ago'
+  if (diff < 3_600_000) return `${Math.round(diff / 60_000)}m ago`
+  if (diff < 86_400_000) return `${Math.round(diff / 3_600_000)}h ago`
+  return `${Math.round(diff / 86_400_000)}d ago`
+}
+
+function formatTokens(n: number): string {
+  if (!n || n <= 0) return '0'
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
 }
 
 function shortTitle(s: SessionRowData): string {
@@ -79,7 +85,11 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
   const badges: Array<SessionBadge> = []
   const now = Date.now()
   // Hot: started or updated within 5 minutes and still idle/active
-  if (s.updatedAt && now - s.updatedAt < 5 * 60_000 && s.status !== 'ended') {
+  if (
+    s.updatedAt &&
+    now - s.updatedAt < 5 * 60_000 &&
+    s.status !== 'ended'
+  ) {
     badges.push({
       label: 'hot',
       tone: 'var(--theme-success)',
@@ -100,10 +110,7 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
       title: `${formatTokens(s.tokenCount)} tokens`,
     })
   }
-  if (
-    s.status?.toLowerCase() === 'error' ||
-    s.status?.toLowerCase() === 'failed'
-  ) {
+  if (s.status?.toLowerCase() === 'error' || s.status?.toLowerCase() === 'failed') {
     badges.push({
       label: 'error',
       tone: 'var(--theme-danger)',
@@ -156,7 +163,9 @@ export function SessionsIntelligenceCard({
 
   // Highlight: top hot session, otherwise top tool-heavy, otherwise top recent.
   const highlightId = useMemo(() => {
-    const hot = enriched.find((e) => e.badges.some((b) => b.label === 'hot'))
+    const hot = enriched.find((e) =>
+      e.badges.some((b) => b.label === 'hot'),
+    )
     if (hot) return hot.session.key
     const heavy = enriched.find((e) =>
       e.badges.some((b) => b.label === 'tool-heavy'),
@@ -178,11 +187,15 @@ export function SessionsIntelligenceCard({
       }}
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
+        <h3
+          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
+        >
           Sessions intelligence
         </h3>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
+          <span
+            className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
+          >
             {sessions.length} recent
           </span>
           <button
@@ -201,7 +214,9 @@ export function SessionsIntelligenceCard({
       </div>
 
       {sessions.length === 0 ? (
-        <div className="flex h-[120px] items-center justify-center rounded-md border border-dashed border-[var(--theme-border)] text-[11px] text-[var(--theme-muted)]">
+        <div
+          className="flex h-[120px] items-center justify-center rounded-md border border-dashed border-[var(--theme-border)] text-[11px] text-[var(--theme-muted)]"
+        >
           No sessions yet — start a chat.
         </div>
       ) : (
@@ -263,7 +278,9 @@ export function SessionsIntelligenceCard({
                         </span>
                       ))}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.05em] text-[var(--theme-muted)]">
+                    <div
+                      className="mt-0.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.05em] text-[var(--theme-muted)]"
+                    >
                       {s.model ? (
                         <span
                           className="rounded px-1 py-0.5"

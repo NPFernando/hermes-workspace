@@ -15,10 +15,15 @@ export const Route = createFileRoute('/api/tasks-batch-execute')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         let body: { limit?: number; taskIds?: Array<string> } = {}
-        try { body = (await request.json()) as typeof body } catch { /* empty body ok */ }
-        const limit = typeof body.limit === 'number' && body.limit > 0
-          ? Math.min(body.limit, 20)
-          : 5
+        try {
+          body = (await request.json()) as typeof body
+        } catch {
+          /* empty body ok */
+        }
+        const limit =
+          typeof body.limit === 'number' && body.limit > 0
+            ? Math.min(body.limit, 20)
+            : 5
         const result = batchExecuteBackground(limit, body.taskIds)
         return json({ ok: true, ...result })
       },

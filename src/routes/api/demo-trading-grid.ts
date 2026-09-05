@@ -19,7 +19,10 @@ import {
   runGridPaperCycle,
 } from '../../server/grid-paper-engine'
 import { appendAuditLog, readFinanceStore } from '../../server/finance-store'
-import { DEFAULT_GUARDIAN_CONFIG, bucketExposureQuote } from '../../server/trading-guardian'
+import {
+  DEFAULT_GUARDIAN_CONFIG,
+  bucketExposureQuote,
+} from '../../server/trading-guardian'
 import { crossEngineBucketExposureQuote } from '../../server/exposure-aggregator'
 import { getEngineState } from '../../server/demo-trading-engine'
 
@@ -43,18 +46,24 @@ import { getEngineState } from '../../server/demo-trading-engine'
 export function warnIfCrossEngineExposureBreached(): void {
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
-  const guardianOverride =
-    (settings.demoTrading as Record<string, unknown> | undefined)?.guardian
+  const guardianOverride = (
+    settings.demoTrading as Record<string, unknown> | undefined
+  )?.guardian
   const guardian = {
     ...DEFAULT_GUARDIAN_CONFIG,
-    ...(guardianOverride && typeof guardianOverride === 'object' ? guardianOverride : {}),
+    ...(guardianOverride && typeof guardianOverride === 'object'
+      ? guardianOverride
+      : {}),
   }
   if (!guardian.correlationBucketsEnabled) return
   const councilExposure = bucketExposureQuote(
     getEngineState().positions,
     guardian.correlationBuckets,
   )
-  const merged = crossEngineBucketExposureQuote(councilExposure, guardian.correlationBuckets)
+  const merged = crossEngineBucketExposureQuote(
+    councilExposure,
+    guardian.correlationBuckets,
+  )
   for (const [bucket, exposureQuote] of Object.entries(merged)) {
     if (exposureQuote > guardian.maxBucketExposureQuote) {
       appendAuditLog('grid_cross_engine_exposure_warning', {

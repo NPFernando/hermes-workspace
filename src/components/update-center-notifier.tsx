@@ -12,7 +12,10 @@ import {
   Loading03Icon,
   Tick01Icon,
 } from '@hugeicons/core-free-icons'
-import type { ReleaseNotes as Notes, ReleaseNoteSection } from '@/lib/update-notes'
+import type {
+  ReleaseNotes as Notes,
+  ReleaseNoteSection,
+} from '@/lib/update-notes'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
 import { safeErrorMessage } from '@/lib/error-utils'
@@ -128,9 +131,12 @@ export function UpdateCenterNotifier() {
   const [naveenError, setNaveenError] = useState('')
   const [naveenDismissed, setNaveenDismissed] = useState(false)
   const [naveenModalOpen, setNaveenModalOpen] = useState(false)
-  const [naveenAiAnalysis, setNaveenAiAnalysis] = useState<NaveenAiAnalysis | null>(null)
+  const [naveenAiAnalysis, setNaveenAiAnalysis] =
+    useState<NaveenAiAnalysis | null>(null)
   const [naveenAiLoading, setNaveenAiLoading] = useState(false)
-  const [perFileStrategy, setPerFileStrategy] = useState<Record<string, ResolutionStrategy>>({})
+  const [perFileStrategy, setPerFileStrategy] = useState<
+    Record<string, ResolutionStrategy>
+  >({})
 
   useEffect(() => {
     const values = new Set<string>()
@@ -181,7 +187,9 @@ export function UpdateCenterNotifier() {
     // banner", not throw and take the whole route down with it. The widened
     // type expresses that the wire payload may not match UpdateStatus.
     const raw = data as
-      | { products?: Partial<Record<'workspace' | 'agent', ProductUpdateStatus>> }
+      | {
+          products?: Partial<Record<'workspace' | 'agent', ProductUpdateStatus>>
+        }
       | null
       | undefined
     const products = [raw?.products?.workspace, raw?.products?.agent].filter(
@@ -262,13 +270,17 @@ export function UpdateCenterNotifier() {
       try {
         // Check cache first
         const cacheRes = await fetch('/api/update/naveen-ai-analysis')
-        const cacheData = (await cacheRes.json()) as { ok: boolean; analysis: NaveenAiAnalysis | null }
+        const cacheData = (await cacheRes.json()) as {
+          ok: boolean
+          analysis: NaveenAiAnalysis | null
+        }
         if (cacheData.ok && cacheData.analysis) {
           setNaveenAiAnalysis(cacheData.analysis)
           // Pre-populate per-file strategy from AI recommendations
           const aiDefaults: Record<string, ResolutionStrategy> = {}
           for (const rec of cacheData.analysis.recommendations) {
-            if (rec.action !== 'needs_manual_merge') aiDefaults[rec.file] = rec.action
+            if (rec.action !== 'needs_manual_merge')
+              aiDefaults[rec.file] = rec.action
           }
           setPerFileStrategy((prev) => ({ ...aiDefaults, ...prev }))
           setNaveenAiLoading(false)
@@ -280,12 +292,16 @@ export function UpdateCenterNotifier() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
         })
-        const analysisData = (await res.json()) as { ok: boolean; analysis?: NaveenAiAnalysis }
+        const analysisData = (await res.json()) as {
+          ok: boolean
+          analysis?: NaveenAiAnalysis
+        }
         if (analysisData.ok && analysisData.analysis) {
           setNaveenAiAnalysis(analysisData.analysis)
           const aiDefaults: Record<string, ResolutionStrategy> = {}
           for (const rec of analysisData.analysis.recommendations) {
-            if (rec.action !== 'needs_manual_merge') aiDefaults[rec.file] = rec.action
+            if (rec.action !== 'needs_manual_merge')
+              aiDefaults[rec.file] = rec.action
           }
           setPerFileStrategy((prev) => ({ ...aiDefaults, ...prev }))
         }
@@ -301,10 +317,9 @@ export function UpdateCenterNotifier() {
     setNaveenPhase('applying')
     setNaveenError('')
     try {
-      const body =
-        naveenStatus?.potentialConflicts.length
-          ? { strategy: 'keep_ours', perFileStrategy }
-          : { strategy: 'auto' }
+      const body = naveenStatus?.potentialConflicts.length
+        ? { strategy: 'keep_ours', perFileStrategy }
+        : { strategy: 'auto' }
       const res = await fetch('/api/update/naveen-apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -318,7 +333,9 @@ export function UpdateCenterNotifier() {
       }
       setNaveenPhase('done')
       setNaveenModalOpen(false)
-      await queryClient.invalidateQueries({ queryKey: ['naveen-update-status'] })
+      await queryClient.invalidateQueries({
+        queryKey: ['naveen-update-status'],
+      })
       toast(
         result.restartRequired
           ? 'Smart update applied. Restart the service to activate.'
@@ -326,7 +343,10 @@ export function UpdateCenterNotifier() {
         { type: 'success', duration: 8000 },
       )
       if (result.pushedToFork) {
-        toast('Changes pushed to your GitHub fork.', { type: 'success', duration: 5000 })
+        toast('Changes pushed to your GitHub fork.', {
+          type: 'success',
+          duration: 5000,
+        })
       }
     } catch (err) {
       setNaveenPhase('error')
@@ -428,9 +448,7 @@ function UpdateCard({
       }}
     >
       {updating ? (
-        <div
-          className="h-0.5 animate-pulse bg-[var(--theme-accent)]"
-        />
+        <div className="h-0.5 animate-pulse bg-[var(--theme-accent)]" />
       ) : null}
       <div className="flex items-center gap-3 px-5 py-3.5">
         <div
@@ -457,13 +475,16 @@ function UpdateCard({
             }
             size={18}
             strokeWidth={2}
-            className={cn(updating ? 'animate-spin' : '', blocked || phase === 'error' ? 'text-amber-500' : 'text-[var(--theme-accent)]')}
+            className={cn(
+              updating ? 'animate-spin' : '',
+              blocked || phase === 'error'
+                ? 'text-amber-500'
+                : 'text-[var(--theme-accent)]',
+            )}
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p
-            className="text-sm font-semibold text-[var(--theme-text)]"
-          >
+          <p className="text-sm font-semibold text-[var(--theme-text)]">
             {blocked
               ? `${product.label} update blocked`
               : `${product.label} update available`}
@@ -471,7 +492,10 @@ function UpdateCard({
           {/* Don't truncate when blocked — the full reason is what the
               user needs to act on. See #293. */}
           <p
-            className={cn('text-xs text-[var(--theme-muted)]', blocked ? '' : 'truncate')}
+            className={cn(
+              'text-xs text-[var(--theme-muted)]',
+              blocked ? '' : 'truncate',
+            )}
           >
             {subtitle}
           </p>
@@ -483,7 +507,9 @@ function UpdateCard({
               {product.repoPath}
             </p>
           ) : null}
-          {blocked && product.blockingFiles && product.blockingFiles.length > 0 ? (
+          {blocked &&
+          product.blockingFiles &&
+          product.blockingFiles.length > 0 ? (
             <ul className="mt-1 max-h-24 overflow-auto pr-1">
               {product.blockingFiles.slice(0, 8).map((file) => (
                 <li
@@ -495,9 +521,7 @@ function UpdateCard({
                 </li>
               ))}
               {product.blockingFiles.length > 8 ? (
-                <li
-                  className="text-[11px] italic text-[var(--theme-muted)]"
-                >
+                <li className="text-[11px] italic text-[var(--theme-muted)]">
                   …and {product.blockingFiles.length - 8} more
                 </li>
               ) : null}
@@ -616,9 +640,7 @@ function ReleaseNotes({
               </section>
             ))}
           </div>
-          <div
-            className="flex justify-end border-t px-5 py-3 border-[var(--theme-border)]"
-          >
+          <div className="flex justify-end border-t px-5 py-3 border-[var(--theme-border)]">
             <button
               type="button"
               onClick={onClose}
@@ -673,9 +695,7 @@ function NaveenUpdateCard({
       }}
     >
       {applying && (
-        <div
-          className="h-0.5 animate-pulse bg-gradient-to-r from-purple-500 via-blue-500 to-purple-500"
-        />
+        <div className="h-0.5 animate-pulse bg-gradient-to-r from-purple-500 via-blue-500 to-purple-500" />
       )}
       <div className="flex items-center gap-3 px-5 py-3.5">
         <div
@@ -687,10 +707,19 @@ function NaveenUpdateCard({
           }}
         >
           <HugeiconsIcon
-            icon={applying ? Loading03Icon : hasConflicts ? AlertDiamondIcon : CodeSimpleIcon}
+            icon={
+              applying
+                ? Loading03Icon
+                : hasConflicts
+                  ? AlertDiamondIcon
+                  : CodeSimpleIcon
+            }
             size={18}
             strokeWidth={2}
-            className={cn(applying ? 'animate-spin' : '', hasConflicts ? 'text-amber-500' : 'text-purple-500')}
+            className={cn(
+              applying ? 'animate-spin' : '',
+              hasConflicts ? 'text-amber-500' : 'text-purple-500',
+            )}
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -706,7 +735,10 @@ function NaveenUpdateCard({
             type="button"
             onClick={onOpen}
             disabled={applying}
-            className={cn('rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60', hasConflicts ? 'bg-amber-500' : 'bg-purple-500')}
+            className={cn(
+              'rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60',
+              hasConflicts ? 'bg-amber-500' : 'bg-purple-500',
+            )}
           >
             {applying ? 'Updating' : hasConflicts ? 'Review' : 'Update'}
           </button>
@@ -753,7 +785,9 @@ function NaveenUpdateModal({
   return (
     <div
       className="fixed inset-0 z-[10000] flex items-start justify-center bg-black/45 px-4 pt-[calc(var(--titlebar-h,0px)+1.5rem)] backdrop-blur-sm sm:items-center sm:pt-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
       <motion.div
         className="flex w-full max-w-xl flex-col overflow-hidden rounded-2xl shadow-2xl select-text"
@@ -770,9 +804,7 @@ function NaveenUpdateModal({
       >
         {/* Header */}
         <div className="flex items-start gap-3 px-5 py-4">
-          <div
-            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/14"
-          >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/14">
             <HugeiconsIcon
               icon={hasConflicts ? AlertDiamondIcon : CodeSimpleIcon}
               size={20}
@@ -783,7 +815,8 @@ function NaveenUpdateModal({
           <div className="min-w-0 flex-1">
             <p className="text-base font-semibold">Smart upstream update</p>
             <p className="text-sm text-[var(--theme-muted)]">
-              {status.upstreamBehind} new upstream commit{status.upstreamBehind > 1 ? 's' : ''} ·{' '}
+              {status.upstreamBehind} new upstream commit
+              {status.upstreamBehind > 1 ? 's' : ''} ·{' '}
               {hasConflicts
                 ? `${status.potentialConflicts.length} custom file${status.potentialConflicts.length > 1 ? 's' : ''} need your decision`
                 : 'No conflicts — safe to apply'}
@@ -818,14 +851,17 @@ function NaveenUpdateModal({
           </section>
 
           {/* Custom files upstream touched but we didn't change */}
-          {status.customFilesUpstreamTouched.length > status.potentialConflicts.length ? (
+          {status.customFilesUpstreamTouched.length >
+          status.potentialConflicts.length ? (
             <section>
               <h3 className="mb-2 text-sm font-semibold text-[var(--theme-text)]">
                 Custom files upstream updated (no conflict)
               </h3>
               <ul className="space-y-1">
                 {status.customFilesUpstreamTouched
-                  .filter((f) => !status.potentialConflicts.some((c) => c.file === f))
+                  .filter(
+                    (f) => !status.potentialConflicts.some((c) => c.file === f),
+                  )
                   .map((file) => (
                     <li
                       key={file}
@@ -840,16 +876,21 @@ function NaveenUpdateModal({
 
           {/* AI summary */}
           {hasConflicts && (
-            <section
-              className="rounded-xl px-4 py-3 bg-purple-500/8"
-            >
+            <section className="rounded-xl px-4 py-3 bg-purple-500/8">
               <p className="mb-1 text-xs font-semibold text-purple-500">
                 AI Analysis
               </p>
               {aiLoading ? (
                 <div className="flex items-center gap-2 text-[var(--theme-muted)]">
-                  <HugeiconsIcon icon={Loading03Icon} size={14} strokeWidth={2} className="animate-spin" />
-                  <span className="text-xs">Asking Astra to analyze conflicts…</span>
+                  <HugeiconsIcon
+                    icon={Loading03Icon}
+                    size={14}
+                    strokeWidth={2}
+                    className="animate-spin"
+                  />
+                  <span className="text-xs">
+                    Asking Astra to analyze conflicts…
+                  </span>
                 </div>
               ) : aiAnalysis?.summary ? (
                 <p className="text-xs text-[var(--theme-muted)]">
@@ -865,8 +906,11 @@ function NaveenUpdateModal({
 
           {/* Per-file conflict resolution */}
           {status.potentialConflicts.map((conflict) => {
-            const aiRec = aiAnalysis?.recommendations.find((r) => r.file === conflict.file)
-            const currentStrategy = perFileStrategy[conflict.file] ?? 'keep_ours'
+            const aiRec = aiAnalysis?.recommendations.find(
+              (r) => r.file === conflict.file,
+            )
+            const currentStrategy =
+              perFileStrategy[conflict.file] ?? 'keep_ours'
             return (
               <section
                 key={conflict.file}
@@ -887,7 +931,8 @@ function NaveenUpdateModal({
                             : 'bg-amber-500/15 text-amber-500',
                       )}
                     >
-                      AI: {aiRec.action.replace(/_/g, ' ')} ({aiRec.confidence}%)
+                      AI: {aiRec.action.replace(/_/g, ' ')} ({aiRec.confidence}
+                      %)
                     </span>
                   )}
                 </div>
@@ -922,7 +967,9 @@ function NaveenUpdateModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onStrategyChange(conflict.file, 'take_theirs')}
+                    onClick={() =>
+                      onStrategyChange(conflict.file, 'take_theirs')
+                    }
                     className={cn(
                       'flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all border border-[var(--theme-border)]',
                       currentStrategy === 'take_theirs'
@@ -946,9 +993,7 @@ function NaveenUpdateModal({
         )}
 
         {/* Footer */}
-        <div
-          className="flex items-center justify-between border-t px-5 py-3 border-[var(--theme-border)]"
-        >
+        <div className="flex items-center justify-between border-t px-5 py-3 border-[var(--theme-border)]">
           <p className="text-xs text-[var(--theme-muted)]">
             {hasConflicts
               ? 'Rebase with chosen strategies · build · push to fork'
@@ -969,9 +1014,18 @@ function NaveenUpdateModal({
               className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60 bg-purple-500"
             >
               {applying && (
-                <HugeiconsIcon icon={Loading03Icon} size={14} strokeWidth={2} className="animate-spin" />
+                <HugeiconsIcon
+                  icon={Loading03Icon}
+                  size={14}
+                  strokeWidth={2}
+                  className="animate-spin"
+                />
               )}
-              {applying ? 'Applying…' : hasConflicts ? 'Apply Smart Update' : 'Apply Update'}
+              {applying
+                ? 'Applying…'
+                : hasConflicts
+                  ? 'Apply Smart Update'
+                  : 'Apply Update'}
             </button>
           </div>
         </div>

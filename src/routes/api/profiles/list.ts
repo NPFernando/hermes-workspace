@@ -15,14 +15,12 @@ export const Route = createFileRoute('/api/profiles/list')({
         }
         try {
           bootstrapOnceLazy()
-          const { profiles, activeProfile } =
-            await listProfilesWithFallback()
+          const { profiles, activeProfile } = await listProfilesWithFallback()
           return json({ profiles, activeProfile })
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
               profiles: [],
             },
             { status: 500 },

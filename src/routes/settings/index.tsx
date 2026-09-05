@@ -32,7 +32,6 @@ import { ClaudeConfigSection } from '@/screens/settings/sections/claude-config-s
 import { ConnectionSection } from '@/screens/settings/sections/connection-section'
 import { useNotificationCenterStore } from '@/stores/notification-center-store'
 
-
 const VALID_SECTION_IDS: ReadonlyArray<SettingsNavId> = SETTINGS_NAV_ITEMS.map(
   (item) => item.id,
 )
@@ -50,7 +49,6 @@ export const Route = createFileRoute('/settings/')({
   },
   component: SettingsRoute,
 })
-
 
 type SettingsSectionId = SettingsNavId
 
@@ -155,7 +153,8 @@ function SettingsRoute() {
                         value={settings.interfaceFont}
                         onChange={(event) =>
                           updateSettings({
-                            interfaceFont: event.target.value as typeof settings.interfaceFont,
+                            interfaceFont: event.target
+                              .value as typeof settings.interfaceFont,
                           })
                         }
                         className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-sm text-[var(--theme-text)] outline-none"
@@ -174,7 +173,8 @@ function SettingsRoute() {
                         value={settings.interfaceDensity}
                         onChange={(event) =>
                           updateSettings({
-                            interfaceDensity: event.target.value as typeof settings.interfaceDensity,
+                            interfaceDensity: event.target
+                              .value as typeof settings.interfaceDensity,
                           })
                         }
                         className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-sm text-[var(--theme-text)] outline-none"

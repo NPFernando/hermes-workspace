@@ -16,8 +16,14 @@ export const Route = createFileRoute('/api/hindsight/memories')({
         try {
           const url = new URL(request.url)
           const q = url.searchParams.get('q') || undefined
-          const limit = Number.parseInt(url.searchParams.get('limit') ?? '50', 10)
-          const offset = Number.parseInt(url.searchParams.get('offset') ?? '0', 10)
+          const limit = Number.parseInt(
+            url.searchParams.get('limit') ?? '50',
+            10,
+          )
+          const offset = Number.parseInt(
+            url.searchParams.get('offset') ?? '0',
+            10,
+          )
           const bank = url.searchParams.get('bank') ?? undefined
           return json(
             await listHindsightMemories({
@@ -28,10 +34,7 @@ export const Route = createFileRoute('/api/hindsight/memories')({
             }),
           )
         } catch (err) {
-          return json(
-            { error: safeErrorMessage(err) },
-            { status: 500 },
-          )
+          return json({ error: safeErrorMessage(err) }, { status: 500 })
         }
       },
     },

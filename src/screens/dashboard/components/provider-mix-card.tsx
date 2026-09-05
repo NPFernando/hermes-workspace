@@ -1,6 +1,13 @@
 import { useMemo } from 'react'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
-import { formatTokens } from '@/screens/dashboard/lib/formatters'
+
+function formatTokens(n: number): string {
+  if (!n || n <= 0) return '0'
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
 
 /**
  * Provider mix donut.
@@ -137,17 +144,24 @@ export function ProviderMixCard({
       />
 
       <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
+        <h3
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
+        >
           Provider mix
         </h3>
-        <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
+        <span
+          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
+        >
           {analytics ? `${analytics.windowDays}d` : ''} · {buckets.length} fam
         </span>
       </div>
 
       <div className="flex items-center gap-3">
         {/* Donut */}
-        <div className="relative shrink-0" style={{ width: 64, height: 64 }}>
+        <div
+          className="relative shrink-0"
+          style={{ width: 64, height: 64 }}
+        >
           <div
             className="absolute inset-0 rounded-full"
             style={{ background: conic }}
@@ -158,10 +172,14 @@ export function ProviderMixCard({
             aria-hidden
           />
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center leading-none">
-            <span className="font-mono text-[12px] font-bold tabular-nums text-[var(--theme-text)]">
+            <span
+              className="font-mono text-[12px] font-bold tabular-nums text-[var(--theme-text)]"
+            >
               {topPct.toFixed(0)}%
             </span>
-            <span className="mt-0.5 font-mono text-[7px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+            <span
+              className="mt-0.5 font-mono text-[7px] uppercase tracking-[0.12em] text-[var(--theme-muted)]"
+            >
               {top.label}
             </span>
           </div>
@@ -183,7 +201,9 @@ export function ProviderMixCard({
                     className="inline-block size-1.5 shrink-0 rounded-full"
                     style={{ background: b.tone }}
                   />
-                  <span className="truncate font-mono uppercase tracking-[0.1em] text-[var(--theme-text)]">
+                  <span
+                    className="truncate font-mono uppercase tracking-[0.1em] text-[var(--theme-text)]"
+                  >
                     {b.label}
                   </span>
                 </span>
@@ -194,7 +214,9 @@ export function ProviderMixCard({
             )
           })}
           {buckets.length > 4 ? (
-            <li className="text-[9px] font-mono uppercase tracking-[0.1em] text-[var(--theme-muted)]">
+            <li
+              className="text-[9px] font-mono uppercase tracking-[0.1em] text-[var(--theme-muted)]"
+            >
               +{buckets.length - 4} more
             </li>
           ) : null}

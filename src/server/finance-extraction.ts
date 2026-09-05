@@ -17,8 +17,16 @@
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { callWithFallback, readOpenRouterKey, selectHarpRoutes } from './llm-signal-engine'
-import type { ContractRisk, ExtractedContract, ExtractedTransaction } from './finance-store'
+import {
+  callWithFallback,
+  readOpenRouterKey,
+  selectHarpRoutes,
+} from './llm-signal-engine'
+import type {
+  ContractRisk,
+  ExtractedContract,
+  ExtractedTransaction,
+} from './finance-store'
 
 export type ExtractionResult =
   | { ok: true; data: ExtractedTransaction }
@@ -50,38 +58,74 @@ If the content does not clearly describe a single financial transaction, respond
  * from what the user actually picked instead of the model guessing again.
  * Kept short (10 max) since this goes straight into the prompt.
  */
-export function promptWithCategoryHints(base: string, categoryHints?: Record<string, string>): string {
-  const entries = categoryHints ? Object.entries(categoryHints).slice(0, 10) : []
+export function promptWithCategoryHints(
+  base: string,
+  categoryHints?: Record<string, string>,
+): string {
+  const entries = categoryHints
+    ? Object.entries(categoryHints).slice(0, 10)
+    : []
   if (entries.length === 0) return base
-  const hintLines = entries.map(([vendor, category]) => `- "${vendor}" -> "${category}"`).join('\n')
+  const hintLines = entries
+    .map(([vendor, category]) => `- "${vendor}" -> "${category}"`)
+    .join('\n')
   return `${base}\n\nKnown vendor -> category corrections from this user's past edits (use these when the vendor matches):\n${hintLines}`
 }
 
 export function parseExtractionJson(raw: string): ExtractionResult {
-  const stripped = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/, '')
+    .trim()
   try {
     const obj: unknown = JSON.parse(stripped)
-    if (typeof obj !== 'object' || obj === null) return { ok: false, reason: 'malformed_response' }
+    if (typeof obj !== 'object' || obj === null)
+      return { ok: false, reason: 'malformed_response' }
     const o = obj as Record<string, unknown>
     if (o.error) return { ok: false, reason: String(o.error) }
 
     const kind = o.kind
-    if (kind !== 'income' && kind !== 'expense') return { ok: false, reason: 'malformed_response' }
+    if (kind !== 'income' && kind !== 'expense')
+      return { ok: false, reason: 'malformed_response' }
     const amount = typeof o.amount === 'number' ? o.amount : Number(o.amount)
-    if (!Number.isFinite(amount)) return { ok: false, reason: 'malformed_response' }
-    const currency = typeof o.currency === 'string' && o.currency.trim() ? o.currency.trim() : 'LKR'
-    const vendorOrSource = typeof o.vendorOrSource === 'string' && o.vendorOrSource.trim()
-      ? o.vendorOrSource.trim()
-      : 'Unknown'
-    const date = typeof o.date === 'string' && o.date.trim()
-      ? o.date.trim()
-      : new Date().toISOString().slice(0, 10)
-    const category = typeof o.category === 'string' && o.category.trim() ? o.category.trim() : undefined
-    const confidence = o.confidence === 'high' || o.confidence === 'medium' || o.confidence === 'low'
-      ? o.confidence
-      : 'low'
+    if (!Number.isFinite(amount))
+      return { ok: false, reason: 'malformed_response' }
+    const currency =
+      typeof o.currency === 'string' && o.currency.trim()
+        ? o.currency.trim()
+        : 'LKR'
+    const vendorOrSource =
+      typeof o.vendorOrSource === 'string' && o.vendorOrSource.trim()
+        ? o.vendorOrSource.trim()
+        : 'Unknown'
+    const date =
+      typeof o.date === 'string' && o.date.trim()
+        ? o.date.trim()
+        : new Date().toISOString().slice(0, 10)
+    const category =
+      typeof o.category === 'string' && o.category.trim()
+        ? o.category.trim()
+        : undefined
+    const confidence =
+      o.confidence === 'high' ||
+      o.confidence === 'medium' ||
+      o.confidence === 'low'
+        ? o.confidence
+        : 'low'
 
-    return { ok: true, data: { kind, amount, currency, vendorOrSource, date, category, confidence } }
+    return {
+      ok: true,
+      data: {
+        kind,
+        amount,
+        currency,
+        vendorOrSource,
+        date,
+        category,
+        confidence,
+      },
+    }
   } catch {
     return { ok: false, reason: 'malformed_response' }
   }
@@ -91,7 +135,10 @@ export async function extractTransactionFromText(
   bodyText: string,
   categoryHints?: Record<string, string>,
 ): Promise<ExtractionResult> {
-  const instructions = promptWithCategoryHints(EXTRACTION_PROMPT_INSTRUCTIONS, categoryHints)
+  const instructions = promptWithCategoryHints(
+    EXTRACTION_PROMPT_INSTRUCTIONS,
+    categoryHints,
+  )
   const prompt = `${instructions}\n\nContent:\n${bodyText.slice(0, 8_000)}`
 
   // HARP's free-tier OpenRouter chain is tried first (same routing the rest
@@ -153,7 +200,10 @@ ${JSON.stringify(context)}
 Question: ${question}`
 }
 
-export type FinanceAnswerChart = { title: string; data: Array<{ label: string; value: number }> }
+export type FinanceAnswerChart = {
+  title: string
+  data: Array<{ label: string; value: number }>
+}
 
 /**
  * AI-203: parses the strict-JSON response answerFinanceQuestion()'s prompt
@@ -163,18 +213,28 @@ export type FinanceAnswerChart = { title: string; data: Array<{ label: string; v
  * weaker fallback tiers) degrades to the raw response as plain text with no
  * chart, rather than failing the whole answer.
  */
-export function parseFinanceAnswerJson(raw: string): { text: string; chart: FinanceAnswerChart | null } {
-  const stripped = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
+export function parseFinanceAnswerJson(raw: string): {
+  text: string
+  chart: FinanceAnswerChart | null
+} {
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/, '')
+    .trim()
   try {
     const obj: unknown = JSON.parse(stripped)
-    if (typeof obj !== 'object' || obj === null) return { text: raw.trim(), chart: null }
+    if (typeof obj !== 'object' || obj === null)
+      return { text: raw.trim(), chart: null }
     const o = obj as Record<string, unknown>
-    if (typeof o.text !== 'string' || !o.text.trim()) return { text: raw.trim(), chart: null }
+    if (typeof o.text !== 'string' || !o.text.trim())
+      return { text: raw.trim(), chart: null }
 
     let chart: FinanceAnswerChart | null = null
     if (o.chart && typeof o.chart === 'object') {
       const c = o.chart as Record<string, unknown>
-      const title = typeof c.title === 'string' && c.title.trim() ? c.title.trim() : null
+      const title =
+        typeof c.title === 'string' && c.title.trim() ? c.title.trim() : null
       const rawData = Array.isArray(c.data) ? c.data : null
       if (title && rawData) {
         const data = rawData
@@ -212,7 +272,8 @@ export async function answerFinanceQuestion(
   context: unknown,
   priorTurns: Array<FinanceQaTurn> = [],
 ): Promise<
-  { ok: true; answer: string; chart: FinanceAnswerChart | null } | { ok: false; reason: string }
+  | { ok: true; answer: string; chart: FinanceAnswerChart | null }
+  | { ok: false; reason: string }
 > {
   const prompt = buildFinanceAnswerPrompt(question, context, priorTurns)
 
@@ -254,7 +315,9 @@ export function mimeTypeForImageExtension(ext: string): string {
   return IMAGE_MIME_TYPES_BY_EXTENSION[ext.toLowerCase()] ?? 'image/jpeg'
 }
 
-function readImageAsBase64(imagePath: string): { base64: string; mimeType: string } | null {
+function readImageAsBase64(
+  imagePath: string,
+): { base64: string; mimeType: string } | null {
   try {
     const buffer = fs.readFileSync(imagePath)
     const mimeType = mimeTypeForImageExtension(path.extname(imagePath))
@@ -270,15 +333,26 @@ function readImageAsBase64(imagePath: string): { base64: string; mimeType: strin
  * "image") rather than assumed — kept short and explicit since HARP's own
  * routing isn't vision-aware. Tried in order before falling back to Gemini.
  */
-const VISION_ROUTE_MODELS = ['google/gemma-4-31b-it:free', 'google/gemma-4-26b-a4b-it:free']
+const VISION_ROUTE_MODELS = [
+  'google/gemma-4-31b-it:free',
+  'google/gemma-4-26b-a4b-it:free',
+]
 
-async function callOpenRouterVision(model: string, prompt: string, base64: string, mimeType: string): Promise<string | null> {
+async function callOpenRouterVision(
+  model: string,
+  prompt: string,
+  base64: string,
+  mimeType: string,
+): Promise<string | null> {
   const apiKey = readOpenRouterKey()
   if (!apiKey) return null
   try {
     const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         model,
         messages: [
@@ -286,7 +360,10 @@ async function callOpenRouterVision(model: string, prompt: string, base64: strin
             role: 'user',
             content: [
               { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+              {
+                type: 'image_url',
+                image_url: { url: `data:${mimeType};base64,${base64}` },
+              },
             ],
           },
         ],
@@ -295,7 +372,9 @@ async function callOpenRouterVision(model: string, prompt: string, base64: strin
       signal: AbortSignal.timeout(45_000),
     })
     if (!resp.ok) return null
-    const data = (await resp.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    const data = (await resp.json()) as {
+      choices?: Array<{ message?: { content?: string } }>
+    }
     return data.choices?.[0]?.message?.content ?? null
   } catch {
     return null
@@ -314,7 +393,9 @@ function readGoogleApiKey(): string | null {
   }
 }
 
-async function callGemini(parts: Array<Record<string, unknown>>): Promise<string | null> {
+async function callGemini(
+  parts: Array<Record<string, unknown>>,
+): Promise<string | null> {
   const apiKey = readGoogleApiKey()
   if (!apiKey) return null
   try {
@@ -337,15 +418,24 @@ async function callGemini(parts: Array<Record<string, unknown>>): Promise<string
     // Gemini's response can include a leading "thoughtSignature" part before
     // the actual text part — find the first part that actually has text
     // rather than assuming index 0.
-    const textPart = data.candidates?.[0]?.content?.parts?.find((p) => typeof p.text === 'string')
+    const textPart = data.candidates?.[0]?.content?.parts?.find(
+      (p) => typeof p.text === 'string',
+    )
     return textPart?.text ?? null
   } catch {
     return null
   }
 }
 
-async function callGeminiVision(prompt: string, base64: string, mimeType: string): Promise<string | null> {
-  return callGemini([{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }])
+async function callGeminiVision(
+  prompt: string,
+  base64: string,
+  mimeType: string,
+): Promise<string | null> {
+  return callGemini([
+    { text: prompt },
+    { inline_data: { mime_type: mimeType, data: base64 } },
+  ])
 }
 
 async function callGeminiText(prompt: string): Promise<string | null> {
@@ -358,14 +448,26 @@ export async function extractTransactionFromImage(
 ): Promise<ExtractionResult> {
   const image = readImageAsBase64(imagePath)
   if (!image) return { ok: false, reason: 'image_not_found' }
-  const instructions = promptWithCategoryHints(EXTRACTION_PROMPT_INSTRUCTIONS, categoryHints)
+  const instructions = promptWithCategoryHints(
+    EXTRACTION_PROMPT_INSTRUCTIONS,
+    categoryHints,
+  )
 
   for (const model of VISION_ROUTE_MODELS) {
-    const content = await callOpenRouterVision(model, instructions, image.base64, image.mimeType)
+    const content = await callOpenRouterVision(
+      model,
+      instructions,
+      image.base64,
+      image.mimeType,
+    )
     if (content) return parseExtractionJson(content)
   }
 
-  const geminiContent = await callGeminiVision(instructions, image.base64, image.mimeType)
+  const geminiContent = await callGeminiVision(
+    instructions,
+    image.base64,
+    image.mimeType,
+  )
   if (geminiContent) return parseExtractionJson(geminiContent)
 
   return { ok: false, reason: 'all_routes_failed' }
@@ -404,34 +506,73 @@ Look specifically for things like: notice-period asymmetry (employer owes less n
 
 If the content does not appear to be an employment contract/offer letter, respond with exactly: {"error": "not_a_contract"}`
 
-export function parseContractExtractionJson(raw: string): ContractExtractionResult {
-  const stripped = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
+export function parseContractExtractionJson(
+  raw: string,
+): ContractExtractionResult {
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/, '')
+    .trim()
   try {
     const obj: unknown = JSON.parse(stripped)
-    if (typeof obj !== 'object' || obj === null) return { ok: false, reason: 'malformed_response' }
+    if (typeof obj !== 'object' || obj === null)
+      return { ok: false, reason: 'malformed_response' }
     const o = obj as Record<string, unknown>
     if (o.error) return { ok: false, reason: String(o.error) }
 
-    const employerName = typeof o.employerName === 'string' && o.employerName.trim() ? o.employerName.trim() : 'Unknown employer'
+    const employerName =
+      typeof o.employerName === 'string' && o.employerName.trim()
+        ? o.employerName.trim()
+        : 'Unknown employer'
     const employmentType =
-      o.employmentType === 'full_time' || o.employmentType === 'contract' || o.employmentType === 'freelance'
+      o.employmentType === 'full_time' ||
+      o.employmentType === 'contract' ||
+      o.employmentType === 'freelance'
         ? o.employmentType
         : 'other'
     const monthlyIncomeAmount =
-      typeof o.monthlyIncomeAmount === 'number' && Number.isFinite(o.monthlyIncomeAmount)
+      typeof o.monthlyIncomeAmount === 'number' &&
+      Number.isFinite(o.monthlyIncomeAmount)
         ? o.monthlyIncomeAmount
         : undefined
-    const currency = typeof o.currency === 'string' && o.currency.trim() ? o.currency.trim() : 'LKR'
-    const contractStartDate = typeof o.contractStartDate === 'string' && o.contractStartDate.trim() ? o.contractStartDate.trim() : undefined
-    const contractEndDate = typeof o.contractEndDate === 'string' && o.contractEndDate.trim() ? o.contractEndDate.trim() : undefined
-    const jobTitle = typeof o.jobTitle === 'string' && o.jobTitle.trim() ? o.jobTitle.trim() : undefined
+    const currency =
+      typeof o.currency === 'string' && o.currency.trim()
+        ? o.currency.trim()
+        : 'LKR'
+    const contractStartDate =
+      typeof o.contractStartDate === 'string' && o.contractStartDate.trim()
+        ? o.contractStartDate.trim()
+        : undefined
+    const contractEndDate =
+      typeof o.contractEndDate === 'string' && o.contractEndDate.trim()
+        ? o.contractEndDate.trim()
+        : undefined
+    const jobTitle =
+      typeof o.jobTitle === 'string' && o.jobTitle.trim()
+        ? o.jobTitle.trim()
+        : undefined
     const paydayDayOfMonth =
-      typeof o.paydayDayOfMonth === 'number' && Number.isInteger(o.paydayDayOfMonth) && o.paydayDayOfMonth >= 1 && o.paydayDayOfMonth <= 31
+      typeof o.paydayDayOfMonth === 'number' &&
+      Number.isInteger(o.paydayDayOfMonth) &&
+      o.paydayDayOfMonth >= 1 &&
+      o.paydayDayOfMonth <= 31
         ? o.paydayDayOfMonth
         : undefined
-    const paySchedule = typeof o.paySchedule === 'string' && o.paySchedule.trim() ? o.paySchedule.trim().slice(0, 200) : undefined
-    const confidence = o.confidence === 'high' || o.confidence === 'medium' || o.confidence === 'low' ? o.confidence : 'low'
-    const riskSummary = typeof o.riskSummary === 'string' ? o.riskSummary.trim().slice(0, 600) : ''
+    const paySchedule =
+      typeof o.paySchedule === 'string' && o.paySchedule.trim()
+        ? o.paySchedule.trim().slice(0, 200)
+        : undefined
+    const confidence =
+      o.confidence === 'high' ||
+      o.confidence === 'medium' ||
+      o.confidence === 'low'
+        ? o.confidence
+        : 'low'
+    const riskSummary =
+      typeof o.riskSummary === 'string'
+        ? o.riskSummary.trim().slice(0, 600)
+        : ''
 
     const rawRisks = Array.isArray(o.risks) ? o.risks : []
     const risks: Array<ContractRisk> = rawRisks
@@ -439,9 +580,20 @@ export function parseContractExtractionJson(raw: string): ContractExtractionResu
       .map((r): ContractRisk | null => {
         if (typeof r !== 'object' || r === null) return null
         const ro = r as Record<string, unknown>
-        const severity = ro.severity === 'high' || ro.severity === 'medium' || ro.severity === 'low' ? ro.severity : 'low'
-        const clause = typeof ro.clause === 'string' && ro.clause.trim() ? ro.clause.trim() : ''
-        const concern = typeof ro.concern === 'string' && ro.concern.trim() ? ro.concern.trim() : ''
+        const severity =
+          ro.severity === 'high' ||
+          ro.severity === 'medium' ||
+          ro.severity === 'low'
+            ? ro.severity
+            : 'low'
+        const clause =
+          typeof ro.clause === 'string' && ro.clause.trim()
+            ? ro.clause.trim()
+            : ''
+        const concern =
+          typeof ro.concern === 'string' && ro.concern.trim()
+            ? ro.concern.trim()
+            : ''
         if (!clause || !concern) return null
         return { severity, clause, concern }
       })
@@ -479,7 +631,10 @@ async function callOpenRouterVisionMulti(
   try {
     const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         model,
         messages: [
@@ -489,7 +644,9 @@ async function callOpenRouterVisionMulti(
               { type: 'text', text: prompt },
               ...images.map((image) => ({
                 type: 'image_url' as const,
-                image_url: { url: `data:${image.mimeType};base64,${image.base64}` },
+                image_url: {
+                  url: `data:${image.mimeType};base64,${image.base64}`,
+                },
               })),
             ],
           },
@@ -499,33 +656,51 @@ async function callOpenRouterVisionMulti(
       signal: AbortSignal.timeout(60_000),
     })
     if (!resp.ok) return null
-    const data = (await resp.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    const data = (await resp.json()) as {
+      choices?: Array<{ message?: { content?: string } }>
+    }
     return data.choices?.[0]?.message?.content ?? null
   } catch {
     return null
   }
 }
 
-async function callGeminiVisionMulti(prompt: string, images: Array<{ base64: string; mimeType: string }>): Promise<string | null> {
+async function callGeminiVisionMulti(
+  prompt: string,
+  images: Array<{ base64: string; mimeType: string }>,
+): Promise<string | null> {
   return callGemini([
     { text: prompt },
-    ...images.map((image) => ({ inline_data: { mime_type: image.mimeType, data: image.base64 } })),
+    ...images.map((image) => ({
+      inline_data: { mime_type: image.mimeType, data: image.base64 },
+    })),
   ])
 }
 
-export async function extractEmploymentContract(imagePaths: Array<string>): Promise<ContractExtractionResult> {
+export async function extractEmploymentContract(
+  imagePaths: Array<string>,
+): Promise<ContractExtractionResult> {
   const images = imagePaths
     .slice(0, CONTRACT_MAX_PAGES)
     .map((imagePath) => readImageAsBase64(imagePath))
-    .filter((image): image is { base64: string; mimeType: string } => image !== null)
+    .filter(
+      (image): image is { base64: string; mimeType: string } => image !== null,
+    )
   if (images.length === 0) return { ok: false, reason: 'image_not_found' }
 
   for (const model of VISION_ROUTE_MODELS) {
-    const content = await callOpenRouterVisionMulti(model, CONTRACT_EXTRACTION_PROMPT_INSTRUCTIONS, images)
+    const content = await callOpenRouterVisionMulti(
+      model,
+      CONTRACT_EXTRACTION_PROMPT_INSTRUCTIONS,
+      images,
+    )
     if (content) return parseContractExtractionJson(content)
   }
 
-  const geminiContent = await callGeminiVisionMulti(CONTRACT_EXTRACTION_PROMPT_INSTRUCTIONS, images)
+  const geminiContent = await callGeminiVisionMulti(
+    CONTRACT_EXTRACTION_PROMPT_INSTRUCTIONS,
+    images,
+  )
   if (geminiContent) return parseContractExtractionJson(geminiContent)
 
   return { ok: false, reason: 'all_routes_failed' }

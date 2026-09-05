@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react'
-import type {DashboardLayout, WidgetId} from '@/screens/dashboard/lib/use-dashboard-layout';
-import {
-  
-  WIDGET_CATALOG
-  
+import type {
+  DashboardLayout,
+  WidgetId,
 } from '@/screens/dashboard/lib/use-dashboard-layout'
+import { WIDGET_CATALOG } from '@/screens/dashboard/lib/use-dashboard-layout'
 
 /**
  * Wraps a dashboard widget so it participates in edit mode without

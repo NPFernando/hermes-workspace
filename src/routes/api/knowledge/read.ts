@@ -20,8 +20,7 @@ export const Route = createFileRoute('/api/knowledge/read')({
           const { meta, content, backlinks } = readKnowledgePage(pathParam)
           return json({ page: meta, content, backlinks })
         } catch (error) {
-          const message =
-            safeErrorMessage(error)
+          const message = safeErrorMessage(error)
           const status =
             /not allowed|outside knowledge root|required|traversal/i.test(
               message,

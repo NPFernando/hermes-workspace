@@ -16,12 +16,18 @@ export const Route = createFileRoute('/api/sisters-growth')({
         const id = url.searchParams.get('id')?.trim() ?? ''
 
         if (!id) {
-          return json({ ok: false, error: 'id query param required' }, { status: 400 })
+          return json(
+            { ok: false, error: 'id query param required' },
+            { status: 400 },
+          )
         }
 
         const sisters = listSisters()
         if (!sisters.find((s) => s.id === id)) {
-          return json({ ok: false, error: `Sister '${id}' not found` }, { status: 404 })
+          return json(
+            { ok: false, error: `Sister '${id}' not found` },
+            { status: 404 },
+          )
         }
 
         const level = getGrowthLevel(id)

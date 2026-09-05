@@ -15,7 +15,9 @@ import {
 
 type ProviderValidationResult = { ok: boolean; error?: string }
 
-async function validateAnthropicKey(apiKey: string): Promise<ProviderValidationResult> {
+async function validateAnthropicKey(
+  apiKey: string,
+): Promise<ProviderValidationResult> {
   try {
     const res = await fetch('https://api.anthropic.com/v1/models', {
       headers: {
@@ -24,7 +26,8 @@ async function validateAnthropicKey(apiKey: string): Promise<ProviderValidationR
       },
       signal: AbortSignal.timeout(8000),
     })
-    if (res.status === 401 || res.status === 403) return { ok: false, error: 'Invalid API key' }
+    if (res.status === 401 || res.status === 403)
+      return { ok: false, error: 'Invalid API key' }
     if (!res.ok) return { ok: false, error: `Provider returned ${res.status}` }
     return { ok: true }
   } catch (err) {
@@ -32,13 +35,16 @@ async function validateAnthropicKey(apiKey: string): Promise<ProviderValidationR
   }
 }
 
-async function validateOpenRouterKey(apiKey: string): Promise<ProviderValidationResult> {
+async function validateOpenRouterKey(
+  apiKey: string,
+): Promise<ProviderValidationResult> {
   try {
     const res = await fetch('https://openrouter.ai/api/v1/auth/key', {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(8000),
     })
-    if (res.status === 401 || res.status === 403) return { ok: false, error: 'Invalid API key' }
+    if (res.status === 401 || res.status === 403)
+      return { ok: false, error: 'Invalid API key' }
     if (!res.ok) return { ok: false, error: `Provider returned ${res.status}` }
     return { ok: true }
   } catch (err) {
@@ -46,13 +52,16 @@ async function validateOpenRouterKey(apiKey: string): Promise<ProviderValidation
   }
 }
 
-async function validateOpenAIKey(apiKey: string): Promise<ProviderValidationResult> {
+async function validateOpenAIKey(
+  apiKey: string,
+): Promise<ProviderValidationResult> {
   try {
     const res = await fetch('https://api.openai.com/v1/models', {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(8000),
     })
-    if (res.status === 401 || res.status === 403) return { ok: false, error: 'Invalid API key' }
+    if (res.status === 401 || res.status === 403)
+      return { ok: false, error: 'Invalid API key' }
     if (!res.ok) return { ok: false, error: `Provider returned ${res.status}` }
     return { ok: true }
   } catch (err) {
@@ -72,15 +81,25 @@ export const Route = createFileRoute('/api/validate-provider')({
 
         let providerId: string, apiKey: string
         try {
-          const body = (await request.json()) as { providerId?: string; apiKey?: string }
-          providerId = typeof body.providerId === 'string' ? body.providerId.trim() : ''
+          const body = (await request.json()) as {
+            providerId?: string
+            apiKey?: string
+          }
+          providerId =
+            typeof body.providerId === 'string' ? body.providerId.trim() : ''
           apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : ''
         } catch {
-          return json({ ok: false, error: 'Invalid JSON body' }, { status: 400 })
+          return json(
+            { ok: false, error: 'Invalid JSON body' },
+            { status: 400 },
+          )
         }
 
         if (!providerId || !apiKey) {
-          return json({ ok: false, error: 'providerId and apiKey are required' }, { status: 400 })
+          return json(
+            { ok: false, error: 'providerId and apiKey are required' },
+            { status: 400 },
+          )
         }
 
         let result: ProviderValidationResult

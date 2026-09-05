@@ -35,27 +35,78 @@ function groupBlockers(tasks: Array<TaskRecord>): Array<BlockerGroup> {
 
   for (const t of tasks) {
     switch (t.blocker_type) {
-      case 'credential':  credential.push(t); break
-      case 'dependency':  dependency.push(t); break
-      case 'execution':   execution.push(t); break
-      case 'input':       input.push(t); break
-      case 'environment': environment.push(t); break
-      default:            unknown.push(t); break
+      case 'credential':
+        credential.push(t)
+        break
+      case 'dependency':
+        dependency.push(t)
+        break
+      case 'execution':
+        execution.push(t)
+        break
+      case 'input':
+        input.push(t)
+        break
+      case 'environment':
+        environment.push(t)
+        break
+      default:
+        unknown.push(t)
+        break
     }
   }
 
   const groups: Array<BlockerGroup> = []
-  if (credential.length > 0)  groups.push({ type: 'credential',  label: 'Credentials Needed',   icon: '🔑', tasks: credential })
-  if (dependency.length > 0)  groups.push({ type: 'dependency',  label: 'Dependency Blockers',   icon: '🔗', tasks: dependency })
-  if (execution.length > 0)   groups.push({ type: 'execution',   label: 'Execution Failures',    icon: '⚠️', tasks: execution })
-  if (input.length > 0)       groups.push({ type: 'input',       label: 'Awaiting Input',        icon: '💬', tasks: input })
-  if (environment.length > 0) groups.push({ type: 'environment', label: 'Environment Issues',    icon: '🖥️', tasks: environment })
-  if (unknown.length > 0)     groups.push({ type: 'unknown',     label: 'Other Blockers',        icon: '🚫', tasks: unknown })
+  if (credential.length > 0)
+    groups.push({
+      type: 'credential',
+      label: 'Credentials Needed',
+      icon: '🔑',
+      tasks: credential,
+    })
+  if (dependency.length > 0)
+    groups.push({
+      type: 'dependency',
+      label: 'Dependency Blockers',
+      icon: '🔗',
+      tasks: dependency,
+    })
+  if (execution.length > 0)
+    groups.push({
+      type: 'execution',
+      label: 'Execution Failures',
+      icon: '⚠️',
+      tasks: execution,
+    })
+  if (input.length > 0)
+    groups.push({
+      type: 'input',
+      label: 'Awaiting Input',
+      icon: '💬',
+      tasks: input,
+    })
+  if (environment.length > 0)
+    groups.push({
+      type: 'environment',
+      label: 'Environment Issues',
+      icon: '🖥️',
+      tasks: environment,
+    })
+  if (unknown.length > 0)
+    groups.push({
+      type: 'unknown',
+      label: 'Other Blockers',
+      icon: '🚫',
+      tasks: unknown,
+    })
   return groups
 }
 
 function getEnvFilePath(): string {
-  const home = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+  const home =
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes')
   const possible = [
     path.join(home, '.env'),
     path.join(os.homedir(), 'hermes-workspace', '.env'),
@@ -102,7 +153,10 @@ function verifyCredentialExists(key: string): boolean {
 }
 
 // ── Resolve a dependency blocker: check if depends_on tasks are done ────────
-function checkDependencyCompletion(task: TaskRecord): { allDone: boolean; pending: Array<string> } {
+function checkDependencyCompletion(task: TaskRecord): {
+  allDone: boolean
+  pending: Array<string>
+} {
   const deps = task.depends_on ?? []
   const allTasks = listTasks({ includeDone: true })
   const depMap = new Map(allTasks.map((t) => [t.id, t]))
@@ -119,7 +173,10 @@ function checkDependencyCompletion(task: TaskRecord): { allDone: boolean; pendin
 }
 
 // ── Auto-resume: find tasks whose depends_on are all done and offer to unblock ─
-function findResumableTasks(): Array<{ task: TaskRecord; pending: Array<string> }> {
+function findResumableTasks(): Array<{
+  task: TaskRecord
+  pending: Array<string>
+}> {
   const blocked = listTasks({ column: 'blocked' })
   const resumable: Array<{ task: TaskRecord; pending: Array<string> }> = []
 
@@ -171,19 +228,28 @@ export const Route = createFileRoute('/api/tasks-blockers')({
           const action = body.action as string | undefined
 
           if (!action) {
-            return json({ ok: false, error: 'action is required' }, { status: 400 })
+            return json(
+              { ok: false, error: 'action is required' },
+              { status: 400 },
+            )
           }
 
           // ── Resolve a blocker ──────────────────────────────────────────────
           if (action === 'resolve') {
             const taskId = body.task_id as string | undefined
             if (!taskId) {
-              return json({ ok: false, error: 'task_id is required' }, { status: 400 })
+              return json(
+                { ok: false, error: 'task_id is required' },
+                { status: 400 },
+              )
             }
 
             const task = getTask(taskId)
             if (!task) {
-              return json({ ok: false, error: 'Task not found' }, { status: 404 })
+              return json(
+                { ok: false, error: 'Task not found' },
+                { status: 404 },
+              )
             }
 
             // Clear blocker fields and move to todo
@@ -217,15 +283,22 @@ export const Route = createFileRoute('/api/tasks-blockers')({
             const credentialValue = body.credential_value as string | undefined
 
             if (!taskId || !credentialKey || !credentialValue) {
-              return json({
-                ok: false,
-                error: 'task_id, credential_key, and credential_value are required',
-              }, { status: 400 })
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'task_id, credential_key, and credential_value are required',
+                },
+                { status: 400 },
+              )
             }
 
             const task = getTask(taskId)
             if (!task) {
-              return json({ ok: false, error: 'Task not found' }, { status: 404 })
+              return json(
+                { ok: false, error: 'Task not found' },
+                { status: 404 },
+              )
             }
 
             // Write credential to .env file (never store in tasks.json)
@@ -234,8 +307,13 @@ export const Route = createFileRoute('/api/tasks-blockers')({
             // Mark credential as provided in the task
             const credentials = (task.credentials_needed ?? []).map((c) =>
               c.key === credentialKey
-                ? { ...c, provided: true, provided_at: new Date().toISOString(), validated: false }
-                : c
+                ? {
+                    ...c,
+                    provided: true,
+                    provided_at: new Date().toISOString(),
+                    validated: false,
+                  }
+                : c,
             )
 
             // Check if all credentials are now provided
@@ -246,7 +324,8 @@ export const Route = createFileRoute('/api/tasks-blockers')({
             }
 
             if (allProvided) {
-              updates.blocker_reason = 'Credentials provided, pending validation'
+              updates.blocker_reason =
+                'Credentials provided, pending validation'
               updates.agent_history = [
                 ...(task.agent_history ?? []),
                 {
@@ -259,7 +338,10 @@ export const Route = createFileRoute('/api/tasks-blockers')({
                 },
               ]
             } else {
-              const remaining = credentials.filter((c) => !c.provided).map((c) => c.label).join(', ')
+              const remaining = credentials
+                .filter((c) => !c.provided)
+                .map((c) => c.label)
+                .join(', ')
               updates.agent_history = [
                 ...(task.agent_history ?? []),
                 {
@@ -285,12 +367,18 @@ export const Route = createFileRoute('/api/tasks-blockers')({
           if (action === 'validate') {
             const taskId = body.task_id as string | undefined
             if (!taskId) {
-              return json({ ok: false, error: 'task_id is required' }, { status: 400 })
+              return json(
+                { ok: false, error: 'task_id is required' },
+                { status: 400 },
+              )
             }
 
             const task = getTask(taskId)
             if (!task) {
-              return json({ ok: false, error: 'Task not found' }, { status: 404 })
+              return json(
+                { ok: false, error: 'Task not found' },
+                { status: 404 },
+              )
             }
 
             const credentials = task.credentials_needed ?? []
@@ -329,7 +417,10 @@ export const Route = createFileRoute('/api/tasks-blockers')({
                 },
               ]
             } else {
-              const failed = results.filter((r) => !r.exists).map((r) => r.label).join(', ')
+              const failed = results
+                .filter((r) => !r.exists)
+                .map((r) => r.label)
+                .join(', ')
               updates.agent_history = [
                 ...(task.agent_history ?? []),
                 {
@@ -344,7 +435,12 @@ export const Route = createFileRoute('/api/tasks-blockers')({
             }
 
             const updated = updateTask(taskId, updates)
-            return json({ ok: true, all_valid: allValid, results, task: updated })
+            return json({
+              ok: true,
+              all_valid: allValid,
+              results,
+              task: updated,
+            })
           }
 
           // ── Auto-resume: unblock all tasks whose dependencies are done ──────
@@ -377,9 +473,15 @@ export const Route = createFileRoute('/api/tasks-blockers')({
             return json({ ok: true, unblocked })
           }
 
-          return json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 })
+          return json(
+            { ok: false, error: `Unknown action: ${action}` },
+            { status: 400 },
+          )
         } catch (err) {
-          return json({ ok: false, error: safeErrorMessage(err) }, { status: 500 })
+          return json(
+            { ok: false, error: safeErrorMessage(err) },
+            { status: 500 },
+          )
         }
       },
     },

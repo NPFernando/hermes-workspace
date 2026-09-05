@@ -24,7 +24,11 @@
  * engine's settings when explicitly enabled — mirrors
  * LearningPolicy.enabled's off-by-default pattern.
  */
-import { appendAuditLog, readFinanceStore, writeFinanceStore } from './finance-store'
+import {
+  appendAuditLog,
+  readFinanceStore,
+  writeFinanceStore,
+} from './finance-store'
 import { getGridEngineState } from './grid-paper-engine'
 import { getLlmSignalState } from './llm-signal-engine'
 import { getRebalanceState } from './rebalance-engine'
@@ -100,8 +104,11 @@ const REBALANCE_MAX_MIN_TRADE_NOTIONAL = 15
 function evaluateRebalanceCandidate(): RefinementCandidate | null {
   const { config, trades } = getRebalanceState()
   if (trades.length < REBALANCE_MIN_TRADES) return null
-  const smallTradeCeiling = config.minTradeNotionalQuote * REBALANCE_SMALL_TRADE_MULTIPLE
-  const smallTradeCount = trades.filter((t) => t.notionalQuote <= smallTradeCeiling).length
+  const smallTradeCeiling =
+    config.minTradeNotionalQuote * REBALANCE_SMALL_TRADE_MULTIPLE
+  const smallTradeCount = trades.filter(
+    (t) => t.notionalQuote <= smallTradeCeiling,
+  ).length
   const smallTradeFraction = smallTradeCount / trades.length
   if (smallTradeFraction < REBALANCE_SMALL_TRADE_FRACTION_THRESHOLD) return null
   const newValue = Math.min(
@@ -116,7 +123,11 @@ function evaluateRebalanceCandidate(): RefinementCandidate | null {
     newValue,
     reason: `${smallTradeCount}/${trades.length} recent rebalance trades were near the notional floor; raising the floor to cut fee-heavy small trades.`,
     riskDirection: 'reducing',
-    evidence: { tradeCount: trades.length, smallTradeCount, smallTradeFraction },
+    evidence: {
+      tradeCount: trades.length,
+      smallTradeCount,
+      smallTradeFraction,
+    },
   }
 }
 
@@ -164,7 +175,11 @@ function applyCandidate(candidate: RefinementCandidate): void {
   // Defense in depth: even though every evaluate* function above only ever
   // proposes a move in its safe direction, refuse to apply anything that
   // isn't risk/cost-reducing, and refuse a no-op.
-  if (candidate.riskDirection !== 'reducing' && candidate.riskDirection !== 'neutral') return
+  if (
+    candidate.riskDirection !== 'reducing' &&
+    candidate.riskDirection !== 'neutral'
+  )
+    return
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const settingsKey = SETTINGS_KEY_BY_ENGINE[candidate.engine]

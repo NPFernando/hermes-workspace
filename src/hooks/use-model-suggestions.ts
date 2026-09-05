@@ -168,7 +168,12 @@ export function useModelSuggestions({
   messages: Array<Message>
   availableModels: Array<string>
 }) {
-  return _useModelSuggestionsImpl({ currentModel, sessionKey, messages, availableModels })
+  return _useModelSuggestionsImpl({
+    currentModel,
+    sessionKey,
+    messages,
+    availableModels,
+  })
 }
 
 function _useModelSuggestionsImpl({

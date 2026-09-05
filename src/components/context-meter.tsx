@@ -128,9 +128,7 @@ export function ContextMeter({
           style={{ width: `${Math.min(pct, 100)}%` }}
         />
       </div>
-      <span
-        className="text-[10px] shrink-0 tabular-nums text-[var(--theme-muted)]"
-      >
+      <span className="text-[10px] shrink-0 tabular-nums text-[var(--theme-muted)]">
         {Math.round(pct)}%
       </span>
     </div>

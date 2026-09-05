@@ -10,15 +10,27 @@ export function ResetEnvironmentSection() {
     mutationFn: async () => {
       const res = await fetch('/api/env-reset', { method: 'POST' })
       if (!res.ok) throw new Error(`Reset failed: ${res.status}`)
-      return res.json() as Promise<{ ok: boolean; mcpProbesCleared: number; gateway: { available: boolean } }>
+      return res.json() as Promise<{
+        ok: boolean
+        mcpProbesCleared: number
+        gateway: { available: boolean }
+      }>
     },
     onSuccess: async (data) => {
       await queryClient.invalidateQueries()
-      const probeMsg = data.mcpProbesCleared > 0 ? `, ${data.mcpProbesCleared} MCP probe${data.mcpProbesCleared === 1 ? '' : 's'} cleared` : ''
-      toast(`Environment reset${probeMsg}. Gateway: ${data.gateway.available ? 'online' : 'offline'}`, { type: 'success' })
+      const probeMsg =
+        data.mcpProbesCleared > 0
+          ? `, ${data.mcpProbesCleared} MCP probe${data.mcpProbesCleared === 1 ? '' : 's'} cleared`
+          : ''
+      toast(
+        `Environment reset${probeMsg}. Gateway: ${data.gateway.available ? 'online' : 'offline'}`,
+        { type: 'success' },
+      )
     },
     onError: (err) => {
-      toast(err instanceof Error ? err.message : 'Reset failed', { type: 'error' })
+      toast(err instanceof Error ? err.message : 'Reset failed', {
+        type: 'error',
+      })
     },
   })
 
@@ -27,9 +39,12 @@ export function ResetEnvironmentSection() {
       <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm md:p-5">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h3 className="text-sm font-semibold text-[var(--theme-text)]">Reset Environment</h3>
+            <h3 className="text-sm font-semibold text-[var(--theme-text)]">
+              Reset Environment
+            </h3>
             <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
-              Clears cached MCP probes and re-checks gateway connectivity. Use after restarting Hermes Agent.
+              Clears cached MCP probes and re-checks gateway connectivity. Use
+              after restarting Hermes Agent.
             </p>
           </div>
           <Button
@@ -51,4 +66,3 @@ export function ResetEnvironmentSection() {
     </section>
   )
 }
-

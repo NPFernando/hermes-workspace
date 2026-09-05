@@ -1,5 +1,8 @@
 /**
- * Binance trading engine API.
+ * Legacy-compatible Binance trading engine API.
+ *
+ * The route name remains `/api/demo-trading` for compatibility. The engine
+ * itself supports the staged paper -> sandbox/testnet -> gated live lifecycle.
  *
  *  GET  /api/demo-trading            → engine state (scores + open positions)
  *  POST /api/demo-trading {action}   → "run_cycle" triggers one trading cycle
@@ -17,7 +20,9 @@ import {
 import {
   decisionQualityReport,
   getEngineState,
+  getLastTradingCycleDiagnostics,
   getLiveMonitor,
+  getStrategyEligibilityAudit,
   marketLearningReport,
   runTradingCycle,
 } from '../../server/demo-trading-engine'
@@ -33,8 +38,10 @@ export const Route = createFileRoute('/api/demo-trading')({
           const monitor = await getLiveMonitor()
           return json({
             ok: true,
-            ...getEngineState(),
+            ...getEngineState(monitor),
             monitor,
+            strategyEligibilityAudit: getStrategyEligibilityAudit(),
+            lastCycleDiagnostics: getLastTradingCycleDiagnostics(),
             learning: decisionQualityReport(),
             marketLearning: marketLearningReport(),
           })

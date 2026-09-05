@@ -4,11 +4,30 @@ import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { deleteTask, getTask, moveTask, updateTask } from '../../server/tasks-store'
-import { breakdownTaskWithAI, executeTaskBackground, executeTaskWithHermesBackground } from '../../server/astra-tasks'
-import { appendLocalMessage, ensureLocalSession, getLocalMessages } from '../../server/local-session-store'
+import {
+  deleteTask,
+  getTask,
+  moveTask,
+  updateTask,
+} from '../../server/tasks-store'
+import {
+  breakdownTaskWithAI,
+  executeTaskBackground,
+  executeTaskWithHermesBackground,
+} from '../../server/astra-tasks'
+import {
+  appendLocalMessage,
+  ensureLocalSession,
+  getLocalMessages,
+} from '../../server/local-session-store'
 import { getSessionMessages } from '../../server/claude-dashboard-api'
-import type { ActivityEntry, ClarificationQuestion, TaskAgentState, TaskColumn, TaskPriority } from '../../server/tasks-store'
+import type {
+  ActivityEntry,
+  ClarificationQuestion,
+  TaskAgentState,
+  TaskColumn,
+  TaskPriority,
+} from '../../server/tasks-store'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -45,7 +64,9 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
         const url = new URL(request.url)
         if (url.searchParams.get('action') === 'log') {
           const hermesHome =
-            process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+            process.env.HERMES_HOME ??
+            process.env.CLAUDE_HOME ??
+            path.join(os.homedir(), '.hermes')
           const logsDir = path.join(hermesHome, 'logs')
           const prefix = `exec-${params.taskId.slice(0, 8)}-`
           try {
@@ -53,13 +74,24 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
               .readdirSync(logsDir)
               .filter((f) => f.startsWith(prefix) && f.endsWith('.log'))
               .map((f) => {
-                try { return { name: f, mtime: fs.statSync(path.join(logsDir, f)).mtimeMs } }
-                catch { return { name: f, mtime: 0 } }
+                try {
+                  return {
+                    name: f,
+                    mtime: fs.statSync(path.join(logsDir, f)).mtimeMs,
+                  }
+                } catch {
+                  return { name: f, mtime: 0 }
+                }
               })
               .sort((a, b) => b.mtime - a.mtime)
-            if (files.length === 0) return jsonResponse({ found: false, log: '' })
-            const raw = fs.readFileSync(path.join(logsDir, files[0].name), 'utf-8')
-            const log = raw.length > 51_200 ? '…(truncated)\n' + raw.slice(-51_200) : raw
+            if (files.length === 0)
+              return jsonResponse({ found: false, log: '' })
+            const raw = fs.readFileSync(
+              path.join(logsDir, files[0].name),
+              'utf-8',
+            )
+            const log =
+              raw.length > 51_200 ? '…(truncated)\n' + raw.slice(-51_200) : raw
             return jsonResponse({ found: true, log, file: files[0].name })
           } catch {
             return jsonResponse({ found: false, log: '' })
@@ -80,17 +112,48 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
           const body = (await request.json()) as Record<string, unknown>
           const task = updateTask(params.taskId, {
             title: typeof body.title === 'string' ? body.title : undefined,
-            description: typeof body.description === 'string' ? body.description : undefined,
+            description:
+              typeof body.description === 'string'
+                ? body.description
+                : undefined,
             column: isTaskColumn(body.column) ? body.column : undefined,
             priority: isTaskPriority(body.priority) ? body.priority : undefined,
-            assignee: body.assignee === null || typeof body.assignee === 'string' ? body.assignee : undefined,
-            tags: Array.isArray(body.tags) ? body.tags.filter((tag): tag is string => typeof tag === 'string') : undefined,
-            due_date: body.due_date === null || typeof body.due_date === 'string' ? body.due_date : undefined,
-            position: typeof body.position === 'number' ? body.position : undefined,
-            session_id: body.session_id === null || typeof body.session_id === 'string' ? body.session_id : undefined,
-            agent_state: (body.agent_state === null || body.agent_state === 'reviewing' || body.agent_state === 'delegating' || body.agent_state === 'working' || body.agent_state === 'waiting_for_input') ? body.agent_state as TaskAgentState | null : undefined,
-            agent_name: body.agent_name === null || typeof body.agent_name === 'string' ? body.agent_name : undefined,
-            agent_action_at: body.agent_action_at === null || typeof body.agent_action_at === 'string' ? body.agent_action_at : undefined,
+            assignee:
+              body.assignee === null || typeof body.assignee === 'string'
+                ? body.assignee
+                : undefined,
+            tags: Array.isArray(body.tags)
+              ? body.tags.filter(
+                  (tag): tag is string => typeof tag === 'string',
+                )
+              : undefined,
+            due_date:
+              body.due_date === null || typeof body.due_date === 'string'
+                ? body.due_date
+                : undefined,
+            position:
+              typeof body.position === 'number' ? body.position : undefined,
+            session_id:
+              body.session_id === null || typeof body.session_id === 'string'
+                ? body.session_id
+                : undefined,
+            agent_state:
+              body.agent_state === null ||
+              body.agent_state === 'reviewing' ||
+              body.agent_state === 'delegating' ||
+              body.agent_state === 'working' ||
+              body.agent_state === 'waiting_for_input'
+                ? (body.agent_state as TaskAgentState | null)
+                : undefined,
+            agent_name:
+              body.agent_name === null || typeof body.agent_name === 'string'
+                ? body.agent_name
+                : undefined,
+            agent_action_at:
+              body.agent_action_at === null ||
+              typeof body.agent_action_at === 'string'
+                ? body.agent_action_at
+                : undefined,
           })
 
           if (!task) return jsonResponse({ error: 'Task not found' }, 404)
@@ -136,9 +199,16 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
               if (dashResult.messages.length) {
                 tail = dashResult.messages
                   .filter((m) => m.role === 'user' || m.role === 'assistant')
-                  .filter((m) => typeof m.content === 'string' && m.content.trim().length > 0)
+                  .filter(
+                    (m) =>
+                      typeof m.content === 'string' &&
+                      m.content.trim().length > 0,
+                  )
                   .slice(-20)
-                  .map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' }))
+                  .map((m) => ({
+                    role: m.role,
+                    content: typeof m.content === 'string' ? m.content : '',
+                  }))
               }
             } catch {
               // Dashboard unavailable — fall back to local store
@@ -150,7 +220,10 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
               tail = localMsgs
                 .filter((m) => m.role === 'user' || m.role === 'assistant')
                 .slice(-20)
-                .map((m) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' }))
+                .map((m) => ({
+                  role: m.role,
+                  content: typeof m.content === 'string' ? m.content : '',
+                }))
             }
 
             if (tail.length > 0) {
@@ -186,7 +259,11 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
             timestamp: Date.now(),
           })
 
-          return jsonResponse({ sessionId, briefing, task: getTask(params.taskId) })
+          return jsonResponse({
+            sessionId,
+            briefing,
+            task: getTask(params.taskId),
+          })
         }
 
         if (action === 'comment') {
@@ -197,30 +274,47 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
             const task = getTask(params.taskId)
             if (!task) return jsonResponse({ error: 'Task not found' }, 404)
             const now = new Date().toISOString()
-            const entry: ActivityEntry = { id: randomUUID(), by: 'user', byEmoji: '👤', action: 'replied', note: text, at: now }
+            const entry: ActivityEntry = {
+              id: randomUUID(),
+              by: 'user',
+              byEmoji: '👤',
+              action: 'replied',
+              note: text,
+              at: now,
+            }
             const existing = task.agent_history ?? []
             // Re-trigger agent when: waiting for input, OR agent has previously worked on this task
-            const hasAgentHistory = existing.some(e => e.by !== 'user' && e.action !== 'executed')
-            const shouldResume = task.agent_state === 'waiting_for_input' || (hasAgentHistory && task.agent_state !== 'working')
+            const hasAgentHistory = existing.some(
+              (e) => e.by !== 'user' && e.action !== 'executed',
+            )
+            const shouldResume =
+              task.agent_state === 'waiting_for_input' ||
+              (hasAgentHistory && task.agent_state !== 'working')
             // Use the full hermes execution engine when a prior hermes run exists (i.e. the
             // task was previously executed, not just analysed). Conversational-only tasks that
             // have never been executed still get the lighter directChat path.
-            const hadExecution = existing.some(e =>
-              e.by !== 'user' && ['attempted', 'completed', 'blocked'].includes(e.action)
+            const hadExecution = existing.some(
+              (e) =>
+                e.by !== 'user' &&
+                ['attempted', 'completed', 'blocked'].includes(e.action),
             )
             // Re-open: if user replies on a completed (review) or blocked task, move it back
             // to in_progress so the board reflects that work is resuming.
             const reopenColumn =
-              task.column === 'blocked' || task.column === 'review' ? 'in_progress' : task.column
+              task.column === 'blocked' || task.column === 'review'
+                ? 'in_progress'
+                : task.column
             updateTask(params.taskId, {
               agent_history: [...existing, entry],
-              ...(shouldResume ? {
-                agent_state: 'working',
-                agent_name: task.agent_name ?? 'astra',
-                agent_action_at: now,
-                waiting_for_user: false,
-                column: reopenColumn,
-              } : {}),
+              ...(shouldResume
+                ? {
+                    agent_state: 'working',
+                    agent_name: task.agent_name ?? 'astra',
+                    agent_action_at: now,
+                    waiting_for_user: false,
+                    column: reopenColumn,
+                  }
+                : {}),
             })
             if (shouldResume) {
               if (hadExecution) {
@@ -242,11 +336,12 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
             const task = getTask(params.taskId)
             if (!task) return jsonResponse({ error: 'Task not found' }, 404)
 
-            const questions: Array<ClarificationQuestion> = task.clarification_questions ?? []
+            const questions: Array<ClarificationQuestion> =
+              task.clarification_questions ?? []
             const now = new Date().toISOString()
 
             // Save answers back into the questions array
-            const updatedQuestions = questions.map(q => ({
+            const updatedQuestions = questions.map((q) => ({
               ...q,
               answer: answers[q.id] != null ? String(answers[q.id]) : q.answer,
               answered_at: answers[q.id] != null ? now : q.answered_at,
@@ -254,7 +349,10 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
 
             // Build one combined Q&A history entry so the resumed agent sees context
             const qaNote = updatedQuestions
-              .map((q, i) => `Q${i + 1}: ${q.question}\nA${i + 1}: ${answers[q.id] ?? q.answer ?? '(no answer)'}`)
+              .map(
+                (q, i) =>
+                  `Q${i + 1}: ${q.question}\nA${i + 1}: ${answers[q.id] ?? q.answer ?? '(no answer)'}`,
+              )
               .join('\n\n')
 
             const replyEntry: ActivityEntry = {
@@ -267,11 +365,15 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
             }
 
             const existing = task.agent_history ?? []
-            const hadExecution = existing.some(e =>
-              e.by !== 'user' && ['attempted', 'completed', 'blocked'].includes(e.action),
+            const hadExecution = existing.some(
+              (e) =>
+                e.by !== 'user' &&
+                ['attempted', 'completed', 'blocked'].includes(e.action),
             )
             const reopenColumn =
-              task.column === 'blocked' || task.column === 'review' ? 'in_progress' : task.column
+              task.column === 'blocked' || task.column === 'review'
+                ? 'in_progress'
+                : task.column
 
             updateTask(params.taskId, {
               clarification_questions: updatedQuestions,
@@ -299,38 +401,62 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
           const task = getTask(params.taskId)
           if (!task) return jsonResponse({ error: 'Task not found' }, 404)
           const result = await breakdownTaskWithAI(params.taskId)
-          if (!result) return jsonResponse({ ok: false, error: 'AI could not generate subtasks' }, 422)
+          if (!result)
+            return jsonResponse(
+              { ok: false, error: 'AI could not generate subtasks' },
+              422,
+            )
           const bdExisting = task.agent_history ?? []
           updateTask(params.taskId, {
-            agent_history: [...bdExisting, {
-              id: randomUUID(), by: 'user', byEmoji: '🔀', action: 'breakdown',
-              note: `Created ${result.count} subtask${result.count !== 1 ? 's' : ''}: ${result.titles.slice(0, 3).join(', ')}${result.count > 3 ? '…' : ''}`,
-              at: new Date().toISOString(),
-            }],
+            agent_history: [
+              ...bdExisting,
+              {
+                id: randomUUID(),
+                by: 'user',
+                byEmoji: '🔀',
+                action: 'breakdown',
+                note: `Created ${result.count} subtask${result.count !== 1 ? 's' : ''}: ${result.titles.slice(0, 3).join(', ')}${result.count > 3 ? '…' : ''}`,
+                at: new Date().toISOString(),
+              },
+            ],
           })
-          return jsonResponse({ ok: true, count: result.count, titles: result.titles })
+          return jsonResponse({
+            ok: true,
+            count: result.count,
+            titles: result.titles,
+          })
         }
 
         if (action === 'execute') {
           const task = getTask(params.taskId)
           if (!task) return jsonResponse({ error: 'Task not found' }, 404)
-          if (task.agent_state === 'working') return jsonResponse({ ok: true, alreadyRunning: true })
+          if (task.agent_state === 'working')
+            return jsonResponse({ ok: true, alreadyRunning: true })
           const exExisting = task.agent_history ?? []
           const now = new Date().toISOString()
           // Move to in_progress atomically — guards against duplicate clicks and sets
           // agent_state before the background fn starts, so a second request sees 'working'.
-          const targetColumn = (task.column === 'backlog' || task.column === 'todo') ? 'in_progress' : task.column
+          const targetColumn =
+            task.column === 'backlog' || task.column === 'todo'
+              ? 'in_progress'
+              : task.column
           updateTask(params.taskId, {
             column: targetColumn,
             agent_state: 'working',
             agent_name: 'astra',
             agent_action_at: now,
             waiting_for_user: false,
-            agent_history: [...exExisting, {
-              id: randomUUID(), by: 'user', byEmoji: '👤', action: 'executed',
-              note: 'Sent task to agent for execution.',
-              at: now,
-            }],
+            agent_history: [
+              ...exExisting,
+              {
+                id: randomUUID(),
+                by: 'user',
+                byEmoji: '👤',
+                action: 'executed',
+                note: 'Sent task to agent for execution.',
+                at: now,
+              },
+            ],
           })
           executeTaskWithHermesBackground(params.taskId)
           return jsonResponse({ ok: true })

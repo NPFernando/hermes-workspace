@@ -17,7 +17,9 @@ function AlertDialogTrigger({ className, ...props }: AlertDialogTriggerProps) {
   return <AlertDialog.Trigger className={cn(className)} {...props} />
 }
 
-type AlertDialogContentProps = React.ComponentProps<typeof AlertDialog.Popup> & {
+type AlertDialogContentProps = React.ComponentProps<
+  typeof AlertDialog.Popup
+> & {
   className?: string
   children: React.ReactNode
 }

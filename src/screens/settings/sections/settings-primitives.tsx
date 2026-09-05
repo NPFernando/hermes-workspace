@@ -8,7 +8,12 @@ export type SectionProps = {
   children: React.ReactNode
 }
 
-export function SettingsSection({ title, description, icon, children }: SectionProps) {
+export function SettingsSection({
+  title,
+  description,
+  icon,
+  children,
+}: SectionProps) {
   return (
     <section className="surface-card card-glow rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 shadow-sm backdrop-blur-xl md:p-5">
       <div className="mb-4 flex items-start gap-3">
@@ -19,7 +24,9 @@ export function SettingsSection({ title, description, icon, children }: SectionP
           <h2 className="text-base font-medium text-[var(--theme-text)] text-balance">
             {title}
           </h2>
-          <p className="text-sm text-[var(--theme-muted)] text-pretty">{description}</p>
+          <p className="text-sm text-[var(--theme-muted)] text-pretty">
+            {description}
+          </p>
         </div>
       </div>
       <div className="space-y-4">{children}</div>
@@ -41,7 +48,9 @@ export function SettingsRow({ label, description, children }: RowProps) {
           {label}
         </p>
         {description ? (
-          <p className="text-xs text-[var(--theme-muted)] text-pretty">{description}</p>
+          <p className="text-xs text-[var(--theme-muted)] text-pretty">
+            {description}
+          </p>
         ) : null}
       </div>
       <div className="flex w-full items-center gap-2 md:w-auto md:justify-end">

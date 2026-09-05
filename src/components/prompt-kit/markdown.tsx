@@ -30,7 +30,9 @@ export function rewriteLocalMediaSources(content: string): string {
     markdownImage,
     (_match, prefix: string, mediaPath: string, suffix: string) => {
       const rewritten = rewritePath(mediaPath)
-      return rewritten ? `${prefix}${rewritten}${suffix}` : `${prefix}MEDIA:${mediaPath}${suffix}`
+      return rewritten
+        ? `${prefix}${rewritten}${suffix}`
+        : `${prefix}MEDIA:${mediaPath}${suffix}`
     },
   )
 
@@ -207,7 +209,9 @@ const INITIAL_COMPONENTS: Partial<Components> = {
   },
   p: function PComponent({ children }) {
     return (
-      <p className="text-[var(--theme-text)] text-pretty leading-relaxed">{children}</p>
+      <p className="text-[var(--theme-text)] text-pretty leading-relaxed">
+        {children}
+      </p>
     )
   },
   ul: function UlComponent({ children }) {
@@ -256,7 +260,11 @@ const INITIAL_COMPONENTS: Partial<Components> = {
     )
   },
   strong: function StrongComponent({ children }) {
-    return <strong className="font-medium text-[var(--theme-text)]">{children}</strong>
+    return (
+      <strong className="font-medium text-[var(--theme-text)]">
+        {children}
+      </strong>
+    )
   },
   em: function EmComponent({ children }) {
     return <em className="italic text-[var(--theme-text)]">{children}</em>
@@ -466,7 +474,13 @@ const MemoizedMarkdownBlock = memo(
       if (!onCodeExpand) return components
       return {
         ...components,
-        code: function CodeComponentWithExpand({ className, children }: { className?: string; children?: React.ReactNode }) {
+        code: function CodeComponentWithExpand({
+          className,
+          children,
+        }: {
+          className?: string
+          children?: React.ReactNode
+        }) {
           const isInline = !className?.includes('language-')
           if (isInline) {
             return (
@@ -479,7 +493,11 @@ const MemoizedMarkdownBlock = memo(
           if (language === 'mermaid') {
             return <MermaidBlock code={String(children ?? '').trim()} />
           }
-          if (language === 'diff' || language === 'patch' || language === 'udiff') {
+          if (
+            language === 'diff' ||
+            language === 'patch' ||
+            language === 'udiff'
+          ) {
             return <DiffBlock code={String(children ?? '').trimEnd()} />
           }
           const code = String(children ?? '')

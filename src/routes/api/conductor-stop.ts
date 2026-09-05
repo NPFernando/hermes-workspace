@@ -6,7 +6,10 @@ import {
   safeErrorMessage,
 } from '../../server/rate-limit'
 import { deleteSession } from '../../server/claude-api'
-import { dashboardFetch, ensureGatewayProbed } from '../../server/gateway-capabilities'
+import {
+  dashboardFetch,
+  ensureGatewayProbed,
+} from '../../server/gateway-capabilities'
 import { cancelSwarmMission } from '../../server/swarm-missions'
 import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
 
@@ -21,7 +24,10 @@ export const Route = createFileRoute('/api/conductor-stop')({
         if (csrfCheck) return csrfCheck
 
         try {
-          const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
+          const body = (await request.json().catch(() => ({}))) as Record<
+            string,
+            unknown
+          >
           const sessionKeys = Array.isArray(body.sessionKeys)
             ? body.sessionKeys.filter(
                 (value): value is string =>
@@ -48,7 +54,13 @@ export const Route = createFileRoute('/api/conductor-stop')({
               })
               if (cancelled) {
                 cancelledNativeMissions += 1
-                for (const workerId of Array.from(new Set(cancelled.mission.assignments.map((assignment) => assignment.workerId)))) {
+                for (const workerId of Array.from(
+                  new Set(
+                    cancelled.mission.assignments.map(
+                      (assignment) => assignment.workerId,
+                    ),
+                  ),
+                )) {
                   try {
                     resetSwarmWorkerRuntime(workerId, {
                       actor: 'conductor-stop',
@@ -86,7 +98,12 @@ export const Route = createFileRoute('/api/conductor-stop')({
             }
           }
 
-          return json({ ok: true, deleted, stoppedMissions, cancelledNativeMissions })
+          return json({
+            ok: true,
+            deleted,
+            stoppedMissions,
+            cancelledNativeMissions,
+          })
         } catch (error) {
           return json(
             {

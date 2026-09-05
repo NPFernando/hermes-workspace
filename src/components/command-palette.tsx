@@ -501,7 +501,8 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
                             }}
                             className={cn(
                               'gap-3 rounded-lg px-3 py-2',
-                              isSelected && 'bg-[var(--theme-hover)] text-[var(--theme-text)]',
+                              isSelected &&
+                                'bg-[var(--theme-hover)] text-[var(--theme-text)]',
                             )}
                           >
                             <HugeiconsIcon

@@ -42,7 +42,11 @@ describe('writeFinanceStore dual-write (Phase 5 mirror step, trading side)', () 
       createdAt: '2026-06-28T00:00:00.000Z',
       updatedAt: '2026-06-28T00:00:00.000Z',
     })
-    db.strategy_results.push({ id: 'trade-1', kind: 'demo_trade_log', pnlQuote: 12.5 })
+    db.strategy_results.push({
+      id: 'trade-1',
+      kind: 'demo_trade_log',
+      pnlQuote: 12.5,
+    })
 
     store.writeFinanceStore(db)
 
@@ -88,7 +92,11 @@ describe('readFinanceStore split-store overlay (Phase 5 read cutover step, tradi
       createdAt: '2026-06-28T00:00:00.000Z',
       updatedAt: '2026-06-28T00:00:00.000Z',
     })
-    db.strategy_results.push({ id: 'trade-1', kind: 'demo_trade_log', pnlQuote: 12.5 })
+    db.strategy_results.push({
+      id: 'trade-1',
+      kind: 'demo_trade_log',
+      pnlQuote: 12.5,
+    })
     db.settings.tradingMode = 'paper_trade' as never
 
     store.writeFinanceStore(db)

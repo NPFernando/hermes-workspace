@@ -13,7 +13,10 @@ import {
   resolveSessionKey,
   shouldBindMainToPortableSession,
 } from '../../server/session-utils'
-import { getLocalMessages, getLocalSession } from '../../server/local-session-store'
+import {
+  getLocalMessages,
+  getLocalSession,
+} from '../../server/local-session-store'
 import { safeErrorMessage } from '../../server/rate-limit'
 import { isAuthenticated } from '@/server/auth-middleware'
 

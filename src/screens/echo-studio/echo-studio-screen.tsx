@@ -1,5 +1,5 @@
-import {  useState } from 'react'
-import type {ReactNode} from 'react';
+import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 type Tab = 'create' | 'manage' | 'theme'
@@ -37,7 +37,10 @@ export function EchoStudioScreen() {
   }
 
   const handleTemplate = (id: string) => {
-    const templates: Record<string, { id: string; title: string; prompt: string }> = {
+    const templates: Record<
+      string,
+      { id: string; title: string; prompt: string }
+    > = {
       analytics: {
         id: 'tool-analytics',
         title: 'Tool Analytics',
@@ -66,7 +69,10 @@ export function EchoStudioScreen() {
   }
 
   return (
-    <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
+    <div
+      data-route-page
+      className="min-h-full overflow-y-auto bg-surface text-ink"
+    >
       <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-6">
@@ -147,10 +153,18 @@ export function EchoStudioScreen() {
                   <button
                     type="button"
                     onClick={handleCreate}
-                    disabled={!pageId.trim() || !pageTitle.trim() || !prompt.trim() || creating}
+                    disabled={
+                      !pageId.trim() ||
+                      !pageTitle.trim() ||
+                      !prompt.trim() ||
+                      creating
+                    }
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all',
-                      creating || !pageId.trim() || !pageTitle.trim() || !prompt.trim()
+                      creating ||
+                        !pageId.trim() ||
+                        !pageTitle.trim() ||
+                        !prompt.trim()
                         ? 'cursor-not-allowed bg-[var(--theme-hover)] opacity-60'
                         : 'bg-accent-500 hover:bg-accent-600 active:scale-[0.98]',
                     )}
@@ -206,7 +220,9 @@ export function EchoStudioScreen() {
         {/* Manage Tab */}
         {tab === 'manage' && (
           <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-8 text-center">
-            <p className="text-lg text-[var(--theme-muted)]">No screens created yet.</p>
+            <p className="text-lg text-[var(--theme-muted)]">
+              No screens created yet.
+            </p>
             <p className="mt-1 text-sm text-[var(--theme-muted)]">
               Use the Create tab to build your first dashboard.
             </p>
@@ -216,9 +232,12 @@ export function EchoStudioScreen() {
         {/* Theme Tab */}
         {tab === 'theme' && (
           <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-8 text-center">
-            <p className="text-lg text-[var(--theme-muted)]">Theme customization coming soon.</p>
+            <p className="text-lg text-[var(--theme-muted)]">
+              Theme customization coming soon.
+            </p>
             <p className="mt-1 text-sm text-[var(--theme-muted)]">
-              Choose from light, dark, and custom color schemes for your dashboards.
+              Choose from light, dark, and custom color schemes for your
+              dashboards.
             </p>
           </div>
         )}
@@ -233,7 +252,9 @@ function StatCard({ label, value }: { label: string; value: number }) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]">
         {label}
       </p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight text-ink">{value}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight text-ink">
+        {value}
+      </p>
     </div>
   )
 }

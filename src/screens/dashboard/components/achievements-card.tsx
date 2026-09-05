@@ -5,7 +5,6 @@ import type {
   DashboardAchievementUnlock,
   DashboardOverview,
 } from '@/server/dashboard-aggregator'
-import { formatRelativeTime } from '@/screens/dashboard/lib/formatters'
 
 const TIER_COLORS: Record<string, string> = {
   Copper: '#b45309',
@@ -22,7 +21,11 @@ function tierColor(tier: string | null): string {
 
 function relativeTime(unlockedAtSeconds: number | null): string {
   if (!unlockedAtSeconds) return ''
-  return formatRelativeTime(unlockedAtSeconds * 1000)
+  const diff = Date.now() / 1000 - unlockedAtSeconds
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86_400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86_400)}d ago`
 }
 
 function AchievementRow({
@@ -33,7 +36,9 @@ function AchievementRow({
   compact?: boolean
 }) {
   return (
-    <div className="flex items-center gap-2 rounded border px-2 py-1.5 border-[var(--theme-border)]">
+    <div
+      className="flex items-center gap-2 rounded border px-2 py-1.5 border-[var(--theme-border)]"
+    >
       <span
         aria-hidden
         className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-base"
@@ -46,11 +51,15 @@ function AchievementRow({
         🏆
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[11px] font-semibold text-[var(--theme-text)]">
+        <div
+          className="truncate text-[11px] font-semibold text-[var(--theme-text)]"
+        >
           {unlock.name}
         </div>
         {!compact ? (
-          <div className="truncate text-[10px] text-[var(--theme-muted)]">
+          <div
+            className="truncate text-[10px] text-[var(--theme-muted)]"
+          >
             {unlock.description || unlock.category}
           </div>
         ) : null}
@@ -64,7 +73,9 @@ function AchievementRow({
             {unlock.tier}
           </span>
         ) : null}
-        <span className="block text-[9px] font-mono text-[var(--theme-muted)]">
+        <span
+          className="block text-[9px] font-mono text-[var(--theme-muted)]"
+        >
           {relativeTime(unlock.unlockedAt)}
         </span>
       </div>
@@ -84,8 +95,9 @@ export function AchievementsCard({
   achievements: DashboardOverview['achievements']
 }) {
   const [showAll, setShowAll] = useState(false)
-  const [allUnlocks, setAllUnlocks] =
-    useState<Array<DashboardAchievementUnlock> | null>(null)
+  const [allUnlocks, setAllUnlocks] = useState<
+    Array<DashboardAchievementUnlock> | null
+  >(null)
   const [loadingAll, setLoadingAll] = useState(false)
   const [allError, setAllError] = useState<string | null>(null)
 
@@ -134,7 +146,9 @@ export function AchievementsCard({
               strokeWidth={1.5}
               className="text-[var(--theme-muted)]"
             />
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
+            <h3
+              className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
+            >
               Achievements
             </h3>
           </div>
@@ -148,7 +162,9 @@ export function AchievementsCard({
         </div>
         <div className="flex flex-col gap-1.5">
           {achievements.recentUnlocks.length === 0 ? (
-            <div className="py-3 text-center text-[11px] text-[var(--theme-muted)]">
+            <div
+              className="py-3 text-center text-[11px] text-[var(--theme-muted)]"
+            >
               No unlocks yet — keep working.
             </div>
           ) : (
@@ -164,7 +180,7 @@ export function AchievementsCard({
 
       {showAll ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-8"
           role="dialog"
           aria-modal="true"
           onClick={() => setShowAll(false)}
@@ -173,8 +189,12 @@ export function AchievementsCard({
             className="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-lg border bg-[var(--theme-card)] border-[var(--theme-border)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b px-4 py-3 border-[var(--theme-border)]">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--theme-text)]">
+            <div
+              className="flex items-center justify-between border-b px-4 py-3 border-[var(--theme-border)]"
+            >
+              <h2
+                className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--theme-text)]"
+              >
                 Achievement Ribbon
               </h2>
               <button
@@ -193,11 +213,15 @@ export function AchievementsCard({
             </div>
             <div className="max-h-[64vh] overflow-y-auto p-4">
               {loadingAll ? (
-                <div className="py-8 text-center text-[11px] text-[var(--theme-muted)]">
+                <div
+                  className="py-8 text-center text-[11px] text-[var(--theme-muted)]"
+                >
                   Loading…
                 </div>
               ) : allError ? (
-                <div className="py-8 text-center text-[11px] text-[var(--theme-danger)]">
+                <div
+                  className="py-8 text-center text-[11px] text-[var(--theme-danger,#ef4444)]"
+                >
                   {allError}
                 </div>
               ) : (

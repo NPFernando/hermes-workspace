@@ -75,11 +75,15 @@ function ContextMeterComponent({ usedTokens, maxTokens }: ContextMeterProps) {
       </PreviewCardTrigger>
       <PreviewCardPopup align="end" sideOffset={8} className="w-52 px-2 py-1">
         <div className="space-y-0.5 text-xs text-[var(--theme-text)]">
-          <div className="text-[var(--theme-text)] font-[450]">Context window:</div>
+          <div className="text-[var(--theme-text)] font-[450]">
+            Context window:
+          </div>
           <div className="tabular-nums text-[var(--theme-muted)]">
             {percentage.toFixed(0)}% used ({leftPercentage.toFixed(0)}% left)
           </div>
-          <div className="tabular-nums text-[var(--theme-muted)]">{usedLabel}</div>
+          <div className="tabular-nums text-[var(--theme-muted)]">
+            {usedLabel}
+          </div>
         </div>
       </PreviewCardPopup>
     </PreviewCard>

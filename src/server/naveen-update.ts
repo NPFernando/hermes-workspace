@@ -160,7 +160,9 @@ function isInRebase(cwd = CWD): boolean {
 
 function readStatusCache(): NaveenUpdateStatus | null {
   try {
-    const raw = JSON.parse(readFileSync(STATUS_CACHE_FILE, 'utf8')) as NaveenUpdateStatus & {
+    const raw = JSON.parse(
+      readFileSync(STATUS_CACHE_FILE, 'utf8'),
+    ) as NaveenUpdateStatus & {
       _ts?: number
     }
     if (Date.now() - (raw._ts ?? 0) < STATUS_CACHE_TTL) return raw
@@ -215,7 +217,12 @@ export function readNaveenUpdateStatus(skipCache = false): NaveenUpdateStatus {
 
   // LEFT = our commits ahead of origin/main (our custom work)
   // RIGHT = upstream commits we don't have yet
-  const divRaw = git(['rev-list', '--left-right', '--count', `HEAD...origin/main`])
+  const divRaw = git([
+    'rev-list',
+    '--left-right',
+    '--count',
+    `HEAD...origin/main`,
+  ])
   const [leftStr = '0', rightStr = '0'] = (divRaw || '0\t0').split(/\s+/)
   const ourAhead = Number(leftStr)
   const upstreamBehind = Number(rightStr)
@@ -242,15 +249,25 @@ export function readNaveenUpdateStatus(skipCache = false): NaveenUpdateStatus {
     CWD,
     10_000,
   )
-  const upstreamNewCommits = commitsRaw?.split('\n').filter(Boolean).slice(0, 20) ?? []
+  const upstreamNewCommits =
+    commitsRaw?.split('\n').filter(Boolean).slice(0, 20) ?? []
 
   // Files upstream changed
-  const upstreamChangedRaw = git(['diff', '--name-only', mergeBase, 'origin/main'])
-  const upstreamChangedFiles = new Set(upstreamChangedRaw?.split('\n').filter(Boolean) ?? [])
+  const upstreamChangedRaw = git([
+    'diff',
+    '--name-only',
+    mergeBase,
+    'origin/main',
+  ])
+  const upstreamChangedFiles = new Set(
+    upstreamChangedRaw?.split('\n').filter(Boolean) ?? [],
+  )
 
   // Files we changed
   const ourChangedRaw = git(['diff', '--name-only', mergeBase, 'HEAD'])
-  const ourChangedFiles = new Set(ourChangedRaw?.split('\n').filter(Boolean) ?? [])
+  const ourChangedFiles = new Set(
+    ourChangedRaw?.split('\n').filter(Boolean) ?? [],
+  )
 
   // Custom files upstream touched
   const customFilesUpstreamTouched = NAVEEN_CUSTOM_FILES.filter((f) =>
@@ -262,19 +279,43 @@ export function readNaveenUpdateStatus(skipCache = false): NaveenUpdateStatus {
   for (const file of customFilesUpstreamTouched) {
     if (!ourChangedFiles.has(file)) continue
     const upstreamDiffStat =
-      git(['diff', '--stat', mergeBase, 'origin/main', '--', file])?.split('\n')[0] ??
-      'changed upstream'
+      git(['diff', '--stat', mergeBase, 'origin/main', '--', file])?.split(
+        '\n',
+      )[0] ?? 'changed upstream'
     const ourDiffStat =
       git(['diff', '--stat', mergeBase, 'HEAD', '--', file])?.split('\n')[0] ??
       'changed locally'
-    const upstreamDiff =
-      (git(['-c', 'color.diff=never', 'diff', '-U3', mergeBase, 'origin/main', '--', file]) ?? '').slice(
-        0,
-        3000,
-      )
-    const ourDiff =
-      (git(['-c', 'color.diff=never', 'diff', '-U3', mergeBase, 'HEAD', '--', file]) ?? '').slice(0, 3000)
-    potentialConflicts.push({ file, upstreamDiffStat, ourDiffStat, upstreamDiff, ourDiff })
+    const upstreamDiff = (
+      git([
+        '-c',
+        'color.diff=never',
+        'diff',
+        '-U3',
+        mergeBase,
+        'origin/main',
+        '--',
+        file,
+      ]) ?? ''
+    ).slice(0, 3000)
+    const ourDiff = (
+      git([
+        '-c',
+        'color.diff=never',
+        'diff',
+        '-U3',
+        mergeBase,
+        'HEAD',
+        '--',
+        file,
+      ]) ?? ''
+    ).slice(0, 3000)
+    potentialConflicts.push({
+      file,
+      upstreamDiffStat,
+      ourDiffStat,
+      upstreamDiff,
+      ourDiff,
+    })
   }
 
   const status: NaveenUpdateStatus = {
@@ -294,7 +335,9 @@ export function readNaveenUpdateStatus(skipCache = false): NaveenUpdateStatus {
 
 // ── applyNaveenSmartUpdate ────────────────────────────────────────────────────
 
-export function applyNaveenSmartUpdate(options: NaveenApplyOptions = {}): NaveenApplyResult {
+export function applyNaveenSmartUpdate(
+  options: NaveenApplyOptions = {},
+): NaveenApplyResult {
   const output: Array<string> = []
   const rebaseEnv: NodeJS.ProcessEnv = {
     ...process.env,
@@ -375,7 +418,10 @@ export function applyNaveenSmartUpdate(options: NaveenApplyOptions = {}): Naveen
         perFileStrategy?.[file] ??
         (strategy === 'take_theirs' ? 'take_theirs' : 'keep_ours')
       const gitArg = fileStrategy === 'take_theirs' ? '--theirs' : '--ours'
-      spawnSync('git', ['checkout', gitArg, '--', file], { cwd: CWD, env: rebaseEnv })
+      spawnSync('git', ['checkout', gitArg, '--', file], {
+        cwd: CWD,
+        env: rebaseEnv,
+      })
       spawnSync('git', ['add', '--', file], { cwd: CWD, env: rebaseEnv })
     }
 
@@ -423,11 +469,18 @@ export function applyNaveenSmartUpdate(options: NaveenApplyOptions = {}): Naveen
   return _buildAndFinish(output, rebaseEnv)
 }
 
-function _buildAndFinish(output: Array<string>, env: NodeJS.ProcessEnv): NaveenApplyResult {
+function _buildAndFinish(
+  output: Array<string>,
+  env: NodeJS.ProcessEnv,
+): NaveenApplyResult {
   const changedFiles =
-    git(['diff', '--name-only', 'HEAD@{1}', 'HEAD'])?.split('\n').filter(Boolean) ?? []
+    git(['diff', '--name-only', 'HEAD@{1}', 'HEAD'])
+      ?.split('\n')
+      .filter(Boolean) ?? []
 
-  if (changedFiles.some((f) => f === 'package.json' || f === 'pnpm-lock.yaml')) {
+  if (
+    changedFiles.some((f) => f === 'package.json' || f === 'pnpm-lock.yaml')
+  ) {
     try {
       output.push(
         execFileSync(PNPM_BIN, ['install', '--no-frozen-lockfile'], {
@@ -506,7 +559,11 @@ export function generateNaveenAiAnalysis(
   conflicts: Array<ConflictFile>,
 ): NaveenAiAnalysis {
   if (conflicts.length === 0) {
-    return { recommendations: [], summary: 'No conflicts to analyze.', checkedAt: Date.now() }
+    return {
+      recommendations: [],
+      summary: 'No conflicts to analyze.',
+      checkedAt: Date.now(),
+    }
   }
 
   const conflictDetails = conflicts
@@ -577,9 +634,7 @@ ${conflictDetails}`
   const recommendations = parsed ? parsed.recommendations : []
   const summary = parsed ? parsed.summary : result.stdout.slice(0, 500)
   const analysis: NaveenAiAnalysis = {
-    recommendations: Array.isArray(recommendations)
-      ? recommendations
-      : [],
+    recommendations: Array.isArray(recommendations) ? recommendations : [],
     summary,
     checkedAt: Date.now(),
   }
@@ -589,11 +644,16 @@ ${conflictDetails}`
   return analysis
 }
 
-type AiAnalysisPayload = { recommendations: Array<AiFileRecommendation>; summary: string }
+type AiAnalysisPayload = {
+  recommendations: Array<AiFileRecommendation>
+  summary: string
+}
 
 export function readCachedAiAnalysis(): NaveenAiAnalysis | null {
   try {
-    const raw = JSON.parse(readFileSync(AI_CACHE_FILE, 'utf8')) as NaveenAiAnalysis
+    const raw = JSON.parse(
+      readFileSync(AI_CACHE_FILE, 'utf8'),
+    ) as NaveenAiAnalysis
     if (Date.now() - raw.checkedAt < 2 * 60 * 60 * 1000) return raw
   } catch {
     /* ignore */

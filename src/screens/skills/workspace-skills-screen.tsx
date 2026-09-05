@@ -56,8 +56,7 @@ const MEMORY_FILTERS: Array<MemoryFilter> = [
 ]
 
 const STATUS_BADGE_CLASS: Record<SkillItem['status'], string> = {
-  active:
-    'border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_12%,transparent)] text-[var(--theme-success)]',
+  active: 'border-green-200 bg-green-50 text-green-700',
 }
 
 async function readPayload(response: Response): Promise<unknown> {
@@ -231,10 +230,7 @@ export function WorkspaceSkillsScreen() {
   }
 
   return (
-    <div
-      data-route-page
-      className="min-h-full px-4 pb-10 pt-5 text-[var(--theme-text)] md:px-6 md:pt-8"
-    >
+    <div data-route-page className="min-h-full px-4 pb-10 pt-5 text-[var(--theme-text)] md:px-6 md:pt-8">
       <section className="mx-auto flex min-h-full w-full max-w-[1480px] flex-col gap-5">
         <header className="flex flex-col gap-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3">
@@ -285,7 +281,7 @@ export function WorkspaceSkillsScreen() {
                     Loading skills...
                   </div>
                 ) : skillsQuery.isError ? (
-                  <div className="rounded-2xl border border-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-4 py-5 text-sm text-[var(--theme-danger)]">
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-600">
                     {skillsQuery.error instanceof Error
                       ? skillsQuery.error.message
                       : 'Failed to load skills'}
@@ -416,7 +412,7 @@ export function WorkspaceSkillsScreen() {
                         ))}
                       </div>
                     ) : skillContentQuery.isError ? (
-                      <div className="rounded-lg border border-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-3 py-2 text-sm text-[var(--theme-danger)]">
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
                         {skillContentQuery.error instanceof Error
                           ? skillContentQuery.error.message
                           : 'Failed to load skill content'}
@@ -505,7 +501,7 @@ export function WorkspaceSkillsScreen() {
                     Loading memory files...
                   </div>
                 ) : memoryQuery.isError ? (
-                  <div className="rounded-2xl border border-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-4 py-5 text-sm text-[var(--theme-danger)]">
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-600">
                     {memoryQuery.error instanceof Error
                       ? memoryQuery.error.message
                       : 'Failed to load memory files'}
@@ -547,25 +543,19 @@ export function WorkspaceSkillsScreen() {
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2">
-                      <span className="text-[var(--theme-muted)]">
-                        Workspace memory
-                      </span>
+                      <span className="text-[var(--theme-muted)]">Workspace memory</span>
                       <span className="font-medium text-[var(--theme-text)]">
                         Permanent
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2">
-                      <span className="text-[var(--theme-muted)]">
-                        Project memory
-                      </span>
+                      <span className="text-[var(--theme-muted)]">Project memory</span>
                       <span className="font-medium text-[var(--theme-text)]">
                         Per-project
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2">
-                      <span className="text-[var(--theme-muted)]">
-                        Agent memory
-                      </span>
+                      <span className="text-[var(--theme-muted)]">Agent memory</span>
                       <span className="font-medium text-[var(--theme-text)]">
                         30 day rolling
                       </span>
@@ -624,16 +614,10 @@ function MemorySectionBlock({
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span
-                    title={file.name}
-                    className="block truncate text-sm font-medium text-[var(--theme-text)]"
-                  >
+                  <span title={file.name} className="block truncate text-sm font-medium text-[var(--theme-text)]">
                     {file.name}
                   </span>
-                  <span
-                    title={file.path}
-                    className="block truncate text-xs text-[var(--theme-muted)]"
-                  >
+                  <span title={file.path} className="block truncate text-xs text-[var(--theme-muted)]">
                     {file.path}
                   </span>
                 </span>

@@ -70,8 +70,18 @@ export function GridTradingPanel() {
 
   useEffect(() => {
     void load()
-    const id = window.setInterval(load, 30_000)
-    return () => window.clearInterval(id)
+    // Small fixed offset before the recurring timer starts so this panel's
+    // poll doesn't land in the same instant as the other trading panels'
+    // (grid/llm/rebalance/council each poll a different endpoint every 30s;
+    // staggering spreads the resulting requests instead of bursting them).
+    let id: number | undefined
+    const offset = window.setTimeout(() => {
+      id = window.setInterval(load, 30_000)
+    }, 3_000)
+    return () => {
+      window.clearTimeout(offset)
+      if (id !== undefined) window.clearInterval(id)
+    }
   }, [load])
 
   const runCycle = useCallback(async () => {

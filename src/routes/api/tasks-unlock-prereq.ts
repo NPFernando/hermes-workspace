@@ -24,16 +24,28 @@ export const Route = createFileRoute('/api/tasks-unlock-prereq')({
         }
 
         let body: { prereq_id?: string } = {}
-        try { body = (await request.json()) as typeof body } catch { /* empty body */ }
+        try {
+          body = (await request.json()) as typeof body
+        } catch {
+          /* empty body */
+        }
 
         const prereqId = body.prereq_id?.trim()
         if (!prereqId) {
-          return json({ ok: false, error: 'prereq_id is required' }, { status: 400 })
+          return json(
+            { ok: false, error: 'prereq_id is required' },
+            { status: 400 },
+          )
         }
 
-        const prereq = listTasks({ includeDone: true }).find((t) => t.id === prereqId)
+        const prereq = listTasks({ includeDone: true }).find(
+          (t) => t.id === prereqId,
+        )
         if (!prereq) {
-          return json({ ok: false, error: 'Prerequisite task not found' }, { status: 404 })
+          return json(
+            { ok: false, error: 'Prerequisite task not found' },
+            { status: 404 },
+          )
         }
 
         const now = new Date().toISOString()
@@ -41,14 +53,17 @@ export const Route = createFileRoute('/api/tasks-unlock-prereq')({
         // Mark the prereq task as done
         updateTask(prereqId, {
           column: 'done',
-          agent_history: [...(prereq.agent_history ?? []), {
-            id: randomUUID(),
-            by: 'user',
-            byEmoji: '👤',
-            action: 'completed',
-            note: 'Marked done via Unlock Prereq — credentials configured manually.',
-            at: now,
-          }],
+          agent_history: [
+            ...(prereq.agent_history ?? []),
+            {
+              id: randomUUID(),
+              by: 'user',
+              byEmoji: '👤',
+              action: 'completed',
+              note: 'Marked done via Unlock Prereq — credentials configured manually.',
+              at: now,
+            },
+          ],
         })
 
         // Remove depends_on from all tasks waiting on this prereq
@@ -57,26 +72,39 @@ export const Route = createFileRoute('/api/tasks-unlock-prereq')({
         )
 
         for (const task of gated) {
-          const remaining = (task.depends_on ?? []).filter((id) => id !== prereqId)
+          const remaining = (task.depends_on ?? []).filter(
+            (id) => id !== prereqId,
+          )
           updateTask(task.id, {
             depends_on: remaining.length > 0 ? remaining : undefined,
-            agent_history: [...(task.agent_history ?? []), {
-              id: randomUUID(),
-              by: 'astra',
-              byEmoji: '🌟',
-              action: 'unblocked',
-              note: `Credential prerequisite resolved — task is now eligible for planning.`,
-              at: now,
-            }],
+            agent_history: [
+              ...(task.agent_history ?? []),
+              {
+                id: randomUUID(),
+                by: 'astra',
+                byEmoji: '🌟',
+                action: 'unblocked',
+                note: `Credential prerequisite resolved — task is now eligible for planning.`,
+                at: now,
+              },
+            ],
           })
         }
 
         // Fire a deploy sweep so newly eligible tasks get picked up immediately
         setTimeout(() => {
-          try { runAgentDeployBackground('manual') } catch { /* non-fatal */ }
+          try {
+            runAgentDeployBackground('manual')
+          } catch {
+            /* non-fatal */
+          }
         }, 500)
 
-        return json({ ok: true, unblocked: gated.length, prereq_title: prereq.title })
+        return json({
+          ok: true,
+          unblocked: gated.length,
+          prereq_title: prereq.title,
+        })
       },
 
       // GET: return info about which tasks are gated on which prereqs
@@ -88,14 +116,23 @@ export const Route = createFileRoute('/api/tasks-unlock-prereq')({
         const all = listTasks({})
         const prereqIds = new Set<string>()
         all.forEach((t) => {
-          if (Array.isArray(t.depends_on)) t.depends_on.forEach((id) => prereqIds.add(id))
+          if (Array.isArray(t.depends_on))
+            t.depends_on.forEach((id) => prereqIds.add(id))
         })
 
         const prereqs = [...prereqIds].map((id) => {
-          const task = all.find((t) => t.id === id) ??
+          const task =
+            all.find((t) => t.id === id) ??
             listTasks({ includeDone: true }).find((t) => t.id === id)
-          const gated = all.filter((t) => Array.isArray(t.depends_on) && t.depends_on.includes(id))
-          return { id, title: task?.title ?? '(unknown)', column: task?.column ?? '?', gated_count: gated.length }
+          const gated = all.filter(
+            (t) => Array.isArray(t.depends_on) && t.depends_on.includes(id),
+          )
+          return {
+            id,
+            title: task?.title ?? '(unknown)',
+            column: task?.column ?? '?',
+            gated_count: gated.length,
+          }
         })
 
         return json({ ok: true, prereqs })

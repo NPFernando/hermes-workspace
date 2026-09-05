@@ -110,7 +110,8 @@ function deriveOrigin(
   bundled: Set<string>,
 ): SkillSummary['origin'] {
   if (bundled.has(skill.id) || bundled.has(skill.slug)) return 'builtin'
-  if (skill.author === 'Hermes Agent' && skill.sourcePath) return 'agent-created'
+  if (skill.author === 'Hermes Agent' && skill.sourcePath)
+    return 'agent-created'
   return 'marketplace'
 }
 
@@ -459,11 +460,12 @@ export const Route = createFileRoute('/api/skills')({
             Math.max(1, Number(url.searchParams.get('limit') || '30')),
           )
 
-          const [sourceItems, localPathMap, bundledManifest] = await Promise.all([
-            fetchClaudeSkills(),
-            buildLocalSkillPathMap(),
-            loadBundledManifest(),
-          ])
+          const [sourceItems, localPathMap, bundledManifest] =
+            await Promise.all([
+              fetchClaudeSkills(),
+              buildLocalSkillPathMap(),
+              loadBundledManifest(),
+            ])
           for (const skill of sourceItems) {
             if (skill.installed) {
               const meta =
@@ -521,10 +523,7 @@ export const Route = createFileRoute('/api/skills')({
             categories: KNOWN_CATEGORIES,
           })
         } catch (err) {
-          return json(
-            { error: safeErrorMessage(err) },
-            { status: 500 },
-          )
+          return json({ error: safeErrorMessage(err) }, { status: 500 })
         }
       },
       POST: async ({ request }) => {

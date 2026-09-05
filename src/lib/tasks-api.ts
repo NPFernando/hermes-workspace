@@ -71,10 +71,13 @@ async function resolveBackend(): Promise<BackendResolution> {
     // Prefer hermes if it has real data (> 0). Fall back to claude only when
     // hermes is empty/unavailable and claude has tasks.
     // Default to hermes when both are empty — it is the canonical agent task store.
-    const useHermes = hermesCount >= 0 && (claudeCount < 0 || hermesCount >= claudeCount)
+    const useHermes =
+      hermesCount >= 0 && (claudeCount < 0 || hermesCount >= claudeCount)
     _resolved = {
       base: useHermes ? HERMES_BASE : CLAUDE_BASE,
-      assigneesBase: useHermes ? '/api/hermes-tasks-assignees' : '/api/claude-tasks-assignees',
+      assigneesBase: useHermes
+        ? '/api/hermes-tasks-assignees'
+        : '/api/claude-tasks-assignees',
       backend: useHermes ? 'hermes' : 'claude',
     }
     return _resolved
@@ -96,10 +99,22 @@ export function resetBackendResolution(): void {
 
 // --- Types --------------------------------------------------------------
 
-export type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'blocked' | 'done' | 'deleted'
+export type TaskColumn =
+  | 'backlog'
+  | 'todo'
+  | 'in_progress'
+  | 'review'
+  | 'blocked'
+  | 'done'
+  | 'deleted'
 export type TaskPriority = 'high' | 'medium' | 'low'
 
-export type TaskAgentState = 'reviewing' | 'delegating' | 'working' | 'waiting_for_input' | null
+export type TaskAgentState =
+  | 'reviewing'
+  | 'delegating'
+  | 'working'
+  | 'waiting_for_input'
+  | null
 export type TaskSource = 'human' | 'idea_job' | 'astra' | null
 
 export type ActivityEntry = {
@@ -120,7 +135,13 @@ export type ClarificationQuestion = {
   answered_at?: string
 }
 
-export type BlockerType = 'credential' | 'dependency' | 'execution' | 'input' | 'environment' | null
+export type BlockerType =
+  | 'credential'
+  | 'dependency'
+  | 'execution'
+  | 'input'
+  | 'environment'
+  | null
 
 export type CredentialNeeded = {
   key: string
@@ -236,12 +257,18 @@ export async function createTask(input: CreateTaskInput): Promise<ClaudeTask> {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error((body as { detail?: string }).detail || `Failed to create task: ${res.status}`)
+    throw new Error(
+      (body as { detail?: string }).detail ||
+        `Failed to create task: ${res.status}`,
+    )
   }
   return (await res.json()).task
 }
 
-export async function updateTask(taskId: string, input: UpdateTaskInput): Promise<ClaudeTask> {
+export async function updateTask(
+  taskId: string,
+  input: UpdateTaskInput,
+): Promise<ClaudeTask> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}`, {
     method: 'PATCH',
@@ -258,7 +285,10 @@ export async function deleteTask(taskId: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to delete task: ${res.status}`)
 }
 
-export async function linkSession(taskId: string, sessionId: string | null): Promise<ClaudeTask> {
+export async function linkSession(
+  taskId: string,
+  sessionId: string | null,
+): Promise<ClaudeTask> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}`, {
     method: 'PATCH',
@@ -269,7 +299,9 @@ export async function linkSession(taskId: string, sessionId: string | null): Pro
   return (await res.json()).task
 }
 
-export async function launchSession(taskId: string): Promise<{ sessionId: string; briefing: string; task: ClaudeTask }> {
+export async function launchSession(
+  taskId: string,
+): Promise<{ sessionId: string; briefing: string; task: ClaudeTask }> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}?action=launch`, {
     method: 'POST',
@@ -280,7 +312,9 @@ export async function launchSession(taskId: string): Promise<{ sessionId: string
   return res.json()
 }
 
-export async function breakdownTask(taskId: string): Promise<{ ok: boolean; count: number; titles: Array<string> }> {
+export async function breakdownTask(
+  taskId: string,
+): Promise<{ ok: boolean; count: number; titles: Array<string> }> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}?action=breakdown`, {
     method: 'POST',
@@ -289,12 +323,16 @@ export async function breakdownTask(taskId: string): Promise<{ ok: boolean; coun
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error((body as { error?: string }).error || `Breakdown failed: ${res.status}`)
+    throw new Error(
+      (body as { error?: string }).error || `Breakdown failed: ${res.status}`,
+    )
   }
   return res.json()
 }
 
-export async function generateTaskFromText(text: string): Promise<CreateTaskInput> {
+export async function generateTaskFromText(
+  text: string,
+): Promise<CreateTaskInput> {
   const res = await fetch('/api/tasks-from-text', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -302,13 +340,18 @@ export async function generateTaskFromText(text: string): Promise<CreateTaskInpu
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error((body as { error?: string }).error || `AI task generation failed: ${res.status}`)
+    throw new Error(
+      (body as { error?: string }).error ||
+        `AI task generation failed: ${res.status}`,
+    )
   }
   const { suggestion } = (await res.json()) as { suggestion: CreateTaskInput }
   return suggestion
 }
 
-export async function executeTask(taskId: string): Promise<{ ok: boolean; alreadyRunning?: boolean }> {
+export async function executeTask(
+  taskId: string,
+): Promise<{ ok: boolean; alreadyRunning?: boolean }> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}?action=execute`, {
     method: 'POST',
@@ -319,7 +362,10 @@ export async function executeTask(taskId: string): Promise<{ ok: boolean; alread
   return res.json()
 }
 
-export async function batchExecuteTasks(limit = 5, taskIds?: Array<string>): Promise<{ ok: boolean; started: number; remaining: number }> {
+export async function batchExecuteTasks(
+  limit = 5,
+  taskIds?: Array<string>,
+): Promise<{ ok: boolean; started: number; remaining: number }> {
   const res = await fetch('/api/tasks-batch-execute', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -329,7 +375,10 @@ export async function batchExecuteTasks(limit = 5, taskIds?: Array<string>): Pro
   return res.json()
 }
 
-export async function postTaskComment(taskId: string, text: string): Promise<{ resumed: boolean }> {
+export async function postTaskComment(
+  taskId: string,
+  text: string,
+): Promise<{ resumed: boolean }> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}?action=comment`, {
     method: 'POST',
@@ -355,7 +404,11 @@ export async function submitClarificationAnswers(
   return res.json()
 }
 
-export async function moveTask(taskId: string, column: TaskColumn, movedBy = 'user'): Promise<ClaudeTask> {
+export async function moveTask(
+  taskId: string,
+  column: TaskColumn,
+  movedBy = 'user',
+): Promise<ClaudeTask> {
   const { base } = await resolveBackend()
   const res = await fetch(`${base}/${taskId}?action=move`, {
     method: 'POST',
@@ -364,7 +417,10 @@ export async function moveTask(taskId: string, column: TaskColumn, movedBy = 'us
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error((body as { detail?: string }).detail || `Failed to move task: ${res.status}`)
+    throw new Error(
+      (body as { detail?: string }).detail ||
+        `Failed to move task: ${res.status}`,
+    )
   }
   return (await res.json()).task
 }
@@ -381,7 +437,14 @@ export const COLUMN_LABELS: Record<TaskColumn, string> = {
   deleted: 'Deleted',
 }
 
-export const COLUMN_ORDER: Array<TaskColumn> = ['backlog', 'todo', 'in_progress', 'review', 'blocked', 'done']
+export const COLUMN_ORDER: Array<TaskColumn> = [
+  'backlog',
+  'todo',
+  'in_progress',
+  'review',
+  'blocked',
+  'done',
+]
 
 export const PRIORITY_COLORS: Record<TaskPriority, string> = {
   high: '#ef4444',
@@ -430,7 +493,12 @@ export type BlockerOverview = {
   ok: boolean
   count: number
   groups: Array<BlockerGroup>
-  resumable: Array<{ id: string; title: string; blocker_type: string | null; blocker_reason: string | null }>
+  resumable: Array<{
+    id: string
+    title: string
+    blocker_type: string | null
+    blocker_reason: string | null
+  }>
 }
 
 export async function fetchBlockers(): Promise<BlockerOverview> {
@@ -439,7 +507,9 @@ export async function fetchBlockers(): Promise<BlockerOverview> {
   return res.json() as Promise<BlockerOverview>
 }
 
-export async function resolveBlocker(taskId: string): Promise<{ ok: boolean; task: ClaudeTask }> {
+export async function resolveBlocker(
+  taskId: string,
+): Promise<{ ok: boolean; task: ClaudeTask }> {
   const res = await fetch('/api/tasks-blockers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -457,28 +527,51 @@ export async function provideCredential(
   const res = await fetch('/api/tasks-blockers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'provide_credential', task_id: taskId, credential_key: credentialKey, credential_value: credentialValue }),
+    body: JSON.stringify({
+      action: 'provide_credential',
+      task_id: taskId,
+      credential_key: credentialKey,
+      credential_value: credentialValue,
+    }),
   })
   if (!res.ok) throw new Error(`Provide credential failed: ${res.status}`)
-  return res.json() as Promise<{ ok: boolean; all_provided: boolean; task: ClaudeTask }>
+  return res.json() as Promise<{
+    ok: boolean
+    all_provided: boolean
+    task: ClaudeTask
+  }>
 }
 
-export async function validateCredentials(taskId: string): Promise<{ ok: boolean; all_valid: boolean; results: Array<{ key: string; label: string; exists: boolean }> }> {
+export async function validateCredentials(taskId: string): Promise<{
+  ok: boolean
+  all_valid: boolean
+  results: Array<{ key: string; label: string; exists: boolean }>
+}> {
   const res = await fetch('/api/tasks-blockers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'validate', task_id: taskId }),
   })
   if (!res.ok) throw new Error(`Validate credentials failed: ${res.status}`)
-  return res.json() as Promise<{ ok: boolean; all_valid: boolean; results: Array<{ key: string; label: string; exists: boolean }> }>
+  return res.json() as Promise<{
+    ok: boolean
+    all_valid: boolean
+    results: Array<{ key: string; label: string; exists: boolean }>
+  }>
 }
 
-export async function autoResumeBlocked(): Promise<{ ok: boolean; unblocked: Array<{ id: string; title: string }> }> {
+export async function autoResumeBlocked(): Promise<{
+  ok: boolean
+  unblocked: Array<{ id: string; title: string }>
+}> {
   const res = await fetch('/api/tasks-blockers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'auto_resume' }),
   })
   if (!res.ok) throw new Error(`Auto-resume failed: ${res.status}`)
-  return res.json() as Promise<{ ok: boolean; unblocked: Array<{ id: string; title: string }> }>
+  return res.json() as Promise<{
+    ok: boolean
+    unblocked: Array<{ id: string; title: string }>
+  }>
 }

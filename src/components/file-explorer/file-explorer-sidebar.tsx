@@ -438,7 +438,9 @@ export function FileExplorerSidebar({
       <ScrollAreaRoot className="flex-1 min-h-0">
         <ScrollAreaViewport className="px-1">
           {loading ? (
-            <div className="px-3 py-2 text-xs text-[var(--theme-muted)]">Loading…</div>
+            <div className="px-3 py-2 text-xs text-[var(--theme-muted)]">
+              Loading…
+            </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center">
               <div className="flex size-10 items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-hover)]">

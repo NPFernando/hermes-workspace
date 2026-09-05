@@ -48,7 +48,9 @@ export const Route = createFileRoute('/api/sessions')({
 
           // Merge local portable sessions (Ollama, Atomic Chat, etc.)
           const localSessions = listLocalSessions()
-          const gatewayIds = new Set(gatewaySessions.map((s: any) => s.key || s.id))
+          const gatewayIds = new Set(
+            gatewaySessions.map((s: any) => s.key || s.id),
+          )
           for (const ls of localSessions) {
             if (!gatewayIds.has(ls.id)) {
               gatewaySessions.push({
@@ -207,7 +209,9 @@ export const Route = createFileRoute('/api/sessions')({
           // Try to update via gateway/dashboard first so the title persists
           // in the backend. Only fall back to local if the session is not
           // known to the gateway (i.e. a portable-mode-only session).
-          let gatewaySession: Awaited<ReturnType<typeof updateSession>> | undefined
+          let gatewaySession:
+            | Awaited<ReturnType<typeof updateSession>>
+            | undefined
           try {
             gatewaySession = await updateSession(sessionKey, { title: label })
           } catch {
@@ -216,7 +220,8 @@ export const Route = createFileRoute('/api/sessions')({
           if (gatewaySession) {
             // Keep local store in sync if a mirror exists there
             const localSession = getLocalSession(sessionKey)
-            if (localSession && label) updateLocalSessionTitle(sessionKey, label)
+            if (localSession && label)
+              updateLocalSessionTitle(sessionKey, label)
             return json({
               ok: true,
               sessionKey,
@@ -248,7 +253,10 @@ export const Route = createFileRoute('/api/sessions')({
             })
           }
 
-          return json({ ok: false, error: 'Session not found' }, { status: 404 })
+          return json(
+            { ok: false, error: 'Session not found' },
+            { status: 404 },
+          )
         } catch (err) {
           return json(
             {

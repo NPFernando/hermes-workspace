@@ -53,13 +53,22 @@ function extractItems(data: unknown): Array<unknown> {
   if (data && typeof data === 'object') {
     const d = data as Record<string, unknown>
     const candidate =
-      d.servers ?? d.manifests ?? d.packages ?? d.items ?? d.results ?? d.entries
+      d.servers ??
+      d.manifests ??
+      d.packages ??
+      d.items ??
+      d.results ??
+      d.entries
     if (Array.isArray(candidate)) return candidate
   }
   return []
 }
 
-function parseItems(items: Array<unknown>, sourceId: string, defaultTrust: HubTrust): Array<HubMcpEntry> {
+function parseItems(
+  items: Array<unknown>,
+  sourceId: string,
+  defaultTrust: HubTrust,
+): Array<HubMcpEntry> {
   const entries: Array<HubMcpEntry> = []
 
   for (const item of items) {
@@ -67,8 +76,10 @@ function parseItems(items: Array<unknown>, sourceId: string, defaultTrust: HubTr
     const raw = item as RawItem
 
     // Prefer qualifiedName → name → displayName
-    const qualified = typeof raw.qualifiedName === 'string' ? raw.qualifiedName.trim() : ''
-    const display = typeof raw.displayName === 'string' ? raw.displayName.trim() : ''
+    const qualified =
+      typeof raw.qualifiedName === 'string' ? raw.qualifiedName.trim() : ''
+    const display =
+      typeof raw.displayName === 'string' ? raw.displayName.trim() : ''
     const fallback = typeof raw.name === 'string' ? raw.name.trim() : ''
     const name = qualified || fallback || display
     if (!name) continue
@@ -94,7 +105,9 @@ function parseItems(items: Array<unknown>, sourceId: string, defaultTrust: HubTr
       trust = 'official'
     } else if (
       typeof raw.trust === 'string' &&
-      (raw.trust === 'official' || raw.trust === 'community' || raw.trust === 'unverified')
+      (raw.trust === 'official' ||
+        raw.trust === 'community' ||
+        raw.trust === 'unverified')
     ) {
       trust = raw.trust
     }
@@ -145,7 +158,9 @@ function parseItems(items: Array<unknown>, sourceId: string, defaultTrust: HubTr
  * Read the response body with a byte limit of MAX_RESPONSE_BYTES (5 MB).
  * Returns { text, truncated } — if truncated is true the body was cut short.
  */
-async function readBodyWithLimit(response: Response): Promise<{ text: string; truncated: boolean }> {
+async function readBodyWithLimit(
+  response: Response,
+): Promise<{ text: string; truncated: boolean }> {
   if (!response.body) {
     const text = await response.text()
     return { text, truncated: false }
@@ -174,7 +189,9 @@ async function readBodyWithLimit(response: Response): Promise<{ text: string; tr
     reader.releaseLock()
   }
 
-  const combined = new Uint8Array(totalBytes <= MAX_RESPONSE_BYTES ? totalBytes : MAX_RESPONSE_BYTES)
+  const combined = new Uint8Array(
+    totalBytes <= MAX_RESPONSE_BYTES ? totalBytes : MAX_RESPONSE_BYTES,
+  )
   let offset = 0
   for (const chunk of chunks) {
     combined.set(chunk, offset)
@@ -231,7 +248,11 @@ export async function fetchGenericJson(
     const msg = safeErrorMessage(err)
     warnings.push(`${sourceId}: network error: ${msg}`)
     if (cached) {
-      return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -247,7 +268,8 @@ export async function fetchGenericJson(
   if (response.status === 403) {
     const remaining = response.headers.get('X-RateLimit-Remaining')
     const resetAt = response.headers.get('X-RateLimit-Reset')
-    const remainingNum = remaining !== null ? parseInt(remaining, 10) : undefined
+    const remainingNum =
+      remaining !== null ? parseInt(remaining, 10) : undefined
     const resetAtNum = resetAt !== null ? parseInt(resetAt, 10) : undefined
 
     warnings.push(
@@ -257,10 +279,16 @@ export async function fetchGenericJson(
     if (cached) {
       setCache(cacheKey, {
         ...cached,
-        ...(remainingNum !== undefined ? { rateLimitRemaining: remainingNum } : {}),
+        ...(remainingNum !== undefined
+          ? { rateLimitRemaining: remainingNum }
+          : {}),
         ...(resetAtNum !== undefined ? { rateLimitResetAt: resetAtNum } : {}),
       })
-      return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -268,7 +296,11 @@ export async function fetchGenericJson(
   if (!response.ok) {
     warnings.push(`${sourceId}: unexpected status ${response.status}`)
     if (cached) {
-      return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -278,7 +310,11 @@ export async function fetchGenericJson(
   if (truncated) {
     warnings.push(`${sourceId}: Response too large (>5MB)`)
     if (cached) {
-      return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }
@@ -291,7 +327,11 @@ export async function fetchGenericJson(
     const msg = safeErrorMessage(err)
     warnings.push(`${sourceId}: failed to parse JSON: ${msg}`)
     if (cached) {
-      return { entries: cached.payload as Array<HubMcpEntry>, warnings, degraded: true }
+      return {
+        entries: cached.payload as Array<HubMcpEntry>,
+        warnings,
+        degraded: true,
+      }
     }
     return { entries: [], warnings, degraded: true }
   }

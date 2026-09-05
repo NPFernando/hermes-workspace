@@ -67,7 +67,11 @@ export function DataTable({
 
   const trimmedSearch = search.trim().toLowerCase()
   const filtered = trimmedSearch
-    ? rows.filter((row) => columns.some((column) => textValue(row, column).toLowerCase().includes(trimmedSearch)))
+    ? rows.filter((row) =>
+        columns.some((column) =>
+          textValue(row, column).toLowerCase().includes(trimmedSearch),
+        ),
+      )
     : rows
 
   const sorted = sortColumn
@@ -76,14 +80,16 @@ export function DataTable({
         const bv = b[sortColumn]
         let cmp: number
         if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv
-        else cmp = textValue(a, sortColumn).localeCompare(textValue(b, sortColumn))
+        else
+          cmp = textValue(a, sortColumn).localeCompare(textValue(b, sortColumn))
         return sortDirection === 'asc' ? cmp : -cmp
       })
     : filtered
 
   // A search or sort implies looking beyond the recent-8 default — show
   // everything matching instead of silently hiding older rows.
-  const visibleRows = searchable && (trimmedSearch || sortColumn) ? sorted : sorted.slice(-8)
+  const visibleRows =
+    searchable && (trimmedSearch || sortColumn) ? sorted : sorted.slice(-8)
 
   function startEdit(row: Record<string, unknown>) {
     setError(null)
@@ -130,7 +136,11 @@ export function DataTable({
       const res = await fetch('/api/finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_record', kind, id: confirmDeleteId }),
+        body: JSON.stringify({
+          action: 'delete_record',
+          kind,
+          id: confirmDeleteId,
+        }),
       })
       const data = (await res.json()) as { ok?: boolean; error?: string }
       if (data.ok === false) {
@@ -167,7 +177,10 @@ export function DataTable({
             />
           )}
           <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
-            {visibleRows.length === rows.length ? rows.length : `${visibleRows.length} / ${rows.length}`} records
+            {visibleRows.length === rows.length
+              ? rows.length
+              : `${visibleRows.length} / ${rows.length}`}{' '}
+            records
           </span>
         </div>
       </div>
@@ -178,7 +191,9 @@ export function DataTable({
           database is initialized and ready.
         </p>
       ) : visibleRows.length === 0 ? (
-        <p className="text-sm text-[var(--theme-muted)]">No records match "{search}".</p>
+        <p className="text-sm text-[var(--theme-muted)]">
+          No records match "{search}".
+        </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
@@ -191,7 +206,8 @@ export function DataTable({
                     onClick={searchable ? () => toggleSort(column) : undefined}
                   >
                     {column}
-                    {sortColumn === column && (sortDirection === 'asc' ? ' ▲' : ' ▼')}
+                    {sortColumn === column &&
+                      (sortDirection === 'asc' ? ' ▲' : ' ▼')}
                   </th>
                 ))}
                 {editable && (
@@ -217,12 +233,21 @@ export function DataTable({
                             <input
                               type="checkbox"
                               checked={Boolean(draft[column])}
-                              onChange={(e) => setDraft((prev) => ({ ...prev, [column]: e.target.checked }))}
+                              onChange={(e) =>
+                                setDraft((prev) => ({
+                                  ...prev,
+                                  [column]: e.target.checked,
+                                }))
+                              }
                             />
                           ) : (
                             <input
                               type={inputTypeFor(row[column])}
-                              value={draft[column] == null ? '' : String(draft[column])}
+                              value={
+                                draft[column] == null
+                                  ? ''
+                                  : String(draft[column])
+                              }
                               onChange={(e) =>
                                 setDraft((prev) => ({
                                   ...prev,
@@ -292,7 +317,9 @@ export function DataTable({
       {confirmDeleteId && (
         <ConfirmDialog
           title="Delete this record?"
-          body={error ? `${error} — try again or cancel.` : "This can't be undone."}
+          body={
+            error ? `${error} — try again or cancel.` : "This can't be undone."
+          }
           confirmLabel="Delete"
           busy={busy}
           onConfirm={() => void confirmDelete()}

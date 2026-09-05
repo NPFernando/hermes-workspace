@@ -100,7 +100,9 @@ export function runRebalanceBacktest(
     priceIndex[s] = new Map(candles.map((c) => [c.openTime, c.close]))
   }
 
-  const holdingsQty: Record<string, number> = Object.fromEntries(symbols.map((s) => [s, 0]))
+  const holdingsQty: Record<string, number> = Object.fromEntries(
+    symbols.map((s) => [s, 0]),
+  )
   let quoteBalance = config.startingBalanceQuote
   const trades: Array<RebalanceBacktestTrade> = []
   let lastRebalanceAt: number | null = null
@@ -145,10 +147,16 @@ export function runRebalanceBacktest(
     const holdingsValueQuote = Object.fromEntries(
       symbols.map((s) => [s, (holdingsQty[s] ?? 0) * (knownPrice[s] ?? 0)]),
     )
-    const { items } = planRebalance(holdingsValueQuote, quoteBalance, targetWeights)
+    const { items } = planRebalance(
+      holdingsValueQuote,
+      quoteBalance,
+      targetWeights,
+    )
     const drift = maxDrift(items)
     const elapsedMinutes =
-      lastRebalanceAt == null ? Number.POSITIVE_INFINITY : (t - lastRebalanceAt) / 60_000
+      lastRebalanceAt == null
+        ? Number.POSITIVE_INFINITY
+        : (t - lastRebalanceAt) / 60_000
     const timeTriggered = elapsedMinutes >= config.minRebalanceIntervalMinutes
     const driftTriggered = drift >= config.driftThresholdPct
     const triggered = lastRebalanceAt == null || timeTriggered || driftTriggered
@@ -213,7 +221,9 @@ export function runRebalanceBacktest(
     )
   const returnPct =
     config.startingBalanceQuote > 0
-      ? ((finalEquityQuote - config.startingBalanceQuote) / config.startingBalanceQuote) * 100
+      ? ((finalEquityQuote - config.startingBalanceQuote) /
+          config.startingBalanceQuote) *
+        100
       : 0
   const totalFeesQuote = trades.reduce((s, t) => s + t.feeQuote, 0)
   const buyAndHoldReturnPct: Record<string, number> = {}
@@ -257,6 +267,10 @@ export function runRebalanceBacktest(
     finalEquityQuote,
     buyAndHoldReturnPct,
     equityCurve,
-    riskAdjusted: computeRiskAdjustedMetrics(equityCurve, returnPct, maxDrawdownPct),
+    riskAdjusted: computeRiskAdjustedMetrics(
+      equityCurve,
+      returnPct,
+      maxDrawdownPct,
+    ),
   }
 }

@@ -18,8 +18,7 @@ export const Route = createFileRoute('/api/knowledge/graph')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

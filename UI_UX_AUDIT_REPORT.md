@@ -7,31 +7,31 @@
 > all Critical items and more. Current status, integrated on
 > `integration/ui-audit`:
 >
-> | Finding | Status |
-> |---|---|
-> | Critical #1 — duplicate mobile titles (7 screens) | **Fixed** (`fix/mobile-duplicate-title-files`, `fix/mobile-duplicate-titles-batch2`) |
-> | Critical #2 — Tasks stats row unreadable on mobile | **Fixed** — landed on `main` via the autonomous auto-improve loop (`9cd9db87`); the parallel branch `fix/tasks-mobile-stats-scroll` is superseded and excluded from integration |
-> | Critical #3 — Swarm worker-card overlap | **Fixed** (`fix/swarm-worker-card-mobile-overlap`) — also fixed a latent role-badge truncation bug affecting desktop |
-> | Critical #4 — Terminal input behind tab bar | **Fixed** (`fix/terminal-mobile-input-tabbar`) — confirmed by geometry + typing interaction, not just screenshots |
-> | Critical #5 — Dashboard skills-count / fake hint | **Fixed** (`fix/dashboard-skills-count-and-hint-loading`) — root cause was error-swallowing in the count query, not the data source |
-> | Critical #6 — dead confirm dialogs in Tasks | **Fixed twice**: original fix (`fix/tasks-dead-confirm-dialogs`, now stale) was lost to the tasks-screen refactor on main; re-fixed via the shared component (`feat/shared-confirm-dialog`), which also implements §9.1 |
-> | Critical #7 — sister-picker duplicate names | **Fixed** (`fix/sister-picker-profile-distinction`) — confirmed to be AI sisters + delegation profiles sharing display names; profile pills now show their role |
-> | §9.1 shared ConfirmDialog | **Done** (`feat/shared-confirm-dialog`) |
-> | Phase 5 polish (settings ❌, research CTA, skills tabs) | **Done** (`polish/audit-phase5`) |
-> | Title tooltips (rounds 1–3) | **Done** (`fix/skills-title-tooltips`, `fix/profiles-jobs-title-tooltips`) |
+> | Finding                                                 | Status                                                                                                                                                                                                                  |
+> | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | Critical #1 — duplicate mobile titles (7 screens)       | **Fixed** (`fix/mobile-duplicate-title-files`, `fix/mobile-duplicate-titles-batch2`)                                                                                                                                    |
+> | Critical #2 — Tasks stats row unreadable on mobile      | **Fixed** — landed on `main` via the autonomous auto-improve loop (`9cd9db87`); the parallel branch `fix/tasks-mobile-stats-scroll` is superseded and excluded from integration                                         |
+> | Critical #3 — Swarm worker-card overlap                 | **Fixed** (`fix/swarm-worker-card-mobile-overlap`) — also fixed a latent role-badge truncation bug affecting desktop                                                                                                    |
+> | Critical #4 — Terminal input behind tab bar             | **Fixed** (`fix/terminal-mobile-input-tabbar`) — confirmed by geometry + typing interaction, not just screenshots                                                                                                       |
+> | Critical #5 — Dashboard skills-count / fake hint        | **Fixed** (`fix/dashboard-skills-count-and-hint-loading`) — root cause was error-swallowing in the count query, not the data source                                                                                     |
+> | Critical #6 — dead confirm dialogs in Tasks             | **Fixed twice**: original fix (`fix/tasks-dead-confirm-dialogs`, now stale) was lost to the tasks-screen refactor on main; re-fixed via the shared component (`feat/shared-confirm-dialog`), which also implements §9.1 |
+> | Critical #7 — sister-picker duplicate names             | **Fixed** (`fix/sister-picker-profile-distinction`) — confirmed to be AI sisters + delegation profiles sharing display names; profile pills now show their role                                                         |
+> | §9.1 shared ConfirmDialog                               | **Done** (`feat/shared-confirm-dialog`)                                                                                                                                                                                 |
+> | Phase 5 polish (settings ❌, research CTA, skills tabs) | **Done** (`polish/audit-phase5`)                                                                                                                                                                                        |
+> | Title tooltips (rounds 1–3)                             | **Done** (`fix/skills-title-tooltips`, `fix/profiles-jobs-title-tooltips`)                                                                                                                                              |
 >
 > **Phase 4 accessibility results (2026-07-02):**
 >
-> - *Keyboard alternative for board drag-and-drop*: already existed — every
+> - _Keyboard alternative for board drag-and-drop_: already existed — every
 >   task card's kebab menu (aria-label "Task options") has a full "Move to
 >   [column]" section. The real gap was that the kebab lives in an
 >   `opacity-0 group-hover:opacity-100` cluster, invisible to keyboard users
 >   even when focused. Fixed with `focus-within:opacity-100` on the action
 >   cluster and `focus-visible:opacity-100` on both hidden bulk-select
 >   checkboxes (`fix/task-card-focus-visibility`).
-> - *Mobile tab-bar aria-labels*: verified already correct — every tab has a
+> - _Mobile tab-bar aria-labels_: verified already correct — every tab has a
 >   state-aware label including "(current page)". No change needed.
-> - *`--theme-muted` contrast (WCAG, muted-on-bg / muted-on-card)*: 8 of 11
+> - _`--theme-muted` contrast (WCAG, muted-on-bg / muted-on-card)_: 8 of 11
 >   parsed themes pass AA 4.5:1 (odysseus 4.91/5.36, matrix 6.42/6.35,
 >   claude-official 7.79/7.15, claude-classic 5.46/4.72, claude-slate
 >   6.15/5.26, claude-classic-light 4.98/5.34, claude-slate-light 6.00/6.39,
@@ -92,6 +92,7 @@ still wrong today, not a case for redoing existing work.
 
 **Two round-1 leads were investigated further in round 2 and retracted** —
 noted explicitly in §2 so they aren't mistaken for open issues:
+
 - The "changelog modal keeps reappearing" observation: root-caused to my own
   test script seeding the wrong localStorage value (an arbitrary `'999.0.0'`
   instead of the real current version string the app checks for exact
@@ -120,7 +121,7 @@ not a finished feature to polish yet.
 
 ## 1. UI/UX Executive Summary
 
-The design *system* (tokens, themes, shared utility classes) is solid and
+The design _system_ (tokens, themes, shared utility classes) is solid and
 consistently used. The real problems cluster in four places:
 
 1. **Duplicate page titles on mobile — systemic, confirmed on 7 of 10 screens
@@ -168,6 +169,7 @@ data-consistency, not in the app's form/dialog patterns generally.
 ## 2. Critical UX Issues
 
 ### Critical #1 — Duplicate page title on mobile (systemic: 7 of 10 screens)
+
 - **Files:** `src/components/workspace-shell.tsx` (`MobilePageHeader`) +
   each screen's own heading — confirmed on `tasks-screen.tsx`,
   `files-screen.tsx`, `command-center-screen.tsx`, `research-screen.tsx`,
@@ -201,6 +203,7 @@ data-consistency, not in the app's form/dialog patterns generally.
   content moves, not just a delete.
 
 ### Critical #2 — Tasks screen header is unusable on mobile
+
 - **File:** `src/screens/tasks/tasks-screen.tsx` (header block).
 - **Problem:** Screenshotted at 375px. The stats line and action-button row
   do not adapt to narrow viewports — text fragments wrap one-or-two-words-
@@ -211,11 +214,12 @@ data-consistency, not in the app's form/dialog patterns generally.
   key numbers and moves the action buttons into a horizontal scroll row or
   overflow menu below ~640px — same pattern already used for
   `agents-screen.tsx`'s tab row (`flex-nowrap overflow-x-auto
-  scrollbar-none`, per `NAVEEN_CUSTOMIZATIONS.md`).
+scrollbar-none`, per `NAVEEN_CUSTOMIZATIONS.md`).
 - **Risk if applied:** Medium — layout-judgment call, needs visual QA.
   **Not applied** — recommended, pending your sign-off on the target layout.
 
 ### Critical #3 — Swarm screen: agent card header text overlaps on mobile
+
 - **File:** `src/screens/swarm2/` (per-agent/worker card header — the
   component rendering the agent name next to status pills like "MERGE GATE"
   / "KILL CRITERIA").
@@ -237,6 +241,7 @@ data-consistency, not in the app's form/dialog patterns generally.
   **Not applied.**
 
 ### Critical #4 — Terminal's mobile input bar appears to render behind the tab bar
+
 - **File:** `src/components/terminal/mobile-terminal-input.tsx` (per an
   existing code comment in `workspace-shell.tsx`: "Mobile input bar — only
   mount on the terminal route. It uses fixed bottom positioning...").
@@ -258,13 +263,14 @@ data-consistency, not in the app's form/dialog patterns generally.
   first since I can't be fully sure without it.
 
 ### Critical #5 — Dashboard shows stale/placeholder data presented as real
+
 - **File:** `src/screens/dashboard/` (Skills Usage widget + Optimization
   Hint card — exact component not identified down to filename in this pass).
 - **Problem:** Screenshotted at 1440px (`desktop-dashboard.png`). Two issues
   in the same screen: (1) the "Skills Usage" card reads "0 installed · NO
   SKILLS INSTALLED," while the Skills Browser — screenshotted the same
   session, same account — clearly lists 9+ installed skills
-  (adaptive-memory-decay, astra-*, atlas_sel, auto-improvement-loop, etc.).
+  (adaptive-memory-decay, astra-\*, atlas_sel, auto-improvement-loop, etc.).
   (2) The "Optimization Hint" card shows "Dashboard loading — Overview data
   not yet available. Suggestions will appear once analytics are loaded,"
   styled identically to a real actionable hint (complete with a "LOW"
@@ -286,6 +292,7 @@ data-consistency, not in the app's form/dialog patterns generally.
   understanding before patching the display.
 
 ### Critical #6 — Dead confirm-dialog flows in Tasks (delete, prune stale, bulk delete)
+
 - **File:** `src/screens/tasks/tasks-screen.tsx`
 - **Problem:** `deleteConfirmId`, `confirmPruneStale`, and `confirmBulkDelete`
   state were set by their trigger buttons but no dialog ever read that
@@ -299,6 +306,7 @@ data-consistency, not in the app's form/dialog patterns generally.
 - **Risk:** Low — pure wiring, no new business logic.
 
 ### Critical #7 — Chat sister-picker shows apparent duplicate agent names
+
 - **File:** `src/screens/chat/components/sister-picker.tsx` (renders
   whatever `sisters` array it's given, no dedup) +
   `src/screens/chat/chat-screen.tsx` (fetches `/api/sisters` and passes the
@@ -313,7 +321,7 @@ data-consistency, not in the app's form/dialog patterns generally.
   216-234). Command Center, screenshotted the same session, shows all 12 AI
   Sisters exactly once with **no duplicates**, and a separate "Delegation
   Profiles" section below it. This means the "duplicates" in the chat picker
-  are near-certainly two *different* registry entries (different `id`s, one
+  are near-certainly two _different_ registry entries (different `id`s, one
   an AI sister and one a delegation/business profile) that happen to share a
   display **name** — the dedup-by-id logic correctly lets both through since
   they're technically different entries, but the picker gives the user no
@@ -354,7 +362,7 @@ data-consistency, not in the app's form/dialog patterns generally.
   far right of a secondary controls row (Rounds/Max time), visually
   disconnected from both the input above it and from the app's own
   convention of filled accent-colored buttons for primary actions (compare
-  Tasks' "New Task", "Create"). It's easy to miss as *the* primary action of
+  Tasks' "New Task", "Create"). It's easy to miss as _the_ primary action of
   an otherwise very sparse page.
 - **Skills Browser (desktop)**: solid marketplace-grid layout. Card titles
   use `line-clamp-1` with several names sharing long common prefixes
@@ -415,7 +423,7 @@ data-consistency, not in the app's form/dialog patterns generally.
   power-user-facing settings screen, but worth knowing there's no guardrail
   against a typo'd model string beyond whatever the backend returns on save.
 - **Create Task dialog (round 4, both viewports): no issues found — a good
-  example to point to.** Required-field marker ("Title *"), helpful
+  example to point to.** Required-field marker ("Title \*"), helpful
   placeholder copy, "Create Task" correctly disabled until Title is filled,
   and a proactive helper line ("Assignee is separate from status. Dragging a
   card changes its column only.") that heads off a likely point of

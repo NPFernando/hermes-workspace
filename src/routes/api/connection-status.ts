@@ -16,7 +16,9 @@ import {
 import { isAuthenticated } from '../../server/auth-middleware'
 
 const CONFIG_PATH = path.join(
-  process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes'),
+  process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes'),
   'config.yaml',
 )
 
@@ -24,7 +26,10 @@ function readActiveModel(): string {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8')
     const parsed = YAML.parse(raw)
-    const config = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {}
+    const config =
+      parsed && typeof parsed === 'object'
+        ? (parsed as Record<string, unknown>)
+        : {}
     const modelField = config.model
     if (typeof modelField === 'string') return modelField
     if (modelField && typeof modelField === 'object') {

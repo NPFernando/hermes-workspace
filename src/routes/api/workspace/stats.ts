@@ -14,7 +14,9 @@ import { isAuthenticated } from '../../../server/auth-middleware'
 
 function getDiskUsagePercent(): number | null {
   try {
-    const out = execSync("df / --output=pcent | tail -1", { timeout: 2000 }).toString().trim()
+    const out = execSync('df / --output=pcent | tail -1', { timeout: 2000 })
+      .toString()
+      .trim()
     return parseInt(out.replace('%', ''), 10)
   } catch {
     return null
@@ -23,12 +25,18 @@ function getDiskUsagePercent(): number | null {
 
 function getOpenTaskCount(): number {
   try {
-    const hermesHome = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+    const hermesHome =
+      process.env.HERMES_HOME ??
+      process.env.CLAUDE_HOME ??
+      path.join(os.homedir(), '.hermes')
     const tasksPath = path.join(hermesHome, 'tasks.json')
     if (!fs.existsSync(tasksPath)) return 0
-    const data = JSON.parse(fs.readFileSync(tasksPath, 'utf-8')) as { tasks?: Array<{ column?: string }> }
+    const data = JSON.parse(fs.readFileSync(tasksPath, 'utf-8')) as {
+      tasks?: Array<{ column?: string }>
+    }
     const tasks = Array.isArray(data.tasks) ? data.tasks : []
-    return tasks.filter((t) => t.column !== 'done' && t.column !== 'deleted').length
+    return tasks.filter((t) => t.column !== 'done' && t.column !== 'deleted')
+      .length
   } catch {
     return 0
   }

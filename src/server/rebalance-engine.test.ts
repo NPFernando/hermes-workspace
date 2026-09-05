@@ -54,14 +54,21 @@ function fakeClient(balances: Array<{ asset: string; free: number }>) {
     getPrice: async () => 100,
     getKlines: async () => [],
     getAccount: async () => ({ accountType: 'SPOT', canTrade: true, balances }),
-    placeOrder: async (o: { symbol: string; side: 'BUY' | 'SELL'; quoteOrderQty?: number; quantity?: number }) => ({
+    placeOrder: async (o: {
+      symbol: string
+      side: 'BUY' | 'SELL'
+      quoteOrderQty?: number
+      quantity?: number
+    }) => ({
       symbol: o.symbol,
       orderId: 1,
       status: 'FILLED' as const,
       side: o.side,
       type: 'MARKET' as const,
-      executedQty: o.side === 'BUY' ? (o.quoteOrderQty ?? 0) / 100 : (o.quantity ?? 0),
-      cummulativeQuoteQty: o.side === 'BUY' ? (o.quoteOrderQty ?? 0) : (o.quantity ?? 0) * 100,
+      executedQty:
+        o.side === 'BUY' ? (o.quoteOrderQty ?? 0) / 100 : (o.quantity ?? 0),
+      cummulativeQuoteQty:
+        o.side === 'BUY' ? (o.quoteOrderQty ?? 0) : (o.quantity ?? 0) * 100,
       fills: [],
       transactTime: Date.now(),
       avgPrice: 100,
@@ -71,7 +78,13 @@ function fakeClient(balances: Array<{ asset: string; free: number }>) {
 
 describe('equalTargetWeights', () => {
   it('splits evenly across symbols', () => {
-    const w = equalTargetWeights(['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT'])
+    const w = equalTargetWeights([
+      'BTCUSDT',
+      'ETHUSDT',
+      'SOLUSDT',
+      'BNBUSDT',
+      'XRPUSDT',
+    ])
     expect(w.BTCUSDT).toBeCloseTo(0.2, 10)
     expect(Object.values(w).reduce((s, v) => s + v, 0)).toBeCloseTo(1, 10)
   })
@@ -102,8 +115,22 @@ describe('planRebalance', () => {
 describe('maxDrift', () => {
   it('returns the largest absolute deviation from target', () => {
     const drift = maxDrift([
-      { symbol: 'A', actualWeight: 0.6, targetWeight: 0.5, actualValueQuote: 0, targetValueQuote: 0, diffQuote: 0 },
-      { symbol: 'B', actualWeight: 0.4, targetWeight: 0.5, actualValueQuote: 0, targetValueQuote: 0, diffQuote: 0 },
+      {
+        symbol: 'A',
+        actualWeight: 0.6,
+        targetWeight: 0.5,
+        actualValueQuote: 0,
+        targetValueQuote: 0,
+        diffQuote: 0,
+      },
+      {
+        symbol: 'B',
+        actualWeight: 0.4,
+        targetWeight: 0.5,
+        actualValueQuote: 0,
+        targetValueQuote: 0,
+        diffQuote: 0,
+      },
     ])
     expect(drift).toBeCloseTo(0.1, 10)
   })
@@ -113,11 +140,36 @@ describe('buildTradePlan', () => {
   it('orders sells before buys and skips trades below the minimum notional', () => {
     const plan = buildTradePlan(
       [
-        { symbol: 'OVER', actualWeight: 0.6, targetWeight: 0.5, actualValueQuote: 60, targetValueQuote: 50, diffQuote: -10 },
-        { symbol: 'UNDER', actualWeight: 0.4, targetWeight: 0.5, actualValueQuote: 40, targetValueQuote: 50, diffQuote: 10 },
-        { symbol: 'TINY', actualWeight: 0.5, targetWeight: 0.5, actualValueQuote: 50.5, targetValueQuote: 50, diffQuote: -0.5 },
+        {
+          symbol: 'OVER',
+          actualWeight: 0.6,
+          targetWeight: 0.5,
+          actualValueQuote: 60,
+          targetValueQuote: 50,
+          diffQuote: -10,
+        },
+        {
+          symbol: 'UNDER',
+          actualWeight: 0.4,
+          targetWeight: 0.5,
+          actualValueQuote: 40,
+          targetValueQuote: 50,
+          diffQuote: 10,
+        },
+        {
+          symbol: 'TINY',
+          actualWeight: 0.5,
+          targetWeight: 0.5,
+          actualValueQuote: 50.5,
+          targetValueQuote: 50,
+          diffQuote: -0.5,
+        },
       ],
-      { ...DEFAULT_REBALANCE_CONFIG, maxNotionalPerCycleQuote: 1000, minTradeNotionalQuote: 5 },
+      {
+        ...DEFAULT_REBALANCE_CONFIG,
+        maxNotionalPerCycleQuote: 1000,
+        minTradeNotionalQuote: 5,
+      },
     )
     expect(plan.map((p) => p.symbol)).toEqual(['OVER', 'UNDER'])
     expect(plan[0]?.side).toBe('SELL')
@@ -127,10 +179,28 @@ describe('buildTradePlan', () => {
   it('stops adding trades once the per-cycle notional cap is reached', () => {
     const plan = buildTradePlan(
       [
-        { symbol: 'A', actualWeight: 0, targetWeight: 0, actualValueQuote: 0, targetValueQuote: 0, diffQuote: 60 },
-        { symbol: 'B', actualWeight: 0, targetWeight: 0, actualValueQuote: 0, targetValueQuote: 0, diffQuote: 60 },
+        {
+          symbol: 'A',
+          actualWeight: 0,
+          targetWeight: 0,
+          actualValueQuote: 0,
+          targetValueQuote: 0,
+          diffQuote: 60,
+        },
+        {
+          symbol: 'B',
+          actualWeight: 0,
+          targetWeight: 0,
+          actualValueQuote: 0,
+          targetValueQuote: 0,
+          diffQuote: 60,
+        },
       ],
-      { ...DEFAULT_REBALANCE_CONFIG, maxNotionalPerCycleQuote: 100, minTradeNotionalQuote: 5 },
+      {
+        ...DEFAULT_REBALANCE_CONFIG,
+        maxNotionalPerCycleQuote: 100,
+        minTradeNotionalQuote: 5,
+      },
     )
     const totalNotional = plan.reduce((s, p) => s + p.notionalQuote, 0)
     expect(totalNotional).toBeLessThanOrEqual(100)
@@ -185,7 +255,8 @@ describe('runRebalanceCycle gating', () => {
   it('executes trades once enabled, in testnet_execute, and drift exceeds the threshold', async () => {
     await setMode('testnet_execute')
     await enableEngine()
-    const { runRebalanceCycle, getRebalanceState } = await import('./rebalance-engine')
+    const { runRebalanceCycle, getRebalanceState } =
+      await import('./rebalance-engine')
     // All-USDT, no crypto holdings — 100% drift from equal-weight target on every symbol.
     const client = fakeClient([{ asset: 'USDT', free: 1000 }])
     const result = await runRebalanceCycle({ client: client as never })

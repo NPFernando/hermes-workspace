@@ -76,10 +76,20 @@ import {
   parseStrategyBaselines,
   resolveStrategyDecayConfig,
 } from './strategy-decay'
+import {
+  computeStrategyEvidenceWindow,
+  deriveGuardRecommendation,
+} from './strategy-guard-evidence'
 import type { AlertSeverity } from './alerts'
 import type { StrategyDecayResult } from './strategy-decay'
+import type { StrategyGuardReview } from './strategy-guard-evidence'
 import type { BucketStats, EntryFeatureVector } from './trading-pattern-veto'
-import type { Candle, CouncilMember, StrategyScore } from './trading-strategies'
+import type {
+  Candle,
+  CouncilMember,
+  Signal,
+  StrategyScore,
+} from './trading-strategies'
 import type { GuardianBlock, GuardianConfig } from './trading-guardian'
 import type {
   BinanceExecutionClient,
@@ -221,6 +231,34 @@ export interface EngineConfig {
    */
   longShortSentimentEnabled: boolean
   longShortSentimentPeriod: string
+  /**
+   * Sandbox/testnet "patient hold" mode (on by default): suppresses any exit
+   * that would realize a loss (fixed/ATR stop-loss, trailing stop, max-hold
+   * force-close, and owner/council SELL signals) while the position's mark
+   * price is still below its breakeven price. Take-profit / breakeven-or-
+   * better exits are never gated. Guardian safety valves (dust/unsellable
+   * close, close-failure force-close, daily/weekly halt, max open positions)
+   * remain fully active regardless of this flag, so capital can't be stuck
+   * forever. Intended only for paper/testnet validation, never live money.
+   */
+  noLossExitMode: boolean
+  /** Sandbox-only automatic guard for sufficiently evidenced weak strategies. */
+  strategyGuardEnabled: boolean
+  strategyGuardMinClosedTrades: number
+  strategyGuardLossRateThreshold: number
+  strategyGuardMaxPnlQuote: number
+  strategyGuardAction: StrategyOverrideMode
+  /**
+   * Bounded recent-evaluation window (days) for guard-review evidence — see
+   * strategy-guard-evidence.ts. Kept separate from the all-time
+   * `strategyGuard*` thresholds above (which still drive the actual
+   * automatic guard trigger, unchanged) so the dashboard can show *why* a
+   * strategy is flagged using recent evidence, while reusing
+   * `strategyGuardMinClosedTrades`/`strategyGuardLossRateThreshold`/
+   * `strategyGuardMaxPnlQuote` as the same sample/trigger thresholds applied
+   * to that window instead of introducing a parallel set of knobs.
+   */
+  guardEvidenceWindowDays: number
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -255,6 +293,13 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   fibExtensionRatio: 1.618,
   longShortSentimentEnabled: false,
   longShortSentimentPeriod: '1h',
+  noLossExitMode: true,
+  strategyGuardEnabled: false,
+  strategyGuardMinClosedTrades: 5,
+  strategyGuardLossRateThreshold: 0.4,
+  strategyGuardMaxPnlQuote: 0,
+  strategyGuardAction: 'reduce_size',
+  guardEvidenceWindowDays: 14,
   councilThreshold: 0.6,
   maxHoldMinutes: 0,
   guardian: DEFAULT_GUARDIAN_CONFIG,
@@ -288,6 +333,35 @@ interface OpenPosition {
   patternFeatures?: EntryFeatureVector
   /** Consecutive failed close attempts; alerts at 3, force book-close at 12 (~1h of 5-min cycles). Reset on any successful cycle exit. */
   closeFailureCount?: number
+  /** Timestamp of the one-time "still underwater, holding for recovery" alert, so it isn't re-sent every cycle while noLossExitMode keeps a losing position open. */
+  recoveryAlertSentAt?: string
+}
+
+export interface RecoveryAnalytics {
+  generatedAt: string
+  sample: {
+    closedTrades: number
+    openPositions: number
+    recoveredTrades: number
+    forcedCloseTrades: number
+  }
+  closed: {
+    recoveryRate: number | null
+    averageHoldMinutes: number | null
+    maxHoldMinutes: number | null
+    capitalHours: number
+    realizedPnlQuote: number
+    realizedLossQuote: number
+  }
+  open: {
+    underwaterCount: number
+    underwaterQuote: number
+    unrealizedPnlQuote: number
+    averageHoldMinutes: number | null
+    maxHoldMinutes: number | null
+    capitalHours: number
+    nearestBreakevenPct: number | null
+  }
 }
 
 type PositionAtrExits = Pick<
@@ -298,6 +372,107 @@ type PositionAtrExits = Pick<
   | 'atrTrailDistance'
   | 'fibTakeProfitPrice'
 >
+
+/** Estimated breakeven price for a position: entry price adjusted for the
+ * round-trip commission (buy-side fee ratio, doubled as a proxy for the
+ * exit-side fee too). Shared by the "patient hold" exit gate (below) and by
+ * `getEngineState()`'s display enrichment so the UI shows the exact same
+ * target the engine itself is holding out for. */
+function computeBreakEvenPrice(
+  pos: Pick<OpenPosition, 'entryPrice' | 'entryQuote' | 'entryFeeQuote'>,
+): number {
+  const feeRatio =
+    pos.entryQuote > 0 ? pos.entryFeeQuote / pos.entryQuote : 0
+  return pos.entryPrice * (1 + feeRatio * 2)
+}
+
+function durationMinutes(start: string, end: string): number | null {
+  const startMs = Date.parse(start)
+  const endMs = Date.parse(end)
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs)
+    return null
+  return (endMs - startMs) / 60_000
+}
+
+export function recoveryAnalytics(
+  positions: Array<OpenPosition>,
+  trades: Array<TradeLogEntry>,
+  monitor?: LiveMonitor,
+  noLossExitMode = false,
+): RecoveryAnalytics {
+  const now = new Date().toISOString()
+  const closedDurations = trades
+    .map((trade) => durationMinutes(trade.openedAt, trade.closedAt))
+    .filter((value): value is number => value != null)
+  const openViews = positions.map((position) => {
+    const live = monitor?.monitoring.find((m) => m.symbol === position.symbol)
+    const currentPrice = live?.price ?? position.entryPrice
+    const breakeven = computeBreakEvenPrice(position)
+    return {
+      position,
+      duration: durationMinutes(position.openedAt, now) ?? 0,
+      underwater: currentPrice < breakeven,
+      quote: position.entryQuote,
+      pnl: currentPrice * position.quantity - position.entryQuote,
+      breakevenPct:
+        position.entryPrice > 0
+          ? (breakeven - currentPrice) / currentPrice
+          : null,
+      patientHold: noLossExitMode && currentPrice < breakeven,
+    }
+  })
+  const recoveredTrades = trades.filter(
+    (trade) => trade.pnlQuote >= 0 && !trade.reason.includes('force-closed'),
+  ).length
+  const forcedCloseTrades = trades.filter((trade) =>
+    trade.reason.includes('force-closed'),
+  ).length
+  const average = (values: Array<number>): number | null =>
+    values.length
+      ? values.reduce((sum, value) => sum + value, 0) / values.length
+      : null
+  const capitalHours = (items: Array<{ quote: number; duration: number }>) =>
+    items.reduce((sum, item) => sum + (item.quote * item.duration) / 60, 0)
+  return {
+    generatedAt: now,
+    sample: {
+      closedTrades: trades.length,
+      openPositions: positions.length,
+      recoveredTrades,
+      forcedCloseTrades,
+    },
+    closed: {
+      recoveryRate: trades.length ? recoveredTrades / trades.length : null,
+      averageHoldMinutes: average(closedDurations),
+      maxHoldMinutes: closedDurations.length ? Math.max(...closedDurations) : null,
+      capitalHours: capitalHours(
+        trades.map((trade, index) => ({
+          quote: trade.entryQuote,
+          duration: closedDurations[index] ?? 0,
+        })),
+      ),
+      realizedPnlQuote: trades.reduce((sum, trade) => sum + trade.pnlQuote, 0),
+      realizedLossQuote: trades
+        .filter((trade) => trade.pnlQuote < 0)
+        .reduce((sum, trade) => sum + trade.pnlQuote, 0),
+    },
+    open: {
+      underwaterCount: openViews.filter((item) => item.underwater).length,
+      underwaterQuote: openViews
+        .filter((item) => item.underwater)
+        .reduce((sum, item) => sum + item.quote, 0),
+      unrealizedPnlQuote: openViews.reduce((sum, item) => sum + item.pnl, 0),
+      averageHoldMinutes: average(openViews.map((item) => item.duration)),
+      maxHoldMinutes: openViews.length
+        ? Math.max(...openViews.map((item) => item.duration))
+        : null,
+      capitalHours: capitalHours(openViews),
+      nearestBreakevenPct: openViews.length
+        ? Math.min(...openViews.map((item) => item.breakevenPct ?? 0))
+        : null,
+    },
+  }
+}
 
 export interface TradeLogEntry {
   id: string
@@ -325,7 +500,7 @@ export interface TradeLogEntry {
 export interface CycleAction {
   symbol: string
   strategyId: string
-  action: 'OPEN' | 'CLOSE' | 'SKIP' | 'BLOCKED'
+  action: 'OPEN' | 'CLOSE' | 'SKIP' | 'BLOCKED' | 'HOLD_FOR_RECOVERY'
   reason: string
   price?: number
   pnlQuote?: number
@@ -341,7 +516,39 @@ export interface CycleResult {
   ranAt: string
   executionMode?: BinanceExecutionEnvironment
   marketWarmup?: MarketDataWarmupReport
+  diagnostics?: TradingCycleDiagnostics
   learning?: LearningCycleResult
+}
+
+export interface TradingCycleDiagnosticSymbol {
+  symbol: string
+  candles: number
+  latestPrice: number | null
+  strategySignals: Array<{
+    strategyId: string
+    signal: 'BUY' | 'SELL' | 'HOLD'
+    confidence: number
+    reason: string
+  }>
+  councilSignal: 'BUY' | 'SELL' | 'HOLD'
+  councilNet: number
+  councilReasons: Array<string>
+  finalAction: CycleAction['action'] | null
+  finalReason: string | null
+}
+
+export interface TradingCycleDiagnostics {
+  ranAt: string
+  executionMode?: BinanceExecutionEnvironment
+  status: 'completed' | 'blocked' | 'data_error'
+  reason: string | null
+  symbols: Array<TradingCycleDiagnosticSymbol>
+}
+
+let lastTradingCycleDiagnostics: TradingCycleDiagnostics | null = null
+
+export function getLastTradingCycleDiagnostics(): TradingCycleDiagnostics | null {
+  return lastTradingCycleDiagnostics
 }
 
 export type MarketLearningStatus =
@@ -642,11 +849,11 @@ class PaperBinanceClient implements BinanceExecutionClient {
   readonly environment: BinanceExecutionEnvironment = 'paper'
 
   ping(): Promise<boolean> {
-    return Promise.resolve(true);
+    return Promise.resolve(true)
   }
 
   buildUserDataStreamSubscribeParams(): Record<string, unknown> {
-    return {};
+    return {}
   }
 
   async getPrice(symbol: string): Promise<number> {
@@ -921,7 +1128,10 @@ function tradeAlertDigest(actions: Array<CycleAction>): string {
 
 let cycleInProgress = false
 
-function executionModeForTradingMode(
+/** Exported for validation-run.ts, which must resolve/re-verify the exact
+ * same paper/testnet/live mapping this engine's own cycle gating uses —
+ * duplicating this logic anywhere else risks the two drifting apart. */
+export function executionModeForTradingMode(
   mode: string,
 ): BinanceExecutionEnvironment | null {
   if (mode === 'paper_trade') return 'paper'
@@ -1459,7 +1669,10 @@ async function runTradingCycleInner(
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const config = resolveEngineConfig(settings.demoTrading, options.config)
-  const cycleContext: { marketWarmup?: MarketDataWarmupReport } = {}
+  const cycleContext: {
+    marketWarmup?: MarketDataWarmupReport
+    diagnostics: Array<TradingCycleDiagnosticSymbol>
+  } = { diagnostics: [] }
 
   const mode = db.settings.tradingMode
   let executionMode: BinanceExecutionEnvironment | null =
@@ -1473,7 +1686,10 @@ async function runTradingCycleInner(
   const trades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE)
   const blocks = rows.filter((r) => r.kind === SR_KIND_BLOCK)
   let patternVetoStats: Record<string, BucketStats> = Object.fromEntries(
-    loadOfKind<BucketStats>(rows, SR_KIND_PATTERN_VETO_STATS).map((s) => [s.key, s]),
+    loadOfKind<BucketStats>(rows, SR_KIND_PATTERN_VETO_STATS).map((s) => [
+      s.key,
+      s,
+    ]),
   )
   const sentimentObservations = rows.filter(
     (r) => r.kind === SR_KIND_LONG_SHORT_OBSERVATION,
@@ -1484,6 +1700,13 @@ async function runTradingCycleInner(
   const dailyPnlQuote = realizedToday(activeTrades)
 
   const bail = (reason: string): CycleResult => {
+    lastTradingCycleDiagnostics = {
+      ranAt,
+      executionMode: executionMode ?? undefined,
+      status: 'blocked',
+      reason,
+      symbols: cycleContext.diagnostics,
+    }
     appendAuditLog('demo_trading_cycle_bailed', {
       reason,
       tradingMode: db.settings.tradingMode,
@@ -1501,13 +1724,16 @@ async function runTradingCycleInner(
       ranAt,
       executionMode: executionMode ?? undefined,
       marketWarmup: cycleContext.marketWarmup,
+      diagnostics: lastTradingCycleDiagnostics,
     }
   }
 
   if (db.settings.emergencyKillSwitch)
     return bail('emergency kill switch is active')
   if (isConnectivityBreakerTripped()) {
-    return bail('connectivity breaker tripped — repeated invalid-credential errors, needs manual reset')
+    return bail(
+      'connectivity breaker tripped — repeated invalid-credential errors, needs manual reset',
+    )
   }
   if (!executionMode) {
     return bail(
@@ -1615,9 +1841,24 @@ async function runTradingCycleInner(
     0.1,
     Math.min(1, quality.recommendedAdjustments.positionSizeMultiplier),
   )
-  const strategyOverrides = readStrategyOverrideState(settings.demoTrading)
+  applyAutomaticStrategyGuard(config, scores, executionMode)
+  reviewSandboxExperiments()
+  const strategyOverrides = strategyOverrideState()
   const overrideByStrategy = new Map(
-    strategyOverrides.active.map((override) => [override.strategyId, override]),
+    strategyOverrides.active
+      .filter(
+        (override) =>
+          !strategyOverrideExpired(override) &&
+          // Automatic guard AND sandbox-experiment overrides are sandbox-only
+          // safety features; neither is ever honoured in live mode, even if
+          // one were somehow still persisted (defense in depth — experiments
+          // also reject live at start and reviewSandboxExperiments() above
+          // force-rolls-back any experiment the moment live mode is active).
+          (executionMode !== 'live' ||
+            (override.source !== 'automatic' &&
+              override.source !== 'experiment')),
+      )
+      .map((override) => [override.strategyId, override]),
   )
 
   const actions: Array<CycleAction> = []
@@ -1652,7 +1893,11 @@ async function runTradingCycleInner(
     })
     const severity = guardianBlockAlertSeverity(verdictBlocks)
     if (
-      shouldAlertGuardianBlock(`${symbol}:${strategyId}`, verdictBlocks, Date.now())
+      shouldAlertGuardianBlock(
+        `${symbol}:${strategyId}`,
+        verdictBlocks,
+        Date.now(),
+      )
     ) {
       sendAlert({
         severity,
@@ -1697,7 +1942,12 @@ async function runTradingCycleInner(
   // changed the vote — building up history for a future backtest (Binance
   // only retains ~30 days of this via its API, so we accumulate our own).
   const appendSentimentObservation = (
-    point: { longShortRatio: number; longAccount: number; shortAccount: number; timestamp: number } | null,
+    point: {
+      longShortRatio: number
+      longAccount: number
+      shortAccount: number
+      timestamp: number
+    } | null,
     obsSymbol: string,
   ) => {
     if (point == null) return
@@ -1713,7 +1963,15 @@ async function runTradingCycleInner(
   }
 
   // Crash-safety: persist the store immediately after each order or shadow decision.
-  const checkpoint = () => persist({ scores, positions, trades, blocks, patternVetoStats, sentimentObservations })
+  const checkpoint = () =>
+    persist({
+      scores,
+      positions,
+      trades,
+      blocks,
+      patternVetoStats,
+      sentimentObservations,
+    })
 
   for (const symbol of config.symbols) {
     let candles: Array<Candle>
@@ -1754,6 +2012,17 @@ async function runTradingCycleInner(
         }
       }
     } catch (err) {
+      cycleContext.diagnostics.push({
+        symbol,
+        candles: 0,
+        latestPrice: null,
+        strategySignals: [],
+        councilSignal: 'HOLD',
+        councilNet: 0,
+        councilReasons: [],
+        finalAction: 'SKIP',
+        finalReason: `market data error: ${(err as Error).message}`,
+      })
       actions.push({
         symbol,
         strategyId: '-',
@@ -1798,7 +2067,9 @@ async function runTradingCycleInner(
         strategyId: s.id,
         decision:
           regime != null && !strategyAllowedInRegime(s.id, regime)
-            ? HOLD(`muted: ${regime}-vol regime favors a different strategy family`)
+            ? HOLD(
+                `muted: ${regime}-vol regime favors a different strategy family`,
+              )
             : s.evaluate(candles),
         score: scores.get(s.id)?.score ?? 0,
       }))
@@ -1813,7 +2084,9 @@ async function runTradingCycleInner(
         appendSentimentObservation(latest ?? null, symbol)
         members.push({
           strategyId: 'long_short_sentiment',
-          decision: longShortSentimentDecision(latest ? latest.longShortRatio : null),
+          decision: longShortSentimentDecision(
+            latest ? latest.longShortRatio : null,
+          ),
           score: scores.get('long_short_sentiment')?.score ?? 0,
         })
       } catch {
@@ -1822,6 +2095,23 @@ async function runTradingCycleInner(
       }
     }
     const vote = councilVote(members, config.councilThreshold)
+    const diagnostic: TradingCycleDiagnosticSymbol = {
+      symbol,
+      candles: candles.length,
+      latestPrice: price,
+      strategySignals: members.map((member) => ({
+        strategyId: member.strategyId,
+        signal: member.decision.signal,
+        confidence: member.decision.confidence,
+        reason: member.decision.reason,
+      })),
+      councilSignal: vote.signal,
+      councilNet: vote.net,
+      councilReasons: vote.reasons,
+      finalAction: null,
+      finalReason: null,
+    }
+    cycleContext.diagnostics.push(diagnostic)
 
     // 1. Manage existing positions (exits first).
     const held = activePositions().filter((p) => p.symbol === symbol)
@@ -1866,7 +2156,22 @@ async function runTradingCycleInner(
         (Date.now() - new Date(pos.openedAt).getTime()) / 60_000
       const hitMaxHold =
         config.maxHoldMinutes > 0 && heldMinutes >= config.maxHoldMinutes
-      if (
+      // "Patient hold" (sandbox/testnet only): estimate the breakeven price
+      // from the entry-side commission rate (doubled, as a proxy for the
+      // exit-side fee too) and refuse to let any exit realize a loss below
+      // it while noLossExitMode is on. Profit-side exits are unaffected;
+      // guardian-level force-closes (dust/unsellable/close-failure limit
+      // below) are a separate code path and are never gated by this.
+      const breakEvenPrice = computeBreakEvenPrice(pos)
+      const wouldRealizeLoss = price < breakEvenPrice
+      const closeFailureForceDue =
+        (pos.closeFailureCount ?? 0) >= CLOSE_FAILURE_FORCE_LIMIT
+      const lossExitSuppressed =
+        executionMode !== 'live' &&
+        config.noLossExitMode &&
+        wouldRealizeLoss &&
+        !closeFailureForceDue
+      const exitTriggered =
         hitAtrStop ||
         hitFixedStop ||
         hitAtrTrail ||
@@ -1877,7 +2182,24 @@ async function runTradingCycleInner(
         ownerExit ||
         councilExit ||
         hitMaxHold
-      ) {
+      if (exitTriggered && lossExitSuppressed) {
+        actions.push({
+          symbol,
+          strategyId: pos.strategyId,
+          action: 'HOLD_FOR_RECOVERY',
+          reason: `holding at a loss (${(changePct * 100).toFixed(2)}%, breakeven ${breakEvenPrice.toFixed(4)}) instead of realizing a loss`,
+          price,
+        })
+        if (heldMinutes >= 24 * 60 && !pos.recoveryAlertSentAt) {
+          pos.recoveryAlertSentAt = new Date().toISOString()
+          sendTradeAlert(
+            `⏳ ${symbol} (${pos.strategyId}) has been held ${Math.round(heldMinutes / 60)}h at a loss ` +
+              `(${(changePct * 100).toFixed(2)}%) — patient-hold mode is keeping it open until breakeven/profit ` +
+              `(breakeven ${breakEvenPrice.toFixed(4)}, current ${price.toFixed(4)}).`,
+          )
+        }
+      }
+      if (exitTriggered && !lossExitSuppressed) {
         const reason = hitAtrStop
           ? `atr-stop ${(changePct * 100).toFixed(2)}% (ATR ${pos.atrAtEntry?.toFixed(2) ?? '?'})`
           : hitFixedStop
@@ -2318,7 +2640,10 @@ async function runTradingCycleInner(
           // remains.
           bucketExposureQuote: config.guardian.correlationBucketsEnabled
             ? crossEngineBucketExposureQuote(
-                bucketExposureQuote(activePositions(), config.guardian.correlationBuckets),
+                bucketExposureQuote(
+                  activePositions(),
+                  config.guardian.correlationBuckets,
+                ),
                 config.guardian.correlationBuckets,
               )
             : undefined,
@@ -2371,8 +2696,7 @@ async function runTradingCycleInner(
             // executedQty minus fees taken in the base asset, and selling the
             // gross amount later fails with insufficient balance.
             const netQuantity =
-              order.executedQty -
-              orderBaseFee(order.fills, baseAssetOf(symbol))
+              order.executedQty - orderBaseFee(order.fills, baseAssetOf(symbol))
             positions.push({
               id: `pos_${symbol}_${Date.now()}`,
               symbol,
@@ -2429,7 +2753,14 @@ async function runTradingCycleInner(
     }
   }
 
-  persist({ scores, positions, trades, blocks, patternVetoStats, sentimentObservations })
+  persist({
+    scores,
+    positions,
+    trades,
+    blocks,
+    patternVetoStats,
+    sentimentObservations,
+  })
   let learning: LearningCycleResult | undefined
   if (mode === 'paper_trade' || mode === 'testnet_execute') {
     try {
@@ -2442,6 +2773,18 @@ async function runTradingCycleInner(
   }
   const digest = tradeAlertDigest(actions)
   if (digest) sendTradeAlert(digest)
+  for (const diagnostic of cycleContext.diagnostics) {
+    const action = actions.find((candidate) => candidate.symbol === diagnostic.symbol)
+    diagnostic.finalAction = action?.action ?? null
+    diagnostic.finalReason = action?.reason ?? null
+  }
+  lastTradingCycleDiagnostics = {
+    ranAt,
+    executionMode,
+    status: 'completed',
+    reason: null,
+    symbols: cycleContext.diagnostics,
+  }
   return {
     ran: true,
     actions,
@@ -2451,39 +2794,164 @@ async function runTradingCycleInner(
     ranAt,
     executionMode,
     marketWarmup: cycleContext.marketWarmup,
+    diagnostics: lastTradingCycleDiagnostics,
     learning,
   }
 }
 
-/** Read-only snapshot for the API/UI. */
-export function getEngineState(): {
+/** Open position enriched with live, display-only fields for the UI — current
+ * price, unrealized P&L, the breakeven target, and whether "patient hold"
+ * (no-loss exit mode) is actively keeping the position open this cycle
+ * instead of realizing a loss. Only populated when a `LiveMonitor` is passed
+ * to `getEngineState()`; fields are simply omitted (`undefined`) when no
+ * monitor is supplied (e.g. callers like demo-trading-grid.ts that only need
+ * the raw position list) or when the symbol isn't in the monitor's snapshot. */
+export type OpenPositionView = OpenPosition & {
+  currentPrice?: number
+  breakEvenPrice?: number
+  unrealizedPnlQuote?: number
+  unrealizedPnlPct?: number
+  holdingForRecovery?: boolean
+}
+
+function enrichPosition(
+  pos: OpenPosition,
+  monitor: LiveMonitor | undefined,
+  noLossExitMode: boolean,
+): OpenPositionView {
+  const marketSymbol = monitor?.monitoring.find((m) => m.symbol === pos.symbol)
+  if (!marketSymbol || marketSymbol.price <= 0) return pos
+  const currentPrice = marketSymbol.price
+  const breakEvenPrice = computeBreakEvenPrice(pos)
+  const unrealizedPnlQuote = currentPrice * pos.quantity - pos.entryQuote
+  const unrealizedPnlPct =
+    pos.entryQuote > 0 ? unrealizedPnlQuote / pos.entryQuote : 0
+  return {
+    ...pos,
+    currentPrice,
+    breakEvenPrice,
+    unrealizedPnlQuote,
+    unrealizedPnlPct,
+    holdingForRecovery: noLossExitMode && currentPrice < breakEvenPrice,
+  }
+}
+
+interface EngineSnapshot {
   scores: Array<StrategyScore>
-  positions: Array<OpenPosition>
+  /** ALL open positions for the current execution mode, uncapped. */
+  positions: Array<OpenPositionView>
+  /** ALL closed trades for the current execution mode, uncapped, oldest
+   * first (callers that want "most recent N" slice+reverse themselves). */
   trades: Array<TradeLogEntry>
+  archivedPositions: Array<OpenPositionView>
+  archivedTrades: Array<TradeLogEntry>
   guardianBlocks: Array<SRRow>
   dailyPnlQuote: number
+  totalRealizedPnlQuote: number
+  recoveryAnalytics: RecoveryAnalytics
   config: EngineConfig
-} {
+}
+
+/** Shared, uncapped computation behind both `getEngineState()` (which slices
+ * to a display-sized window) and `getFullEngineHistory()` (which doesn't) —
+ * kept as one function so the two never drift on filtering/enrichment
+ * logic. */
+function computeEngineSnapshot(monitor?: LiveMonitor): EngineSnapshot {
   const db = readFinanceStore()
   const rows = db.strategy_results as Array<SRRow>
-  const trades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
+  const currentExecutionMode: BinanceExecutionEnvironment =
+    executionModeForTradingMode(db.settings.tradingMode as string) ?? 'testnet'
+  const allTrades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
     (trade) => !isShadow(trade),
   )
-  const positions = loadOfKind<OpenPosition>(rows, SR_KIND_POSITION).filter(
+  const allPositions = loadOfKind<OpenPosition>(rows, SR_KIND_POSITION).filter(
     (position) => !isShadow(position),
+  )
+  const trades = realizedTradesForMode(allTrades, currentExecutionMode)
+  const positions = activePositionsForMode(allPositions, currentExecutionMode)
+  const archivedTrades = allTrades.filter(
+    (trade) => !trades.includes(trade),
+  )
+  const archivedPositions = allPositions.filter(
+    (position) => !positions.includes(position),
+  )
+  const config = resolveEngineConfig(
+    (db.settings as Record<string, unknown>).demoTrading,
+  )
+  const recovery = recoveryAnalytics(
+    positions,
+    trades,
+    monitor,
+    config.noLossExitMode,
   )
   return {
     scores: [...loadScores(rows).values()],
-    positions,
-    trades: trades.slice(-20).reverse(),
-    guardianBlocks: rows
-      .filter((r) => r.kind === SR_KIND_BLOCK)
-      .slice(-20)
-      .reverse(),
-    dailyPnlQuote: realizedToday(trades),
-    config: resolveEngineConfig(
-      (db.settings as Record<string, unknown>).demoTrading,
+    positions: positions.map((p) =>
+      enrichPosition(p, monitor, config.noLossExitMode),
     ),
+    trades,
+    archivedPositions: archivedPositions.map((p) =>
+      enrichPosition(p, monitor, config.noLossExitMode),
+    ),
+    archivedTrades,
+    guardianBlocks: rows.filter((r) => r.kind === SR_KIND_BLOCK),
+    dailyPnlQuote: realizedToday(trades),
+    totalRealizedPnlQuote: trades.reduce((sum, t) => sum + t.pnlQuote, 0),
+    recoveryAnalytics: recovery,
+    config,
+  }
+}
+
+/** Read-only snapshot for the API/UI. Pass `monitor` (already fetched by the
+ * caller, e.g. `/api/demo-trading`) to additionally enrich each open
+ * position with live price/unrealized-P&L/breakeven/patient-hold fields for
+ * display; omit it for callers that only need the raw position/trade lists. */
+export function getEngineState(monitor?: LiveMonitor): {
+  scores: Array<StrategyScore>
+  positions: Array<OpenPositionView>
+  trades: Array<TradeLogEntry>
+  /** Positions from a previously-active execution mode (e.g. left over from
+   * paper testing before switching to testnet), excluded from the live view
+   * so they no longer pollute current P/L, but preserved here for an
+   * optional "history / other modes" panel. Nothing here is closed or
+   * modified — it is purely a display split. */
+  archivedPositions: Array<OpenPositionView>
+  archivedTrades: Array<TradeLogEntry>
+  guardianBlocks: Array<SRRow>
+  dailyPnlQuote: number
+  /** All-time realized P/L for the CURRENT execution mode only (unlike
+   * `trades`, which is capped to the most recent 20 for display). Used by
+   * the Trading Account Overview card. */
+  totalRealizedPnlQuote: number
+  recoveryAnalytics: RecoveryAnalytics
+  config: EngineConfig
+} {
+  const snapshot = computeEngineSnapshot(monitor)
+  return {
+    ...snapshot,
+    trades: snapshot.trades.slice(-20).reverse(),
+    archivedTrades: snapshot.archivedTrades.slice(-50).reverse(),
+    guardianBlocks: snapshot.guardianBlocks.slice(-20).reverse(),
+  }
+}
+
+/** Uncapped counterpart of `getEngineState()` — every open position and
+ * every closed trade (current mode + archived), for the read-only trading
+ * ledger. Never mutates anything; reuses the exact same
+ * filtering/enrichment as the display view so the two can never disagree
+ * about which records belong to which mode. */
+export function getFullEngineHistory(monitor?: LiveMonitor): {
+  positions: Array<OpenPositionView>
+  trades: Array<TradeLogEntry>
+  archivedPositions: Array<OpenPositionView>
+  archivedTrades: Array<TradeLogEntry>
+} {
+  const snapshot = computeEngineSnapshot(monitor)
+  return {
+    positions: snapshot.positions,
+    trades: snapshot.trades,
+    archivedPositions: snapshot.archivedPositions,
+    archivedTrades: snapshot.archivedTrades,
   }
 }
 
@@ -2672,6 +3140,15 @@ export interface SafeguardHistoryEntry {
 
 export type StrategyOverrideMode = 'disabled' | 'reduce_size'
 export type StrategyOverrideAction = StrategyOverrideMode | 'clear'
+/**
+ * 'manual' always wins and is never touched by the automatic guard or a
+ * sandbox experiment. 'automatic' is managed exclusively by
+ * applyAutomaticStrategyGuard(). 'experiment' is managed exclusively by the
+ * sandbox-experiment lifecycle (startSandboxExperiment/reconcile/stop/
+ * rollback) below — neither automatic source ever edits or clears the
+ * other's override.
+ */
+export type StrategyOverrideSource = 'manual' | 'automatic' | 'experiment'
 
 export interface StrategyOverride {
   id: string
@@ -2683,7 +3160,7 @@ export interface StrategyOverride {
   updatedAt: string
   reviewAt: string | null
   expiresAt: string | null
-  source: 'manual'
+  source: StrategyOverrideSource
 }
 
 export interface StrategyOverrideHistoryEntry {
@@ -4136,8 +4613,16 @@ function strategyOverrideFromRecord(
     updatedAt: stringFromRecord(row, 'updatedAt') ?? now,
     reviewAt: isoFromRecord(row, 'reviewAt'),
     expiresAt: isoFromRecord(row, 'expiresAt'),
-    source: 'manual',
+    source: strategyOverrideSourceFromRecord(row),
   }
+}
+
+function strategyOverrideSourceFromRecord(
+  row: Record<string, unknown>,
+): StrategyOverrideSource {
+  if (row.source === 'automatic') return 'automatic'
+  if (row.source === 'experiment') return 'experiment'
+  return 'manual'
 }
 
 function strategyOverrideHistoryFromRecord(
@@ -4191,7 +4676,12 @@ function normalizeStrategyOverrideState(value: unknown): StrategyOverrideState {
   for (const row of activeRows) {
     if (!row || typeof row !== 'object' || Array.isArray(row)) continue
     const override = strategyOverrideFromRecord(row as Record<string, unknown>)
-    if (override && !strategyOverrideExpired(override, nowMs))
+    if (
+      override &&
+      (!strategyOverrideExpired(override, nowMs) ||
+        override.source === 'automatic' ||
+        override.source === 'experiment')
+    )
       byStrategy.set(override.strategyId, override)
   }
   const history = historyRows
@@ -4246,6 +4736,7 @@ export function setStrategyOverride(input: {
   expiresAt?: unknown
   reviewAfterDays?: unknown
   expiresAfterDays?: unknown
+  source?: StrategyOverrideSource
 }): StrategyOverrideResult {
   const strategyId =
     typeof input.strategyId === 'string' ? input.strategyId.trim() : ''
@@ -4256,6 +4747,10 @@ export function setStrategyOverride(input: {
     typeof input.reason === 'string' && input.reason.trim()
       ? input.reason.trim().slice(0, 240)
       : 'Manual strategy review.'
+  const source: StrategyOverrideSource =
+    input.source === 'automatic' || input.source === 'experiment'
+      ? input.source
+      : 'manual'
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const dt = (
@@ -4329,7 +4824,7 @@ export function setStrategyOverride(input: {
         updatedAt: now,
         reviewAt: dates.reviewAt,
         expiresAt: dates.expiresAt,
-        source: 'manual',
+        source,
       }
       activeByStrategy.set(strategyId, nextOverride)
       changed = true
@@ -4383,14 +4878,786 @@ export function setStrategyOverride(input: {
       reviewAt: nextOverride?.reviewAt ?? null,
       expiresAt: nextOverride?.expiresAt ?? null,
       reason,
+      source,
     })
   }
+
   return {
     changed,
     message,
     activeOverrides: nextState.active,
     history: [...nextState.history].reverse(),
   }
+}
+
+function applyAutomaticStrategyGuard(
+  config: EngineConfig,
+  scores: Map<string, StrategyScore>,
+  executionMode: 'paper' | 'testnet' | 'live',
+): void {
+  if (!config.strategyGuardEnabled || executionMode === 'live') return
+  const state = strategyOverrideState()
+  const activeByStrategy = new Map(
+    state.active.map((override) => [override.strategyId, override]),
+  )
+  for (const strategy of STRATEGIES) {
+    if (!config.enabledStrategies.includes(strategy.id)) continue
+    const score = scores.get(strategy.id)
+    if (!score) continue
+    const triggered =
+      score.trades >= config.strategyGuardMinClosedTrades &&
+      score.winRate <= config.strategyGuardLossRateThreshold &&
+      score.totalPnlQuote <= config.strategyGuardMaxPnlQuote
+    const existing = activeByStrategy.get(strategy.id)
+    // Manual overrides always win; a strategy currently inside a bounded
+    // sandbox experiment is left alone too — the experiment owns that
+    // strategy's override for its configured duration/trade budget and
+    // manages its own rollback (see reconcileSandboxExperiments below).
+    if (existing?.source === 'manual' || existing?.source === 'experiment')
+      continue
+    if (
+      triggered &&
+      existing?.source === 'automatic' &&
+      strategyOverrideExpired(existing)
+    )
+      continue
+    if (triggered) {
+      const automaticOverride: Parameters<typeof setStrategyOverride>[0] = {
+        strategyId: strategy.id,
+        overrideAction: config.strategyGuardAction,
+        multiplier:
+          config.strategyGuardAction === 'reduce_size' ? 0.5 : undefined,
+        reason: `Automatic sandbox guard: ${score.trades} trades, ${(score.winRate * 100).toFixed(1)}% win rate, ${score.totalPnlQuote.toFixed(2)} USDT PnL.`,
+        source: 'automatic',
+      }
+      if (!existing) {
+        automaticOverride.reviewAfterDays = 3
+        automaticOverride.expiresAfterDays = 7
+      }
+      setStrategyOverride(automaticOverride)
+    } else if (existing?.source === 'automatic') {
+      setStrategyOverride({
+        strategyId: strategy.id,
+        overrideAction: 'clear',
+        reason: 'Automatic sandbox guard cleared after metrics recovered.',
+        source: 'automatic',
+      })
+    }
+  }
+}
+
+// ── Bounded sandbox experiments ─────────────────────────────────────────────
+//
+// A named, time/trade-bounded, sandbox-only (paper/testnet) size-reduction
+// experiment for one or more strategies. Distinct from the always-on
+// automatic guard above: an experiment is operator-initiated, always has a
+// finite budget (duration and/or trade count — never unbounded), captures
+// the pre-experiment override as an explicit baseline, and is rolled back
+// automatically the moment it expires, hits its trade cap, or execution mode
+// becomes live. Manual overrides always take precedence and are never
+// touched by an experiment (start is rejected if one is already active for a
+// targeted strategy).
+
+const SANDBOX_EXPERIMENT_HISTORY_CAP = 30
+const SANDBOX_EXPERIMENT_MAX_DURATION_MINUTES = 30 * 24 * 60 // 30 days
+const SANDBOX_EXPERIMENT_MAX_TRADE_CAP = 500
+
+export type SandboxExperimentStatus =
+  | 'active'
+  | 'stopped'
+  | 'expired'
+  | 'trade_cap_reached'
+  | 'rolled_back'
+
+export interface SandboxExperimentBaselineEntry {
+  strategyId: string
+  /** The override active for this strategy immediately before the
+   * experiment started, or null if there was none. Restored verbatim on
+   * rollback. */
+  override: StrategyOverride | null
+}
+
+export interface SandboxExperiment {
+  id: string
+  label: string
+  reason: string
+  strategyIds: Array<string>
+  /** Sandbox-only — never 'live'. Enforced at start and re-checked on every
+   * reconcile. */
+  executionMode: 'paper' | 'testnet'
+  durationMinutes: number | null
+  tradeCap: number | null
+  /** Size multiplier applied as a `reduce_size` override while the
+   * experiment is active (1 = no reduction, tracking only). */
+  sizeMultiplierCap: number
+  status: SandboxExperimentStatus
+  startedAt: string
+  updatedAt: string
+  /** Precomputed startedAt + durationMinutes, or null when time-unbounded. */
+  endsAt: string | null
+  endedAt: string | null
+  rolledBackAt: string | null
+  tradesObserved: number
+  baseline: Array<SandboxExperimentBaselineEntry>
+  createdAt: string
+}
+
+export interface SandboxExperimentState {
+  active: Array<SandboxExperiment>
+  history: Array<SandboxExperiment>
+}
+
+function normalizePositiveIntOrNull(
+  value: unknown,
+  max: number,
+): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) return null
+  return Math.min(max, Math.floor(numeric))
+}
+
+/** Unlike `normalizeMultiplier()` (used for manual/automatic override
+ * multipliers, clamped to 0.1-0.9 since those always imply *some*
+ * reduction), an experiment's size cap may legitimately be 1 — meaning
+ * "track this experiment but don't reduce size at all" — so it is clamped
+ * to 0.1-1.0 instead. */
+function normalizeSizeMultiplierCap(value: unknown): number {
+  const numeric =
+    typeof value === 'number' && Number.isFinite(value) ? value : 1
+  return Math.max(0.1, Math.min(1, Math.round(numeric * 100) / 100))
+}
+
+function sandboxExperimentBaselineFromRecord(
+  value: unknown,
+): Array<SandboxExperimentBaselineEntry> {
+  if (!Array.isArray(value)) return []
+  const entries: Array<SandboxExperimentBaselineEntry> = []
+  for (const row of value) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) continue
+    const record = row as Record<string, unknown>
+    const strategyId = stringFromRecord(record, 'strategyId')
+    if (!strategyId) continue
+    const overrideRecord = record.override
+    const override =
+      overrideRecord && typeof overrideRecord === 'object'
+        ? strategyOverrideFromRecord(overrideRecord as Record<string, unknown>)
+        : null
+    entries.push({ strategyId, override })
+  }
+  return entries
+}
+
+function sandboxExperimentStatusFromRecord(
+  value: unknown,
+): SandboxExperimentStatus {
+  if (
+    value === 'active' ||
+    value === 'stopped' ||
+    value === 'expired' ||
+    value === 'trade_cap_reached' ||
+    value === 'rolled_back'
+  )
+    return value
+  return 'active'
+}
+
+function sandboxExperimentFromRecord(
+  row: Record<string, unknown>,
+): SandboxExperiment | null {
+  const id = stringFromRecord(row, 'id')
+  const startedAt = isoFromRecord(row, 'startedAt')
+  const strategyIds = Array.isArray(row.strategyIds)
+    ? row.strategyIds.filter(
+        (value): value is string =>
+          typeof value === 'string' && Boolean(getStrategy(value)),
+      )
+    : []
+  const executionMode = row.executionMode === 'paper' ? 'paper' : 'testnet'
+  if (!id || !startedAt || strategyIds.length === 0) return null
+  return {
+    id,
+    label: stringFromRecord(row, 'label') ?? `Experiment: ${strategyIds.join(', ')}`,
+    reason: stringFromRecord(row, 'reason') ?? 'Sandbox experiment.',
+    strategyIds,
+    executionMode,
+    durationMinutes: numberFromRecord(row, 'durationMinutes'),
+    tradeCap: numberFromRecord(row, 'tradeCap'),
+    sizeMultiplierCap:
+      typeof row.sizeMultiplierCap === 'number' &&
+      Number.isFinite(row.sizeMultiplierCap)
+        ? Math.max(0.1, Math.min(1, row.sizeMultiplierCap))
+        : 1,
+    status: sandboxExperimentStatusFromRecord(row.status),
+    startedAt,
+    updatedAt: stringFromRecord(row, 'updatedAt') ?? startedAt,
+    endsAt: isoFromRecord(row, 'endsAt'),
+    endedAt: isoFromRecord(row, 'endedAt'),
+    rolledBackAt: isoFromRecord(row, 'rolledBackAt'),
+    tradesObserved: numberFromRecord(row, 'tradesObserved') ?? 0,
+    baseline: sandboxExperimentBaselineFromRecord(row.baseline),
+    createdAt: stringFromRecord(row, 'createdAt') ?? startedAt,
+  }
+}
+
+function normalizeSandboxExperimentState(value: unknown): SandboxExperimentState {
+  const source =
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {}
+  const activeRows = Array.isArray(source.active) ? source.active : []
+  const historyRows = Array.isArray(source.history) ? source.history : []
+  const active = activeRows
+    .map((row) =>
+      row && typeof row === 'object' && !Array.isArray(row)
+        ? sandboxExperimentFromRecord(row as Record<string, unknown>)
+        : null,
+    )
+    .filter((row): row is SandboxExperiment => Boolean(row))
+  const history = historyRows
+    .map((row) =>
+      row && typeof row === 'object' && !Array.isArray(row)
+        ? sandboxExperimentFromRecord(row as Record<string, unknown>)
+        : null,
+    )
+    .filter((row): row is SandboxExperiment => Boolean(row))
+    .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt))
+    .slice(-SANDBOX_EXPERIMENT_HISTORY_CAP)
+  return { active, history }
+}
+
+function readSandboxExperimentState(
+  settingsDemoTrading: unknown,
+): SandboxExperimentState {
+  const dt =
+    settingsDemoTrading &&
+    typeof settingsDemoTrading === 'object' &&
+    !Array.isArray(settingsDemoTrading)
+      ? (settingsDemoTrading as Record<string, unknown>)
+      : {}
+  return normalizeSandboxExperimentState(dt.sandboxExperiments)
+}
+
+/** Read-only snapshot — does not reconcile expiry/trade-cap. Use
+ * `reviewSandboxExperiments()` for a reconciled view. */
+export function sandboxExperimentState(): SandboxExperimentState {
+  const db = readFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  return readSandboxExperimentState(settings.demoTrading)
+}
+
+function writeSandboxExperimentState(next: SandboxExperimentState): void {
+  const db = readFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const dt = (
+    settings.demoTrading &&
+    typeof settings.demoTrading === 'object' &&
+    !Array.isArray(settings.demoTrading)
+      ? { ...(settings.demoTrading as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>
+  dt.sandboxExperiments = next
+  settings.demoTrading = dt
+  writeFinanceStore(db)
+}
+
+/** Restores each baseline entry's pre-experiment override (or clears the
+ * experiment's own override if there was none) — but only if the strategy's
+ * *current* active override still belongs to this experiment, so a manual
+ * override placed after the experiment started is never clobbered. */
+function restoreSandboxExperimentBaseline(
+  experiment: SandboxExperiment,
+  restoreReason: string,
+): void {
+  const currentActive = new Map(
+    strategyOverrideState().active.map((override) => [
+      override.strategyId,
+      override,
+    ]),
+  )
+  for (const entry of experiment.baseline) {
+    const current = currentActive.get(entry.strategyId)
+    if (current && current.source !== 'experiment') continue
+    if (entry.override) {
+      setStrategyOverride({
+        strategyId: entry.strategyId,
+        overrideAction: entry.override.mode,
+        multiplier:
+          entry.override.mode === 'reduce_size'
+            ? entry.override.multiplier
+            : undefined,
+        reason: restoreReason,
+        reviewAt: entry.override.reviewAt ?? undefined,
+        expiresAt: entry.override.expiresAt ?? undefined,
+        source: entry.override.source,
+      })
+    } else if (current) {
+      setStrategyOverride({
+        strategyId: entry.strategyId,
+        overrideAction: 'clear',
+        reason: restoreReason,
+        source: 'experiment',
+      })
+    }
+  }
+}
+
+/**
+ * Validates and starts a bounded sandbox experiment. Rejects live execution
+ * modes outright, requires at least one of duration/trade cap (never
+ * unbounded), and refuses to start over an existing manual override or an
+ * already-active experiment for any targeted strategy.
+ */
+export function startSandboxExperiment(input: {
+  strategyIds: unknown
+  label?: unknown
+  reason?: unknown
+  executionMode: unknown
+  durationMinutes?: unknown
+  tradeCap?: unknown
+  sizeMultiplierCap?: unknown
+}): {
+  changed: boolean
+  message: string
+  experiment: SandboxExperiment | null
+  state: SandboxExperimentState
+} {
+  if (input.executionMode !== 'paper' && input.executionMode !== 'testnet')
+    throw new Error(
+      'Sandbox experiments may only target paper or testnet execution — never live.',
+    )
+  const executionMode = input.executionMode
+  const strategyIds = Array.isArray(input.strategyIds)
+    ? [
+        ...new Set(
+          input.strategyIds.filter(
+            (id): id is string => typeof id === 'string' && Boolean(getStrategy(id)),
+          ),
+        ),
+      ]
+    : []
+  if (strategyIds.length === 0)
+    throw new Error('At least one known strategyId is required.')
+
+  const durationMinutesCap = normalizePositiveIntOrNull(
+    input.durationMinutes,
+    SANDBOX_EXPERIMENT_MAX_DURATION_MINUTES,
+  )
+  const tradeCap = normalizePositiveIntOrNull(
+    input.tradeCap,
+    SANDBOX_EXPERIMENT_MAX_TRADE_CAP,
+  )
+  if (durationMinutesCap === null && tradeCap === null)
+    throw new Error(
+      'An experiment needs a duration and/or a trade cap — it cannot run unbounded.',
+    )
+  const sizeMultiplierCap = normalizeSizeMultiplierCap(input.sizeMultiplierCap)
+  const reason =
+    typeof input.reason === 'string' && input.reason.trim()
+      ? input.reason.trim().slice(0, 240)
+      : 'Sandbox experiment.'
+  const label =
+    typeof input.label === 'string' && input.label.trim()
+      ? input.label.trim().slice(0, 120)
+      : `Experiment: ${strategyIds.join(', ')}`
+
+  const overrideState = strategyOverrideState()
+  const activeOverrideByStrategy = new Map(
+    overrideState.active.map((override) => [override.strategyId, override]),
+  )
+  const experimentState = sandboxExperimentState()
+  const strategiesWithActiveExperiment = new Set(
+    experimentState.active.flatMap((experiment) => experiment.strategyIds),
+  )
+  for (const strategyId of strategyIds) {
+    if (strategiesWithActiveExperiment.has(strategyId))
+      throw new Error(
+        `${strategyId} already has an active sandbox experiment — stop it or let it end first.`,
+      )
+    const existingOverride = activeOverrideByStrategy.get(strategyId)
+    if (existingOverride?.source === 'manual')
+      throw new Error(
+        `${strategyId} has an active manual override — manual overrides take precedence, clear it before starting an experiment.`,
+      )
+  }
+
+  const now = new Date().toISOString()
+  const baseline: Array<SandboxExperimentBaselineEntry> = strategyIds.map(
+    (strategyId) => ({
+      strategyId,
+      override: activeOverrideByStrategy.get(strategyId) ?? null,
+    }),
+  )
+  const id = `experiment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  const endsAt =
+    durationMinutesCap != null
+      ? new Date(Date.now() + durationMinutesCap * 60_000).toISOString()
+      : null
+  const experiment: SandboxExperiment = {
+    id,
+    label,
+    reason,
+    strategyIds,
+    executionMode,
+    durationMinutes: durationMinutesCap,
+    tradeCap,
+    sizeMultiplierCap,
+    status: 'active',
+    startedAt: now,
+    updatedAt: now,
+    endsAt,
+    endedAt: null,
+    rolledBackAt: null,
+    tradesObserved: 0,
+    baseline,
+    createdAt: now,
+  }
+
+  if (sizeMultiplierCap < 1) {
+    for (const strategyId of strategyIds) {
+      setStrategyOverride({
+        strategyId,
+        overrideAction: 'reduce_size',
+        multiplier: sizeMultiplierCap,
+        reason: `Sandbox experiment "${label}": ${reason}`,
+        source: 'experiment',
+        ...(endsAt ? { expiresAt: endsAt } : {}),
+      })
+    }
+  }
+
+  const nextState: SandboxExperimentState = {
+    active: [...experimentState.active, experiment],
+    history: experimentState.history,
+  }
+  writeSandboxExperimentState(nextState)
+  appendAuditLog('sandbox_experiment_started', {
+    id,
+    strategyIds,
+    executionMode,
+    durationMinutes,
+    tradeCap,
+    sizeMultiplierCap,
+    reason,
+  })
+  return {
+    changed: true,
+    message: `Started sandbox experiment "${label}" for ${strategyIds.join(', ')}.`,
+    experiment,
+    state: nextState,
+  }
+}
+
+function endSandboxExperiment(
+  id: string,
+  status: 'stopped' | 'rolled_back',
+  reason: string,
+): { changed: boolean; message: string; state: SandboxExperimentState } {
+  const state = sandboxExperimentState()
+  const experiment = state.active.find((row) => row.id === id)
+  if (!experiment)
+    return {
+      changed: false,
+      message: `No active sandbox experiment with id ${id}.`,
+      state,
+    }
+  restoreSandboxExperimentBaseline(
+    experiment,
+    `Sandbox experiment "${experiment.label}" ${status === 'stopped' ? 'stopped' : 'rolled back'} by operator: ${reason}`,
+  )
+  const endedAt = new Date().toISOString()
+  const ended: SandboxExperiment = {
+    ...experiment,
+    status,
+    updatedAt: endedAt,
+    endedAt,
+    rolledBackAt: endedAt,
+  }
+  const nextState: SandboxExperimentState = {
+    active: state.active.filter((row) => row.id !== id),
+    history: [...state.history, ended].slice(-SANDBOX_EXPERIMENT_HISTORY_CAP),
+  }
+  writeSandboxExperimentState(nextState)
+  appendAuditLog('sandbox_experiment_ended', {
+    id,
+    status,
+    reason,
+    strategyIds: experiment.strategyIds,
+    tradesObserved: experiment.tradesObserved,
+  })
+  return {
+    changed: true,
+    message: `Sandbox experiment "${experiment.label}" ${status === 'stopped' ? 'stopped' : 'rolled back'}.`,
+    state: nextState,
+  }
+}
+
+/** Manually ends an active experiment early, immediately restoring its
+ * baseline. */
+export function stopSandboxExperiment(
+  id: string,
+  reason?: unknown,
+): { changed: boolean; message: string; state: SandboxExperimentState } {
+  return endSandboxExperiment(
+    id,
+    'stopped',
+    typeof reason === 'string' && reason.trim()
+      ? reason.trim().slice(0, 240)
+      : 'Stopped by operator.',
+  )
+}
+
+/** Explicit, idempotent baseline restoration — usable as an emergency
+ * rollback of an active experiment, or to force-confirm restoration of one
+ * that has already ended. Safe to call repeatedly. */
+export function rollbackSandboxExperiment(
+  id: string,
+  reason?: unknown,
+): { changed: boolean; message: string; state: SandboxExperimentState } {
+  const reasonText =
+    typeof reason === 'string' && reason.trim()
+      ? reason.trim().slice(0, 240)
+      : 'Manual rollback by operator.'
+  const state = sandboxExperimentState()
+  if (state.active.some((row) => row.id === id))
+    return endSandboxExperiment(id, 'rolled_back', reasonText)
+  const ended = state.history.find((row) => row.id === id)
+  if (!ended)
+    return {
+      changed: false,
+      message: `No sandbox experiment with id ${id}.`,
+      state,
+    }
+  if (ended.rolledBackAt)
+    return {
+      changed: false,
+      message: `Sandbox experiment "${ended.label}" was already rolled back.`,
+      state,
+    }
+  restoreSandboxExperimentBaseline(
+    ended,
+    `Sandbox experiment "${ended.label}" rolled back by operator: ${reasonText}`,
+  )
+  const rolledBackAt = new Date().toISOString()
+  const nextState: SandboxExperimentState = {
+    active: state.active,
+    history: state.history.map((row) =>
+      row.id === id
+        ? { ...row, status: 'rolled_back', rolledBackAt, updatedAt: rolledBackAt }
+        : row,
+    ),
+  }
+  writeSandboxExperimentState(nextState)
+  appendAuditLog('sandbox_experiment_ended', {
+    id,
+    status: 'rolled_back',
+    reason: reasonText,
+    strategyIds: ended.strategyIds,
+    tradesObserved: ended.tradesObserved,
+  })
+  return {
+    changed: true,
+    message: `Sandbox experiment "${ended.label}" rolled back.`,
+    state: nextState,
+  }
+}
+
+/**
+ * Re-arms an ended experiment by starting a brand-new one with identical
+ * parameters (fresh id, budget, and baseline capture) — the explicit
+ * "run it again after review" action referenced in the trading UI. Subject
+ * to the exact same validation as a fresh start (rejects if the strategy
+ * now has a manual override or another active experiment).
+ */
+export function rearmSandboxExperiment(id: string): {
+  changed: boolean
+  message: string
+  experiment: SandboxExperiment | null
+  state: SandboxExperimentState
+} {
+  const prior = sandboxExperimentState().history.find((row) => row.id === id)
+  if (!prior) throw new Error(`No ended sandbox experiment with id ${id} to re-arm.`)
+  const started = startSandboxExperiment({
+    strategyIds: prior.strategyIds,
+    label: prior.label,
+    reason: `Re-armed from experiment ${prior.id}: ${prior.reason}`,
+    executionMode: prior.executionMode,
+    durationMinutes: prior.durationMinutes ?? undefined,
+    tradeCap: prior.tradeCap ?? undefined,
+    sizeMultiplierCap: prior.sizeMultiplierCap,
+  })
+  appendAuditLog('sandbox_experiment_rearmed', {
+    fromId: prior.id,
+    newId: started.experiment?.id ?? null,
+  })
+  return started
+}
+
+/**
+ * Reconciles active experiments against the current trade log and wall
+ * clock: auto-rolls-back on time expiry, trade-cap reached, or (as a last-
+ * resort safety valve) execution mode having become live. Called from both
+ * `runTradingCycle()` (so rollback happens even without anyone viewing the
+ * dashboard) and `reviewSandboxExperiments()` below (so opening the trading
+ * settings screen — including right after a service restart — reconciles
+ * immediately, since nothing here depends on in-memory scheduling: status is
+ * always re-derived fresh from persisted state plus the current clock).
+ */
+function reconcileSandboxExperiments(
+  allTrades: Array<TradeLogEntry>,
+  currentExecutionMode: BinanceExecutionEnvironment,
+): SandboxExperimentState {
+  const state = sandboxExperimentState()
+  if (state.active.length === 0) return state
+
+  const nowMs = Date.now()
+  const stillActive: Array<SandboxExperiment> = []
+  const justEnded: Array<{ experiment: SandboxExperiment; status: SandboxExperimentStatus }> = []
+  for (const experiment of state.active) {
+    const tradesObserved = allTrades.filter(
+      (trade) =>
+        experiment.strategyIds.includes(trade.strategyId) &&
+        trade.executionMode === experiment.executionMode &&
+        Date.parse(trade.openedAt) >= Date.parse(experiment.startedAt),
+    ).length
+    const modeUnsafe = currentExecutionMode === 'live'
+    const timeExpired =
+      experiment.endsAt != null && Date.parse(experiment.endsAt) <= nowMs
+    const tradeCapReached =
+      experiment.tradeCap != null && tradesObserved >= experiment.tradeCap
+    if (modeUnsafe || timeExpired || tradeCapReached) {
+      justEnded.push({
+        experiment: { ...experiment, tradesObserved },
+        status: modeUnsafe
+          ? 'rolled_back'
+          : timeExpired
+            ? 'expired'
+            : 'trade_cap_reached',
+      })
+    } else {
+      stillActive.push({
+        ...experiment,
+        tradesObserved,
+        updatedAt: new Date().toISOString(),
+      })
+    }
+  }
+
+  if (justEnded.length === 0) {
+    const nextState: SandboxExperimentState = { active: stillActive, history: state.history }
+    writeSandboxExperimentState(nextState)
+    return nextState
+  }
+
+  for (const { experiment, status } of justEnded) {
+    restoreSandboxExperimentBaseline(
+      experiment,
+      `Automatic rollback: sandbox experiment "${experiment.label}" ${status.replace(/_/g, ' ')}.`,
+    )
+  }
+  const endedAt = new Date().toISOString()
+  const finalizedEnded = justEnded.map(({ experiment, status }) => ({
+    ...experiment,
+    status,
+    updatedAt: endedAt,
+    endedAt,
+    rolledBackAt: endedAt,
+  }))
+  for (const experiment of finalizedEnded) {
+    appendAuditLog('sandbox_experiment_auto_rolled_back', {
+      id: experiment.id,
+      status: experiment.status,
+      strategyIds: experiment.strategyIds,
+      tradesObserved: experiment.tradesObserved,
+    })
+  }
+  const nextState: SandboxExperimentState = {
+    active: stillActive,
+    history: [...state.history, ...finalizedEnded].slice(
+      -SANDBOX_EXPERIMENT_HISTORY_CAP,
+    ),
+  }
+  writeSandboxExperimentState(nextState)
+  return nextState
+}
+
+/** Reconciled read — safe to call from any request path (API routes,
+ * scheduled trading cycles) with no reliance on in-memory scheduling, so a
+ * service restart never leaves an expired/trade-capped experiment silently
+ * un-rolled-back: the very next call (cycle or dashboard read) reconciles it
+ * from persisted state and the current clock. */
+export function reviewSandboxExperiments(): SandboxExperimentState {
+  const db = readFinanceStore()
+  const rows = db.strategy_results as Array<SRRow>
+  const currentExecutionMode: BinanceExecutionEnvironment =
+    executionModeForTradingMode(db.settings.tradingMode as string) ?? 'testnet'
+  const allTrades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
+    (trade) => !isShadow(trade),
+  )
+  return reconcileSandboxExperiments(allTrades, currentExecutionMode)
+}
+
+/**
+ * Evidence-driven guard review: pairs each enabled strategy's all-time score
+ * with a bounded recent window (see strategy-guard-evidence.ts) and an
+ * explicit recommendation, so the trading UI can show why a strategy is (or
+ * isn't) flagged instead of just a raw score.
+ */
+export function strategyGuardReview(): Array<StrategyGuardReview> {
+  const db = readFinanceStore()
+  const rows = db.strategy_results as Array<SRRow>
+  const config = resolveEngineConfig(
+    (db.settings as Record<string, unknown>).demoTrading,
+  )
+  const scores = loadScores(rows)
+  const allTrades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
+    (trade) => !isShadow(trade),
+  )
+  const overrides = strategyOverrideState()
+  const experiments = sandboxExperimentState()
+  const activeOverrideByStrategy = new Map(
+    overrides.active.map((override) => [override.strategyId, override]),
+  )
+  const strategiesWithActiveExperiment = new Set(
+    experiments.active.flatMap((experiment) => experiment.strategyIds),
+  )
+  const now = new Date().toISOString()
+  return config.enabledStrategies
+    .filter((strategyId) => Boolean(getStrategy(strategyId)))
+    .map((strategyId) => {
+      const score = scores.get(strategyId) ?? emptyScore(strategyId)
+      const window = computeStrategyEvidenceWindow(
+        strategyId,
+        allTrades,
+        config.guardEvidenceWindowDays,
+        config.strategyGuardMinClosedTrades,
+        now,
+      )
+      const override = activeOverrideByStrategy.get(strategyId)
+      const hasActiveGuardOrExperiment =
+        override?.source === 'automatic' ||
+        override?.source === 'experiment' ||
+        strategiesWithActiveExperiment.has(strategyId)
+      const { recommendation, reason } = deriveGuardRecommendation({
+        window,
+        guardWinRateThreshold: config.strategyGuardLossRateThreshold,
+        guardMaxPnlQuote: config.strategyGuardMaxPnlQuote,
+        guardAction: config.strategyGuardAction,
+        hasActiveGuardOrExperiment,
+      })
+      return {
+        strategyId,
+        allTime: {
+          trades: score.trades,
+          winRate: score.winRate,
+          totalPnlQuote: score.totalPnlQuote,
+        },
+        window,
+        recommendation,
+        reason,
+        hasActiveGuardOrExperiment,
+      }
+    })
 }
 
 function targetOverrideForRecommendation(
@@ -4648,31 +5915,120 @@ export interface MonitorSymbol {
 export interface LiveMonitor {
   clientAvailable: boolean
   quoteBalance: number
+  /** False if the balance fetch itself failed (network hiccup, rate limit,
+   * etc.) — distinct from `clientAvailable`/a genuinely zero balance, so
+   * callers don't mistake "couldn't check" for "account is empty". */
+  balanceFetchOk: boolean
   deployedQuote: number
   openUnrealizedPnlQuote: number
   equityQuote: number
   monitoring: Array<MonitorSymbol>
+  /** Epoch ms when the underlying balance/price data was actually fetched
+   * from the exchange — this comes from a background-refreshed cache (see
+   * LIVE_MARKET_SNAPSHOT_REFRESH_MS below), not necessarily "now", so the UI
+   * can show "as of Xs ago" instead of implying an always-live read. */
+  asOfMs: number
 }
 
-/**
- * Read-only live snapshot for the monitoring UI: current testnet balance, what
- * each watched symbol is doing right now (price + council signal), and open
- * position mark-to-market. Places no orders and ignores the trading-mode gate —
- * it just observes, so it works before the engine is armed too.
- */
-export async function getLiveMonitor(): Promise<LiveMonitor> {
+export interface StrategyEligibilityAudit {
+  generatedAt: string
+  executionMode: BinanceExecutionEnvironment
+  interval: string
+  asOfMs: number
+  councilThreshold: number
+  symbols: Array<{
+    symbol: string
+    candles: number
+    latestPrice: number | null
+    strategies: Array<{
+      strategyId: string
+      name: string
+      signal: Signal
+      confidence: number
+      reason: string
+      minCandles: number
+      active: boolean
+      overrideMode: StrategyOverrideMode | null
+      dataAvailable: boolean
+      dataIssues: Array<string>
+      regime: string | null
+      muted: boolean
+      councilEligible: boolean
+      exclusionReason: string | null
+    }>
+    council: {
+      signal: Signal
+      net: number
+      threshold: number
+      leadStrategyId: string | null
+      eligible: boolean
+      reasons: Array<string>
+      participatingStrategyIds: Array<string>
+    }
+  }>
+}
+
+export interface StrategyEligibilityAuditMarketSnapshot {
+  symbols: Array<{
+    symbol: string
+    price: number
+  }>
+  candlesBySymbol: Map<string, Array<Candle>>
+}
+
+export interface StrategyEligibilityAuditBuildInput {
+  executionMode: BinanceExecutionEnvironment
+  interval: string
+  asOfMs: number
+  config: EngineConfig
+  scores: Map<string, StrategyScore>
+  overrides: Array<Pick<StrategyOverride, 'strategyId' | 'mode'>>
+  snapshot: StrategyEligibilityAuditMarketSnapshot
+}
+
+/** Network-derived piece of the monitor (balance + per-symbol price/signal) —
+ * the slow part, fetched from Binance testnet/live. Kept separate from
+ * position data (which is cheap, DB-only, and changes far more often) so it
+ * can be cached/background-refreshed independently. */
+interface MarketSnapshotSymbol {
+  symbol: string
+  price: number
+  signal: 'BUY' | 'SELL' | 'HOLD'
+  net: number
+}
+
+interface LiveMarketSnapshot {
+  clientAvailable: boolean
+  quoteBalance: number
+  balanceFetchOk: boolean
+  symbols: Array<MarketSnapshotSymbol>
+  candlesBySymbol: Map<string, Array<Candle>>
+  /** Execution mode + configured symbol set the snapshot was fetched under —
+   * used to detect a mode/config change and force a fresh fetch rather than
+   * serving stale data from the wrong exchange context. */
+  mode: string
+  symbolsKey: string
+  asOfMs: number
+}
+
+/** How often the background timer re-fetches balance + per-symbol market
+ * data from the exchange. Purely a display cadence — the real trading cycle
+ * runs on its own separate 20-min cron and is unaffected. */
+const LIVE_MARKET_SNAPSHOT_REFRESH_MS = 20_000
+
+let liveMarketSnapshotCache: LiveMarketSnapshot | null = null
+let liveMarketSnapshotTimer: ReturnType<typeof setInterval> | null = null
+let liveMarketSnapshotInFlight: Promise<LiveMarketSnapshot> | null = null
+
+async function fetchLiveMarketSnapshot(): Promise<LiveMarketSnapshot> {
   const db = readFinanceStore()
   const config = resolveEngineConfig(
     (db.settings as Record<string, unknown>).demoTrading,
   )
   const rows = db.strategy_results as Array<SRRow>
   const mode = executionModeForTradingMode(db.settings.tradingMode) ?? 'paper'
-  const positions = activePositionsForMode(
-    loadOfKind<OpenPosition>(rows, SR_KIND_POSITION),
-    mode,
-  )
   const scores = loadScores(rows)
-  const deployedQuote = positions.reduce((sum, p) => sum + p.entryQuote, 0)
+  const symbolsKey = config.symbols.join(',')
 
   let client: BinanceExecutionClient | null = null
   if (mode === 'paper') {
@@ -4686,59 +6042,322 @@ export async function getLiveMonitor(): Promise<LiveMonitor> {
     return {
       clientAvailable: false,
       quoteBalance: 0,
-      deployedQuote,
-      openUnrealizedPnlQuote: 0,
-      equityQuote: deployedQuote,
-      monitoring: [],
+      balanceFetchOk: false,
+      symbols: [],
+      candlesBySymbol: new Map(),
+      mode,
+      symbolsKey,
+      asOfMs: Date.now(),
     }
   }
 
   let quoteBalance = 0
+  let balanceFetchOk = true
   try {
     const acct = await client.getAccount()
     quoteBalance = acct.balances.find((b) => b.asset === 'USDT')?.free ?? 0
   } catch {
     /* balance read failed - leave 0 */
+    balanceFetchOk = false
   }
 
-  const monitoring: Array<MonitorSymbol> = []
-  for (const symbol of config.symbols) {
-    let price = 0
-    let signal: 'BUY' | 'SELL' | 'HOLD' = 'HOLD'
-    let net = 0
-    try {
-      const candles = await client.getKlines(
-        symbol,
-        config.interval,
-        Math.min(MARKET_WARMUP_TARGET_CANDLES, 1000),
-      )
-      price = candles.length
-        ? candles[candles.length - 1].close
-        : await client.getPrice(symbol)
-      const members = STRATEGIES.filter((s) =>
-        config.enabledStrategies.includes(s.id),
-      ).map((s) => ({
-        strategyId: s.id,
-        decision: s.evaluate(candles),
-        score: scores.get(s.id)?.score ?? 0,
-      }))
-      const vote = councilVote(members, config.councilThreshold)
-      signal = vote.signal
-      net = vote.net
-    } catch {
-      /* market data failed for this symbol - leave defaults */
-    }
-    const pos = positions.find((p) => p.symbol === symbol)
-    monitoring.push({
+  // Fetch all symbols concurrently instead of one-at-a-time — roughly halves
+  // (or better) the refresh latency once there's more than one symbol.
+  const symbolResults = await Promise.all(
+    config.symbols.map(async (symbol) => {
+      let price = 0
+      let signal: 'BUY' | 'SELL' | 'HOLD' = 'HOLD'
+      let net = 0
+      let candles: Array<Candle> = []
+      try {
+        candles = await client.getKlines(
+          symbol,
+          config.interval,
+          Math.min(MARKET_WARMUP_TARGET_CANDLES, 1000),
+        )
+        price = candles.length
+          ? candles[candles.length - 1].close
+          : await client.getPrice(symbol)
+        const members = STRATEGIES.filter((s) =>
+          config.enabledStrategies.includes(s.id),
+        ).map((s) => ({
+          strategyId: s.id,
+          decision: s.evaluate(candles),
+          score: scores.get(s.id)?.score ?? 0,
+        }))
+        const vote = councilVote(members, config.councilThreshold)
+        signal = vote.signal
+        net = vote.net
+      } catch {
+        /* market data failed for this symbol - leave defaults */
+      }
+      return { symbol, price, signal, net, candles }
+    }),
+  )
+
+  return {
+    clientAvailable: true,
+    quoteBalance,
+    balanceFetchOk,
+    symbols: symbolResults.map(({ symbol, price, signal, net }) => ({
       symbol,
       price,
       signal,
       net,
-      held: Boolean(pos),
-      unrealizedPnlQuote:
-        pos && price > 0 ? price * pos.quantity - pos.entryQuote : 0,
+    })),
+    candlesBySymbol: new Map(
+      symbolResults.map(({ symbol, candles }) => [symbol, candles]),
+    ),
+    mode,
+    symbolsKey,
+    asOfMs: Date.now(),
+  }
+}
+
+function strategyDataIssues(
+  strategy: (typeof STRATEGIES)[number],
+  candles: Array<Candle>,
+): Array<string> {
+  const issues: Array<string> = []
+  if (candles.length < strategy.minCandles) {
+    issues.push(`needs at least ${strategy.minCandles} candles`)
+  }
+  if (
+    strategy.id === 'taker_imbalance' &&
+    candles.some((candle) => candle.takerBuyVolume == null)
+  ) {
+    issues.push('taker buy volume unavailable')
+  }
+  return issues
+}
+
+export function buildStrategyEligibilityAudit(
+  input: StrategyEligibilityAuditBuildInput,
+): StrategyEligibilityAudit {
+  const { config, scores, snapshot } = input
+  const overrideByStrategy = new Map(
+    input.overrides.map((override) => [override.strategyId, override.mode]),
+  )
+
+  return {
+    generatedAt: new Date().toISOString(),
+    executionMode: input.executionMode,
+    interval: input.interval,
+    asOfMs: input.asOfMs,
+    councilThreshold: config.councilThreshold,
+    symbols: snapshot.symbols.map((market) => {
+      const candles = snapshot.candlesBySymbol.get(market.symbol) ?? []
+      const regime = config.regimeSwitchingEnabled
+        ? classifyVolRegime(
+            candles,
+            config.regimeSwitchingVolPeriod,
+            config.regimeSwitchingBaselineLookback,
+          )
+        : null
+      const strategies = STRATEGIES.map((strategy) => {
+        const active = config.enabledStrategies.includes(strategy.id)
+        const overrideMode = overrideByStrategy.get(strategy.id) ?? null
+        const muted =
+          regime != null && !strategyAllowedInRegime(strategy.id, regime)
+        const decision = muted
+          ? HOLD(
+              `muted: ${regime}-vol regime favors a different strategy family`,
+            )
+          : strategy.evaluate(candles)
+        const dataIssues = strategyDataIssues(strategy, candles)
+        const councilEligible =
+          active &&
+          overrideMode !== 'disabled' &&
+          dataIssues.length === 0 &&
+          !muted
+        const exclusionReason = !active
+          ? 'disabled in the active strategy roster'
+          : overrideMode === 'disabled'
+            ? 'disabled by strategy override'
+            : dataIssues.length > 0
+              ? dataIssues.join('; ')
+              : muted
+                ? `muted by ${regime}-vol regime`
+              : null
+        return {
+          strategyId: strategy.id,
+          name: strategy.name,
+          signal: decision.signal,
+          confidence: decision.confidence,
+          reason: decision.reason,
+          minCandles: strategy.minCandles,
+          active,
+          overrideMode,
+          dataAvailable: dataIssues.length === 0,
+          dataIssues,
+          regime,
+          muted,
+          councilEligible,
+          exclusionReason,
+        }
+      })
+      const participating = strategies.filter(
+        (strategy) => strategy.councilEligible,
+      )
+      const vote = councilVote(
+        participating.map((strategy) => ({
+          strategyId: strategy.strategyId,
+          decision: {
+            signal: strategy.signal,
+            confidence: strategy.confidence,
+            reason: strategy.reason,
+          },
+          score: scores.get(strategy.strategyId)?.score ?? 0,
+        })),
+        config.councilThreshold,
+      )
+      return {
+        symbol: market.symbol,
+        candles: candles.length,
+        latestPrice: market.price || null,
+        strategies,
+        council: {
+          ...vote,
+          threshold: config.councilThreshold,
+          eligible: vote.signal !== 'HOLD',
+          participatingStrategyIds: participating.map(
+            (strategy) => strategy.strategyId,
+          ),
+        },
+      }
+    }),
+  }
+}
+
+export function getStrategyEligibilityAudit(): StrategyEligibilityAudit {
+  ensureLiveMarketSnapshotRefreshLoop()
+  const db = readFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const config = resolveEngineConfig(settings.demoTrading)
+  const mode = executionModeForTradingMode(db.settings.tradingMode) ?? 'paper'
+  const scores = loadScores(db.strategy_results as Array<SRRow>)
+  const overrides = readStrategyOverrideState(settings.demoTrading).active
+  const symbolsKey = config.symbols.join(',')
+  const snapshot = liveMarketSnapshotCache
+  if (!snapshot || snapshot.mode !== mode || snapshot.symbolsKey !== symbolsKey) {
+    return buildStrategyEligibilityAudit({
+      executionMode: mode,
+      interval: config.interval,
+      asOfMs: 0,
+      config,
+      scores,
+      overrides,
+      snapshot: { symbols: [], candlesBySymbol: new Map() },
     })
   }
+  return buildStrategyEligibilityAudit({
+    executionMode: mode,
+    interval: config.interval,
+    asOfMs: snapshot.asOfMs,
+    config,
+    scores,
+    overrides,
+    snapshot,
+  })
+}
+
+/** Starts the background refresh loop the first time it's needed. Safe to
+ * call repeatedly — a no-op once the timer exists. Uses `unref()` so it never
+ * keeps the process alive on its own (e.g. during tests or graceful shutdown). */
+function ensureLiveMarketSnapshotRefreshLoop(): void {
+  if (liveMarketSnapshotTimer) return
+  const tick = async () => {
+    try {
+      liveMarketSnapshotCache = await fetchLiveMarketSnapshot()
+    } catch (err) {
+      // Keep serving the last-known-good cache entry rather than erroring
+      // the whole dashboard on a transient exchange/network failure.
+      console.error('[live-monitor] background refresh failed:', err)
+    }
+  }
+  liveMarketSnapshotTimer = setInterval(
+    () => void tick(),
+    LIVE_MARKET_SNAPSHOT_REFRESH_MS,
+  )
+  liveMarketSnapshotTimer.unref()
+  void tick()
+}
+
+/**
+ * Read-only live snapshot for the monitoring UI: current testnet balance, what
+ * each watched symbol is doing right now (price + council signal), and open
+ * position mark-to-market. Places no orders and ignores the trading-mode gate —
+ * it just observes, so it works before the engine is armed too.
+ *
+ * The slow, network-bound part (balance + per-symbol klines/price) is served
+ * from a background-refreshed cache (~20s cadence) instead of being fetched
+ * inline on every call — this is what previously made every call to this
+ * function (and therefore /api/demo-trading and /api/trading/summary) take
+ * 45+ seconds. Position data is still read fresh from disk every call since
+ * it's cheap and changes far more often than market data.
+ */
+export async function getLiveMonitor(): Promise<LiveMonitor> {
+  ensureLiveMarketSnapshotRefreshLoop()
+
+  const db = readFinanceStore()
+  const config = resolveEngineConfig(
+    (db.settings as Record<string, unknown>).demoTrading,
+  )
+  const rows = db.strategy_results as Array<SRRow>
+  const mode = executionModeForTradingMode(db.settings.tradingMode) ?? 'paper'
+  const symbolsKey = config.symbols.join(',')
+  const positions = activePositionsForMode(
+    loadOfKind<OpenPosition>(rows, SR_KIND_POSITION),
+    mode,
+  )
+  const deployedQuote = positions.reduce((sum, p) => sum + p.entryQuote, 0)
+
+  let snapshot = liveMarketSnapshotCache
+  const staleForModeOrConfig =
+    snapshot && (snapshot.mode !== mode || snapshot.symbolsKey !== symbolsKey)
+  if (!snapshot || staleForModeOrConfig) {
+    // Cache empty (just after server start) or the trading mode/configured
+    // symbols changed since the last refresh — fetch inline once so this
+    // caller isn't stuck with stale/wrong-context data, and prime the cache
+    // for everyone else. Concurrent callers share the same in-flight fetch.
+    if (!liveMarketSnapshotInFlight) {
+      liveMarketSnapshotInFlight = fetchLiveMarketSnapshot()
+        .then((s) => {
+          liveMarketSnapshotCache = s
+          return s
+        })
+        .finally(() => {
+          liveMarketSnapshotInFlight = null
+        })
+    }
+    snapshot = await liveMarketSnapshotInFlight
+  }
+
+  if (!snapshot.clientAvailable) {
+    return {
+      clientAvailable: false,
+      quoteBalance: 0,
+      balanceFetchOk: false,
+      deployedQuote,
+      openUnrealizedPnlQuote: 0,
+      equityQuote: deployedQuote,
+      monitoring: [],
+      asOfMs: snapshot.asOfMs,
+    }
+  }
+
+  const monitoring: Array<MonitorSymbol> = snapshot.symbols.map((s) => {
+    const pos = positions.find((p) => p.symbol === s.symbol)
+    return {
+      symbol: s.symbol,
+      price: s.price,
+      signal: s.signal,
+      net: s.net,
+      held: Boolean(pos),
+      unrealizedPnlQuote:
+        pos && s.price > 0 ? s.price * pos.quantity - pos.entryQuote : 0,
+    }
+  })
 
   const openUnrealizedPnlQuote = monitoring.reduce(
     (sum, m) => sum + (m.held ? m.unrealizedPnlQuote : 0),
@@ -4751,10 +6370,12 @@ export async function getLiveMonitor(): Promise<LiveMonitor> {
 
   return {
     clientAvailable: true,
-    quoteBalance,
+    quoteBalance: snapshot.quoteBalance,
+    balanceFetchOk: snapshot.balanceFetchOk,
     deployedQuote,
     openUnrealizedPnlQuote,
-    equityQuote: quoteBalance + positionsMarkValue,
+    equityQuote: snapshot.quoteBalance + positionsMarkValue,
     monitoring,
+    asOfMs: snapshot.asOfMs,
   }
 }

@@ -8,7 +8,11 @@ import path from 'node:path'
 import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
 import YAML from 'yaml'
-import { BEARER_TOKEN, CLAUDE_API, CLAUDE_DASHBOARD_URL } from '../../server/gateway-capabilities'
+import {
+  BEARER_TOKEN,
+  CLAUDE_API,
+  CLAUDE_DASHBOARD_URL,
+} from '../../server/gateway-capabilities'
 import { isAuthenticated } from '../../server/auth-middleware'
 
 type RawAssignee = {
@@ -25,14 +29,19 @@ type TaskAssignee = {
   isHuman: boolean
 }
 
-const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+const CLAUDE_HOME =
+  process.env.HERMES_HOME ??
+  process.env.CLAUDE_HOME ??
+  path.join(os.homedir(), '.hermes')
 const CONFIG_PATH = path.join(CLAUDE_HOME, 'config.yaml')
 const PROFILES_PATH = path.join(CLAUDE_HOME, 'profiles')
 
 function readConfig(): Record<string, unknown> {
   try {
     const parsed = YAML.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'))
-    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {}
+    return parsed && typeof parsed === 'object'
+      ? (parsed as Record<string, unknown>)
+      : {}
   } catch {
     return {}
   }
@@ -40,7 +49,7 @@ function readConfig(): Record<string, unknown> {
 
 function getProfileNames(): Array<string> {
   try {
-    return fs.readdirSync(PROFILES_PATH).filter(name => {
+    return fs.readdirSync(PROFILES_PATH).filter((name) => {
       try {
         return (
           fs.statSync(path.join(PROFILES_PATH, name)).isDirectory() &&
@@ -63,14 +72,18 @@ function titleCaseProfile(name: string): string {
   return name
     .split(/[-_\s]+/)
     .filter(Boolean)
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
 }
 
-function normalizeAssigneePayload(payload: unknown, humanReviewer: string | null): Array<TaskAssignee> {
-  const record = payload && typeof payload === 'object' && !Array.isArray(payload)
-    ? payload as Record<string, unknown>
-    : null
+function normalizeAssigneePayload(
+  payload: unknown,
+  humanReviewer: string | null,
+): Array<TaskAssignee> {
+  const record =
+    payload && typeof payload === 'object' && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : null
   const rawAssignees = Array.isArray(payload)
     ? payload
     : Array.isArray(record?.assignees)
@@ -81,21 +94,25 @@ function normalizeAssigneePayload(payload: unknown, humanReviewer: string | null
   const assignees: Array<TaskAssignee> = []
 
   for (const raw of rawAssignees) {
-    const item = typeof raw === 'string' ? { id: raw, label: raw } : raw as RawAssignee
-    const id = typeof item.id === 'string'
-      ? item.id
-      : typeof item.name === 'string'
-        ? item.name
-        : null
+    const item =
+      typeof raw === 'string' ? { id: raw, label: raw } : (raw as RawAssignee)
+    const id =
+      typeof item.id === 'string'
+        ? item.id
+        : typeof item.name === 'string'
+          ? item.name
+          : null
     if (!id || seen.has(id)) continue
     seen.add(id)
-    const label = typeof item.label === 'string' && item.label.trim().length > 0
-      ? item.label
-      : titleCaseProfile(id)
+    const label =
+      typeof item.label === 'string' && item.label.trim().length > 0
+        ? item.label
+        : titleCaseProfile(id)
     assignees.push({
       id,
       label,
-      isHuman: item.isHuman === true || item.is_human === true || id === humanReviewer,
+      isHuman:
+        item.isHuman === true || item.is_human === true || id === humanReviewer,
     })
   }
 
@@ -120,7 +137,9 @@ export const Route = createFileRoute('/api/hermes-tasks-assignees')({
     handlers: {
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+          })
         }
 
         const config = readConfig()
@@ -128,8 +147,9 @@ export const Route = createFileRoute('/api/hermes-tasks-assignees')({
         const humanReviewer = (tasksConfig.human_reviewer as string) || null
 
         const remotePayload =
-          await fetchJson(`${CLAUDE_DASHBOARD_URL}/api/plugins/kanban/assignees`) ??
-          await fetchJson(`${CLAUDE_API}/api/tasks/assignees`)
+          (await fetchJson(
+            `${CLAUDE_DASHBOARD_URL}/api/plugins/kanban/assignees`,
+          )) ?? (await fetchJson(`${CLAUDE_API}/api/tasks/assignees`))
         const remoteAssignees = remotePayload
           ? normalizeAssigneePayload(remotePayload, humanReviewer)
           : []
@@ -141,7 +161,11 @@ export const Route = createFileRoute('/api/hermes-tasks-assignees')({
         }
         for (const id of profiles) {
           if (!merged.has(id)) {
-            merged.set(id, { id, label: titleCaseProfile(id), isHuman: id === humanReviewer })
+            merged.set(id, {
+              id,
+              label: titleCaseProfile(id),
+              isHuman: id === humanReviewer,
+            })
           }
         }
         if (humanReviewer && !merged.has(humanReviewer)) {
@@ -157,10 +181,10 @@ export const Route = createFileRoute('/api/hermes-tasks-assignees')({
           return a.label.localeCompare(b.label)
         })
 
-        return new Response(
-          JSON.stringify({ assignees, humanReviewer }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        )
+        return new Response(JSON.stringify({ assignees, humanReviewer }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
       },
     },
   },

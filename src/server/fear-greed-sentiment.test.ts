@@ -12,8 +12,14 @@ describe('fearGreedSentimentDecision', () => {
       confidence: 0,
       reason: 'no fear & greed data',
     })
-    expect(fearGreedSentimentDecision(-1)).toMatchObject({ signal: 'HOLD', confidence: 0 })
-    expect(fearGreedSentimentDecision(101)).toMatchObject({ signal: 'HOLD', confidence: 0 })
+    expect(fearGreedSentimentDecision(-1)).toMatchObject({
+      signal: 'HOLD',
+      confidence: 0,
+    })
+    expect(fearGreedSentimentDecision(101)).toMatchObject({
+      signal: 'HOLD',
+      confidence: 0,
+    })
   })
 
   it('holds near neutral (value 50, below the confidence floor)', () => {
@@ -43,17 +49,27 @@ describe('fearGreedSentimentDecision', () => {
 describe('fetchFearGreedHistory', () => {
   it('builds the correct URL and parses string fields to numbers', async () => {
     let capturedUrl = ''
-    const fakeFetchJson = async <T,>(url: string): Promise<T> => {
+    const fakeFetchJson = async <T>(url: string): Promise<T> => {
       capturedUrl = url
       return {
         data: [
-          { value: '31', value_classification: 'Fear', timestamp: '1784764800' },
-          { value: '33', value_classification: 'Fear', timestamp: '1784678400' },
+          {
+            value: '31',
+            value_classification: 'Fear',
+            timestamp: '1784764800',
+          },
+          {
+            value: '33',
+            value_classification: 'Fear',
+            timestamp: '1784678400',
+          },
         ],
       } as unknown as T
     }
     const points = await fetchFearGreedHistory(2, fakeFetchJson)
-    expect(capturedUrl).toBe('https://api.alternative.me/fng/?limit=2&format=json')
+    expect(capturedUrl).toBe(
+      'https://api.alternative.me/fng/?limit=2&format=json',
+    )
     expect(points).toEqual([
       { value: 31, classification: 'Fear', timestamp: 1784764800 },
       { value: 33, classification: 'Fear', timestamp: 1784678400 },
@@ -63,16 +79,27 @@ describe('fetchFearGreedHistory', () => {
 
 describe('fetchLatestFearGreed', () => {
   it('returns the first point from history', async () => {
-    const fakeFetchJson = async <T,>(): Promise<T> =>
+    const fakeFetchJson = async <T>(): Promise<T> =>
       ({
-        data: [{ value: '42', value_classification: 'Fear', timestamp: '1784764800' }],
+        data: [
+          {
+            value: '42',
+            value_classification: 'Fear',
+            timestamp: '1784764800',
+          },
+        ],
       }) as unknown as T
     const point = await fetchLatestFearGreed(fakeFetchJson)
-    expect(point).toEqual({ value: 42, classification: 'Fear', timestamp: 1784764800 })
+    expect(point).toEqual({
+      value: 42,
+      classification: 'Fear',
+      timestamp: 1784764800,
+    })
   })
 
   it('returns null when there is no data', async () => {
-    const fakeFetchJson = async <T,>(): Promise<T> => ({ data: [] }) as unknown as T
+    const fakeFetchJson = async <T>(): Promise<T> =>
+      ({ data: [] }) as unknown as T
     expect(await fetchLatestFearGreed(fakeFetchJson)).toBeNull()
   })
 })

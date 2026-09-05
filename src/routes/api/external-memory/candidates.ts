@@ -35,8 +35,7 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )
@@ -73,7 +72,9 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
             try {
               const prov = getExternalMemoryProviderById(body.provider)
               if (prov.kind === 'hindsight') {
-                const { operation_id } = await retainHindsight(result.candidate.text)
+                const { operation_id } = await retainHindsight(
+                  result.candidate.text,
+                )
                 updateExternalMemoryCandidateMeta({
                   provider: body.provider,
                   id: body.id || '',
@@ -102,8 +103,7 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )
@@ -122,8 +122,7 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

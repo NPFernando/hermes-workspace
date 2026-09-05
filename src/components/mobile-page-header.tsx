@@ -50,9 +50,7 @@ export function MobilePageHeader({
           />
         </svg>
       </button>
-      <span
-        className="flex-1 text-center text-[15px] font-semibold truncate -ml-11 text-[var(--theme-text)]"
-      >
+      <span className="flex-1 text-center text-[15px] font-semibold truncate -ml-11 text-[var(--theme-text)]">
         {title}
       </span>
       <div className="shrink-0 w-9">{right ?? null}</div>

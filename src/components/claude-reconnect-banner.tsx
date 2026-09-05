@@ -116,8 +116,7 @@ export function ClaudeReconnectBanner({
           } else {
             wasDisconnectedRef.current = true
             setBannerState('disconnected')
-            const sinceLastTry =
-              Date.now() - autoRestartTriedAtRef.current
+            const sinceLastTry = Date.now() - autoRestartTriedAtRef.current
             if (sinceLastTry > AUTO_RESTART_COOLDOWN_MS) {
               autoRestartTriedAtRef.current = Date.now()
               void fetch('/api/start-claude', {
@@ -134,8 +133,7 @@ export function ClaudeReconnectBanner({
                   }
                   if (res.ok && data.ok) {
                     setMessage(
-                      data.message ||
-                        'Auto-restarting Hermes Agent gateway…',
+                      data.message || 'Auto-restarting Hermes Agent gateway…',
                     )
                     // Probe again shortly so the banner clears as soon as
                     // the gateway answers /health.
@@ -258,7 +256,12 @@ export function ClaudeReconnectBanner({
       >
         <div className="flex min-w-0 items-center gap-3">
           <span
-            className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-full', isDisconnected ? 'bg-[var(--theme-danger)]' : 'bg-[var(--theme-border)]')}
+            className={cn(
+              'inline-block h-2.5 w-2.5 shrink-0 rounded-full',
+              isDisconnected
+                ? 'bg-[var(--theme-danger)]'
+                : 'bg-[var(--theme-border)]',
+            )}
           />
           <div className="min-w-0">
             <p className="text-sm font-semibold">

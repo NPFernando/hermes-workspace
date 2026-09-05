@@ -42,7 +42,9 @@ export function ModelSuggestionToast({
               <p className="text-sm font-medium text-[var(--theme-text)]">
                 Try {getModelDisplayName(suggestedModel)}?
               </p>
-              <p className="mt-0.5 text-xs text-[var(--theme-muted)]">{reason}</p>
+              <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
+                {reason}
+              </p>
               {costImpact && (
                 <p className="mt-1 text-xs font-medium text-emerald-700">
                   {costImpact}

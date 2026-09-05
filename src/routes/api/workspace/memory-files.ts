@@ -29,12 +29,19 @@ function formatSize(bytes: number): string {
 }
 
 function tryStatFile(filePath: string): fs.Stats | null {
-  try { return fs.statSync(filePath) } catch { return null }
+  try {
+    return fs.statSync(filePath)
+  } catch {
+    return null
+  }
 }
 
 function collectFiles(): Array<MemoryFileItem> {
   const home = os.homedir()
-  const hermesHome = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(home, '.hermes')
+  const hermesHome =
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(home, '.hermes')
   const result: Array<MemoryFileItem> = []
 
   function add(filePath: string, section: MemorySection) {
@@ -54,7 +61,13 @@ function collectFiles(): Array<MemoryFileItem> {
   add(path.join(hermesHome, 'SOUL.md'), 'workspace')
 
   // Claude Code memory (auto-memory from claude.ai/code)
-  const claudeMemoryDir = path.join(home, '.claude', 'projects', '-home-ubuntu', 'memory')
+  const claudeMemoryDir = path.join(
+    home,
+    '.claude',
+    'projects',
+    '-home-ubuntu',
+    'memory',
+  )
   if (fs.existsSync(claudeMemoryDir)) {
     for (const f of fs.readdirSync(claudeMemoryDir)) {
       if (f.endsWith('.md')) add(path.join(claudeMemoryDir, f), 'workspace')
@@ -77,7 +90,17 @@ function collectFiles(): Array<MemoryFileItem> {
 
   // Agent memory files
   add(path.join(hermesHome, 'memories', 'MEMORY.md'), 'agent')
-  add(path.join(home, '.claude', 'projects', '-home-ubuntu', 'memory', 'MEMORY.md'), 'agent')
+  add(
+    path.join(
+      home,
+      '.claude',
+      'projects',
+      '-home-ubuntu',
+      'memory',
+      'MEMORY.md',
+    ),
+    'agent',
+  )
 
   const profilesDir = path.join(hermesHome, 'profiles')
   if (fs.existsSync(profilesDir)) {

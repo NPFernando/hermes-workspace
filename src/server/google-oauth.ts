@@ -4,10 +4,13 @@ import { join } from 'node:path'
 
 export const GOOGLE_ALLOWED_EMAIL = 'fernandonaveen2000@gmail.com'
 
-const GOOGLE_REDIRECT_URI = 'https://agent.fernandofamily.com/api/auth/google/callback'
+const GOOGLE_REDIRECT_URI =
+  'https://agent.fernandofamily.com/api/auth/google/callback'
 
 const HERMES_HOME =
-  process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? join(homedir(), '.hermes')
+  process.env.HERMES_HOME ??
+  process.env.CLAUDE_HOME ??
+  join(homedir(), '.hermes')
 const PROFILE_FILE = join(HERMES_HOME, 'workspace-user-profile.json')
 const GMAIL_TOKEN_FILE = join(HERMES_HOME, 'finance', 'gmail-oauth.json')
 const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
@@ -20,7 +23,10 @@ export type GoogleUserProfile = {
 
 export function storeUserProfile(profile: GoogleUserProfile): void {
   try {
-    writeFileSync(PROFILE_FILE, JSON.stringify(profile, null, 2), { encoding: 'utf8', mode: 0o600 })
+    writeFileSync(PROFILE_FILE, JSON.stringify(profile, null, 2), {
+      encoding: 'utf8',
+      mode: 0o600,
+    })
   } catch {
     console.warn('[google-oauth] Failed to persist user profile')
   }
@@ -37,7 +43,9 @@ export function getUserProfile(): GoogleUserProfile | null {
 }
 
 export function isGoogleOAuthEnabled(): boolean {
-  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+  return Boolean(
+    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
+  )
 }
 
 export function buildGoogleAuthUrl(state: string): string {
@@ -109,16 +117,25 @@ export async function exchangeCodeForEmail(
 export type OAuthStatePurpose = 'login' | 'gmail_connect'
 
 const STATE_TTL_MS = 10 * 60 * 1000 // 10 minutes
-const _oauthStates = new Map<string, { expiry: number; purpose: OAuthStatePurpose }>()
+const _oauthStates = new Map<
+  string,
+  { expiry: number; purpose: OAuthStatePurpose }
+>()
 
-setInterval(() => {
-  const now = Date.now()
-  for (const [s, entry] of _oauthStates) {
-    if (entry.expiry < now) _oauthStates.delete(s)
-  }
-}, 5 * 60 * 1000)
+setInterval(
+  () => {
+    const now = Date.now()
+    for (const [s, entry] of _oauthStates) {
+      if (entry.expiry < now) _oauthStates.delete(s)
+    }
+  },
+  5 * 60 * 1000,
+)
 
-export function storeOAuthState(state: string, purpose: OAuthStatePurpose = 'login'): void {
+export function storeOAuthState(
+  state: string,
+  purpose: OAuthStatePurpose = 'login',
+): void {
   _oauthStates.set(state, { expiry: Date.now() + STATE_TTL_MS, purpose })
 }
 
@@ -170,7 +187,10 @@ export async function exchangeCodeForGmailTokens(
     const body = await tokenRes.text().catch(() => '')
     throw new Error(`Google token exchange failed ${tokenRes.status}: ${body}`)
   }
-  const tokens = (await tokenRes.json()) as { access_token: string; refresh_token?: string }
+  const tokens = (await tokenRes.json()) as {
+    access_token: string
+    refresh_token?: string
+  }
   if (!tokens.refresh_token) {
     throw new Error(
       'Google did not return a refresh token (it only issues one on first consent). Revoke this app at https://myaccount.google.com/permissions and try connecting again.',
@@ -182,24 +202,43 @@ export async function exchangeCodeForGmailTokens(
   })
   if (!userRes.ok) throw new Error(`Google userinfo failed: ${userRes.status}`)
   const info = (await userRes.json()) as { email?: string }
-  if (!info.email || info.email.toLowerCase() !== GOOGLE_ALLOWED_EMAIL.toLowerCase()) {
+  if (
+    !info.email ||
+    info.email.toLowerCase() !== GOOGLE_ALLOWED_EMAIL.toLowerCase()
+  ) {
     throw new Error('Gmail must be connected with the same authorized account.')
   }
 
   return { refreshToken: tokens.refresh_token, email: info.email }
 }
 
-type GmailOAuthRecord = { refreshToken: string; email: string; connectedAt: string }
+type GmailOAuthRecord = {
+  refreshToken: string
+  email: string
+  connectedAt: string
+}
 
-export function storeGmailRefreshToken(refreshToken: string, email: string): void {
-  const record: GmailOAuthRecord = { refreshToken, email, connectedAt: new Date().toISOString() }
+export function storeGmailRefreshToken(
+  refreshToken: string,
+  email: string,
+): void {
+  const record: GmailOAuthRecord = {
+    refreshToken,
+    email,
+    connectedAt: new Date().toISOString(),
+  }
   mkdirSync(join(HERMES_HOME, 'finance'), { recursive: true, mode: 0o700 })
-  writeFileSync(GMAIL_TOKEN_FILE, JSON.stringify(record, null, 2), { encoding: 'utf8', mode: 0o600 })
+  writeFileSync(GMAIL_TOKEN_FILE, JSON.stringify(record, null, 2), {
+    encoding: 'utf8',
+    mode: 0o600,
+  })
 }
 
 export function readGmailRefreshToken(): string | null {
   try {
-    const record = JSON.parse(readFileSync(GMAIL_TOKEN_FILE, 'utf8')) as GmailOAuthRecord
+    const record = JSON.parse(
+      readFileSync(GMAIL_TOKEN_FILE, 'utf8'),
+    ) as GmailOAuthRecord
     return record.refreshToken || null
   } catch {
     return null

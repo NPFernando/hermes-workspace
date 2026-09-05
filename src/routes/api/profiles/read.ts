@@ -20,8 +20,7 @@ export const Route = createFileRoute('/api/profiles/read')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

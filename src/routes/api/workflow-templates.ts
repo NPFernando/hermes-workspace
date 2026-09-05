@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated, requireLocalOrAuth } from '../../server/auth-middleware'
+import {
+  isAuthenticated,
+  requireLocalOrAuth,
+} from '../../server/auth-middleware'
 import {
   requireJsonContentType,
   safeErrorMessage,

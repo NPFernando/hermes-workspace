@@ -20,13 +20,19 @@ export function MessageStatus({
   className,
 }: MessageStatusProps) {
   return (
-    <div className={cn('w-full max-w-[var(--chat-content-max-width)]', className)}>
+    <div
+      className={cn('w-full max-w-[var(--chat-content-max-width)]', className)}
+    >
       <Message>
         <div className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 text-[var(--theme-text)]">
           <div className="text-balance font-medium">{title}</div>
-          <div className="mt-2 text-pretty text-[var(--theme-muted)]">{description}</div>
+          <div className="mt-2 text-pretty text-[var(--theme-muted)]">
+            {description}
+          </div>
           {detail ? (
-            <div className="mt-2 text-xs text-[var(--theme-muted)]">{detail}</div>
+            <div className="mt-2 text-xs text-[var(--theme-muted)]">
+              {detail}
+            </div>
           ) : null}
           {actionLabel && onAction ? (
             <div className="mt-3">

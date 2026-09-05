@@ -13,15 +13,24 @@ import { resolveHermesBin } from '../../server/hermes-bin'
 // Body: { text: string; chat_id?: string; priority?: string; assignee?: string }
 // ---------------------------------------------------------------------------
 
-const HERMES_BIN  = resolveHermesBin()
-const DEFAULT_TG  = 'telegram:2130622225'
+const HERMES_BIN = resolveHermesBin()
+const DEFAULT_TG = 'telegram:2130622225'
 
 export const Route = createFileRoute('/api/tasks-create-from-tg')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        let body: { text?: string; chat_id?: string; priority?: string; assignee?: string } = {}
-        try { body = (await request.json()) as typeof body } catch { /* empty body */ }
+        let body: {
+          text?: string
+          chat_id?: string
+          priority?: string
+          assignee?: string
+        } = {}
+        try {
+          body = (await request.json()) as typeof body
+        } catch {
+          /* empty body */
+        }
 
         const text = body.text?.trim()
         if (!text) {
@@ -33,15 +42,24 @@ export const Route = createFileRoute('/api/tasks-create-from-tg')({
         try {
           suggestion = await generateTaskFromText(text)
         } catch {
-          return json({ ok: false, error: 'AI task parsing failed' }, { status: 500 })
+          return json(
+            { ok: false, error: 'AI task parsing failed' },
+            { status: 500 },
+          )
         }
 
         if (!suggestion) {
-          return json({ ok: false, error: 'Could not parse task from text' }, { status: 422 })
+          return json(
+            { ok: false, error: 'Could not parse task from text' },
+            { status: 422 },
+          )
         }
 
         // Override with explicit fields if provided
-        if (body.priority && ['high', 'medium', 'low'].includes(body.priority)) {
+        if (
+          body.priority &&
+          ['high', 'medium', 'low'].includes(body.priority)
+        ) {
           suggestion.priority = body.priority as 'high' | 'medium' | 'low'
         }
         if (body.assignee) suggestion.assignee = body.assignee
@@ -55,7 +73,12 @@ export const Route = createFileRoute('/api/tasks-create-from-tg')({
 
         // Send confirmation to Telegram
         const target = body.chat_id ? `telegram:${body.chat_id}` : DEFAULT_TG
-        const priorityEmoji = task.priority === 'high' ? '🔴' : task.priority === 'low' ? '🟢' : '🟡'
+        const priorityEmoji =
+          task.priority === 'high'
+            ? '🔴'
+            : task.priority === 'low'
+              ? '🟢'
+              : '🟡'
         const msg = `✅ Task created\n${priorityEmoji} ${task.title}\n${task.description ? task.description.slice(0, 120) + (task.description.length > 120 ? '…' : '') : ''}\n→ agent.fernandofamily.com/tasks?task=${task.id}`
 
         spawnSync(HERMES_BIN, ['send', '--to', target, '-q', msg], {
@@ -63,7 +86,15 @@ export const Route = createFileRoute('/api/tasks-create-from-tg')({
           timeout: 15_000,
         })
 
-        return json({ ok: true, task: { id: task.id, title: task.title, priority: task.priority, column: task.column } })
+        return json({
+          ok: true,
+          task: {
+            id: task.id,
+            title: task.title,
+            priority: task.priority,
+            column: task.column,
+          },
+        })
       },
     },
   },

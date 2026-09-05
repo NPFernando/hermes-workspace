@@ -18,8 +18,16 @@ import type { AgoraUser } from './lib/agora-types'
 
 export function AgoraScreen() {
   const { profile, updateProfile } = useAgoraProfile()
-  const { world, self, others, messages, activeBubbles, nearbyIds, sendMessage, moveSelfToward } =
-    useAgoraRoom({ profile })
+  const {
+    world,
+    self,
+    others,
+    messages,
+    activeBubbles,
+    nearbyIds,
+    sendMessage,
+    moveSelfToward,
+  } = useAgoraRoom({ profile })
 
   const [drawerUser, setDrawerUser] = useState<AgoraUser | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -40,17 +48,19 @@ export function AgoraScreen() {
   }
 
   return (
-    <div data-route-page className="flex h-full min-h-0 flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]">
+    <div
+      data-route-page
+      className="flex h-full min-h-0 flex-col bg-[var(--theme-bg)] text-[var(--theme-text)]"
+    >
       {/* Top bar */}
-      <header
-        className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--theme-border)]"
-      >
+      <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--theme-border)]">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-base font-semibold truncate">🏛️ Agora</span>
           <span
             className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--theme-accent)]"
             style={{
-              background: 'color-mix(in srgb, var(--theme-accent) 25%, transparent)',
+              background:
+                'color-mix(in srgb, var(--theme-accent) 25%, transparent)',
             }}
           >
             beta
@@ -76,10 +86,13 @@ export function AgoraScreen() {
               height={20}
               className="rounded-full"
               onError={(e) => {
-                ;(e.currentTarget as HTMLImageElement).src = '/avatars/hermes.png'
+                ;(e.currentTarget as HTMLImageElement).src =
+                  '/avatars/hermes.png'
               }}
             />
-            <span className="max-w-[110px] truncate">{self.profile.displayName}</span>
+            <span className="max-w-[110px] truncate">
+              {self.profile.displayName}
+            </span>
           </button>
         </div>
       </header>

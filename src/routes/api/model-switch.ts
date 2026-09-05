@@ -18,9 +18,15 @@ export const Route = createFileRoute('/api/model-switch')({
         if (csrfCheck) return csrfCheck
 
         try {
-          const body = (await request.json()) as { sessionKey?: string; model?: string }
+          const body = (await request.json()) as {
+            sessionKey?: string
+            model?: string
+          }
           if (!body.model) {
-            return json({ ok: false, error: 'model is required' }, { status: 400 })
+            return json(
+              { ok: false, error: 'model is required' },
+              { status: 400 },
+            )
           }
 
           // Forward to gateway if it supports model-switch; fall back to ok:true

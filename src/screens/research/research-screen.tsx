@@ -59,22 +59,54 @@ type LibraryEntry = {
 
 function phaseLabel(phase: string | undefined): string {
   switch (phase) {
-    case 'probing': return 'Probing model...'
-    case 'thinking': return 'Thinking...'
-    case 'searching': return 'Searching...'
-    case 'extracting': return 'Extracting...'
-    case 'synthesizing': return 'Synthesizing...'
-    case 'done': return 'Complete'
-    case 'error': return 'Error'
-    case 'warning': return 'Warning'
-    default: return phase ?? 'Working...'
+    case 'probing':
+      return 'Probing model...'
+    case 'thinking':
+      return 'Thinking...'
+    case 'searching':
+      return 'Searching...'
+    case 'extracting':
+      return 'Extracting...'
+    case 'synthesizing':
+      return 'Synthesizing...'
+    case 'done':
+      return 'Complete'
+    case 'error':
+      return 'Error'
+    case 'warning':
+      return 'Warning'
+    default:
+      return phase ?? 'Working...'
   }
 }
 
 function phaseIcon(phase: string) {
-  if (phase === 'done') return <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2} className="text-green-400" />
-  if (phase === 'error') return <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} className="text-red-400" />
-  return <HugeiconsIcon icon={FlowIcon} size={14} strokeWidth={1.5} className="text-accent-500 opacity-70" />
+  if (phase === 'done')
+    return (
+      <HugeiconsIcon
+        icon={Tick02Icon}
+        size={14}
+        strokeWidth={2}
+        className="text-green-400"
+      />
+    )
+  if (phase === 'error')
+    return (
+      <HugeiconsIcon
+        icon={Cancel01Icon}
+        size={14}
+        strokeWidth={2}
+        className="text-red-400"
+      />
+    )
+  return (
+    <HugeiconsIcon
+      icon={FlowIcon}
+      size={14}
+      strokeWidth={1.5}
+      className="text-accent-500 opacity-70"
+    />
+  )
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
@@ -112,7 +144,12 @@ export function ResearchScreen() {
     stepCounterRef.current += 1
     setSteps((prev) => [
       ...prev,
-      { id: stepCounterRef.current, phase: stepPhase, message, timestamp: Date.now() },
+      {
+        id: stepCounterRef.current,
+        phase: stepPhase,
+        message,
+        timestamp: Date.now(),
+      },
     ])
   }, [])
 
@@ -137,7 +174,9 @@ export function ResearchScreen() {
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error((body as { detail?: string }).detail ?? `HTTP ${res.status}`)
+        throw new Error(
+          (body as { detail?: string }).detail ?? `HTTP ${res.status}`,
+        )
       }
       const data = (await res.json()) as { session_id: string }
       const sid = data.session_id
@@ -156,7 +195,12 @@ export function ResearchScreen() {
           const msg = event.message ?? phaseLabel(evPhase)
           appendStep(evPhase, msg)
 
-          if (event.final || event.status === 'done' || event.status === 'error' || event.status === 'cancelled') {
+          if (
+            event.final ||
+            event.status === 'done' ||
+            event.status === 'error' ||
+            event.status === 'cancelled'
+          ) {
             es.close()
             if (event.status === 'error') {
               setPhase('error')
@@ -204,7 +248,9 @@ export function ResearchScreen() {
   const cancelResearch = useCallback(() => {
     eventSourceRef.current?.close()
     if (sessionId) {
-      void fetch(`/api/odysseus/research/cancel/${sessionId}`, { method: 'POST' })
+      void fetch(`/api/odysseus/research/cancel/${sessionId}`, {
+        method: 'POST',
+      })
     }
     setPhase('cancelled')
   }, [sessionId])
@@ -221,7 +267,10 @@ export function ResearchScreen() {
   // Bootstrap: ensure Odysseus has an LLM endpoint registered
   useQuery({
     queryKey: ['odysseus-bootstrap'],
-    queryFn: () => fetch('/api/odysseus-bootstrap', { method: 'POST' }).then((r) => r.json()),
+    queryFn: () =>
+      fetch('/api/odysseus-bootstrap', { method: 'POST' }).then((r) =>
+        r.json(),
+      ),
     staleTime: Infinity,
     retry: false,
     refetchOnWindowFocus: false,
@@ -240,42 +289,56 @@ export function ResearchScreen() {
     staleTime: 30_000,
   })
 
-  const loadSavedResult = useCallback(async (entry: LibraryEntry) => {
-    setActiveTab('new')
-    setQuery(entry.query)
-    setSessionId(entry.session_id)
-    setSteps([])
-    setErrorMsg(null)
-    eventSourceRef.current?.close()
+  const loadSavedResult = useCallback(
+    async (entry: LibraryEntry) => {
+      setActiveTab('new')
+      setQuery(entry.query)
+      setSessionId(entry.session_id)
+      setSteps([])
+      setErrorMsg(null)
+      eventSourceRef.current?.close()
 
-    if (entry.status === 'done') {
-      try {
-        const res = await fetch(`/api/odysseus/research/result-peek/${entry.session_id}`, { method: 'POST' })
-        if (res.ok) {
-          const data = (await res.json()) as { result?: string }
-          if (data.result) {
-            setResult(data.result)
-            setPhase('done')
-            appendStep('done', 'Loaded saved research report')
-            return
+      if (entry.status === 'done') {
+        try {
+          const res = await fetch(
+            `/api/odysseus/research/result-peek/${entry.session_id}`,
+            { method: 'POST' },
+          )
+          if (res.ok) {
+            const data = (await res.json()) as { result?: string }
+            if (data.result) {
+              setResult(data.result)
+              setPhase('done')
+              appendStep('done', 'Loaded saved research report')
+              return
+            }
           }
+        } catch {
+          // fall through to idle
         }
-      } catch {
-        // fall through to idle
       }
-    }
-    setPhase('idle')
-    setResult(null)
-  }, [appendStep])
+      setPhase('idle')
+      setResult(null)
+    },
+    [appendStep],
+  )
 
-  const isRunning = phase === 'starting' || phase === 'probing' || phase === 'running'
+  const isRunning =
+    phase === 'starting' || phase === 'probing' || phase === 'running'
 
   return (
     <div data-route-page className="flex h-full min-h-0 flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-[var(--theme-border)] px-4 py-3">
-        <HugeiconsIcon icon={Search01Icon} size={20} strokeWidth={1.5} className="text-accent-500 shrink-0" />
-        <h1 className="hidden text-base font-semibold md:block">Deep Research</h1>
+        <HugeiconsIcon
+          icon={Search01Icon}
+          size={20}
+          strokeWidth={1.5}
+          className="text-accent-500 shrink-0"
+        />
+        <h1 className="hidden text-base font-semibold md:block">
+          Deep Research
+        </h1>
         <div className="ml-auto flex gap-2">
           <button
             type="button"
@@ -306,32 +369,49 @@ export function ResearchScreen() {
 
       {/* Content */}
       {activeTab === 'library' ? (
-        <LibraryView
-          entries={library ?? []}
-          onSelect={loadSavedResult}
-        />
+        <LibraryView entries={library ?? []} onSelect={loadSavedResult} />
       ) : phase === 'done' && result ? (
         /* ── Two-panel done layout ── */
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Left sidebar: query + controls + steps log */}
           <div className="w-72 shrink-0 flex flex-col border-r border-[var(--theme-border)] overflow-y-auto">
             <div className="p-4 space-y-3">
-              <p className="text-sm font-medium text-[var(--theme-text)] leading-snug">{query}</p>
+              <p className="text-sm font-medium text-[var(--theme-text)] leading-snug">
+                {query}
+              </p>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={reset} className="text-xs">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={reset}
+                  className="text-xs"
+                >
                   New research
                 </Button>
                 {sessionId && (
                   <Button
-                    size="sm" variant="outline" className="gap-1.5 text-xs"
-                    onClick={() => window.open(`/api/odysseus/research/report/${sessionId}`, '_blank')}
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs"
+                    onClick={() =>
+                      window.open(
+                        `/api/odysseus/research/report/${sessionId}`,
+                        '_blank',
+                      )
+                    }
                   >
-                    <HugeiconsIcon icon={Telescope02Icon} size={13} strokeWidth={1.5} />
+                    <HugeiconsIcon
+                      icon={Telescope02Icon}
+                      size={13}
+                      strokeWidth={1.5}
+                    />
                     Full report
                   </Button>
                 )}
                 <Button
-                  size="sm" variant="outline" className="gap-1.5 text-xs"
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
                   onClick={() => {
                     void navigator.clipboard.writeText(result).then(() => {
                       setCopied(true)
@@ -339,20 +419,37 @@ export function ResearchScreen() {
                     })
                   }}
                 >
-                  <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={13} strokeWidth={1.5} />
+                  <HugeiconsIcon
+                    icon={copied ? Tick02Icon : Copy01Icon}
+                    size={13}
+                    strokeWidth={1.5}
+                  />
                   {copied ? 'Copied!' : 'Copy'}
                 </Button>
                 {sessionId && (
                   <Button
-                    size="sm" variant="outline" className="text-xs"
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
                     onClick={async () => {
                       try {
-                        const res = await fetch(`/api/odysseus/research/spinoff/${sessionId}`, { method: 'POST' })
+                        const res = await fetch(
+                          `/api/odysseus/research/spinoff/${sessionId}`,
+                          { method: 'POST' },
+                        )
                         if (res.ok) {
-                          const data = (await res.json()) as { session_id?: string }
-                          if (data.session_id) void navigate({ to: '/chat/$sessionKey', params: { sessionKey: data.session_id } })
+                          const data = (await res.json()) as {
+                            session_id?: string
+                          }
+                          if (data.session_id)
+                            void navigate({
+                              to: '/chat/$sessionKey',
+                              params: { sessionKey: data.session_id },
+                            })
                         }
-                      } catch { /* ignore */ }
+                      } catch {
+                        /* ignore */
+                      }
                     }}
                   >
                     Continue in chat
@@ -367,9 +464,16 @@ export function ResearchScreen() {
                 </p>
                 <div className="space-y-1.5">
                   {steps.map((step) => (
-                    <div key={step.id} className="flex items-start gap-2 text-xs">
-                      <span className="mt-0.5 shrink-0">{phaseIcon(step.phase)}</span>
-                      <span className="text-[var(--theme-muted)]">{step.message}</span>
+                    <div
+                      key={step.id}
+                      className="flex items-start gap-2 text-xs"
+                    >
+                      <span className="mt-0.5 shrink-0">
+                        {phaseIcon(step.phase)}
+                      </span>
+                      <span className="text-[var(--theme-muted)]">
+                        {step.message}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -388,7 +492,6 @@ export function ResearchScreen() {
         </div>
       ) : (
         <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-4 md:p-6">
-
           {/* Query form */}
           {phase === 'idle' && (
             <motion.div
@@ -397,13 +500,15 @@ export function ResearchScreen() {
               className="mx-auto w-full max-w-2xl"
             >
               <p className="mb-4 text-sm text-[var(--theme-muted)]">
-                Enter a research question. Odysseus will iteratively search, extract, and synthesize a detailed report.
+                Enter a research question. Odysseus will iteratively search,
+                extract, and synthesize a detailed report.
               </p>
               <textarea
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void startResearch()
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey))
+                    void startResearch()
                 }}
                 placeholder="What do you want to research?"
                 rows={4}
@@ -419,7 +524,9 @@ export function ResearchScreen() {
                   >
                     <option value={0}>Auto</option>
                     {[3, 5, 8, 10, 15, 20].map((n) => (
-                      <option key={n} value={n}>{n}</option>
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -431,7 +538,9 @@ export function ResearchScreen() {
                     className="rounded-lg border border-[var(--theme-border)] bg-transparent px-2 py-1 text-xs"
                   >
                     {[60, 120, 180, 300, 600, 900, 1200].map((s) => (
-                      <option key={s} value={s}>{s < 60 ? `${s}s` : `${s / 60}m`}</option>
+                      <option key={s} value={s}>
+                        {s < 60 ? `${s}s` : `${s / 60}m`}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -442,7 +551,11 @@ export function ResearchScreen() {
                   className="ml-auto gap-2 bg-[var(--theme-accent)] text-white hover:opacity-90"
                 >
                   Start research
-                  <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={2} />
+                  <HugeiconsIcon
+                    icon={ArrowRight01Icon}
+                    size={16}
+                    strokeWidth={2}
+                  />
                 </Button>
               </div>
             </motion.div>
@@ -450,50 +563,80 @@ export function ResearchScreen() {
 
           {/* Progress */}
           <AnimatePresence>
-            {(isRunning || phase === 'done' || phase === 'error' || phase === 'cancelled') && steps.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mx-auto w-full max-w-2xl"
-              >
-                {/* Query label */}
-                <div className="mb-4 flex items-start justify-between gap-4">
-                  <p className="text-sm font-medium text-[var(--theme-text)] leading-snug">
-                    {query}
-                  </p>
-                  <div className="flex shrink-0 gap-2">
-                    {isRunning && (
-                      <Button size="sm" variant="outline" onClick={cancelResearch} className="gap-1.5 text-xs">
-                        <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} />
-                        Cancel
-                      </Button>
-                    )}
-                    {!isRunning && (
-                      <Button size="sm" variant="outline" onClick={reset} className="text-xs">
-                        New research
-                      </Button>
-                    )}
+            {(isRunning ||
+              phase === 'done' ||
+              phase === 'error' ||
+              phase === 'cancelled') &&
+              steps.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mx-auto w-full max-w-2xl"
+                >
+                  {/* Query label */}
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <p className="text-sm font-medium text-[var(--theme-text)] leading-snug">
+                      {query}
+                    </p>
+                    <div className="flex shrink-0 gap-2">
+                      {isRunning && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={cancelResearch}
+                          className="gap-1.5 text-xs"
+                        >
+                          <HugeiconsIcon
+                            icon={Cancel01Icon}
+                            size={13}
+                            strokeWidth={2}
+                          />
+                          Cancel
+                        </Button>
+                      )}
+                      {!isRunning && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={reset}
+                          className="text-xs"
+                        >
+                          New research
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Steps */}
-                <div className="space-y-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
-                  {steps.map((step) => (
-                    <div key={step.id} className="flex items-start gap-2 text-xs">
-                      <span className="mt-0.5 shrink-0">{phaseIcon(step.phase)}</span>
-                      <span className="text-[var(--theme-muted)]">{step.message}</span>
-                    </div>
-                  ))}
-                  {isRunning && (
-                    <div className="flex items-center gap-2 text-xs text-accent-500">
-                      <HugeiconsIcon icon={Loading03Icon} size={14} strokeWidth={2} className="animate-spin" />
-                      <span>Researching...</span>
-                    </div>
-                  )}
-                  <div ref={stepsEndRef} />
-                </div>
-              </motion.div>
-            )}
+                  {/* Steps */}
+                  <div className="space-y-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3">
+                    {steps.map((step) => (
+                      <div
+                        key={step.id}
+                        className="flex items-start gap-2 text-xs"
+                      >
+                        <span className="mt-0.5 shrink-0">
+                          {phaseIcon(step.phase)}
+                        </span>
+                        <span className="text-[var(--theme-muted)]">
+                          {step.message}
+                        </span>
+                      </div>
+                    ))}
+                    {isRunning && (
+                      <div className="flex items-center gap-2 text-xs text-accent-500">
+                        <HugeiconsIcon
+                          icon={Loading03Icon}
+                          size={14}
+                          strokeWidth={2}
+                          className="animate-spin"
+                        />
+                        <span>Researching...</span>
+                      </div>
+                    )}
+                    <div ref={stepsEndRef} />
+                  </div>
+                </motion.div>
+              )}
           </AnimatePresence>
 
           {/* Error */}
@@ -533,9 +676,18 @@ export function ResearchScreen() {
                   size="sm"
                   variant="outline"
                   className="gap-1.5"
-                  onClick={() => window.open(`/api/odysseus/research/report/${sessionId}`, '_blank')}
+                  onClick={() =>
+                    window.open(
+                      `/api/odysseus/research/report/${sessionId}`,
+                      '_blank',
+                    )
+                  }
                 >
-                  <HugeiconsIcon icon={Telescope02Icon} size={14} strokeWidth={1.5} />
+                  <HugeiconsIcon
+                    icon={Telescope02Icon}
+                    size={14}
+                    strokeWidth={1.5}
+                  />
                   View full report
                 </Button>
                 {result && (
@@ -550,7 +702,11 @@ export function ResearchScreen() {
                       })
                     }}
                   >
-                    <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={14} strokeWidth={1.5} />
+                    <HugeiconsIcon
+                      icon={copied ? Tick02Icon : Copy01Icon}
+                      size={14}
+                      strokeWidth={1.5}
+                    />
                     {copied ? 'Copied!' : 'Copy report'}
                   </Button>
                 )}
@@ -559,11 +715,19 @@ export function ResearchScreen() {
                   variant="outline"
                   onClick={async () => {
                     try {
-                      const res = await fetch(`/api/odysseus/research/spinoff/${sessionId}`, { method: 'POST' })
+                      const res = await fetch(
+                        `/api/odysseus/research/spinoff/${sessionId}`,
+                        { method: 'POST' },
+                      )
                       if (res.ok) {
-                        const data = (await res.json()) as { session_id?: string }
+                        const data = (await res.json()) as {
+                          session_id?: string
+                        }
                         if (data.session_id) {
-                          void navigate({ to: '/chat/$sessionKey', params: { sessionKey: data.session_id } })
+                          void navigate({
+                            to: '/chat/$sessionKey',
+                            params: { sessionKey: data.session_id },
+                          })
                         }
                       }
                     } catch {
@@ -595,7 +759,12 @@ function LibraryView({
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-[var(--theme-muted)]">
         <div className="text-center">
-          <HugeiconsIcon icon={BookOpen02Icon} size={32} strokeWidth={1} className="mx-auto mb-2 opacity-40" />
+          <HugeiconsIcon
+            icon={BookOpen02Icon}
+            size={32}
+            strokeWidth={1}
+            className="mx-auto mb-2 opacity-40"
+          />
           No past research found
         </div>
       </div>
@@ -605,35 +774,37 @@ function LibraryView({
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6">
       <div className="mx-auto max-w-2xl space-y-2">
-        {entries.filter((e) => !e.archived).map((entry) => (
-          <button
-            key={entry.session_id}
-            type="button"
-            onClick={() => onSelect(entry)}
-            className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3 text-left text-sm transition-colors hover:border-accent-400/50 hover:bg-accent-50/20 dark:hover:border-accent-500/30"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <span className="font-medium text-[var(--theme-text)] line-clamp-2">
-                {entry.query}
-              </span>
-              <span
-                className={cn(
-                  'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium',
-                  entry.status === 'done'
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-[var(--theme-hover)] text-[var(--theme-muted)]',
-                )}
-              >
-                {entry.status}
-              </span>
-            </div>
-            {entry.created_at && (
-              <span className="mt-1 block text-xs text-[var(--theme-muted)]">
-                {new Date(entry.created_at).toLocaleString()}
-              </span>
-            )}
-          </button>
-        ))}
+        {entries
+          .filter((e) => !e.archived)
+          .map((entry) => (
+            <button
+              key={entry.session_id}
+              type="button"
+              onClick={() => onSelect(entry)}
+              className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3 text-left text-sm transition-colors hover:border-accent-400/50 hover:bg-accent-50/20 dark:hover:border-accent-500/30"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="font-medium text-[var(--theme-text)] line-clamp-2">
+                  {entry.query}
+                </span>
+                <span
+                  className={cn(
+                    'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    entry.status === 'done'
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : 'bg-[var(--theme-hover)] text-[var(--theme-muted)]',
+                  )}
+                >
+                  {entry.status}
+                </span>
+              </div>
+              {entry.created_at && (
+                <span className="mt-1 block text-xs text-[var(--theme-muted)]">
+                  {new Date(entry.created_at).toLocaleString()}
+                </span>
+              )}
+            </button>
+          ))}
       </div>
     </div>
   )

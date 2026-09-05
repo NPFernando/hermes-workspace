@@ -1,11 +1,6 @@
 import { useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  Alert01Icon,
-  CheckmarkCircle01Icon,
-  Idea01Icon,
-  Refresh01Icon,
-} from '@hugeicons/core-free-icons'
+import { Alert01Icon, CheckmarkCircle01Icon, Idea01Icon, Refresh01Icon } from '@hugeicons/core-free-icons'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 
 type Suggestion = {
@@ -23,40 +18,15 @@ const NEMOTRON_FREE = 'nvidia/nemotron-3-super-120b-a12b:free'
 function isPaidAndReplaceable(modelId: string): boolean {
   const id = modelId.toLowerCase()
   // Already free
-  if (
-    id.includes(':free') ||
-    id.includes('nemotron') ||
-    id.includes('gemma') ||
-    id.includes('llama')
-  )
-    return false
+  if (id.includes(':free') || id.includes('nemotron') || id.includes('gemma') || id.includes('llama')) return false
   // Subscription / local — no real cost
-  if (
-    id.startsWith('pc1-') ||
-    id.startsWith('pc2-') ||
-    id.includes('ollama') ||
-    id.includes('lmstudio') ||
-    id.includes('minimax')
-  )
-    return false
-  if (
-    id.includes('anthropic-oauth') ||
-    (id.includes('claude-') && id.includes('oauth'))
-  )
-    return false
+  if (id.startsWith('pc1-') || id.startsWith('pc2-') || id.includes('ollama') || id.includes('lmstudio') || id.includes('minimax')) return false
+  if (id.includes('anthropic-oauth') || id.includes('claude-') && id.includes('oauth')) return false
   // These are real paid calls
-  return (
-    id.includes('claude') ||
-    id.includes('gpt') ||
-    id.includes('deepseek') ||
-    id.includes('openai')
-  )
+  return id.includes('claude') || id.includes('gpt') || id.includes('deepseek') || id.includes('openai')
 }
 
-function buildSuggestions(
-  overview: DashboardOverview | null,
-  cycleIdx: number,
-): Array<Suggestion> {
+function buildSuggestions(overview: DashboardOverview | null, cycleIdx: number): Array<Suggestion> {
   const suggestions: Array<Suggestion> = []
 
   // No fake "Dashboard loading" suggestion here — the card renders a real
@@ -210,26 +180,11 @@ export function ProactiveSuggestionsCard({
 
   const iconNode =
     active.icon === 'warn' ? (
-      <HugeiconsIcon
-        icon={Alert01Icon}
-        size={13}
-        strokeWidth={1.8}
-        className="text-[var(--theme-warning)]"
-      />
+      <HugeiconsIcon icon={Alert01Icon} size={13} strokeWidth={1.8} className="text-amber-400" />
     ) : active.icon === 'ok' ? (
-      <HugeiconsIcon
-        icon={CheckmarkCircle01Icon}
-        size={13}
-        strokeWidth={1.8}
-        className="text-[var(--theme-success)]"
-      />
+      <HugeiconsIcon icon={CheckmarkCircle01Icon} size={13} strokeWidth={1.8} className="text-[var(--theme-success,#50fa7b)]" />
     ) : (
-      <HugeiconsIcon
-        icon={Idea01Icon}
-        size={13}
-        strokeWidth={1.8}
-        className="text-[var(--theme-accent)]"
-      />
+      <HugeiconsIcon icon={Idea01Icon} size={13} strokeWidth={1.8} className="text-[var(--theme-accent)]" />
     )
 
   const impactColor =
@@ -259,16 +214,15 @@ export function ProactiveSuggestionsCard({
       />
 
       <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
+        <h3
+          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
+        >
           Optimization hint
         </h3>
         <div className="flex items-center gap-1.5">
           <span
             className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em]"
-            style={{
-              color: impactColor,
-              background: `color-mix(in srgb, ${impactColor} 12%, transparent)`,
-            }}
+            style={{ color: impactColor, background: `color-mix(in srgb, ${impactColor} 12%, transparent)` }}
           >
             {active.impact}
           </span>
@@ -286,10 +240,14 @@ export function ProactiveSuggestionsCard({
       <div className="flex gap-2">
         <span className="mt-0.5 shrink-0">{iconNode}</span>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-medium leading-tight text-[var(--theme-text)]">
+          <p
+            className="text-[11px] font-medium leading-tight text-[var(--theme-text)]"
+          >
             {active.title}
           </p>
-          <p className="mt-0.5 text-[10px] leading-relaxed text-[var(--theme-muted)]">
+          <p
+            className="mt-0.5 text-[10px] leading-relaxed text-[var(--theme-muted)]"
+          >
             {active.body}
           </p>
           {active.href ? (
@@ -304,7 +262,9 @@ export function ProactiveSuggestionsCard({
       </div>
 
       {suggestions.length > 1 ? (
-        <p className="text-right text-[9px] text-[var(--theme-muted)]">
+        <p
+          className="text-right text-[9px] text-[var(--theme-muted)]"
+        >
           {(cycleIdx % suggestions.length) + 1} / {suggestions.length}
         </p>
       ) : null}

@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { injectIdeasAsBacklog, runAgentDeployBackground } from '../../server/astra-tasks'
+import {
+  injectIdeasAsBacklog,
+  runAgentDeployBackground,
+} from '../../server/astra-tasks'
 
 export const Route = createFileRoute('/api/tasks-inject-ideas')({
   server: {

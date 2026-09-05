@@ -51,17 +51,18 @@ export function parseWorkSummary(
   let next = ''
   let question = ''
 
-  const block = output.match(/<WORK_SUMMARY>([\s\S]*?)<\/WORK_SUMMARY>/)?.[1] ?? ''
+  const block =
+    output.match(/<WORK_SUMMARY>([\s\S]*?)<\/WORK_SUMMARY>/)?.[1] ?? ''
   const src = block || (output.match(/^STATUS:/im) ? output : '')
   if (src) {
     const sm = src.match(/STATUS:\s*(\w+)/i)
     const su = src.match(/SUMMARY:\s*(.+)/i)
     const nx = src.match(/NEXT:\s*(.+)/i)
-    const q  = src.match(/QUESTION:\s*(.+)/i)
-    if (sm) status   = sm[1].toLowerCase()
-    if (su) summary  = su[1].trim().replace(/^\[|\]$/g, '')
-    if (nx) next     = nx[1].trim().replace(/^\[|\]$/g, '')
-    if (q)  question = q[1].trim().replace(/^\[|\]$/g, '')
+    const q = src.match(/QUESTION:\s*(.+)/i)
+    if (sm) status = sm[1].toLowerCase()
+    if (su) summary = su[1].trim().replace(/^\[|\]$/g, '')
+    if (nx) next = nx[1].trim().replace(/^\[|\]$/g, '')
+    if (q) question = q[1].trim().replace(/^\[|\]$/g, '')
   }
 
   // Non-zero exit → blocked only for genuine agent failures.
@@ -73,14 +74,22 @@ export function parseWorkSummary(
     stderr.includes('rate limit')
 
   if (exitCode !== 0 && status === 'partial' && !isTransientFailure) {
-    status  = 'blocked'
-    summary = summary || `hermes exited with code ${exitCode}${stderr ? ': ' + stderr.slice(0, 200) : ''}`
+    status = 'blocked'
+    summary =
+      summary ||
+      `hermes exited with code ${exitCode}${stderr ? ': ' + stderr.slice(0, 200) : ''}`
   } else if (exitCode !== 0 && status === 'partial' && isTransientFailure) {
-    summary = summary || `Transient execution failure (model unavailable) — will retry automatically. ${stderr.slice(0, 150)}`
+    summary =
+      summary ||
+      `Transient execution failure (model unavailable) — will retry automatically. ${stderr.slice(0, 150)}`
   }
 
-  const freeText = output.replace(/<WORK_SUMMARY>[\s\S]*?<\/WORK_SUMMARY>/g, '').trim()
-  const note = summary || freeText.slice(0, 800) ||
+  const freeText = output
+    .replace(/<WORK_SUMMARY>[\s\S]*?<\/WORK_SUMMARY>/g, '')
+    .trim()
+  const note =
+    summary ||
+    freeText.slice(0, 800) ||
     (exitCode !== 0
       ? `Execution failed (exit ${exitCode}): ${stderr.slice(0, 200)}`
       : 'Task executed — no summary returned.')
@@ -92,12 +101,18 @@ export function parseWorkSummary(
   return {
     status,
     note: parts.join('\n\n'),
-    actionLabel: status === 'done' ? 'completed'
-      : (status === 'blocked' || status === 'needs_input') ? 'blocked'
-      : 'attempted',
-    newColumn: status === 'done' ? 'review'
-      : (status === 'blocked' || status === 'needs_input') ? 'blocked'
-      : null,
+    actionLabel:
+      status === 'done'
+        ? 'completed'
+        : status === 'blocked' || status === 'needs_input'
+          ? 'blocked'
+          : 'attempted',
+    newColumn:
+      status === 'done'
+        ? 'review'
+        : status === 'blocked' || status === 'needs_input'
+          ? 'blocked'
+          : null,
   }
 }
 

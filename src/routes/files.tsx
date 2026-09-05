@@ -114,7 +114,9 @@ export const Route = createFileRoute('/files')({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="spinner-accent spinner-xl mb-3" />
-          <p className="text-sm text-[var(--theme-muted)]">Loading file explorer...</p>
+          <p className="text-sm text-[var(--theme-muted)]">
+            Loading file explorer...
+          </p>
         </div>
       </div>
     )
@@ -294,7 +296,9 @@ function FilesRoute() {
                 </>
               ) : (
                 <>
-                  <h1 className="hidden text-base font-medium md:block md:text-lg">Files</h1>
+                  <h1 className="hidden text-base font-medium md:block md:text-lg">
+                    Files
+                  </h1>
                   <p className="hidden text-sm text-[var(--theme-muted)] sm:block">
                     Click a file in the sidebar to load it into the editor.
                   </p>

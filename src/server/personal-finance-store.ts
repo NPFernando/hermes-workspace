@@ -57,7 +57,12 @@ export interface PersonalFinanceSlice {
     financeQaHistory?: Array<{ at: number; question: string; answer: string }>
     gmailIngestState?: {
       lastSyncedAtSeconds?: number
-      syncHistory?: Array<{ at: number; found: number; queued: number; skippedAlreadyQueued: number }>
+      syncHistory?: Array<{
+        at: number
+        found: number
+        queued: number
+        skippedAlreadyQueued: number
+      }>
     }
     categoryCorrections?: Record<string, string>
   }

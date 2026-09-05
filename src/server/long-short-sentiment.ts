@@ -32,7 +32,9 @@ function httpsGetJson<T>(url: string): Promise<T> {
       res.on('data', (chunk) => {
         bytes += chunk.length
         if (bytes > MAX_RESPONSE_BYTES) {
-          req.destroy(new Error('Binance response exceeded maximum allowed size'))
+          req.destroy(
+            new Error('Binance response exceeded maximum allowed size'),
+          )
           return
         }
         data += chunk
@@ -46,7 +48,9 @@ function httpsGetJson<T>(url: string): Promise<T> {
       })
     })
     req.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error(`Binance request timed out after ${REQUEST_TIMEOUT_MS}ms`))
+      req.destroy(
+        new Error(`Binance request timed out after ${REQUEST_TIMEOUT_MS}ms`),
+      )
     })
     req.on('error', (err) => {
       reject(new Error(`Failed to fetch from Binance: ${err}`))
@@ -96,7 +100,9 @@ export async function fetchTopTraderLongShortRatio(
  * confidence scales with distance from parity (1.0), capped at 1. Below a
  * small confidence floor, reports HOLD rather than a barely-there lean.
  */
-export function longShortSentimentDecision(ratio: number | null): StrategyDecision {
+export function longShortSentimentDecision(
+  ratio: number | null,
+): StrategyDecision {
   if (ratio == null || ratio <= 0) {
     return { signal: 'HOLD', confidence: 0, reason: 'no long/short data' }
   }

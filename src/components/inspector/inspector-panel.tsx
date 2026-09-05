@@ -57,9 +57,7 @@ function LoadingState({ text }: { text: string }) {
           borderTopColor: 'transparent',
         }}
       />
-      <span className="text-xs text-[var(--theme-muted)]">
-        {text}
-      </span>
+      <span className="text-xs text-[var(--theme-muted)]">{text}</span>
     </div>
   )
 }
@@ -95,9 +93,7 @@ function ArtifactsTab() {
 function ErrorState({ text }: { text: string }) {
   return (
     <div className="p-4">
-      <span className="text-xs text-[var(--theme-danger,#ef4444)]">
-        {text}
-      </span>
+      <span className="text-xs text-[var(--theme-danger,#ef4444)]">{text}</span>
     </div>
   )
 }
@@ -105,9 +101,7 @@ function ErrorState({ text }: { text: string }) {
 function EmptyState({ text }: { text: string }) {
   return (
     <div className="p-4">
-      <span className="text-xs text-[var(--theme-muted)]">
-        {text}
-      </span>
+      <span className="text-xs text-[var(--theme-muted)]">{text}</span>
     </div>
   )
 }
@@ -136,15 +130,11 @@ function ActivityTab() {
           key={i}
           className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs bg-[var(--theme-card2)]"
         >
-          <span
-            className="text-[var(--theme-accent)] font-mono"
-          >
+          <span className="text-[var(--theme-accent)] font-mono">
             {event.time}
           </span>
           <span className="text-[var(--theme-muted)]">{event.type}</span>
-          <span
-            className="ml-auto truncate text-[var(--theme-text)]"
-          >
+          <span className="ml-auto truncate text-[var(--theme-text)]">
             {event.text}
           </span>
         </div>
@@ -320,9 +310,7 @@ function SkillsTab() {
       </p>
       {Object.entries(grouped).map(([category, items = []]) => (
         <div key={category}>
-          <p
-            className="text-[10px] uppercase tracking-wider mb-1 font-semibold text-[var(--theme-accent)]"
-          >
+          <p className="text-[10px] uppercase tracking-wider mb-1 font-semibold text-[var(--theme-accent)]">
             {category}
           </p>
           {items.map((skill) => (
@@ -346,9 +334,7 @@ function SkillsTab() {
                 <span>{skill.name}</span>
               </div>
               {expanded === skill.name && skill.description && (
-                <p
-                  className="mt-1 pl-5 text-[11px] text-[var(--theme-muted)]"
-                >
+                <p className="mt-1 pl-5 text-[11px] text-[var(--theme-muted)]">
                   {skill.description}
                 </p>
               )}
@@ -390,8 +376,7 @@ function McpTab() {
             id: String(entry.id || entry.name || ''),
             name: String(entry.name || ''),
             enabled: Boolean(entry.enabled),
-            status:
-              typeof entry.status === 'string' ? entry.status : undefined,
+            status: typeof entry.status === 'string' ? entry.status : undefined,
             discoveredToolsCount:
               typeof entry.discoveredToolsCount === 'number'
                 ? entry.discoveredToolsCount
@@ -484,7 +469,9 @@ function LogsTab() {
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
-export function InspectorPanel({ embedded = false }: { embedded?: boolean } = {}) {
+export function InspectorPanel({
+  embedded = false,
+}: { embedded?: boolean } = {}) {
   const isOpen = useInspectorStore((s) => s.isOpen)
   const memoryAvailable = useFeatureAvailable('memory')
   const skillsAvailable = useFeatureAvailable('skills')
@@ -522,12 +509,8 @@ export function InspectorPanel({ embedded = false }: { embedded?: boolean } = {}
       {(embedded || isOpen) && (
         <>
           {/* Header */}
-          <div
-            className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-[var(--theme-border)]"
-          >
-            <span
-              className="text-sm font-semibold text-[var(--theme-text)]"
-            >
+          <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-[var(--theme-border)]">
+            <span className="text-sm font-semibold text-[var(--theme-text)]">
               Inspector
             </span>
             <button
@@ -541,9 +524,7 @@ export function InspectorPanel({ embedded = false }: { embedded?: boolean } = {}
           </div>
 
           {/* Tab bar */}
-          <div
-            className="flex shrink-0 overflow-x-auto border-b border-[var(--theme-border)]"
-          >
+          <div className="flex shrink-0 overflow-x-auto border-b border-[var(--theme-border)]">
             {TABS.map((tab) =>
               (() => {
                 const available =

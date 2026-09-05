@@ -4,7 +4,8 @@
  * Automatically re-authenticates on 401 responses.
  */
 
-const ODYSSEUS_BASE = process.env['ODYSSEUS_BASE_URL'] ?? 'http://127.0.0.1:7100'
+const ODYSSEUS_BASE =
+  process.env['ODYSSEUS_BASE_URL'] ?? 'http://127.0.0.1:7100'
 const USERNAME = process.env['ODYSSEUS_USERNAME'] ?? ''
 const PASSWORD = process.env['ODYSSEUS_PASSWORD'] ?? ''
 

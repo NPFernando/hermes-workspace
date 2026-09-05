@@ -32,7 +32,10 @@ function notifyListeners() {
   for (const fn of _listeners) fn()
 }
 
-export function setActiveResearch(sessionKey: string, odysseusSessionId: string) {
+export function setActiveResearch(
+  sessionKey: string,
+  odysseusSessionId: string,
+) {
   _active.set(sessionKey, odysseusSessionId)
   notifyListeners()
 }
@@ -52,14 +55,22 @@ type ProgressEvent = {
 
 function phaseLabel(phase: string | undefined): string {
   switch (phase) {
-    case 'probing': return 'Probing model...'
-    case 'thinking': return 'Thinking...'
-    case 'searching': return 'Searching...'
-    case 'extracting': return 'Extracting sources...'
-    case 'synthesizing': return 'Synthesizing report...'
-    case 'done': return 'Research complete'
-    case 'error': return 'Research failed'
-    default: return phase ?? 'Working...'
+    case 'probing':
+      return 'Probing model...'
+    case 'thinking':
+      return 'Thinking...'
+    case 'searching':
+      return 'Searching...'
+    case 'extracting':
+      return 'Extracting sources...'
+    case 'synthesizing':
+      return 'Synthesizing report...'
+    case 'done':
+      return 'Research complete'
+    case 'error':
+      return 'Research failed'
+    default:
+      return phase ?? 'Working...'
   }
 }
 
@@ -87,7 +98,9 @@ export function useResearchCard(opts?: {
   useEffect(() => {
     const handler = () => setStoreVersion((v) => v + 1)
     _listeners.add(handler)
-    return () => { _listeners.delete(handler) }
+    return () => {
+      _listeners.delete(handler)
+    }
   }, [])
 
   // Reset on resetKey change
@@ -123,7 +136,11 @@ export function useResearchCard(opts?: {
         const event = JSON.parse(evt.data as string) as ProgressEvent
         const phase = event.phase ?? event.status ?? 'running'
         const label = event.message ?? phaseLabel(phase)
-        const isFinal = event.final === true || event.status === 'done' || event.status === 'error' || event.status === 'cancelled'
+        const isFinal =
+          event.final === true ||
+          event.status === 'done' ||
+          event.status === 'error' ||
+          event.status === 'cancelled'
 
         stepCounterRef.current += 1
         const step: ResearchStep = {
@@ -176,7 +193,8 @@ export function useResearchCard(opts?: {
   }, [sessionKey])
 
   const odysseusId = sessionKey ? _active.get(sessionKey) : undefined
-  const isVisible = !dismissed && (steps.length > 0 || (!!odysseusId && isActive))
+  const isVisible =
+    !dismissed && (steps.length > 0 || (!!odysseusId && isActive))
   const currentStep = steps.filter((s) => s.status === 'done').length
 
   return {

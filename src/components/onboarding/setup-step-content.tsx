@@ -213,8 +213,8 @@ export function ModelConfigurationStep({
       </h2>
 
       <p className="mb-6 max-w-md text-base leading-relaxed text-[var(--theme-muted)]">
-        Core chat works with any OpenAI-compatible backend. Hermes Agent gateway APIs
-        make provider and model setup editable from the workspace.
+        Core chat works with any OpenAI-compatible backend. Hermes Agent gateway
+        APIs make provider and model setup editable from the workspace.
       </p>
 
       <div className="mb-6 w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-hover)]/70 p-4 text-left">

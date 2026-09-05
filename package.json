@@ -15,6 +15,7 @@
     "start:dev": "vite dev",
     "preview": "vite preview",
     "test": "vitest run",
+    "finance:postgres-cutover": "tsx scripts/finance-postgres-cutover.ts",
     "smoke:managed": "node scripts/managed-companion-smoke.mjs",
     "playground:ws": "node scripts/playground-ws.mjs",
     "lint": "eslint",

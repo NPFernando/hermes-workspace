@@ -23,8 +23,7 @@ export const Route = createFileRoute('/api/profiles/delete')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

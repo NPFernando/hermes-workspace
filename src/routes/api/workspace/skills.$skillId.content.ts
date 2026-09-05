@@ -17,7 +17,10 @@ function readSkillContent(skillId: string): string | null {
   // Sanitize: only allow alphanumeric, hyphen, underscore
   if (!/^[\w-]+$/.test(skillId)) return null
 
-  const hermesHome = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+  const hermesHome =
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes')
   const skillDir = path.join(hermesHome, 'skills', skillId)
 
   if (!fs.existsSync(skillDir)) return null
@@ -48,7 +51,10 @@ export const Route = createFileRoute('/api/workspace/skills/$skillId/content')({
         const content = readSkillContent(skillId)
 
         if (content === null) {
-          return json({ ok: false, error: `Skill '${skillId}' not found` }, { status: 404 })
+          return json(
+            { ok: false, error: `Skill '${skillId}' not found` },
+            { status: 404 },
+          )
         }
 
         return json({ ok: true, content })

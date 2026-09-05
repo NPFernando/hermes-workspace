@@ -45,11 +45,17 @@ export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   { command: '/goal pause', description: 'Pause active goal' },
   { command: '/goal resume', description: 'Resume paused goal' },
   { command: '/goal clear', description: 'Clear active goal' },
-  { command: '/subgoal <text>', description: 'Add extra success criteria to active goal' },
+  {
+    command: '/subgoal <text>',
+    description: 'Add extra success criteria to active goal',
+  },
 
   // Model & config
   { command: '/model', description: 'Show or change the current model' },
-  { command: '/reasoning', description: 'Set reasoning level (none/minimal/low/medium/high/xhigh)' },
+  {
+    command: '/reasoning',
+    description: 'Set reasoning level (none/minimal/low/medium/high/xhigh)',
+  },
   { command: '/skin', description: 'Change the display theme' },
   { command: '/config', description: 'Show session config' },
   { command: '/profile', description: 'Show active Hermes profile info' },
@@ -57,7 +63,10 @@ export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   // Tools & skills
   { command: '/skills', description: 'Browse and manage skills' },
   { command: '/skill <name>', description: 'Load a skill into session' },
-  { command: '/plugins', description: 'List installed plugins and their status' },
+  {
+    command: '/plugins',
+    description: 'List installed plugins and their status',
+  },
   { command: '/mcp', description: 'Open MCP server manager' },
   { command: '/cron', description: 'Open Jobs & scheduled cron runs' },
   { command: '/agents', description: 'Open Command Center' },
@@ -65,8 +74,14 @@ export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
 
   // Navigate to tools
   { command: '/tasks', description: 'Open task board' },
-  { command: '/task <title>', description: 'Quick-capture a task without leaving chat' },
-  { command: '/research <query>', description: 'Open Deep Research with query pre-filled' },
+  {
+    command: '/task <title>',
+    description: 'Quick-capture a task without leaving chat',
+  },
+  {
+    command: '/research <query>',
+    description: 'Open Deep Research with query pre-filled',
+  },
   { command: '/files', description: 'Open file browser' },
   { command: '/jobs', description: 'View scheduled jobs and cron runs' },
   { command: '/terminal', description: 'Open terminal' },
@@ -106,7 +121,12 @@ export function mergeSlashCommands(
 }
 
 const SlashCommandMenu = forwardRef(function SlashCommandMenuComponent(
-  { open, query, onSelect, commands = DEFAULT_SLASH_COMMANDS }: SlashCommandMenuProps,
+  {
+    open,
+    query,
+    onSelect,
+    commands = DEFAULT_SLASH_COMMANDS,
+  }: SlashCommandMenuProps,
   ref: Ref<SlashCommandMenuHandle>,
 ) {
   const [activeIndex, setActiveIndex] = useState(0)
@@ -203,7 +223,9 @@ const SlashCommandMenu = forwardRef(function SlashCommandMenuComponent(
                   <span className="font-mono text-[var(--color-accent,#6366f1)]">
                     {item.command}
                   </span>
-                  <span className="text-[var(--theme-muted)]">{item.description}</span>
+                  <span className="text-[var(--theme-muted)]">
+                    {item.description}
+                  </span>
                 </CommandItem>
               ))}
             </CommandList>

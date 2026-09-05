@@ -20,32 +20,65 @@ afterEach(() => {
   fs.rmSync(tmp, { recursive: true, force: true })
 })
 
-function auditLines(): Array<{ action: string; details: Record<string, unknown> }> {
+function auditLines(): Array<{
+  action: string
+  details: Record<string, unknown>
+}> {
   const auditPath = path.join(tmp, '.hermes', 'finance', 'audit.jsonl')
   if (!fs.existsSync(auditPath)) return []
   return fs
     .readFileSync(auditPath, 'utf-8')
     .split('\n')
     .filter(Boolean)
-    .map((line) => JSON.parse(line) as { action: string; details: Record<string, unknown> })
+    .map(
+      (line) =>
+        JSON.parse(line) as {
+          action: string
+          details: Record<string, unknown>
+        },
+    )
 }
 
 describe('sendAlert', () => {
   it('always appends an alert_sent audit entry regardless of severity or alertsEnabled', async () => {
     const { sendAlert } = await import('./alerts')
-    sendAlert({ severity: 'info', title: 'test info', detail: 'd', source: 'unit-test' })
-    sendAlert({ severity: 'warning', title: 'test warning', detail: 'd', source: 'unit-test' })
-    sendAlert({ severity: 'critical', title: 'test critical', detail: 'd', source: 'unit-test' })
+    sendAlert({
+      severity: 'info',
+      title: 'test info',
+      detail: 'd',
+      source: 'unit-test',
+    })
+    sendAlert({
+      severity: 'warning',
+      title: 'test warning',
+      detail: 'd',
+      source: 'unit-test',
+    })
+    sendAlert({
+      severity: 'critical',
+      title: 'test critical',
+      detail: 'd',
+      source: 'unit-test',
+    })
 
     const entries = auditLines().filter((e) => e.action === 'alert_sent')
     expect(entries).toHaveLength(3)
-    expect(entries.map((e) => e.details.severity)).toEqual(['info', 'warning', 'critical'])
+    expect(entries.map((e) => e.details.severity)).toEqual([
+      'info',
+      'warning',
+      'critical',
+    ])
   })
 
   it('never throws even if delivery would fail', async () => {
     const { sendAlert } = await import('./alerts')
     expect(() =>
-      sendAlert({ severity: 'critical', title: 't', detail: 'd', source: 'unit-test' }),
+      sendAlert({
+        severity: 'critical',
+        title: 't',
+        detail: 'd',
+        source: 'unit-test',
+      }),
     ).not.toThrow()
   })
 })
@@ -63,7 +96,12 @@ describe('sendAlert delivery gating', () => {
     const prevVitest = process.env.VITEST
     delete process.env.VITEST
     try {
-      sendAlert({ severity: 'warning', title: 't', detail: 'd', source: 'unit-test' })
+      sendAlert({
+        severity: 'warning',
+        title: 't',
+        detail: 'd',
+        source: 'unit-test',
+      })
     } finally {
       process.env.VITEST = prevVitest
     }
@@ -82,7 +120,12 @@ describe('sendAlert delivery gating', () => {
     delete process.env.VITEST
     process.env.NODE_ENV = 'production'
     try {
-      sendAlert({ severity: 'critical', title: 't', detail: 'd', source: 'unit-test' })
+      sendAlert({
+        severity: 'critical',
+        title: 't',
+        detail: 'd',
+        source: 'unit-test',
+      })
     } finally {
       process.env.VITEST = prevVitest
       process.env.NODE_ENV = prevNodeEnv
@@ -95,7 +138,8 @@ describe('sendAlert delivery gating', () => {
       spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })),
     }))
     const { spawn } = await import('node:child_process')
-    const { readFinanceStore, writeFinanceStore } = await import('./finance-store')
+    const { readFinanceStore, writeFinanceStore } =
+      await import('./finance-store')
     const { sendAlert } = await import('./alerts')
 
     const db = readFinanceStore()
@@ -107,7 +151,12 @@ describe('sendAlert delivery gating', () => {
     delete process.env.VITEST
     process.env.NODE_ENV = 'production'
     try {
-      sendAlert({ severity: 'info', title: 't', detail: 'd', source: 'unit-test' })
+      sendAlert({
+        severity: 'info',
+        title: 't',
+        detail: 'd',
+        source: 'unit-test',
+      })
     } finally {
       process.env.VITEST = prevVitest
       process.env.NODE_ENV = prevNodeEnv

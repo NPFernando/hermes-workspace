@@ -13,14 +13,22 @@ export function MobileAppSection() {
 
   useEffect(() => {
     fetch('/api/app-version')
-      .then((r) => r.json() as Promise<{ versionCode: number; versionName: string }>)
+      .then(
+        (r) =>
+          r.json() as Promise<{ versionCode: number; versionName: string }>,
+      )
       .then((v) => {
         setVersion(v)
-        const stored = parseInt(localStorage.getItem('hermes-apk-downloaded-version') ?? '0', 10)
+        const stored = parseInt(
+          localStorage.getItem('hermes-apk-downloaded-version') ?? '0',
+          10,
+        )
         setUpdateAvailable(stored > 0 && v.versionCode > stored)
       })
       .catch(() => {})
-    setReminderEnabled(localStorage.getItem('claude-mobile-access-dismissed') !== 'true')
+    setReminderEnabled(
+      localStorage.getItem('claude-mobile-access-dismissed') !== 'true',
+    )
   }, [])
 
   const toggleReminder = (checked: boolean) => {
@@ -42,7 +50,9 @@ export function MobileAppSection() {
       <div className="card-glow rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-[var(--theme-text)]">Hermes Workspace</p>
+            <p className="text-sm font-semibold text-[var(--theme-text)]">
+              Hermes Workspace
+            </p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <p className="text-xs text-[var(--theme-muted)]">
                 {version ? `APK v${version.versionName}` : 'Loading…'}
@@ -57,8 +67,8 @@ export function MobileAppSection() {
               )}
             </div>
           </div>
-          {version && (
-            updateAvailable ? (
+          {version &&
+            (updateAvailable ? (
               <span className="shrink-0 rounded-full bg-[var(--theme-accent)]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[var(--theme-accent)]">
                 Update available
               </span>
@@ -66,8 +76,7 @@ export function MobileAppSection() {
               <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-500">
                 Up to date
               </span>
-            )
-          )}
+            ))}
         </div>
         <a
           href="/download-apk"
@@ -84,11 +93,31 @@ export function MobileAppSection() {
 
       {/* Install steps */}
       <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3.5 text-xs text-[var(--theme-muted)]">
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">How to install</p>
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+          How to install
+        </p>
         <ol className="list-inside list-decimal space-y-1.5">
-          <li>Open <span className="font-medium text-[var(--theme-text)]">agent.fernandofamily.com/download-apk</span> on your phone</li>
-          <li>Tap <span className="font-medium text-[var(--theme-text)]">Download APK</span> and open the file when it finishes</li>
-          <li>Tap <span className="font-medium text-[var(--theme-text)]">Install</span> — allow unknown sources if prompted (one-time only)</li>
+          <li>
+            Open{' '}
+            <span className="font-medium text-[var(--theme-text)]">
+              agent.fernandofamily.com/download-apk
+            </span>{' '}
+            on your phone
+          </li>
+          <li>
+            Tap{' '}
+            <span className="font-medium text-[var(--theme-text)]">
+              Download APK
+            </span>{' '}
+            and open the file when it finishes
+          </li>
+          <li>
+            Tap{' '}
+            <span className="font-medium text-[var(--theme-text)]">
+              Install
+            </span>{' '}
+            — allow unknown sources if prompted (one-time only)
+          </li>
           <li>Updates install over the existing app and keep all your data</li>
         </ol>
       </div>

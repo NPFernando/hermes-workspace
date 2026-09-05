@@ -74,8 +74,7 @@ export const Route = createFileRoute('/api/connection-settings')({
           await ensureGatewayProbed()
           return json({ ok: true, ...getResolvedUrls() })
         } catch (error) {
-          const message =
-            safeErrorMessage(error)
+          const message = safeErrorMessage(error)
           return json({ error: message }, { status: 500 })
         }
       },

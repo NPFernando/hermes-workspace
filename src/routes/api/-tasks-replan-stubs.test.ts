@@ -30,51 +30,67 @@ function task(overrides: Partial<TaskRecord>): TaskRecord {
 
 describe('isStubReviewTask', () => {
   it('matches review tasks whose latest plan is unavailable', () => {
-    expect(isStubReviewTask(task({
-      agent_history: [{
-        id: 'h1',
-        by: 'Astra',
-        byEmoji: '✨',
-        action: 'planned',
-        at: '2026-07-13T00:00:00.000Z',
-        note: '(Plan unavailable — press Execute to proceed.)',
-      }],
-    }))).toBe(true)
+    expect(
+      isStubReviewTask(
+        task({
+          agent_history: [
+            {
+              id: 'h1',
+              by: 'Astra',
+              byEmoji: '✨',
+              action: 'planned',
+              at: '2026-07-13T00:00:00.000Z',
+              note: '(Plan unavailable — press Execute to proceed.)',
+            },
+          ],
+        }),
+      ),
+    ).toBe(true)
   })
 
   it('does not move completed review tasks without a plan back to todo', () => {
-    expect(isStubReviewTask(task({
-      agent_history: [{
-        id: 'h1',
-        by: 'astra',
-        byEmoji: '🌟',
-        action: 'completed',
-        at: '2026-07-13T00:00:00.000Z',
-        note: 'Implemented and verified.',
-      }],
-    }))).toBe(false)
+    expect(
+      isStubReviewTask(
+        task({
+          agent_history: [
+            {
+              id: 'h1',
+              by: 'astra',
+              byEmoji: '🌟',
+              action: 'completed',
+              at: '2026-07-13T00:00:00.000Z',
+              note: 'Implemented and verified.',
+            },
+          ],
+        }),
+      ),
+    ).toBe(false)
   })
 
   it('does not move attempted review tasks even if an old plan was a stub', () => {
-    expect(isStubReviewTask(task({
-      agent_history: [
-        {
-          id: 'h1',
-          by: 'Astra',
-          byEmoji: '✨',
-          action: 'planned',
-          at: '2026-07-13T00:00:00.000Z',
-          note: '(Plan unavailable — press Execute to proceed.)',
-        },
-        {
-          id: 'h2',
-          by: 'maya',
-          byEmoji: '🔨',
-          action: 'attempted',
-          at: '2026-07-13T00:05:00.000Z',
-          note: 'Work was attempted.',
-        },
-      ],
-    }))).toBe(false)
+    expect(
+      isStubReviewTask(
+        task({
+          agent_history: [
+            {
+              id: 'h1',
+              by: 'Astra',
+              byEmoji: '✨',
+              action: 'planned',
+              at: '2026-07-13T00:00:00.000Z',
+              note: '(Plan unavailable — press Execute to proceed.)',
+            },
+            {
+              id: 'h2',
+              by: 'maya',
+              byEmoji: '🔨',
+              action: 'attempted',
+              at: '2026-07-13T00:05:00.000Z',
+              note: 'Work was attempted.',
+            },
+          ],
+        }),
+      ),
+    ).toBe(false)
   })
 })

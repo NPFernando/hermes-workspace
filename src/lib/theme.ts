@@ -22,7 +22,8 @@ export const THEMES: Array<{
   {
     id: 'claude-nous',
     label: 'Nous',
-    description: 'Deep teal background, cream accent — matches Nous Research chrome',
+    description:
+      'Deep teal background, cream accent — matches Nous Research chrome',
     icon: '◱',
   },
   {
@@ -94,7 +95,8 @@ export const THEMES: Array<{
   {
     id: 'odysseus',
     label: 'Odysseus',
-    description: 'Minimal monospace-forward dark — blue-gray background, coral-red accent, cyan text',
+    description:
+      'Minimal monospace-forward dark — blue-gray background, coral-red accent, cyan text',
     icon: '◎',
   },
 ]
@@ -102,16 +104,18 @@ export const THEMES: Array<{
 const STORAGE_KEY = 'claude-theme'
 const DEFAULT_THEME: ThemeId = 'odysseus'
 const THEME_SET = new Set<ThemeId>(THEMES.map((theme) => theme.id))
-const LIGHT_THEME_MAP: Partial<Record<
-  Exclude<ThemeId, `${string}-light`>,
-  Extract<ThemeId, `${string}-light`>
->> = {
+const LIGHT_THEME_MAP: Partial<
+  Record<
+    Exclude<ThemeId, `${string}-light`>,
+    Extract<ThemeId, `${string}-light`>
+  >
+> = {
   'claude-nous': 'claude-nous-light',
   matrix: 'matrix-light',
   'claude-official': 'claude-official-light',
   'claude-classic': 'claude-classic-light',
   'claude-slate': 'claude-slate-light',
-  'scifi': 'scifi-light',
+  scifi: 'scifi-light',
   // odysseus: no light variant — stays as-is when light mode is requested
 }
 const DARK_THEME_MAP: Record<

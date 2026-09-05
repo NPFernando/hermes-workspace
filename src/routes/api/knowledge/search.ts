@@ -21,8 +21,7 @@ export const Route = createFileRoute('/api/knowledge/search')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )
