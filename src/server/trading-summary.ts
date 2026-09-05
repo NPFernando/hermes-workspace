@@ -10,7 +10,11 @@
  * src/routes/api/finance.ts's own handlers already use.
  */
 import { readFinanceStore } from './finance-store'
-import { decisionQualityReport, getEngineState } from './demo-trading-engine'
+import {
+  decisionQualityReport,
+  getEngineState,
+  getLiveMonitor,
+} from './demo-trading-engine'
 import { getGridEngineState } from './grid-paper-engine'
 import { getRebalanceState } from './rebalance-engine'
 import { getLlmSignalState } from './llm-signal-engine'
@@ -64,8 +68,13 @@ export function getTradingSummary(): TradingSummary {
 
   // LLM signal
   const llm = getLlmSignalState()
-  const llmClosedTrades = llm.trades.filter((t) => typeof t.pnlQuote === 'number')
-  const llmTotalPnl = llmClosedTrades.reduce((sum, t) => sum + (t.pnlQuote ?? 0), 0)
+  const llmClosedTrades = llm.trades.filter(
+    (t) => typeof t.pnlQuote === 'number',
+  )
+  const llmTotalPnl = llmClosedTrades.reduce(
+    (sum, t) => sum + (t.pnlQuote ?? 0),
+    0,
+  )
   const llmTodayPnl = llmClosedTrades
     .filter((t) => isToday(t.createdAt, today))
     .reduce((sum, t) => sum + (t.pnlQuote ?? 0), 0)
@@ -76,17 +85,24 @@ export function getTradingSummary(): TradingSummary {
     requiresTestnet: boolean,
     ownExecutionMode?: string,
   ): { state: TradingEngineArmState; reason: string } {
-    if (emergencyKillSwitch) return { state: 'disabled', reason: 'emergency kill switch is active' }
+    if (emergencyKillSwitch)
+      return { state: 'disabled', reason: 'emergency kill switch is active' }
     if (!enabled) return { state: 'disabled', reason: 'disabled in settings' }
     if (requiresTestnet && tradingMode !== 'testnet_execute') {
-      return { state: 'gated', reason: `tradingMode is "${tradingMode}", not testnet_execute` }
+      return {
+        state: 'gated',
+        reason: `tradingMode is "${tradingMode}", not testnet_execute`,
+      }
     }
     // Grid has its OWN independent executionMode (settings.demoTradingGrid),
     // checked in addition to the global tradingMode by
     // grid-paper-engine.ts's own testnet-mirror gate — deliberately
     // decoupled so grid can't be silently armed by a global tradingMode
     // flip meant for other engines. Reflect that here, not just tradingMode.
-    if (ownExecutionMode !== undefined && ownExecutionMode !== 'testnet_execute') {
+    if (
+      ownExecutionMode !== undefined &&
+      ownExecutionMode !== 'testnet_execute'
+    ) {
       return {
         state: 'paper',
         reason: `own executionMode is "${ownExecutionMode}" (independent of the global tradingMode)`,
@@ -143,14 +159,22 @@ export function getTradingSummary(): TradingSummary {
   ]
 
   const todayPnlQuote = engineState.dailyPnlQuote + gridTodayPnl + llmTodayPnl
-  const totalPnlQuote = quality.metrics.totalPnlQuote + grid.performance.totalPnlQuote + llmTotalPnl
-  const openPositions = engineState.positions.length + grid.states.filter((s) =>
-    s.levels.some((l) => l.held),
-  ).length
+  const totalPnlQuote =
+    quality.metrics.totalPnlQuote + grid.performance.totalPnlQuote + llmTotalPnl
+  const openPositions =
+    engineState.positions.length +
+    grid.states.filter((s) => s.levels.some((l) => l.held)).length
 
-  const totalWinTrades = quality.metrics.totalTrades * quality.metrics.winRate + grid.performance.wins + llmWins
-  const totalTradesWithOutcome = quality.metrics.totalTrades + grid.performance.totalTrades + llmClosedTrades.length
-  const winRate = totalTradesWithOutcome > 0 ? totalWinTrades / totalTradesWithOutcome : null
+  const totalWinTrades =
+    quality.metrics.totalTrades * quality.metrics.winRate +
+    grid.performance.wins +
+    llmWins
+  const totalTradesWithOutcome =
+    quality.metrics.totalTrades +
+    grid.performance.totalTrades +
+    llmClosedTrades.length
+  const winRate =
+    totalTradesWithOutcome > 0 ? totalWinTrades / totalTradesWithOutcome : null
 
   return {
     tradingMode,
@@ -160,5 +184,119 @@ export function getTradingSummary(): TradingSummary {
     openPositions,
     winRate,
     engines,
+  }
+}
+
+export interface AccountBaseline {
+  equityQuote: number
+  recordedAt: string
+}
+
+export interface AccountOverview {
+  /** Always the Binance sandbox/testnet account today — surfaced explicitly
+   * so the UI can label it clearly as resettable paper-trade validation,
+   * never real money. */
+  label: string
+  tradingMode: string
+  clientAvailable: boolean
+  /** False if the balance fetch failed (network hiccup/rate limit) — the UI
+   * should show "unavailable" rather than a misleading $0 in that case. */
+  balanceFetchOk: boolean
+  baseline: AccountBaseline | null
+  /** Free balance, not currently deployed in any open position. */
+  availableQuote: number
+  /** Currently deployed across all 4 engines' open positions. */
+  deployedQuote: number
+  /** Mark-to-market P/L on currently open positions (council only — grid/llm
+   * don't currently expose live mark price the same way). */
+  unrealizedPnlQuote: number
+  /** All-time realized P/L (sum of closed trades) across all 4 engines, for
+   * the currently active execution mode only. */
+  realizedPnlQuote: number
+  todayPnlQuote: number
+  /** available + deployed + unrealized. */
+  equityQuote: number
+  /** equityQuote - baseline.equityQuote, or null if no baseline recorded yet. */
+  netVsBaselineQuote: number | null
+  /** Counts only — see getEngineState()'s archivedPositions/archivedTrades
+   * for the actual stale/other-mode entries kept out of this view. */
+  archivedPositionsCount: number
+  archivedTradesCount: number
+  /** Epoch ms when the balance/price data behind this snapshot was actually
+   * fetched from the exchange (served from a ~20s background-refreshed
+   * cache, not fetched fresh on every call) — lets the UI show "as of Xs
+   * ago" instead of implying an always-instant live read. */
+  asOfMs: number
+}
+
+/** Powers the Trading Account Overview card — the single "what do we have,
+ * what's deployed, what have we earned/lost, what's it worth now" view the
+ * per-engine panels don't otherwise provide in one place. */
+export async function getAccountOverview(): Promise<AccountOverview> {
+  const db = readFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const tradingMode = String(settings.tradingMode ?? 'observe_only')
+  const baseline = (settings.accountBaseline ?? null) as AccountBaseline | null
+
+  const monitor = await getLiveMonitor()
+  const engineState = getEngineState()
+  const grid = getGridEngineState()
+  const rebalance = getRebalanceState()
+  const llm = getLlmSignalState()
+  void rebalance // rebalancing shuffles existing spot holdings rather than
+  // deploying separate quote capital, so it has no distinct "deployed"
+  // figure to add here.
+
+  const gridDeployedQuote = grid.states.reduce(
+    (sum, state) =>
+      sum +
+      state.levels
+        .filter((level) => level.held)
+        .reduce((levelSum, level) => levelSum + level.entryQuote, 0),
+    0,
+  )
+  const llmDeployedQuote = llm.positions.reduce(
+    (sum, position) => sum + position.entryQuote,
+    0,
+  )
+  const deployedQuote =
+    monitor.deployedQuote + gridDeployedQuote + llmDeployedQuote
+
+  const gridRealizedQuote = grid.performance.totalPnlQuote
+  const llmRealizedQuote = llm.trades.reduce(
+    (sum, trade) => sum + (trade.pnlQuote ?? 0),
+    0,
+  )
+  const realizedPnlQuote =
+    engineState.totalRealizedPnlQuote + gridRealizedQuote + llmRealizedQuote
+
+  const today = new Date().toISOString().slice(0, 10)
+  const gridTodayPnl = grid.trades
+    .filter((trade) => isToday(trade.closedAt, today))
+    .reduce((sum, trade) => sum + trade.pnlQuote, 0)
+  const llmTodayPnl = llm.trades
+    .filter((trade) => isToday(trade.createdAt, today))
+    .reduce((sum, trade) => sum + (trade.pnlQuote ?? 0), 0)
+  const todayPnlQuote = engineState.dailyPnlQuote + gridTodayPnl + llmTodayPnl
+
+  const equityQuote =
+    monitor.quoteBalance + deployedQuote + monitor.openUnrealizedPnlQuote
+
+  return {
+    label: 'Binance Sandbox (Testnet) — Paper-Trade Validation',
+    tradingMode,
+    clientAvailable: monitor.clientAvailable,
+    balanceFetchOk: monitor.balanceFetchOk,
+    baseline,
+    availableQuote: monitor.quoteBalance,
+    deployedQuote,
+    unrealizedPnlQuote: monitor.openUnrealizedPnlQuote,
+    realizedPnlQuote,
+    todayPnlQuote,
+    equityQuote,
+    netVsBaselineQuote: baseline ? equityQuote - baseline.equityQuote : null,
+    archivedPositionsCount: engineState.archivedPositions.length,
+    archivedTradesCount: engineState.archivedTrades.length,
+    asOfMs: monitor.asOfMs,
   }
 }

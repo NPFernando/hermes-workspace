@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_REBALANCE_BACKTEST_CONFIG, runRebalanceBacktest } from './rebalance-backtest'
+import {
+  DEFAULT_REBALANCE_BACKTEST_CONFIG,
+  runRebalanceBacktest,
+} from './rebalance-backtest'
 import type { RebalanceBacktestConfig } from './rebalance-backtest'
 import type { Candle } from './trading-strategies'
 
@@ -17,7 +20,9 @@ function candle(index: number, close: number): Candle {
   }
 }
 
-function cfg(overrides: Partial<RebalanceBacktestConfig> = {}): RebalanceBacktestConfig {
+function cfg(
+  overrides: Partial<RebalanceBacktestConfig> = {},
+): RebalanceBacktestConfig {
   return { ...DEFAULT_REBALANCE_BACKTEST_CONFIG, ...overrides }
 }
 
@@ -29,7 +34,11 @@ describe('runRebalanceBacktest', () => {
     }
     const report = runRebalanceBacktest(
       candlesBySymbol,
-      cfg({ symbols: ['A', 'B'], startingBalanceQuote: 500, feeRatePerSide: 0.001 }),
+      cfg({
+        symbols: ['A', 'B'],
+        startingBalanceQuote: 500,
+        feeRatePerSide: 0.001,
+      }),
     )
     expect(report.rebalanceCount).toBe(1)
     expect(report.trades).toHaveLength(2)
@@ -45,7 +54,11 @@ describe('runRebalanceBacktest', () => {
     }
     const report = runRebalanceBacktest(
       candlesBySymbol,
-      cfg({ symbols: ['A', 'B'], startingBalanceQuote: 500, minRebalanceIntervalMinutes: 1440 }),
+      cfg({
+        symbols: ['A', 'B'],
+        startingBalanceQuote: 500,
+        minRebalanceIntervalMinutes: 1440,
+      }),
     )
     expect(report.rebalanceCount).toBe(1) // only the initial allocation
   })
@@ -73,7 +86,10 @@ describe('runRebalanceBacktest', () => {
       A: [candle(0, 100), candle(1, 110)],
       B: [candle(0, 100), candle(1, 90)],
     }
-    const report = runRebalanceBacktest(candlesBySymbol, cfg({ symbols: ['A', 'B'] }))
+    const report = runRebalanceBacktest(
+      candlesBySymbol,
+      cfg({ symbols: ['A', 'B'] }),
+    )
     expect(report.buyAndHoldReturnPct.A).toBeCloseTo(10, 6)
     expect(report.buyAndHoldReturnPct.B).toBeCloseTo(-10, 6)
   })

@@ -26,12 +26,16 @@ export const Route = createFileRoute('/api/harp-config')({
         try {
           body = (await request.json()) as Record<string, unknown>
         } catch {
-          return json({ ok: false, error: 'Invalid JSON body' }, { status: 400 })
+          return json(
+            { ok: false, error: 'Invalid JSON body' },
+            { status: 400 },
+          )
         }
         // Special action: create a starter config from scratch
         if (body.action === 'create-starter') {
           const result = createStarterHarpConfig()
-          if (!result.ok) return json({ ok: false, error: result.error }, { status: 400 })
+          if (!result.ok)
+            return json({ ok: false, error: result.error }, { status: 400 })
           return json({ ok: true, ...getHarpConfigView() })
         }
         const result = applyHarpPatch(body as HarpPatch)

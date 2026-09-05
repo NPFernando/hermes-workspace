@@ -132,7 +132,9 @@ export function listExternalMemoryProviders(): {
     if (!dbPath) continue
     const configPath = resolveUnderHermesHome(hermesHome, item.config_path)
     seen.add(id)
-    const rawKind = String(item.kind || 'custom').trim().toLowerCase()
+    const rawKind = String(item.kind || 'custom')
+      .trim()
+      .toLowerCase()
     const kind: ExternalMemoryProvider['kind'] =
       rawKind === 'hindsight' ? 'hindsight' : 'custom'
     providers.push({
@@ -143,7 +145,9 @@ export function listExternalMemoryProviders(): {
       ),
       kind,
       capabilities:
-        kind === 'hindsight' ? ['review', 'search', 'commit'] : ['review', 'search'],
+        kind === 'hindsight'
+          ? ['review', 'search', 'commit']
+          : ['review', 'search'],
       dbPath,
       configPath,
       available: fs.existsSync(dbPath) || fs.existsSync(path.dirname(dbPath)),
@@ -153,7 +157,9 @@ export function listExternalMemoryProviders(): {
   return { ok: true, active: providers[0]?.id || '', providers }
 }
 
-export function getExternalMemoryProviderById(id?: string): ExternalMemoryProvider {
+export function getExternalMemoryProviderById(
+  id?: string,
+): ExternalMemoryProvider {
   return getProvider(id)
 }
 
@@ -427,7 +433,13 @@ export function updateExternalMemoryCandidateMeta(options: {
   try {
     execFileSync(
       'python3',
-      ['-c', META_UPDATE_SCRIPT, provider.dbPath, id, JSON.stringify(options.meta)],
+      [
+        '-c',
+        META_UPDATE_SCRIPT,
+        provider.dbPath,
+        id,
+        JSON.stringify(options.meta),
+      ],
       { encoding: 'utf-8', timeout: 3000, maxBuffer: 1024 * 64 },
     )
   } catch {

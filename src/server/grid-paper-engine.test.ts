@@ -56,7 +56,14 @@ function cfg(overrides: Partial<GridEngineConfig> = {}): GridEngineConfig {
 }
 
 /** Strips fields that legitimately differ per call (id, timestamps) for economic comparison. */
-function economicShape(trades: Array<{ entryPrice: number; exitPrice: number; reason: string; pnlQuote: number }>) {
+function economicShape(
+  trades: Array<{
+    entryPrice: number
+    exitPrice: number
+    reason: string
+    pnlQuote: number
+  }>,
+) {
   return trades
     .map((t) => ({
       entryPrice: t.entryPrice,
@@ -70,7 +77,8 @@ function economicShape(trades: Array<{ entryPrice: number; exitPrice: number; re
 describe('advanceSymbolState — cold start', () => {
   it('arms from a warmup window and fills on a subsequent sweep', () => {
     const candles: Array<Candle> = []
-    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    for (let i = 0; i < 5; i++)
+      candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
     candles.push(candle(5, { open: 92, high: 95, low: 85, close: 90 }))
     candles.push(candle(6, { open: 98, high: 105, low: 95, close: 100 }))
 
@@ -78,7 +86,12 @@ describe('advanceSymbolState — cold start', () => {
       'BTCUSDT',
       undefined,
       candles,
-      cfg({ rangeLookbackCandles: 5, gridCount: 3, spacing: 'arithmetic', efficiencyGate: false }),
+      cfg({
+        rangeLookbackCandles: 5,
+        gridCount: 3,
+        spacing: 'arithmetic',
+        efficiencyGate: false,
+      }),
     )
 
     expect(state.armed).toBe(true)
@@ -94,7 +107,8 @@ describe('advanceSymbolState — cold start', () => {
 describe('advanceSymbolState — incremental correctness', () => {
   it('produces the same economic result across two calls as one continuous call', () => {
     const candles: Array<Candle> = []
-    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    for (let i = 0; i < 5; i++)
+      candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
     candles.push(candle(5, { open: 92, high: 95, low: 85, close: 90 })) // fills level 90
     for (let i = 6; i < 9; i++) candles.push(flat(i, 92, 1))
     candles.push(candle(9, { open: 98, high: 105, low: 95, close: 100 })) // sells at 100
@@ -112,27 +126,48 @@ describe('advanceSymbolState — incremental correctness', () => {
     // Split the same history into two "cron cycles": first sees only the
     // first 9 candles, second sees the full history (as a live fetch would
     // — a generous trailing window that includes already-processed candles).
-    const firstCycle = advanceSymbolState('BTCUSDT', undefined, candles.slice(0, 9), config)
-    const secondCycle = advanceSymbolState('BTCUSDT', firstCycle.state, candles, config)
+    const firstCycle = advanceSymbolState(
+      'BTCUSDT',
+      undefined,
+      candles.slice(0, 9),
+      config,
+    )
+    const secondCycle = advanceSymbolState(
+      'BTCUSDT',
+      firstCycle.state,
+      candles,
+      config,
+    )
     const combinedTrades = [...firstCycle.trades, ...secondCycle.trades]
 
     expect(economicShape(combinedTrades)).toEqual(economicShape(oneShot.trades))
-    expect(secondCycle.state.lastProcessedOpenTime).toBe(oneShot.state.lastProcessedOpenTime)
+    expect(secondCycle.state.lastProcessedOpenTime).toBe(
+      oneShot.state.lastProcessedOpenTime,
+    )
     expect(secondCycle.state.armed).toBe(oneShot.state.armed)
   })
 
   it('does nothing when a cycle sees no candles newer than lastProcessedOpenTime', () => {
     const candles: Array<Candle> = []
-    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    for (let i = 0; i < 5; i++)
+      candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
     candles.push(candle(5, { open: 92, high: 95, low: 85, close: 90 }))
 
-    const config = cfg({ rangeLookbackCandles: 5, gridCount: 3, spacing: 'arithmetic', efficiencyGate: false })
+    const config = cfg({
+      rangeLookbackCandles: 5,
+      gridCount: 3,
+      spacing: 'arithmetic',
+      efficiencyGate: false,
+    })
     const first = advanceSymbolState('BTCUSDT', undefined, candles, config)
     // Re-run with the exact same candle set — nothing new to process.
     const second = advanceSymbolState('BTCUSDT', first.state, candles, config)
 
     expect(second.trades).toHaveLength(0)
-    expect(second.state).toEqual({ ...first.state, updatedAt: second.state.updatedAt })
+    expect(second.state).toEqual({
+      ...first.state,
+      updatedAt: second.state.updatedAt,
+    })
   })
 })
 
@@ -167,8 +202,22 @@ describe('advanceSymbolState — efficiency gate persists across calls', () => {
           entryFeeQuote: 0.005,
           openedAt: new Date(BASE + 4 * HOUR).toISOString(),
         },
-        { price: 100, held: false, entryPrice: 0, entryQuote: 0, entryFeeQuote: 0, openedAt: '' },
-        { price: 101, held: false, entryPrice: 0, entryQuote: 0, entryFeeQuote: 0, openedAt: '' },
+        {
+          price: 100,
+          held: false,
+          entryPrice: 0,
+          entryQuote: 0,
+          entryFeeQuote: 0,
+          openedAt: '',
+        },
+        {
+          price: 101,
+          held: false,
+          entryPrice: 0,
+          entryQuote: 0,
+          entryFeeQuote: 0,
+          openedAt: '',
+        },
       ],
       lastProcessedOpenTime: BASE + 4 * HOUR,
       updatedAt: new Date(0).toISOString(),
@@ -185,19 +234,36 @@ describe('advanceSymbolState — efficiency gate persists across calls', () => {
     candles.push(candle(11, { open: 120, high: 132, low: 118, close: 130 }))
     candles.push(candle(12, { open: 130, high: 142, low: 128, close: 140 }))
 
-    const firstCycle = advanceSymbolState('BTCUSDT', seeded, candles.slice(0, 4), config)
+    const firstCycle = advanceSymbolState(
+      'BTCUSDT',
+      seeded,
+      candles.slice(0, 4),
+      config,
+    )
     expect(firstCycle.state.pausedForChop).toBe(false)
     expect(firstCycle.state.levels[0]?.held).toBe(true)
 
     // Second cycle sees the full history including the wide swing.
-    const secondCycle = advanceSymbolState('BTCUSDT', firstCycle.state, candles, config)
+    const secondCycle = advanceSymbolState(
+      'BTCUSDT',
+      firstCycle.state,
+      candles,
+      config,
+    )
     expect(secondCycle.state.pausedForChop).toBe(true)
-    expect(secondCycle.trades.some((t) => t.reason === 'chop-pause-liquidation')).toBe(true)
+    expect(
+      secondCycle.trades.some((t) => t.reason === 'chop-pause-liquidation'),
+    ).toBe(true)
 
     // Third cycle: calm again — should resume.
     const calmTail: Array<Candle> = []
     for (let i = 13; i < 20; i++) calmTail.push(flat(i, 99, 1))
-    const thirdCycle = advanceSymbolState('BTCUSDT', secondCycle.state, [...candles, ...calmTail], config)
+    const thirdCycle = advanceSymbolState(
+      'BTCUSDT',
+      secondCycle.state,
+      [...candles, ...calmTail],
+      config,
+    )
     expect(thirdCycle.state.pausedForChop).toBe(false)
   })
 })
@@ -220,8 +286,22 @@ describe('advanceSymbolState — idle-range re-arm', () => {
         entryFeeQuote: 0.005,
         openedAt: new Date(BASE + 4 * HOUR).toISOString(),
       },
-      { price: 100, held: false, entryPrice: 0, entryQuote: 0, entryFeeQuote: 0, openedAt: '' },
-      { price: 110, held: false, entryPrice: 0, entryQuote: 0, entryFeeQuote: 0, openedAt: '' },
+      {
+        price: 100,
+        held: false,
+        entryPrice: 0,
+        entryQuote: 0,
+        entryFeeQuote: 0,
+        openedAt: '',
+      },
+      {
+        price: 110,
+        held: false,
+        entryPrice: 0,
+        entryQuote: 0,
+        entryFeeQuote: 0,
+        openedAt: '',
+      },
     ],
     lastProcessedOpenTime: BASE + 4 * HOUR,
     updatedAt: new Date(0).toISOString(),
@@ -244,7 +324,12 @@ describe('advanceSymbolState — idle-range re-arm', () => {
     for (let i = 5; i < 10; i++) candles.push(flat(i, 88, 1))
 
     // First cycle sees only two outside closes — streak persists, no re-arm yet.
-    const first = advanceSymbolState('BTCUSDT', seededHeld(), candles.slice(0, 2), config)
+    const first = advanceSymbolState(
+      'BTCUSDT',
+      seededHeld(),
+      candles.slice(0, 2),
+      config,
+    )
     expect(first.trades).toHaveLength(0)
     expect(first.state.outsideRangeStreak).toBe(2)
     expect(first.state.levels[0]?.held).toBe(true)
@@ -295,7 +380,8 @@ describe('advanceSymbolState — absolute stop floor', () => {
       absoluteStopFloorEnabled: true,
     })
     const candles: Array<Candle> = []
-    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    for (let i = 0; i < 5; i++)
+      candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
     // Sweeps both the 90 and 100 levels.
     candles.push(candle(5, { open: 100, high: 101, low: 89, close: 99 }))
     // First (ordinary) stop breach — lower (90) sits above its own floor by
@@ -308,12 +394,20 @@ describe('advanceSymbolState — absolute stop floor', () => {
     // AND price closes below it (79 < 81) — halts for good.
     candles.push(candle(8, { open: 85, high: 86, low: 78, close: 79 }))
     // Recovers well back into the original range — should NOT re-enter.
-    for (let i = 9; i < 13; i++) candles.push(candle(i, { open: 90, high: 105, low: 88, close: 100 }))
+    for (let i = 9; i < 13; i++)
+      candles.push(candle(i, { open: 90, high: 105, low: 88, close: 100 }))
 
-    const { state, trades } = advanceSymbolState('BTCUSDT', undefined, candles, config)
+    const { state, trades } = advanceSymbolState(
+      'BTCUSDT',
+      undefined,
+      candles,
+      config,
+    )
 
     const stopTrades = trades.filter((t) => t.reason === 'stop-liquidation')
-    const floorTrades = trades.filter((t) => t.reason === 'absolute-floor-liquidation')
+    const floorTrades = trades.filter(
+      (t) => t.reason === 'absolute-floor-liquidation',
+    )
     expect(stopTrades).toHaveLength(2)
     expect(floorTrades).toHaveLength(1)
     expect(floorTrades[0]?.exitPrice).toBe(79)
@@ -333,7 +427,8 @@ describe('advanceSymbolState — absolute stop floor', () => {
       absoluteStopFloorEnabled: true,
     })
     const candles: Array<Candle> = []
-    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    for (let i = 0; i < 5; i++)
+      candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
     candles.push(candle(5, { open: 100, high: 101, low: 89, close: 99 }))
     candles.push(candle(6, { open: 99, high: 100, low: 70, close: 75 }))
 
@@ -359,22 +454,30 @@ describe('advanceSymbolState — absolute stop floor', () => {
       absoluteStopFloorEnabled: false,
     })
     const candles: Array<Candle> = []
-    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    for (let i = 0; i < 5; i++)
+      candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
     candles.push(candle(5, { open: 100, high: 101, low: 89, close: 99 }))
     candles.push(candle(6, { open: 99, high: 100, low: 70, close: 75 }))
     candles.push(candle(7, { open: 85, high: 88, low: 69, close: 85 }))
     candles.push(candle(8, { open: 85, high: 86, low: 78, close: 79 }))
 
-    const { state, trades } = advanceSymbolState('BTCUSDT', undefined, candles, config)
+    const { state, trades } = advanceSymbolState(
+      'BTCUSDT',
+      undefined,
+      candles,
+      config,
+    )
     expect(state.floorPrice ?? null).toBeNull()
-    expect(trades.filter((t) => t.reason === 'absolute-floor-liquidation')).toHaveLength(0)
+    expect(
+      trades.filter((t) => t.reason === 'absolute-floor-liquidation'),
+    ).toHaveLength(0)
     // Without the floor, the grid stays armed through the same decline.
     expect(state.halted).toBe(false)
   })
 })
 
 describe('runGridPaperCycle — I/O + lock', () => {
-  it('does not run when the connectivity breaker is tripped — this engine\'s first-ever global gate', async () => {
+  it("does not run when the connectivity breaker is tripped — this engine's first-ever global gate", async () => {
     const { recordConnectivityOutcome } = await import('./connectivity-breaker')
     const CRED_FAILURE = 'Binance demo /api/v3/order failed (401): Unauthorized'
     recordConnectivityOutcome(CRED_FAILURE)
@@ -391,7 +494,8 @@ describe('runGridPaperCycle — I/O + lock', () => {
   it('serializes overlapping cycles — the second is rejected as busy', async () => {
     const { runGridPaperCycle } = await import('./grid-paper-engine')
     const candles: Array<Candle> = []
-    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    for (let i = 0; i < 5; i++)
+      candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
     const fetchKlines = vi.fn().mockResolvedValue(candles)
 
     const [a, b] = await Promise.all([
@@ -403,25 +507,33 @@ describe('runGridPaperCycle — I/O + lock', () => {
   })
 
   it('persists grid state through the finance store and getGridEngineState reads it back', async () => {
-    const { runGridPaperCycle, getGridEngineState } = await import('./grid-paper-engine')
+    const { runGridPaperCycle, getGridEngineState } =
+      await import('./grid-paper-engine')
     const candles: Array<Candle> = []
-    for (let i = 0; i < 5; i++) candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    for (let i = 0; i < 5; i++)
+      candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
     candles.push(candle(5, { open: 92, high: 95, low: 85, close: 90 }))
     const fetchKlines = vi.fn().mockResolvedValue(candles)
 
     const result = await runGridPaperCycle({ fetchKlines })
     expect(result.ran).toBe(true)
-    expect(result.symbolsProcessed).toBe(DEFAULT_GRID_ENGINE_CONFIG.symbols.length)
+    expect(result.symbolsProcessed).toBe(
+      DEFAULT_GRID_ENGINE_CONFIG.symbols.length,
+    )
 
     const state = getGridEngineState()
     expect(state.states.length).toBe(DEFAULT_GRID_ENGINE_CONFIG.symbols.length)
     // Only 6 candles were fetched, well under the default 200-candle
     // rangeLookback, so the grid correctly stays unarmed — this test is
     // about the store round-trip (persist → re-read), not arming.
-    const btc = state.states.find((s: GridSymbolState) => s.symbol === 'BTCUSDT')
+    const btc = state.states.find(
+      (s: GridSymbolState) => s.symbol === 'BTCUSDT',
+    )
     expect(btc?.symbol).toBe('BTCUSDT')
     expect(btc?.armed).toBe(false)
-    expect(btc?.lastProcessedOpenTime).toBe(candles[candles.length - 1]?.openTime)
+    expect(btc?.lastProcessedOpenTime).toBe(
+      candles[candles.length - 1]?.openTime,
+    )
   })
 })
 
@@ -556,7 +668,9 @@ describe('runGridPaperCycle — testnet execution mirror', () => {
     const { runGridPaperCycle } = await import('./grid-paper-engine')
     const client = fakeGridClient({
       placeOrder: vi.fn(async () => {
-        throw new Error('Account has insufficient balance for requested action.')
+        throw new Error(
+          'Account has insufficient balance for requested action.',
+        )
       }),
     })
     const result = await runGridPaperCycle({

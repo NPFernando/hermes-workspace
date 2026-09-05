@@ -24,10 +24,16 @@ function detectPlatform(): Platform {
 }
 
 const KIND_STYLE: Record<ChangeKind, { label: string; className: string }> = {
-  added:    { label: 'New',     className: 'bg-emerald-500/10 text-emerald-500' },
-  fixed:    { label: 'Fix',     className: 'bg-rose-500/10 text-rose-400' },
-  improved: { label: 'Better',  className: 'bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]' },
-  removed:  { label: 'Removed', className: 'bg-[var(--theme-muted)]/10 text-[var(--theme-muted)]' },
+  added: { label: 'New', className: 'bg-emerald-500/10 text-emerald-500' },
+  fixed: { label: 'Fix', className: 'bg-rose-500/10 text-rose-400' },
+  improved: {
+    label: 'Better',
+    className: 'bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]',
+  },
+  removed: {
+    label: 'Removed',
+    className: 'bg-[var(--theme-muted)]/10 text-[var(--theme-muted)]',
+  },
 }
 
 function DownloadApkPage() {
@@ -77,10 +83,13 @@ function DownloadApkPage() {
   const isAndroid = platform === 'android'
   const isIos = platform === 'ios'
   const platformLabel =
-    platform === 'android' ? 'Android detected' :
-    platform === 'ios' ? 'iPhone / iPad detected' :
-    platform === 'desktop' ? 'Desktop browser detected' :
-    'Device check running'
+    platform === 'android'
+      ? 'Android detected'
+      : platform === 'ios'
+        ? 'iPhone / iPad detected'
+        : platform === 'desktop'
+          ? 'Desktop browser detected'
+          : 'Device check running'
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-[var(--theme-bg)] p-6">
@@ -104,14 +113,18 @@ function DownloadApkPage() {
 
           {loadState === 'error' && (
             <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
-              Couldn&apos;t verify the latest APK version. You can still open the workspace or retry this page.
+              Couldn&apos;t verify the latest APK version. You can still open
+              the workspace or retry this page.
             </div>
           )}
 
           {isIos && (
             <div className="mb-4 rounded-lg border border-[var(--theme-accent)]/30 bg-[var(--theme-accent)]/10 px-3 py-2 text-left text-xs text-[var(--theme-muted)]">
-              <p className="mb-1 font-medium text-[var(--theme-text)]">Best option on iOS</p>
-              Use the web app, then Share → Add to Home Screen for an app-like launch icon.
+              <p className="mb-1 font-medium text-[var(--theme-text)]">
+                Best option on iOS
+              </p>
+              Use the web app, then Share → Add to Home Screen for an app-like
+              launch icon.
             </div>
           )}
 
@@ -136,15 +149,25 @@ function DownloadApkPage() {
                 onClick={handleDownload}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent-500 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-400 active:scale-95"
               >
-                <svg viewBox="0 0 24 24" className="size-5 fill-current" aria-hidden>
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-5 fill-current"
+                  aria-hidden
+                >
                   <path d="M12 16l-5-5 1.41-1.41L11 13.17V4h2v9.17l2.59-2.58L17 11zM5 20h14v-2H5z" />
                 </svg>
-                {isUpdate ? 'Download Update' : isAndroid ? 'Download APK' : 'Download Android APK'}
+                {isUpdate
+                  ? 'Download Update'
+                  : isAndroid
+                    ? 'Download APK'
+                    : 'Download Android APK'}
               </a>
             )}
             {!isAndroid && (
               <a
-                href={isIos ? '/api/download-apk' : '/chat/new?source=download-page'}
+                href={
+                  isIos ? '/api/download-apk' : '/chat/new?source=download-page'
+                }
                 download={isIos ? 'hermes-workspace.apk' : undefined}
                 onClick={isIos ? handleDownload : undefined}
                 className="flex w-full items-center justify-center rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-5 py-3 text-sm font-semibold text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-hover)]"
@@ -156,7 +179,11 @@ function DownloadApkPage() {
 
           <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3 text-left text-xs text-[var(--theme-muted)]">
             <p className="mb-1 font-medium text-[var(--theme-text)]">
-              {isIos ? 'iOS / iPadOS steps' : isUpdate ? 'Update steps' : 'Install steps'}
+              {isIos
+                ? 'iOS / iPadOS steps'
+                : isUpdate
+                  ? 'Update steps'
+                  : 'Install steps'}
             </p>
             <ol className="list-inside list-decimal space-y-0.5">
               {isIos ? (
@@ -195,7 +222,10 @@ function DownloadApkPage() {
                 entry.changes.map((c, i) => {
                   const style = KIND_STYLE[c.kind]
                   return (
-                    <div key={`${entry.version}-${i}`} className="flex items-start gap-2.5">
+                    <div
+                      key={`${entry.version}-${i}`}
+                      className="flex items-start gap-2.5"
+                    >
                       <span
                         className={cn(
                           'mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
@@ -204,7 +234,9 @@ function DownloadApkPage() {
                       >
                         {style.label}
                       </span>
-                      <span className="text-xs leading-snug text-[var(--theme-muted)]">{c.text}</span>
+                      <span className="text-xs leading-snug text-[var(--theme-muted)]">
+                        {c.text}
+                      </span>
                     </div>
                   )
                 }),

@@ -1,6 +1,9 @@
 import { useState } from 'react'
 
-type FinanceActionResponse = { ok?: boolean; error?: string } & Record<string, unknown>
+type FinanceActionResponse = { ok?: boolean; error?: string } & Record<
+  string,
+  unknown
+>
 
 /**
  * Shared busy/error + `POST /api/finance` + refresh-parent-payload pattern.
@@ -41,7 +44,9 @@ export function useFinanceAction<T extends FinanceActionResponse>(
       onPayload(data)
       return data
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : 'Request failed')
+      setError(
+        nextError instanceof Error ? nextError.message : 'Request failed',
+      )
       return undefined
     } finally {
       setBusy(null)

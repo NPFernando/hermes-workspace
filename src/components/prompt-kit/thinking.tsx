@@ -28,7 +28,9 @@ function Thinking({ content }: ThinkingProps) {
             />
           }
         >
-          <span className="text-sm font-medium text-[var(--theme-text)]">Thinking</span>
+          <span className="text-sm font-medium text-[var(--theme-text)]">
+            Thinking
+          </span>
           <HugeiconsIcon
             icon={ArrowDown01Icon}
             size={14}

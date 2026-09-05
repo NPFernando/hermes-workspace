@@ -33,7 +33,9 @@ export const Route = createFileRoute('/operations')({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="spinner-accent spinner-xl mb-3" />
-          <p className="text-sm text-[var(--theme-muted)]">Loading operations...</p>
+          <p className="text-sm text-[var(--theme-muted)]">
+            Loading operations...
+          </p>
         </div>
       </div>
     )

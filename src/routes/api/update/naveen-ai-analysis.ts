@@ -9,12 +9,11 @@ import {
   safeErrorMessage,
 } from '../../../server/rate-limit'
 import {
-  
   generateNaveenAiAnalysis,
   readCachedAiAnalysis,
-  readNaveenUpdateStatus
+  readNaveenUpdateStatus,
 } from '../../../server/naveen-update'
-import type {ConflictFile} from '../../../server/naveen-update';
+import type { ConflictFile } from '../../../server/naveen-update'
 
 export const Route = createFileRoute('/api/update/naveen-ai-analysis')({
   server: {

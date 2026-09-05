@@ -38,10 +38,7 @@ export const Route = createFileRoute('/api/commands')({
           const body = await res.json()
           return Response.json(body)
         } catch {
-          return json(
-            { error: 'Gateway is unreachable' },
-            { status: 500 },
-          )
+          return json({ error: 'Gateway is unreachable' }, { status: 500 })
         }
       },
     },

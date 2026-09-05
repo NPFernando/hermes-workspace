@@ -15,7 +15,11 @@ export const Route = createFileRoute('/api/ops-observability')({
           return json({ ok: true, ...payload })
         } catch (err) {
           return json(
-            { ok: false, error: err instanceof Error ? err.message : 'Failed to load ops data' },
+            {
+              ok: false,
+              error:
+                err instanceof Error ? err.message : 'Failed to load ops data',
+            },
             { status: 500 },
           )
         }

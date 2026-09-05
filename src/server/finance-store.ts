@@ -5,7 +5,9 @@ import { createHash, randomUUID } from 'node:crypto'
 import {
   appendFinanceAuditPostgres,
   financePostgresStatus,
+  readFinancePostgresNormalized,
   readFinancePostgresStore,
+  writeFinancePostgresNormalized,
   writeFinancePostgresStore,
 } from './finance-postgres-store'
 import {
@@ -16,7 +18,13 @@ import { readTradingStore, writeTradingStore } from './trading-store'
 import type { ConnectivityBreakerState } from './connectivity-breaker'
 
 export const FINANCE_SCHEMA_VERSION = 1
-export const FINANCE_DATA_DIR = path.join(os.homedir(), '.hermes', 'finance')
+// Respect HOME overrides used by isolated tests while retaining the normal
+// ~/.hermes/finance location in production.
+export const FINANCE_DATA_DIR = path.join(
+  process.env.HOME || os.homedir(),
+  '.hermes',
+  'finance',
+)
 export const FINANCE_DATA_PATH = path.join(FINANCE_DATA_DIR, 'finance.json')
 export const FINANCE_AUDIT_PATH = path.join(FINANCE_DATA_DIR, 'audit.jsonl')
 /** Original documents/photos from both ingestion paths (upload, Gmail attachments) — referenced by pending_ingestions.sourceRef. */
@@ -732,6 +740,21 @@ export type FinanceSettings = {
   strategyDecayDetection?: Record<string, unknown>
   /** Per-strategy validated backtest baselines, keyed by strategyId. See strategy-decay.ts. */
   strategyBaselines?: Record<string, unknown>
+  /**
+   * Staged live-trading readiness state (versioned gate snapshot + a
+   * time-bounded, fingerprinted approval record). Owned exclusively by
+   * trading-readiness.ts — loosely typed here for the same reason as
+   * `demoTrading` etc above (that module already imports from this one).
+   */
+  liveReadiness?: Record<string, unknown>
+  /**
+   * Bounded paper/sandbox validation-run state (active + history), one
+   * active run per stage ('paper' | 'sandbox'). Owned exclusively by
+   * validation-run.ts — loosely typed here for the same reason as
+   * `demoTrading`/`liveReadiness` above (that module already imports from
+   * this one).
+   */
+  validationRuns?: Record<string, unknown>
 }
 
 export type FinanceDatabase = {
@@ -924,7 +947,45 @@ export function ensureFinanceStore(): FinanceDatabase {
   return readFinanceStore()
 }
 
+/** How long a `readFinanceStore()` result may be reused before re-reading
+ * from disk/Postgres. `readFinanceStore()` is expensive — it parses a
+ * multi-MB JSON file, queries Postgres, and (in the normal case) writes
+ * back to both stores on every single call — and a single dashboard
+ * request (e.g. /api/trading/summary) calls it 5-7+ times (once per
+ * engine's state function). A short cache collapses those into one real
+ * read per request/burst instead of duplicating the full read+write cycle
+ * every time. Kept intentionally short so writes from other requests are
+ * never invisible for more than a moment, and invalidated immediately by
+ * writeFinanceStore() below so callers always see their own writes. */
+const FINANCE_STORE_CACHE_TTL_MS = 1500
+let financeStoreCache: { db: FinanceDatabase; atMs: number } | null = null
+
 export function readFinanceStore(): FinanceDatabase {
+  if (
+    financeStoreCache &&
+    Date.now() - financeStoreCache.atMs < FINANCE_STORE_CACHE_TTL_MS
+  ) {
+    return financeStoreCache.db
+  }
+  const db = readFinanceStoreUncached()
+  financeStoreCache = { db, atMs: Date.now() }
+  return db
+}
+
+function readFinanceStoreUncached(): FinanceDatabase {
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') {
+    return readFinanceStoreJsonCompatibility()
+  }
+  const postgresDb = readFinancePostgresNormalized()
+  if (!postgresDb) {
+    throw new Error(
+      'Finance PostgreSQL runtime store is unavailable; refusing JSON fallback.',
+    )
+  }
+  return migrateFinanceStore(postgresDb)
+}
+
+function readFinanceStoreJsonCompatibility(): FinanceDatabase {
   const jsonDb = readFinanceJsonStore()
   const pgDb = readFinancePostgresStore()
   if (pgDb && shouldPreferPostgresStore(pgDb, jsonDb)) {
@@ -1292,17 +1353,67 @@ function migrateFinanceStore(db: FinanceDatabase): FinanceDatabase {
 }
 
 export function writeFinanceStore(db: FinanceDatabase): void {
-  fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
   const updated = { ...db, updatedAt: nowIso() }
-  writeFinanceJsonStore(updated) // also mirrors into the split stores, see its own doc
-  writeFinancePostgresStore(updated)
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') {
+    fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+    writeFinanceJsonStore(updated)
+    writeFinancePostgresStore(updated)
+  } else if (!writeFinancePostgresNormalized(updated)) {
+    throw new Error(
+      'Finance PostgreSQL runtime store is unavailable; write was not persisted.',
+    )
+  }
+  // Invalidate (rather than repopulate) the read cache: `updated` here is
+  // the raw pre-overlay object, not the merged result readFinanceStore()
+  // normally returns (Postgres-sourced personal-finance collections/settings,
+  // split-store trading data, etc. — see overlaySplitStores()). Caching it
+  // directly would let callers observe a write that skips that merge.
+  // Invalidating just means the very next read after a write pays the full
+  // uncached cost once, which is rare next to the read-heavy dashboard
+  // access pattern this cache targets.
+  financeStoreCache = null
+}
+
+export function setNonLiveExecutionMode(
+  mode: 'observe_only' | 'paper_trade' | 'testnet_execute',
+): FinanceDatabase {
+  const db = readFinanceStore()
+  const validationRuns = (db.settings as Record<string, unknown>)
+    .validationRuns
+  const activeRuns =
+    validationRuns && typeof validationRuns === 'object'
+      ? (validationRuns as { active?: Array<{ stage?: string }> }).active ?? []
+      : []
+  const expectedStage =
+    mode === 'paper_trade'
+      ? 'paper'
+      : mode === 'testnet_execute'
+        ? 'sandbox'
+        : null
+  if (
+    expectedStage &&
+    activeRuns.some((run) => run.stage && run.stage !== expectedStage)
+  ) {
+    throw new Error(
+      `Cannot switch to ${mode} while a validation run for another stage is active.`,
+    )
+  }
+  db.settings.tradingMode = mode
+  db.settings.executionAccount =
+    mode === 'testnet_execute' ? 'binance_testnet' : 'paper'
+  db.settings.liveTradingEnabled = false
+  writeFinanceStore(db)
+  appendAuditLog('non_live_execution_mode_changed', {
+    tradingMode: mode,
+    executionAccount: db.settings.executionAccount,
+  })
+  return db
 }
 
 export function appendAuditLog(
   action: string,
   details: Record<string, unknown>,
 ): void {
-  fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
   const entry = {
     id: randomUUID(),
     action,
@@ -1310,10 +1421,25 @@ export function appendAuditLog(
     source: 'hermes-finance',
     createdAt: nowIso(),
   }
-  fs.appendFileSync(FINANCE_AUDIT_PATH, `${JSON.stringify(entry)}\n`, {
-    mode: 0o600,
-  })
-  appendFinanceAuditPostgres(entry)
+  try {
+    fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+    fs.appendFileSync(FINANCE_AUDIT_PATH, `${JSON.stringify(entry)}\n`, {
+      mode: 0o600,
+    })
+    if (process.env.VITEST || process.env.NODE_ENV === 'test') {
+      appendFinanceAuditPostgres(entry)
+      return
+    }
+    if (!appendFinanceAuditPostgres(entry)) {
+      // Best-effort persistence: keep the local audit trail authoritative even
+      // when Postgres is temporarily unavailable, rather than crashing a live
+      // trading cycle or dashboard request.
+      return
+    }
+  } catch {
+    // Fall back silently to the local JSONL file; the local audit trail is still
+    // valuable even when the database is unavailable.
+  }
 }
 
 function storageHealthNeedsSelfHeal(health: FinanceStorageHealth): boolean {
@@ -1327,6 +1453,26 @@ function storageHealthNeedsSelfHeal(health: FinanceStorageHealth): boolean {
 export function financeStorageStatus(
   options: { selfHeal?: boolean; selfHealRetries?: number } = {},
 ) {
+  if (!(process.env.VITEST || process.env.NODE_ENV === 'test')) {
+    const pg = financePostgresStatus()
+    const postgresDb = readFinancePostgresNormalized()
+    const health = buildFinanceStorageHealth({
+      jsonDb: null,
+      postgresDb,
+      postgres: {
+        ...pg,
+        snapshotAvailable: postgresDb !== null,
+      },
+    })
+    return {
+      active: postgresDb ? 'postgres' : 'unavailable',
+      fallback: 'none',
+      jsonPath: FINANCE_DATA_PATH,
+      auditPath: FINANCE_AUDIT_PATH,
+      postgres: pg,
+      health,
+    }
+  }
   let pg = financePostgresStatus()
   const jsonDb = readFinanceJsonStore()
   let postgresDb = readFinancePostgresStore()

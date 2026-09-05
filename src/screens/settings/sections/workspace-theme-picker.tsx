@@ -103,7 +103,7 @@ const THEME_PREVIEWS: Record<
     accent: '#b98a44',
     text: '#1a1f26',
   },
-  'matrix': {
+  matrix: {
     bg: '#020804',
     panel: '#07130A',
     border: 'rgba(0,255,65,0.28)',
@@ -124,7 +124,7 @@ const THEME_PREVIEWS: Record<
     accent: '#3b82f6',
     text: '#1F2328',
   },
-  'scifi': {
+  scifi: {
     bg: '#060b18',
     panel: '#0a1628',
     border: '#1a3a5c',
@@ -138,7 +138,7 @@ const THEME_PREVIEWS: Record<
     accent: '#0097A7',
     text: '#0A1628',
   },
-  'odysseus': {
+  odysseus: {
     bg: '#282c34',
     panel: '#111111',
     border: 'rgba(53,90,102,0.5)',
@@ -192,4 +192,3 @@ export function WorkspaceThemePicker() {
     </div>
   )
 }
-

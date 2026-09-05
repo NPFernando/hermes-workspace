@@ -92,7 +92,10 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
           return json({ error: 'invalid session' }, { status: 400 })
         }
         if (!direction) {
-          return json({ error: 'direction must be up or down' }, { status: 400 })
+          return json(
+            { error: 'direction must be up or down' },
+            { status: 400 },
+          )
         }
 
         const tmuxBin = resolveTmuxBin()

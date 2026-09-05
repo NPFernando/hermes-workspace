@@ -27,7 +27,9 @@ function httpsGetJson<T>(url: string): Promise<T> {
       res.on('data', (chunk) => {
         bytes += chunk.length
         if (bytes > MAX_RESPONSE_BYTES) {
-          req.destroy(new Error('Fear & Greed response exceeded maximum allowed size'))
+          req.destroy(
+            new Error('Fear & Greed response exceeded maximum allowed size'),
+          )
           return
         }
         data += chunk
@@ -41,7 +43,11 @@ function httpsGetJson<T>(url: string): Promise<T> {
       })
     })
     req.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error(`Fear & Greed request timed out after ${REQUEST_TIMEOUT_MS}ms`))
+      req.destroy(
+        new Error(
+          `Fear & Greed request timed out after ${REQUEST_TIMEOUT_MS}ms`,
+        ),
+      )
     })
     req.on('error', (err) => {
       reject(new Error(`Failed to fetch Fear & Greed index: ${err}`))
@@ -94,7 +100,9 @@ export async function fetchLatestFearGreed(
  * midpoint, same skew-based shape as longShortSentimentDecision. Below a
  * small confidence floor, reports HOLD rather than a barely-there lean.
  */
-export function fearGreedSentimentDecision(value: number | null): StrategyDecision {
+export function fearGreedSentimentDecision(
+  value: number | null,
+): StrategyDecision {
   if (value == null || value < 0 || value > 100) {
     return { signal: 'HOLD', confidence: 0, reason: 'no fear & greed data' }
   }

@@ -1,14 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { fetchAddressBalance, whaleFlowDecision } from './onchain-whale-tracking'
+import {
+  fetchAddressBalance,
+  whaleFlowDecision,
+} from './onchain-whale-tracking'
 
 describe('fetchAddressBalance', () => {
   it('builds the correct URL and converts wei to native units', async () => {
     let capturedUrl = ''
-    const fakeFetchJson = async <T,>(url: string): Promise<T> => {
+    const fakeFetchJson = async <T>(url: string): Promise<T> => {
       capturedUrl = url
-      return { status: '1', message: 'OK', result: '2500000000000000000' } as unknown as T
+      return {
+        status: '1',
+        message: 'OK',
+        result: '2500000000000000000',
+      } as unknown as T
     }
-    const balance = await fetchAddressBalance('ethereum', '0xabc', 'test-key', fakeFetchJson)
+    const balance = await fetchAddressBalance(
+      'ethereum',
+      '0xabc',
+      'test-key',
+      fakeFetchJson,
+    )
     expect(capturedUrl).toBe(
       'https://api.etherscan.io/v2/api?chainid=1&module=account&action=balance&address=0xabc&tag=latest&apikey=test-key',
     )
@@ -17,37 +29,45 @@ describe('fetchAddressBalance', () => {
 
   it('uses chainid 56 for bsc', async () => {
     let capturedUrl = ''
-    const fakeFetchJson = async <T,>(url: string): Promise<T> => {
+    const fakeFetchJson = async <T>(url: string): Promise<T> => {
       capturedUrl = url
-      return { status: '1', message: 'OK', result: '1000000000000000000' } as unknown as T
+      return {
+        status: '1',
+        message: 'OK',
+        result: '1000000000000000000',
+      } as unknown as T
     }
     await fetchAddressBalance('bsc', '0xdef', 'test-key', fakeFetchJson)
     expect(capturedUrl).toContain('chainid=56')
   })
 
   it('throws when Etherscan reports a non-1 status', async () => {
-    const fakeFetchJson = async <T,>(): Promise<T> =>
-      ({ status: '0', message: 'Invalid API Key', result: 'Invalid API Key' }) as unknown as T
-    await expect(fetchAddressBalance('ethereum', '0xabc', 'bad-key', fakeFetchJson)).rejects.toThrow(
-      'Invalid API Key',
-    )
+    const fakeFetchJson = async <T>(): Promise<T> =>
+      ({
+        status: '0',
+        message: 'Invalid API Key',
+        result: 'Invalid API Key',
+      }) as unknown as T
+    await expect(
+      fetchAddressBalance('ethereum', '0xabc', 'bad-key', fakeFetchJson),
+    ).rejects.toThrow('Invalid API Key')
   })
 
   it('throws on a non-numeric result', async () => {
-    const fakeFetchJson = async <T,>(): Promise<T> =>
+    const fakeFetchJson = async <T>(): Promise<T> =>
       ({ status: '1', message: 'OK', result: 'not-a-number' }) as unknown as T
-    await expect(fetchAddressBalance('ethereum', '0xabc', 'test-key', fakeFetchJson)).rejects.toThrow(
-      'non-numeric balance',
-    )
+    await expect(
+      fetchAddressBalance('ethereum', '0xabc', 'test-key', fakeFetchJson),
+    ).rejects.toThrow('non-numeric balance')
   })
 
   it('propagates a fetch failure rather than swallowing it (callers are responsible for try/catch)', async () => {
-    const failingFetchJson = async <T,>(): Promise<T> => {
+    const failingFetchJson = async <T>(): Promise<T> => {
       throw new Error('network error')
     }
-    await expect(fetchAddressBalance('ethereum', '0xabc', 'test-key', failingFetchJson)).rejects.toThrow(
-      'network error',
-    )
+    await expect(
+      fetchAddressBalance('ethereum', '0xabc', 'test-key', failingFetchJson),
+    ).rejects.toThrow('network error')
   })
 })
 

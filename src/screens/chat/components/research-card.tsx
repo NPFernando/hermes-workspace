@@ -2,7 +2,11 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { FlowIcon, Tick02Icon } from '@hugeicons/core-free-icons'
 import type { UseResearchCardResult } from '@/hooks/use-research-card'
 
-export function ResearchCard({ researchCard }: { researchCard: UseResearchCardResult | null | undefined }) {
+export function ResearchCard({
+  researchCard,
+}: {
+  researchCard: UseResearchCardResult | null | undefined
+}) {
   if (!researchCard || researchCard.steps.length === 0) return null
 
   return (
@@ -23,7 +27,9 @@ export function ResearchCard({ researchCard }: { researchCard: UseResearchCardRe
         </div>
       ))}
       {researchCard.isActive && (
-        <div className="pl-5 text-xs text-accent-500 animate-pulse">Researching…</div>
+        <div className="pl-5 text-xs text-accent-500 animate-pulse">
+          Researching…
+        </div>
       )}
     </div>
   )

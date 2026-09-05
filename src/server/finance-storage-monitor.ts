@@ -129,9 +129,7 @@ export function readFinanceStorageMonitorState(
           ? Math.max(0, Math.floor(parsed.consecutiveFailures))
           : 0,
       lastStatus:
-        typeof parsed.lastStatus === 'string'
-          ? (parsed.lastStatus)
-          : null,
+        typeof parsed.lastStatus === 'string' ? parsed.lastStatus : null,
       lastWarnings: Array.isArray(parsed.lastWarnings)
         ? parsed.lastWarnings.filter(
             (warning): warning is string => typeof warning === 'string',

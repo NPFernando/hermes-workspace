@@ -32,7 +32,11 @@ const MIME_BY_EXT: Record<string, string> = {
 }
 
 function hermesHome(): string {
-  return process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? resolvePath(os.homedir(), '.hermes')
+  return (
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    resolvePath(os.homedir(), '.hermes')
+  )
 }
 
 function allowedPrefixes(): Array<string> {
@@ -55,7 +59,9 @@ function allowedPrefixes(): Array<string> {
 function isAllowed(absPath: string): boolean {
   return allowedPrefixes().some((prefix) => {
     const normalizedPrefix = resolvePath(prefix)
-    return absPath === normalizedPrefix || absPath.startsWith(`${normalizedPrefix}/`)
+    return (
+      absPath === normalizedPrefix || absPath.startsWith(`${normalizedPrefix}/`)
+    )
   })
 }
 
@@ -72,7 +78,9 @@ export const Route = createFileRoute('/api/media')({
           const rawPath = url.searchParams.get('path')?.trim() ?? ''
           if (!rawPath) return new Response('path required', { status: 400 })
           if (!isAbsolute(rawPath)) {
-            return new Response('Only absolute paths are accepted', { status: 400 })
+            return new Response('Only absolute paths are accepted', {
+              status: 400,
+            })
           }
 
           const absPath = resolvePath(rawPath)
@@ -106,10 +114,7 @@ export const Route = createFileRoute('/api/media')({
             },
           })
         } catch (err) {
-          return new Response(
-            safeErrorMessage(err),
-            { status: 500 },
-          )
+          return new Response(safeErrorMessage(err), { status: 500 })
         }
       },
     },

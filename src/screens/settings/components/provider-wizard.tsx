@@ -384,7 +384,8 @@ export function ProviderWizard({
                     key={item.id}
                     className={cn(
                       'rounded-xl border px-2.5 py-2',
-                      isCurrent && 'border-[var(--theme-accent)] bg-[var(--theme-hover)]/70',
+                      isCurrent &&
+                        'border-[var(--theme-accent)] bg-[var(--theme-hover)]/70',
                       isComplete && 'border-green-500/30 bg-green-500/10',
                       !isCurrent &&
                         !isComplete &&
@@ -395,7 +396,8 @@ export function ProviderWizard({
                       <span
                         className={cn(
                           'inline-flex size-5 items-center justify-center rounded-full border text-xs font-medium tabular-nums',
-                          isCurrent && 'border-[var(--theme-accent)] text-[var(--theme-text)]',
+                          isCurrent &&
+                            'border-[var(--theme-accent)] text-[var(--theme-text)]',
                           isComplete && 'border-green-500/40 text-green-600',
                           !isCurrent &&
                             !isComplete &&
@@ -615,8 +617,8 @@ export function ProviderWizard({
                   <>
                     <p className="mt-1 text-sm text-[var(--theme-muted)] text-pretty">
                       If you have Claude Code or the Hermes CLI installed,
-                      Hermes Agent can use the same auth token. Run the configure
-                      command to detect and import it automatically.
+                      Hermes Agent can use the same auth token. Run the
+                      configure command to detect and import it automatically.
                     </p>
 
                     <div className="mt-4 flex flex-col gap-3">
@@ -723,7 +725,8 @@ export function ProviderWizard({
                             strokeWidth={1.5}
                             className="inline mr-1"
                           />
-                          Key saved! Hermes Agent is restarting to apply changes.
+                          Key saved! Hermes Agent is restarting to apply
+                          changes.
                         </p>
                       ) : null}
                     </div>
@@ -856,7 +859,8 @@ export function ProviderWizard({
                     {verifyTitle}
                   </p>
                   <p className="mt-1 text-sm text-[var(--theme-muted)] text-pretty">
-                    {verificationMessage || 'Waiting for Hermes Agent to respond…'}
+                    {verificationMessage ||
+                      'Waiting for Hermes Agent to respond…'}
                   </p>
                 </div>
 

@@ -29,8 +29,7 @@ export const Route = createFileRoute('/api/profiles/update')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

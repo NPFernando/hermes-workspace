@@ -81,7 +81,9 @@ export function ManageModesModal({
           >
             Manage Modes
           </h2>
-          <p className="mb-6 text-sm text-[var(--theme-muted)]">No modes saved.</p>
+          <p className="mb-6 text-sm text-[var(--theme-muted)]">
+            No modes saved.
+          </p>
           <div className="flex justify-end">
             <button
               type="button"

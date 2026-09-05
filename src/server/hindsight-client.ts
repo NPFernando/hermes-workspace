@@ -2,10 +2,20 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const METADATA_PATH = path.join(os.homedir(), '.hindsight', 'profiles', 'metadata.json')
+const METADATA_PATH = path.join(
+  os.homedir(),
+  '.hindsight',
+  'profiles',
+  'metadata.json',
+)
 const HERMES_PROFILE = 'hermes'
 const DEFAULT_BANK = 'hermes'
-const CONFIG_PATH = path.join(os.homedir(), '.hermes', 'hindsight', 'config.json')
+const CONFIG_PATH = path.join(
+  os.homedir(),
+  '.hermes',
+  'hindsight',
+  'config.json',
+)
 const DLQ_PATH = path.join(os.homedir(), '.hindsight', 'retain_dlq.jsonl')
 
 function getHindsightPort(): number {
@@ -78,7 +88,10 @@ async function hFetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
 
 export function getHindsightConfig(): Record<string, unknown> {
   try {
-    return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) as Record<string, unknown>
+    return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) as Record<
+      string,
+      unknown
+    >
   } catch {
     return {}
   }
@@ -93,11 +106,16 @@ export function getDlqCount(): number {
   }
 }
 
-export async function getHindsightHealth(): Promise<{ status: string; database: string }> {
+export async function getHindsightHealth(): Promise<{
+  status: string
+  database: string
+}> {
   return hFetch('/health')
 }
 
-export async function getHindsightStats(bank = DEFAULT_BANK): Promise<Record<string, unknown>> {
+export async function getHindsightStats(
+  bank = DEFAULT_BANK,
+): Promise<Record<string, unknown>> {
   return hFetch(`/v1/default/banks/${bank}/stats`)
 }
 
@@ -106,7 +124,12 @@ export async function listHindsightMemories(opts: {
   limit?: number
   offset?: number
   bank?: string
-}): Promise<{ items: Array<HindsightMemory>; total: number; limit: number; offset: number }> {
+}): Promise<{
+  items: Array<HindsightMemory>
+  total: number
+  limit: number
+  offset: number
+}> {
   const bank = opts.bank ?? DEFAULT_BANK
   const params = new URLSearchParams()
   if (opts.q) params.set('q', opts.q)
@@ -158,7 +181,13 @@ export async function retainHindsight(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      items: [{ content, ...(context ? { context } : {}), metadata: { source: 'manual_ui' } }],
+      items: [
+        {
+          content,
+          ...(context ? { context } : {}),
+          metadata: { source: 'manual_ui' },
+        },
+      ],
       async: true,
     }),
   })
@@ -168,7 +197,10 @@ export async function deleteHindsightMemory(
   memoryId: string,
   bank = DEFAULT_BANK,
 ): Promise<void> {
-  await hFetch(`/v1/default/banks/${bank}/memories/${encodeURIComponent(memoryId)}/observations`, {
-    method: 'DELETE',
-  })
+  await hFetch(
+    `/v1/default/banks/${bank}/memories/${encodeURIComponent(memoryId)}/observations`,
+    {
+      method: 'DELETE',
+    },
+  )
 }

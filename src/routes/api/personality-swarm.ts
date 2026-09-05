@@ -38,13 +38,23 @@ export const Route = createFileRoute('/api/personality-swarm')({
         try {
           body = (await request.json()) as ApplyPersonalitySwarmOptions
         } catch {
-          return json({ ok: false, error: 'Invalid JSON body' }, { status: 400 })
+          return json(
+            { ok: false, error: 'Invalid JSON body' },
+            { status: 400 },
+          )
         }
         if (!body.primaryPersonality.trim()) {
-          return json({ ok: false, error: 'primaryPersonality is required' }, { status: 400 })
+          return json(
+            { ok: false, error: 'primaryPersonality is required' },
+            { status: 400 },
+          )
         }
         const result = applyPersonalityToSwarm(body)
-        return json({ ok: result.ok, applied: result.applied, error: result.error })
+        return json({
+          ok: result.ok,
+          applied: result.applied,
+          error: result.error,
+        })
       },
     },
   },

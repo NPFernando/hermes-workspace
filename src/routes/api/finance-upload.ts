@@ -11,7 +11,12 @@ import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { getClientIp, rateLimit, rateLimitResponse, safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import {
   FINANCE_DATA_DIR,
   FINANCE_INGESTION_UPLOAD_DIR,
@@ -20,7 +25,11 @@ import {
   listPendingIngestions,
 } from '../../server/finance-store'
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
-import { extractEmploymentContract, extractTransactionFromImage, mimeTypeForImageExtension } from '../../server/finance-extraction'
+import {
+  extractEmploymentContract,
+  extractTransactionFromImage,
+  mimeTypeForImageExtension,
+} from '../../server/finance-extraction'
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 const UPLOAD_DIR = FINANCE_INGESTION_UPLOAD_DIR
@@ -42,22 +51,38 @@ export const Route = createFileRoute('/api/finance-upload')({
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
         const id = new URL(request.url).searchParams.get('id')
-        if (!id) return json({ ok: false, error: 'Missing id.' }, { status: 400 })
+        if (!id)
+          return json({ ok: false, error: 'Missing id.' }, { status: 400 })
 
         const pending = listPendingIngestions().find((p) => p.id === id)
         const imagePath = pending?.rawPreviewImagePath
-        if (!imagePath) return json({ ok: false, error: 'No preview available.' }, { status: 404 })
+        if (!imagePath)
+          return json(
+            { ok: false, error: 'No preview available.' },
+            { status: 404 },
+          )
 
         const resolved = path.resolve(imagePath)
         if (!resolved.startsWith(path.resolve(FINANCE_DATA_DIR) + path.sep)) {
-          return json({ ok: false, error: 'Invalid preview path.' }, { status: 400 })
+          return json(
+            { ok: false, error: 'Invalid preview path.' },
+            { status: 400 },
+          )
         }
         try {
           const buffer = fs.readFileSync(resolved)
           const contentType = mimeTypeForImageExtension(path.extname(resolved))
-          return new Response(buffer, { headers: { 'content-type': contentType, 'cache-control': 'private, max-age=300' } })
+          return new Response(buffer, {
+            headers: {
+              'content-type': contentType,
+              'cache-control': 'private, max-age=300',
+            },
+          })
         } catch {
-          return json({ ok: false, error: 'Preview file not found.' }, { status: 404 })
+          return json(
+            { ok: false, error: 'Preview file not found.' },
+            { status: 404 },
+          )
         }
       },
       POST: async ({ request }) => {
@@ -72,12 +97,16 @@ export const Route = createFileRoute('/api/finance-upload')({
         try {
           const contentType = request.headers.get('content-type') || ''
           if (!contentType.includes('multipart/form-data')) {
-            return json({ ok: false, error: 'Expected multipart/form-data upload.' }, { status: 400 })
+            return json(
+              { ok: false, error: 'Expected multipart/form-data upload.' },
+              { status: 400 },
+            )
           }
 
           const form = await request.formData()
           const file = form.get('file')
-          const documentType = form.get('documentType') === 'contract' ? 'contract' : 'transaction'
+          const documentType =
+            form.get('documentType') === 'contract' ? 'contract' : 'transaction'
           if (!(file instanceof File)) {
             return json({ ok: false, error: 'Missing file.' }, { status: 400 })
           }
@@ -85,12 +114,20 @@ export const Route = createFileRoute('/api/finance-upload')({
             return json({ ok: false, error: 'File is empty.' }, { status: 400 })
           }
           if (file.size > MAX_UPLOAD_BYTES) {
-            return json({ ok: false, error: 'File exceeds 15 MB limit.' }, { status: 413 })
+            return json(
+              { ok: false, error: 'File exceeds 15 MB limit.' },
+              { status: 413 },
+            )
           }
 
           fs.mkdirSync(UPLOAD_DIR, { recursive: true, mode: 0o700 })
-          const savedPath = path.join(UPLOAD_DIR, `${randomUUID()}${extensionFor(file)}`)
-          fs.writeFileSync(savedPath, Buffer.from(await file.arrayBuffer()), { mode: 0o600 })
+          const savedPath = path.join(
+            UPLOAD_DIR,
+            `${randomUUID()}${extensionFor(file)}`,
+          )
+          fs.writeFileSync(savedPath, Buffer.from(await file.arrayBuffer()), {
+            mode: 0o600,
+          })
 
           const isPdf = savedPath.toLowerCase().endsWith('.pdf')
           if (isPdf && isPdfEncrypted(savedPath)) {
@@ -100,7 +137,11 @@ export const Route = createFileRoute('/api/finance-upload')({
               sourceRef: savedPath,
               status: 'awaiting_password',
             })
-            return json({ ok: true, pendingIngestionId: pending.id, status: pending.status })
+            return json({
+              ok: true,
+              pendingIngestionId: pending.id,
+              status: pending.status,
+            })
           }
 
           let previewImagePath = savedPath
@@ -115,7 +156,11 @@ export const Route = createFileRoute('/api/finance-upload')({
                 status: 'awaiting_review',
                 error: `Could not process document: ${normalized.reason}`,
               })
-              return json({ ok: true, pendingIngestionId: pending.id, status: pending.status })
+              return json({
+                ok: true,
+                pendingIngestionId: pending.id,
+                status: pending.status,
+              })
             }
             previewImagePath = normalized.imagePaths[0]
             allImagePaths = normalized.imagePaths
@@ -132,10 +177,17 @@ export const Route = createFileRoute('/api/finance-upload')({
               extractedContract: extraction.ok ? extraction.data : undefined,
               error: extraction.ok ? undefined : extraction.reason,
             })
-            return json({ ok: true, pendingIngestionId: pending.id, status: pending.status })
+            return json({
+              ok: true,
+              pendingIngestionId: pending.id,
+              status: pending.status,
+            })
           }
 
-          const extraction = await extractTransactionFromImage(previewImagePath, getCategoryCorrections())
+          const extraction = await extractTransactionFromImage(
+            previewImagePath,
+            getCategoryCorrections(),
+          )
           const pending = addPendingIngestion({
             source: 'upload',
             documentType: 'transaction',
@@ -146,9 +198,16 @@ export const Route = createFileRoute('/api/finance-upload')({
             error: extraction.ok ? undefined : extraction.reason,
           })
 
-          return json({ ok: true, pendingIngestionId: pending.id, status: pending.status })
+          return json({
+            ok: true,
+            pendingIngestionId: pending.id,
+            status: pending.status,
+          })
         } catch (error) {
-          return json({ ok: false, error: safeErrorMessage(error) }, { status: 500 })
+          return json(
+            { ok: false, error: safeErrorMessage(error) },
+            { status: 500 },
+          )
         }
       },
     },

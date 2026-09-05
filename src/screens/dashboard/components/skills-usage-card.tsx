@@ -51,14 +51,10 @@ export function SkillsUsageCard({
         }}
       />
       <div className="flex items-center justify-between">
-        <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-        >
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
           Skills usage
         </h3>
-        <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em] transition-colors group-hover:text-[var(--theme-accent)] text-[var(--theme-muted)]"
-        >
+        <span className="font-mono text-[9px] uppercase tracking-[0.15em] transition-colors group-hover:text-[var(--theme-accent)] text-[var(--theme-muted)]">
           {hasUsage
             ? installedCount != null
               ? `${usage.distinctSkills} of ${installedCount} used`
@@ -83,9 +79,7 @@ export function SkillsUsageCard({
                   >
                     {formatSkillName(s.skill)}
                   </span>
-                  <span
-                    className="font-mono text-[10px] tabular-nums text-[var(--theme-muted)]"
-                  >
+                  <span className="font-mono text-[10px] tabular-nums text-[var(--theme-muted)]">
                     {s.totalCount}
                     <span className="ml-1">·</span>
                     <span className="ml-1">{s.percentage.toFixed(1)}%</span>
@@ -112,9 +106,7 @@ export function SkillsUsageCard({
           })}
         </ul>
       ) : (
-        <div
-          className="font-mono text-[11px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-        >
+        <div className="font-mono text-[11px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
           {installedCount === 0
             ? 'no skills installed'
             : installedCount === null

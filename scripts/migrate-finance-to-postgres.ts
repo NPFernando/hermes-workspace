@@ -1,4 +1,8 @@
-import { financeStorageStatus, readFinanceStore, writeFinanceStore } from '../src/server/finance-store'
+import {
+  financeStorageStatus,
+  readFinanceStore,
+  writeFinanceStore,
+} from '../src/server/finance-store'
 
 const before = financeStorageStatus()
 const db = readFinanceStore()
@@ -10,11 +14,17 @@ for (const [key, value] of Object.entries(db)) {
   if (Array.isArray(value)) counts[key] = value.length
 }
 
-console.log(JSON.stringify({
-  ok: after.postgres.available && after.postgres.snapshotAvailable,
-  before,
-  after,
-  schemaVersion: db.schemaVersion,
-  updatedAt: db.updatedAt,
-  counts,
-}, null, 2))
+console.log(
+  JSON.stringify(
+    {
+      ok: after.postgres.available && after.postgres.snapshotAvailable,
+      before,
+      after,
+      schemaVersion: db.schemaVersion,
+      updatedAt: db.updatedAt,
+      counts,
+    },
+    null,
+    2,
+  ),
+)

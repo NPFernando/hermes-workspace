@@ -9,7 +9,7 @@ they otherwise only exist as ad-hoc files on the VM with no history.
   `scripts/deploy.sh`'s header comment for why this split exists.
 - `systemd/hermes-workspace-deploy.service` + `.timer` — polls
   `origin/main` every 5 minutes and runs `scripts/deploy.sh
-  --quiet-if-unchanged`, which no-ops unless there's actually a new commit.
+--quiet-if-unchanged`, which no-ops unless there's actually a new commit.
   Deliberately a poll, not a GitHub Actions webhook — a webhook would need
   an inbound trigger surface from GitHub into this VM (a secret, an open
   port, or a self-hosted runner) that a 5-minute poll simply doesn't need.

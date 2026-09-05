@@ -35,9 +35,11 @@ function useTemporaryStateDir(): void {
 }
 
 afterEach(() => {
-  if (originalStateDir === undefined) delete process.env.HERMES_WORKSPACE_STATE_DIR
+  if (originalStateDir === undefined)
+    delete process.env.HERMES_WORKSPACE_STATE_DIR
   else process.env.HERMES_WORKSPACE_STATE_DIR = originalStateDir
-  for (const directory of stateDirs.splice(0)) rmSync(directory, { force: true, recursive: true })
+  for (const directory of stateDirs.splice(0))
+    rmSync(directory, { force: true, recursive: true })
 })
 
 describe('paper decision journal', () => {
@@ -66,7 +68,9 @@ describe('paper decision journal', () => {
         side_effects: false,
       },
     })
-    expect(result.entry.compositeIntelligenceId).toMatch(/^composite:BTCUSDT:research-v1:/)
+    expect(result.entry.compositeIntelligenceId).toMatch(
+      /^composite:BTCUSDT:research-v1:/,
+    )
     expect(readPaperDecisionJournal()).toEqual([result.entry])
   })
 

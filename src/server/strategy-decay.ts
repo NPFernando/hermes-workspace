@@ -12,7 +12,11 @@
  * --save-baselines flag) — a backtest result should be reviewed before it's
  * trusted as the live comparison point.
  */
-import { appendAuditLog, readFinanceStore, writeFinanceStore } from './finance-store'
+import {
+  appendAuditLog,
+  readFinanceStore,
+  writeFinanceStore,
+} from './finance-store'
 
 export type StrategyBaseline = {
   strategyId: string
@@ -118,7 +122,8 @@ export function detectStrategyDecay(
   }
   const winRateDrop = baseline.winRate - live.winRate
   const expectancyFlipped = baseline.avgPnlQuote > 0 && live.avgPnlQuote <= 0
-  const decayed = winRateDrop >= config.winRateDropThreshold || expectancyFlipped
+  const decayed =
+    winRateDrop >= config.winRateDropThreshold || expectancyFlipped
   if (!decayed) {
     return { decayed: false, reason: null, winRateDrop, expectancyFlipped }
   }
@@ -136,7 +141,12 @@ export function detectStrategyDecay(
  * (finance-store.ts) rather than each hand-rolling the merge/write.
  */
 export function saveStrategyBaselines(
-  reports: Array<{ strategyId: string; winRate: number; avgPnlQuote: number; trades: number }>,
+  reports: Array<{
+    strategyId: string
+    winRate: number
+    avgPnlQuote: number
+    trades: number
+  }>,
   source: string,
 ): void {
   if (reports.length === 0) return

@@ -3,11 +3,10 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { safeErrorMessage } from '../../../server/rate-limit'
 import {
-  
   readKnowledgeBaseConfig,
-  writeKnowledgeBaseConfig
+  writeKnowledgeBaseConfig,
 } from '../../../server/knowledge-config'
-import type {KnowledgeBaseConfig} from '../../../server/knowledge-config';
+import type { KnowledgeBaseConfig } from '../../../server/knowledge-config'
 
 export const Route = createFileRoute('/api/knowledge/config')({
   server: {
@@ -21,8 +20,7 @@ export const Route = createFileRoute('/api/knowledge/config')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )
@@ -43,8 +41,7 @@ export const Route = createFileRoute('/api/knowledge/config')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

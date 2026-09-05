@@ -34,8 +34,7 @@ export const Route = createFileRoute('/api/profiles/create')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

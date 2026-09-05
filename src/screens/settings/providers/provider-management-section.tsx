@@ -21,7 +21,6 @@ export function ProviderStatusBadge({ status }: { status: ProviderStatus }) {
   )
 }
 
-
 export function ProviderManagementSection(props: {
   embedded: boolean
   providerSummaries: Array<ProviderSummary>
@@ -91,7 +90,8 @@ export function ProviderManagementSection(props: {
         {modelsQuery.error ? (
           <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3">
             <p className="mb-2 text-sm text-[var(--theme-muted)]">
-              Unable to load providers right now. Check your Hermes Agent connection.
+              Unable to load providers right now. Check your Hermes Agent
+              connection.
             </p>
             <Button
               variant="outline"
@@ -195,4 +195,3 @@ export function ProviderManagementSection(props: {
     </div>
   )
 }
-

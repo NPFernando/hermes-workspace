@@ -1,6 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { ODYSSEUS_BASE, getOdysseusCookie, invalidateOdysseusCookie } from '../../server/odysseus-session'
+import {
+  ODYSSEUS_BASE,
+  getOdysseusCookie,
+  invalidateOdysseusCookie,
+} from '../../server/odysseus-session'
 
 import { safeErrorMessage } from '../../server/rate-limit'
 
@@ -31,7 +35,16 @@ async function handler({ request }: { request: Request }): Promise<Response> {
 
   const upstreamHeaders = new Headers(request.headers)
   // Don't forward host or hop-by-hop headers
-  for (const h of ['host', 'connection', 'keep-alive', 'upgrade', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer']) {
+  for (const h of [
+    'host',
+    'connection',
+    'keep-alive',
+    'upgrade',
+    'proxy-authenticate',
+    'proxy-authorization',
+    'te',
+    'trailer',
+  ]) {
     upstreamHeaders.delete(h)
   }
   // Prevent nginx/CDN buffering on SSE stream endpoints
@@ -89,7 +102,10 @@ async function handler({ request }: { request: Request }): Promise<Response> {
   } catch (err) {
     const message = safeErrorMessage(err)
     return new Response(
-      JSON.stringify({ ok: false, error: `Odysseus unreachable (${target}): ${message}` }),
+      JSON.stringify({
+        ok: false,
+        error: `Odysseus unreachable (${target}): ${message}`,
+      }),
       {
         status: 502,
         headers: { 'content-type': 'application/json' },

@@ -112,7 +112,9 @@ export const DEFAULT_GRID_ENGINE_CONFIG: GridEngineConfig = {
   maxRealOrdersPerCycle: 12,
 }
 
-export function resolveGridEngineConfig(settingsOverride: unknown): GridEngineConfig {
+export function resolveGridEngineConfig(
+  settingsOverride: unknown,
+): GridEngineConfig {
   const fromSettings =
     settingsOverride && typeof settingsOverride === 'object'
       ? (settingsOverride as Partial<GridEngineConfig>)
@@ -284,7 +286,9 @@ function armFrom(
 ): { lower: number; upper: number; levels: Array<GridLevelState> } | null {
   const range = rangeFromWindow(candles, endIndex, config.rangeLookbackCandles)
   if (!range) return null
-  const levels = initLevelStates(buildLevels(range.lower, range.upper, config.spacing, config.gridCount))
+  const levels = initLevelStates(
+    buildLevels(range.lower, range.upper, config.spacing, config.gridCount),
+  )
   if (levels.length < 2) return null
   return { lower: range.lower, upper: range.upper, levels }
 }
@@ -368,7 +372,10 @@ export function advanceSymbolState(
     // Cold start: arm using the oldest available warmup window in this
     // fetch and skip that bar for fills — the bar that defines the range
     // would trivially "sweep" whichever boundary it just set.
-    const warmupIndex = Math.min(config.rangeLookbackCandles - 1, candles.length - 1)
+    const warmupIndex = Math.min(
+      config.rangeLookbackCandles - 1,
+      candles.length - 1,
+    )
     const armResult = armFrom(candles, warmupIndex, config)
     if (armResult) {
       lower = armResult.lower
@@ -377,7 +384,8 @@ export function advanceSymbolState(
       armed = true
       if (config.absoluteStopFloorEnabled) floorPrice = computeFloor()
     }
-    if (candles[warmupIndex]) lastProcessedOpenTime = candles[warmupIndex].openTime
+    if (candles[warmupIndex])
+      lastProcessedOpenTime = candles[warmupIndex].openTime
     startIndex = warmupIndex + 1
   }
 
@@ -431,10 +439,20 @@ export function advanceSymbolState(
       ? efficiencyRatio(candles, i, config.efficiencyLookbackCandles)
       : null
     const trending =
-      config.efficiencyGate && efficiency != null && efficiency > config.maxEfficiencyRatio
+      config.efficiencyGate &&
+      efficiency != null &&
+      efficiency > config.maxEfficiencyRatio
 
     if (trending && !pausedForChop) {
-      liquidateAll(levels, candle.close, at, 'chop-pause-liquidation', symbol, config, trades)
+      liquidateAll(
+        levels,
+        candle.close,
+        at,
+        'chop-pause-liquidation',
+        symbol,
+        config,
+        trades,
+      )
       pausedForChop = true
       continue
     } else if (!trending && pausedForChop) {
@@ -461,18 +479,36 @@ export function advanceSymbolState(
       lower < floorPrice &&
       candle.close < floorPrice
     ) {
-      liquidateAll(levels, candle.close, at, 'absolute-floor-liquidation', symbol, config, trades)
+      liquidateAll(
+        levels,
+        candle.close,
+        at,
+        'absolute-floor-liquidation',
+        symbol,
+        config,
+        trades,
+      )
       armed = false
       halted = true
       continue
     }
 
-    const upperBound = config.upperStopPct > 0 ? upper * (1 + config.upperStopPct) : null
-    const lowerBound = config.lowerStopPct > 0 ? lower * (1 - config.lowerStopPct) : null
+    const upperBound =
+      config.upperStopPct > 0 ? upper * (1 + config.upperStopPct) : null
+    const lowerBound =
+      config.lowerStopPct > 0 ? lower * (1 - config.lowerStopPct) : null
     const breachedUp = upperBound != null && candle.close > upperBound
     const breachedDown = lowerBound != null && candle.close < lowerBound
     if (breachedUp || breachedDown) {
-      liquidateAll(levels, candle.close, at, 'stop-liquidation', symbol, config, trades)
+      liquidateAll(
+        levels,
+        candle.close,
+        at,
+        'stop-liquidation',
+        symbol,
+        config,
+        trades,
+      )
       armed = false
       if (config.autoRecenter) {
         const armResult = armFrom(candles, i, config)
@@ -499,7 +535,15 @@ export function advanceSymbolState(
       const outside = candle.close > upper || candle.close < lower
       outsideRangeStreak = outside ? outsideRangeStreak + 1 : 0
       if (outsideRangeStreak >= config.rearmOutsideRangeCandles) {
-        liquidateAll(levels, candle.close, at, 'range-idle-rearm', symbol, config, trades)
+        liquidateAll(
+          levels,
+          candle.close,
+          at,
+          'range-idle-rearm',
+          symbol,
+          config,
+          trades,
+        )
         const armResult = armFrom(candles, i, config)
         armed = !!armResult
         if (armResult) {
@@ -699,12 +743,14 @@ async function mirrorRealOrders(input: {
   let client = input.client
   if (!client) {
     const built = createDemoClientFromEnv()
-    if (!built.client) return skip(`no testnet client: ${built.reason ?? 'unknown'}`)
+    if (!built.client)
+      return skip(`no testnet client: ${built.reason ?? 'unknown'}`)
     client = built.client
   }
 
   const realFills: Array<GridRealFill> = []
-  let budget = config.maxRealOrdersPerCycle > 0 ? config.maxRealOrdersPerCycle : Infinity
+  let budget =
+    config.maxRealOrdersPerCycle > 0 ? config.maxRealOrdersPerCycle : Infinity
   const overBudget: Array<string> = []
 
   // Sells first: they free balance for the buys and reduce exposure.
@@ -725,11 +771,13 @@ async function mirrorRealOrders(input: {
         }
         if (client.getSymbolFilters) {
           const filters = await client.getSymbolFilters(sell.symbol)
-          if (filters.stepSize > 0) quantity = floorToStep(quantity, filters.stepSize)
+          if (filters.stepSize > 0)
+            quantity = floorToStep(quantity, filters.stepSize)
           if (
             quantity <= 0 ||
             (filters.minQty > 0 && quantity < filters.minQty) ||
-            (filters.minNotional > 0 && quantity * sell.exitPrice < filters.minNotional)
+            (filters.minNotional > 0 &&
+              quantity * sell.exitPrice < filters.minNotional)
           ) {
             appendAuditLog('grid_real_sell_dust_skipped', {
               symbol: sell.symbol,
@@ -848,7 +896,9 @@ export interface GridCycleOptions {
   client?: BinanceExecutionClient
 }
 
-async function runGridPaperCycleInner(options: GridCycleOptions): Promise<GridCycleResult> {
+async function runGridPaperCycleInner(
+  options: GridCycleOptions,
+): Promise<GridCycleResult> {
   // First global gate this paper-only engine has ever had — previously ran
   // regardless of emergencyKillSwitch/tradingMode. A tripped connectivity
   // breaker means repeated invalid-credential errors elsewhere (this engine
@@ -885,9 +935,18 @@ async function runGridPaperCycleInner(options: GridCycleOptions): Promise<GridCy
   const allNewBuys: Array<GridBuyEvent> = []
 
   for (const symbol of config.symbols) {
-    const candles = await fetchKlines(symbol, config.interval, config.fetchCandleLimit)
+    const candles = await fetchKlines(
+      symbol,
+      config.interval,
+      config.fetchCandleLimit,
+    )
     const persisted = existingBySymbol.get(symbol)
-    const { state, trades, buys } = advanceSymbolState(symbol, persisted, candles, config)
+    const { state, trades, buys } = advanceSymbolState(
+      symbol,
+      persisted,
+      candles,
+      config,
+    )
     newStates.push(state)
     allNewTrades.push(...trades)
     allNewBuys.push(...buys)
@@ -917,7 +976,9 @@ async function runGridPaperCycleInner(options: GridCycleOptions): Promise<GridCy
       r.kind !== SR_KIND_GRID_TRADE &&
       r.kind !== SR_KIND_GRID_REAL_FILL,
   )
-  const mergedTrades = [...existingTrades, ...allNewTrades].slice(-GRID_TRADE_LOG_CAP)
+  const mergedTrades = [...existingTrades, ...allNewTrades].slice(
+    -GRID_TRADE_LOG_CAP,
+  )
   const mergedRealFills = [...existingRealFills, ...newRealFills].slice(
     -GRID_REAL_FILL_LOG_CAP,
   )
@@ -942,7 +1003,13 @@ export async function runGridPaperCycle(
   options: GridCycleOptions = {},
 ): Promise<GridCycleResult> {
   if (gridCycleInProgress) {
-    return { ran: false, reason: 'busy', trades: [], symbolsProcessed: 0, realFills: [] }
+    return {
+      ran: false,
+      reason: 'busy',
+      trades: [],
+      symbolsProcessed: 0,
+      realFills: [],
+    }
   }
   gridCycleInProgress = true
   try {
@@ -1001,10 +1068,25 @@ export function getGridEngineState(): {
   ) as unknown as Array<GridPaperTrade>
   return {
     config: resolveGridEngineConfig(settings.demoTradingGrid),
-    states: rows.filter((r) => r.kind === SR_KIND_GRID_STATE) as unknown as Array<GridSymbolState>,
+    states: rows.filter(
+      (r) => r.kind === SR_KIND_GRID_STATE,
+    ) as unknown as Array<GridSymbolState>,
     trades: [...allTrades].slice(-50).reverse(),
     performance: summarizeGridTrades(allTrades),
   }
+}
+
+/** Uncapped counterpart of `getGridEngineState()` — every closed grid trade
+ * (not just the most recent 50 used for display), for the read-only trading
+ * ledger. Currently-held levels are already uncapped in `states`, so
+ * `getGridEngineState()` covers open positions fine; only the trade log
+ * needed a display cap lifted. */
+export function getAllGridTrades(): Array<GridPaperTrade> {
+  const db = readFinanceStore()
+  const rows = db.strategy_results
+  return rows.filter(
+    (r) => r.kind === SR_KIND_GRID_TRADE,
+  ) as unknown as Array<GridPaperTrade>
 }
 
 /**
@@ -1024,7 +1106,8 @@ export function heldGridPositions(): Array<{
   const held: Array<{ symbol: string; entryQuote: number }> = []
   for (const state of states) {
     for (const level of state.levels) {
-      if (level.held) held.push({ symbol: state.symbol, entryQuote: level.entryQuote })
+      if (level.held)
+        held.push({ symbol: state.symbol, entryQuote: level.entryQuote })
     }
   }
   return held

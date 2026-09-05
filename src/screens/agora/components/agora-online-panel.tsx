@@ -16,14 +16,19 @@ const STATUS_DOT: Record<string, string> = {
   busy: '#ef4444',
 }
 
-export function AgoraOnlinePanel({ self, others, nearbyIds, onSelectUser }: AgoraOnlinePanelProps) {
+export function AgoraOnlinePanel({
+  self,
+  others,
+  nearbyIds,
+  onSelectUser,
+}: AgoraOnlinePanelProps) {
   const all = [self, ...others]
   return (
-    <div
-      className="flex h-full flex-col rounded-2xl bg-[var(--theme-card)] border border-[var(--theme-border)]"
-    >
+    <div className="flex h-full flex-col rounded-2xl bg-[var(--theme-card)] border border-[var(--theme-border)]">
       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--theme-border)]">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">Online</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">
+          Online
+        </span>
         <span className="text-[10px] opacity-50">{all.length}</span>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
@@ -43,22 +48,30 @@ export function AgoraOnlinePanel({ self, others, nearbyIds, onSelectUser }: Agor
                 height={28}
                 className="rounded-full border border-[var(--theme-border)]"
                 onError={(e) => {
-                  ;(e.currentTarget as HTMLImageElement).src = '/avatars/hermes.png'
+                  ;(e.currentTarget as HTMLImageElement).src =
+                    '/avatars/hermes.png'
                 }}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span
                     className="block h-1.5 w-1.5 rounded-full"
-                    style={{ background: STATUS_DOT[u.profile.status] ?? '#9ca3af' }}
+                    style={{
+                      background: STATUS_DOT[u.profile.status] ?? '#9ca3af',
+                    }}
                   />
-                  <span className="text-[12px] font-medium truncate">{u.profile.displayName}</span>
-                  {u.isSelf && <span className="text-[10px] opacity-50">you</span>}
+                  <span className="text-[12px] font-medium truncate">
+                    {u.profile.displayName}
+                  </span>
+                  {u.isSelf && (
+                    <span className="text-[10px] opacity-50">you</span>
+                  )}
                   {nearby && (
                     <span
                       className="text-[9px] uppercase tracking-[0.15em] rounded px-1"
                       style={{
-                        background: 'color-mix(in srgb, var(--theme-accent) 18%, transparent)',
+                        background:
+                          'color-mix(in srgb, var(--theme-accent) 18%, transparent)',
                         color: 'var(--theme-accent)',
                       }}
                     >
@@ -67,7 +80,9 @@ export function AgoraOnlinePanel({ self, others, nearbyIds, onSelectUser }: Agor
                   )}
                 </div>
                 {u.profile.activity && (
-                  <div className="text-[10px] opacity-50 truncate">{u.profile.activity}</div>
+                  <div className="text-[10px] opacity-50 truncate">
+                    {u.profile.activity}
+                  </div>
                 )}
               </div>
             </button>

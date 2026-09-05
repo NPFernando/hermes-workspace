@@ -5,16 +5,28 @@ import { join } from 'node:path'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import {  newestCheckpointFromMessages, parseSwarmCheckpoint } from '../../server/swarm-checkpoints'
+import {
+  newestCheckpointFromMessages,
+  parseSwarmCheckpoint,
+} from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
-import { createOrUpdateMission, getSwarmMission, markMissionAssignmentDispatched, recordMissionAssignmentBlocked, recordMissionCheckpoint } from '../../server/swarm-missions'
-import { appendSwarmMemoryEvent, buildSwarmStartupSnapshot } from '../../server/swarm-memory'
-import {  rosterByWorkerId } from '../../server/swarm-roster'
+import {
+  createOrUpdateMission,
+  getSwarmMission,
+  markMissionAssignmentDispatched,
+  recordMissionAssignmentBlocked,
+  recordMissionCheckpoint,
+} from '../../server/swarm-missions'
+import {
+  appendSwarmMemoryEvent,
+  buildSwarmStartupSnapshot,
+} from '../../server/swarm-memory'
+import { rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
 import { safeErrorMessage } from '../../server/rate-limit'
-import type {SwarmRosterWorker} from '../../server/swarm-roster';
-import type {ParsedSwarmCheckpoint} from '../../server/swarm-checkpoints';
+import type { SwarmRosterWorker } from '../../server/swarm-roster'
+import type { ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 
 const HERMES_BIN_CANDIDATES = [
   process.env.HERMES_CLI_BIN,
@@ -71,7 +83,13 @@ type WorkerResult = {
 }
 
 type RuntimeCheckpointSnapshot = {
-  checkpointStatus: 'none' | 'in_progress' | 'done' | 'blocked' | 'handoff' | 'needs_input'
+  checkpointStatus:
+    | 'none'
+    | 'in_progress'
+    | 'done'
+    | 'blocked'
+    | 'handoff'
+    | 'needs_input'
   state: string | null
   lastSummary: string | null
   lastResult: string | null
@@ -86,7 +104,8 @@ const MAX_PROMPT_CHARS = 32_000
 const MAX_OUTPUT_CHARS = 200_000
 const DEFAULT_TIMEOUT_S = 240
 const MAX_TIMEOUT_S = 600
-const HARP_ROTATE_SCRIPT = '/srv/projects/_hermes-control/scripts/harp-rotate-delegate.py'
+const HARP_ROTATE_SCRIPT =
+  '/srv/projects/_hermes-control/scripts/harp-rotate-delegate.py'
 const HARP_ROTATE_TIMEOUT_MS = 360_000
 
 type HarpRotationAttempt = {
@@ -197,19 +216,29 @@ function execFileAsync(
   args: Array<string>,
   timeout = 8_000,
   input?: string,
-): Promise<{ ok: true; stdout: string; stderr: string } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; stdout: string; stderr: string } | { ok: false; error: string }
+> {
   return new Promise((resolve) => {
-    const child = execFile(cmd, args, { timeout, maxBuffer: MAX_OUTPUT_CHARS }, (error, stdout, stderr) => {
-      if (error) {
-        resolve({ ok: false, error: stderr.toString().trim() || error.message })
-        return
-      }
-      resolve({
-        ok: true,
-        stdout: (stdout || '').toString(),
-        stderr: (stderr || '').toString(),
-      })
-    })
+    const child = execFile(
+      cmd,
+      args,
+      { timeout, maxBuffer: MAX_OUTPUT_CHARS },
+      (error, stdout, stderr) => {
+        if (error) {
+          resolve({
+            ok: false,
+            error: stderr.toString().trim() || error.message,
+          })
+          return
+        }
+        resolve({
+          ok: true,
+          stdout: (stdout || '').toString(),
+          stderr: (stderr || '').toString(),
+        })
+      },
+    )
     if (input !== undefined) {
       child.stdin?.end(input)
     }
@@ -244,7 +273,9 @@ export function buildHermesTmuxLaunchCommand(input: {
     `HERMES_CLI_BIN='${shellEscapeSingle(input.hermesBin)}'`,
     input.ghToken ? `GH_TOKEN='${shellEscapeSingle(input.ghToken)}'` : '',
     input.ghToken ? `GITHUB_TOKEN='${shellEscapeSingle(input.ghToken)}'` : '',
-  ].filter(Boolean).join(' ')
+  ]
+    .filter(Boolean)
+    .join(' ')
   const hermesBin = shellEscapeSingle(input.hermesBin)
 
   // Do not exec the Hermes process. Keeping the parent shell alive means a
@@ -261,12 +292,26 @@ function parseAssignments(value: unknown): Array<AssignmentRequest> {
     const obj = entry as Record<string, unknown>
     const workerId = typeof obj.workerId === 'string' ? obj.workerId.trim() : ''
     const task = typeof obj.task === 'string' ? obj.task.trim() : ''
-    const rationale = typeof obj.rationale === 'string' ? obj.rationale.trim() : undefined
-    const dependsOn = Array.isArray(obj.dependsOn) ? obj.dependsOn.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : undefined
-    const reviewRequired = typeof obj.reviewRequired === 'boolean' ? obj.reviewRequired : undefined
+    const rationale =
+      typeof obj.rationale === 'string' ? obj.rationale.trim() : undefined
+    const dependsOn = Array.isArray(obj.dependsOn)
+      ? obj.dependsOn.filter(
+          (item): item is string =>
+            typeof item === 'string' && item.trim().length > 0,
+        )
+      : undefined
+    const reviewRequired =
+      typeof obj.reviewRequired === 'boolean' ? obj.reviewRequired : undefined
     const direct = typeof obj.direct === 'boolean' ? obj.direct : undefined
     if (!workerId || !task || !validateWorkerId(workerId)) continue
-    assignments.push({ workerId, task, rationale, dependsOn, reviewRequired, direct })
+    assignments.push({
+      workerId,
+      task,
+      rationale,
+      dependsOn,
+      reviewRequired,
+      direct,
+    })
   }
   return assignments
 }
@@ -275,13 +320,19 @@ function readRuntimeJson(profilePath: string): Record<string, unknown> {
   const runtimePath = join(profilePath, 'runtime.json')
   if (!existsSync(runtimePath)) return {}
   try {
-    return JSON.parse(readFileSync(runtimePath, 'utf8')) as Record<string, unknown>
+    return JSON.parse(readFileSync(runtimePath, 'utf8')) as Record<
+      string,
+      unknown
+    >
   } catch {
     return {}
   }
 }
 
-function writeRuntimePatch(workerId: string, patch: Record<string, unknown>): void {
+function writeRuntimePatch(
+  workerId: string,
+  patch: Record<string, unknown>,
+): void {
   const profilePath = getProfilePath(workerId)
   mkdirSync(profilePath, { recursive: true })
   const runtimePath = join(profilePath, 'runtime.json')
@@ -304,13 +355,21 @@ function cleanRuntimeNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function cleanRuntimeCheckpointStatus(value: unknown): RuntimeCheckpointSnapshot['checkpointStatus'] {
-  return value === 'in_progress' || value === 'done' || value === 'blocked' || value === 'handoff' || value === 'needs_input'
+function cleanRuntimeCheckpointStatus(
+  value: unknown,
+): RuntimeCheckpointSnapshot['checkpointStatus'] {
+  return value === 'in_progress' ||
+    value === 'done' ||
+    value === 'blocked' ||
+    value === 'handoff' ||
+    value === 'needs_input'
     ? value
     : 'none'
 }
 
-export function readRuntimeCheckpointSnapshot(profilePath: string): RuntimeCheckpointSnapshot {
+export function readRuntimeCheckpointSnapshot(
+  profilePath: string,
+): RuntimeCheckpointSnapshot {
   const raw = readRuntimeJson(profilePath)
   return {
     checkpointStatus: cleanRuntimeCheckpointStatus(raw.checkpointStatus),
@@ -325,7 +384,9 @@ export function readRuntimeCheckpointSnapshot(profilePath: string): RuntimeCheck
   }
 }
 
-export function runtimeCheckpointSignature(snapshot: RuntimeCheckpointSnapshot): string {
+export function runtimeCheckpointSignature(
+  snapshot: RuntimeCheckpointSnapshot,
+): string {
   return JSON.stringify(snapshot)
 }
 
@@ -335,7 +396,9 @@ function isoToMs(value: string | null): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function stateLabelForRuntimeSnapshot(snapshot: RuntimeCheckpointSnapshot): ParsedSwarmCheckpoint['stateLabel'] | null {
+function stateLabelForRuntimeSnapshot(
+  snapshot: RuntimeCheckpointSnapshot,
+): ParsedSwarmCheckpoint['stateLabel'] | null {
   switch (snapshot.checkpointStatus) {
     case 'done':
       return 'DONE'
@@ -353,12 +416,21 @@ function stateLabelForRuntimeSnapshot(snapshot: RuntimeCheckpointSnapshot): Pars
   const state = snapshot.state?.toLowerCase()
   if (state === 'blocked') return 'BLOCKED'
   if (state === 'waiting') return 'NEEDS_INPUT'
-  if (state === 'executing' || state === 'thinking' || state === 'writing' || state === 'reviewing' || state === 'syncing') return 'IN_PROGRESS'
+  if (
+    state === 'executing' ||
+    state === 'thinking' ||
+    state === 'writing' ||
+    state === 'reviewing' ||
+    state === 'syncing'
+  )
+    return 'IN_PROGRESS'
   if (state === 'idle') return 'DONE'
   return null
 }
 
-function runtimeSnapshotHasMeaningfulCheckpoint(snapshot: RuntimeCheckpointSnapshot): boolean {
+function runtimeSnapshotHasMeaningfulCheckpoint(
+  snapshot: RuntimeCheckpointSnapshot,
+): boolean {
   return Boolean(
     snapshot.checkpointRaw ||
     snapshot.lastSummary ||
@@ -368,7 +440,11 @@ function runtimeSnapshotHasMeaningfulCheckpoint(snapshot: RuntimeCheckpointSnaps
   )
 }
 
-export function runtimeSnapshotIsFresh(snapshot: RuntimeCheckpointSnapshot, baselineSignature: string, dispatchedAt: number): boolean {
+export function runtimeSnapshotIsFresh(
+  snapshot: RuntimeCheckpointSnapshot,
+  baselineSignature: string,
+  dispatchedAt: number,
+): boolean {
   const changed = runtimeCheckpointSignature(snapshot) !== baselineSignature
   if (!changed) return false
   const outputAt = snapshot.lastOutputAt
@@ -390,13 +466,18 @@ function formatRuntimeCheckpointRaw(checkpoint: ParsedSwarmCheckpoint): string {
   ].join('\n')
 }
 
-export function checkpointFromRuntimeSnapshot(snapshot: RuntimeCheckpointSnapshot): ParsedSwarmCheckpoint | null {
+export function checkpointFromRuntimeSnapshot(
+  snapshot: RuntimeCheckpointSnapshot,
+): ParsedSwarmCheckpoint | null {
   if (snapshot.checkpointRaw) {
-    const parsed = newestCheckpointFromMessages([{ role: 'assistant', content: snapshot.checkpointRaw }])
+    const parsed = newestCheckpointFromMessages([
+      { role: 'assistant', content: snapshot.checkpointRaw },
+    ])
     if (parsed) return parsed
   }
   const stateLabel = stateLabelForRuntimeSnapshot(snapshot)
-  if (!stateLabel || !runtimeSnapshotHasMeaningfulCheckpoint(snapshot)) return null
+  if (!stateLabel || !runtimeSnapshotHasMeaningfulCheckpoint(snapshot))
+    return null
   const result = snapshot.lastResult ?? snapshot.lastSummary
   const blocker = snapshot.blockedReason
   const checkpoint: ParsedSwarmCheckpoint = {
@@ -445,9 +526,14 @@ export function buildWorkerPrompt(input: {
   const displayName = roster?.name.trim() || input.workerId
   const role = roster?.role || 'Worker'
   const humanLabel = `${displayName} — ${role}`
-  const skills = roster?.skills.length ? roster.skills.join(', ') : 'swarm-worker-core'
-  const capabilities = roster?.capabilities.length ? roster.capabilities.join(', ') : 'not declared'
-  const mission = roster?.mission || 'Execute assigned swarm tasks and checkpoint progress.'
+  const skills = roster?.skills.length
+    ? roster.skills.join(', ')
+    : 'swarm-worker-core'
+  const capabilities = roster?.capabilities.length
+    ? roster.capabilities.join(', ')
+    : 'not declared'
+  const mission =
+    roster?.mission || 'Execute assigned swarm tasks and checkpoint progress.'
   const specialty = roster?.specialty || 'General execution'
 
   let snapshotSection = ''
@@ -505,7 +591,13 @@ export function buildWorkerPrompt(input: {
   return lines.filter(Boolean).join('\n')
 }
 
-function markDispatchStarted(workerId: string, task: string, missionId?: string | null, assignmentId?: string | null, notifySessionKey?: string | null): void {
+function markDispatchStarted(
+  workerId: string,
+  task: string,
+  missionId?: string | null,
+  assignmentId?: string | null,
+  notifySessionKey?: string | null,
+): void {
   const controlMessage = `Dispatched task: ${task.slice(0, 180)}`
   writeRuntimePatch(workerId, {
     state: 'executing',
@@ -522,7 +614,8 @@ function markDispatchStarted(workerId: string, task: string, missionId?: string 
     lastCheckIn: new Date().toISOString(),
     lastSummary: controlMessage,
     lastControlMessage: controlMessage,
-    nextAction: 'Worker should execute and return the required checkpoint format.',
+    nextAction:
+      'Worker should execute and return the required checkpoint format.',
     notifySessionKey: notifySessionKey ?? 'main',
   })
 }
@@ -531,7 +624,9 @@ function markDispatchResult(workerId: string, result: WorkerResult): void {
   writeRuntimePatch(workerId, {
     lastDispatchAt: Date.now(),
     lastDispatchMode: result.delivery ?? 'none',
-    lastDispatchResult: result.ok ? result.output.slice(0, 500) : (result.error ?? 'dispatch failed').slice(0, 500),
+    lastDispatchResult: result.ok
+      ? result.output.slice(0, 500)
+      : (result.error ?? 'dispatch failed').slice(0, 500),
     state: result.ok ? 'executing' : 'blocked',
     checkpointStatus: result.ok ? 'in_progress' : 'blocked',
     blockedReason: result.ok ? null : result.error,
@@ -539,13 +634,26 @@ function markDispatchResult(workerId: string, result: WorkerResult): void {
   })
 }
 
-export function dispatchBlockReason(result: Pick<WorkerResult, 'ok' | 'error' | 'output' | 'checkpointStatus'>): string | null {
-  if (!result.ok) return (result.error ?? '').trim() || result.output.trim() || 'Dispatch failed before a worker checkpoint was recorded.'
-  if (result.checkpointStatus === 'timeout') return 'No fresh checkpoint before poll timeout.'
+export function dispatchBlockReason(
+  result: Pick<WorkerResult, 'ok' | 'error' | 'output' | 'checkpointStatus'>,
+): string | null {
+  if (!result.ok)
+    return (
+      (result.error ?? '').trim() ||
+      result.output.trim() ||
+      'Dispatch failed before a worker checkpoint was recorded.'
+    )
+  if (result.checkpointStatus === 'timeout')
+    return 'No fresh checkpoint before poll timeout.'
   return null
 }
 
-function recordDispatchBlock(workerId: string, assignment: AssignmentRequest, result: WorkerResult, options?: { missionId?: string | null }): void {
+function recordDispatchBlock(
+  workerId: string,
+  assignment: AssignmentRequest,
+  result: WorkerResult,
+  options?: { missionId?: string | null },
+): void {
   const reason = dispatchBlockReason(result)
   if (!reason) return
   recordMissionAssignmentBlocked({
@@ -566,7 +674,11 @@ function recordDispatchBlock(workerId: string, assignment: AssignmentRequest, re
   })
 }
 
-function markCheckpointResult(workerId: string, checkpoint: ParsedSwarmCheckpoint, notifySessionKey?: string | null): void {
+function markCheckpointResult(
+  workerId: string,
+  checkpoint: ParsedSwarmCheckpoint,
+  notifySessionKey?: string | null,
+): void {
   // When the checkpoint reaches any terminal status (anything other than
   // 'in_progress' — i.e. done/blocked/needs_input/handoff) the worker is no
   // longer running this task, so clear currentTask the same way conductor-stop
@@ -586,7 +698,11 @@ function markCheckpointResult(workerId: string, checkpoint: ParsedSwarmCheckpoin
     lastRealResult: checkpoint.result,
     lastControlMessage: null,
     nextAction: checkpoint.nextAction,
-    blockedReason: checkpoint.stateLabel === 'BLOCKED' || checkpoint.stateLabel === 'NEEDS_INPUT' ? checkpoint.blocker : null,
+    blockedReason:
+      checkpoint.stateLabel === 'BLOCKED' ||
+      checkpoint.stateLabel === 'NEEDS_INPUT'
+        ? checkpoint.blocker
+        : null,
     needsHuman: checkpoint.stateLabel === 'NEEDS_INPUT',
     checkpointRaw: checkpoint.raw,
     checkpointFilesChanged: checkpoint.filesChanged,
@@ -606,9 +722,16 @@ async function waitForFreshCheckpoint(
   const profilePath = getProfilePath(workerId)
   while (Date.now() - started < timeoutMs) {
     const runtimeSnapshot = readRuntimeCheckpointSnapshot(profilePath)
-    if (runtimeSnapshotIsFresh(runtimeSnapshot, baselineRuntimeSignature, dispatchedAt)) {
+    if (
+      runtimeSnapshotIsFresh(
+        runtimeSnapshot,
+        baselineRuntimeSignature,
+        dispatchedAt,
+      )
+    ) {
       const runtimeCheckpoint = checkpointFromRuntimeSnapshot(runtimeSnapshot)
-      if (runtimeCheckpoint && runtimeCheckpoint.raw !== previousRaw) return runtimeCheckpoint
+      if (runtimeCheckpoint && runtimeCheckpoint.raw !== previousRaw)
+        return runtimeCheckpoint
     }
 
     const chat = readWorkerMessages(profilePath, 50)
@@ -638,8 +761,15 @@ function resolveWorkerCwd(workerId: string): string {
   return homedir()
 }
 
-async function captureTmuxPane(tmuxBin: string, sessionName: string): Promise<string> {
-  const captured = await execFileAsync(tmuxBin, ['capture-pane', '-p', '-t', sessionName, '-S', '-200'], 8_000)
+async function captureTmuxPane(
+  tmuxBin: string,
+  sessionName: string,
+): Promise<string> {
+  const captured = await execFileAsync(
+    tmuxBin,
+    ['capture-pane', '-p', '-t', sessionName, '-S', '-200'],
+    8_000,
+  )
   return captured.ok ? captured.stdout.trim() : ''
 }
 
@@ -651,55 +781,94 @@ function redactStartupOutput(output: string): string {
     .replace(/"user_id"\s*:\s*"[^"]+"/g, '"user_id":"REDACTED"')
 }
 
-function isLikelyModelRoutingFailure(error: string | null | undefined): boolean {
+function isLikelyModelRoutingFailure(
+  error: string | null | undefined,
+): boolean {
   const text = (error ?? '').toLowerCase()
-  return Boolean(text.match(/model .*not found|model .*does not exist|openrouter|rate limit|rate-limited|quota|http 429|http 404|provider returned error|free-models-per-day|api call/))
+  return Boolean(
+    text.match(
+      /model .*not found|model .*does not exist|openrouter|rate limit|rate-limited|quota|http 429|http 404|provider returned error|free-models-per-day|api call/,
+    ),
+  )
 }
 
 function inferHarpTaskType(assignment: AssignmentRequest): string {
   const text = `${assignment.workerId} ${assignment.task}`.toLowerCase()
   if (text.match(/security|vulnerab|threat/)) return 'audit'
   if (text.match(/review|gate|quality/)) return 'code_review'
-  if (text.match(/debug|bug|error|blocked|fix|failure|runtime/)) return 'debugging'
+  if (text.match(/debug|bug|error|blocked|fix|failure|runtime/))
+    return 'debugging'
   if (text.match(/implement|build|code|patch|ship/)) return 'code_generation'
   if (text.match(/doc|handoff|readme|summary/)) return 'documentation'
   if (text.match(/json|schema|extract|structured/)) return 'structured_output'
-  return assignment.workerId === 'reviewer' ? 'code_review' : assignment.workerId === 'qa' ? 'debugging' : 'code_generation'
+  return assignment.workerId === 'reviewer'
+    ? 'code_review'
+    : assignment.workerId === 'qa'
+      ? 'debugging'
+      : 'code_generation'
 }
 
 function inferHarpRiskLevel(assignment: AssignmentRequest): string {
   const text = assignment.task.toLowerCase()
-  if (text.match(/production|deploy|release|public|secret|credential|payment|security/)) return 'production'
-  if (text.match(/architecture|multi-step|autonomous|conductor|mission|webapp|runtime|gateway|service/)) return 'complex'
+  if (
+    text.match(
+      /production|deploy|release|public|secret|credential|payment|security/,
+    )
+  )
+    return 'production'
+  if (
+    text.match(
+      /architecture|multi-step|autonomous|conductor|mission|webapp|runtime|gateway|service/,
+    )
+  )
+    return 'complex'
   return 'standard'
 }
 
-function formatHarpAttempts(attempts: Array<HarpRotationAttempt> | undefined): string {
+function formatHarpAttempts(
+  attempts: Array<HarpRotationAttempt> | undefined,
+): string {
   if (!attempts?.length) return 'No HARP rotation attempts were reported.'
-  return attempts.map((attempt, index) => {
-    const provider = attempt.provider ?? 'unknown'
-    const model = attempt.model ?? 'unknown'
-    const status = attempt.status ?? 'unknown'
-    const reason = attempt.error || attempt.skipped_reason || ''
-    const cooldown = attempt.cooldown_until ? ` cooldown=${attempt.cooldown_until}` : ''
-    const code = typeof attempt.http_code === 'number' ? ` HTTP ${attempt.http_code}` : ''
-    return `${index + 1}. ${provider}/${model} -> ${status}${code}${cooldown}${reason ? ` — ${reason.slice(0, 240)}` : ''}`
-  }).join('\n')
+  return attempts
+    .map((attempt, index) => {
+      const provider = attempt.provider ?? 'unknown'
+      const model = attempt.model ?? 'unknown'
+      const status = attempt.status ?? 'unknown'
+      const reason = attempt.error || attempt.skipped_reason || ''
+      const cooldown = attempt.cooldown_until
+        ? ` cooldown=${attempt.cooldown_until}`
+        : ''
+      const code =
+        typeof attempt.http_code === 'number'
+          ? ` HTTP ${attempt.http_code}`
+          : ''
+      return `${index + 1}. ${provider}/${model} -> ${status}${code}${cooldown}${reason ? ` — ${reason.slice(0, 240)}` : ''}`
+    })
+    .join('\n')
 }
 
 function readHarpRotationResponse(resultFile: string | undefined): string {
   if (!resultFile || !existsSync(resultFile)) return ''
   try {
-    const parsed = JSON.parse(readFileSync(resultFile, 'utf8')) as { response_full?: unknown; response_preview?: unknown }
-    const full = typeof parsed.response_full === 'string' ? parsed.response_full : ''
+    const parsed = JSON.parse(readFileSync(resultFile, 'utf8')) as {
+      response_full?: unknown
+      response_preview?: unknown
+    }
+    const full =
+      typeof parsed.response_full === 'string' ? parsed.response_full : ''
     if (full.trim()) return full
-    return typeof parsed.response_preview === 'string' ? parsed.response_preview : ''
+    return typeof parsed.response_preview === 'string'
+      ? parsed.response_preview
+      : ''
   } catch {
     return ''
   }
 }
 
-function synthesizeHarpCheckpoint(rotation: HarpRotationOutput, response: string): ParsedSwarmCheckpoint {
+function synthesizeHarpCheckpoint(
+  rotation: HarpRotationOutput,
+  response: string,
+): ParsedSwarmCheckpoint {
   const winner = rotation.winner
   const result = response.trim()
     ? response.trim().slice(0, 1600)
@@ -712,76 +881,113 @@ function synthesizeHarpCheckpoint(rotation: HarpRotationOutput, response: string
     'BLOCKER: none',
     'NEXT_ACTION: Review the fallback output and continue mission orchestration.',
   ].join('\n')
-  return parseSwarmCheckpoint(raw) ?? {
-    stateLabel: 'DONE',
-    runtimeState: 'idle',
-    checkpointStatus: 'done',
-    filesChanged: 'none',
-    commandsRun: 'HARP model rotation fallback',
-    result,
-    blocker: 'none',
-    nextAction: 'Review the fallback output and continue mission orchestration.',
-    raw,
-  }
+  return (
+    parseSwarmCheckpoint(raw) ?? {
+      stateLabel: 'DONE',
+      runtimeState: 'idle',
+      checkpointStatus: 'done',
+      filesChanged: 'none',
+      commandsRun: 'HARP model rotation fallback',
+      result,
+      blocker: 'none',
+      nextAction:
+        'Review the fallback output and continue mission orchestration.',
+      raw,
+    }
+  )
 }
 
-function runHarpRotationFallback(assignment: AssignmentRequest, prompt: string): Promise<HarpRotationResult> {
+function runHarpRotationFallback(
+  assignment: AssignmentRequest,
+  prompt: string,
+): Promise<HarpRotationResult> {
   return new Promise((resolve) => {
     if (!existsSync(HARP_ROTATE_SCRIPT)) {
-      resolve({ ok: false, output: '', error: `HARP rotation script missing at ${HARP_ROTATE_SCRIPT}` })
+      resolve({
+        ok: false,
+        output: '',
+        error: `HARP rotation script missing at ${HARP_ROTATE_SCRIPT}`,
+      })
       return
     }
     const args = [
       HARP_ROTATE_SCRIPT,
-      '--task', inferHarpTaskType(assignment),
-      '--risk', inferHarpRiskLevel(assignment),
-      '--prompt', prompt,
-      '--max-attempts', process.env.HARP_SWARM_MAX_ATTEMPTS || '10',
+      '--task',
+      inferHarpTaskType(assignment),
+      '--risk',
+      inferHarpRiskLevel(assignment),
+      '--prompt',
+      prompt,
+      '--max-attempts',
+      process.env.HARP_SWARM_MAX_ATTEMPTS || '10',
       '--allow-codex',
       '--json',
     ]
     if (process.env.HARP_SWARM_ALLOW_PAID_OPENROUTER === '1') {
       args.push('--allow-paid-openrouter')
     }
-    execFile('python3', args, { timeout: HARP_ROTATE_TIMEOUT_MS, maxBuffer: MAX_OUTPUT_CHARS }, (error, stdout, stderr) => {
-      const stdoutStr = (stdout || '').toString()
-      const stderrStr = (stderr || '').toString()
-      let rotation: HarpRotationOutput | null = null
-      try {
-        rotation = JSON.parse(stdoutStr) as HarpRotationOutput
-      } catch {
-        resolve({ ok: false, output: stdoutStr, error: stderrStr.trim() || error?.message || 'HARP rotation returned non-JSON output' })
-        return
-      }
-      const attempts = formatHarpAttempts(rotation.attempts)
-      if (rotation.status !== 'success' || !rotation.winner) {
+    execFile(
+      'python3',
+      args,
+      { timeout: HARP_ROTATE_TIMEOUT_MS, maxBuffer: MAX_OUTPUT_CHARS },
+      (error, stdout, stderr) => {
+        const stdoutStr = (stdout || '').toString()
+        const stderrStr = (stderr || '').toString()
+        let rotation: HarpRotationOutput | null = null
+        try {
+          rotation = JSON.parse(stdoutStr) as HarpRotationOutput
+        } catch {
+          resolve({
+            ok: false,
+            output: stdoutStr,
+            error:
+              stderrStr.trim() ||
+              error?.message ||
+              'HARP rotation returned non-JSON output',
+          })
+          return
+        }
+        const attempts = formatHarpAttempts(rotation.attempts)
+        if (rotation.status !== 'success' || !rotation.winner) {
+          resolve({
+            ok: false,
+            output: stdoutStr,
+            error: [
+              'HARP model rotation exhausted all suitable fallbacks.',
+              attempts,
+              rotation.openrouter_paid_credit_check
+                ? `OpenRouter paid credit check: ${rotation.openrouter_paid_credit_check}`
+                : '',
+              rotation.result_file
+                ? `Result file: ${rotation.result_file}`
+                : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          })
+          return
+        }
+        const response = readHarpRotationResponse(rotation.result_file)
+        const parsedCheckpoint = response
+          ? parseSwarmCheckpoint(response)
+          : null
+        const checkpoint =
+          parsedCheckpoint ?? synthesizeHarpCheckpoint(rotation, response)
         resolve({
-          ok: false,
-          output: stdoutStr,
-          error: [
-            'HARP model rotation exhausted all suitable fallbacks.',
-            attempts,
-            rotation.openrouter_paid_credit_check ? `OpenRouter paid credit check: ${rotation.openrouter_paid_credit_check}` : '',
+          ok: true,
+          output: [
+            `HARP rotation fallback succeeded via ${rotation.winner.provider ?? 'unknown'} / ${rotation.winner.model ?? 'unknown'}.`,
             rotation.result_file ? `Result file: ${rotation.result_file}` : '',
-          ].filter(Boolean).join('\n'),
+            '',
+            response || checkpoint.raw,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+          error: null,
+          checkpoint,
         })
-        return
-      }
-      const response = readHarpRotationResponse(rotation.result_file)
-      const parsedCheckpoint = response ? parseSwarmCheckpoint(response) : null
-      const checkpoint = parsedCheckpoint ?? synthesizeHarpCheckpoint(rotation, response)
-      resolve({
-        ok: true,
-        output: [
-          `HARP rotation fallback succeeded via ${rotation.winner.provider ?? 'unknown'} / ${rotation.winner.model ?? 'unknown'}.`,
-          rotation.result_file ? `Result file: ${rotation.result_file}` : '',
-          '',
-          response || checkpoint.raw,
-        ].filter(Boolean).join('\n'),
-        error: null,
-        checkpoint,
-      })
-    })
+      },
+    )
   })
 }
 
@@ -804,7 +1010,11 @@ async function tryHarpRotationAfterModelFailure(input: {
     }
   }
   if (rotated.checkpoint) {
-    markCheckpointResult(input.workerId, rotated.checkpoint, input.options?.notifySessionKey ?? 'main')
+    markCheckpointResult(
+      input.workerId,
+      rotated.checkpoint,
+      input.options?.notifySessionKey ?? 'main',
+    )
     recordMissionCheckpoint({
       missionId: input.options?.missionId,
       assignmentId: input.assignment.assignmentId ?? null,
@@ -833,7 +1043,12 @@ async function tryHarpRotationAfterModelFailure(input: {
   }
 }
 
-async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmuxBin: string; sessionName: string } | { ok: false; error: string }> {
+async function ensureLiveTmuxSession(
+  workerId: string,
+): Promise<
+  | { ok: true; tmuxBin: string; sessionName: string }
+  | { ok: false; error: string }
+> {
   const tmuxBin = resolveTmuxBin()
   if (!tmuxBin) return { ok: false, error: 'tmux not installed' }
 
@@ -864,7 +1079,13 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
     return { ok: false, error: started.error }
   }
 
-  const launched = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, launchCommand, 'C-m'])
+  const launched = await execFileAsync(tmuxBin, [
+    'send-keys',
+    '-t',
+    sessionName,
+    launchCommand,
+    'C-m',
+  ])
   if (!launched.ok) {
     return { ok: false, error: launched.error }
   }
@@ -874,7 +1095,10 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
   // surface the real startup failure instead of a later tmux "can't find pane".
   await sleep(1200)
   if (!(await tmuxHasSession(tmuxBin, sessionName))) {
-    return { ok: false, error: `Hermes worker tmux session ${sessionName} exited during startup` }
+    return {
+      ok: false,
+      error: `Hermes worker tmux session ${sessionName} exited during startup`,
+    }
   }
 
   const startupOutput = await captureTmuxPane(tmuxBin, sessionName)
@@ -886,8 +1110,12 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
     const logsDir = join(profilePath, 'logs')
     mkdirSync(logsDir, { recursive: true })
     const startupLogPath = join(logsDir, 'swarm-dispatch-startup.log')
-    writeFileSync(startupLogPath, `${new Date().toISOString()} ${sanitizedOutput}
-`, { flag: 'a' })
+    writeFileSync(
+      startupLogPath,
+      `${new Date().toISOString()} ${sanitizedOutput}
+`,
+      { flag: 'a' },
+    )
     return {
       ok: false,
       error: `Hermes worker failed to start in tmux session ${sessionName}. Startup output saved to ${startupLogPath}: ${sanitizedOutput}`,
@@ -897,7 +1125,10 @@ async function ensureLiveTmuxSession(workerId: string): Promise<{ ok: true; tmux
   return { ok: true, tmuxBin, sessionName }
 }
 
-async function sendPromptToLiveSession(workerId: string, prompt: string): Promise<WorkerResult | null> {
+async function sendPromptToLiveSession(
+  workerId: string,
+  prompt: string,
+): Promise<WorkerResult | null> {
   const startedAt = Date.now()
   const ensured = await ensureLiveTmuxSession(workerId)
   if (!ensured.ok) return null
@@ -909,12 +1140,12 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
   // reliable for live TUI delivery because it preserves multiline content and
   // avoids key translation/terminal timing issues. Enter submits the composed
   // prompt after paste.
-  const loaded = await execFileAsync(tmuxBin, [
-    'load-buffer',
-    '-b',
-    `swarm-dispatch-${workerId}`,
-    '-',
-  ], 8_000, normalizedPrompt)
+  const loaded = await execFileAsync(
+    tmuxBin,
+    ['load-buffer', '-b', `swarm-dispatch-${workerId}`, '-'],
+    8_000,
+    normalizedPrompt,
+  )
   if (!loaded.ok) {
     return {
       workerId,
@@ -930,7 +1161,12 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
   // Ensure we are sending a fresh prompt, not appending onto a partially typed
   // line left in the agent TUI. Ctrl-U clears readline-style input in the
   // current prompt without disrupting the session.
-  const cleared = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'C-u'])
+  const cleared = await execFileAsync(tmuxBin, [
+    'send-keys',
+    '-t',
+    sessionName,
+    'C-u',
+  ])
   if (!cleared.ok) {
     return {
       workerId,
@@ -968,7 +1204,12 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
   // to accept Enter; sending a confirmation Enter shortly after the first one
   // prevents the user-visible failure mode where the task sits at the prompt.
   await sleep(2000)
-  const enter = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'C-m'])
+  const enter = await execFileAsync(tmuxBin, [
+    'send-keys',
+    '-t',
+    sessionName,
+    'C-m',
+  ])
   if (!enter.ok) {
     return {
       workerId,
@@ -981,7 +1222,12 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
     }
   }
   await sleep(1000)
-  const confirmEnter = await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'C-m'])
+  const confirmEnter = await execFileAsync(tmuxBin, [
+    'send-keys',
+    '-t',
+    sessionName,
+    'C-m',
+  ])
   if (!confirmEnter.ok) {
     return {
       workerId,
@@ -1010,230 +1256,140 @@ export function buildHermesChatQueryArgs(prompt: string): Array<string> {
   // Keeping the prompt adjacent to -q prevents argparse from interpreting
   // following flags (for example -Q) as a missing query and failing with:
   // "argument -q/--query: expected one argument".
-  return ['chat', '-q', prompt, '-Q', '--yolo', '--ignore-rules', '--source', 'swarm-dispatch']
+  return [
+    'chat',
+    '-q',
+    prompt,
+    '-Q',
+    '--yolo',
+    '--ignore-rules',
+    '--source',
+    'swarm-dispatch',
+  ]
 }
 
-function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: SwarmRosterWorker | undefined, options?: { waitForCheckpoint?: boolean; checkpointPollMs?: number; missionId?: string | null; notifySessionKey?: string | null }): Promise<WorkerResult> {
+function runWorker(
+  assignment: AssignmentRequest,
+  timeoutMs: number,
+  roster: SwarmRosterWorker | undefined,
+  options?: {
+    waitForCheckpoint?: boolean
+    checkpointPollMs?: number
+    missionId?: string | null
+    notifySessionKey?: string | null
+  },
+): Promise<WorkerResult> {
   return new Promise((resolve) => {
     const workerId = assignment.workerId
     void (async () => {
-    const prompt = buildWorkerPrompt({
-      workerId,
-      task: assignment.task,
-      rationale: assignment.rationale,
-      roster,
-      direct: assignment.direct,
-      missionId: options?.missionId ?? null,
-      taskTitle: assignment.task.slice(0, 120),
-    })
-    const profilePath = getProfilePath(workerId)
-    const runtimeBeforeDispatch = readRuntimeCheckpointSnapshot(profilePath)
-    const previousRaw = runtimeBeforeDispatch.checkpointRaw
-    const baselineRuntimeSignature = runtimeCheckpointSignature(runtimeBeforeDispatch)
-    markDispatchStarted(workerId, assignment.task, options?.missionId ?? null, assignment.assignmentId ?? null, options?.notifySessionKey ?? 'main')
-    if (options?.missionId) {
-      markMissionAssignmentDispatched({
-        missionId: options.missionId,
+      const prompt = buildWorkerPrompt({
         workerId,
         task: assignment.task,
-        source: 'swarm-dispatch',
-        author: 'aurora',
+        rationale: assignment.rationale,
+        roster,
+        direct: assignment.direct,
+        missionId: options?.missionId ?? null,
+        taskTitle: assignment.task.slice(0, 120),
       })
-    }
-    appendSwarmMemoryEvent({
-      workerId,
-      missionId: options?.missionId ?? null,
-      assignmentId: assignment.assignmentId ?? null,
-      type: 'dispatch',
-      summary: `Dispatched task: ${assignment.task.slice(0, 240)}`,
-      event: {
-        task: assignment.task,
-        rationale: assignment.rationale ?? null,
-        direct: assignment.direct ?? false,
-        deliveryTarget: 'tmux',
-      },
-    })
-    const startedAt = Date.now()
-    const wrapperPath = getWrapperPath(workerId)
-
-    // Prefer the persistent live agent session when available/startable.
-    const liveResult = await sendPromptToLiveSession(workerId, prompt)
-    if (liveResult) {
-      const effectiveLiveResult = liveResult.ok
-        ? liveResult
-        : await tryHarpRotationAfterModelFailure({
-          workerId,
-          assignment,
-          prompt,
-          result: liveResult,
-          options,
-          startedAt,
-        })
-      markDispatchResult(workerId, effectiveLiveResult)
-      if (options?.waitForCheckpoint && effectiveLiveResult.ok) {
-        const checkpoint = effectiveLiveResult.checkpoint ?? await waitForFreshCheckpoint(
-          workerId,
-          previousRaw,
-          baselineRuntimeSignature,
-          startedAt,
-          options.checkpointPollMs ?? 90_000,
-        )
-        if (checkpoint) {
-          markCheckpointResult(workerId, checkpoint, options.notifySessionKey ?? 'main')
-          const updatedMission = recordMissionCheckpoint({
-            missionId: options.missionId,
-            assignmentId: assignment.assignmentId ?? null,
-            workerId,
-            checkpoint,
-            source: 'swarm-dispatch',
-          })
-          if (updatedMission?._completed) {
-            try {
-              for (const wId of new Set(updatedMission.assignments.map((a) => a.workerId))) {
-                appendSwarmMemoryEvent({
-                  workerId: wId,
-                  missionId: updatedMission.id,
-                  type: 'complete',
-                  title: updatedMission.title,
-                  summary: `Mission complete: ${updatedMission.title}`,
-                })
-              }
-            } catch { /* memory write best-effort */ }
-          }
-          appendSwarmMemoryEvent({
-            workerId,
-            missionId: options.missionId ?? null,
-            assignmentId: assignment.assignmentId ?? null,
-            type: 'checkpoint',
-            summary: checkpoint.result ?? `Checkpoint ${checkpoint.stateLabel}`,
-            checkpoint,
-            event: {
-              stateLabel: checkpoint.stateLabel,
-              filesChanged: checkpoint.filesChanged,
-              commandsRun: checkpoint.commandsRun,
-              blocker: checkpoint.blocker,
-              nextAction: checkpoint.nextAction,
-            },
-          })
-          publishSwarmCheckpointNotification({
-            workerId,
-            missionId: options.missionId ?? null,
-            assignmentId: assignment.assignmentId ?? null,
-            checkpoint,
-            notifySessionKey: options.notifySessionKey ?? 'main',
-          })
-          effectiveLiveResult.checkpoint = checkpoint
-          effectiveLiveResult.checkpointStatus = 'checkpointed'
-          effectiveLiveResult.output = `${effectiveLiveResult.output}\nCheckpoint ${checkpoint.stateLabel}: ${checkpoint.result ?? 'no result'}`
-        } else {
-          effectiveLiveResult.checkpoint = null
-          effectiveLiveResult.checkpointStatus = 'timeout'
-          effectiveLiveResult.output = `${effectiveLiveResult.output}\nNo fresh checkpoint before poll timeout.`
-        }
-      } else {
-        effectiveLiveResult.checkpointStatus = 'not-requested'
-      }
-      recordDispatchBlock(workerId, assignment, effectiveLiveResult, options)
-      resolve(effectiveLiveResult)
-      return
-    }
-
-    if (!existsSync(profilePath)) {
-      const result: WorkerResult = {
+      const profilePath = getProfilePath(workerId)
+      const runtimeBeforeDispatch = readRuntimeCheckpointSnapshot(profilePath)
+      const previousRaw = runtimeBeforeDispatch.checkpointRaw
+      const baselineRuntimeSignature = runtimeCheckpointSignature(
+        runtimeBeforeDispatch,
+      )
+      markDispatchStarted(
         workerId,
-        ok: false,
-        output: '',
-        error: `Profile not found at ${profilePath}`,
-        durationMs: Date.now() - startedAt,
-        exitCode: null,
-        delivery: 'oneshot',
-      }
-      markDispatchResult(workerId, result)
-      recordDispatchBlock(workerId, assignment, result, options)
-      resolve(result)
-      return
-    }
-
-    const useWrapper = existsSync(wrapperPath)
-    const cmd = useWrapper ? wrapperPath : resolveHermesBin()
-    const args = buildHermesChatQueryArgs(prompt)
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      HERMES_HOME: profilePath,
-    }
-    const ghToken = resolveGithubToken()
-    if (ghToken) {
-      env.GH_TOKEN = ghToken
-      env.GITHUB_TOKEN = ghToken
-    }
-
-    const proc = execFile(
-      cmd,
-      args,
-      {
-        env,
-        cwd: homedir(),
-        timeout: timeoutMs,
-        maxBuffer: MAX_OUTPUT_CHARS,
-        killSignal: 'SIGTERM',
-      },
-      async (error, stdout, stderr) => {
-        const durationMs = Date.now() - startedAt
-        const stdoutStr = (stdout || '').toString()
-        const stderrStr = (stderr || '').toString()
-        const out = stdoutStr.length > MAX_OUTPUT_CHARS ? stdoutStr.slice(-MAX_OUTPUT_CHARS) : stdoutStr
-
-        if (error) {
-          const code = (error as { code?: number | null }).code ?? null
-          const result: WorkerResult = {
-            workerId,
-            ok: false,
-            output: out,
-            error: stderrStr.trim() || error.message,
-            durationMs,
-            exitCode: typeof code === 'number' ? code : null,
-            delivery: 'oneshot',
-          }
-          const rotatedResult = await tryHarpRotationAfterModelFailure({
-            workerId,
-            assignment,
-            prompt,
-            result,
-            options,
-            startedAt,
-          })
-          markDispatchResult(workerId, rotatedResult)
-          recordDispatchBlock(workerId, assignment, rotatedResult, options)
-          resolve(rotatedResult)
-          return
-        }
-
-        const result: WorkerResult = {
+        assignment.task,
+        options?.missionId ?? null,
+        assignment.assignmentId ?? null,
+        options?.notifySessionKey ?? 'main',
+      )
+      if (options?.missionId) {
+        markMissionAssignmentDispatched({
+          missionId: options.missionId,
           workerId,
-          ok: true,
-          output: out,
-          error: stderrStr.trim() || null,
-          durationMs,
-          exitCode: 0,
-          delivery: 'oneshot',
-        }
-        if (options?.waitForCheckpoint) {
-          const checkpoint = parseSwarmCheckpoint(out)
+          task: assignment.task,
+          source: 'swarm-dispatch',
+          author: 'aurora',
+        })
+      }
+      appendSwarmMemoryEvent({
+        workerId,
+        missionId: options?.missionId ?? null,
+        assignmentId: assignment.assignmentId ?? null,
+        type: 'dispatch',
+        summary: `Dispatched task: ${assignment.task.slice(0, 240)}`,
+        event: {
+          task: assignment.task,
+          rationale: assignment.rationale ?? null,
+          direct: assignment.direct ?? false,
+          deliveryTarget: 'tmux',
+        },
+      })
+      const startedAt = Date.now()
+      const wrapperPath = getWrapperPath(workerId)
+
+      // Prefer the persistent live agent session when available/startable.
+      const liveResult = await sendPromptToLiveSession(workerId, prompt)
+      if (liveResult) {
+        const effectiveLiveResult = liveResult.ok
+          ? liveResult
+          : await tryHarpRotationAfterModelFailure({
+              workerId,
+              assignment,
+              prompt,
+              result: liveResult,
+              options,
+              startedAt,
+            })
+        markDispatchResult(workerId, effectiveLiveResult)
+        if (options?.waitForCheckpoint && effectiveLiveResult.ok) {
+          const checkpoint =
+            effectiveLiveResult.checkpoint ??
+            (await waitForFreshCheckpoint(
+              workerId,
+              previousRaw,
+              baselineRuntimeSignature,
+              startedAt,
+              options.checkpointPollMs ?? 90_000,
+            ))
           if (checkpoint) {
-            markCheckpointResult(workerId, checkpoint, options.notifySessionKey ?? 'main')
-            recordMissionCheckpoint({
+            markCheckpointResult(
+              workerId,
+              checkpoint,
+              options.notifySessionKey ?? 'main',
+            )
+            const updatedMission = recordMissionCheckpoint({
               missionId: options.missionId,
               assignmentId: assignment.assignmentId ?? null,
               workerId,
               checkpoint,
               source: 'swarm-dispatch',
             })
+            if (updatedMission?._completed) {
+              try {
+                for (const wId of new Set(
+                  updatedMission.assignments.map((a) => a.workerId),
+                )) {
+                  appendSwarmMemoryEvent({
+                    workerId: wId,
+                    missionId: updatedMission.id,
+                    type: 'complete',
+                    title: updatedMission.title,
+                    summary: `Mission complete: ${updatedMission.title}`,
+                  })
+                }
+              } catch {
+                /* memory write best-effort */
+              }
+            }
             appendSwarmMemoryEvent({
               workerId,
               missionId: options.missionId ?? null,
               assignmentId: assignment.assignmentId ?? null,
               type: 'checkpoint',
-              summary: checkpoint.result ?? `Checkpoint ${checkpoint.stateLabel}`,
+              summary:
+                checkpoint.result ?? `Checkpoint ${checkpoint.stateLabel}`,
               checkpoint,
               event: {
                 stateLabel: checkpoint.stateLabel,
@@ -1250,35 +1406,171 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
               checkpoint,
               notifySessionKey: options.notifySessionKey ?? 'main',
             })
-            result.checkpoint = checkpoint
-            result.checkpointStatus = 'checkpointed'
+            effectiveLiveResult.checkpoint = checkpoint
+            effectiveLiveResult.checkpointStatus = 'checkpointed'
+            effectiveLiveResult.output = `${effectiveLiveResult.output}\nCheckpoint ${checkpoint.stateLabel}: ${checkpoint.result ?? 'no result'}`
           } else {
-            result.checkpoint = null
-            result.checkpointStatus = 'timeout'
+            effectiveLiveResult.checkpoint = null
+            effectiveLiveResult.checkpointStatus = 'timeout'
+            effectiveLiveResult.output = `${effectiveLiveResult.output}\nNo fresh checkpoint before poll timeout.`
           }
         } else {
-          result.checkpointStatus = 'not-requested'
+          effectiveLiveResult.checkpointStatus = 'not-requested'
+        }
+        recordDispatchBlock(workerId, assignment, effectiveLiveResult, options)
+        resolve(effectiveLiveResult)
+        return
+      }
+
+      if (!existsSync(profilePath)) {
+        const result: WorkerResult = {
+          workerId,
+          ok: false,
+          output: '',
+          error: `Profile not found at ${profilePath}`,
+          durationMs: Date.now() - startedAt,
+          exitCode: null,
+          delivery: 'oneshot',
         }
         markDispatchResult(workerId, result)
         recordDispatchBlock(workerId, assignment, result, options)
         resolve(result)
-      },
-    )
-
-    proc.on('error', (error) => {
-      const result: WorkerResult = {
-        workerId,
-        ok: false,
-        output: '',
-        error: error.message,
-        durationMs: Date.now() - startedAt,
-        exitCode: null,
-        delivery: 'oneshot',
+        return
       }
-      markDispatchResult(workerId, result)
-      recordDispatchBlock(workerId, assignment, result, options)
-      resolve(result)
-    })
+
+      const useWrapper = existsSync(wrapperPath)
+      const cmd = useWrapper ? wrapperPath : resolveHermesBin()
+      const args = buildHermesChatQueryArgs(prompt)
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        HERMES_HOME: profilePath,
+      }
+      const ghToken = resolveGithubToken()
+      if (ghToken) {
+        env.GH_TOKEN = ghToken
+        env.GITHUB_TOKEN = ghToken
+      }
+
+      const proc = execFile(
+        cmd,
+        args,
+        {
+          env,
+          cwd: homedir(),
+          timeout: timeoutMs,
+          maxBuffer: MAX_OUTPUT_CHARS,
+          killSignal: 'SIGTERM',
+        },
+        async (error, stdout, stderr) => {
+          const durationMs = Date.now() - startedAt
+          const stdoutStr = (stdout || '').toString()
+          const stderrStr = (stderr || '').toString()
+          const out =
+            stdoutStr.length > MAX_OUTPUT_CHARS
+              ? stdoutStr.slice(-MAX_OUTPUT_CHARS)
+              : stdoutStr
+
+          if (error) {
+            const code = (error as { code?: number | null }).code ?? null
+            const result: WorkerResult = {
+              workerId,
+              ok: false,
+              output: out,
+              error: stderrStr.trim() || error.message,
+              durationMs,
+              exitCode: typeof code === 'number' ? code : null,
+              delivery: 'oneshot',
+            }
+            const rotatedResult = await tryHarpRotationAfterModelFailure({
+              workerId,
+              assignment,
+              prompt,
+              result,
+              options,
+              startedAt,
+            })
+            markDispatchResult(workerId, rotatedResult)
+            recordDispatchBlock(workerId, assignment, rotatedResult, options)
+            resolve(rotatedResult)
+            return
+          }
+
+          const result: WorkerResult = {
+            workerId,
+            ok: true,
+            output: out,
+            error: stderrStr.trim() || null,
+            durationMs,
+            exitCode: 0,
+            delivery: 'oneshot',
+          }
+          if (options?.waitForCheckpoint) {
+            const checkpoint = parseSwarmCheckpoint(out)
+            if (checkpoint) {
+              markCheckpointResult(
+                workerId,
+                checkpoint,
+                options.notifySessionKey ?? 'main',
+              )
+              recordMissionCheckpoint({
+                missionId: options.missionId,
+                assignmentId: assignment.assignmentId ?? null,
+                workerId,
+                checkpoint,
+                source: 'swarm-dispatch',
+              })
+              appendSwarmMemoryEvent({
+                workerId,
+                missionId: options.missionId ?? null,
+                assignmentId: assignment.assignmentId ?? null,
+                type: 'checkpoint',
+                summary:
+                  checkpoint.result ?? `Checkpoint ${checkpoint.stateLabel}`,
+                checkpoint,
+                event: {
+                  stateLabel: checkpoint.stateLabel,
+                  filesChanged: checkpoint.filesChanged,
+                  commandsRun: checkpoint.commandsRun,
+                  blocker: checkpoint.blocker,
+                  nextAction: checkpoint.nextAction,
+                },
+              })
+              publishSwarmCheckpointNotification({
+                workerId,
+                missionId: options.missionId ?? null,
+                assignmentId: assignment.assignmentId ?? null,
+                checkpoint,
+                notifySessionKey: options.notifySessionKey ?? 'main',
+              })
+              result.checkpoint = checkpoint
+              result.checkpointStatus = 'checkpointed'
+            } else {
+              result.checkpoint = null
+              result.checkpointStatus = 'timeout'
+            }
+          } else {
+            result.checkpointStatus = 'not-requested'
+          }
+          markDispatchResult(workerId, result)
+          recordDispatchBlock(workerId, assignment, result, options)
+          resolve(result)
+        },
+      )
+
+      proc.on('error', (error) => {
+        const result: WorkerResult = {
+          workerId,
+          ok: false,
+          output: '',
+          error: error.message,
+          durationMs: Date.now() - startedAt,
+          exitCode: null,
+          delivery: 'oneshot',
+        }
+        markDispatchResult(workerId, result)
+        recordDispatchBlock(workerId, assignment, result, options)
+        resolve(result)
+      })
     })().catch((error: unknown) => {
       const result: WorkerResult = {
         workerId,
@@ -1333,23 +1625,47 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
   if (assignments.some((assignment) => assignment.task.length === 0)) {
     throw new SwarmDispatchError('assignment task required')
   }
-  if (assignments.some((assignment) => assignment.task.length > MAX_PROMPT_CHARS)) {
-    throw new SwarmDispatchError(`assignment task exceeds ${MAX_PROMPT_CHARS} characters`)
+  if (
+    assignments.some((assignment) => assignment.task.length > MAX_PROMPT_CHARS)
+  ) {
+    throw new SwarmDispatchError(
+      `assignment task exceeds ${MAX_PROMPT_CHARS} characters`,
+    )
   }
 
-  const timeoutRaw = typeof body.timeoutSeconds === 'number' ? body.timeoutSeconds : DEFAULT_TIMEOUT_S
-  const timeoutSeconds = Math.max(10, Math.min(MAX_TIMEOUT_S, Math.floor(timeoutRaw)))
+  const timeoutRaw =
+    typeof body.timeoutSeconds === 'number'
+      ? body.timeoutSeconds
+      : DEFAULT_TIMEOUT_S
+  const timeoutSeconds = Math.max(
+    10,
+    Math.min(MAX_TIMEOUT_S, Math.floor(timeoutRaw)),
+  )
   const timeoutMs = timeoutSeconds * 1000
-  const waitForCheckpoint = !(body.waitForCheckpoint === false && body.allowAsync === true)
-  const pollRaw = typeof body.checkpointPollSeconds === 'number' ? body.checkpointPollSeconds : 90
+  const waitForCheckpoint = !(
+    body.waitForCheckpoint === false && body.allowAsync === true
+  )
+  const pollRaw =
+    typeof body.checkpointPollSeconds === 'number'
+      ? body.checkpointPollSeconds
+      : 90
   const checkpointPollSeconds = Math.max(5, Math.min(300, Math.floor(pollRaw)))
-  const notifySessionKey = typeof body.notifySessionKey === 'string' && body.notifySessionKey.trim() ? body.notifySessionKey.trim() : 'main'
+  const notifySessionKey =
+    typeof body.notifySessionKey === 'string' && body.notifySessionKey.trim()
+      ? body.notifySessionKey.trim()
+      : 'main'
 
-  const requestedMissionId = typeof body.missionId === 'string' ? body.missionId.trim() : ''
-  const hasExplicitMissionTitle = typeof body.missionTitle === 'string' && body.missionTitle.trim()
+  const requestedMissionId =
+    typeof body.missionId === 'string' ? body.missionId.trim() : ''
+  const hasExplicitMissionTitle =
+    typeof body.missionTitle === 'string' && body.missionTitle.trim()
   const missionTitle = hasExplicitMissionTitle
     ? (body.missionTitle as string).trim()
-    : requestedMissionId ? '' : assignments.length === 1 ? assignments[0].task.slice(0, 120) : `${assignments.length} assigned tasks`
+    : requestedMissionId
+      ? ''
+      : assignments.length === 1
+        ? assignments[0].task.slice(0, 120)
+        : `${assignments.length} assigned tasks`
   const mission = createOrUpdateMission({
     missionId: requestedMissionId || null,
     title: missionTitle,
@@ -1370,20 +1686,33 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
     }
   }
 
-  const assignmentIdByKey = new Map(mission.assignments.map((item) => [`${item.workerId}\n${item.task}`, item.id]))
+  const assignmentIdByKey = new Map(
+    mission.assignments.map((item) => [
+      `${item.workerId}\n${item.task}`,
+      item.id,
+    ]),
+  )
   assignments = assignments.map((assignment) => ({
     ...assignment,
-    assignmentId: assignmentIdByKey.get(`${assignment.workerId}\n${assignment.task}`),
+    assignmentId: assignmentIdByKey.get(
+      `${assignment.workerId}\n${assignment.task}`,
+    ),
   }))
 
   const dispatchedAt = Date.now()
-  const roster = rosterByWorkerId(assignments.map((assignment) => assignment.workerId))
-  const results = await Promise.all(assignments.map((assignment) => runWorker(
-    assignment,
-    timeoutMs,
-    roster.get(assignment.workerId),
-    { waitForCheckpoint, checkpointPollMs: checkpointPollSeconds * 1000, missionId: mission.id, notifySessionKey },
-  )))
+  const roster = rosterByWorkerId(
+    assignments.map((assignment) => assignment.workerId),
+  )
+  const results = await Promise.all(
+    assignments.map((assignment) =>
+      runWorker(assignment, timeoutMs, roster.get(assignment.workerId), {
+        waitForCheckpoint,
+        checkpointPollMs: checkpointPollSeconds * 1000,
+        missionId: mission.id,
+        notifySessionKey,
+      }),
+    ),
+  )
 
   const latestMission = getSwarmMission(mission.id) ?? mission
 
@@ -1392,7 +1721,10 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
     completedAt: Date.now(),
     missionId: mission.id,
     mission: latestMission,
-    prompt: assignments.length === 1 ? assignments[0].task : `${assignments.length} assigned tasks`,
+    prompt:
+      assignments.length === 1
+        ? assignments[0].task
+        : `${assignments.length} assigned tasks`,
     assignments,
     timeoutSeconds,
     waitForCheckpoint,

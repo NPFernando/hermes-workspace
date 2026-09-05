@@ -50,12 +50,22 @@ import { saveStrategyBaselines } from '../src/server/strategy-decay'
  * trade/win/pnl counts rather than averaging rates, so the merged winRate
  * and avgPnlQuote stay correctly weighted by trade count.
  */
-function aggregateStrategyReports(
-  reports: Array<StrategyReport>,
-): Array<{ strategyId: string; winRate: number; avgPnlQuote: number; trades: number }> {
-  const byId = new Map<string, { wins: number; trades: number; totalPnlQuote: number }>()
+function aggregateStrategyReports(reports: Array<StrategyReport>): Array<{
+  strategyId: string
+  winRate: number
+  avgPnlQuote: number
+  trades: number
+}> {
+  const byId = new Map<
+    string,
+    { wins: number; trades: number; totalPnlQuote: number }
+  >()
   for (const r of reports) {
-    const acc = byId.get(r.strategyId) ?? { wins: 0, trades: 0, totalPnlQuote: 0 }
+    const acc = byId.get(r.strategyId) ?? {
+      wins: 0,
+      trades: 0,
+      totalPnlQuote: 0,
+    }
     acc.wins += r.wins
     acc.trades += r.trades
     acc.totalPnlQuote += r.totalPnlQuote
@@ -355,12 +365,13 @@ function main() {
         String(DEFAULT_BACKTEST_CONFIG.volRegimeBaselineLookback),
       ),
     ),
-    volRegimeMaxPercentile: Number(
-      arg(
-        'vol-regime-max-pct',
-        String(DEFAULT_BACKTEST_CONFIG.volRegimeMaxPercentile * 100),
-      ),
-    ) / 100,
+    volRegimeMaxPercentile:
+      Number(
+        arg(
+          'vol-regime-max-pct',
+          String(DEFAULT_BACKTEST_CONFIG.volRegimeMaxPercentile * 100),
+        ),
+      ) / 100,
   }
 
   const candlesBySymbol: Record<string, Array<Candle>> = {}
@@ -429,7 +440,10 @@ function main() {
     if (saveBaselines) {
       const oosStrategyReports = folds.flatMap((f) => f.test.strategyReports)
       const baselines = aggregateStrategyReports(oosStrategyReports)
-      saveStrategyBaselines(baselines, `backtest-trading:walk-forward-${foldCount}fold`)
+      saveStrategyBaselines(
+        baselines,
+        `backtest-trading:walk-forward-${foldCount}fold`,
+      )
       console.log(
         `saved ${baselines.length} strategy baseline(s) from out-of-sample folds\n`,
       )

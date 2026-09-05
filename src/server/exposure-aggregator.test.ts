@@ -29,7 +29,10 @@ async function seedGridState(
 ) {
   const store = await import('./finance-store')
   const db = store.readFinanceStore()
-  const bySymbol = new Map<string, Array<{ entryQuote: number; held: boolean }>>()
+  const bySymbol = new Map<
+    string,
+    Array<{ entryQuote: number; held: boolean }>
+  >()
   for (const l of levels) {
     const arr = bySymbol.get(l.symbol) ?? []
     arr.push({ entryQuote: l.entryQuote, held: l.held })
@@ -65,47 +68,40 @@ describe('crossEngineBucketExposureQuote', () => {
       { symbol: 'ETHUSDT', entryQuote: 40, held: true },
       { symbol: 'ETHUSDT', entryQuote: 30, held: true },
     ])
-    const { crossEngineBucketExposureQuote } = await import(
-      './exposure-aggregator'
-    )
+    const { crossEngineBucketExposureQuote } =
+      await import('./exposure-aggregator')
     const merged = crossEngineBucketExposureQuote({ majors: 100 }, BUCKETS)
     expect(merged.majors).toBe(170) // 100 council + 40 + 30 grid
   })
 
   it('ignores unheld grid levels', async () => {
-    await seedGridState([
-      { symbol: 'ETHUSDT', entryQuote: 40, held: false },
-    ])
-    const { crossEngineBucketExposureQuote } = await import(
-      './exposure-aggregator'
-    )
+    await seedGridState([{ symbol: 'ETHUSDT', entryQuote: 40, held: false }])
+    const { crossEngineBucketExposureQuote } =
+      await import('./exposure-aggregator')
     const merged = crossEngineBucketExposureQuote({}, BUCKETS)
     expect(merged.majors ?? 0).toBe(0)
   })
 
   it('keeps buckets independent — alts exposure never bleeds into majors', async () => {
     await seedGridState([{ symbol: 'XRPUSDT', entryQuote: 25, held: true }])
-    const { crossEngineBucketExposureQuote } = await import(
-      './exposure-aggregator'
-    )
+    const { crossEngineBucketExposureQuote } =
+      await import('./exposure-aggregator')
     const merged = crossEngineBucketExposureQuote({ majors: 50 }, BUCKETS)
     expect(merged.majors).toBe(50)
     expect(merged.alts).toBe(25)
   })
 
   it('returns council exposure unchanged when the grid engine holds nothing', async () => {
-    const { crossEngineBucketExposureQuote } = await import(
-      './exposure-aggregator'
-    )
+    const { crossEngineBucketExposureQuote } =
+      await import('./exposure-aggregator')
     const merged = crossEngineBucketExposureQuote({ majors: 75 }, BUCKETS)
     expect(merged).toEqual({ majors: 75 })
   })
 
   it('symbols outside any configured bucket contribute nothing', async () => {
     await seedGridState([{ symbol: 'DOGEUSDT', entryQuote: 999, held: true }])
-    const { crossEngineBucketExposureQuote } = await import(
-      './exposure-aggregator'
-    )
+    const { crossEngineBucketExposureQuote } =
+      await import('./exposure-aggregator')
     const merged = crossEngineBucketExposureQuote({}, BUCKETS)
     expect(merged).toEqual({})
   })

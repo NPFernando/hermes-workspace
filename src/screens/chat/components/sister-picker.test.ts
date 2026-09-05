@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { dedupeSistersForPicker } from './sister-picker'
 import type { SisterOption } from './sister-picker'
 
-const sister = (over: Partial<SisterOption> & Pick<SisterOption, 'id' | 'name'>): SisterOption => ({
+const sister = (
+  over: Partial<SisterOption> & Pick<SisterOption, 'id' | 'name'>,
+): SisterOption => ({
   emoji: '✦',
   description: '',
   type: 'ai_sister',

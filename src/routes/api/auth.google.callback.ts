@@ -49,7 +49,8 @@ export const Route = createFileRoute('/api/auth/google/callback')({
 
         if (purpose === 'gmail_connect') {
           try {
-            const { refreshToken, email } = await exchangeCodeForGmailTokens(code)
+            const { refreshToken, email } =
+              await exchangeCodeForGmailTokens(code)
             storeGmailRefreshToken(refreshToken, email)
             return new Response(null, {
               status: 302,

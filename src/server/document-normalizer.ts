@@ -16,7 +16,12 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 
-const INGESTION_TMP_DIR = path.join(os.homedir(), '.hermes', 'finance', 'ingestion-tmp')
+const INGESTION_TMP_DIR = path.join(
+  os.homedir(),
+  '.hermes',
+  'finance',
+  'ingestion-tmp',
+)
 
 function ensureTmpDir(): void {
   fs.mkdirSync(INGESTION_TMP_DIR, { recursive: true, mode: 0o700 })
@@ -38,7 +43,10 @@ export type PdfToImagesResult =
   | { ok: true; imagePaths: Array<string> }
   | { ok: false; reason: 'bad_password' | 'conversion_failed' | 'not_found' }
 
-export function pdfToImages(pdfPath: string, password?: string): PdfToImagesResult {
+export function pdfToImages(
+  pdfPath: string,
+  password?: string,
+): PdfToImagesResult {
   if (!fs.existsSync(pdfPath)) return { ok: false, reason: 'not_found' }
   ensureTmpDir()
   const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -58,10 +66,14 @@ export function pdfToImages(pdfPath: string, password?: string): PdfToImagesResu
   }
 
   const outPrefix = path.join(INGESTION_TMP_DIR, `${jobId}-page`)
-  const convert = spawnSync('pdftoppm', ['-png', '-r', '150', sourcePath, outPrefix], {
-    encoding: 'utf-8',
-    timeout: 30_000,
-  })
+  const convert = spawnSync(
+    'pdftoppm',
+    ['-png', '-r', '150', sourcePath, outPrefix],
+    {
+      encoding: 'utf-8',
+      timeout: 30_000,
+    },
+  )
   if (convert.status !== 0) {
     return { ok: false, reason: 'conversion_failed' }
   }

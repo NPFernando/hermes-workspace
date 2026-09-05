@@ -149,12 +149,21 @@ describe('fibExtensionTarget', () => {
   ]
 
   it('projects entryPrice + swingRange * ratio for a long, minus for a short', () => {
-    expect(fibExtensionTarget('long', 100, window, 2, 1.618)).toBeCloseTo(100 + 20 * 1.618, 6)
-    expect(fibExtensionTarget('short', 100, window, 2, 1.618)).toBeCloseTo(100 - 20 * 1.618, 6)
+    expect(fibExtensionTarget('long', 100, window, 2, 1.618)).toBeCloseTo(
+      100 + 20 * 1.618,
+      6,
+    )
+    expect(fibExtensionTarget('short', 100, window, 2, 1.618)).toBeCloseTo(
+      100 - 20 * 1.618,
+      6,
+    )
   })
 
   it('defaults extensionRatio to 1.618', () => {
-    expect(fibExtensionTarget('long', 100, window, 2)).toBeCloseTo(100 + 20 * 1.618, 6)
+    expect(fibExtensionTarget('long', 100, window, 2)).toBeCloseTo(
+      100 + 20 * 1.618,
+      6,
+    )
   })
 
   it('returns null with insufficient lookback candles', () => {
@@ -162,7 +171,10 @@ describe('fibExtensionTarget', () => {
   })
 
   it('returns null when the swing range is zero (flat window)', () => {
-    const flatWindow = [candleLike(0, 100, 100, 100), candleLike(1, 100, 100, 100)]
+    const flatWindow = [
+      candleLike(0, 100, 100, 100),
+      candleLike(1, 100, 100, 100),
+    ]
     expect(fibExtensionTarget('long', 100, flatWindow, 2)).toBeNull()
   })
 })
@@ -488,7 +500,13 @@ describe('keltnerChannelStrategy', () => {
 describe('takerImbalanceStrategy', () => {
   it('buys on persistent taker buy pressure, with confidence clearing the council threshold', () => {
     const candles: Array<Candle> = Array.from({ length: 21 }, (_, i) =>
-      ohlcv(i, { high: 101, low: 99, close: 100, volume: 10, takerBuyVolume: 7 }),
+      ohlcv(i, {
+        high: 101,
+        low: 99,
+        close: 100,
+        volume: 10,
+        takerBuyVolume: 7,
+      }),
     )
     const d = takerImbalanceStrategy.evaluate(candles)
     expect(d.signal).toBe('BUY')
@@ -504,7 +522,13 @@ describe('takerImbalanceStrategy', () => {
 
   it('sells on persistent taker sell pressure', () => {
     const candles: Array<Candle> = Array.from({ length: 21 }, (_, i) =>
-      ohlcv(i, { high: 101, low: 99, close: 100, volume: 10, takerBuyVolume: 3 }),
+      ohlcv(i, {
+        high: 101,
+        low: 99,
+        close: 100,
+        volume: 10,
+        takerBuyVolume: 3,
+      }),
     )
     const d = takerImbalanceStrategy.evaluate(candles)
     expect(d.signal).toBe('SELL')
@@ -514,14 +538,26 @@ describe('takerImbalanceStrategy', () => {
 
   it('holds when taker volume is balanced', () => {
     const candles: Array<Candle> = Array.from({ length: 21 }, (_, i) =>
-      ohlcv(i, { high: 101, low: 99, close: 100, volume: 10, takerBuyVolume: 5 }),
+      ohlcv(i, {
+        high: 101,
+        low: 99,
+        close: 100,
+        volume: 10,
+        takerBuyVolume: 5,
+      }),
     )
     expect(takerImbalanceStrategy.evaluate(candles).signal).toBe('HOLD')
   })
 
   it('holds when takerBuyVolume is missing from any candle in the window, rather than treating it as zero', () => {
     const candles: Array<Candle> = Array.from({ length: 21 }, (_, i) =>
-      ohlcv(i, { high: 101, low: 99, close: 100, volume: 10, takerBuyVolume: 7 }),
+      ohlcv(i, {
+        high: 101,
+        low: 99,
+        close: 100,
+        volume: 10,
+        takerBuyVolume: 7,
+      }),
     )
     // Drop the field on the most recent candle — guaranteed inside the
     // rolling window regardless of period, unlike an older out-of-window one.
@@ -533,7 +569,13 @@ describe('takerImbalanceStrategy', () => {
 
   it('holds below minCandles regardless of the pattern', () => {
     const candles: Array<Candle> = Array.from({ length: 10 }, (_, i) =>
-      ohlcv(i, { high: 101, low: 99, close: 100, volume: 10, takerBuyVolume: 9 }),
+      ohlcv(i, {
+        high: 101,
+        low: 99,
+        close: 100,
+        volume: 10,
+        takerBuyVolume: 9,
+      }),
     )
     expect(takerImbalanceStrategy.evaluate(candles).signal).toBe('HOLD')
   })
@@ -555,7 +597,11 @@ describe('realizedVolPercentile / volatilityRegimeAllowsEntry', () => {
   const volPeriod = 5
   const baselineLookback = 50
 
-  function candlesWithVol(count: number, dailyStdevPct: number, seedOffset = 0): Array<Candle> {
+  function candlesWithVol(
+    count: number,
+    dailyStdevPct: number,
+    seedOffset = 0,
+  ): Array<Candle> {
     // Deterministic pseudo-random walk (LCG) so tests are reproducible —
     // alternating sign keeps it oscillating rather than trending, isolating
     // "volatility magnitude" from "direction" the way this gate is meant to.
@@ -566,16 +612,27 @@ describe('realizedVolPercentile / volatilityRegimeAllowsEntry', () => {
       state = (state * 1103515245 + 12345) & 0x7fffffff
       const noise = (state / 0x7fffffff - 0.5) * 2 * dailyStdevPct
       price *= 1 + (i % 2 === 0 ? noise : -noise)
-      out.push({ openTime: i, open: price, high: price, low: price, close: price, volume: 1 })
+      out.push({
+        openTime: i,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+        volume: 1,
+      })
     }
     return out
   }
 
   it('fails open when disabled or without enough history', () => {
     const candles = candlesWithVol(10, 0.01)
-    expect(volatilityRegimeAllowsEntry(candles, 0, baselineLookback, 0.75)).toBe(true)
+    expect(
+      volatilityRegimeAllowsEntry(candles, 0, baselineLookback, 0.75),
+    ).toBe(true)
     expect(volatilityRegimeAllowsEntry(candles, volPeriod, 0, 0.75)).toBe(true)
-    expect(volatilityRegimeAllowsEntry(candles, volPeriod, baselineLookback, 0.75)).toBe(true)
+    expect(
+      volatilityRegimeAllowsEntry(candles, volPeriod, baselineLookback, 0.75),
+    ).toBe(true)
   })
 
   it('ranks a perfectly flat tail at the bottom of a volatile baseline history', () => {
@@ -584,14 +641,17 @@ describe('realizedVolPercentile / volatilityRegimeAllowsEntry', () => {
     // regime transition would itself register as a (large) return and
     // contaminate the very first rolling-vol window of the "flat" tail.
     const flatPrice = volatileBaseline[volatileBaseline.length - 1].close
-    const flatTail: Array<Candle> = Array.from({ length: volPeriod }, (_, i) => ({
-      openTime: volatileBaseline.length + i,
-      open: flatPrice,
-      high: flatPrice,
-      low: flatPrice,
-      close: flatPrice,
-      volume: 1,
-    }))
+    const flatTail: Array<Candle> = Array.from(
+      { length: volPeriod },
+      (_, i) => ({
+        openTime: volatileBaseline.length + i,
+        open: flatPrice,
+        high: flatPrice,
+        low: flatPrice,
+        close: flatPrice,
+        volume: 1,
+      }),
+    )
     const candles = [...volatileBaseline, ...flatTail]
     const pct = realizedVolPercentile(candles, volPeriod, baselineLookback)
     expect(pct).toBe(0)
@@ -607,9 +667,13 @@ describe('realizedVolPercentile / volatilityRegimeAllowsEntry', () => {
     const pct = realizedVolPercentile(candles, volPeriod, baselineLookback)
     expect(pct).not.toBeNull()
     expect(pct as number).toBeGreaterThan(0.75)
-    expect(volatilityRegimeAllowsEntry(candles, volPeriod, baselineLookback, 0.75)).toBe(false)
+    expect(
+      volatilityRegimeAllowsEntry(candles, volPeriod, baselineLookback, 0.75),
+    ).toBe(false)
     // A generous threshold should still allow it through.
-    expect(volatilityRegimeAllowsEntry(candles, volPeriod, baselineLookback, 1)).toBe(true)
+    expect(
+      volatilityRegimeAllowsEntry(candles, volPeriod, baselineLookback, 1),
+    ).toBe(true)
   })
 
   it('classifyVolRegime returns null (no opinion) without enough history, same fail-open convention', () => {
@@ -619,15 +683,22 @@ describe('realizedVolPercentile / volatilityRegimeAllowsEntry', () => {
   it('classifies a calm tail against a volatile baseline as low regime', () => {
     const volatileBaseline = candlesWithVol(baselineLookback + volPeriod, 0.02)
     const flatPrice = volatileBaseline[volatileBaseline.length - 1].close
-    const flatTail: Array<Candle> = Array.from({ length: volPeriod }, (_, i) => ({
-      openTime: volatileBaseline.length + i,
-      open: flatPrice,
-      high: flatPrice,
-      low: flatPrice,
-      close: flatPrice,
-      volume: 1,
-    }))
-    const regime = classifyVolRegime([...volatileBaseline, ...flatTail], volPeriod, baselineLookback)
+    const flatTail: Array<Candle> = Array.from(
+      { length: volPeriod },
+      (_, i) => ({
+        openTime: volatileBaseline.length + i,
+        open: flatPrice,
+        high: flatPrice,
+        low: flatPrice,
+        close: flatPrice,
+        volume: 1,
+      }),
+    )
+    const regime = classifyVolRegime(
+      [...volatileBaseline, ...flatTail],
+      volPeriod,
+      baselineLookback,
+    )
     expect(regime).toBe('low')
   })
 
@@ -637,7 +708,11 @@ describe('realizedVolPercentile / volatilityRegimeAllowsEntry', () => {
       ...c,
       openTime: calm.length + i,
     }))
-    const regime = classifyVolRegime([...calm, ...spike], volPeriod, baselineLookback)
+    const regime = classifyVolRegime(
+      [...calm, ...spike],
+      volPeriod,
+      baselineLookback,
+    )
     expect(regime).toBe('high')
   })
 })
@@ -779,7 +854,11 @@ describe('applyTradeOutcome avgWinQuote/avgLossQuote', () => {
     const legacy = { ...emptyScore('x') } as Record<string, unknown>
     delete legacy.avgWinQuote
     delete legacy.avgLossQuote
-    const next = applyTradeOutcome(legacy as unknown as ReturnType<typeof emptyScore>, 40, 100)
+    const next = applyTradeOutcome(
+      legacy as unknown as ReturnType<typeof emptyScore>,
+      40,
+      100,
+    )
     expect(next.avgWinQuote).toBeCloseTo(40, 8)
     expect(next.avgLossQuote).toBeCloseTo(0, 8)
   })

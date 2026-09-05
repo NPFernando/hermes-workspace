@@ -71,7 +71,9 @@ export function MobilePromptTrigger() {
     inApp.current = isRunningAsApp()
 
     // Force-open via URL param (dev preview)
-    if (new URLSearchParams(window.location.search).get('mobile-preview') === '1') {
+    if (
+      new URLSearchParams(window.location.search).get('mobile-preview') === '1'
+    ) {
       const url = new URL(window.location.href)
       url.searchParams.delete('mobile-preview')
       window.history.replaceState({}, '', url.toString())
@@ -80,7 +82,8 @@ export function MobilePromptTrigger() {
     }
 
     // Permanent opt-out
-    if (localStorage.getItem('claude-mobile-access-dismissed') === 'true') return
+    if (localStorage.getItem('claude-mobile-access-dismissed') === 'true')
+      return
 
     async function evaluate() {
       const [version, installed] = await Promise.all([
@@ -121,12 +124,15 @@ export function MobilePromptTrigger() {
     }
 
     let cleanup: (() => void) | undefined
-    evaluate().then((fn) => { cleanup = fn })
+    evaluate().then((fn) => {
+      cleanup = fn
+    })
     return () => cleanup?.()
   }, [])
 
   const dismiss = () => {
-    if (dontShowAgain) localStorage.setItem('claude-mobile-access-dismissed', 'true')
+    if (dontShowAgain)
+      localStorage.setItem('claude-mobile-access-dismissed', 'true')
     sessionStorage.setItem(SESSION_DISMISSED_KEY, 'true')
     setPromptState('hidden')
   }
@@ -194,7 +200,11 @@ export function MobilePromptTrigger() {
                     className="rounded-lg p-1.5 transition-colors hover:opacity-80 text-[var(--theme-muted)]"
                     aria-label="Dismiss"
                   >
-                    <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={2} />
+                    <HugeiconsIcon
+                      icon={Cancel01Icon}
+                      size={16}
+                      strokeWidth={2}
+                    />
                   </button>
                 </div>
               </div>
@@ -215,7 +225,10 @@ export function MobilePromptTrigger() {
         ) : null}
       </AnimatePresence>
 
-      <MobileSetupModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <MobileSetupModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </>
   )
 }

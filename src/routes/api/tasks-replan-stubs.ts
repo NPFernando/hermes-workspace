@@ -3,7 +3,11 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { listTasks, updateTask } from '../../server/tasks-store'
 
-export function isStubReviewTask(task: { column: string; agent_state?: string | null; agent_history?: Array<{ action: string; note?: string }> }): boolean {
+export function isStubReviewTask(task: {
+  column: string
+  agent_state?: string | null
+  agent_history?: Array<{ action: string; note?: string }>
+}): boolean {
   if (task.agent_state) return false
   const history = task.agent_history ?? []
   // Find the last planned action in history (assuming chronological order)
@@ -18,7 +22,7 @@ export function isStubReviewTask(task: { column: string; agent_state?: string | 
   if (lastPlannedIndex === -1) return false
   // If there are any actions after the last planned action, something happened after the plan -> not a stub
   if (lastPlannedIndex < history.length - 1) return false
-  const note = (history[lastPlannedIndex].note ?? '') 
+  const note = history[lastPlannedIndex].note ?? ''
   return note.includes('Plan unavailable') || note.length < 80
 }
 
@@ -50,7 +54,11 @@ export const Route = createFileRoute('/api/tasks-replan-stubs')({
           })
         }
 
-        return json({ ok: true, moved: stubs.length, titles: stubs.slice(0, 10).map((t) => t.title.slice(0, 60)) })
+        return json({
+          ok: true,
+          moved: stubs.length,
+          titles: stubs.slice(0, 10).map((t) => t.title.slice(0, 60)),
+        })
       },
     },
   },

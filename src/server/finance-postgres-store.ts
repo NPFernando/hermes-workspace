@@ -38,6 +38,64 @@ export interface FinanceAuditEntry {
   createdAt: string
 }
 
+const FINANCE_COLLECTIONS = [
+  'finance_accounts',
+  'income_records',
+  'expense_records',
+  'budget_categories',
+  'categories',
+  'subcategories',
+  'merchants',
+  'tags',
+  'savings_goals',
+  'tax_records',
+  'pending_ingestions',
+  'income_sources',
+  'stock_holdings',
+  'fixed_deposits',
+  'loans',
+  'properties',
+  'beneficiaries',
+  'exchange_rates',
+  'investment_accounts',
+  'trading_platforms',
+  'api_connections',
+  'assets',
+  'market_prices',
+  'historical_candles',
+  'news_items',
+  'sentiment_scores',
+  'risk_scores',
+  'intelligence_records',
+  'trading_plans',
+  'trade_orders',
+  'trade_executions',
+  'virtual_accounts',
+  'portfolio_positions',
+  'account_balances',
+  'strategy_results',
+  'prediction_results',
+  'agent_memory',
+  'audit_logs',
+  'error_logs',
+  'trading_signals',
+] as const
+
+export const FINANCE_POSTGRES_COLLECTIONS = FINANCE_COLLECTIONS
+export const DIAGNOSTIC_COLLECTION = 'trading_cycle_diagnostics'
+export const DIAGNOSTIC_RETENTION = 100
+
+export interface PersistedTradingCycleDiagnostic {
+  id: string
+  runId?: string
+  stage?: string
+  executionMode?: string
+  ranAt: string
+  status: string
+  reason: string | null
+  symbols: Array<Record<string, unknown>>
+}
+
 let schemaReady = false
 let lastWriteError: string | null = null
 
@@ -55,15 +113,21 @@ function financePostgresEnabled(): boolean {
 
 function envFileValues(): Record<string, string> {
   const values: Record<string, string> = {}
-  try {
-    const env = fs.readFileSync(path.join(HERMES_HOME, '.env'), 'utf8')
+  for (const envPath of [
+    path.join(HERMES_HOME, '.env'),
+    path.join(HERMES_HOME, '.hermes.backup', '.env'),
+  ]) {
+    let env = ''
+    try {
+      env = fs.readFileSync(envPath, 'utf8')
+    } catch {
+      continue
+    }
     for (const line of env.split('\n')) {
       const match = line.match(/^HERMES_PG_(PASSWORD|HOST|PORT|USER)=(.*)$/)
       if (!match) continue
       values[`HERMES_PG_${match[1]}`] = match[2].trim().replace(/^"|"$/g, '')
     }
-  } catch {
-    return values
   }
   return values
 }
@@ -643,6 +707,8 @@ function runPsql(
         '-d',
         database,
         '-tA',
+        '-F',
+        '\t',
         '-v',
         'ON_ERROR_STOP=1',
         '-f',
@@ -700,6 +766,27 @@ CREATE TABLE IF NOT EXISTS finance_store_snapshots (
   id TEXT PRIMARY KEY,
   data JSONB NOT NULL,
   updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS finance_engine_collections (
+  collection_name TEXT NOT NULL,
+  record_id TEXT NOT NULL,
+  data JSONB NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (collection_name, record_id)
+);
+
+CREATE INDEX IF NOT EXISTS finance_engine_collections_updated_idx
+  ON finance_engine_collections (collection_name, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS finance_engine_metadata (
+  id INTEGER PRIMARY KEY,
+  schema_version INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  source_manifest JSONB,
+  migrated_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -856,6 +943,242 @@ export function readFinancePostgresStore(): FinanceDatabase | null {
     return JSON.parse(result.stdout) as FinanceDatabase
   } catch {
     return null
+  }
+}
+
+export function readFinancePostgresNormalized(): FinanceDatabase | null {
+    if (!ensureFinancePostgresSchema()) return null
+    const result = runPsql(
+      FINANCE_PG_DATABASE,
+      `SELECT collection_name, record_id, data::text
+         FROM finance_engine_collections
+        ORDER BY collection_name, record_id;`,
+    )
+    if (!result.ok) return null
+    const settingsResult = runPsql(
+      FINANCE_PG_DATABASE,
+      'SELECT data::text FROM settings WHERE id = 1;',
+    )
+    if (!settingsResult.ok || !settingsResult.stdout) return null
+    const metadataResult = runPsql(
+      FINANCE_PG_DATABASE,
+      'SELECT schema_version, created_at, updated_at FROM finance_engine_metadata WHERE id = 1;',
+    )
+    if (!metadataResult.ok || !metadataResult.stdout) return null
+    try {
+      const collections: Record<string, Array<Record<string, unknown>>> = {}
+      for (const line of result.stdout.split('\n').filter(Boolean)) {
+        const [collectionName, recordId, data] = line.split('\t')
+        if (!collectionName || !recordId || !data) continue
+        const record = JSON.parse(data) as Record<string, unknown>
+        if (!record.id) record.id = recordId
+        ;(collections[collectionName] ??= []).push(record)
+      }
+      const settings = JSON.parse(settingsResult.stdout) as FinanceDatabase['settings']
+      const [schemaVersion, createdAt, updatedAt] = metadataResult.stdout.split('\t')
+      const base = {
+        schemaVersion: Number(schemaVersion),
+        createdAt,
+        updatedAt,
+        settings,
+      } as FinanceDatabase
+      for (const collection of FINANCE_COLLECTIONS) {
+        ;(base as unknown as Record<string, unknown>)[collection] =
+          collections[collection] ?? []
+      }
+      base.riskState = (collections.riskState[0] ?? {
+        dailyRealizedLoss: 0,
+        dailyUnrealizedLoss: 0,
+        weeklyRealizedLoss: 0,
+        weeklyUnrealizedLoss: 0,
+        dailyBreached: false,
+        weeklyBreached: false,
+        lastResetDay: new Date().toISOString(),
+        lastResetWeek: new Date().toISOString(),
+      }) as FinanceDatabase['riskState']
+      base.connectivityBreaker = (collections.connectivityBreaker[0] ?? {
+        consecutiveCredentialFailures: 0,
+        firstFailureAt: null,
+        tripped: false,
+        trippedAt: null,
+        trippedReason: null,
+      }) as unknown as FinanceDatabase['connectivityBreaker']
+      return base
+    } catch {
+      return null
+    }
+}
+
+export function writeFinancePostgresNormalized(db: FinanceDatabase): boolean {
+    if (!ensureFinancePostgresSchema()) return false
+    const updatedAt = db.updatedAt || new Date().toISOString()
+    const rowsSql = FINANCE_COLLECTIONS.flatMap((collection) => {
+      const value = (db as unknown as Record<string, unknown>)[collection]
+      if (!Array.isArray(value)) return []
+      return value.map((record, index) => {
+        const row = isRecord(record) ? record : { value: record }
+        const id = firstText(row, ['id'], `${collection}:${index + 1}`)
+        return `(${sqlText(collection)}, ${sqlText(id)}, ${sqlJsonb(row)}, ${sqlText(timestampValue(row, ['createdAt', 'created_at'], updatedAt))}, ${sqlText(timestampValue(row, ['updatedAt', 'updated_at'], updatedAt))})`
+      })
+    })
+    const specialRows = [
+      `('riskState', 'default', ${sqlJsonb(db.riskState)}, ${sqlText(updatedAt)}, ${sqlText(updatedAt)})`,
+      `('connectivityBreaker', 'default', ${sqlJsonb(db.connectivityBreaker)}, ${sqlText(updatedAt)}, ${sqlText(updatedAt)})`,
+    ]
+    const writeResult = runPsql(
+      FINANCE_PG_DATABASE,
+      `
+  BEGIN;
+  DELETE FROM finance_engine_collections
+   WHERE collection_name IN (${FINANCE_COLLECTIONS.map(sqlText).join(', ')}, 'riskState', 'connectivityBreaker');
+  INSERT INTO finance_engine_collections
+    (collection_name, record_id, data, created_at, updated_at)
+  VALUES ${[...rowsSql, ...specialRows].join(',\n')};
+  INSERT INTO settings (id, data, updated_at)
+  VALUES (1, ${sqlJsonb(db.settings)}, ${sqlText(updatedAt)})
+  ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at;
+  INSERT INTO finance_engine_metadata
+    (id, schema_version, created_at, updated_at, migrated_at)
+  VALUES (1, ${sqlNumber(db.schemaVersion, 1)}, ${sqlText(db.createdAt)}, ${sqlText(updatedAt)}, COALESCE((SELECT migrated_at FROM finance_engine_metadata WHERE id = 1), ${sqlText(updatedAt)}))
+  ON CONFLICT (id) DO UPDATE SET
+    schema_version = EXCLUDED.schema_version,
+    created_at = EXCLUDED.created_at,
+    updated_at = EXCLUDED.updated_at;
+  COMMIT;
+  `,
+    )
+    lastWriteError = writeResult.ok ? null : writeResult.reason
+    return writeResult.ok
+}
+
+export function persistTradingCycleDiagnostic(
+  diagnostic: PersistedTradingCycleDiagnostic,
+): boolean {
+  if (!ensureFinancePostgresSchema()) return false
+  const result = runPsql(
+    FINANCE_PG_DATABASE,
+    `
+BEGIN;
+INSERT INTO finance_engine_collections
+  (collection_name, record_id, data, created_at, updated_at)
+VALUES
+  (${sqlText(DIAGNOSTIC_COLLECTION)}, ${sqlText(diagnostic.id)}, ${sqlJsonb(diagnostic)}, ${sqlText(diagnostic.ranAt)}, ${sqlText(diagnostic.ranAt)})
+ON CONFLICT (collection_name, record_id) DO UPDATE SET
+  data = EXCLUDED.data,
+  updated_at = EXCLUDED.updated_at;
+DELETE FROM finance_engine_collections
+ WHERE collection_name = ${sqlText(DIAGNOSTIC_COLLECTION)}
+   AND record_id IN (
+     SELECT record_id
+       FROM (
+         SELECT record_id,
+                row_number() OVER (
+                  PARTITION BY COALESCE(data->>'stage', '')
+                  ORDER BY updated_at DESC
+                ) AS row_number
+           FROM finance_engine_collections
+          WHERE collection_name = ${sqlText(DIAGNOSTIC_COLLECTION)}
+       ) retained
+      WHERE row_number > ${DIAGNOSTIC_RETENTION}
+   );
+COMMIT;
+`,
+  )
+  lastWriteError = result.ok ? null : result.reason
+  return result.ok
+}
+
+export function readTradingCycleDiagnostics(
+  stage?: string,
+): Array<PersistedTradingCycleDiagnostic> {
+  if (!ensureFinancePostgresSchema()) return []
+  const stageFilter = stage ? ` AND data->>'stage' = ${sqlText(stage)}` : ''
+  const result = runPsql(
+    FINANCE_PG_DATABASE,
+    `SELECT data::text
+       FROM finance_engine_collections
+      WHERE collection_name = ${sqlText(DIAGNOSTIC_COLLECTION)}
+        ${stageFilter}
+      ORDER BY updated_at DESC
+      LIMIT ${DIAGNOSTIC_RETENTION};`,
+  )
+  if (!result.ok) return []
+  return result.stdout
+    .split('\n')
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line) as PersistedTradingCycleDiagnostic]
+      } catch {
+        return []
+      }
+    })
+}
+
+export interface TradingCycleDiagnosticTrends {
+  stage: string
+  cycles: number
+  oldestAt: string | null
+  newestAt: string | null
+  statusCounts: Record<string, number>
+  actionCounts: Record<string, number>
+  councilCounts: Record<string, number>
+  strategySignalCounts: Record<string, Record<string, number>>
+  reasonCounts: Array<{ reason: string; count: number }>
+}
+
+export function tradingCycleDiagnosticTrends(
+  stage: string,
+): TradingCycleDiagnosticTrends {
+  const history = readTradingCycleDiagnostics(stage)
+  const statusCounts: Record<string, number> = {}
+  const actionCounts: Record<string, number> = {}
+  const councilCounts: Record<string, number> = {}
+  const strategySignalCounts: Record<string, Record<string, number>> = {}
+  const reasonCounts = new Map<string, number>()
+  for (const diagnostic of history) {
+    statusCounts[diagnostic.status] = (statusCounts[diagnostic.status] ?? 0) + 1
+    for (const symbol of diagnostic.symbols) {
+      const action =
+        typeof symbol.finalAction === 'string'
+          ? symbol.finalAction
+          : 'NO_ACTION'
+      actionCounts[action] = (actionCounts[action] ?? 0) + 1
+      const council =
+        typeof symbol.councilSignal === 'string'
+          ? symbol.councilSignal
+          : 'HOLD'
+      councilCounts[council] = (councilCounts[council] ?? 0) + 1
+      const signals = Array.isArray(symbol.strategySignals)
+        ? symbol.strategySignals
+        : []
+      for (const rawSignal of signals) {
+        if (!isRecord(rawSignal)) continue
+        const strategyId = firstText(rawSignal, ['strategyId'], 'unknown')
+        const signal = firstText(rawSignal, ['signal'], 'HOLD')
+        const bySignal = (strategySignalCounts[strategyId] ??= {})
+        bySignal[signal] = (bySignal[signal] ?? 0) + 1
+      }
+      const reason =
+        typeof symbol.finalReason === 'string' && symbol.finalReason.trim()
+          ? symbol.finalReason.trim()
+          : diagnostic.reason?.trim() || `${council} / no final action`
+      reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1)
+    }
+  }
+  return {
+    stage,
+    cycles: history.length,
+    oldestAt: history.at(-1)?.ranAt ?? null,
+    newestAt: history[0]?.ranAt ?? null,
+    statusCounts,
+    actionCounts,
+    councilCounts,
+    strategySignalCounts,
+    reasonCounts: [...reasonCounts.entries()]
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason))
+      .slice(0, 12),
   }
 }
 

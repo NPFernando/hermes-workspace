@@ -100,19 +100,30 @@ function bearRegimeBreakout(): Array<Candle> {
 const config: BacktestConfig = { ...DEFAULT_BACKTEST_CONFIG }
 
 function equityPoint(daysFromEpoch: number, equity: number) {
-  return { at: new Date(Date.UTC(2026, 0, 1) + daysFromEpoch * 86_400_000).toISOString(), equity }
+  return {
+    at: new Date(
+      Date.UTC(2026, 0, 1) + daysFromEpoch * 86_400_000,
+    ).toISOString(),
+    equity,
+  }
 }
 
 describe('computeRiskAdjustedMetrics', () => {
   it('returns all-null with fewer than 2 equity points', () => {
     const metrics = computeRiskAdjustedMetrics([equityPoint(0, 1000)], 0, 0)
-    expect(metrics).toEqual({ sharpeRatio: null, calmarRatio: null, annualizedReturnPct: null })
+    expect(metrics).toEqual({
+      sharpeRatio: null,
+      calmarRatio: null,
+      annualizedReturnPct: null,
+    })
   })
 
   it('treats a steady gain with zero volatility as Infinity, not null', () => {
     // Constant 1% *percentage* growth each step (geometric, not linear) —
     // this is what actually produces zero-variance period returns.
-    const curve = Array.from({ length: 10 }, (_, i) => equityPoint(i, 1000 * 1.01 ** i))
+    const curve = Array.from({ length: 10 }, (_, i) =>
+      equityPoint(i, 1000 * 1.01 ** i),
+    )
     const metrics = computeRiskAdjustedMetrics(curve, 9, 0)
     expect(metrics.sharpeRatio).toBe(Infinity)
     expect(metrics.calmarRatio).toBe(Infinity)
@@ -126,7 +137,9 @@ describe('computeRiskAdjustedMetrics', () => {
   })
 
   it('penalizes volatile returns relative to a smooth path with the same total return', () => {
-    const smooth = Array.from({ length: 20 }, (_, i) => equityPoint(i, 1000 * (1 + i * 0.005)))
+    const smooth = Array.from({ length: 20 }, (_, i) =>
+      equityPoint(i, 1000 * (1 + i * 0.005)),
+    )
     // Same start/end equity as smooth, but oscillating in between.
     const volatile = [
       equityPoint(0, 1000),
@@ -139,7 +152,9 @@ describe('computeRiskAdjustedMetrics', () => {
     const volatileMetrics = computeRiskAdjustedMetrics(volatile, 9.5, 5)
     expect(smoothMetrics.sharpeRatio).not.toBeNull()
     expect(volatileMetrics.sharpeRatio).not.toBeNull()
-    expect(smoothMetrics.sharpeRatio as number).toBeGreaterThan(volatileMetrics.sharpeRatio as number)
+    expect(smoothMetrics.sharpeRatio as number).toBeGreaterThan(
+      volatileMetrics.sharpeRatio as number,
+    )
   })
 
   it('annualizes a short window return, and Calmar divides by max drawdown', () => {
@@ -147,8 +162,14 @@ describe('computeRiskAdjustedMetrics', () => {
     const curve = [equityPoint(0, 1000), equityPoint(30, 1100)]
     const metrics = computeRiskAdjustedMetrics(curve, 10, 20)
     expect(metrics.annualizedReturnPct).not.toBeNull()
-    expect(metrics.annualizedReturnPct as number).toBeCloseTo(10 * (365 / 30), 1)
-    expect(metrics.calmarRatio).toBeCloseTo((metrics.annualizedReturnPct as number) / 20, 6)
+    expect(metrics.annualizedReturnPct as number).toBeCloseTo(
+      10 * (365 / 30),
+      1,
+    )
+    expect(metrics.calmarRatio).toBeCloseTo(
+      (metrics.annualizedReturnPct as number) / 20,
+      6,
+    )
   })
 })
 
@@ -174,9 +195,13 @@ describe('runBacktest', () => {
     expect(windows).toHaveLength(4)
     expect(windows.map((w) => w.testStartPct)).toEqual([60, 70, 80, 90])
     expect(windows.map((w) => w.testEndPct)).toEqual([70, 80, 90, 100])
-    expect(windows.map((w) => w.train.BTCUSDT?.length)).toEqual([60, 70, 80, 90])
+    expect(windows.map((w) => w.train.BTCUSDT?.length)).toEqual([
+      60, 70, 80, 90,
+    ])
     expect(windows.map((w) => w.test.BTCUSDT?.length)).toEqual([10, 10, 10, 10])
-    expect(windows.map((w) => w.train.ETHUSDT?.length)).toEqual([48, 56, 64, 72])
+    expect(windows.map((w) => w.train.ETHUSDT?.length)).toEqual([
+      48, 56, 64, 72,
+    ])
     expect(windows.map((w) => w.test.ETHUSDT?.length)).toEqual([8, 8, 8, 8])
     expect(windows[1]?.test.BTCUSDT?.[0]?.openTime).toBe(T0 + 70 * HOUR)
   })
@@ -544,7 +569,8 @@ describe('runBacktest', () => {
     const report = runBacktest({ BTCUSDT: series }, '1h', config)
     const first = series[0]
     const last = series[series.length - 1]
-    const expected = ((last?.close ?? 0) - (first?.close ?? 0)) / (first?.close ?? 1) * 100
+    const expected =
+      (((last?.close ?? 0) - (first?.close ?? 0)) / (first?.close ?? 1)) * 100
     expect(report.buyAndHoldReturnPct.BTCUSDT).toBeCloseTo(expected, 8)
   })
 
@@ -650,7 +676,10 @@ describe('backtest slippage + gap-down guard integration', () => {
     return [...flat, breakoutBar]
   }
 
-  const breakoutOnly: BacktestConfig = { ...config, enabledStrategies: ['breakout'] }
+  const breakoutOnly: BacktestConfig = {
+    ...config,
+    enabledStrategies: ['breakout'],
+  }
 
   it('applies slippage to both entry and exit fills, reducing pnl vs an unslipped run', () => {
     // A series that ends right on the breakout bar opens exactly one trade,
@@ -667,10 +696,20 @@ describe('backtest slippage + gap-down guard integration', () => {
     })
     expect(baseline.trades).toHaveLength(1)
     expect(slipped.trades).toHaveLength(1)
-    expect(slipped.trades[0]?.entryPrice).toBeCloseTo(applyFillSlippage(112, 'buy', 50), 8)
-    expect(slipped.trades[0]?.exitPrice).toBeCloseTo(applyFillSlippage(112, 'sell', 50), 8)
-    expect(slipped.trades[0]?.entryPrice).toBeGreaterThan(baseline.trades[0]?.entryPrice ?? 0)
-    expect(slipped.trades[0]?.exitPrice ?? 0).toBeLessThan(baseline.trades[0]?.exitPrice ?? 0)
+    expect(slipped.trades[0]?.entryPrice).toBeCloseTo(
+      applyFillSlippage(112, 'buy', 50),
+      8,
+    )
+    expect(slipped.trades[0]?.exitPrice).toBeCloseTo(
+      applyFillSlippage(112, 'sell', 50),
+      8,
+    )
+    expect(slipped.trades[0]?.entryPrice).toBeGreaterThan(
+      baseline.trades[0]?.entryPrice ?? 0,
+    )
+    expect(slipped.trades[0]?.exitPrice ?? 0).toBeLessThan(
+      baseline.trades[0]?.exitPrice ?? 0,
+    )
     expect(slipped.totalPnlQuote).toBeLessThan(baseline.totalPnlQuote)
   })
 
@@ -684,20 +723,42 @@ describe('backtest slippage + gap-down guard integration', () => {
   })
 
   it('still opens the same entry when the guard is off (default) despite the gap', () => {
-    const report = runBacktest({ BTCUSDT: breakoutSeriesWithGap(90) }, '1h', breakoutOnly)
+    const report = runBacktest(
+      { BTCUSDT: breakoutSeriesWithGap(90) },
+      '1h',
+      breakoutOnly,
+    )
     expect(report.trades.length + 1).toBeGreaterThan(1) // opened (may still be open at report end, realized on close-out)
     expect(report.guardianBlocks.gap_down_guard ?? 0).toBe(0)
   })
 
   it('never blocks an exit — an existing position still stops out on a gapped-down bar', () => {
     const flat = Array.from({ length: 25 }, (_, i) => candle(i, 100))
-    const openBar: Candle = { openTime: T0 + 25 * HOUR, open: 100, high: 115, low: 99, close: 112, volume: 100 }
+    const openBar: Candle = {
+      openTime: T0 + 25 * HOUR,
+      open: 100,
+      high: 115,
+      low: 99,
+      close: 112,
+      volume: 100,
+    }
     // Gaps down ~20% from the prior close (112) and breaches the 2% stop-loss.
-    const crashBar: Candle = { openTime: T0 + 26 * HOUR, open: 90, high: 91, low: 84, close: 85, volume: 100 }
-    const report = runBacktest({ BTCUSDT: [...flat, openBar, crashBar] }, '1h', {
-      ...breakoutOnly,
-      gapDownGuardPct: 0.07,
-    })
+    const crashBar: Candle = {
+      openTime: T0 + 26 * HOUR,
+      open: 90,
+      high: 91,
+      low: 84,
+      close: 85,
+      volume: 100,
+    }
+    const report = runBacktest(
+      { BTCUSDT: [...flat, openBar, crashBar] },
+      '1h',
+      {
+        ...breakoutOnly,
+        gapDownGuardPct: 0.07,
+      },
+    )
     const stops = report.trades.filter((t) => t.reason.startsWith('stop-loss'))
     expect(stops.length).toBeGreaterThan(0)
   })
@@ -708,7 +769,9 @@ describe('backtest ATR position sizing', () => {
     const withField: BacktestConfig = { ...config, atrSizeBaselinePct: 0 }
     const a = runBacktest({ BTCUSDT: rampSeries() }, '1h', config)
     const b = runBacktest({ BTCUSDT: rampSeries() }, '1h', withField)
-    expect(b.trades.map((t) => t.entryQuote)).toEqual(a.trades.map((t) => t.entryQuote))
+    expect(b.trades.map((t) => t.entryQuote)).toEqual(
+      a.trades.map((t) => t.entryQuote),
+    )
   })
 
   it('shrinks entry size when the baseline is set far below actual volatility', () => {
@@ -730,13 +793,21 @@ describe('backtest ATR position sizing', () => {
 describe('backtest ADX trend-strength gate', () => {
   it('is a no-op at the default (adxThreshold: 0)', () => {
     const a = runBacktest({ BTCUSDT: rampSeries() }, '1h', config)
-    const b = runBacktest({ BTCUSDT: rampSeries() }, '1h', { ...config, adxThreshold: 0 })
-    expect(b.trades.map((t) => t.entryPrice)).toEqual(a.trades.map((t) => t.entryPrice))
+    const b = runBacktest({ BTCUSDT: rampSeries() }, '1h', {
+      ...config,
+      adxThreshold: 0,
+    })
+    expect(b.trades.map((t) => t.entryPrice)).toEqual(
+      a.trades.map((t) => t.entryPrice),
+    )
   })
 
   it('blocks every entry when the threshold is set above any real ADX value', () => {
     const baseline = runBacktest({ BTCUSDT: rampSeries() }, '1h', config)
-    const blocked = runBacktest({ BTCUSDT: rampSeries() }, '1h', { ...config, adxThreshold: 999 })
+    const blocked = runBacktest({ BTCUSDT: rampSeries() }, '1h', {
+      ...config,
+      adxThreshold: 999,
+    })
     expect(baseline.trades.length).toBeGreaterThan(0)
     expect(blocked.trades.length).toBe(0)
     expect(blocked.guardianBlocks.adx_trend_weak).toBeGreaterThan(0)
@@ -746,8 +817,13 @@ describe('backtest ADX trend-strength gate', () => {
 describe('backtest Fibonacci-extension take-profit', () => {
   it('is a no-op at the default (fibTakeProfitEnabled: false)', () => {
     const a = runBacktest({ BTCUSDT: rampSeries() }, '1h', config)
-    const b = runBacktest({ BTCUSDT: rampSeries() }, '1h', { ...config, fibTakeProfitEnabled: false })
-    expect(b.trades.map((t) => t.entryPrice)).toEqual(a.trades.map((t) => t.entryPrice))
+    const b = runBacktest({ BTCUSDT: rampSeries() }, '1h', {
+      ...config,
+      fibTakeProfitEnabled: false,
+    })
+    expect(b.trades.map((t) => t.entryPrice)).toEqual(
+      a.trades.map((t) => t.entryPrice),
+    )
   })
 
   it('exits at a fib-target when enabled with a tight extension ratio', () => {
@@ -757,6 +833,8 @@ describe('backtest Fibonacci-extension take-profit', () => {
       fibSwingLookback: 20,
       fibExtensionRatio: 0.05, // tight enough that the sustained ramp clears it quickly
     })
-    expect(report.trades.some((t) => t.reason.startsWith('fib-target'))).toBe(true)
+    expect(report.trades.some((t) => t.reason.startsWith('fib-target'))).toBe(
+      true,
+    )
   })
 })

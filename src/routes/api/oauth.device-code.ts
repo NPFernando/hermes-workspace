@@ -51,10 +51,7 @@ export const Route = createFileRoute('/api/oauth/device-code')({
             }
             return json(data)
           } catch (err) {
-            return json(
-              { error: safeErrorMessage(err) },
-              { status: 500 },
-            )
+            return json({ error: safeErrorMessage(err) }, { status: 500 })
           }
         }
 

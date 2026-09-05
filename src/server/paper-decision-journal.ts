@@ -53,7 +53,9 @@ function toEntry(value: unknown): PaperDecisionJournalEntry | null {
     entry.kind !== 'research_snapshot' ||
     typeof entry.symbol !== 'string' ||
     typeof entry.compositeIntelligenceId !== 'string' ||
-    !(typeof entry.compositeScore === 'number' || entry.compositeScore === null) ||
+    !(
+      typeof entry.compositeScore === 'number' || entry.compositeScore === null
+    ) ||
     typeof entry.recordedAt !== 'string' ||
     typeof entry.idempotencyKey !== 'string' ||
     entry.side_effects !== false ||
@@ -132,6 +134,9 @@ export function appendPaperDecisionSnapshot(input: {
 
   const path = paperDecisionJournalPath()
   mkdirSync(getStateDir(), { recursive: true, mode: 0o700 })
-  appendFileSync(path, `${JSON.stringify(entry)}\n`, { encoding: 'utf8', mode: 0o600 })
+  appendFileSync(path, `${JSON.stringify(entry)}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+  })
   return { entry, appended: true }
 }

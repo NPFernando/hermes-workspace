@@ -78,7 +78,9 @@ function listClaudeProcesses(): Array<CliAgentEntry> {
     if (printIdx !== -1 && args[printIdx + 1]) {
       task = args[printIdx + 1].slice(0, 80)
     } else {
-      const positional = args.filter((a) => !a.startsWith('-') && !a.includes('claude')).join(' ')
+      const positional = args
+        .filter((a) => !a.startsWith('-') && !a.includes('claude'))
+        .join(' ')
       if (positional.trim()) task = positional.slice(0, 80)
     }
 

@@ -26,12 +26,19 @@ export const Route = createFileRoute('/api/gateway/sessions')({
         const caps = getCapabilities()
 
         if (!caps.sessions) {
-          return json({ ok: true, data: { sessions: [] }, source: 'unavailable' })
+          return json({
+            ok: true,
+            data: { sessions: [] },
+            source: 'unavailable',
+          })
         }
 
         try {
           const sessions = await listSessions(50)
-          return json({ ok: true, data: { sessions: Array.isArray(sessions) ? sessions : [] } })
+          return json({
+            ok: true,
+            data: { sessions: Array.isArray(sessions) ? sessions : [] },
+          })
         } catch (err) {
           return json(
             { ok: false, error: safeErrorMessage(err) },

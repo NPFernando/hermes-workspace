@@ -66,10 +66,14 @@ export function bucketVeto(
   minSamples = 20,
   lossRateThreshold = 0.65,
 ): { blocked: boolean; detail?: string } {
-  const bucket = Object.prototype.hasOwnProperty.call(stats, bucketKey(features))
+  const bucket = Object.prototype.hasOwnProperty.call(
+    stats,
+    bucketKey(features),
+  )
     ? stats[bucketKey(features)]
     : undefined
-  if (bucket === undefined || bucket.trades < minSamples) return { blocked: false }
+  if (bucket === undefined || bucket.trades < minSamples)
+    return { blocked: false }
   if (bucket.lossRate < lossRateThreshold) return { blocked: false }
   return {
     blocked: true,
@@ -78,7 +82,10 @@ export function bucketVeto(
 }
 
 /** ATR/price at each point past the warmup — the distribution volRegime buckets against. */
-export function atrPctSeries(candles: Array<Candle>, period: number): Array<number> {
+export function atrPctSeries(
+  candles: Array<Candle>,
+  period: number,
+): Array<number> {
   const out: Array<number> = []
   for (let i = period; i < candles.length; i++) {
     const slice = candles.slice(0, i + 1)

@@ -28,7 +28,8 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
 function resolveClaudeAgentDir(env: Record<string, string>): string | null {
   const candidates: string[] = []
 
-  const explicitAgentPath = env.HERMES_AGENT_PATH?.trim() || env.CLAUDE_AGENT_PATH?.trim()
+  const explicitAgentPath =
+    env.HERMES_AGENT_PATH?.trim() || env.CLAUDE_AGENT_PATH?.trim()
   if (explicitAgentPath) {
     candidates.push(explicitAgentPath)
   }
@@ -253,12 +254,16 @@ const config = defineConfig(({ mode, command }) => {
       return
     }
 
-    const child = spawn(odysseusVenvPython, ['-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '7100'], {
-      cwd: odysseusDir,
-      detached: false,
-      stdio: 'pipe',
-      env: { ...process.env, PYTHONUNBUFFERED: '1' },
-    })
+    const child = spawn(
+      odysseusVenvPython,
+      ['-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '7100'],
+      {
+        cwd: odysseusDir,
+        detached: false,
+        stdio: 'pipe',
+        env: { ...process.env, PYTHONUNBUFFERED: '1' },
+      },
+    )
     odysseusChild = child
     odysseusStarted = true
 
@@ -285,7 +290,9 @@ const config = defineConfig(({ mode, command }) => {
         return
       }
     }
-    console.warn('[odysseus] Started but health check timed out — may still be loading')
+    console.warn(
+      '[odysseus] Started but health check timed out — may still be loading',
+    )
   }
   // ── end Odysseus ────────────────────────────────────────────────────────────
 
@@ -549,7 +556,8 @@ const config = defineConfig(({ mode, command }) => {
           manualChunks(id) {
             if (!id.includes('node_modules')) return undefined
             // Only split truly isolated libs that have no circular deps with the framework
-            if (id.includes('/@hugeicons/') || id.includes('/@lobehub/icons')) return 'vendor-icons'
+            if (id.includes('/@hugeicons/') || id.includes('/@lobehub/icons'))
+              return 'vendor-icons'
             return undefined
           },
         },

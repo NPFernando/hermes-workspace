@@ -1,7 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { getClientIp, rateLimit, rateLimitResponse } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+} from '../../server/rate-limit'
 import { listSisters } from '../../server/sisters-registry'
 import { BEARER_TOKEN, CLAUDE_API } from '../../server/gateway-capabilities'
 import { classifyMultiple, classifyOne } from '../../lib/sister-routing'
@@ -45,7 +49,9 @@ async function callOrchestration(
       const text = await res.text().catch(() => '')
       throw new Error(`completions ${res.status}: ${text.slice(0, 100)}`)
     }
-    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> }
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>
+    }
     return data.choices?.[0]?.message?.content?.trim() ?? ''
   } finally {
     clearTimeout(timer)
@@ -65,7 +71,7 @@ export const Route = createFileRoute('/api/orchestrate')({
 
         let message = ''
         try {
-          const body = await request.json() as { message?: unknown }
+          const body = (await request.json()) as { message?: unknown }
           message = typeof body.message === 'string' ? body.message.trim() : ''
         } catch {
           return json({ ok: false, error: 'invalid body' }, { status: 400 })
@@ -88,11 +94,14 @@ export const Route = createFileRoute('/api/orchestrate')({
           if (matched.length >= 2) {
             let rawContent = ''
             try {
-              rawContent = await callOrchestration(message, matched.map((s) => ({
-                name: s.name,
-                emoji: s.emoji,
-                description: s.description,
-              })))
+              rawContent = await callOrchestration(
+                message,
+                matched.map((s) => ({
+                  name: s.name,
+                  emoji: s.emoji,
+                  description: s.description,
+                })),
+              )
             } catch (err) {
               console.error('[orchestrate] callOrchestration failed:', err)
             }
@@ -100,7 +109,10 @@ export const Route = createFileRoute('/api/orchestrate')({
             if (rawContent) {
               const names = matched.map((s) => s.name).join(', ')
               const preamble = `> 🌟 **Astra** — Coordinating with ${names}\n\n`
-              return json({ orchestrated: true, content: preamble + rawContent })
+              return json({
+                orchestrated: true,
+                content: preamble + rawContent,
+              })
             }
             // Fall through to single-sister if orchestration failed
           }

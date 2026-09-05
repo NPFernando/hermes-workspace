@@ -27,7 +27,6 @@ import {
   fetchJobOutput,
   fetchJobProfiles,
   fetchJobs,
-  getJobErrorText,
   isFailedJobState,
   pauseJob,
   resumeJob,
@@ -286,8 +285,6 @@ function JobCard({
   const isCompleted = job.state === 'completed'
   const lastRunStatus = getLastRunStatus(job)
   const freshnessCopy = formatJobFreshnessCopy(job)
-  const jobErrorText =
-    job.last_run_success === false ? getJobErrorText(job) : null
   const outputQuery = useQuery({
     queryKey: ['claude', 'jobs', job.id, 'output'],
     queryFn: () => fetchJobOutput(job.id),
@@ -363,16 +360,8 @@ function JobCard({
             />
             <span>{lastRunStatus.label}</span>
           </div>
-          {jobErrorText ? (
-            <p
-              title={jobErrorText}
-              className="mt-1 line-clamp-2 text-[10px] leading-4 text-[var(--theme-danger)]"
-            >
-              {jobErrorText}
-            </p>
-          ) : null}
           {freshnessCopy ? (
-            <p className="mt-1 text-[10px] leading-4 text-[var(--theme-warning)]">
+            <p className="mt-1 text-[10px] leading-4 text-[var(--theme-warning,#f59e0b)]">
               {freshnessCopy}
             </p>
           ) : null}
@@ -441,7 +430,7 @@ function JobCard({
             <HugeiconsIcon
               icon={Delete01Icon}
               size={14}
-              className="text-[var(--theme-danger)]"
+              className="text-[var(--theme-danger,#ef4444)]"
             />
           </button>
         </div>
@@ -676,7 +665,7 @@ export function JobsScreen() {
               />
             </div>
             {profilesQuery.isError && (
-              <span className="text-xs text-[var(--theme-warning)] shrink-0">
+              <span className="text-xs text-amber-400 shrink-0">
                 Profiles failed to load
               </span>
             )}
@@ -741,7 +730,7 @@ export function JobsScreen() {
               Loading jobs...
             </div>
           ) : jobsQuery.isError ? (
-            <div className="col-span-full flex items-center justify-center py-12 text-sm text-[var(--theme-danger)]">
+            <div className="col-span-full flex items-center justify-center py-12 text-sm text-[var(--theme-danger,#ef4444)]">
               Failed to load jobs:{' '}
               {jobsQuery.error instanceof Error
                 ? jobsQuery.error.message

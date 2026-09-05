@@ -24,24 +24,50 @@ function candle(i: number, close: number, wick = 0.5): Candle {
 
 describe('bucketKey', () => {
   it('is a stable, human-readable composite of the feature vector', () => {
-    const f: EntryFeatureVector = { strategyId: 'rsi_reversion', rsiDecile: 2, volRegime: 'high' }
+    const f: EntryFeatureVector = {
+      strategyId: 'rsi_reversion',
+      rsiDecile: 2,
+      volRegime: 'high',
+    }
     expect(bucketKey(f)).toBe('rsi_reversion|rsi2|high')
   })
 })
 
 describe('applyBucketOutcome', () => {
   it('starts a new bucket at trades:1 and recomputes lossRate each time', () => {
-    const f: EntryFeatureVector = { strategyId: 's', rsiDecile: 3, volRegime: 'low' }
+    const f: EntryFeatureVector = {
+      strategyId: 's',
+      rsiDecile: 3,
+      volRegime: 'low',
+    }
     let stats: Record<string, BucketStats> = {}
     stats = applyBucketOutcome(stats, f, -5)
-    expect(stats[bucketKey(f)]).toEqual({ key: bucketKey(f), trades: 1, losses: 1, lossRate: 1 })
+    expect(stats[bucketKey(f)]).toEqual({
+      key: bucketKey(f),
+      trades: 1,
+      losses: 1,
+      lossRate: 1,
+    })
     stats = applyBucketOutcome(stats, f, 10)
-    expect(stats[bucketKey(f)]).toEqual({ key: bucketKey(f), trades: 2, losses: 1, lossRate: 0.5 })
+    expect(stats[bucketKey(f)]).toEqual({
+      key: bucketKey(f),
+      trades: 2,
+      losses: 1,
+      lossRate: 0.5,
+    })
   })
 
   it('keeps other buckets untouched', () => {
-    const a: EntryFeatureVector = { strategyId: 's', rsiDecile: 1, volRegime: 'low' }
-    const b: EntryFeatureVector = { strategyId: 's', rsiDecile: 9, volRegime: 'high' }
+    const a: EntryFeatureVector = {
+      strategyId: 's',
+      rsiDecile: 1,
+      volRegime: 'low',
+    }
+    const b: EntryFeatureVector = {
+      strategyId: 's',
+      rsiDecile: 9,
+      volRegime: 'high',
+    }
     let stats: Record<string, BucketStats> = {}
     stats = applyBucketOutcome(stats, a, -1)
     stats = applyBucketOutcome(stats, b, -1)
@@ -51,11 +77,20 @@ describe('applyBucketOutcome', () => {
 })
 
 describe('bucketVeto', () => {
-  const f: EntryFeatureVector = { strategyId: 's', rsiDecile: 8, volRegime: 'high' }
+  const f: EntryFeatureVector = {
+    strategyId: 's',
+    rsiDecile: 8,
+    volRegime: 'high',
+  }
 
   it('vetoes once both the sample floor and loss-rate threshold clear', () => {
     const stats: Record<string, BucketStats> = {
-      [bucketKey(f)]: { key: bucketKey(f), trades: 25, losses: 18, lossRate: 0.72 },
+      [bucketKey(f)]: {
+        key: bucketKey(f),
+        trades: 25,
+        losses: 18,
+        lossRate: 0.72,
+      },
     }
     const result = bucketVeto(stats, f, 20, 0.65)
     expect(result.blocked).toBe(true)
@@ -65,14 +100,24 @@ describe('bucketVeto', () => {
 
   it('does not veto below the sample floor, even at a terrible loss rate', () => {
     const stats: Record<string, BucketStats> = {
-      [bucketKey(f)]: { key: bucketKey(f), trades: 15, losses: 15, lossRate: 1 },
+      [bucketKey(f)]: {
+        key: bucketKey(f),
+        trades: 15,
+        losses: 15,
+        lossRate: 1,
+      },
     }
     expect(bucketVeto(stats, f, 20, 0.65).blocked).toBe(false)
   })
 
   it('does not veto a well-sampled bucket at a merely-average loss rate', () => {
     const stats: Record<string, BucketStats> = {
-      [bucketKey(f)]: { key: bucketKey(f), trades: 100, losses: 50, lossRate: 0.5 },
+      [bucketKey(f)]: {
+        key: bucketKey(f),
+        trades: 100,
+        losses: 50,
+        lossRate: 0.5,
+      },
     }
     expect(bucketVeto(stats, f, 20, 0.65).blocked).toBe(false)
   })
@@ -104,13 +149,20 @@ describe('atrPctSeries', () => {
   })
 
   it('returns an empty series when there are fewer candles than the period', () => {
-    expect(atrPctSeries(Array.from({ length: 3 }, (_, i) => candle(i, 100)), 14)).toEqual([])
+    expect(
+      atrPctSeries(
+        Array.from({ length: 3 }, (_, i) => candle(i, 100)),
+        14,
+      ),
+    ).toEqual([])
   })
 })
 
 describe('buildEntryFeatureVector', () => {
   it('produces a decile in range and a valid vol regime for a real candle window', () => {
-    const candles = Array.from({ length: 60 }, (_, i) => candle(i, 100 + Math.sin(i / 3) * 2))
+    const candles = Array.from({ length: 60 }, (_, i) =>
+      candle(i, 100 + Math.sin(i / 3) * 2),
+    )
     const f = buildEntryFeatureVector('rsi_reversion', candles, 14)
     expect(f.strategyId).toBe('rsi_reversion')
     expect(f.rsiDecile).toBeGreaterThanOrEqual(0)

@@ -90,7 +90,10 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     label: 'Command Center',
     icon: UserMultipleIcon,
     to: '/command',
-    match: (p: string) => p.startsWith('/command') || p.startsWith('/operations') || p.startsWith('/agents'),
+    match: (p: string) =>
+      p.startsWith('/command') ||
+      p.startsWith('/operations') ||
+      p.startsWith('/agents'),
   },
   {
     id: 'conductor',
@@ -104,7 +107,8 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     label: 'Swarm',
     icon: UserGroupIcon,
     to: '/swarm',
-    match: (p: string) => p === '/swarm' || p.startsWith('/swarm/') || p.startsWith('/swarm2'),
+    match: (p: string) =>
+      p === '/swarm' || p.startsWith('/swarm/') || p.startsWith('/swarm2'),
   },
   {
     id: 'echo-studio',
@@ -257,9 +261,7 @@ export function MobileHamburgerMenu() {
         )}
       >
         {/* Header */}
-        <div
-          className="flex items-center justify-between px-4 pb-4 border-b border-[var(--theme-border)]"
-        >
+        <div className="flex items-center justify-between px-4 pb-4 border-b border-[var(--theme-border)]">
           <div className="flex items-center gap-2.5">
             <img
               src="/claude-avatar.webp"
@@ -267,14 +269,10 @@ export function MobileHamburgerMenu() {
               className="size-8 rounded-xl shrink-0"
             />
             <div className="flex flex-col leading-tight">
-              <span
-                className="font-bold text-[15px] tracking-tight text-[var(--theme-text)]"
-              >
+              <span className="font-bold text-[15px] tracking-tight text-[var(--theme-text)]">
                 Hermes Agent
               </span>
-              <span
-                className="text-[11px] text-[var(--theme-muted)]"
-              >
+              <span className="text-[11px] text-[var(--theme-muted)]">
                 Workspace
               </span>
             </div>
@@ -328,9 +326,7 @@ export function MobileHamburgerMenu() {
         </nav>
 
         {/* Bottom — user profile + settings + theme toggle */}
-        <div
-          className="px-3 pb-2 pt-3 border-t border-[var(--theme-border)]"
-        >
+        <div className="px-3 pb-2 pt-3 border-t border-[var(--theme-border)]">
           <div className="flex items-center gap-3 px-2">
             {/* User avatar + name + status dot */}
             <div
@@ -357,9 +353,7 @@ export function MobileHamburgerMenu() {
                 <circle cx="12" cy="7" r="4" />
               </svg>
             </div>
-            <span
-              className="text-[15px] font-semibold truncate text-[var(--theme-text)]"
-            >
+            <span className="text-[15px] font-semibold truncate text-[var(--theme-text)]">
               {profileDisplayName}
             </span>
             <span className="size-2.5 rounded-full bg-green-500 shrink-0" />

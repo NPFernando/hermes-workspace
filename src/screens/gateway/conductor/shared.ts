@@ -9,8 +9,17 @@ export type HistoryMessage = {
   content?: string | Array<{ type?: string; text?: string }>
 }
 
-export const AGENT_NAMES  = ['Astra', 'Nova', 'Ada',  'Maya', 'Vega', 'Atlas', 'Lyra', 'Forge']
-export const AGENT_EMOJIS = ['✨',    '🔎',  '💻',   '🔨',   '📈',  '🗺️',   '💡',   '🏗️']
+export const AGENT_NAMES = [
+  'Astra',
+  'Nova',
+  'Ada',
+  'Maya',
+  'Vega',
+  'Atlas',
+  'Lyra',
+  'Forge',
+]
+export const AGENT_EMOJIS = ['✨', '🔎', '💻', '🔨', '📈', '🗺️', '💡', '🏗️']
 
 export function getAgentPersona(index: number) {
   return {
@@ -25,7 +34,9 @@ export function getShortModelName(model: string | null | undefined): string {
   return parts[parts.length - 1] || model
 }
 
-export function extractMessageText(message: HistoryMessage | undefined): string {
+export function extractMessageText(
+  message: HistoryMessage | undefined,
+): string {
   if (!message) return ''
   if (typeof message.content === 'string') return message.content
   if (Array.isArray(message.content)) {
@@ -37,7 +48,9 @@ export function extractMessageText(message: HistoryMessage | undefined): string 
   return ''
 }
 
-export function getLastAssistantMessage(messages: Array<HistoryMessage> | undefined): string {
+export function getLastAssistantMessage(
+  messages: Array<HistoryMessage> | undefined,
+): string {
   if (!Array.isArray(messages)) return ''
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages.at(index)

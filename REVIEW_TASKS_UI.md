@@ -1,6 +1,7 @@
 # Review of Workspace UI Task-Centric View (src/screens/tasks/tasks-screen.tsx)
 
 ## Strengths
+
 1. **Clean Separation of Concerns**: The component uses React Query for data fetching and state management, keeping UI logic distinct from data synchronization.
 2. **Optimistic UI Updates**: Mutations (add, update, move, delete) update the local store immediately for a responsive feel, then reconcile with the server.
 3. **Robust Error Handling**: Each mutation includes error handling with user feedback via toast messages.
@@ -11,6 +12,7 @@
 8. **Extensible Design**: The task model includes fields for project, mission, tags, due dates, etc., allowing future enrichment.
 
 ## Weaknesses / Areas for Improvement
+
 1. **Tight Coupling to Local Storage Persistence**: The store uses `zustand` persist middleware, which writes to localStorage. While this provides offline capability, it can cause conflicts in multi‑tab scenarios and does not inherently support real‑time collaboration.
 2. **Polling‑Based Sync**: The `syncFromApi` method is called only on component mount (or manually via refresh). There is no automatic polling or websocket‑based live sync, so changes made elsewhere (e.g., by Maia or another agent) are not reflected until a manual refresh or remount.
 3. **No Conflict Resolution**: If two clients modify the same task simultaneously, the last write wins without any merge strategy or versioning.
@@ -21,6 +23,7 @@
 8. **No Task‑Specific Notifications**: When a task is assigned, updated, or completed, there is no in‑app notification or toast to inform relevant parties.
 
 ## Suggestions for Improvement (Focus: Automatic Updates Managed by Maia)
+
 1. **Enable Real‑Time Sync**: Replace or supplement the polling‑based `syncFromApi` with a websocket connection (e.g., using the existing `hindsight` or a dedicated task‑socket) so that Maia‑generated tasks appear instantly in the UI.
 2. **Create a Maia‑Driven Task Source**: Have Maia read `IDEAS.json`, delegate ideas to the appropriate sister (Nova, Atlas, Analyst, Coder), and upon delegation create a task via the tasks API (`POST /api/tasks`). The task should include:
    - `title`: idea title

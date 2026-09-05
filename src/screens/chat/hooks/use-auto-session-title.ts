@@ -57,7 +57,11 @@ async function generateAiTitle(messages: Array<ChatMessage>): Promise<string> {
     body: JSON.stringify({ messages: context }),
   })
   if (!res.ok) throw new Error(`generate-title: ${res.status}`)
-  const data = (await res.json()) as { ok: boolean; title?: string; error?: string }
+  const data = (await res.json()) as {
+    ok: boolean
+    title?: string
+    error?: string
+  }
   if (!data.ok || !data.title) throw new Error(data.error ?? 'empty title')
   return data.title
 }
@@ -98,9 +102,14 @@ export function useAutoSessionTitle({
     hasAssistantResponse(messages) &&
     (!activeSession?.label || isGenericTitle(activeSession.label)) &&
     (!activeSession?.title || isGenericTitle(activeSession.title)) &&
-    (!activeSession?.derivedTitle || isGenericTitle(activeSession.derivedTitle)) &&
+    (!activeSession?.derivedTitle ||
+      isGenericTitle(activeSession.derivedTitle)) &&
     !(titleInfo.source === 'manual' && titleInfo.title) &&
-    !(titleInfo.status === 'ready' && titleInfo.title && !isGenericTitle(titleInfo.title)) &&
+    !(
+      titleInfo.status === 'ready' &&
+      titleInfo.title &&
+      !isGenericTitle(titleInfo.title)
+    ) &&
     titleInfo.status !== 'generating'
 
   const applyTitle = (
@@ -182,13 +191,21 @@ export function useAutoSessionTitle({
 
     generateAiTitle(messages)
       .then((aiTitle) => {
-        mutate({ friendlyId, sessionKey: sessionKey ?? friendlyId, title: aiTitle })
+        mutate({
+          friendlyId,
+          sessionKey: sessionKey ?? friendlyId,
+          title: aiTitle,
+        })
       })
       .catch(() => {
         // Fallback: use truncated first user message
         const fallback = truncateTitle(getFirstUserMessage(messages))
         if (fallback) {
-          mutate({ friendlyId, sessionKey: sessionKey ?? friendlyId, title: fallback })
+          mutate({
+            friendlyId,
+            sessionKey: sessionKey ?? friendlyId,
+            title: fallback,
+          })
         } else {
           updateSessionTitleState(friendlyId, { status: 'idle', error: null })
           lastAttemptRef.current[key] = false

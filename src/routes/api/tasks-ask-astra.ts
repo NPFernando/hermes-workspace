@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { appendLocalMessage, ensureLocalSession } from '../../server/local-session-store'
+import {
+  appendLocalMessage,
+  ensureLocalSession,
+} from '../../server/local-session-store'
 import { listTasks } from '../../server/tasks-store'
 
 function jsonResponse(data: unknown, status = 200) {
@@ -32,13 +35,22 @@ export const Route = createFileRoute('/api/tasks-ask-astra')({
         }
 
         const focusTasks = allTasks
-          .filter((t) => t.column === 'in_progress' || t.column === 'blocked' || t.column === 'review')
+          .filter(
+            (t) =>
+              t.column === 'in_progress' ||
+              t.column === 'blocked' ||
+              t.column === 'review',
+          )
           .slice(0, 15)
 
         const focusLines = focusTasks
           .map((t) => {
-            const agentNote = t.agent_state ? ` [agent: ${t.agent_state} by ${t.agent_name ?? 'astra'}]` : ''
-            const commentNote = t.agent_comment ? ` — ${t.agent_comment.slice(0, 120)}` : ''
+            const agentNote = t.agent_state
+              ? ` [agent: ${t.agent_state} by ${t.agent_name ?? 'astra'}]`
+              : ''
+            const commentNote = t.agent_comment
+              ? ` — ${t.agent_comment.slice(0, 120)}`
+              : ''
             return `- [${t.column.toUpperCase()}] [${t.priority}] ${t.title}${agentNote}${commentNote}`
           })
           .join('\n')
@@ -50,7 +62,9 @@ export const Route = createFileRoute('/api/tasks-ask-astra')({
           `- Total active tasks: ${counts.total}`,
           `- Running: ${counts.running}  |  Blocked: ${counts.blocked}  |  In Review: ${counts.review}`,
           `- Triage: ${counts.backlog}  |  Ready: ${counts.todo}`,
-          counts.agentActive > 0 ? `- Agents currently working: ${counts.agentActive}` : '',
+          counts.agentActive > 0
+            ? `- Agents currently working: ${counts.agentActive}`
+            : '',
           '',
           focusTasks.length > 0
             ? `**Active / blocked tasks:**\n${focusLines}`

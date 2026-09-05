@@ -31,9 +31,18 @@ export const Route = createFileRoute('/api/finance-document')({
         const url = new URL(request.url)
         const kind = url.searchParams.get('kind')
         const id = url.searchParams.get('id')
-        if (!id || (kind !== 'income_source' && kind !== 'income_record' && kind !== 'expense_record')) {
+        if (
+          !id ||
+          (kind !== 'income_source' &&
+            kind !== 'income_record' &&
+            kind !== 'expense_record')
+        ) {
           return json(
-            { ok: false, error: 'kind=income_source|income_record|expense_record and id are required.' },
+            {
+              ok: false,
+              error:
+                'kind=income_source|income_record|expense_record and id are required.',
+            },
             { status: 400 },
           )
         }
@@ -46,11 +55,18 @@ export const Route = createFileRoute('/api/finance-document')({
               ? db.income_records.find((r) => r.id === id)
               : db.expense_records.find((r) => r.id === id)
         const documentRef = record?.documentRef
-        if (!documentRef) return json({ ok: false, error: 'No document on file for this record.' }, { status: 404 })
+        if (!documentRef)
+          return json(
+            { ok: false, error: 'No document on file for this record.' },
+            { status: 404 },
+          )
 
         const resolved = path.resolve(documentRef)
         if (!resolved.startsWith(path.resolve(FINANCE_DATA_DIR) + path.sep)) {
-          return json({ ok: false, error: 'Invalid document path.' }, { status: 400 })
+          return json(
+            { ok: false, error: 'Invalid document path.' },
+            { status: 400 },
+          )
         }
         try {
           const buffer = fs.readFileSync(resolved)
@@ -62,7 +78,10 @@ export const Route = createFileRoute('/api/finance-document')({
             },
           })
         } catch {
-          return json({ ok: false, error: 'Document file not found.' }, { status: 404 })
+          return json(
+            { ok: false, error: 'Document file not found.' },
+            { status: 404 },
+          )
         }
       },
     },

@@ -23,13 +23,19 @@ interface MobileSetupModalProps {
 }
 
 export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
-  const [version, setVersion] = useState<{ versionCode: number; versionName: string } | null>(null)
+  const [version, setVersion] = useState<{
+    versionCode: number
+    versionName: string
+  } | null>(null)
   const [platform, setPlatform] = useState<Platform>('unknown')
 
   useEffect(() => {
     setPlatform(detectPlatform())
     fetch('/api/app-version')
-      .then((r) => r.json() as Promise<{ versionCode: number; versionName: string }>)
+      .then(
+        (r) =>
+          r.json() as Promise<{ versionCode: number; versionName: string }>,
+      )
       .then(setVersion)
       .catch(() => {})
   }, [])
@@ -67,12 +73,16 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
 
         {/* Header */}
         <div className="mb-4 flex items-center gap-3 pr-8">
-          <img src="/claude-avatar.webp" alt="Hermes" className="size-10 rounded-xl" />
+          <img
+            src="/claude-avatar.webp"
+            alt="Hermes"
+            className="size-10 rounded-xl"
+          />
           <div>
-            <h2 className="text-base font-semibold text-[var(--theme-text)]">{title}</h2>
-            <p className="text-xs text-[var(--theme-muted)]">
-              {subtitle}
-            </p>
+            <h2 className="text-base font-semibold text-[var(--theme-text)]">
+              {title}
+            </h2>
+            <p className="text-xs text-[var(--theme-muted)]">{subtitle}</p>
           </div>
         </div>
 
@@ -80,15 +90,49 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
         <div className="mb-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-3.5">
           {isIos ? (
             <ol className="space-y-1.5 text-xs text-[var(--theme-muted)] list-decimal list-inside">
-              <li>Tap <span className="font-medium text-[var(--theme-text)]">Open Web App</span></li>
-              <li>Use Safari&apos;s <span className="font-medium text-[var(--theme-text)]">Share</span> button</li>
-              <li>Choose <span className="font-medium text-[var(--theme-text)]">Add to Home Screen</span></li>
+              <li>
+                Tap{' '}
+                <span className="font-medium text-[var(--theme-text)]">
+                  Open Web App
+                </span>
+              </li>
+              <li>
+                Use Safari&apos;s{' '}
+                <span className="font-medium text-[var(--theme-text)]">
+                  Share
+                </span>{' '}
+                button
+              </li>
+              <li>
+                Choose{' '}
+                <span className="font-medium text-[var(--theme-text)]">
+                  Add to Home Screen
+                </span>
+              </li>
             </ol>
           ) : (
             <ol className="space-y-1.5 text-xs text-[var(--theme-muted)] list-decimal list-inside">
-              <li>Open <span className="font-medium text-[var(--theme-text)]">agent.fernandofamily.com/download-apk</span> on your Android device</li>
-              <li>Tap <span className="font-medium text-[var(--theme-text)]">Download APK</span> and open the file</li>
-              <li>Tap <span className="font-medium text-[var(--theme-text)]">Install</span> — allow unknown sources if prompted</li>
+              <li>
+                Open{' '}
+                <span className="font-medium text-[var(--theme-text)]">
+                  agent.fernandofamily.com/download-apk
+                </span>{' '}
+                on your Android device
+              </li>
+              <li>
+                Tap{' '}
+                <span className="font-medium text-[var(--theme-text)]">
+                  Download APK
+                </span>{' '}
+                and open the file
+              </li>
+              <li>
+                Tap{' '}
+                <span className="font-medium text-[var(--theme-text)]">
+                  Install
+                </span>{' '}
+                — allow unknown sources if prompted
+              </li>
             </ol>
           )}
         </div>
@@ -118,7 +162,11 @@ export function MobileSetupModal({ isOpen, onClose }: MobileSetupModalProps) {
               onClick={handleDownload}
               className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-400"
             >
-              <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden>
+              <svg
+                viewBox="0 0 24 24"
+                className="size-4 fill-current"
+                aria-hidden
+              >
                 <path d="M12 16l-5-5 1.41-1.41L11 13.17V4h2v9.17l2.59-2.58L17 11zM5 20h14v-2H5z" />
               </svg>
               {isAndroid ? 'Open Download Page' : 'Send to Android'}

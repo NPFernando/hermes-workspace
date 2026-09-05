@@ -1,5 +1,11 @@
 import { execFile } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
@@ -20,7 +26,9 @@ const AGENT_BUS_SCRIPT =
   process.env.AGENT_BUS_SCRIPT ||
   '/opt/central-inteligencia/services/hermes-agent-bus/agent_bus.py'
 
-const HANDOFF_CONTRACTS: Partial<Record<string, { businessScope: string; reason: string }>> = {
+const HANDOFF_CONTRACTS: Partial<
+  Record<string, { businessScope: string; reason: string }>
+> = {
   'dona-helena->larissinha': {
     businessScope: 'DES',
     reason: 'duvida_juridica_interna',
@@ -111,19 +119,29 @@ function issueAgents(status: AgentBusStatus): Array<Record<string, unknown>> {
   return agents.filter((agent) => {
     const statusConfig = String(agent.status_config ?? '')
     const health = String(agent.health ?? '')
-    const operational = statusConfig === 'active' || statusConfig === 'observer_mode'
+    const operational =
+      statusConfig === 'active' || statusConfig === 'observer_mode'
     return !operational || health !== 'up'
   })
 }
 
 function utcStamp(): string {
-  return new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+  return new Date()
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}Z$/, 'Z')
 }
 
 function writeMission(payload: Record<string, unknown>): string {
   mkdirSync(MISSIONS_DIR, { recursive: true })
-  const target = String(payload.target ?? 'mission').replace(/[^a-z0-9-]/gi, '-')
-  const missionType = String(payload.mission_type ?? 'mission').replace(/[^a-z0-9-]/gi, '-')
+  const target = String(payload.target ?? 'mission').replace(
+    /[^a-z0-9-]/gi,
+    '-',
+  )
+  const missionType = String(payload.mission_type ?? 'mission').replace(
+    /[^a-z0-9-]/gi,
+    '-',
+  )
   const path = join(MISSIONS_DIR, `${utcStamp()}-${missionType}-${target}.json`)
   writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf-8')
   return path
@@ -134,13 +152,18 @@ async function syncRoadmap() {
   if (!existsSync(busRoot) || !existsSync(AGENT_BUS_SCRIPT)) {
     return {
       stdout: '',
-      stderr: 'Agent Bus infrastructure not deployed on this host. Set AGENT_BUS_SCRIPT and AGENT_BUS_OUTPUT_DIR env vars to point to your installation.',
+      stderr:
+        'Agent Bus infrastructure not deployed on this host. Set AGENT_BUS_SCRIPT and AGENT_BUS_OUTPUT_DIR env vars to point to your installation.',
     }
   }
-  const result = await execFileAsync('/usr/bin/python3', [AGENT_BUS_SCRIPT, '--sync-roadmap'], {
-    cwd: busRoot,
-    timeout: 60_000,
-  })
+  const result = await execFileAsync(
+    '/usr/bin/python3',
+    [AGENT_BUS_SCRIPT, '--sync-roadmap'],
+    {
+      cwd: busRoot,
+      timeout: 60_000,
+    },
+  )
   return {
     stdout: result.stdout.trim(),
     stderr: result.stderr.trim(),
@@ -170,7 +193,10 @@ async function handleAction(request: Request) {
   if (action === 'thumbnail-mission') {
     const target = String(body.target ?? 'vini').toLowerCase()
     if (!['vini', 'daiane'].includes(target)) {
-      return Response.json({ ok: false, error: 'target invalido' }, { status: 400 })
+      return Response.json(
+        { ok: false, error: 'target invalido' },
+        { status: 400 },
+      )
     }
     const brief =
       String(body.brief ?? '').trim() ||
@@ -188,7 +214,11 @@ async function handleAction(request: Request) {
       source: 'hermes-workspace',
       created_at: new Date().toISOString(),
     }
-    return Response.json({ ok: true, action, mission: { ...payload, mission_record_path: writeMission(payload) } })
+    return Response.json({
+      ok: true,
+      action,
+      mission: { ...payload, mission_record_path: writeMission(payload) },
+    })
   }
 
   if (action === 'handoff-mission') {
@@ -197,7 +227,10 @@ async function handleAction(request: Request) {
     const key = `${source}->${target}`
     const contract = HANDOFF_CONTRACTS[key]
     if (!contract) {
-      return Response.json({ ok: false, error: 'contrato de handoff nao aprovado', key }, { status: 400 })
+      return Response.json(
+        { ok: false, error: 'contrato de handoff nao aprovado', key },
+        { status: 400 },
+      )
     }
     const payload = {
       ok: true,
@@ -211,10 +244,17 @@ async function handleAction(request: Request) {
       source: 'hermes-workspace',
       created_at: new Date().toISOString(),
     }
-    return Response.json({ ok: true, action, mission: { ...payload, mission_record_path: writeMission(payload) } })
+    return Response.json({
+      ok: true,
+      action,
+      mission: { ...payload, mission_record_path: writeMission(payload) },
+    })
   }
 
-  return Response.json({ ok: false, error: 'acao desconhecida' }, { status: 400 })
+  return Response.json(
+    { ok: false, error: 'acao desconhecida' },
+    { status: 400 },
+  )
 }
 
 export const Route = createFileRoute('/api/agent-bus')({

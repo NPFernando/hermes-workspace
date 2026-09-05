@@ -238,7 +238,8 @@ export const rsiReversionStrategy: Strategy = {
     const last = closes[closes.length - 1]
     // See docs/tsconfig-strictness-rollout.md.
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (last === undefined) return HOLD('not enough candles for RSI trend filter')
+    if (last === undefined)
+      return HOLD('not enough candles for RSI trend filter')
     const inUptrend = trendSma != null && last > trendSma * (1 + trendBand)
     const inDowntrend = trendSma != null && last < trendSma * (1 - trendBand)
     if (value <= low) {
@@ -566,11 +567,7 @@ export function realizedVolPercentile(
 
   let below = 0
   let total = 0
-  for (
-    let end = closes.length - baselineLookback;
-    end < closes.length;
-    end++
-  ) {
+  for (let end = closes.length - baselineLookback; end < closes.length; end++) {
     const v = rollingVol(end)
     if (v == null) continue
     total++
@@ -668,7 +665,8 @@ export function fibExtensionTarget(
   if (lookback <= 0 || candles.length < lookback) return null
   const window = candles.slice(-lookback)
   const swingRange =
-    Math.max(...window.map((c) => c.high)) - Math.min(...window.map((c) => c.low))
+    Math.max(...window.map((c) => c.high)) -
+    Math.min(...window.map((c) => c.low))
   if (swingRange <= 0) return null
   return side === 'long'
     ? entryPrice + swingRange * extensionRatio
@@ -1187,5 +1185,8 @@ export function atrSizeMultiplier(
   if (atrValue == null || price <= 0 || baselineAtrPct <= 0) return 1
   const atrPct = atrValue / price
   if (atrPct <= 0) return 1
-  return Math.max(minMultiplier, Math.min(maxMultiplier, baselineAtrPct / atrPct))
+  return Math.max(
+    minMultiplier,
+    Math.min(maxMultiplier, baselineAtrPct / atrPct),
+  )
 }

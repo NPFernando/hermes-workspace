@@ -22,14 +22,10 @@ export function TradingOverviewCard({ onOpen }: { onOpen: () => void }) {
   const query = useQuery({
     queryKey: ['dashboard', 'trading-overview'],
     queryFn: async (): Promise<TradingSummary> => {
-      const response = await fetch('/api/trading/summary', {
-        cache: 'no-store',
-      })
-      if (!response.ok)
-        throw new Error(`Trading API returned HTTP ${response.status}`)
+      const response = await fetch('/api/trading/summary', { cache: 'no-store' })
+      if (!response.ok) throw new Error(`Trading API returned HTTP ${response.status}`)
       const data = (await response.json()) as TradingSummaryResponse
-      if (!data.ok || !data.summary)
-        throw new Error('Trading summary unavailable')
+      if (!data.ok || !data.summary) throw new Error('Trading summary unavailable')
       return data.summary
     },
     staleTime: 15_000,
@@ -38,9 +34,7 @@ export function TradingOverviewCard({ onOpen }: { onOpen: () => void }) {
   })
 
   const summary = query.data
-  const safetyLabel = summary?.emergencyKillSwitch
-    ? 'kill switch active'
-    : 'safety cutoff off'
+  const safetyLabel = summary?.emergencyKillSwitch ? 'kill switch active' : 'safety cutoff off'
 
   return (
     <button
@@ -48,7 +42,7 @@ export function TradingOverviewCard({ onOpen }: { onOpen: () => void }) {
       onClick={onOpen}
       className="group relative flex w-full flex-col gap-3 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 text-left transition-colors hover:bg-[var(--theme-card2)]"
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[var(--theme-success)] via-[color-mix(in_srgb,var(--theme-success)_50%,transparent)] to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-emerald-400 via-emerald-400/50 to-transparent" />
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
@@ -58,7 +52,7 @@ export function TradingOverviewCard({ onOpen }: { onOpen: () => void }) {
             Council, grid, rebalance, and LLM signal engines
           </p>
         </div>
-        <span className="text-xs font-medium text-[var(--theme-success)] group-hover:opacity-80">
+        <span className="text-xs font-medium text-emerald-300 group-hover:text-emerald-200">
           Open →
         </span>
       </div>
@@ -66,26 +60,22 @@ export function TradingOverviewCard({ onOpen }: { onOpen: () => void }) {
       {query.isLoading ? (
         <div className="h-16 animate-pulse rounded-lg bg-[var(--theme-card2)]" />
       ) : query.isError || !summary ? (
-        <p className="rounded-lg border border-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] p-3 text-xs text-[var(--theme-warning)]">
+        <p className="rounded-lg border border-amber-400/25 bg-amber-500/10 p-3 text-xs text-amber-100">
           Trading summary is temporarily unavailable.
         </p>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-[var(--theme-hover)] p-2.5">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)]">
-                Today's P&L
-              </div>
+            <div className="rounded-lg bg-black/10 p-2.5">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)]">Today's P&L</div>
               <div
-                className={`mt-1 text-sm font-semibold tabular-nums ${summary.todayPnlQuote >= 0 ? 'text-[var(--theme-success)]' : 'text-[var(--theme-danger)]'}`}
+                className={`mt-1 text-sm font-semibold tabular-nums ${summary.todayPnlQuote >= 0 ? 'text-emerald-300' : 'text-red-300'}`}
               >
                 {formatUsdt(summary.todayPnlQuote)}
               </div>
             </div>
-            <div className="rounded-lg bg-[var(--theme-hover)] p-2.5">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)]">
-                Open positions
-              </div>
+            <div className="rounded-lg bg-black/10 p-2.5">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)]">Open positions</div>
               <div className="mt-1 text-sm font-semibold tabular-nums text-[var(--theme-text)]">
                 {summary.openPositions}
               </div>
@@ -93,20 +83,9 @@ export function TradingOverviewCard({ onOpen }: { onOpen: () => void }) {
           </div>
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="text-[var(--theme-muted)]">
-              Mode:{' '}
-              <strong className="text-[var(--theme-text)]">
-                {summary.tradingMode.replace(/_/g, ' ')}
-              </strong>
+              Mode: <strong className="text-[var(--theme-text)]">{summary.tradingMode.replace(/_/g, ' ')}</strong>
             </span>
-            <span
-              className={
-                summary.emergencyKillSwitch
-                  ? 'text-[var(--theme-success)]'
-                  : 'text-[var(--theme-danger)]'
-              }
-            >
-              {safetyLabel}
-            </span>
+            <span className={summary.emergencyKillSwitch ? 'text-emerald-300' : 'text-red-300'}>{safetyLabel}</span>
           </div>
         </>
       )}

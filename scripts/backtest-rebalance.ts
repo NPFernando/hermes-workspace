@@ -44,15 +44,26 @@ function loadCache(
       `no cached candles at ${file} — run: pnpm exec tsx scripts/backfill-candles.ts --symbols ${symbol} --intervals ${interval}`,
     )
   }
-  const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { candles: Array<Candle> }
+  const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+    candles: Array<Candle>
+  }
   const cutoff = Date.now() - days * 86_400_000
-  const upperBound = minDaysAgo > 0 ? Date.now() - minDaysAgo * 86_400_000 : Infinity
-  return parsed.candles.filter((c) => c.openTime >= cutoff && c.openTime < upperBound)
+  const upperBound =
+    minDaysAgo > 0 ? Date.now() - minDaysAgo * 86_400_000 : Infinity
+  return parsed.candles.filter(
+    (c) => c.openTime >= cutoff && c.openTime < upperBound,
+  )
 }
 
 const fmt = (n: number, d = 2) => n.toFixed(d)
 
-function reportPath(reportDir: string, symbols: Array<string>, interval: string, days: number, suffix = ''): string {
+function reportPath(
+  reportDir: string,
+  symbols: Array<string>,
+  interval: string,
+  days: number,
+  suffix = '',
+): string {
   const symbolSlug = symbols.join('-').toLowerCase()
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   const unique = `${process.pid}-${process.hrtime.bigint().toString(36)}`
@@ -90,7 +101,10 @@ function printReport(report: RebalanceBacktestReport, title?: string) {
 }
 
 function main() {
-  const symbols = arg('symbols', DEFAULT_REBALANCE_BACKTEST_CONFIG.symbols.join(','))
+  const symbols = arg(
+    'symbols',
+    DEFAULT_REBALANCE_BACKTEST_CONFIG.symbols.join(','),
+  )
     .split(',')
     .map((s) => s.trim().toUpperCase())
   const interval = arg('interval', '1h')
@@ -108,9 +122,15 @@ function main() {
   }
 
   const candlesBySymbol: Record<string, Array<Candle>> = {}
-  for (const s of symbols) candlesBySymbol[s] = loadCache(s, interval, days, minDaysAgo)
+  for (const s of symbols)
+    candlesBySymbol[s] = loadCache(s, interval, days, minDaysAgo)
 
-  const reportDir = path.join(os.homedir(), '.hermes', 'finance', 'backtest-reports')
+  const reportDir = path.join(
+    os.homedir(),
+    '.hermes',
+    'finance',
+    'backtest-reports',
+  )
   fs.mkdirSync(reportDir, { recursive: true })
 
   if (splitPct > 0) {
@@ -119,8 +139,17 @@ function main() {
     const testReport = runRebalanceBacktest(test, config)
     printReport(trainReport, 'TRAIN')
     printReport(testReport, 'TEST (out-of-sample)')
-    const out = reportPath(reportDir, symbols, interval, days, `split${splitPct}`)
-    fs.writeFileSync(out, JSON.stringify({ config, train: trainReport, test: testReport }, null, 2))
+    const out = reportPath(
+      reportDir,
+      symbols,
+      interval,
+      days,
+      `split${splitPct}`,
+    )
+    fs.writeFileSync(
+      out,
+      JSON.stringify({ config, train: trainReport, test: testReport }, null, 2),
+    )
     console.log(`\nsaved: ${out}`)
     return
   }

@@ -13,10 +13,16 @@ import { cn } from '@/lib/utils'
 const SEEN_KEY = 'hermes-workspace-seen-version'
 
 const KIND_STYLE: Record<ChangeKind, { label: string; className: string }> = {
-  added:    { label: 'New',      className: 'bg-emerald-500/10 text-emerald-500' },
-  fixed:    { label: 'Fix',      className: 'bg-rose-500/10 text-rose-400' },
-  improved: { label: 'Better',   className: 'bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]' },
-  removed:  { label: 'Removed',  className: 'bg-[var(--theme-muted)]/10 text-[var(--theme-muted)]' },
+  added: { label: 'New', className: 'bg-emerald-500/10 text-emerald-500' },
+  fixed: { label: 'Fix', className: 'bg-rose-500/10 text-rose-400' },
+  improved: {
+    label: 'Better',
+    className: 'bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]',
+  },
+  removed: {
+    label: 'Removed',
+    className: 'bg-[var(--theme-muted)]/10 text-[var(--theme-muted)]',
+  },
 }
 
 export function ChangeList({ entry }: { entry: VersionEntry }) {
@@ -26,10 +32,17 @@ export function ChangeList({ entry }: { entry: VersionEntry }) {
         const style = KIND_STYLE[c.kind]
         return (
           <div key={i} className="flex items-start gap-2.5 text-sm">
-            <span className={cn('mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none', style.className)}>
+            <span
+              className={cn(
+                'mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                style.className,
+              )}
+            >
               {style.label}
             </span>
-            <span className="text-[var(--theme-muted)] leading-snug">{c.text}</span>
+            <span className="text-[var(--theme-muted)] leading-snug">
+              {c.text}
+            </span>
           </div>
         )
       })}
@@ -90,10 +103,18 @@ export function WhatsNewModal({ onDismissed }: WhatsNewModalProps = {}) {
           >
             {/* Header */}
             <div className="flex items-center gap-3 border-b border-[var(--theme-border)] px-5 py-4">
-              <img src="/claude-avatar.webp" alt="Hermes" className="size-9 rounded-xl shrink-0" />
+              <img
+                src="/claude-avatar.webp"
+                alt="Hermes"
+                className="size-9 rounded-xl shrink-0"
+              />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-[var(--theme-text)]">What's New in v{CHANGELOG[0].version}</p>
-                <p className="text-xs text-[var(--theme-muted)] truncate">{CHANGELOG[0].summary}</p>
+                <p className="text-sm font-semibold text-[var(--theme-text)]">
+                  What's New in v{CHANGELOG[0].version}
+                </p>
+                <p className="text-xs text-[var(--theme-muted)] truncate">
+                  {CHANGELOG[0].summary}
+                </p>
               </div>
               <button
                 type="button"
@@ -124,7 +145,9 @@ export function WhatsNewModal({ onDismissed }: WhatsNewModalProps = {}) {
 
             {/* Footer */}
             <div className="flex items-center justify-between border-t border-[var(--theme-border)] px-5 py-3">
-              <span className="text-xs text-[var(--theme-muted)]">{CHANGELOG[0].date}</span>
+              <span className="text-xs text-[var(--theme-muted)]">
+                {CHANGELOG[0].date}
+              </span>
               <button
                 type="button"
                 onClick={dismiss}

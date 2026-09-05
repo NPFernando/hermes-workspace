@@ -19,14 +19,18 @@ describe('root layout surface state', () => {
   })
 
   it('shows fullscreen onboarding until onboarding is complete after auth is resolved', () => {
-    expect(getRootSurfaceState(false, { authRequired: false, authenticated: false })).toEqual({
+    expect(
+      getRootSurfaceState(false, { authRequired: false, authenticated: false }),
+    ).toEqual({
       showLogin: false,
       showOnboarding: true,
       showWorkspaceShell: false,
       showPostOnboardingOverlays: false,
     })
 
-    expect(getRootSurfaceState(null, { authRequired: false, authenticated: false })).toEqual({
+    expect(
+      getRootSurfaceState(null, { authRequired: false, authenticated: false }),
+    ).toEqual({
       showLogin: false,
       showOnboarding: true,
       showWorkspaceShell: false,
@@ -35,7 +39,9 @@ describe('root layout surface state', () => {
   })
 
   it('shows workspace shell and post-onboarding overlays after completion', () => {
-    expect(getRootSurfaceState(true, { authRequired: false, authenticated: false })).toEqual({
+    expect(
+      getRootSurfaceState(true, { authRequired: false, authenticated: false }),
+    ).toEqual({
       showLogin: false,
       showOnboarding: false,
       showWorkspaceShell: true,

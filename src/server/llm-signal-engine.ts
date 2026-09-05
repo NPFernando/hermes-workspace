@@ -25,7 +25,11 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { createDemoClientFromEnv } from './binance-demo-client'
-import { appendAuditLog, readFinanceStore, writeFinanceStore } from './finance-store'
+import {
+  appendAuditLog,
+  readFinanceStore,
+  writeFinanceStore,
+} from './finance-store'
 import { executionModeAllowed } from './trading-execution-gate'
 import { recordLlmDecision } from './research-store'
 import { atr, rsi, sma } from './trading-strategies'
@@ -60,7 +64,9 @@ export const DEFAULT_LLM_SIGNAL_CONFIG: LlmSignalConfig = {
   harpRisk: 'standard',
 }
 
-export function resolveLlmSignalConfig(settingsOverride: unknown): LlmSignalConfig {
+export function resolveLlmSignalConfig(
+  settingsOverride: unknown,
+): LlmSignalConfig {
   const fromSettings =
     settingsOverride && typeof settingsOverride === 'object'
       ? (settingsOverride as Partial<LlmSignalConfig>)
@@ -142,7 +148,11 @@ export function buildPrompt(
 }
 
 export function parseLlmResponse(raw: string): ParsedLlmDecision | null {
-  const stripped = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/, '')
+    .trim()
   try {
     const obj: unknown = JSON.parse(stripped)
     if (typeof obj !== 'object' || obj === null) return null
@@ -193,13 +203,24 @@ export function selectHarpRoutes(task: string, risk: string): Array<HarpRoute> {
   try {
     const result = spawnSync(
       'python3',
-      ['/home/ubuntu/workspace/projects/universal-harp-engine/scripts/harp-select-route.py', '--task', task, '--risk', risk, '--json'],
+      [
+        '/home/ubuntu/workspace/projects/universal-harp-engine/scripts/harp-select-route.py',
+        '--task',
+        task,
+        '--risk',
+        risk,
+        '--json',
+      ],
       { encoding: 'utf-8', timeout: 15_000 },
     )
     if (result.status !== 0 || !result.stdout) return []
     const parsed: unknown = JSON.parse(result.stdout)
     const fallbacks = (parsed as { fallbacks?: Array<HarpRoute> }).fallbacks
-    return fallbacks?.filter((f) => f.provider === 'openrouter' && f.model && f.tier === 'free') ?? []
+    return (
+      fallbacks?.filter(
+        (f) => f.provider === 'openrouter' && f.model && f.tier === 'free',
+      ) ?? []
+    )
   } catch {
     return []
   }
@@ -217,7 +238,10 @@ export function readOpenRouterKey(): string | null {
   }
 }
 
-export async function callOpenRouter(model: string, prompt: string): Promise<string | null> {
+export async function callOpenRouter(
+  model: string,
+  prompt: string,
+): Promise<string | null> {
   const apiKey = readOpenRouterKey()
   if (!apiKey) {
     console.error('llm-signal-engine: no OpenRouter API key available')
@@ -238,7 +262,9 @@ export async function callOpenRouter(model: string, prompt: string): Promise<str
       signal: AbortSignal.timeout(30_000),
     })
     if (!resp.ok) {
-      console.error(`llm-signal-engine: OpenRouter call to ${model} failed: ${resp.status} ${resp.statusText}`)
+      console.error(
+        `llm-signal-engine: OpenRouter call to ${model} failed: ${resp.status} ${resp.statusText}`,
+      )
       return null
     }
     const data = (await resp.json()) as {
@@ -280,11 +306,20 @@ export interface LlmCycleResult {
 
 export interface LlmCycleOptions {
   client?: BinanceExecutionClient
-  fetchKlines?: (symbol: string, interval: string, limit: number) => Promise<Array<Candle>>
-  callModel?: (routes: Array<HarpRoute>, prompt: string) => Promise<{ content: string; model: string } | null>
+  fetchKlines?: (
+    symbol: string,
+    interval: string,
+    limit: number,
+  ) => Promise<Array<Candle>>
+  callModel?: (
+    routes: Array<HarpRoute>,
+    prompt: string,
+  ) => Promise<{ content: string; model: string } | null>
 }
 
-async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResult> {
+async function runLlmCycleInner(
+  options: LlmCycleOptions,
+): Promise<LlmCycleResult> {
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const config = resolveLlmSignalConfig(settings.demoTradingLlm)
@@ -293,22 +328,30 @@ async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResul
     config,
     'llm signal engine is disabled (settings.demoTradingLlm.enabled)',
   )
-  if (!gate.allowed) return { ran: false, reason: gate.reason };
+  if (!gate.allowed) return { ran: false, reason: gate.reason }
 
   const rows = db.strategy_results
-  const positions = rows.filter((r) => r.kind === SR_KIND_LLM_POSITION) as unknown as Array<LlmPosition>
-  const existingTrades = rows.filter((r) => r.kind === SR_KIND_LLM_TRADE) as unknown as Array<LlmTrade>
+  const positions = rows.filter(
+    (r) => r.kind === SR_KIND_LLM_POSITION,
+  ) as unknown as Array<LlmPosition>
+  const existingTrades = rows.filter(
+    (r) => r.kind === SR_KIND_LLM_TRADE,
+  ) as unknown as Array<LlmTrade>
 
   const today = new Date().toISOString().slice(0, 10)
   const dailyPnl = existingTrades
     .filter((t) => t.pnlQuote != null && t.createdAt.startsWith(today))
     .reduce((s, t) => s + (t.pnlQuote ?? 0), 0)
   if (dailyPnl <= -config.maxDailyLossQuote) {
-    return { ran: false, reason: `daily loss halt: ${dailyPnl.toFixed(2)} <= -${config.maxDailyLossQuote}` }
+    return {
+      ran: false,
+      reason: `daily loss halt: ${dailyPnl.toFixed(2)} <= -${config.maxDailyLossQuote}`,
+    }
   }
 
   const routes = selectHarpRoutes(config.harpTask, config.harpRisk)
-  if (routes.length === 0) return { ran: false, reason: 'no HARP OpenRouter route available' }
+  if (routes.length === 0)
+    return { ran: false, reason: 'no HARP OpenRouter route available' }
 
   let client = options.client
   if (!client) {
@@ -317,7 +360,9 @@ async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResul
     client = created.client
   }
   const fetchKlines =
-    options.fetchKlines ?? ((symbol: string, interval: string, limit: number) => client.getKlines(symbol, interval, limit))
+    options.fetchKlines ??
+    ((symbol: string, interval: string, limit: number) =>
+      client.getKlines(symbol, interval, limit))
   const callModel = options.callModel ?? callWithFallback
 
   const contexts = []
@@ -326,7 +371,8 @@ async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResul
     if (candles.length < 20) continue
     contexts.push(buildContextSummary(symbol, candles))
   }
-  if (contexts.length === 0) return { ran: false, reason: 'no market context available' }
+  if (contexts.length === 0)
+    return { ran: false, reason: 'no market context available' }
 
   const prompt = buildPrompt(
     contexts,
@@ -341,13 +387,21 @@ async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResul
       decision: 'HOLD',
       applied: false,
     })
-    return { ran: false, reason: 'model call failed on every fallback candidate' }
+    return {
+      ran: false,
+      reason: 'model call failed on every fallback candidate',
+    }
   }
   const { content: raw, model: modelUsed } = callResult
 
   const parsedRaw: { symbol?: string | null } | null = (() => {
     try {
-      return JSON.parse(raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '')) as { symbol?: string | null }
+      return JSON.parse(
+        raw
+          .trim()
+          .replace(/^```(?:json)?/i, '')
+          .replace(/```$/, ''),
+      ) as { symbol?: string | null }
     } catch {
       return null
     }
@@ -366,9 +420,16 @@ async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResul
   })
 
   if (!decision || decision.signal === 'HOLD' || !decidedSymbol) {
-    return { ran: true, decision: decision ? { ...decision, symbol: decidedSymbol } : undefined }
+    return {
+      ran: true,
+      decision: decision ? { ...decision, symbol: decidedSymbol } : undefined,
+    }
   }
-  if (typeof decision.confidence !== "number" || !isFinite(decision.confidence) || decision.confidence < config.minConfidence) {
+  if (
+    typeof decision.confidence !== 'number' ||
+    !isFinite(decision.confidence) ||
+    decision.confidence < config.minConfidence
+  ) {
     return { ran: true, decision: { ...decision, symbol: decidedSymbol } }
   }
   if (!config.symbols.includes(decidedSymbol)) {
@@ -412,10 +473,16 @@ async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResul
       reasoning: decision.reasoning,
       createdAt: new Date(order.transactTime).toISOString(),
     }
-    const others = rows.filter((r) => r.kind !== SR_KIND_LLM_POSITION && r.kind !== SR_KIND_LLM_TRADE)
+    const others = rows.filter(
+      (r) => r.kind !== SR_KIND_LLM_POSITION && r.kind !== SR_KIND_LLM_TRADE,
+    )
     const mergedPositions = [...positions, newPosition]
     const mergedTrades = [...existingTrades, trade].slice(-LLM_TRADE_LOG_CAP)
-    db.strategy_results = [...others, ...mergedPositions.map((p) => ({ ...p })), ...mergedTrades.map((t) => ({ ...t }))]
+    db.strategy_results = [
+      ...others,
+      ...mergedPositions.map((p) => ({ ...p })),
+      ...mergedTrades.map((t) => ({ ...t })),
+    ]
     db.updatedAt = new Date().toISOString()
     writeFinanceStore(db)
   } else if (existingPosition) {
@@ -439,10 +506,18 @@ async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResul
       reasoning: decision.reasoning,
       createdAt: new Date(order.transactTime).toISOString(),
     }
-    const remainingPositions = positions.filter((p) => p.symbol !== decidedSymbol)
-    const others = rows.filter((r) => r.kind !== SR_KIND_LLM_POSITION && r.kind !== SR_KIND_LLM_TRADE)
+    const remainingPositions = positions.filter(
+      (p) => p.symbol !== decidedSymbol,
+    )
+    const others = rows.filter(
+      (r) => r.kind !== SR_KIND_LLM_POSITION && r.kind !== SR_KIND_LLM_TRADE,
+    )
     const mergedTrades = [...existingTrades, trade].slice(-LLM_TRADE_LOG_CAP)
-    db.strategy_results = [...others, ...remainingPositions.map((p) => ({ ...p })), ...mergedTrades.map((t) => ({ ...t }))]
+    db.strategy_results = [
+      ...others,
+      ...remainingPositions.map((p) => ({ ...p })),
+      ...mergedTrades.map((t) => ({ ...t })),
+    ]
     db.updatedAt = new Date().toISOString()
     writeFinanceStore(db)
   }
@@ -469,7 +544,9 @@ async function runLlmCycleInner(options: LlmCycleOptions): Promise<LlmCycleResul
   return { ran: true, decision: { ...decision, symbol: decidedSymbol }, trade }
 }
 
-export async function runLlmSignalCycle(options: LlmCycleOptions = {}): Promise<LlmCycleResult> {
+export async function runLlmSignalCycle(
+  options: LlmCycleOptions = {},
+): Promise<LlmCycleResult> {
   if (llmCycleInProgress) return { ran: false, reason: 'already in progress' }
   llmCycleInProgress = true
   try {
@@ -477,6 +554,17 @@ export async function runLlmSignalCycle(options: LlmCycleOptions = {}): Promise<
   } finally {
     llmCycleInProgress = false
   }
+}
+
+/** Uncapped counterpart of `getLlmSignalState()`'s trade log — every
+ * executed order (not just the most recent 50 used for display), for the
+ * read-only trading ledger. */
+export function getAllLlmTrades(): Array<LlmTrade> {
+  const db = readFinanceStore()
+  const rows = db.strategy_results
+  return rows.filter(
+    (r) => r.kind === SR_KIND_LLM_TRADE,
+  ) as unknown as Array<LlmTrade>
 }
 
 export function getLlmSignalState(): {
@@ -489,7 +577,15 @@ export function getLlmSignalState(): {
   const rows = db.strategy_results
   return {
     config: resolveLlmSignalConfig(settings.demoTradingLlm),
-    positions: rows.filter((r) => r.kind === SR_KIND_LLM_POSITION) as unknown as Array<LlmPosition>,
-    trades: (rows.filter((r) => r.kind === SR_KIND_LLM_TRADE) as unknown as Array<LlmTrade>).slice(-50).reverse(),
+    positions: rows.filter(
+      (r) => r.kind === SR_KIND_LLM_POSITION,
+    ) as unknown as Array<LlmPosition>,
+    trades: (
+      rows.filter(
+        (r) => r.kind === SR_KIND_LLM_TRADE,
+      ) as unknown as Array<LlmTrade>
+    )
+      .slice(-50)
+      .reverse(),
   }
 }

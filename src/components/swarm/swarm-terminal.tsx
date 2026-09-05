@@ -68,7 +68,9 @@ export const SwarmTerminal = memo(function SwarmTerminalComponent({
       // while typed input never reaches terminal.onData.
       containerRef.current?.focus()
       terminalRef.current?.focus()
-      const textarea = containerRef.current?.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null
+      const textarea = containerRef.current?.querySelector(
+        '.xterm-helper-textarea',
+      ) as HTMLTextAreaElement | null
       textarea?.focus()
     } catch {
       /* noop */
@@ -87,15 +89,18 @@ export const SwarmTerminal = memo(function SwarmTerminalComponent({
     }).catch(() => undefined)
   }, [])
 
-  const queueInput = useCallback((data: string) => {
-    if (!data) return
-    inputBufferRef.current += data
-    if (flushTimerRef.current) return
-    flushTimerRef.current = setTimeout(() => {
-      flushTimerRef.current = null
-      flushPendingInput()
-    }, 18)
-  }, [flushPendingInput])
+  const queueInput = useCallback(
+    (data: string) => {
+      if (!data) return
+      inputBufferRef.current += data
+      if (flushTimerRef.current) return
+      flushTimerRef.current = setTimeout(() => {
+        flushTimerRef.current = null
+        flushPendingInput()
+      }, 18)
+    },
+    [flushPendingInput],
+  )
 
   const stop = useCallback(() => {
     if (flushTimerRef.current) {
@@ -169,16 +174,17 @@ export const SwarmTerminal = memo(function SwarmTerminalComponent({
 
       focusTerminal()
 
-      const viewport = containerRef.current.querySelector(
-        '.xterm-viewport',
-      )
+      const viewport = containerRef.current.querySelector('.xterm-viewport')
       const wheelHandler: EventListener = (event) => {
         const wheelEvent = event as WheelEvent
         // Make wheel scrolling reliably review terminal scrollback instead of
         // being interpreted as shell/tmux history navigation.
         wheelEvent.preventDefault()
         wheelEvent.stopPropagation()
-        const lines = Math.max(-8, Math.min(8, Math.round(wheelEvent.deltaY / 40)))
+        const lines = Math.max(
+          -8,
+          Math.min(8, Math.round(wheelEvent.deltaY / 40)),
+        )
         if (lines !== 0) {
           terminal.scrollLines(lines)
         }
@@ -202,7 +208,9 @@ export const SwarmTerminal = memo(function SwarmTerminalComponent({
       }).catch(() => null)
 
       if (!response || !response.ok || !response.body) {
-        setError(`Failed to start swarm terminal (${response?.status ?? 'no response'})`)
+        setError(
+          `Failed to start swarm terminal (${response?.status ?? 'no response'})`,
+        )
         setState('error')
         terminal.writeln('\r\n\x1b[31m[swarm] failed to start terminal\x1b[0m')
         return
@@ -242,7 +250,9 @@ export const SwarmTerminal = memo(function SwarmTerminalComponent({
 
       try {
         for (;;) {
-          const readState = await reader.read().catch(() => ({ done: true, value: undefined }))
+          const readState = await reader
+            .read()
+            .catch(() => ({ done: true, value: undefined }))
           if (readState.done) break
           const value = readState.value
           if (!value) continue
@@ -262,7 +272,8 @@ export const SwarmTerminal = memo(function SwarmTerminalComponent({
             try {
               const parsed = JSON.parse(dataLine) as Record<string, unknown>
               if (event === 'session') {
-                const sessionId = typeof parsed.sessionId === 'string' ? parsed.sessionId : null
+                const sessionId =
+                  typeof parsed.sessionId === 'string' ? parsed.sessionId : null
                 if (sessionId) sessionIdRef.current = sessionId
               } else if (event === 'data') {
                 const data = typeof parsed.data === 'string' ? parsed.data : ''
@@ -272,7 +283,10 @@ export const SwarmTerminal = memo(function SwarmTerminalComponent({
                 sessionIdRef.current = null
                 setState('closed')
               } else if (event === 'error') {
-                const message = typeof parsed.message === 'string' ? parsed.message : 'unknown error'
+                const message =
+                  typeof parsed.message === 'string'
+                    ? parsed.message
+                    : 'unknown error'
                 terminal.writeln(`\r\n\x1b[31m[swarm] ${message}\x1b[0m`)
               }
             } catch {
@@ -308,7 +322,14 @@ export const SwarmTerminal = memo(function SwarmTerminalComponent({
         /* noop */
       }
     }
-  }, [workerId, commandKey, cwd, reconnectKey, focusTerminal, flushPendingInput])
+  }, [
+    workerId,
+    commandKey,
+    cwd,
+    reconnectKey,
+    focusTerminal,
+    flushPendingInput,
+  ])
 
   useEffect(() => {
     if (!active) return
@@ -361,7 +382,8 @@ export const SwarmTerminal = memo(function SwarmTerminalComponent({
             if (event.ctrlKey && event.key.length === 1) {
               const upper = event.key.toUpperCase()
               const code = upper.charCodeAt(0)
-              if (code >= 64 && code <= 95) return String.fromCharCode(code - 64)
+              if (code >= 64 && code <= 95)
+                return String.fromCharCode(code - 64)
             }
             switch (event.key) {
               case 'Enter':
@@ -398,7 +420,9 @@ export const SwarmTerminal = memo(function SwarmTerminalComponent({
           const data = keyToData()
           if (!data) return
           const activeEl = document.activeElement as HTMLElement | null
-          const isXtermTextarea = activeEl ? activeEl.classList.contains('xterm-helper-textarea') : false
+          const isXtermTextarea = activeEl
+            ? activeEl.classList.contains('xterm-helper-textarea')
+            : false
 
           if (isXtermTextarea) {
             // Prefer xterm's native onData path. On some macOS browser/input
@@ -435,7 +459,9 @@ export const SwarmTerminal = memo(function SwarmTerminalComponent({
         style={{ height }}
       />
       {error ? (
-        <div className="rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>
+        <div className="rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          {error}
+        </div>
       ) : null}
     </div>
   )

@@ -31,7 +31,12 @@ describe('getTradingSummary', () => {
     expect(summary.totalPnlQuote).toBe(0)
     expect(summary.openPositions).toBe(0)
     expect(summary.engines).toHaveLength(4)
-    expect(summary.engines.map((e) => e.id)).toEqual(['council', 'grid', 'rebalance', 'llm'])
+    expect(summary.engines.map((e) => e.id)).toEqual([
+      'council',
+      'grid',
+      'rebalance',
+      'llm',
+    ])
     // Kill switch is on by default — every engine should report disabled.
     for (const engine of summary.engines) {
       expect(engine.armState).toBe('disabled')

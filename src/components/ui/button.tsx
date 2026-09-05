@@ -32,8 +32,10 @@ const buttonVariants = cva(
           'bg-[var(--theme-panel)] text-[var(--theme-text)] hover:bg-[var(--theme-hover)] outline outline-[var(--theme-border)]/20 shadow-2xs',
         outline:
           'border-[var(--theme-border)] bg-transparent text-[var(--theme-text)] hover:bg-[var(--theme-panel)] shadow-2xs outline outline-[var(--theme-border)]/20',
-        ghost: 'text-[var(--theme-text)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]',
-        destructive: 'bg-red-600 text-[var(--theme-text)] hover:bg-red-700 shadow-sm',
+        ghost:
+          'text-[var(--theme-text)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]',
+        destructive:
+          'bg-red-600 text-[var(--theme-text)] hover:bg-red-700 shadow-sm',
       },
     },
   },

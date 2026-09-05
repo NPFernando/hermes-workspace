@@ -35,7 +35,10 @@ function staticFallback(terminalOutput: string): {
   suggestedCommands: Array<{ command: string; description: string }>
 } {
   const lines = terminalOutput.split('\n')
-  const errorLine = lines.find((l) => /error|Error|ERROR|failed|FAILED/i.test(l)) ?? lines.at(-1) ?? ''
+  const errorLine =
+    lines.find((l) => /error|Error|ERROR|failed|FAILED/i.test(l)) ??
+    lines.at(-1) ??
+    ''
   return {
     summary: 'Terminal command failed',
     rootCause: errorLine.trim().slice(0, 200) || 'Unknown error',
@@ -56,19 +59,29 @@ export const Route = createFileRoute('/api/debug-analyze')({
         let terminalOutput: string
         try {
           const body = (await request.json()) as { terminalOutput?: string }
-          terminalOutput = typeof body.terminalOutput === 'string' ? body.terminalOutput.trim() : ''
+          terminalOutput =
+            typeof body.terminalOutput === 'string'
+              ? body.terminalOutput.trim()
+              : ''
         } catch {
-          return json({ ok: false, error: 'Invalid JSON body' }, { status: 400 })
+          return json(
+            { ok: false, error: 'Invalid JSON body' },
+            { status: 400 },
+          )
         }
 
         if (!terminalOutput) {
-          return json({ ok: false, error: 'terminalOutput is required' }, { status: 400 })
+          return json(
+            { ok: false, error: 'terminalOutput is required' },
+            { status: 400 },
+          )
         }
 
         // Truncate to avoid token limits
-        const truncated = terminalOutput.length > 4000
-          ? terminalOutput.slice(-4000)
-          : terminalOutput
+        const truncated =
+          terminalOutput.length > 4000
+            ? terminalOutput.slice(-4000)
+            : terminalOutput
 
         const caps = getCapabilities()
         if (!caps.chatCompletions && !caps.health) {
@@ -79,14 +92,20 @@ export const Route = createFileRoute('/api/debug-analyze')({
           const raw = await openaiChat(
             [
               { role: 'system', content: SYSTEM_PROMPT },
-              { role: 'user', content: `Terminal output:\n\`\`\`\n${truncated}\n\`\`\`` },
+              {
+                role: 'user',
+                content: `Terminal output:\n\`\`\`\n${truncated}\n\`\`\``,
+              },
             ],
             { stream: false },
           )
 
           const content = typeof raw === 'string' ? raw.trim() : ''
           // Strip markdown fences if model added them anyway
-          const cleaned = content.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim()
+          const cleaned = content
+            .replace(/^```(?:json)?\n?/i, '')
+            .replace(/\n?```$/i, '')
+            .trim()
           const parsed = JSON.parse(cleaned) as {
             summary?: string
             rootCause?: string
@@ -97,7 +116,9 @@ export const Route = createFileRoute('/api/debug-analyze')({
           return json({
             summary: parsed.summary ?? 'Analysis complete',
             rootCause: parsed.rootCause ?? 'See terminal output',
-            suggestedCommands: Array.isArray(parsed.suggestedCommands) ? parsed.suggestedCommands : [],
+            suggestedCommands: Array.isArray(parsed.suggestedCommands)
+              ? parsed.suggestedCommands
+              : [],
             docsLink: parsed.docsLink,
           })
         } catch {

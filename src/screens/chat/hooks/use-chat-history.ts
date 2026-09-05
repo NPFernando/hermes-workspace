@@ -169,9 +169,7 @@ function getAttachmentSignature(message: ChatMessage): string {
       const size =
         typeof attachment.size === 'number' ? String(attachment.size) : ''
       const type =
-        typeof attachment.contentType === 'string'
-          ? attachment.contentType
-          : ''
+        typeof attachment.contentType === 'string' ? attachment.contentType : ''
       return `${name}:${size}:${type}`
     })
     .sort()
@@ -188,8 +186,7 @@ function isOptimisticUserMessage(message: ChatMessage): boolean {
   // being treated as pending and duplicated in the transcript.
   if (status === 'sent' || status === 'done') return false
   return (
-    status === 'sending' ||
-    normalizeMessageValue(raw.__optimisticId).length > 0
+    status === 'sending' || normalizeMessageValue(raw.__optimisticId).length > 0
   )
 }
 
@@ -339,10 +336,10 @@ export function useChatHistory({
       const cached = queryClient.getQueryData(historyKey)
       const optimisticMessages = Array.isArray((cached as any)?.messages)
         ? (cached as any).messages.filter((message: any) => {
-          if (message.status === 'sending') return true
-          if (message.__optimisticId) return true
-          return Boolean(message.clientId)
-        })
+            if (message.status === 'sending') return true
+            if (message.__optimisticId) return true
+            return Boolean(message.clientId)
+          })
         : []
 
       const serverData = await fetchHistory({
@@ -406,11 +403,12 @@ export function useChatHistory({
     notifyOnChangeProps: ['data', 'error', 'isError'],
     retry: (failureCount: number, error: unknown) => {
       // Don't retry auth errors or 404s
-      if (error instanceof Error && error.message.includes('401')) return false;
-      if (error instanceof Error && error.message.includes('404')) return false;
-      return failureCount < 3;
+      if (error instanceof Error && error.message.includes('401')) return false
+      if (error instanceof Error && error.message.includes('404')) return false
+      return failureCount < 3
     },
-    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30_000),
+    retryDelay: (attemptIndex: number) =>
+      Math.min(1000 * 2 ** attemptIndex, 30_000),
   })
 
   const [persistedPending, setPersistedPending] =
@@ -469,8 +467,8 @@ export function useChatHistory({
   const historyMessages = useMemo(() => {
     const messages = persistedPending
       ? mergeOptimisticHistoryMessages(rawHistoryMessages, [
-        persistedPending.optimisticMessage,
-      ])
+          persistedPending.optimisticMessage,
+        ])
       : rawHistoryMessages
     const last = messages[messages.length - 1]
     const lastId =
@@ -500,7 +498,7 @@ export function useChatHistory({
         const text = textFromMessage(msg)
         const execNotification = parseExecNotification(text)
         if (execNotification) {
-          ; (msg as any).__execNotification = execNotification
+          ;(msg as any).__execNotification = execNotification
           return true
         }
         if ((msg as any).__execNotification) {
@@ -587,7 +585,7 @@ export function useChatHistory({
           filtered.splice(i, 1)
           i--
         } else {
-          ; (msg as any).__isNarration = true
+          ;(msg as any).__isNarration = true
         }
       }
     }

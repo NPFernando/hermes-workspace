@@ -1,13 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import {
-  
-  readKnowledgeBaseConfig
-} from '../../../server/knowledge-config'
+import { readKnowledgeBaseConfig } from '../../../server/knowledge-config'
 import { syncKnowledgeSource } from '../../../server/knowledge-browser'
 import { safeErrorMessage } from '../../../server/rate-limit'
-import type {KnowledgeBaseConfig} from '../../../server/knowledge-config';
+import type { KnowledgeBaseConfig } from '../../../server/knowledge-config'
 
 export const Route = createFileRoute('/api/knowledge/sync')({
   server: {
@@ -29,9 +26,8 @@ export const Route = createFileRoute('/api/knowledge/sync')({
         }
 
         if (config) {
-          const { writeKnowledgeBaseConfig } = await import(
-            '../../../server/knowledge-config'
-          )
+          const { writeKnowledgeBaseConfig } =
+            await import('../../../server/knowledge-config')
           writeKnowledgeBaseConfig(config)
         }
 
@@ -41,8 +37,7 @@ export const Route = createFileRoute('/api/knowledge/sync')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

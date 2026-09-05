@@ -7,15 +7,17 @@ import {
   rateLimitResponse,
   requireJsonContentType,
 } from '../../server/rate-limit'
-import { getSisterById, invalidateSistersCache } from '../../server/sisters-registry'
 import {
-  
+  getSisterById,
+  invalidateSistersCache,
+} from '../../server/sisters-registry'
+import {
   appendGrowthEntry,
   isValidCronExpr,
   registerSisterCron,
-  updateSisterDescription
+  updateSisterDescription,
 } from '../../server/sisters-growth'
-import type {SisterCronRequest} from '../../server/sisters-growth';
+import type { SisterCronRequest } from '../../server/sisters-growth'
 
 type ImproveBody = {
   id?: unknown
@@ -51,7 +53,10 @@ export const Route = createFileRoute('/api/sisters-improve')({
         try {
           body = (await request.json()) as ImproveBody
         } catch {
-          return json({ ok: false, error: 'Invalid JSON body' }, { status: 400 })
+          return json(
+            { ok: false, error: 'Invalid JSON body' },
+            { status: 400 },
+          )
         }
 
         const id = typeof body.id === 'string' ? body.id.trim() : ''
@@ -62,7 +67,10 @@ export const Route = createFileRoute('/api/sisters-improve')({
         // Verify sister exists
         const sister = getSisterById(id)
         if (!sister) {
-          return json({ ok: false, error: `Sister '${id}' not found` }, { status: 404 })
+          return json(
+            { ok: false, error: `Sister '${id}' not found` },
+            { status: 404 },
+          )
         }
 
         const results: Array<string> = []
@@ -94,12 +102,16 @@ export const Route = createFileRoute('/api/sisters-improve')({
         if (body.cron && typeof body.cron === 'object') {
           const c = body.cron as CronInput
           const name = typeof c.name === 'string' ? c.name.trim() : ''
-          const schedule = typeof c.schedule === 'string' ? c.schedule.trim() : ''
+          const schedule =
+            typeof c.schedule === 'string' ? c.schedule.trim() : ''
           const prompt = typeof c.prompt === 'string' ? c.prompt.trim() : ''
 
           if (!name || !schedule || !prompt) {
             return json(
-              { ok: false, error: 'cron.name, cron.schedule, and cron.prompt are required' },
+              {
+                ok: false,
+                error: 'cron.name, cron.schedule, and cron.prompt are required',
+              },
               { status: 400 },
             )
           }
@@ -111,13 +123,15 @@ export const Route = createFileRoute('/api/sisters-improve')({
           }
 
           const skills =
-            Array.isArray(c.skills) && c.skills.every((s) => typeof s === 'string')
-              ? (c.skills)
+            Array.isArray(c.skills) &&
+            c.skills.every((s) => typeof s === 'string')
+              ? c.skills
               : []
           const deliver = typeof c.deliver === 'string' ? c.deliver : 'local'
           const toolsets =
-            Array.isArray(c.toolsets) && c.toolsets.every((s) => typeof s === 'string')
-              ? (c.toolsets)
+            Array.isArray(c.toolsets) &&
+            c.toolsets.every((s) => typeof s === 'string')
+              ? c.toolsets
               : undefined
           const profile = typeof c.profile === 'string' ? c.profile : id
 
@@ -142,7 +156,10 @@ export const Route = createFileRoute('/api/sisters-improve')({
 
         if (results.length === 0) {
           return json(
-            { ok: false, error: 'Provide at least one of: note, description, cron' },
+            {
+              ok: false,
+              error: 'Provide at least one of: note, description, cron',
+            },
             { status: 400 },
           )
         }

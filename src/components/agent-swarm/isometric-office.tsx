@@ -9,11 +9,8 @@ import { PERSONA_COLORS, PixelAvatar } from './pixel-avatar'
 import { DESK_POSITIONS, LOCATIONS } from './agent-behaviors'
 import { getSwarmSessionDisplayName } from './session-display-name'
 import type { SwarmSession } from '@/stores/agent-swarm-store'
-import type {AgentBehaviorView} from '@/hooks/use-agent-behaviors';
-import {
-  
-  useAgentBehaviors
-} from '@/hooks/use-agent-behaviors'
+import type { AgentBehaviorView } from '@/hooks/use-agent-behaviors'
+import { useAgentBehaviors } from '@/hooks/use-agent-behaviors'
 import { assignPersona } from '@/lib/agent-personas'
 import { cn } from '@/lib/utils'
 
@@ -102,7 +99,9 @@ function MeetingTable() {
           )
         })}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[8px] text-[var(--theme-muted)]/60">Meeting</span>
+          <span className="text-[8px] text-[var(--theme-muted)]/60">
+            Meeting
+          </span>
         </div>
       </div>
     </div>
@@ -156,7 +155,9 @@ function LunchArea() {
         <div className="size-2 rounded-full bg-green-400/30" />
         <div className="size-2 rounded-full bg-yellow-400/30" />
       </div>
-      <span className="mt-0.5 text-[7px] text-[var(--theme-muted)]">🍕 Lunch</span>
+      <span className="mt-0.5 text-[7px] text-[var(--theme-muted)]">
+        🍕 Lunch
+      </span>
     </div>
   )
 }
@@ -324,7 +325,9 @@ function EmptyOffice() {
         >
           🏢
         </motion.span>
-        <p className="mt-2 text-sm text-[var(--theme-muted)]">Virtual office is empty</p>
+        <p className="mt-2 text-sm text-[var(--theme-muted)]">
+          Virtual office is empty
+        </p>
         <p className="text-xs text-[var(--theme-muted)]">
           Spawn agents to see them work here
         </p>

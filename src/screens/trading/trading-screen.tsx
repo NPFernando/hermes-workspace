@@ -3,11 +3,15 @@ import { Area, AreaChart, ResponsiveContainer } from 'recharts'
 import { useFinanceAction } from '../finance/hooks/use-finance-action'
 import { StatCard } from '../finance/components/stat-card'
 import { TradingSummaryStrip } from './components/trading-summary-strip'
+import { AccountOverviewCard } from './components/account-overview-card'
 import { RebalanceCard } from './components/rebalance-card'
 import { LlmSignalCard } from './components/llm-signal-card'
 import { DemoTradingPanel } from './demo-trading-panel'
 import { GridTradingPanel } from './grid-trading-panel'
+import { TradingLedgerPanel } from './components/trading-ledger-panel'
+import { LiveReadinessCard } from './components/live-readiness-card'
 import { formatFractionPct, formatUsdt } from './format-helpers'
+import type { ReactNode } from 'react'
 
 type DecisionQualityFinding = {
   severity: 'info' | 'warning' | 'critical'
@@ -205,6 +209,44 @@ type StrategyCatalogEntry = {
   description: string
 }
 
+type StrategyEligibilityAudit = {
+  generatedAt: string
+  executionMode: string
+  interval: string
+  asOfMs: number
+  councilThreshold: number
+  symbols: Array<{
+    symbol: string
+    candles: number
+    latestPrice: number | null
+    strategies: Array<{
+      strategyId: string
+      name: string
+      signal: 'BUY' | 'SELL' | 'HOLD'
+      confidence: number
+      reason: string
+      minCandles: number
+      active: boolean
+      overrideMode: 'disabled' | 'reduce_size' | null
+      dataAvailable: boolean
+      dataIssues: Array<string>
+      regime: string | null
+      muted: boolean
+      councilEligible: boolean
+      exclusionReason: string | null
+    }>
+    council: {
+      signal: 'BUY' | 'SELL' | 'HOLD'
+      net: number
+      threshold: number
+      leadStrategyId: string | null
+      eligible: boolean
+      reasons: Array<string>
+      participatingStrategyIds: Array<string>
+    }
+  }>
+}
+
 type StrategyOverride = {
   id: string
   strategyId: string
@@ -215,7 +257,7 @@ type StrategyOverride = {
   updatedAt: string
   reviewAt: string | null
   expiresAt: string | null
-  source: 'manual'
+  source: 'manual' | 'automatic' | 'experiment'
 }
 
 type StrategyOverrideHistoryEntry = {
@@ -233,6 +275,169 @@ type StrategyOverrideHistoryEntry = {
   reason: string
   at: string
   activeOverrideId: string | null
+}
+
+type SandboxExperimentStatus =
+  | 'active'
+  | 'stopped'
+  | 'expired'
+  | 'trade_cap_reached'
+  | 'rolled_back'
+
+type SandboxExperiment = {
+  id: string
+  label: string
+  reason: string
+  strategyIds: Array<string>
+  executionMode: 'paper' | 'testnet'
+  durationMinutes: number | null
+  tradeCap: number | null
+  sizeMultiplierCap: number
+  status: SandboxExperimentStatus
+  startedAt: string
+  updatedAt: string
+  endsAt: string | null
+  endedAt: string | null
+  rolledBackAt: string | null
+  tradesObserved: number
+  createdAt: string
+}
+
+type ValidationStage = 'paper' | 'sandbox'
+type ValidationRunStatus = 'active' | 'completed' | 'stopped' | 'expired'
+
+type ReadinessGateLite = {
+  id: string
+  label: string
+  pass: boolean
+  detail: string
+  evidenceAgeMs: number | null
+}
+
+type ValidationRunBudgets = {
+  maxDurationMs: number
+  maxCycles: number
+  maxTrades: number
+  maxExposureQuote: number
+}
+
+type ValidationRunBaseline = {
+  equityQuote: number | null
+  openPositions: number
+  recordedAt: string
+}
+
+type ValidationRunProgress = {
+  cyclesRun: number
+  tradesOpened: number
+  tradesClosed: number
+  lastCycleAt: string | null
+  lastCycleRan: boolean | null
+  lastCycleReason: string | null
+  currentExposureQuote: number
+}
+
+type ValidationRunEvidence = {
+  ledgerRecordIds: Array<string>
+  realizedPnlQuote: number
+  feesQuote: number
+  avgSlippageQuote: number | null
+  shadowComparisonsSampled: number
+  errors: Array<{ at: string; message: string }>
+}
+
+type ValidationRun = {
+  id: string
+  stage: ValidationStage
+  executionMode: 'paper' | 'testnet'
+  strategies: Array<string>
+  autoRun: boolean
+  status: ValidationRunStatus
+  budgets: ValidationRunBudgets
+  baseline: ValidationRunBaseline
+  progress: ValidationRunProgress
+  evidence: ValidationRunEvidence
+  readinessImpact: ReadinessGateLite | null
+  createdAt: string
+  updatedAt: string
+  endedAt: string | null
+  endReason: string | null
+  notes: string
+}
+
+type ValidationRunView = ValidationRun & {
+  liveReadinessImpact: ReadinessGateLite | null
+}
+
+type ValidationReconciliation = {
+  runId: string
+  stage: ValidationStage
+  status: ValidationRunStatus
+  baselineEquityQuote: number | null
+  currentExposureQuote: number
+  attributedTradeCount: number
+  attributedLedgerCount: number
+  realizedPnlQuote: number
+  feesQuote: number
+  openPositionCount: number
+  warnings: Array<string>
+  recommendation:
+    | 'continue_collecting'
+    | 'keep_unchanged'
+    | 'review_reversible_control'
+  evaluatedAt: string
+}
+
+type StrategyEvidenceWindow = {
+  strategyId: string
+  windowDays: number
+  windowStart: string
+  windowEnd: string
+  closedTrades: number
+  wins: number
+  losses: number
+  winRate: number
+  lossRate: number
+  realizedPnlQuote: number
+  avgWinQuote: number
+  avgLossQuote: number
+  recoveredTrades: number
+  forcedCloseTrades: number
+  sufficientSample: boolean
+}
+
+type StrategyGuardRecommendation =
+  | 'insufficient_evidence'
+  | 'monitor'
+  | 'reduce_size_candidate'
+  | 'disable_candidate'
+  | 'recovered'
+
+type StrategyGuardReview = {
+  strategyId: string
+  allTime: { trades: number; winRate: number; totalPnlQuote: number }
+  window: StrategyEvidenceWindow
+  recommendation: StrategyGuardRecommendation
+  reason: string
+  hasActiveGuardOrExperiment: boolean
+}
+
+type NextTradingRecommendation = {
+  decision:
+    | 'stay_paper_only'
+    | 'sandbox_evidence_only'
+    | 'live_requires_manual_review'
+  currentMode: string
+  liveTradingEnabled: boolean
+  requiresExplicitApproval: boolean
+  summary: string
+  nextAction: string
+  safeSandboxCaps: {
+    durationMinutes: number
+    maxCycles: number
+    maxTrades: number
+    maxExposureUsdt: number
+  }
 }
 
 type FinancePayload = {
@@ -292,6 +497,7 @@ type FinancePayload = {
     liveBinanceApproved: boolean
     ibkrStatus: string
   }
+  nextRecommendation: NextTradingRecommendation
   budgetVsActual: Array<{
     category: string
     month: string
@@ -329,9 +535,77 @@ type FinancePayload = {
   learning: LearningReport
   safeguardHistory: Array<SafeguardHistoryEntry>
   strategyCatalog: Array<StrategyCatalogEntry>
+  strategyEligibilityAudit: StrategyEligibilityAudit
   strategyOverrides: {
     active: Array<StrategyOverride>
     history: Array<StrategyOverrideHistoryEntry>
+  }
+  sandboxExperiments: {
+    active: Array<SandboxExperiment>
+    history: Array<SandboxExperiment>
+  }
+  validationRuns: {
+    active: Array<ValidationRunView>
+    history: Array<ValidationRun>
+  }
+  validationReconciliation: {
+    active: Array<ValidationReconciliation>
+    history: Array<ValidationReconciliation>
+  }
+  lastCycleDiagnostics?: {
+    ranAt: string
+    executionMode?: string
+    status: 'completed' | 'blocked' | 'data_error'
+    reason: string | null
+    symbols: Array<{
+      symbol: string
+      candles: number
+      latestPrice: number | null
+      strategySignals: Array<{
+        strategyId: string
+        signal: 'BUY' | 'SELL' | 'HOLD'
+        confidence: number
+        reason: string
+      }>
+      councilSignal: 'BUY' | 'SELL' | 'HOLD'
+      councilNet: number
+      councilReasons: Array<string>
+      finalAction: 'OPEN' | 'CLOSE' | 'SKIP' | 'BLOCKED' | 'HOLD_FOR_RECOVERY' | null
+      finalReason: string | null
+    }>
+  } | null
+  tradingCycleDiagnosticTrends: Record<
+    'paper' | 'sandbox',
+    {
+      stage: string
+      cycles: number
+      oldestAt: string | null
+      newestAt: string | null
+      statusCounts: Record<string, number>
+      actionCounts: Record<string, number>
+      councilCounts: Record<string, number>
+      strategySignalCounts: Record<string, Record<string, number>>
+      reasonCounts: Array<{ reason: string; count: number }>
+    }
+  >
+  guardEvidence: Array<StrategyGuardReview>
+  liveReadiness: {
+    live: {
+      allPassed: boolean
+      blockers: Array<string>
+      gates: Array<{
+        id: string
+        label: string
+        pass: boolean
+        detail: string
+        evidenceAgeMs: number | null
+      }>
+      computedAt: string
+    }
+    stored: {
+      snapshot: { allPassed: boolean; blockers: Array<string> } | null
+      approval: { status: string; expiresAt: string | null } | null
+    }
   }
   alerts: Array<{
     level: 'info' | 'warning' | 'critical'
@@ -350,6 +624,72 @@ type FinancePayload = {
     assets: Array<Record<string, unknown>>
     news_items: Array<Record<string, unknown>>
   }
+}
+
+function NextRecommendationCard({
+  recommendation,
+}: {
+  recommendation: NextTradingRecommendation
+}) {
+  const accent =
+    recommendation.decision === 'live_requires_manual_review'
+      ? 'amber'
+      : recommendation.decision === 'sandbox_evidence_only'
+        ? 'sky'
+        : 'emerald'
+
+  const accentClass =
+    accent === 'amber'
+      ? 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]'
+      : accent === 'sky'
+        ? 'border-[color-mix(in_srgb,var(--theme-accent-secondary)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent-secondary)_10%,transparent)] text-[var(--theme-accent-secondary)]'
+        : 'border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'
+
+  return (
+    <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+            Next execution recommendation
+          </p>
+          <h2 className="mt-1 text-xl font-semibold">
+            {recommendation.decision === 'stay_paper_only'
+              ? 'Stay in paper mode'
+              : recommendation.decision === 'sandbox_evidence_only'
+                ? 'Stay in sandbox evidence mode'
+                : 'Require manual live review'}
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--theme-muted)]">
+            {recommendation.summary}
+          </p>
+        </div>
+        <div className={`rounded-2xl border px-4 py-3 text-sm font-medium ${accentClass}`}>
+          Current mode: <strong>{recommendation.currentMode}</strong>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_7%,transparent)] p-3 text-sm text-[var(--theme-muted)]">
+          <div className="font-medium text-[var(--theme-text)]">Recommended next action</div>
+          <div className="mt-1 leading-6">{recommendation.nextAction}</div>
+        </div>
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_7%,transparent)] p-3 text-sm text-[var(--theme-muted)]">
+          <div className="font-medium text-[var(--theme-text)]">Safe sandbox caps</div>
+          <div className="mt-1">
+            {recommendation.safeSandboxCaps.durationMinutes} min ·{' '}
+            {recommendation.safeSandboxCaps.maxCycles} cycles ·{' '}
+            {recommendation.safeSandboxCaps.maxTrades} trades ·{' '}
+            ${recommendation.safeSandboxCaps.maxExposureUsdt} max exposure
+          </div>
+          <div className="mt-2 text-xs uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+            {recommendation.requiresExplicitApproval
+              ? 'Explicit approval required'
+              : 'No approval required'}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
 }
 
 const modules = [
@@ -387,6 +727,58 @@ function overrideLifecycleLabel(
     ? `Expires ${formatDateTime(override.expiresAt)}`
     : null
   return [review, expires].filter(Boolean).join(' · ')
+}
+
+function DashboardGroup({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <section className="mt-8">
+      <div className="mb-3 px-1">
+        <h2 className="text-xl font-semibold">{title}</h2>
+        <p className="mt-1 text-sm text-[var(--theme-muted)]">{description}</p>
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  )
+}
+
+function AdvancedDashboardGroup({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <details className="mt-8 group">
+      <summary className="cursor-pointer list-none rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 px-4 py-3 transition hover:bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)]">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold">{title}</h2>
+            <p className="mt-1 text-sm text-[var(--theme-muted)]">
+              {description}
+            </p>
+          </div>
+          <span className="text-xs text-[var(--theme-muted)] group-open:hidden">
+            Expand
+          </span>
+          <span className="hidden text-xs text-[var(--theme-muted)] group-open:inline">
+            Collapse
+          </span>
+        </div>
+      </summary>
+      <div className="space-y-4 pt-1">{children}</div>
+    </details>
+  )
 }
 
 type CsvValue = string | number | boolean | null | undefined
@@ -716,6 +1108,8 @@ function StrategyOverridePanel({
                   }`}
                 >
                   {modeLabel(override)}
+                  {override?.source === 'automatic' ? ' · auto' : ''}
+                  {override?.source === 'experiment' ? ' · experiment' : ''}
                 </span>
               </div>
               <p className="mt-2 text-xs leading-5 text-[var(--theme-muted)]">
@@ -723,7 +1117,10 @@ function StrategyOverridePanel({
               </p>
               {override ? (
                 <p className="mt-2 text-xs text-[var(--theme-muted)]">
-                  Updated {formatDateTime(override.updatedAt)}
+              {override.source === 'automatic' ? 'Automatic guard · ' : ''}
+              {override.source === 'experiment' ? 'Sandbox experiment · ' : ''}
+              {override.reason} ·{' '}
+              Updated {formatDateTime(override.updatedAt)}
                   {overrideLifecycleLabel(override)
                     ? ` · ${overrideLifecycleLabel(override)}`
                     : ''}
@@ -849,6 +1246,1225 @@ function StrategyOverridePanel({
   )
 }
 
+const GUARD_RECOMMENDATION_LABEL: Record<StrategyGuardRecommendation, string> = {
+  insufficient_evidence: 'Insufficient evidence',
+  monitor: 'Monitor',
+  reduce_size_candidate: 'Reduce-size candidate',
+  disable_candidate: 'Disable candidate',
+  recovered: 'Recovered',
+}
+
+function guardRecommendationTone(
+  recommendation: StrategyGuardRecommendation,
+): 'good' | 'warn' | 'danger' | 'neutral' {
+  if (recommendation === 'disable_candidate') return 'danger'
+  if (recommendation === 'reduce_size_candidate') return 'warn'
+  if (recommendation === 'recovered') return 'good'
+  return 'neutral'
+}
+
+/**
+ * Evidence-driven guard review: shows a bounded recent window (separate
+ * from the all-time score) per enabled strategy, an explicit insufficient-
+ * evidence gate, and a recommendation the operator can act on via the
+ * strategy override buttons above or a sandbox experiment below.
+ */
+function GuardEvidencePanel({ evidence }: { evidence: Array<StrategyGuardReview> }) {
+  const pct = formatFractionPct
+  const usdt = formatUsdt
+  return (
+    <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+      <div>
+        <h2 className="text-lg font-semibold">Guard evidence review</h2>
+        <p className="text-xs text-[var(--theme-muted)]">
+          Recent-window evidence per enabled strategy, separate from its
+          all-time score — never recommends acting below the configured
+          minimum sample.
+        </p>
+      </div>
+      {evidence.length === 0 ? (
+        <p className="mt-4 text-sm text-[var(--theme-muted)]">
+          No enabled strategies to review.
+        </p>
+      ) : (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {evidence.map((entry) => (
+            <div
+              key={entry.strategyId}
+              className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <h3 className="text-sm font-semibold">{entry.strategyId}</h3>
+                <StatCard
+                  label="Recommendation"
+                  value={GUARD_RECOMMENDATION_LABEL[entry.recommendation]}
+                  tone={guardRecommendationTone(entry.recommendation)}
+                />
+              </div>
+              <p className="mt-2 text-xs leading-5 text-[var(--theme-muted)]">
+                {entry.reason}
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--theme-muted)] sm:grid-cols-4">
+                <div>
+                  <div className="uppercase tracking-[0.16em]">Window</div>
+                  <div className="text-[var(--theme-text)]">
+                    {entry.window.windowDays}d · {entry.window.closedTrades} trades
+                  </div>
+                </div>
+                <div>
+                  <div className="uppercase tracking-[0.16em]">Win rate</div>
+                  <div className="text-[var(--theme-text)]">
+                    {pct(entry.window.winRate)}
+                  </div>
+                </div>
+                <div>
+                  <div className="uppercase tracking-[0.16em]">Realized</div>
+                  <div className="text-[var(--theme-text)]">
+                    {usdt(entry.window.realizedPnlQuote)}
+                  </div>
+                </div>
+                <div>
+                  <div className="uppercase tracking-[0.16em]">All-time</div>
+                  <div className="text-[var(--theme-text)]">
+                    {entry.allTime.trades} trades · {pct(entry.allTime.winRate)}
+                  </div>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-[var(--theme-muted)]">
+                Recovered {entry.window.recoveredTrades} · forced-close{' '}
+                {entry.window.forcedCloseTrades} in this window
+                {entry.hasActiveGuardOrExperiment
+                  ? ' · guard/experiment currently active'
+                  : ''}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+const EXPERIMENT_STATUS_LABEL: Record<SandboxExperimentStatus, string> = {
+  active: 'Active',
+  stopped: 'Stopped',
+  expired: 'Expired',
+  trade_cap_reached: 'Trade cap reached',
+  rolled_back: 'Rolled back',
+}
+
+function experimentStatusTone(
+  status: SandboxExperimentStatus,
+): 'good' | 'warn' | 'danger' | 'neutral' {
+  if (status === 'active') return 'good'
+  if (status === 'expired' || status === 'trade_cap_reached') return 'warn'
+  if (status === 'rolled_back') return 'neutral'
+  return 'neutral'
+}
+
+/**
+ * Bounded, sandbox-only (paper/testnet) size-reduction experiments.
+ * Start requires a finite time and/or trade budget — never unbounded — and
+ * is rejected server-side over an existing manual override or another
+ * active experiment on the same strategy. Stop/rollback restore the exact
+ * pre-experiment override baseline; re-arm starts a fresh experiment with
+ * the same parameters after review.
+ */
+function SandboxExperimentPanel({
+  catalog,
+  state,
+  onPayload,
+}: {
+  catalog: Array<StrategyCatalogEntry>
+  state: FinancePayload['sandboxExperiments']
+  onPayload: (payload: FinancePayload) => void
+}) {
+  const { run, busy, error } = useFinanceAction<
+    FinancePayload & {
+      sandboxExperimentResult?: { message: string }
+    }
+  >(onPayload)
+  const [message, setMessage] = useState<string | null>(null)
+  const [selectedStrategyId, setSelectedStrategyId] = useState(
+    catalog[0]?.id ?? '',
+  )
+  const [executionMode, setExecutionMode] = useState<'paper' | 'testnet'>(
+    'testnet',
+  )
+  const [durationHours, setDurationHours] = useState(24)
+  const [tradeCap, setTradeCap] = useState(10)
+  const [sizeMultiplierCap, setSizeMultiplierCap] = useState(0.5)
+  const [reason, setReason] = useState('')
+
+  async function submit(
+    action:
+      | 'start_sandbox_experiment'
+      | 'stop_sandbox_experiment'
+      | 'rollback_sandbox_experiment'
+      | 'rearm_sandbox_experiment',
+    body: Record<string, unknown>,
+    busyKey: string,
+  ) {
+    setMessage(null)
+    const data = await run({ action, ...body }, busyKey)
+    if (data) {
+      setMessage(
+        data.sandboxExperimentResult?.message ??
+          'Sandbox experiment updated.',
+      )
+    }
+  }
+
+  async function startExperiment() {
+    if (!selectedStrategyId) return
+    await submit(
+      'start_sandbox_experiment',
+      {
+        strategyIds: [selectedStrategyId],
+        executionMode,
+        durationMinutes: durationHours > 0 ? durationHours * 60 : undefined,
+        tradeCap: tradeCap > 0 ? tradeCap : undefined,
+        sizeMultiplierCap,
+        reason: reason.trim() || undefined,
+      },
+      'start',
+    )
+  }
+
+  async function stopExperiment(id: string) {
+    const confirmed = window.confirm('Stop this experiment and restore its baseline now?')
+    if (!confirmed) return
+    await submit('stop_sandbox_experiment', { experimentId: id }, `stop:${id}`)
+  }
+
+  async function rollbackExperiment(id: string) {
+    await submit(
+      'rollback_sandbox_experiment',
+      { experimentId: id },
+      `rollback:${id}`,
+    )
+  }
+
+  async function rearmExperiment(id: string) {
+    await submit('rearm_sandbox_experiment', { experimentId: id }, `rearm:${id}`)
+  }
+
+  function budgetLabel(experiment: SandboxExperiment): string {
+    const parts: Array<string> = []
+    if (experiment.endsAt) parts.push(`ends ${formatDateTime(experiment.endsAt)}`)
+    if (experiment.tradeCap != null)
+      parts.push(`${experiment.tradesObserved}/${experiment.tradeCap} trades`)
+    return parts.join(' · ') || 'no budget set'
+  }
+
+  return (
+    <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Sandbox experiments</h2>
+          <p className="text-xs text-[var(--theme-muted)]">
+            Finite-duration/trade-cap, paper/testnet-only size-reduction
+            trials with a recorded baseline and automatic rollback.
+          </p>
+        </div>
+        <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
+          {state.active.length} active
+        </span>
+      </div>
+
+      {(message || error) && (
+        <p
+          className={`mt-3 rounded-xl border p-2 text-sm ${error ? 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]' : 'border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'}`}
+        >
+          {error ?? message}
+        </p>
+      )}
+
+      <div className="mt-4 grid gap-2 rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4 sm:grid-cols-2 lg:grid-cols-6">
+        <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+          Strategy
+          <select
+            value={selectedStrategyId}
+            onChange={(event) => setSelectedStrategyId(event.target.value)}
+            className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+          >
+            {catalog.map((strategy) => (
+              <option key={strategy.id} value={strategy.id}>
+                {strategy.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+          Mode
+          <select
+            value={executionMode}
+            onChange={(event) =>
+              setExecutionMode(event.target.value as 'paper' | 'testnet')
+            }
+            className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+          >
+            <option value="testnet">Testnet</option>
+            <option value="paper">Paper</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+          Duration (hours, 0=none)
+          <input
+            type="number"
+            min={0}
+            value={durationHours}
+            onChange={(event) => setDurationHours(Number(event.target.value))}
+            className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+          Trade cap (0=none)
+          <input
+            type="number"
+            min={0}
+            value={tradeCap}
+            onChange={(event) => setTradeCap(Number(event.target.value))}
+            className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+          Size cap
+          <select
+            value={sizeMultiplierCap}
+            onChange={(event) => setSizeMultiplierCap(Number(event.target.value))}
+            className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+          >
+            <option value={1}>1.00x (track only)</option>
+            <option value={0.5}>0.50x</option>
+            <option value={0.25}>0.25x</option>
+            <option value={0.1}>0.10x</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+          Reason
+          <input
+            type="text"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Optional"
+            className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+          />
+        </label>
+        <div className="lg:col-span-6">
+          <button
+            type="button"
+            disabled={busy !== null || !selectedStrategyId}
+            onClick={() => void startExperiment()}
+            className="rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] px-3 py-2 text-xs font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_20%,transparent)] disabled:opacity-50"
+          >
+            Start experiment
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <h3 className="text-sm font-semibold">Active</h3>
+        {state.active.length === 0 ? (
+          <p className="mt-2 text-xs text-[var(--theme-muted)]">
+            No active sandbox experiments.
+          </p>
+        ) : (
+          <div className="mt-2 grid gap-3 lg:grid-cols-2">
+            {state.active.map((experiment) => (
+              <div
+                key={experiment.id}
+                className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <h4 className="text-sm font-semibold">{experiment.label}</h4>
+                  <StatCard
+                    label="Status"
+                    value={EXPERIMENT_STATUS_LABEL[experiment.status]}
+                    tone={experimentStatusTone(experiment.status)}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-[var(--theme-muted)]">
+                  {experiment.strategyIds.join(', ')} · {experiment.executionMode} ·{' '}
+                  {experiment.sizeMultiplierCap.toFixed(2)}x cap
+                </p>
+                <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                  {budgetLabel(experiment)}
+                </p>
+                <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                  {experiment.reason}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => void stopExperiment(experiment.id)}
+                    className="rounded-xl border border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-3 py-2 text-xs font-medium text-[var(--theme-warning)] hover:bg-[color-mix(in_srgb,var(--theme-warning)_20%,transparent)] disabled:opacity-50"
+                  >
+                    Stop &amp; roll back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => void rollbackExperiment(experiment.id)}
+                    className="rounded-xl border border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-3 py-2 text-xs font-medium text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_20%,transparent)] disabled:opacity-50"
+                  >
+                    Emergency rollback
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-5">
+        <h3 className="text-sm font-semibold">History</h3>
+        {state.history.length === 0 ? (
+          <p className="mt-2 text-xs text-[var(--theme-muted)]">
+            No ended sandbox experiments yet.
+          </p>
+        ) : (
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                <tr>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Label</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Status</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Strategies</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Ended</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Trades</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...state.history]
+                  .reverse()
+                  .slice(0, 8)
+                  .map((experiment) => (
+                    <tr key={experiment.id} className="align-top text-[var(--theme-text)]">
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {experiment.label}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {EXPERIMENT_STATUS_LABEL[experiment.status]}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {experiment.strategyIds.join(', ')}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {experiment.endedAt ? formatDateTime(experiment.endedAt) : '-'}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {experiment.tradesObserved}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => void rollbackExperiment(experiment.id)}
+                            title="Idempotent — safe to confirm even if already rolled back."
+                            className="rounded-lg border border-[var(--theme-border)] px-2 py-1 text-xs hover:bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] disabled:opacity-40"
+                          >
+                            Confirm rollback
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => void rearmExperiment(experiment.id)}
+                            className="rounded-lg border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] px-2 py-1 text-xs text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_20%,transparent)]"
+                          >
+                            Re-arm
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+const VALIDATION_STATUS_LABEL: Record<ValidationRunStatus, string> = {
+  active: 'Active',
+  completed: 'Completed',
+  stopped: 'Stopped',
+  expired: 'Expired',
+}
+
+function validationStatusTone(
+  status: ValidationRunStatus,
+): 'good' | 'warn' | 'danger' | 'neutral' {
+  if (status === 'active') return 'good'
+  if (status === 'expired') return 'warn'
+  if (status === 'stopped') return 'danger'
+  return 'neutral'
+}
+
+function msToDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return '0m'
+  const totalMinutes = Math.floor(ms / 60_000)
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+  const parts: Array<string> = []
+  if (days) parts.push(`${days}d`)
+  if (hours) parts.push(`${hours}h`)
+  if (!days && minutes) parts.push(`${minutes}m`)
+  return parts.join(' ') || '<1m'
+}
+
+function ageLabel(iso: string | null): string {
+  if (!iso) return 'never'
+  const ageMs = Date.now() - new Date(iso).getTime()
+  if (!Number.isFinite(ageMs) || ageMs < 0) return 'just now'
+  if (ageMs < 60_000) return `${Math.round(ageMs / 1000)}s ago`
+  return `${msToDuration(ageMs)} ago`
+}
+
+/** One four-way ratio bar (time/cycles/trades/exposure) — "stage
+ * completion" is simply the highest of the four, since any one budget
+ * hitting its cap ends the run regardless of the others. */
+function budgetRatioBar(label: string, used: number, max: number) {
+  const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0
+  return (
+    <div key={label} className="flex flex-col gap-1">
+      <div className="flex items-center justify-between text-[11px] text-[var(--theme-muted)]">
+        <span>{label}</span>
+        <span>{pct}%</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--theme-text)_12%,transparent)]">
+        <div
+          className={`h-full rounded-full ${pct >= 100 ? 'bg-[var(--theme-warning)]' : 'bg-[var(--theme-accent)]'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function ReadinessImpactBadge({ gate }: { gate: ReadinessGateLite | null }) {
+  if (!gate) {
+    return (
+      <span className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 text-[11px] text-[var(--theme-muted)]">
+        readiness: unknown
+      </span>
+    )
+  }
+  return (
+    <span
+      title={gate.detail}
+      className={`rounded-full border px-2 py-0.5 text-[11px] ${
+        gate.pass
+          ? 'border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'
+          : 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]'
+      }`}
+    >
+      readiness: {gate.pass ? 'passing' : 'blocked'}
+    </span>
+  )
+}
+
+function validationStageLabel(stage: ValidationStage): string {
+  return stage === 'paper' ? 'Paper execution' : 'Sandbox / testnet execution'
+}
+
+function validationRecommendationLabel(
+  recommendation: ValidationReconciliation['recommendation'],
+): string {
+  if (recommendation === 'continue_collecting') return 'Continue collecting'
+  if (recommendation === 'review_reversible_control') {
+    return 'Review reversible control'
+  }
+  return 'Keep unchanged'
+}
+
+/**
+ * Controlled paper/sandbox evidence-collection runs. Exactly one active run
+ * per stage; starting one requires explicit, bounded time/cycle/trade/
+ * exposure budgets (no "unlimited" option) and is rejected server-side on
+ * live mode, an out-of-range/missing budget, a stage/tradingMode mismatch,
+ * or an already-active run for that stage. "Run cycle" attributes one
+ * `runTradingCycle()` call (same gates as the main "Run cycle" button,
+ * narrowed to this run's selected strategies) to the run's evidence.
+ */
+function ValidationRunPanel({
+  catalog,
+  state,
+  reconciliation,
+  diagnostics,
+  trends,
+  onPayload,
+}: {
+  catalog: Array<StrategyCatalogEntry>
+  state: FinancePayload['validationRuns']
+  reconciliation: FinancePayload['validationReconciliation']
+  diagnostics: FinancePayload['lastCycleDiagnostics']
+  trends: FinancePayload['tradingCycleDiagnosticTrends']
+  onPayload: (payload: FinancePayload) => void
+}) {
+  const { run, busy, error } = useFinanceAction<
+    FinancePayload & {
+      validationRunResult?: { message: string }
+    }
+  >(onPayload)
+  const [message, setMessage] = useState<string | null>(null)
+  const [stage, setStage] = useState<ValidationStage>('sandbox')
+  const [selectedStrategyIds, setSelectedStrategyIds] = useState<Array<string>>(
+    [],
+  )
+  const [durationHours, setDurationHours] = useState(24)
+  const [maxCycles, setMaxCycles] = useState(20)
+  const [maxTrades, setMaxTrades] = useState(15)
+  const [maxExposureQuote, setMaxExposureQuote] = useState(100)
+  const [notes, setNotes] = useState('')
+  const [autoRun, setAutoRun] = useState(false)
+
+  const activeByStage = new Map(state.active.map((r) => [r.stage, r]))
+  const activeRun = activeByStage.get(stage) ?? null
+  const activeReconciliation =
+    reconciliation.active.find((item) => item.stage === stage) ?? null
+  const activePaperRun = activeByStage.get('paper') ?? null
+  const latestCompletedRun = state.history[0]
+  const latestCompletedTrend = trends[latestCompletedRun.stage]
+  const latestCompletedAt =
+    latestCompletedRun.endedAt ||
+    latestCompletedRun.updatedAt ||
+    latestCompletedRun.createdAt
+  const completedPaperRun = state.history.some(
+    (validationRun) => validationRun.stage === 'paper',
+  )
+  const stageNextAction = activeRun
+    ? stage === 'paper'
+      ? 'Continue the bounded paper run until its checkpoint; zero trades or low samples are incomplete evidence.'
+      : 'Continue the bounded sandbox run and reconcile fills, attribution, account state, and risk before any expansion.'
+    : stage === 'sandbox'
+      ? activePaperRun
+        ? 'Sandbox is blocked while the paper run is active. Review and finalize paper evidence first.'
+        : completedPaperRun
+          ? 'Review the completed paper checkpoint before starting a separate sandbox run.'
+          : 'Start and complete a paper run before using sandbox/testnet.'
+      : 'Start a bounded paper run with the selected strategies and automatic cycles only when ready.'
+
+  useEffect(() => {
+    if (selectedStrategyIds.length > 0) return
+    const preferred = new Set(['sma_crossover', 'rsi_reversion'])
+    const enabledDefaults = catalog
+      .map((strategy) => strategy.id)
+      .filter((id) => preferred.has(id))
+    if (enabledDefaults.length > 0) setSelectedStrategyIds(enabledDefaults)
+  }, [catalog, selectedStrategyIds.length])
+
+  async function submit(
+    action:
+      | 'start_validation_run'
+      | 'run_validation_cycle'
+      | 'stop_validation_run'
+      | 'finalize_validation_run',
+    body: Record<string, unknown>,
+    busyKey: string,
+  ) {
+    setMessage(null)
+    const data = await run({ action, ...body }, busyKey)
+    if (data) {
+      setMessage(data.validationRunResult?.message ?? 'Validation run updated.')
+    }
+  }
+
+  async function startRun() {
+    if (selectedStrategyIds.length === 0) return
+    await submit(
+      'start_validation_run',
+      {
+        stage,
+        strategies: selectedStrategyIds,
+        budgets: {
+          maxDurationMs: Math.max(1, durationHours) * 60 * 60_000,
+          maxCycles,
+          maxTrades,
+          maxExposureQuote,
+        },
+        notes: notes.trim() || undefined,
+        autoRun,
+      },
+      'start',
+    )
+  }
+
+  async function runCycle() {
+    await submit('run_validation_cycle', { stage }, `cycle:${stage}`)
+  }
+
+  async function stopRun() {
+    const reason = window.prompt('Reason for stopping this validation run?') ?? ''
+    await submit('stop_validation_run', { stage, reason }, `stop:${stage}`)
+  }
+
+  async function finalizeRun() {
+    const finalNotes = window.prompt('Any final notes for this run?') ?? undefined
+    await submit(
+      'finalize_validation_run',
+      { stage, notes: finalNotes },
+      `finalize:${stage}`,
+    )
+  }
+
+  function toggleStrategy(id: string) {
+    setSelectedStrategyIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    )
+  }
+
+  return (
+    <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">
+            Evidence checkpoint and validation runs
+          </h2>
+          <p className="text-xs text-[var(--theme-muted)]">
+            Review the latest paper or sandbox evidence first, then manage
+            bounded runs toward the gated-readiness checks below.
+          </p>
+        </div>
+        <div className="flex gap-1 rounded-full border border-[var(--theme-border)] p-1 text-xs">
+          {(['paper', 'sandbox'] as Array<ValidationStage>).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setStage(s)}
+              className={`rounded-full px-3 py-1 ${
+                stage === s
+                  ? 'bg-[var(--theme-accent)] text-[var(--theme-panel)]'
+                  : 'text-[var(--theme-muted)]'
+              }`}
+            >
+              {s === 'paper' ? 'Paper' : 'Sandbox (testnet)'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {(message || error) && (
+        <p
+          className={`mt-3 rounded-xl border p-2 text-sm ${error ? 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] text-[var(--theme-danger)]' : 'border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] text-[var(--theme-success)]'}`}
+        >
+          {error ?? message}
+        </p>
+      )}
+
+      <div className="mt-4 rounded-2xl border border-[color-mix(in_srgb,var(--theme-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+              Current evidence stage
+            </p>
+            <h3 className="mt-1 text-base font-semibold">
+              {validationStageLabel(stage)}
+            </h3>
+          </div>
+          <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
+            {activeRun ? 'run active' : 'no active run'}
+          </span>
+        </div>
+        <p className="mt-2 text-sm text-[var(--theme-text)]">
+          <span className="font-medium">Next safe action:</span>{' '}
+          {stageNextAction}
+        </p>
+        <p className="mt-1 text-xs text-[var(--theme-muted)]">
+          Evidence is stage-separated and bounded. It does not authorize live
+          trading or prove profitability by itself.
+        </p>
+      </div>
+
+      {state.history.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-[color-mix(in_srgb,var(--theme-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)] p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                Latest completed checkpoint
+              </p>
+              <h3 className="mt-1 text-base font-semibold">
+                {validationStageLabel(latestCompletedRun.stage)}
+              </h3>
+              <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                {formatDateTime(latestCompletedAt)}{' '}
+                · {latestCompletedRun.strategies.join(', ')}
+              </p>
+            </div>
+            <ReadinessImpactBadge gate={latestCompletedRun.readinessImpact} />
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            <StatCard
+              label="Cycles"
+              value={`${latestCompletedRun.progress.cyclesRun}/${latestCompletedRun.budgets.maxCycles}`}
+              tone="neutral"
+            />
+            <StatCard
+              label="Closed trades"
+              value={`${latestCompletedRun.progress.tradesClosed}/${latestCompletedRun.budgets.maxTrades}`}
+              tone={latestCompletedRun.progress.tradesClosed > 0 ? 'good' : 'warn'}
+            />
+            <StatCard
+              label="Exposure"
+              value={formatUsdt(latestCompletedRun.progress.currentExposureQuote)}
+              tone={
+                latestCompletedRun.progress.currentExposureQuote > 0
+                  ? 'warn'
+                  : 'neutral'
+              }
+            />
+            <StatCard
+              label="Realized P&L"
+              value={formatUsdt(latestCompletedRun.evidence.realizedPnlQuote)}
+              tone={
+                latestCompletedRun.evidence.realizedPnlQuote > 0
+                  ? 'good'
+                  : latestCompletedRun.evidence.realizedPnlQuote < 0
+                    ? 'danger'
+                    : 'neutral'
+              }
+            />
+            <StatCard
+              label="Errors"
+              value={String(latestCompletedRun.evidence.errors.length)}
+              tone={latestCompletedRun.evidence.errors.length > 0 ? 'danger' : 'good'}
+            />
+          </div>
+
+          <p className="mt-3 rounded-xl border border-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_8%,transparent)] px-3 py-2 text-xs text-[var(--theme-warning)]">
+            {latestCompletedRun.progress.tradesClosed === 0
+              ? 'Incomplete evidence: this checkpoint produced no closed trades, so it cannot establish profitability or readiness.'
+              : latestCompletedRun.readinessImpact?.detail ??
+                'Review the checkpoint before changing stage or strategy controls.'}
+          </p>
+
+          <details className="mt-3 rounded-xl border border-[var(--theme-border)]/70 p-3">
+            <summary className="cursor-pointer text-sm font-semibold">
+              Decision trends · last 100 {latestCompletedRun.stage} cycles
+            </summary>
+            {latestCompletedTrend.cycles === 0 ? (
+              <p className="mt-2 text-xs text-[var(--theme-muted)]">
+                No persisted diagnostic history for this stage yet.
+              </p>
+            ) : (
+              <div className="mt-3 grid gap-2 text-xs text-[var(--theme-muted)] sm:grid-cols-2">
+                <p>
+                  <span className="font-medium text-[var(--theme-text)]">
+                    Council:
+                  </span>{' '}
+                  {Object.entries(latestCompletedTrend.councilCounts)
+                    .map(([key, value]) => `${key} ${value}`)
+                    .join(' · ')}
+                </p>
+                <p>
+                  <span className="font-medium text-[var(--theme-text)]">
+                    Actions:
+                  </span>{' '}
+                  {Object.entries(latestCompletedTrend.actionCounts)
+                    .map(([key, value]) => `${key} ${value}`)
+                    .join(' · ')}
+                </p>
+                <div className="sm:col-span-2">
+                  <span className="font-medium text-[var(--theme-text)]">
+                    Recurring reasons:
+                  </span>
+                  <div className="mt-1 space-y-1">
+                    {latestCompletedTrend.reasonCounts
+                      .slice(0, 5)
+                      .map((reasonEntry) => (
+                        <p key={reasonEntry.reason}>
+                          <span className="font-medium">
+                            {reasonEntry.count}×
+                          </span>{' '}
+                          {reasonEntry.reason}
+                        </p>
+                      ))}
+                  </div>
+                </div>
+                <p className="sm:col-span-2">
+                  Window:{' '}
+                  {latestCompletedTrend.oldestAt
+                    ? `${formatDateTime(latestCompletedTrend.oldestAt)} → ${formatDateTime(latestCompletedTrend.newestAt ?? latestCompletedTrend.oldestAt)}`
+                    : 'not available'}
+                </p>
+              </div>
+            )}
+          </details>
+        </div>
+      )}
+
+      {activeReconciliation && (
+        <div className="mt-4 rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <strong>Evidence reconciliation</strong>
+            <span className="text-[var(--theme-accent)]">
+              {validationRecommendationLabel(activeReconciliation.recommendation)}
+            </span>
+          </div>
+          <p className="mt-2 text-[var(--theme-muted)]">
+            {activeReconciliation.attributedTradeCount} linked trade(s) ·{' '}
+            {activeReconciliation.attributedLedgerCount} ledger record(s) ·
+            realized {formatUsdt(activeReconciliation.realizedPnlQuote)} ·
+            fees {formatUsdt(activeReconciliation.feesQuote)} ·{' '}
+            {activeReconciliation.openPositionCount} open position(s)
+          </p>
+          {activeReconciliation.warnings.length > 0 && (
+            <p className="mt-2 text-[var(--theme-warning)]">
+              {activeReconciliation.warnings.join(' · ')}
+            </p>
+          )}
+
+          {diagnostics && (
+            <details className="mt-4 rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_6%,transparent)] p-4">
+              <summary className="cursor-pointer text-sm font-semibold">
+                Last cycle decision diagnostics
+              </summary>
+              <p className="mt-2 text-xs text-[var(--theme-muted)]">
+                {diagnostics.status === 'completed'
+                  ? 'Read-only snapshot of why each watched symbol acted or stayed on HOLD.'
+                  : diagnostics.reason ?? 'Cycle did not complete.'}{' '}
+                · {ageLabel(diagnostics.ranAt)}
+              </p>
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                {diagnostics.symbols.map((item) => (
+                  <div
+                    key={item.symbol}
+                    className="rounded-xl border border-[var(--theme-border)]/70 p-3 text-xs"
+                  >
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <strong>{item.symbol}</strong>
+                      <span className="text-[var(--theme-accent)]">
+                        {item.finalAction ?? 'NO ACTION'} · council {item.councilSignal}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[var(--theme-muted)]">
+                      {item.candles} candles
+                      {item.latestPrice == null
+                        ? ''
+                        : ` · price ${item.latestPrice.toFixed(4)}`}
+                      {item.finalReason ? ` · ${item.finalReason}` : ''}
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      {item.strategySignals.map((signal) => (
+                        <p key={signal.strategyId}>
+                          <span className="font-medium">{signal.strategyId}</span>{' '}
+                          {signal.signal} ({Math.round(signal.confidence * 100)}%) ·{' '}
+                          {signal.reason}
+                        </p>
+                      ))}
+                    </div>
+                    {item.councilReasons.length > 0 && (
+                      <p className="mt-2 text-[var(--theme-muted)]">
+                        Council: {item.councilReasons.join(' · ')}
+                      </p>
+                    )}
+
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+            <p className="mt-2 text-[11px] text-[var(--theme-muted)]">
+              Evaluated {ageLabel(activeReconciliation.evaluatedAt)} · baseline{' '}
+              {activeReconciliation.baselineEquityQuote == null
+                ? 'n/a'
+                : `${formatUsdt(activeReconciliation.baselineEquityQuote)} USDT`}
+            </p>
+        </div>
+      )}
+
+      {activeRun ? (
+        <div className="mt-4 rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h4 className="text-sm font-semibold">
+                {activeRun.strategies.join(', ')}
+              </h4>
+              <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                started {formatDateTime(activeRun.createdAt)} · last cycle{' '}
+                {ageLabel(activeRun.progress.lastCycleAt)}
+                {activeRun.autoRun ? ' · automatic cycles enabled' : ''}
+                {activeRun.progress.lastCycleReason
+                  ? ` (${activeRun.progress.lastCycleReason})`
+                  : ''}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatCard
+                label="Status"
+                value={VALIDATION_STATUS_LABEL[activeRun.status]}
+                tone={validationStatusTone(activeRun.status)}
+              />
+              <ReadinessImpactBadge gate={activeRun.liveReadinessImpact} />
+            </div>
+          </div>
+          <p className="mt-3 rounded-xl border border-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_8%,transparent)] px-3 py-2 text-xs text-[var(--theme-warning)]">
+            {stageNextAction}
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {budgetRatioBar(
+              'Time',
+              Date.now() - new Date(activeRun.createdAt).getTime(),
+              activeRun.budgets.maxDurationMs,
+            )}
+            {budgetRatioBar(
+              'Cycles',
+              activeRun.progress.cyclesRun,
+              activeRun.budgets.maxCycles,
+            )}
+            {budgetRatioBar(
+              'Trades',
+              activeRun.progress.tradesClosed,
+              activeRun.budgets.maxTrades,
+            )}
+            {budgetRatioBar(
+              'Exposure',
+              activeRun.progress.currentExposureQuote,
+              activeRun.budgets.maxExposureQuote,
+            )}
+          </div>
+
+          <div className="mt-4 grid gap-2 text-xs text-[var(--theme-muted)] sm:grid-cols-2 lg:grid-cols-4">
+            <p>
+              Realized P&amp;L:{' '}
+              <span className="text-[var(--theme-text)]">
+                {formatUsdt(activeRun.evidence.realizedPnlQuote)}
+              </span>
+            </p>
+            <p>
+              Fees:{' '}
+              <span className="text-[var(--theme-text)]">
+                {formatUsdt(activeRun.evidence.feesQuote)}
+              </span>
+            </p>
+            <p>
+              Avg slippage:{' '}
+              <span className="text-[var(--theme-text)]">
+                {activeRun.evidence.avgSlippageQuote == null
+                  ? 'n/a'
+                  : `${formatUsdt(activeRun.evidence.avgSlippageQuote)} (${activeRun.evidence.shadowComparisonsSampled} sampled)`}
+              </span>
+            </p>
+            <p>
+              Ledger records:{' '}
+              <span className="text-[var(--theme-text)]">
+                {activeRun.evidence.ledgerRecordIds.length}
+              </span>
+            </p>
+          </div>
+
+          {activeRun.evidence.errors.length > 0 && (
+            <details className="mt-3 text-xs text-[var(--theme-muted)]">
+              <summary className="cursor-pointer">
+                {activeRun.evidence.errors.length} recorded bail/block event(s)
+              </summary>
+              <ul className="mt-2 space-y-1">
+                {activeRun.evidence.errors.slice(-10).map((e, i) => (
+                  <li key={`${e.at}-${i}`}>
+                    {formatDateTime(e.at)} — {e.message}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void runCycle()}
+              className="rounded-xl border border-[color-mix(in_srgb,var(--theme-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent)_10%,transparent)] px-3 py-2 text-xs font-medium text-[var(--theme-accent)] hover:bg-[color-mix(in_srgb,var(--theme-accent)_20%,transparent)] disabled:opacity-50"
+            >
+              Run cycle now
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void finalizeRun()}
+              className="rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] px-3 py-2 text-xs font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_20%,transparent)] disabled:opacity-50"
+            >
+              Finalize
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void stopRun()}
+              className="rounded-xl border border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] px-3 py-2 text-xs font-medium text-[var(--theme-danger)] hover:bg-[color-mix(in_srgb,var(--theme-danger)_20%,transparent)] disabled:opacity-50"
+            >
+              Stop
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-3 rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-4">
+          <p className="text-xs text-[var(--theme-muted)]">
+            No active {stage === 'paper' ? 'paper' : 'sandbox (testnet)'}{' '}
+            validation run. Select strategies and bounded budgets to start
+            one — every field below is required (no unbounded option).
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {catalog.map((strategy) => (
+              <label
+                key={strategy.id}
+                className="flex items-center gap-1.5 rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs text-[var(--theme-muted)]"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedStrategyIds.includes(strategy.id)}
+                  onChange={() => toggleStrategy(strategy.id)}
+                />
+                {strategy.name}
+              </label>
+            ))}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+              Duration (hours)
+              <input
+                type="number"
+                min={1}
+                value={durationHours}
+                onChange={(event) => setDurationHours(Number(event.target.value))}
+                className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+              Max cycles
+              <input
+                type="number"
+                min={1}
+                value={maxCycles}
+                onChange={(event) => setMaxCycles(Number(event.target.value))}
+                className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+              Max closed trades
+              <input
+                type="number"
+                min={1}
+                value={maxTrades}
+                onChange={(event) => setMaxTrades(Number(event.target.value))}
+                className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+              Max exposure (USDT)
+              <input
+                type="number"
+                min={0.01}
+                value={maxExposureQuote}
+                onChange={(event) =>
+                  setMaxExposureQuote(Number(event.target.value))
+                }
+                className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+              />
+            </label>
+          </div>
+          <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+            Notes (optional)
+            <input
+              type="text"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+            />
+          </label>
+          <label className="flex items-start gap-2 text-xs text-[var(--theme-muted)]">
+            <input
+              type="checkbox"
+              checked={autoRun}
+              onChange={(event) => setAutoRun(event.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Advance automatically every 20 minutes using the existing
+              trading-cycle safety gates. Stop or expiry still ends the run.
+            </span>
+          </label>
+          <div>
+            <button
+              type="button"
+              disabled={busy !== null || selectedStrategyIds.length === 0}
+              onClick={() => void startRun()}
+              className="rounded-xl border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] px-3 py-2 text-xs font-medium text-[var(--theme-success)] hover:bg-[color-mix(in_srgb,var(--theme-success)_20%,transparent)] disabled:opacity-50"
+            >
+              Start {stage} validation run
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-5">
+        <h3 className="text-sm font-semibold">History</h3>
+        {state.history.length === 0 ? (
+          <p className="mt-2 text-xs text-[var(--theme-muted)]">
+            No ended validation runs yet.
+          </p>
+        ) : (
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                <tr>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Stage</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Strategies</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Status</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Cycles</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Trades</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Realized P&amp;L</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Readiness</th>
+                  <th className="border-b border-[var(--theme-border)] py-2 pr-4">Ended</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...state.history]
+                  .slice(0, 10)
+                  .map((r) => (
+                    <tr key={r.id} className="align-top text-[var(--theme-text)]">
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {r.stage}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {r.strategies.join(', ')}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {VALIDATION_STATUS_LABEL[r.status]}
+                        {r.endReason ? ` · ${r.endReason}` : ''}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {r.progress.cyclesRun}/{r.budgets.maxCycles}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {r.progress.tradesClosed}/{r.budgets.maxTrades}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {formatUsdt(r.evidence.realizedPnlQuote)}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        <ReadinessImpactBadge gate={r.readinessImpact} />
+                      </td>
+                      <td className="whitespace-nowrap border-b border-[var(--theme-border)]/60 py-2 pr-4">
+                        {r.endedAt ? formatDateTime(r.endedAt) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function toggleTone(enabled: boolean): 'good' | 'neutral' {
   return enabled ? 'good' : 'neutral'
 }
@@ -876,9 +2492,34 @@ function SignalSettingsPanel({
   const fibTakeProfitEnabled = demoTrading.fibTakeProfitEnabled === true
   const longShortSentimentEnabled =
     demoTrading.longShortSentimentEnabled === true
+  // Defaults to true (see EngineConfig.noLossExitMode's doc comment in
+  // demo-trading-engine.ts) — only false once explicitly toggled off, since
+  // an unset key from settings.demoTrading means "use the engine default".
+  const noLossExitMode = demoTrading.noLossExitMode !== false
+  const strategyGuardEnabled = demoTrading.strategyGuardEnabled === true
+  const strategyGuardMinClosedTrades =
+    typeof demoTrading.strategyGuardMinClosedTrades === 'number'
+      ? demoTrading.strategyGuardMinClosedTrades
+      : 5
+  const strategyGuardLossRateThreshold =
+    typeof demoTrading.strategyGuardLossRateThreshold === 'number'
+      ? demoTrading.strategyGuardLossRateThreshold
+      : 0.4
+  const strategyGuardMaxPnlQuote =
+    typeof demoTrading.strategyGuardMaxPnlQuote === 'number'
+      ? demoTrading.strategyGuardMaxPnlQuote
+      : 0
+  const strategyGuardAction =
+    demoTrading.strategyGuardAction === 'disabled' ? 'disabled' : 'reduce_size'
 
   const [atrInput, setAtrInput] = useState(String(atrSizeBaselinePct * 100))
   const [adxInput, setAdxInput] = useState(String(adxThreshold))
+  const [guardMinTradesInput, setGuardMinTradesInput] = useState(
+    String(strategyGuardMinClosedTrades),
+  )
+  const [guardLossRateInput, setGuardLossRateInput] = useState(
+    String(strategyGuardLossRateThreshold * 100),
+  )
 
   function setConfig(config: Record<string, unknown>, busyKey: string) {
     void post({ action: 'set_demo_config', config }, busyKey)
@@ -936,6 +2577,103 @@ function SignalSettingsPanel({
             >
               {busy === 'atr' ? '...' : 'Save'}
             </button>
+          </div>
+
+          <div className="rounded-2xl border border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_8%,transparent)] p-3 sm:col-span-2">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold">
+                  Automatic sandbox strategy guard
+                </h3>
+                <p className="mt-1 max-w-3xl text-xs text-[var(--theme-muted)]">
+                  After enough closed trades, automatically reduces size or
+                  disables an enabled strategy when its win rate and P&amp;L are
+                  weak. It only affects future paper/testnet entries, expires
+                  after 7 days, and can be cleared from Strategy overrides.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={busy === 'strategy-guard'}
+                onClick={() =>
+                  setConfig(
+                    { strategyGuardEnabled: !strategyGuardEnabled },
+                    'strategy-guard',
+                  )
+                }
+                className={`${buttonClass} ${toneClass(toggleTone(strategyGuardEnabled))}`}
+              >
+                {busy === 'strategy-guard'
+                  ? '...'
+                  : strategyGuardEnabled
+                    ? 'Enabled'
+                    : 'Disabled'}
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <label className="flex items-center gap-2 text-[var(--theme-muted)]">
+                Minimum trades
+                <input
+                  type="number"
+                  min={3}
+                  max={200}
+                  value={guardMinTradesInput}
+                  onChange={(event) => setGuardMinTradesInput(event.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="flex items-center gap-2 text-[var(--theme-muted)]">
+                Max win rate
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={guardLossRateInput}
+                  onChange={(event) => setGuardLossRateInput(event.target.value)}
+                  className={inputClass}
+                />
+                %
+              </label>
+              <select
+                value={strategyGuardAction}
+                onChange={(event) =>
+                  setConfig(
+                    { strategyGuardAction: event.target.value },
+                    'strategy-guard-action',
+                  )
+                }
+                className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-1.5 text-xs text-[var(--theme-text)]"
+              >
+                <option value="reduce_size">Reduce to 50%</option>
+                <option value="disabled">Disable until review</option>
+              </select>
+              <button
+                type="button"
+                disabled={busy === 'strategy-guard-thresholds'}
+                onClick={() =>
+                  setConfig(
+                    {
+                      strategyGuardMinClosedTrades:
+                        guardMinTradesInput.trim() === ''
+                          ? 5
+                          : Number(guardMinTradesInput),
+                      strategyGuardLossRateThreshold:
+                        (guardLossRateInput.trim() === ''
+                          ? 40
+                          : Number(guardLossRateInput)) / 100,
+                    },
+                    'strategy-guard-thresholds',
+                  )
+                }
+                className={`${buttonClass} ${toneClass('neutral')}`}
+              >
+                {busy === 'strategy-guard-thresholds' ? '...' : 'Save thresholds'}
+              </button>
+              <span className="text-[var(--theme-muted)]">
+                Also requires total P&amp;L ≤{' '}
+                {formatUsdt(strategyGuardMaxPnlQuote)}.
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1066,6 +2804,37 @@ function SignalSettingsPanel({
               {busy === 'sentiment'
                 ? '...'
                 : longShortSentimentEnabled
+                  ? 'Enabled'
+                  : 'Disabled'}
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
+          <h3 className="text-sm font-semibold">
+            Patient hold (don't realize losses)
+          </h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            Sandbox/testnet only — while a position is underwater, this skips
+            stop-loss, trailing-stop, max-hold, and strategy-exit sells so the
+            engine keeps holding (and researching) until it can close at
+            breakeven or a profit instead of locking in a loss. Guardian
+            safety limits (dust/unsellable close, daily loss halt, max open
+            positions) stay active regardless. Never enable this for real
+            money — a losing position can never be forced to recover.
+          </p>
+          <div className="mt-2">
+            <button
+              type="button"
+              disabled={busy === 'no-loss'}
+              onClick={() =>
+                setConfig({ noLossExitMode: !noLossExitMode }, 'no-loss')
+              }
+              className={`${buttonClass} ${toneClass(toggleTone(noLossExitMode))}`}
+            >
+              {busy === 'no-loss'
+                ? '...'
+                : noLossExitMode
                   ? 'Enabled'
                   : 'Disabled'}
             </button>
@@ -1274,6 +3043,7 @@ function PerformancePanel({
       </section>
     )
   }
+
   const pct = formatFractionPct
   const usdt = formatUsdt
   const num = (value: number) => value.toFixed(2)
@@ -1339,6 +3109,121 @@ function PerformancePanel({
         />
       </div>
     </section>
+  )
+}
+
+function StrategyEligibilityAuditPanel({
+  audit,
+}: {
+  audit: StrategyEligibilityAudit
+}) {
+  const hasSnapshot = audit.symbols.length > 0 && audit.asOfMs > 0
+  return (
+    <details className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Strategy eligibility audit</h2>
+            <p className="mt-1 text-sm text-[var(--theme-muted)]">
+              Read-only replay of every registered strategy against the latest{' '}
+              {audit.interval} market window. It does not enable strategies or
+              authorize orders.
+            </p>
+          </div>
+          <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
+            {hasSnapshot ? `${audit.symbols.length} symbol(s)` : 'warming up'}
+          </span>
+        </div>
+      </summary>
+      {!hasSnapshot ? (
+        <p className="mt-4 rounded-xl border border-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_8%,transparent)] px-3 py-2 text-sm text-[var(--theme-warning)]">
+          Market snapshot is warming up. Refresh this section after the
+          background market cache completes.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-4">
+          <p className="text-xs text-[var(--theme-muted)]">
+            Council threshold: {audit.councilThreshold.toFixed(2)} · execution:{' '}
+            {audit.executionMode} · market data as of{' '}
+            {new Date(audit.asOfMs).toLocaleTimeString()}
+          </p>
+          {audit.symbols.map((item) => (
+            <section
+              key={item.symbol}
+              className="rounded-2xl border border-[var(--theme-border)]/70 p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold">{item.symbol}</h3>
+                  <p className="text-xs text-[var(--theme-muted)]">
+                    {item.candles} candles · price{' '}
+                    {item.latestPrice == null
+                      ? 'unavailable'
+                      : item.latestPrice.toFixed(4)}
+                  </p>
+                </div>
+                <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs font-semibold">
+                  Council {item.council.signal} · net {item.council.net.toFixed(3)}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {item.strategies.map((strategy) => (
+                  <div
+                    key={strategy.strategyId}
+                    className="rounded-xl border border-[var(--theme-border)]/60 p-3 text-xs"
+                  >
+                    <div className="flex justify-between gap-2">
+                      <span className="font-medium">
+                        {strategy.name}
+                        {!strategy.active ? ' · disabled' : ''}
+                        {strategy.overrideMode === 'disabled'
+                          ? ' · override'
+                          : ''}
+                      </span>
+                      <span
+                        className={
+                          strategy.signal === 'BUY'
+                            ? 'text-[var(--theme-success)]'
+                            : strategy.signal === 'SELL'
+                              ? 'text-[var(--theme-danger)]'
+                              : 'text-[var(--theme-muted)]'
+                        }
+                      >
+                        {strategy.signal} {Math.round(strategy.confidence * 100)}%
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[var(--theme-muted)]">
+                      {strategy.reason}
+                    </p>
+                    <p className="mt-1 text-[var(--theme-muted)]">
+                      {strategy.dataAvailable
+                        ? `${item.candles} candles · minimum ${strategy.minCandles}`
+                        : strategy.dataIssues.join('; ')}
+                    </p>
+                    <p className="mt-1 text-[var(--theme-muted)]">
+                      {strategy.regime
+                        ? `${strategy.muted ? 'Muted' : 'Regime'}: ${strategy.regime}`
+                        : 'Regime switching off'}
+                      {' · '}
+                      {strategy.councilEligible
+                        ? 'eligible for council'
+                        : strategy.exclusionReason ?? 'not eligible'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-[var(--theme-muted)]">
+                Participating:{' '}
+                {item.council.participatingStrategyIds.join(', ') || 'none'} ·{' '}
+                {item.council.eligible
+                  ? `eligible with lead ${item.council.leadStrategyId ?? 'n/a'}`
+                  : `below ${item.council.threshold.toFixed(2)} threshold`}
+              </p>
+            </section>
+          ))}
+        </div>
+      )}
+    </details>
   )
 }
 
@@ -2733,12 +4618,6 @@ export function TradingScreen() {
   }, [])
 
   const summary = payload?.summary
-  const riskTone = useMemo(() => {
-    if (!summary) return 'neutral'
-    if (summary.liveTradingEnabled) return 'danger'
-    if (summary.emergencyKillSwitch) return 'good'
-    return 'warn'
-  }, [summary])
 
   if (loading) {
     return (
@@ -2763,15 +4642,18 @@ export function TradingScreen() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-[color-mix(in_srgb,var(--theme-success)_80%,transparent)]">
-              Hermes Trading
+              Hermes Trading Engine
             </p>
             <h1 className="mt-2 text-3xl font-semibold md:text-4xl">
-              Semi-automated Binance trading — controlled, gated, and monitored
+              Staged Binance trading — paper first, sandbox next, live only
+              with explicit approval
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--theme-muted)]">
-              Council, grid, rebalance, and LLM signal engines, with risk-scored
-              trading, audit logs, and gated real execution with paper-shadow
-              learning.
+              Council, grid, rebalance, and LLM signal engines share risk
+              controls, audit logs, paper validation, Binance sandbox
+              verification, and gated real-money execution. Existing
+              compatibility routes may still use the legacy “demo” name
+              internally.
             </p>
           </div>
           <div className="rounded-2xl border border-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] px-4 py-3 text-sm text-[var(--theme-success)]">
@@ -2787,67 +4669,94 @@ export function TradingScreen() {
         </div>
       </section>
 
-      <TradingSummaryStrip />
-      <LivePriceTicker
-        symbols={
-          Array.isArray(
-            (
-              payload.settings.demoTrading as
-                | Record<string, unknown>
-                | undefined
-            )?.symbols,
-          )
-            ? ((payload.settings.demoTrading as Record<string, unknown>)
-                .symbols as Array<string>)
-            : []
-        }
-      />
-
-      <NewsResearchPanel payload={payload} onPayload={setPayload} />
-      <IntelligenceSummaryPanel onPayload={setPayload} />
-
-      <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Trading safety"
-          value={summary.liveTradingEnabled ? 'Live enabled' : 'Live blocked'}
-          tone={riskTone}
+      <NextRecommendationCard recommendation={payload.nextRecommendation} />
+      <AccountOverviewCard />
+      <DashboardGroup
+        title="Current account and safety"
+        description="See the account state first, then confirm the active mode and emergency protection."
+      >
+        <LiveReadinessCard
+          payload={payload}
+          onPayload={(next) => setPayload(next as FinancePayload)}
         />
-      </section>
+        <TradingSummaryStrip />
+        <TradingControls summary={summary} onPayload={setPayload} />
+      </DashboardGroup>
 
-      <TradingControls summary={summary} onPayload={setPayload} />
+      <DashboardGroup
+        title="Market and performance"
+        description="Review live market context, research, and the results produced by the engines."
+      >
+        <LivePriceTicker
+          symbols={
+            Array.isArray(
+              (
+                payload.settings.demoTrading as
+                  | Record<string, unknown>
+                  | undefined
+              )?.symbols,
+            )
+              ? ((payload.settings.demoTrading as Record<string, unknown>)
+                  .symbols as Array<string>)
+              : []
+          }
+        />
+        <NewsResearchPanel payload={payload} onPayload={setPayload} />
+        <IntelligenceSummaryPanel onPayload={setPayload} />
+        <PerformancePanel perf={payload.demoPerformance} />
+        <StrategyEligibilityAuditPanel audit={payload.strategyEligibilityAudit} />
+        <PaperDecisionQualityPanel report={payload.paperDecisionQuality} />
+        <DecisionQualityPanel
+          report={payload.decisionQuality}
+          overrides={payload.strategyOverrides}
+          onPayload={setPayload}
+        />
+      </DashboardGroup>
 
-      <PerformancePanel perf={payload.demoPerformance} />
+      <DashboardGroup
+        title="Evidence and readiness"
+        description="Collect stage-separated evidence and understand what is still required before promotion."
+      >
+        <ValidationRunPanel
+          catalog={payload.strategyCatalog}
+          state={payload.validationRuns}
+          reconciliation={payload.validationReconciliation}
+          diagnostics={payload.lastCycleDiagnostics}
+          trends={payload.tradingCycleDiagnosticTrends}
+          onPayload={setPayload}
+        />
+      </DashboardGroup>
 
-      <PaperDecisionQualityPanel report={payload.paperDecisionQuality} />
-
-      <DecisionQualityPanel
-        report={payload.decisionQuality}
-        overrides={payload.strategyOverrides}
-        onPayload={setPayload}
-      />
-
-      <SelfImprovementPanel
-        report={payload.learning}
-        summary={summary}
-        onPayload={setPayload}
-      />
-
-      <SafeguardHistoryPanel rows={payload.safeguardHistory} />
-
-      <StrategyOverridePanel
-        catalog={payload.strategyCatalog}
-        state={payload.strategyOverrides}
-        onPayload={setPayload}
-      />
-
-      <SignalSettingsPanel
-        demoTrading={
-          (payload.settings.demoTrading as
-            | Record<string, unknown>
-            | undefined) ?? {}
-        }
-        onPayload={setPayload}
-      />
+      <AdvancedDashboardGroup
+        title="Advanced strategy and engine controls"
+        description="Manage learning, safeguards, strategy overrides, experiments, and signal settings when you need them."
+      >
+        <SelfImprovementPanel
+          report={payload.learning}
+          summary={summary}
+          onPayload={setPayload}
+        />
+        <SafeguardHistoryPanel rows={payload.safeguardHistory} />
+        <StrategyOverridePanel
+          catalog={payload.strategyCatalog}
+          state={payload.strategyOverrides}
+          onPayload={setPayload}
+        />
+        <GuardEvidencePanel evidence={payload.guardEvidence} />
+        <SandboxExperimentPanel
+          catalog={payload.strategyCatalog}
+          state={payload.sandboxExperiments}
+          onPayload={setPayload}
+        />
+        <SignalSettingsPanel
+          demoTrading={
+            (payload.settings.demoTrading as
+              | Record<string, unknown>
+              | undefined) ?? {}
+          }
+          onPayload={setPayload}
+        />
+      </AdvancedDashboardGroup>
 
       <section className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
@@ -2881,10 +4790,16 @@ export function TradingScreen() {
         </div>
       </section>
 
-      <DemoTradingPanel />
-      <GridTradingPanel />
-      <RebalanceCard />
-      <LlmSignalCard />
+      <DashboardGroup
+        title="Engine activity and ledger"
+        description="Inspect engine-specific activity, open positions, and the complete normalized trading history."
+      >
+        <DemoTradingPanel />
+        <GridTradingPanel />
+        <RebalanceCard />
+        <LlmSignalCard />
+        <TradingLedgerPanel />
+      </DashboardGroup>
 
       <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
         <h2 className="text-lg font-semibold">Phased rollout</h2>

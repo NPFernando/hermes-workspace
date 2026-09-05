@@ -50,7 +50,9 @@ export function OpenRouterCreditsBanner() {
 
   useEffect(() => {
     mountedRef.current = true
-    return () => { mountedRef.current = false }
+    return () => {
+      mountedRef.current = false
+    }
   }, [])
 
   useEffect(() => {
@@ -64,7 +66,9 @@ export function OpenRouterCreditsBanner() {
     }
 
     void check()
-    const interval = window.setInterval(() => { void check() }, POLL_INTERVAL_MS)
+    const interval = window.setInterval(() => {
+      void check()
+    }, POLL_INTERVAL_MS)
     return () => window.clearInterval(interval)
   }, [])
 
@@ -83,15 +87,17 @@ export function OpenRouterCreditsBanner() {
   const isExhausted = data.level === 'exhausted'
   const isCritical = data.level === 'critical'
 
-  const borderColor = isExhausted || isCritical ? 'var(--theme-danger)' : '#f59e0b'
-  const textColor = isExhausted || isCritical ? 'var(--theme-danger)' : '#f59e0b'
+  const borderColor =
+    isExhausted || isCritical ? 'var(--theme-danger)' : '#f59e0b'
+  const textColor =
+    isExhausted || isCritical ? 'var(--theme-danger)' : '#f59e0b'
   const dotColor = borderColor
 
   const label = isExhausted
     ? 'OpenRouter paid credits exhausted — free-tier models only'
     : isCritical
-    ? `OpenRouter credits critical: $${data.remaining} remaining`
-    : `OpenRouter credits low: $${data.remaining} remaining`
+      ? `OpenRouter credits critical: $${data.remaining} remaining`
+      : `OpenRouter credits low: $${data.remaining} remaining`
 
   return (
     <div
@@ -107,7 +113,10 @@ export function OpenRouterCreditsBanner() {
             className="inline-block h-2 w-2 shrink-0 rounded-full"
             style={{ background: dotColor }}
           />
-          <p className="text-xs font-medium truncate" style={{ color: textColor }}>
+          <p
+            className="text-xs font-medium truncate"
+            style={{ color: textColor }}
+          >
             {label}
           </p>
         </div>

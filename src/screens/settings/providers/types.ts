@@ -1,5 +1,10 @@
 export type ProviderStatus = 'active' | 'configured'
-export type SettingsTabId = 'providers' | 'models' | 'agents' | 'session' | 'memory'
+export type SettingsTabId =
+  | 'providers'
+  | 'models'
+  | 'agents'
+  | 'session'
+  | 'memory'
 export type SettingKind = 'text' | 'number' | 'select' | 'boolean' | 'multiline'
 
 export type ProviderSummary = {
@@ -66,7 +71,6 @@ export type ClaudeCatalogEntry =
       name: string
       [key: string]: unknown
     }
-
 
 export const TAB_ORDER: Array<{ id: SettingsTabId; label: string }> = [
   { id: 'providers', label: 'Providers' },
@@ -142,4 +146,3 @@ export const DEFAULT_STREAM_READ_TIMEOUT_SECONDS = 60
 export const MODEL_PROVIDER_VALUES = new Set<ModelProviderOption>(
   MODEL_PROVIDER_OPTIONS.map((option) => option.value as ModelProviderOption),
 )
-

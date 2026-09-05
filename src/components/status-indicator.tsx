@@ -156,9 +156,7 @@ export function StatusIndicator({
             className={`relative inline-flex h-1.5 w-1.5 rounded-full ${dotColor}`}
           />
         </span>
-        <span className="text-[10px] text-[var(--theme-muted)]">
-          {label}
-        </span>
+        <span className="text-[10px] text-[var(--theme-muted)]">{label}</span>
       </span>
     )
   }

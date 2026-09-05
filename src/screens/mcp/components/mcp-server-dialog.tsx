@@ -58,9 +58,7 @@ function fromServer(server: McpServer): McpClientInput {
 }
 
 function isMcpServer(value: unknown): value is McpServer {
-  return Boolean(
-    value && typeof value === 'object' && 'discoveredToolsCount' in value,
-  )
+  return Boolean(value && typeof value === 'object' && 'discoveredToolsCount' in (value))
 }
 
 export function McpServerDialog({ open, initial, onClose }: Props) {
@@ -120,8 +118,7 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
         <div className="flex max-h-[85vh] flex-col">
           <div className="border-b border-[var(--theme-border)] px-5 py-4">
             <DialogTitle className="text-balance">
-              🔌{' '}
-              {draft.name || (initial ? 'Edit MCP Server' : 'Add MCP Server')}
+              🔌 {draft.name || (initial ? 'Edit MCP Server' : 'Add MCP Server')}
             </DialogTitle>
             <DialogDescription className="mt-1 text-pretty">
               {initial ? 'Edit MCP Server' : 'Add MCP Server'} •{' '}
@@ -136,7 +133,7 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
                 auth: {draft.authType || 'none'}
               </span>
               {fallbackMode ? (
-                <span className="rounded-md border border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-2 py-0.5 text-xs text-[var(--theme-warning)] dark:border-[var(--theme-warning)] dark:bg-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] dark:text-[var(--theme-warning)]">
+                <span className="rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
                   config-only mode
                 </span>
               ) : null}
@@ -241,13 +238,11 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
                       }
                     />
                     {authEnvRef ? (
-                      <span className="text-[11px] text-[var(--theme-warning)] dark:text-[var(--theme-warning)]">
-                        Token resolved from env var{' '}
-                        <code className="font-mono">{authEnvRef}</code> — leave
-                        blank to keep current, or type to override.
+                      <span className="text-[11px] text-amber-700 dark:text-amber-300">
+                        Token resolved from env var <code className="font-mono">{authEnvRef}</code> — leave blank to keep current, or type to override.
                       </span>
                     ) : initialHasBearer ? (
-                      <span className="text-[11px] text-[var(--theme-success)] dark:text-[var(--theme-success)]">
+                      <span className="text-[11px] text-emerald-700 dark:text-emerald-300">
                         Token currently set on server. Leave blank to keep
                         existing; type a new value to replace.
                       </span>
@@ -256,10 +251,10 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
                 ) : null}
 
                 {fallbackMode ? (
-                  <p className="rounded-lg border border-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-3 py-2 text-xs text-[var(--theme-warning)] dark:border-[var(--theme-warning)] dark:bg-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] dark:text-[var(--theme-warning)]">
-                    ⚠ Local fallback mode — config-only CRUD. Live tool Discover
-                    and connectivity Test require the hermes-agent /api/mcp
-                    runtime endpoint.
+                  <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                    ⚠ Local fallback mode — config-only CRUD. Live tool
+                    Discover and connectivity Test require the hermes-agent
+                    /api/mcp runtime endpoint.
                   </p>
                 ) : null}
                 {discover.data ? (
@@ -268,12 +263,12 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
                   </p>
                 ) : null}
                 {discover.error ? (
-                  <p className="text-xs text-[var(--theme-danger)] dark:text-[var(--theme-danger)]">
+                  <p className="text-xs text-red-700 dark:text-red-300">
                     {discover.error.message}
                   </p>
                 ) : null}
                 {upsert.error ? (
-                  <p className="text-xs text-[var(--theme-danger)] dark:text-[var(--theme-danger)]">
+                  <p className="text-xs text-red-700 dark:text-red-300">
                     {upsert.error.message}
                   </p>
                 ) : null}
@@ -294,42 +289,42 @@ export function McpServerDialog({ open, initial, onClose }: Props) {
               </code>
             </p>
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onClose}
-                disabled={upsert.isPending}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={discover.isPending || !draft.name || fallbackMode}
-                title={discoverDisabledReason}
-                onClick={() => discover.mutate(draft)}
-              >
-                {discover.isPending ? 'Discovering…' : 'Discover'}
-              </Button>
-              <Button
-                size="sm"
-                disabled={upsert.isPending || !draft.name}
-                onClick={async () => {
-                  const payload = bearerToken
-                    ? { ...draft, bearerToken }
-                    : draft
-                  try {
-                    await upsert.mutateAsync(payload)
-                    onClose()
-                  } finally {
-                    // Wipe ephemeral secret on success and on error so it
-                    // does not linger if the user retries the dialog.
-                    setBearerToken('')
-                  }
-                }}
-              >
-                {upsert.isPending ? 'Saving…' : 'Save'}
-              </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              disabled={upsert.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={discover.isPending || !draft.name || fallbackMode}
+              title={discoverDisabledReason}
+              onClick={() => discover.mutate(draft)}
+            >
+              {discover.isPending ? 'Discovering…' : 'Discover'}
+            </Button>
+            <Button
+              size="sm"
+              disabled={upsert.isPending || !draft.name}
+              onClick={async () => {
+                const payload = bearerToken
+                  ? { ...draft, bearerToken }
+                  : draft
+                try {
+                  await upsert.mutateAsync(payload)
+                  onClose()
+                } finally {
+                  // Wipe ephemeral secret on success and on error so it
+                  // does not linger if the user retries the dialog.
+                  setBearerToken('')
+                }
+              }}
+            >
+              {upsert.isPending ? 'Saving…' : 'Save'}
+            </Button>
             </div>
           </div>
         </div>

@@ -170,7 +170,12 @@ interface GridLevel {
   openedAt: string
 }
 
-function buildLevels(lower: number, upper: number, spacing: GridSpacing, count: number): Array<number> {
+function buildLevels(
+  lower: number,
+  upper: number,
+  spacing: GridSpacing,
+  count: number,
+): Array<number> {
   if (count < 2 || upper <= lower) return []
   const levels: Array<number> = []
   if (spacing === 'arithmetic') {
@@ -266,7 +271,11 @@ function runSymbolGrid(
   symbol: string,
   candles: Array<Candle>,
   config: GridBacktestConfig,
-): { trades: Array<GridTrade>; report: GridSymbolReport; equityContribution: Array<{ at: string; equity: number }> } {
+): {
+  trades: Array<GridTrade>
+  report: GridSymbolReport
+  equityContribution: Array<{ at: string; equity: number }>
+} {
   const trades: Array<GridTrade> = []
   const equityContribution: Array<{ at: string; equity: number }> = []
   let stopOuts = 0
@@ -289,11 +298,17 @@ function runSymbolGrid(
   let floorPrice: number | null = null
 
   const arm = (endIndex: number): boolean => {
-    const range = rangeFromWindow(candles, endIndex, config.rangeLookbackCandles)
+    const range = rangeFromWindow(
+      candles,
+      endIndex,
+      config.rangeLookbackCandles,
+    )
     if (!range) return false
     lower = range.lower
     upper = range.upper
-    levels = initLevels(buildLevels(lower, upper, config.spacing, config.gridCount))
+    levels = initLevels(
+      buildLevels(lower, upper, config.spacing, config.gridCount),
+    )
     outsideRangeStreak = 0
     return levels.length > 1
   }
@@ -342,7 +357,8 @@ function runSymbolGrid(
     if (!armed) {
       if (!halted && i >= config.rangeLookbackCandles - 1) {
         armed = arm(i)
-        if (armed && config.absoluteStopFloorEnabled) floorPrice = computeFloor()
+        if (armed && config.absoluteStopFloorEnabled)
+          floorPrice = computeFloor()
       }
       equityContribution.push({ at, equity: realizedPnl })
       continue
@@ -357,7 +373,9 @@ function runSymbolGrid(
       ? efficiencyRatio(candles, i, config.efficiencyLookbackCandles)
       : null
     const efficiencyTrending =
-      config.efficiencyGate && efficiency != null && efficiency > config.maxEfficiencyRatio
+      config.efficiencyGate &&
+      efficiency != null &&
+      efficiency > config.maxEfficiencyRatio
     const trending = rangeTrending || efficiencyTrending
 
     if (trending && !pausedForChop) {
@@ -396,8 +414,10 @@ function runSymbolGrid(
     }
 
     // Range breach: liquidate everything at this candle's close.
-    const upperBound = config.upperStopPct > 0 ? upper * (1 + config.upperStopPct) : null
-    const lowerBound = config.lowerStopPct > 0 ? lower * (1 - config.lowerStopPct) : null
+    const upperBound =
+      config.upperStopPct > 0 ? upper * (1 + config.upperStopPct) : null
+    const lowerBound =
+      config.lowerStopPct > 0 ? lower * (1 - config.lowerStopPct) : null
     const breachedUp = upperBound != null && candle.close > upperBound
     const breachedDown = lowerBound != null && candle.close < lowerBound
     if (breachedUp || breachedDown) {
@@ -426,7 +446,8 @@ function runSymbolGrid(
       if (outsideRangeStreak >= config.rearmOutsideRangeCandles) {
         liquidateAll(candle.close, at, 'range-idle-rearm')
         armed = arm(i)
-        if (armed && config.absoluteStopFloorEnabled) floorPrice = computeFloor()
+        if (armed && config.absoluteStopFloorEnabled)
+          floorPrice = computeFloor()
         equityContribution.push({ at, equity: realizedPnl })
         continue
       }
@@ -482,7 +503,11 @@ function runSymbolGrid(
   // Close out any still-held levels at the final candle's close so PnL reflects full exposure.
   if (candles.length > 0 && levels.some((l) => l.held)) {
     const last = candles[candles.length - 1]
-    liquidateAll(last.close, new Date(last.openTime).toISOString(), 'stop-liquidation')
+    liquidateAll(
+      last.close,
+      new Date(last.openTime).toISOString(),
+      'stop-liquidation',
+    )
     equityContribution.push({
       at: new Date(last.openTime).toISOString(),
       equity: realizedPnl,
@@ -499,7 +524,9 @@ function runSymbolGrid(
   const totalFeesQuote = trades.reduce((s, t) => s + t.feesQuote, 0)
   const buyAndHold =
     candles.length > 1
-      ? ((candles[candles.length - 1].close - candles[0].close) / candles[0].close) * 100
+      ? ((candles[candles.length - 1].close - candles[0].close) /
+          candles[0].close) *
+        100
       : 0
 
   return {
@@ -510,7 +537,12 @@ function runSymbolGrid(
       wins,
       totalPnlQuote: realizedPnl,
       totalFeesQuote,
-      profitFactor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0,
+      profitFactor:
+        grossLoss > 0
+          ? grossProfit / grossLoss
+          : grossProfit > 0
+            ? Infinity
+            : 0,
       stopOuts,
       chopPauses,
       buyAndHoldReturnPct: buyAndHold,
@@ -532,7 +564,10 @@ export function runGridBacktest(
   let candleCount = 0
   let from = ''
   let to = ''
-  const equityBySymbol: Record<string, Array<{ at: string; equity: number }>> = {}
+  const equityBySymbol: Record<
+    string,
+    Array<{ at: string; equity: number }>
+  > = {}
 
   for (const symbol of symbols) {
     const candles = candlesBySymbol[symbol]
@@ -543,7 +578,11 @@ export function runGridBacktest(
       if (!from || first < from) from = first
       if (!to || last > to) to = last
     }
-    const { trades, report, equityContribution } = runSymbolGrid(symbol, candles, config)
+    const { trades, report, equityContribution } = runSymbolGrid(
+      symbol,
+      candles,
+      config,
+    )
     allTrades.push(...trades)
     symbolReports.push(report)
     buyAndHoldReturnPct[symbol] = report.buyAndHoldReturnPct
@@ -567,7 +606,8 @@ export function runGridBacktest(
   // capital + PnL), not the raw cumulative-PnL curve — a PnL curve can sit
   // near zero, and computing "% down from peak" against a near-zero peak
   // blows up into meaningless numbers (e.g. hundreds of percent).
-  const startingBalanceQuote = symbols.length * config.gridCount * config.quotePerGrid
+  const startingBalanceQuote =
+    symbols.length * config.gridCount * config.quotePerGrid
   const equityCurve: Array<{ at: string; equity: number }> = []
   let equity = startingBalanceQuote
   let peak = startingBalanceQuote
@@ -599,7 +639,11 @@ export function runGridBacktest(
     finalEquityQuote: startingBalanceQuote + totalPnlQuote,
     buyAndHoldReturnPct,
     equityCurve,
-    riskAdjusted: computeRiskAdjustedMetrics(equityCurve, returnPct, maxDrawdownPct),
+    riskAdjusted: computeRiskAdjustedMetrics(
+      equityCurve,
+      returnPct,
+      maxDrawdownPct,
+    ),
   }
 }
 

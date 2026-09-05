@@ -63,14 +63,16 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
   {
     id: 'cache_efficiency',
     label: 'Cache efficiency',
-    description: 'Cache-hit rate with daily sparkline. Higher = lower cost.',
+    description:
+      'Cache-hit rate with daily sparkline. Higher = lower cost.',
     column: 'main',
     hideable: true,
   },
   {
     id: 'velocity',
     label: 'Velocity',
-    description: 'Sessions/day average + delta vs prior period + sparkline.',
+    description:
+      'Sessions/day average + delta vs prior period + sparkline.',
     column: 'main',
     hideable: true,
   },
@@ -130,16 +132,14 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
   {
     id: 'finance_overview',
     label: 'Finance overview',
-    description:
-      'Net worth, savings rate, and the current controlled-trading mode.',
+    description: 'Net worth, savings rate, and the current controlled-trading mode.',
     column: 'main',
     hideable: true,
   },
   {
     id: 'trading_overview',
     label: 'Trading overview',
-    description:
-      "Today's/total P&L, open positions, win rate, and per-engine status.",
+    description: "Today's/total P&L, open positions, win rate, and per-engine status.",
     column: 'main',
     hideable: true,
   },
@@ -196,7 +196,9 @@ function readLayout(): StoredLayout {
     }
     const valid = new Set<WidgetId>(WIDGET_CATALOG.map((w) => w.id))
     const incoming = Array.isArray(parsed.hidden) ? parsed.hidden : []
-    const filtered = incoming.filter((id): id is WidgetId => valid.has(id))
+    const filtered = incoming.filter((id): id is WidgetId =>
+      valid.has(id),
+    )
     // Schema migration: when we introduce new widgets that should be
     // off-by-default, bump STORAGE_VERSION and union the prior user
     // hides with the new defaults so existing installs don't suddenly
@@ -227,6 +229,12 @@ function writeLayout(layout: StoredLayout) {
   }
 }
 
+export function shouldExitDashboardEditMode(
+  event: Pick<KeyboardEvent, 'key' | 'defaultPrevented'>,
+): boolean {
+  return event.key === 'Escape' && !event.defaultPrevented
+}
+
 /**
  * Dashboard widget layout hook. Owns:
  * - which widgets are hidden (persisted to localStorage)
@@ -251,6 +259,23 @@ export function useDashboardLayout() {
     writeLayout({ hidden: Array.from(hidden) })
   }, [hidden])
 
+  // Edit mode has an explicit button, but closing it from the keyboard keeps
+  // the dashboard controls quick to use without requiring pointer precision.
+  // Respect another component that has already claimed Escape (for example a
+  // dialog) by leaving default-prevented events alone.
+  useEffect(() => {
+    if (!editMode || typeof window === 'undefined') return undefined
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (shouldExitDashboardEditMode(event)) {
+        setEditMode(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [editMode])
+
   const toggleEdit = useCallback(() => setEditMode((v) => !v), [])
 
   const hide = useCallback((id: WidgetId) => {
@@ -274,9 +299,15 @@ export function useDashboardLayout() {
   // Reset returns to the iteration-006 defaults rather than "show
   // literally everything" so first-time users hitting Reset don't
   // suddenly see Logs they never asked for.
-  const reset = useCallback(() => setHidden(new Set(DEFAULT_HIDDEN)), [])
+  const reset = useCallback(
+    () => setHidden(new Set(DEFAULT_HIDDEN)),
+    [],
+  )
 
-  const isVisible = useCallback((id: WidgetId) => !hidden.has(id), [hidden])
+  const isVisible = useCallback(
+    (id: WidgetId) => !hidden.has(id),
+    [hidden],
+  )
 
   const counts = useMemo(() => {
     const total = WIDGET_CATALOG.length
@@ -291,6 +322,7 @@ export function useDashboardLayout() {
     editMode,
     toggleEdit,
     setEditMode,
+    hidden,
     hide,
     show,
     reset,

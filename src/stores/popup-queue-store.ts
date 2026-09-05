@@ -92,9 +92,7 @@ export const usePopupQueueStore = create<PopupQueueState>()((set, get) => ({
           ...state.requests,
           [lane]: state.requests[lane].filter((r) => r.id !== id),
         },
-        active: wasActive
-          ? { ...state.active, [lane]: null }
-          : state.active,
+        active: wasActive ? { ...state.active, [lane]: null } : state.active,
         // Leave a breather between consecutive modals
         quietUntil:
           wasActive && lane === 'modal'

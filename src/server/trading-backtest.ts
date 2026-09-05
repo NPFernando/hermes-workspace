@@ -649,7 +649,9 @@ export function applyFillSlippage(
 ): number {
   if (slippageBps <= 0) return nominalPrice
   const factor = slippageBps / 10_000
-  return side === 'buy' ? nominalPrice * (1 + factor) : nominalPrice * (1 - factor)
+  return side === 'buy'
+    ? nominalPrice * (1 + factor)
+    : nominalPrice * (1 - factor)
 }
 
 /**
@@ -741,7 +743,11 @@ export function runBacktest(
     // Slippage affects the fill price only — the trigger comparisons above
     // that decided to close already ran against the nominal candle price.
     const exitFillSide = pos.side === 'long' ? 'sell' : 'buy'
-    const exitFillPrice = applyFillSlippage(price, exitFillSide, config.slippageBps)
+    const exitFillPrice = applyFillSlippage(
+      price,
+      exitFillSide,
+      config.slippageBps,
+    )
     const exitQuote = pos.quantity * exitFillPrice
     const exitFee = exitQuote * config.feeRatePerSide
     const feesQuote = pos.entryFeeQuote + exitFee
@@ -806,7 +812,10 @@ export function runBacktest(
       const previousClose = lastClose[symbol]
       lastClose[symbol] = price
       const now = new Date(candle.openTime + 1) // decision time ≈ candle close
-      const window = series.slice(Math.max(0, i + 1 - effectiveWindowSize), i + 1)
+      const window = series.slice(
+        Math.max(0, i + 1 - effectiveWindowSize),
+        i + 1,
+      )
 
       // Same dedicated slice pattern as volRegimeWindow below (own size,
       // not the shared/capped `window`) — classification needs
@@ -816,7 +825,11 @@ export function runBacktest(
             series.slice(
               Math.max(
                 0,
-                i + 1 - (config.volRegimePeriod + config.volRegimeBaselineLookback + 1),
+                i +
+                  1 -
+                  (config.volRegimePeriod +
+                    config.volRegimeBaselineLookback +
+                    1),
               ),
               i + 1,
             ),
@@ -829,7 +842,9 @@ export function runBacktest(
         strategyId: s.id,
         decision:
           regime != null && !strategyAllowedInRegime(s.id, regime)
-            ? HOLD(`muted: ${regime}-vol regime favors a different strategy family`)
+            ? HOLD(
+                `muted: ${regime}-vol regime favors a different strategy family`,
+              )
             : s.evaluate(window),
         score:
           scores.get(scoreKey(s.id, symbol, config.scoreScope))?.score ?? 0,
@@ -931,8 +946,15 @@ export function runBacktest(
       const stillHeld = positions.some((p) => p.symbol === symbol)
       const entrySide = entrySideForSignal(vote.signal, config.tradeDirection)
       if (!stillHeld && entrySide != null && vote.leadStrategyId) {
-        if (gapDownGuardTriggered(candle.open, previousClose, config.gapDownGuardPct)) {
-          guardianBlocks.gap_down_guard = (guardianBlocks.gap_down_guard || 0) + 1
+        if (
+          gapDownGuardTriggered(
+            candle.open,
+            previousClose,
+            config.gapDownGuardPct,
+          )
+        ) {
+          guardianBlocks.gap_down_guard =
+            (guardianBlocks.gap_down_guard || 0) + 1
           continue
         }
         const regimeCloses = series
@@ -947,7 +969,8 @@ export function runBacktest(
           continue
         }
         if (!trendIsStrong(window, config.adxPeriod, config.adxThreshold)) {
-          guardianBlocks.adx_trend_weak = (guardianBlocks.adx_trend_weak || 0) + 1
+          guardianBlocks.adx_trend_weak =
+            (guardianBlocks.adx_trend_weak || 0) + 1
           continue
         }
         // Own slice, not the shared (windowSize-capped) `window`: needs
@@ -955,7 +978,12 @@ export function runBacktest(
         // regularly exceeds windowSize's default of 100 — same reason
         // regimeCloses above doesn't reuse `window` either.
         const volRegimeWindow = series.slice(
-          Math.max(0, i + 1 - (config.volRegimePeriod + config.volRegimeBaselineLookback + 1)),
+          Math.max(
+            0,
+            i +
+              1 -
+              (config.volRegimePeriod + config.volRegimeBaselineLookback + 1),
+          ),
           i + 1,
         )
         if (
@@ -1028,7 +1056,10 @@ export function runBacktest(
             strategyLossStreak: leadScore.lossStreak,
             strategyCooldownUntil: leadScore.cooldownUntil,
             bucketExposureQuote: config.guardian.correlationBucketsEnabled
-              ? bucketExposureQuote(positions, config.guardian.correlationBuckets)
+              ? bucketExposureQuote(
+                  positions,
+                  config.guardian.correlationBuckets,
+                )
               : undefined,
             now,
           },
@@ -1045,7 +1076,11 @@ export function runBacktest(
           // for stop/target geometry) — mirrors how the live engine anchors
           // stops to the real fill price, not a hypothetical unslipped one.
           const entryFillSide = entrySide === 'long' ? 'buy' : 'sell'
-          const entryFillPrice = applyFillSlippage(price, entryFillSide, config.slippageBps)
+          const entryFillPrice = applyFillSlippage(
+            price,
+            entryFillSide,
+            config.slippageBps,
+          )
           const spent = verdict.approvedQuote
           const entryFee = spent * config.feeRatePerSide
           const quantity = spent / entryFillPrice

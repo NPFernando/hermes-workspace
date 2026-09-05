@@ -60,8 +60,7 @@ export const Route = createFileRoute('/api/skills/uninstall')({
           return json(
             {
               ok: false,
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

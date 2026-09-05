@@ -14,13 +14,19 @@ export const Route = createFileRoute('/api/swarm-memory/search')({
         }
         const url = new URL(request.url)
         const workerId = url.searchParams.get('workerId')
-        const query = url.searchParams.get('q') || url.searchParams.get('query') || ''
+        const query =
+          url.searchParams.get('q') || url.searchParams.get('query') || ''
         const scopeParam = url.searchParams.get('scope')
-        const scope = scopeParam === 'shared' || scopeParam === 'all' ? scopeParam : 'worker'
+        const scope =
+          scopeParam === 'shared' || scopeParam === 'all'
+            ? scopeParam
+            : 'worker'
         const rawLimit = Number(url.searchParams.get('limit') || 10)
         const limit = Number.isFinite(rawLimit) ? rawLimit : 10
         try {
-          return json({ results: searchSwarmMemory({ workerId, query, scope, limit }) })
+          return json({
+            results: searchSwarmMemory({ workerId, query, scope, limit }),
+          })
         } catch (error) {
           return json({ error: safeErrorMessage(error) }, { status: 400 })
         }

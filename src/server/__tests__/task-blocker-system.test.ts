@@ -16,9 +16,22 @@ import { randomUUID } from 'node:crypto'
 // ── Minimal in-memory store for testing ────────────────────────────────────
 // Tests the logic directly without relying on module resolution tricks
 
-type TaskColumn = 'backlog' | 'todo' | 'in_progress' | 'review' | 'blocked' | 'done' | 'deleted'
+type TaskColumn =
+  | 'backlog'
+  | 'todo'
+  | 'in_progress'
+  | 'review'
+  | 'blocked'
+  | 'done'
+  | 'deleted'
 type TaskPriority = 'high' | 'medium' | 'low'
-type BlockerType = 'credential' | 'dependency' | 'execution' | 'input' | 'environment' | null
+type BlockerType =
+  | 'credential'
+  | 'dependency'
+  | 'execution'
+  | 'input'
+  | 'environment'
+  | null
 type CredentialNeeded = {
   key: string
   label: string
@@ -27,7 +40,14 @@ type CredentialNeeded = {
   provided_at?: string
   validated?: boolean
 }
-type ActivityEntry = { id: string; by: string; byEmoji: string; action: string; note: string; at: string }
+type ActivityEntry = {
+  id: string
+  by: string
+  byEmoji: string
+  action: string
+  note: string
+  at: string
+}
 type TaskRecord = {
   id: string
   title: string
@@ -48,7 +68,13 @@ function resetStore() {
   allTasks = []
 }
 
-function createTask(overrides: Partial<TaskRecord> & { title: string; column?: TaskColumn; priority?: TaskPriority }): TaskRecord {
+function createTask(
+  overrides: Partial<TaskRecord> & {
+    title: string
+    column?: TaskColumn
+    priority?: TaskPriority
+  },
+): TaskRecord {
   const task: TaskRecord = {
     id: randomUUID(),
     title: overrides.title,
@@ -70,14 +96,20 @@ function getTask(id: string): TaskRecord | undefined {
   return allTasks.find((t) => t.id === id)
 }
 
-function updateTask(id: string, updates: Partial<TaskRecord>): TaskRecord | undefined {
+function updateTask(
+  id: string,
+  updates: Partial<TaskRecord>,
+): TaskRecord | undefined {
   const idx = allTasks.findIndex((t) => t.id === id)
   if (idx === -1) return undefined
   allTasks[idx] = { ...allTasks[idx], ...updates }
   return allTasks[idx]
 }
 
-function listTasks(opts?: { column?: TaskColumn; includeDone?: boolean }): TaskRecord[] {
+function listTasks(opts?: {
+  column?: TaskColumn
+  includeDone?: boolean
+}): TaskRecord[] {
   let tasks = allTasks
   if (opts?.column) tasks = tasks.filter((t) => t.column === opts.column)
   return tasks
@@ -85,7 +117,9 @@ function listTasks(opts?: { column?: TaskColumn; includeDone?: boolean }): TaskR
 
 // ── Auto-resume logic (mirror of astra-tasks.ts) ─────────────────────────
 
-function maybeAutoResumeAfterCompletion(completedTaskId: string): { unblocked: number } {
+function maybeAutoResumeAfterCompletion(completedTaskId: string): {
+  unblocked: number
+} {
   const dependents = allTasks.filter(
     (t) =>
       t.column === 'blocked' &&
@@ -99,7 +133,9 @@ function maybeAutoResumeAfterCompletion(completedTaskId: string): { unblocked: n
   let unblocked = 0
   for (const task of dependents) {
     const deps = task.depends_on ?? []
-    const allDone = deps.every((depId) => allTasks.find((t) => t.id === depId)?.column === 'done')
+    const allDone = deps.every(
+      (depId) => allTasks.find((t) => t.id === depId)?.column === 'done',
+    )
 
     if (!allDone) continue
 
@@ -138,8 +174,18 @@ describe('Task Blocker System', () => {
         blocker_reason: 'Missing IBKR API credentials',
         blocked_since: new Date().toISOString(),
         credentials_needed: [
-          { key: 'IBKR_ACCOUNT_ID', label: 'IBKR Account ID', description: 'Your Interactive Brokers account', provided: false },
-          { key: 'IBKR_API_KEY', label: 'IBKR API Key', description: 'API key for trading', provided: false },
+          {
+            key: 'IBKR_ACCOUNT_ID',
+            label: 'IBKR Account ID',
+            description: 'Your Interactive Brokers account',
+            provided: false,
+          },
+          {
+            key: 'IBKR_API_KEY',
+            label: 'IBKR API Key',
+            description: 'API key for trading',
+            provided: false,
+          },
         ],
       })
 
@@ -167,9 +213,20 @@ describe('Task Blocker System', () => {
     })
 
     it('supports all blocker types', () => {
-      const types: BlockerType[] = ['credential', 'dependency', 'execution', 'input', 'environment', null]
+      const types: BlockerType[] = [
+        'credential',
+        'dependency',
+        'execution',
+        'input',
+        'environment',
+        null,
+      ]
       for (const type of types) {
-        const task = createTask({ title: `Blocker ${type}`, column: 'blocked', blocker_type: type })
+        const task = createTask({
+          title: `Blocker ${type}`,
+          column: 'blocked',
+          blocker_type: type,
+        })
         expect(task.blocker_type).toBe(type)
       }
     })
@@ -202,14 +259,25 @@ describe('Task Blocker System', () => {
         column: 'blocked',
         blocker_type: 'credential',
         credentials_needed: [
-          { key: 'BINANCE_API_KEY', label: 'Binance API Key', description: 'Read-only API key', provided: false },
+          {
+            key: 'BINANCE_API_KEY',
+            label: 'Binance API Key',
+            description: 'Read-only API key',
+            provided: false,
+          },
         ],
       })
 
       // Mark credential as provided
       const updated = updateTask(task.id, {
         credentials_needed: [
-          { key: 'BINANCE_API_KEY', label: 'Binance API Key', description: 'Read-only API key', provided: true, provided_at: new Date().toISOString() },
+          {
+            key: 'BINANCE_API_KEY',
+            label: 'Binance API Key',
+            description: 'Read-only API key',
+            provided: true,
+            provided_at: new Date().toISOString(),
+          },
         ],
       })
 
@@ -237,7 +305,9 @@ describe('Task Blocker System', () => {
       })
 
       const partial = getTask(task.id)
-      expect(partial!.credentials_needed!.filter((c) => c.provided)).toHaveLength(1)
+      expect(
+        partial!.credentials_needed!.filter((c) => c.provided),
+      ).toHaveLength(1)
 
       // Provide second
       updateTask(task.id, {
@@ -302,8 +372,16 @@ describe('Task Blocker System', () => {
 
   describe('Dependency Auto-Resume', () => {
     it('auto-resumes when all depends_on tasks are done', () => {
-      const dep1 = createTask({ title: 'Data sync', column: 'done', priority: 'high' })
-      const dep2 = createTask({ title: 'Model train', column: 'done', priority: 'medium' })
+      const dep1 = createTask({
+        title: 'Data sync',
+        column: 'done',
+        priority: 'high',
+      })
+      const dep2 = createTask({
+        title: 'Model train',
+        column: 'done',
+        priority: 'medium',
+      })
 
       const blocked = createTask({
         title: 'Backtest',

@@ -14,13 +14,17 @@ export function BackendUnavailableState({ feature, description }: Props) {
           <HugeiconsIcon icon={Alert02Icon} size={24} strokeWidth={1.7} />
         </div>
         <div className="mt-4 space-y-2">
-          <h2 className="text-lg font-semibold text-[var(--theme-text)]">{feature}</h2>
+          <h2 className="text-lg font-semibold text-[var(--theme-text)]">
+            {feature}
+          </h2>
           <p className="text-sm leading-6 text-[var(--theme-muted)]">
-            Not available on this backend. Connect to a Hermes Agent gateway to unlock{' '}
-            {feature}.
+            Not available on this backend. Connect to a Hermes Agent gateway to
+            unlock {feature}.
           </p>
           {description ? (
-            <p className="text-xs leading-5 text-[var(--theme-muted)]">{description}</p>
+            <p className="text-xs leading-5 text-[var(--theme-muted)]">
+              {description}
+            </p>
           ) : null}
         </div>
       </div>

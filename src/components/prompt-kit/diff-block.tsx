@@ -46,20 +46,24 @@ export function DiffBlock({ code }: { code: string }) {
   }
 
   return (
-    <div
-      className="my-2 overflow-hidden rounded-lg border text-xs font-mono border-[var(--theme-border)] bg-[var(--theme-bg)]"
-    >
+    <div className="my-2 overflow-hidden rounded-lg border text-xs font-mono border-[var(--theme-border)] bg-[var(--theme-bg)]">
       {/* Header bar */}
-      <div
-        className="flex items-center justify-between border-b px-3 py-1.5 border-[var(--theme-border)] bg-[var(--theme-card2)]"
-      >
-        <span className="text-[10px] uppercase tracking-wider text-[var(--theme-muted)] font-medium">diff</span>
+      <div className="flex items-center justify-between border-b px-3 py-1.5 border-[var(--theme-border)] bg-[var(--theme-card2)]">
+        <span className="text-[10px] uppercase tracking-wider text-[var(--theme-muted)] font-medium">
+          diff
+        </span>
         <button
           type="button"
-          onClick={() => { handleCopy().catch(() => {}) }}
+          onClick={() => {
+            handleCopy().catch(() => {})
+          }}
           className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
         >
-          <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={12} strokeWidth={1.6} />
+          <HugeiconsIcon
+            icon={copied ? Tick02Icon : Copy01Icon}
+            size={12}
+            strokeWidth={1.6}
+          />
           <span className="text-[10px]">{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </div>
@@ -72,12 +76,17 @@ export function DiffBlock({ code }: { code: string }) {
             return (
               <div
                 key={i}
-                className={cn('flex items-start gap-1 px-2 py-px leading-5', LINE_STYLES[type])}
+                className={cn(
+                  'flex items-start gap-1 px-2 py-px leading-5',
+                  LINE_STYLES[type],
+                )}
               >
                 <span className={LINE_PREFIX_STYLES[type]}>
                   {type === 'add' ? '+' : type === 'remove' ? '−' : ''}
                 </span>
-                <span className="min-w-0 flex-1 whitespace-pre">{type === 'add' || type === 'remove' ? line.slice(1) : line}</span>
+                <span className="min-w-0 flex-1 whitespace-pre">
+                  {type === 'add' || type === 'remove' ? line.slice(1) : line}
+                </span>
               </div>
             )
           })}

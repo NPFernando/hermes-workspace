@@ -1,9 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowExpandDiagonalIcon, Copy01Icon, DownloadIcon, Tick02Icon } from '@hugeicons/core-free-icons'
+import {
+  ArrowExpandDiagonalIcon,
+  Copy01Icon,
+  DownloadIcon,
+  Tick02Icon,
+} from '@hugeicons/core-free-icons'
 import { createHighlighterCore } from 'shiki/core'
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma'
-import { LANG_LOADERS, formatLanguageName, normalizeLanguage, resolveLanguage } from './utils'
+import {
+  LANG_LOADERS,
+  formatLanguageName,
+  normalizeLanguage,
+  resolveLanguage,
+} from './utils'
 import type { HighlighterCore } from 'shiki/core'
 import { useResolvedTheme } from '@/hooks/use-chat-settings'
 import { writeTextToClipboard } from '@/lib/clipboard'
@@ -20,23 +30,34 @@ type CodeBlockProps = {
 }
 
 const LANG_FILENAME_MAP: Record<string, string> = {
-  bash: 'script.sh', sh: 'script.sh',
-  python: 'script.py', py: 'script.py',
-  javascript: 'script.js', js: 'script.js',
-  typescript: 'script.ts', ts: 'script.ts',
+  bash: 'script.sh',
+  sh: 'script.sh',
+  python: 'script.py',
+  py: 'script.py',
+  javascript: 'script.js',
+  js: 'script.js',
+  typescript: 'script.ts',
+  ts: 'script.ts',
   json: 'data.json',
-  yaml: 'config.yaml', yml: 'config.yaml',
+  yaml: 'config.yaml',
+  yml: 'config.yaml',
   html: 'page.html',
   css: 'styles.css',
   sql: 'query.sql',
   dockerfile: 'Dockerfile',
-  powershell: 'script.ps1', ps1: 'script.ps1',
+  powershell: 'script.ps1',
+  ps1: 'script.ps1',
   kotlin: 'Script.kt',
   java: 'Script.java',
   xml: 'data.xml',
-  markdown: 'document.md', md: 'document.md',
-  toml: 'config.toml', ini: 'config.ini',
-  rust: 'main.rs', go: 'main.go', cpp: 'main.cpp', c: 'main.c',
+  markdown: 'document.md',
+  md: 'document.md',
+  toml: 'config.toml',
+  ini: 'config.ini',
+  rust: 'main.rs',
+  go: 'main.go',
+  cpp: 'main.cpp',
+  c: 'main.c',
 }
 
 function inferDownloadFilename(lang: string): string {
@@ -199,7 +220,11 @@ export function CodeBlock({
               className="h-auto px-0 text-xs font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)] hover:bg-transparent"
               onClick={onExpand}
             >
-              <HugeiconsIcon icon={ArrowExpandDiagonalIcon} size={16} strokeWidth={1.5} />
+              <HugeiconsIcon
+                icon={ArrowExpandDiagonalIcon}
+                size={16}
+                strokeWidth={1.5}
+              />
             </Button>
           ) : null}
         </div>

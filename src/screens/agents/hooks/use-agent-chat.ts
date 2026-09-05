@@ -1,11 +1,7 @@
 import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type {SessionHistoryMessage} from '@/lib/gateway-api';
-import {
-  
-  fetchSessionHistory,
-  sendToSession
-} from '@/lib/gateway-api'
+import type { SessionHistoryMessage } from '@/lib/gateway-api'
+import { fetchSessionHistory, sendToSession } from '@/lib/gateway-api'
 
 export type OperationsChatMessage = {
   id: string
@@ -55,10 +51,13 @@ export function useAgentChat(sessionKey: string) {
     queryFn: async () => {
       try {
         // Try the ClawSuite history endpoint first (uses sessionKey param)
-        const res = await fetch(`/api/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=50`)
+        const res = await fetch(
+          `/api/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=50`,
+        )
         if (res.ok) {
           const data = await res.json()
-          if (Array.isArray(data.messages)) return data.messages as Array<SessionHistoryMessage>
+          if (Array.isArray(data.messages))
+            return data.messages as Array<SessionHistoryMessage>
         }
       } catch {
         // fall through
@@ -91,7 +90,9 @@ export function useAgentChat(sessionKey: string) {
     () =>
       (historyQuery.data ?? [])
         .map(normalizeMessage)
-        .filter((message): message is OperationsChatMessage => Boolean(message)),
+        .filter((message): message is OperationsChatMessage =>
+          Boolean(message),
+        ),
     [historyQuery.data],
   )
 

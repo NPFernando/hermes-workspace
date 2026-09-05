@@ -51,7 +51,9 @@ export const Route = createFileRoute('/api/gateway/agents')({
 
         // Try the upstream gateway first
         try {
-          const path = agentId ? `/api/agents?agentId=${encodeURIComponent(agentId)}` : '/api/agents'
+          const path = agentId
+            ? `/api/agents?agentId=${encodeURIComponent(agentId)}`
+            : '/api/agents'
           const res = await gatewayFetch(path)
           if (res.ok) {
             const data = await res.json().catch(() => null)
@@ -65,7 +67,9 @@ export const Route = createFileRoute('/api/gateway/agents')({
         if (agentId) {
           const agents = sistersAsAgents()
           const found = agents.find(
-            (a) => a.id === agentId || a.name.toLowerCase() === agentId.toLowerCase(),
+            (a) =>
+              a.id === agentId ||
+              a.name.toLowerCase() === agentId.toLowerCase(),
           )
           return json({
             ok: true,
@@ -99,7 +103,13 @@ export const Route = createFileRoute('/api/gateway/agents')({
             body: JSON.stringify(body),
           })
           if (res.status === 404) {
-            return json({ ok: false, error: 'Gateway does not support agent config updates' }, { status: 404 })
+            return json(
+              {
+                ok: false,
+                error: 'Gateway does not support agent config updates',
+              },
+              { status: 404 },
+            )
           }
           const payload = await res.json().catch(() => ({ ok: true }))
           return json(payload, { status: res.ok ? 200 : res.status })

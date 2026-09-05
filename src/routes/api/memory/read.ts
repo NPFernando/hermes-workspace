@@ -19,8 +19,7 @@ export const Route = createFileRoute('/api/memory/read')({
           const content = readMemoryFile(pathParam)
           return json({ path: pathParam, content })
         } catch (error) {
-          const message =
-            safeErrorMessage(error)
+          const message = safeErrorMessage(error)
           const status = /not allowed|outside workspace|required/i.test(message)
             ? 400
             : /ENOENT/.test(message)

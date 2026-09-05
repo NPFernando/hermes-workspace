@@ -58,7 +58,9 @@ function httpsGetJson<T>(url: string): Promise<T> {
       res.on('data', (chunk) => {
         bytes += chunk.length
         if (bytes > MAX_RESPONSE_BYTES) {
-          req.destroy(new Error('Etherscan response exceeded maximum allowed size'))
+          req.destroy(
+            new Error('Etherscan response exceeded maximum allowed size'),
+          )
           return
         }
         data += chunk
@@ -72,7 +74,9 @@ function httpsGetJson<T>(url: string): Promise<T> {
       })
     })
     req.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error(`Etherscan request timed out after ${REQUEST_TIMEOUT_MS}ms`))
+      req.destroy(
+        new Error(`Etherscan request timed out after ${REQUEST_TIMEOUT_MS}ms`),
+      )
     })
     req.on('error', (err) => {
       reject(new Error(`Failed to fetch from Etherscan: ${err}`))
@@ -104,7 +108,9 @@ export async function fetchAddressBalance(
     `&address=${encodeURIComponent(address)}&tag=latest&apikey=${encodeURIComponent(apiKey)}`
   const body = await fetchJson<RawBalanceResponse>(url)
   if (body.status !== '1') {
-    throw new Error(`Etherscan balance lookup failed for ${address}: ${body.message}`)
+    throw new Error(
+      `Etherscan balance lookup failed for ${address}: ${body.message}`,
+    )
   }
   const wei = Number(body.result)
   if (!Number.isFinite(wei)) {
@@ -128,7 +134,11 @@ export function whaleFlowDecision(
   label: string,
 ): StrategyDecision {
   if (prevBalance == null || currBalance == null || prevBalance <= 0) {
-    return { signal: 'HOLD', confidence: 0, reason: `no prior balance for ${label}` }
+    return {
+      signal: 'HOLD',
+      confidence: 0,
+      reason: `no prior balance for ${label}`,
+    }
   }
   const fractionalChange = (currBalance - prevBalance) / prevBalance
   const confidence = Math.min(1, Math.abs(fractionalChange) * 20)

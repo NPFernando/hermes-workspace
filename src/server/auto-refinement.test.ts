@@ -82,9 +82,7 @@ describe('evaluateAllCandidates', () => {
   })
 
   it('proposes a smaller quotePerGrid when recent grid trades are net negative', async () => {
-    await seedRows(
-      Array.from({ length: 10 }, (_, i) => gridTrade(`g${i}`, -1)),
-    )
+    await seedRows(Array.from({ length: 10 }, (_, i) => gridTrade(`g${i}`, -1)))
     const { evaluateAllCandidates } = await import('./auto-refinement')
     const candidates = evaluateAllCandidates()
     const grid = candidates.find((c) => c.engine === 'grid')
@@ -95,9 +93,7 @@ describe('evaluateAllCandidates', () => {
   })
 
   it('does not propose a grid change when recent trades are net positive', async () => {
-    await seedRows(
-      Array.from({ length: 10 }, (_, i) => gridTrade(`g${i}`, 1)),
-    )
+    await seedRows(Array.from({ length: 10 }, (_, i) => gridTrade(`g${i}`, 1)))
     const { evaluateAllCandidates } = await import('./auto-refinement')
     expect(
       evaluateAllCandidates().find((c) => c.engine === 'grid'),
@@ -109,7 +105,9 @@ describe('evaluateAllCandidates', () => {
       Array.from({ length: 10 }, (_, i) => rebalanceTrade(`r${i}`, 5)),
     )
     const { evaluateAllCandidates } = await import('./auto-refinement')
-    const rebalance = evaluateAllCandidates().find((c) => c.engine === 'rebalance')
+    const rebalance = evaluateAllCandidates().find(
+      (c) => c.engine === 'rebalance',
+    )
     expect(rebalance).toBeDefined()
     expect(rebalance?.paramName).toBe('minTradeNotionalQuote')
     expect(rebalance?.newValue).toBeGreaterThan(rebalance!.oldValue)
@@ -127,9 +125,7 @@ describe('evaluateAllCandidates', () => {
   })
 
   it('proposes a higher minConfidence when closed LLM trades are net negative', async () => {
-    await seedRows(
-      Array.from({ length: 5 }, (_, i) => llmTrade(`l${i}`, -1)),
-    )
+    await seedRows(Array.from({ length: 5 }, (_, i) => llmTrade(`l${i}`, -1)))
     const { evaluateAllCandidates } = await import('./auto-refinement')
     const llm = evaluateAllCandidates().find((c) => c.engine === 'llm_signal')
     expect(llm).toBeDefined()
@@ -139,9 +135,7 @@ describe('evaluateAllCandidates', () => {
   })
 
   it('does not propose an LLM change when closed trades are net positive', async () => {
-    await seedRows(
-      Array.from({ length: 5 }, (_, i) => llmTrade(`l${i}`, 1)),
-    )
+    await seedRows(Array.from({ length: 5 }, (_, i) => llmTrade(`l${i}`, 1)))
     const { evaluateAllCandidates } = await import('./auto-refinement')
     expect(
       evaluateAllCandidates().find((c) => c.engine === 'llm_signal'),
@@ -151,9 +145,7 @@ describe('evaluateAllCandidates', () => {
 
 describe('runAutoRefinementCycle', () => {
   it('records candidates but does not mutate engine settings while the policy is disabled (default)', async () => {
-    await seedRows(
-      Array.from({ length: 10 }, (_, i) => gridTrade(`g${i}`, -1)),
-    )
+    await seedRows(Array.from({ length: 10 }, (_, i) => gridTrade(`g${i}`, -1)))
     const store = await import('./finance-store')
     const { runAutoRefinementCycle } = await import('./auto-refinement')
     const result = await runAutoRefinementCycle()
@@ -165,9 +157,7 @@ describe('runAutoRefinementCycle', () => {
   })
 
   it('applies candidates directly to each engine settings key once the policy is enabled', async () => {
-    await seedRows(
-      Array.from({ length: 10 }, (_, i) => gridTrade(`g${i}`, -1)),
-    )
+    await seedRows(Array.from({ length: 10 }, (_, i) => gridTrade(`g${i}`, -1)))
     const store = await import('./finance-store')
     const db0 = store.readFinanceStore()
     db0.settings.autoRefinement = { enabled: true } as any

@@ -27,7 +27,10 @@ describe('executionModeAllowed (Phase 6 shared gate)', () => {
       { enabled: true },
       'disabled',
     )
-    expect(result).toEqual({ allowed: false, reason: 'emergency kill switch is active' })
+    expect(result).toEqual({
+      allowed: false,
+      reason: 'emergency kill switch is active',
+    })
   })
 
   it('blocks when tradingMode is not testnet_execute', async () => {
@@ -50,7 +53,8 @@ describe('executionModeAllowed (Phase 6 shared gate)', () => {
     )
     expect(result).toEqual({
       allowed: false,
-      reason: 'rebalance engine is disabled (settings.demoTradingRebalance.enabled)',
+      reason:
+        'rebalance engine is disabled (settings.demoTradingRebalance.enabled)',
     })
   })
 

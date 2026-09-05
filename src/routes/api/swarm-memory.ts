@@ -3,16 +3,17 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { safeErrorMessage } from '../../server/rate-limit'
 import {
-  
-  
   appendSwarmMemoryEvent,
   ensureWorkerMemoryScaffold,
   readSwarmMemory,
   validateMissionId,
   validateSwarmId,
-  writeSwarmHandoff
+  writeSwarmHandoff,
 } from '../../server/swarm-memory'
-import type {SwarmMemoryEventType, SwarmMemoryKind} from '../../server/swarm-memory';
+import type {
+  SwarmMemoryEventType,
+  SwarmMemoryKind,
+} from '../../server/swarm-memory'
 
 type SwarmMemoryPostBody = {
   workerId?: unknown
@@ -32,7 +33,13 @@ type SwarmMemoryPostBody = {
   mirrorShared?: unknown
 }
 
-const MEMORY_KINDS = new Set<SwarmMemoryKind>(['profile', 'mission', 'episodic', 'handoff', 'shared'])
+const MEMORY_KINDS = new Set<SwarmMemoryKind>([
+  'profile',
+  'mission',
+  'episodic',
+  'handoff',
+  'shared',
+])
 const EVENT_TYPES = new Set<SwarmMemoryEventType>([
   'mission-start',
   'dispatch',
@@ -47,13 +54,14 @@ const EVENT_TYPES = new Set<SwarmMemoryEventType>([
 
 function asKind(value: unknown): SwarmMemoryKind {
   return typeof value === 'string' && MEMORY_KINDS.has(value as SwarmMemoryKind)
-    ? value as SwarmMemoryKind
+    ? (value as SwarmMemoryKind)
     : 'profile'
 }
 
 function asEventType(value: unknown): SwarmMemoryEventType {
-  return typeof value === 'string' && EVENT_TYPES.has(value as SwarmMemoryEventType)
-    ? value as SwarmMemoryEventType
+  return typeof value === 'string' &&
+    EVENT_TYPES.has(value as SwarmMemoryEventType)
+    ? (value as SwarmMemoryEventType)
     : 'note'
 }
 
@@ -87,7 +95,8 @@ export const Route = createFileRoute('/api/swarm-memory')({
           return json({ error: 'Invalid JSON body' }, { status: 400 })
         }
 
-        const workerId = typeof body.workerId === 'string' ? body.workerId.trim() : ''
+        const workerId =
+          typeof body.workerId === 'string' ? body.workerId.trim() : ''
         if (!workerId || !validateSwarmId(workerId)) {
           return json({ error: 'Valid workerId required' }, { status: 400 })
         }
@@ -98,32 +107,53 @@ export const Route = createFileRoute('/api/swarm-memory')({
               workerId,
               name: typeof body.name === 'string' ? body.name : null,
               role: typeof body.role === 'string' ? body.role : null,
-              specialty: typeof body.specialty === 'string' ? body.specialty : null,
+              specialty:
+                typeof body.specialty === 'string' ? body.specialty : null,
               model: typeof body.model === 'string' ? body.model : null,
             })
             return json({ ok: true, workerId, action: 'scaffolded' })
           }
 
           const kind = asKind(body.kind)
-          const missionId = typeof body.missionId === 'string' ? body.missionId.trim() : null
+          const missionId =
+            typeof body.missionId === 'string' ? body.missionId.trim() : null
           const eventType = asEventType(body.eventType)
-          const summary = typeof body.summary === 'string'
-            ? body.summary.trim()
-            : typeof body.content === 'string'
-              ? body.content.trim().slice(0, 300)
-              : ''
-          const assignmentId = typeof body.assignmentId === 'string' ? body.assignmentId.trim() : null
-          const event = body.event && typeof body.event === 'object' && !Array.isArray(body.event)
-            ? body.event as Record<string, unknown>
-            : undefined
+          const summary =
+            typeof body.summary === 'string'
+              ? body.summary.trim()
+              : typeof body.content === 'string'
+                ? body.content.trim().slice(0, 300)
+                : ''
+          const assignmentId =
+            typeof body.assignmentId === 'string'
+              ? body.assignmentId.trim()
+              : null
+          const event =
+            body.event &&
+            typeof body.event === 'object' &&
+            !Array.isArray(body.event)
+              ? (body.event as Record<string, unknown>)
+              : undefined
 
           if (kind === 'handoff') {
             if (!missionId || !validateMissionId(missionId)) {
-              return json({ error: 'Valid missionId required for handoff writes' }, { status: 400 })
+              return json(
+                { error: 'Valid missionId required for handoff writes' },
+                { status: 400 },
+              )
             }
             const content = typeof body.content === 'string' ? body.content : ''
-            if (!content.trim()) return json({ error: 'handoff content required' }, { status: 400 })
-            const written = writeSwarmHandoff({ workerId, missionId, content, mirrorShared: body.mirrorShared !== false })
+            if (!content.trim())
+              return json(
+                { error: 'handoff content required' },
+                { status: 400 },
+              )
+            const written = writeSwarmHandoff({
+              workerId,
+              missionId,
+              content,
+              mirrorShared: body.mirrorShared !== false,
+            })
             appendSwarmMemoryEvent({
               workerId,
               missionId,

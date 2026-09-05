@@ -11,8 +11,14 @@ describe('longShortSentimentDecision', () => {
       confidence: 0,
       reason: 'no long/short data',
     })
-    expect(longShortSentimentDecision(0)).toMatchObject({ signal: 'HOLD', confidence: 0 })
-    expect(longShortSentimentDecision(-1)).toMatchObject({ signal: 'HOLD', confidence: 0 })
+    expect(longShortSentimentDecision(0)).toMatchObject({
+      signal: 'HOLD',
+      confidence: 0,
+    })
+    expect(longShortSentimentDecision(-1)).toMatchObject({
+      signal: 'HOLD',
+      confidence: 0,
+    })
   })
 
   it('holds near parity (ratio 1.0, below the confidence floor)', () => {
@@ -44,7 +50,7 @@ describe('longShortSentimentDecision', () => {
 describe('fetchTopTraderLongShortRatio', () => {
   it('builds the correct URL and parses string fields to numbers', async () => {
     let capturedUrl = ''
-    const fakeFetchJson = async <T,>(url: string): Promise<T> => {
+    const fakeFetchJson = async <T>(url: string): Promise<T> => {
       capturedUrl = url
       return [
         {
@@ -56,21 +62,32 @@ describe('fetchTopTraderLongShortRatio', () => {
         },
       ] as unknown as T
     }
-    const points = await fetchTopTraderLongShortRatio('BTCUSDT', '1h', 1, fakeFetchJson)
+    const points = await fetchTopTraderLongShortRatio(
+      'BTCUSDT',
+      '1h',
+      1,
+      fakeFetchJson,
+    )
     expect(capturedUrl).toBe(
       'https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=1',
     )
     expect(points).toEqual([
-      { symbol: 'BTCUSDT', longShortRatio: 1.85, longAccount: 0.65, shortAccount: 0.35, timestamp: 1720000000000 },
+      {
+        symbol: 'BTCUSDT',
+        longShortRatio: 1.85,
+        longAccount: 0.65,
+        shortAccount: 0.35,
+        timestamp: 1720000000000,
+      },
     ])
   })
 
   it('propagates a fetch failure rather than swallowing it (callers are responsible for try/catch)', async () => {
-    const failingFetchJson = async <T,>(): Promise<T> => {
+    const failingFetchJson = async <T>(): Promise<T> => {
       throw new Error('network error')
     }
-    await expect(fetchTopTraderLongShortRatio('BTCUSDT', '1h', 1, failingFetchJson)).rejects.toThrow(
-      'network error',
-    )
+    await expect(
+      fetchTopTraderLongShortRatio('BTCUSDT', '1h', 1, failingFetchJson),
+    ).rejects.toThrow('network error')
   })
 })

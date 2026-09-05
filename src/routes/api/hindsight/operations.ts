@@ -15,13 +15,15 @@ export const Route = createFileRoute('/api/hindsight/operations')({
 
         try {
           const url = new URL(request.url)
-          const limit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
-          return json(await listHindsightOperations(Number.isFinite(limit) ? limit : 20))
-        } catch (err) {
-          return json(
-            { error: safeErrorMessage(err) },
-            { status: 500 },
+          const limit = Number.parseInt(
+            url.searchParams.get('limit') ?? '20',
+            10,
           )
+          return json(
+            await listHindsightOperations(Number.isFinite(limit) ? limit : 20),
+          )
+        } catch (err) {
+          return json({ error: safeErrorMessage(err) }, { status: 500 })
         }
       },
     },

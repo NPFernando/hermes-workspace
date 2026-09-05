@@ -345,7 +345,11 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
 
   it('adds, then edits, then deletes an expense record', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('expense', { vendor: 'Cafe', category: 'Dining', amount: 500 })
+    store.addFinanceRecord('expense', {
+      vendor: 'Cafe',
+      category: 'Dining',
+      amount: 500,
+    })
 
     let db = store.readFinanceStore()
     expect(db.expense_records).toHaveLength(1)
@@ -362,39 +366,66 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
 
   it('throws when deleting an id that does not exist, instead of silently no-oping', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('income', { sourceName: 'Salary', originalAmount: 1000 })
+    store.addFinanceRecord('income', {
+      sourceName: 'Salary',
+      originalAmount: 1000,
+    })
 
-    expect(() => store.deleteFinanceRecord('income', 'does-not-exist')).toThrow(/not found/)
+    expect(() => store.deleteFinanceRecord('income', 'does-not-exist')).toThrow(
+      /not found/,
+    )
     const db = store.readFinanceStore()
     expect(db.income_records).toHaveLength(1)
   })
 
   it('throws for an unsupported kind on delete', async () => {
     const store = await import('./finance-store')
-    expect(() => store.deleteFinanceRecord('trading_plan', 'some-id')).toThrow(/Unsupported/)
+    expect(() => store.deleteFinanceRecord('trading_plan', 'some-id')).toThrow(
+      /Unsupported/,
+    )
   })
 
   it('throws when updating a record that does not exist', async () => {
     const store = await import('./finance-store')
-    expect(() => store.updateFinanceRecord('expense', 'does-not-exist', { amount: 1 })).toThrow(/not found/)
+    expect(() =>
+      store.updateFinanceRecord('expense', 'does-not-exist', { amount: 1 }),
+    ).toThrow(/not found/)
   })
 
   it('goalKind (PF-1007 Sinking Funds) defaults to general and accepts sinking', async () => {
     const store = await import('./finance-store')
     store.addFinanceRecord('goal', { name: 'Untyped goal', targetAmount: 1000 })
-    store.addFinanceRecord('goal', { name: 'Car fund', targetAmount: 2000, goalKind: 'sinking' })
-    store.addFinanceRecord('goal', { name: 'Bogus kind', targetAmount: 500, goalKind: 'not-a-real-kind' })
+    store.addFinanceRecord('goal', {
+      name: 'Car fund',
+      targetAmount: 2000,
+      goalKind: 'sinking',
+    })
+    store.addFinanceRecord('goal', {
+      name: 'Bogus kind',
+      targetAmount: 500,
+      goalKind: 'not-a-real-kind',
+    })
 
     const db = store.readFinanceStore()
-    expect(db.savings_goals.find((g) => g.name === 'Untyped goal')?.goalKind).toBe('general')
-    expect(db.savings_goals.find((g) => g.name === 'Car fund')?.goalKind).toBe('sinking')
-    expect(db.savings_goals.find((g) => g.name === 'Bogus kind')?.goalKind).toBe('general')
+    expect(
+      db.savings_goals.find((g) => g.name === 'Untyped goal')?.goalKind,
+    ).toBe('general')
+    expect(db.savings_goals.find((g) => g.name === 'Car fund')?.goalKind).toBe(
+      'sinking',
+    )
+    expect(
+      db.savings_goals.find((g) => g.name === 'Bogus kind')?.goalKind,
+    ).toBe('general')
   })
 
   it('loan (Phase 40) round-trips through add, update, delete, and defaults status to active', async () => {
     const store = await import('./finance-store')
     store.addFinanceRecord('loan', {
-      lender: 'Test Bank', principal: 100_000, currentBalance: 90_000, currency: 'LKR', interestRatePct: 12,
+      lender: 'Test Bank',
+      principal: 100_000,
+      currentBalance: 90_000,
+      currency: 'LKR',
+      interestRatePct: 12,
     })
     let db = store.readFinanceStore()
     expect(db.loans).toHaveLength(1)
@@ -403,7 +434,10 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
     expect(loan.currentBalance).toBe(90_000)
     expect(loan.status).toBe('active')
 
-    store.updateFinanceRecord('loan', loan.id, { currentBalance: 80_000, status: 'active' })
+    store.updateFinanceRecord('loan', loan.id, {
+      currentBalance: 80_000,
+      status: 'active',
+    })
     db = store.readFinanceStore()
     expect(db.loans[0].currentBalance).toBe(80_000)
 
@@ -420,9 +454,23 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
 
   it('loan status defaults to active on add when omitted or invalid', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('loan', { lender: 'A', principal: 1000, currentBalance: 1000 })
-    store.addFinanceRecord('loan', { lender: 'B', principal: 1000, currentBalance: 1000, status: 'paid_off' })
-    store.addFinanceRecord('loan', { lender: 'C', principal: 1000, currentBalance: 1000, status: 'bogus' })
+    store.addFinanceRecord('loan', {
+      lender: 'A',
+      principal: 1000,
+      currentBalance: 1000,
+    })
+    store.addFinanceRecord('loan', {
+      lender: 'B',
+      principal: 1000,
+      currentBalance: 1000,
+      status: 'paid_off',
+    })
+    store.addFinanceRecord('loan', {
+      lender: 'C',
+      principal: 1000,
+      currentBalance: 1000,
+      status: 'bogus',
+    })
 
     const db = store.readFinanceStore()
     expect(db.loans.find((l) => l.lender === 'A')?.status).toBe('active')
@@ -433,7 +481,10 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
   it('property (Phase 40) round-trips through add, update, delete, and defaults propertyType to residential', async () => {
     const store = await import('./finance-store')
     store.addFinanceRecord('property', {
-      description: 'Test House', purchasePrice: 5_000_000, currentValue: 5_500_000, currency: 'LKR',
+      description: 'Test House',
+      purchasePrice: 5_000_000,
+      currentValue: 5_500_000,
+      currency: 'LKR',
     })
     let db = store.readFinanceStore()
     expect(db.properties).toHaveLength(1)
@@ -442,7 +493,9 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
     expect(property.propertyType).toBe('residential')
     expect(property.currentValue).toBe(5_500_000)
 
-    store.updateFinanceRecord('property', property.id, { currentValue: 5_800_000 })
+    store.updateFinanceRecord('property', property.id, {
+      currentValue: 5_800_000,
+    })
     db = store.readFinanceStore()
     expect(db.properties[0].currentValue).toBe(5_800_000)
 
@@ -453,14 +506,34 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
 
   it('propertyType defaults to residential on add when omitted or invalid', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('property', { description: 'A', purchasePrice: 1000, currentValue: 1000 })
-    store.addFinanceRecord('property', { description: 'B', purchasePrice: 1000, currentValue: 1000, propertyType: 'land' })
-    store.addFinanceRecord('property', { description: 'C', purchasePrice: 1000, currentValue: 1000, propertyType: 'bogus' })
+    store.addFinanceRecord('property', {
+      description: 'A',
+      purchasePrice: 1000,
+      currentValue: 1000,
+    })
+    store.addFinanceRecord('property', {
+      description: 'B',
+      purchasePrice: 1000,
+      currentValue: 1000,
+      propertyType: 'land',
+    })
+    store.addFinanceRecord('property', {
+      description: 'C',
+      purchasePrice: 1000,
+      currentValue: 1000,
+      propertyType: 'bogus',
+    })
 
     const db = store.readFinanceStore()
-    expect(db.properties.find((p) => p.description === 'A')?.propertyType).toBe('residential')
-    expect(db.properties.find((p) => p.description === 'B')?.propertyType).toBe('land')
-    expect(db.properties.find((p) => p.description === 'C')?.propertyType).toBe('residential')
+    expect(db.properties.find((p) => p.description === 'A')?.propertyType).toBe(
+      'residential',
+    )
+    expect(db.properties.find((p) => p.description === 'B')?.propertyType).toBe(
+      'land',
+    )
+    expect(db.properties.find((p) => p.description === 'C')?.propertyType).toBe(
+      'residential',
+    )
   })
 })
 
@@ -481,33 +554,78 @@ describe('findPossibleDuplicate', () => {
 
   it('finds a same-day/vendor/amount expense match, case-insensitive on vendor', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('expense', { date: '2026-03-01', vendor: 'Cafe Nero', category: 'Dining', amount: 500 })
+    store.addFinanceRecord('expense', {
+      date: '2026-03-01',
+      vendor: 'Cafe Nero',
+      category: 'Dining',
+      amount: 500,
+    })
 
-    const match = store.findPossibleDuplicate('expense', 'cafe nero', '2026-03-01', 500)
-    expect(match).toMatchObject({ vendorOrSource: 'Cafe Nero', date: '2026-03-01', amount: 500 })
+    const match = store.findPossibleDuplicate(
+      'expense',
+      'cafe nero',
+      '2026-03-01',
+      500,
+    )
+    expect(match).toMatchObject({
+      vendorOrSource: 'Cafe Nero',
+      date: '2026-03-01',
+      amount: 500,
+    })
   })
 
   it('treats amounts within 1% as the same', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('expense', { date: '2026-03-01', vendor: 'Cafe Nero', category: 'Dining', amount: 500 })
-    expect(store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-01', 502)).not.toBeNull()
+    store.addFinanceRecord('expense', {
+      date: '2026-03-01',
+      vendor: 'Cafe Nero',
+      category: 'Dining',
+      amount: 500,
+    })
+    expect(
+      store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-01', 502),
+    ).not.toBeNull()
   })
 
   it('does not match a different date, vendor, or amount beyond tolerance', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('expense', { date: '2026-03-01', vendor: 'Cafe Nero', category: 'Dining', amount: 500 })
+    store.addFinanceRecord('expense', {
+      date: '2026-03-01',
+      vendor: 'Cafe Nero',
+      category: 'Dining',
+      amount: 500,
+    })
 
-    expect(store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-02', 500)).toBeNull()
-    expect(store.findPossibleDuplicate('expense', 'Different Cafe', '2026-03-01', 500)).toBeNull()
-    expect(store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-01', 600)).toBeNull()
+    expect(
+      store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-02', 500),
+    ).toBeNull()
+    expect(
+      store.findPossibleDuplicate(
+        'expense',
+        'Different Cafe',
+        '2026-03-01',
+        500,
+      ),
+    ).toBeNull()
+    expect(
+      store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-01', 600),
+    ).toBeNull()
   })
 
   it('checks income and expense collections independently', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('income', { dateReceived: '2026-03-01', sourceName: 'Client A', originalAmount: 1000 })
+    store.addFinanceRecord('income', {
+      dateReceived: '2026-03-01',
+      sourceName: 'Client A',
+      originalAmount: 1000,
+    })
 
-    expect(store.findPossibleDuplicate('income', 'Client A', '2026-03-01', 1000)).not.toBeNull()
-    expect(store.findPossibleDuplicate('expense', 'Client A', '2026-03-01', 1000)).toBeNull()
+    expect(
+      store.findPossibleDuplicate('income', 'Client A', '2026-03-01', 1000),
+    ).not.toBeNull()
+    expect(
+      store.findPossibleDuplicate('expense', 'Client A', '2026-03-01', 1000),
+    ).toBeNull()
   })
 })
 
@@ -531,14 +649,18 @@ describe('recordCategoryCorrection / getCategoryCorrections', () => {
     expect(store.getCategoryCorrections()).toEqual({})
 
     store.recordCategoryCorrection('Keells Super', 'Groceries')
-    expect(store.getCategoryCorrections()).toEqual({ 'keells super': 'Groceries' })
+    expect(store.getCategoryCorrections()).toEqual({
+      'keells super': 'Groceries',
+    })
   })
 
   it('overwrites a prior correction for the same vendor', async () => {
     const store = await import('./finance-store')
     store.recordCategoryCorrection('Keells Super', 'Groceries')
     store.recordCategoryCorrection('keells super', 'Household')
-    expect(store.getCategoryCorrections()).toEqual({ 'keells super': 'Household' })
+    expect(store.getCategoryCorrections()).toEqual({
+      'keells super': 'Household',
+    })
   })
 
   it('ignores an empty vendor or category', async () => {
@@ -604,7 +726,9 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
     expect(db.income_sources[0].jobTitle).toBe('Software Engineer')
     const id = db.income_sources[0].id
 
-    store.updateFinanceRecord('income_source', id, { jobTitle: 'Senior Software Engineer' })
+    store.updateFinanceRecord('income_source', id, {
+      jobTitle: 'Senior Software Engineer',
+    })
     db = store.readFinanceStore()
     expect(db.income_sources[0].jobTitle).toBe('Senior Software Engineer')
   })
@@ -614,10 +738,13 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
     store.addFinanceRecord('income_source', {
       employerName: 'Acme Corp',
       employmentType: 'contract',
-      documentRef: '/home/ubuntu/.hermes/finance/ingestion-uploads/some-contract.pdf',
+      documentRef:
+        '/home/ubuntu/.hermes/finance/ingestion-uploads/some-contract.pdf',
     })
     const db = store.readFinanceStore()
-    expect(db.income_sources[0].documentRef).toBe('/home/ubuntu/.hermes/finance/ingestion-uploads/some-contract.pdf')
+    expect(db.income_sources[0].documentRef).toBe(
+      '/home/ubuntu/.hermes/finance/ingestion-uploads/some-contract.pdf',
+    )
   })
 
   it('persists expectedPaydayDayOfMonth/paySchedule on a job, and incomeSourceId on an income record', async () => {
@@ -675,14 +802,20 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
 
   it('defaults employmentType to other for an unrecognized value', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('income_source', { employerName: 'X', employmentType: 'bogus' })
+    store.addFinanceRecord('income_source', {
+      employerName: 'X',
+      employmentType: 'bogus',
+    })
     const db = store.readFinanceStore()
     expect(db.income_sources[0].employmentType).toBe('other')
   })
 
   it('supports an income source with no monthlyIncomeAmount (irregular income)', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('income_source', { employerName: 'Freelance Clients', employmentType: 'freelance' })
+    store.addFinanceRecord('income_source', {
+      employerName: 'Freelance Clients',
+      employmentType: 'freelance',
+    })
     const db = store.readFinanceStore()
     expect(db.income_sources[0].monthlyIncomeAmount).toBeUndefined()
   })
@@ -699,12 +832,23 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
     })
     let db = store.readFinanceStore()
     expect(db.stock_holdings).toHaveLength(1)
-    expect(db.stock_holdings[0]).toMatchObject({ symbol: 'JKH.N0000', quantity: 100, buyPrice: 150, priceSource: 'manual' })
+    expect(db.stock_holdings[0]).toMatchObject({
+      symbol: 'JKH.N0000',
+      quantity: 100,
+      buyPrice: 150,
+      priceSource: 'manual',
+    })
     const id = db.stock_holdings[0].id
 
-    store.updateFinanceRecord('stock_holding', id, { lastKnownPrice: 165, priceSource: 'cse_api' })
+    store.updateFinanceRecord('stock_holding', id, {
+      lastKnownPrice: 165,
+      priceSource: 'cse_api',
+    })
     db = store.readFinanceStore()
-    expect(db.stock_holdings[0]).toMatchObject({ lastKnownPrice: 165, priceSource: 'cse_api' })
+    expect(db.stock_holdings[0]).toMatchObject({
+      lastKnownPrice: 165,
+      priceSource: 'cse_api',
+    })
 
     store.deleteFinanceRecord('stock_holding', id)
     db = store.readFinanceStore()
@@ -724,7 +868,11 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
     })
     let db = store.readFinanceStore()
     expect(db.fixed_deposits).toHaveLength(1)
-    expect(db.fixed_deposits[0]).toMatchObject({ bankName: 'Sampath Bank', principal: 500_000, status: 'active' })
+    expect(db.fixed_deposits[0]).toMatchObject({
+      bankName: 'Sampath Bank',
+      principal: 500_000,
+      status: 'active',
+    })
     const id = db.fixed_deposits[0].id
 
     store.updateFinanceRecord('fixed_deposit', id, { status: 'matured' })
@@ -782,7 +930,12 @@ describe('account (PF-100 Account Model)', () => {
 
   it('supports an account with no opening balance (optional field)', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('account', { name: 'Wallet Cash', type: 'cash', currency: 'LKR', balance: 5000 })
+    store.addFinanceRecord('account', {
+      name: 'Wallet Cash',
+      type: 'cash',
+      currency: 'LKR',
+      balance: 5000,
+    })
     const db = store.readFinanceStore()
     expect(db.finance_accounts[0].openingBalance).toBeUndefined()
     expect(db.finance_accounts[0].openingBalanceDate).toBeUndefined()
@@ -790,14 +943,24 @@ describe('account (PF-100 Account Model)', () => {
 
   it('defaults account type to other for an unrecognized value', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('account', { name: 'Mystery', type: 'bogus', currency: 'LKR', balance: 0 })
+    store.addFinanceRecord('account', {
+      name: 'Mystery',
+      type: 'bogus',
+      currency: 'LKR',
+      balance: 0,
+    })
     const db = store.readFinanceStore()
     expect(db.finance_accounts[0].type).toBe('other')
   })
 
   it('adds, edits, then deletes an account', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('account', { name: 'Crypto Wallet', type: 'crypto_wallet', currency: 'USD', balance: 100 })
+    store.addFinanceRecord('account', {
+      name: 'Crypto Wallet',
+      type: 'crypto_wallet',
+      currency: 'USD',
+      balance: 100,
+    })
     let db = store.readFinanceStore()
     expect(db.finance_accounts).toHaveLength(1)
     const id = db.finance_accounts[0].id
@@ -829,10 +992,18 @@ describe('category (PF-109 Categories)', () => {
 
   it('adds, edits, then deletes a category', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('category', { name: 'Groceries', kind: 'expense', color: '#22c55e' })
+    store.addFinanceRecord('category', {
+      name: 'Groceries',
+      kind: 'expense',
+      color: '#22c55e',
+    })
     let db = store.readFinanceStore()
     expect(db.categories).toHaveLength(1)
-    expect(db.categories[0]).toMatchObject({ name: 'Groceries', kind: 'expense', color: '#22c55e' })
+    expect(db.categories[0]).toMatchObject({
+      name: 'Groceries',
+      kind: 'expense',
+      color: '#22c55e',
+    })
     const id = db.categories[0].id
 
     store.updateFinanceRecord('category', id, { name: 'Groceries & Household' })
@@ -852,7 +1023,10 @@ describe('category (PF-109 Categories)', () => {
     let db = store.readFinanceStore()
     expect(db.categories[0].kind).toBe('both')
 
-    store.addFinanceRecord('category', { name: 'Bogus Kind', kind: 'not-a-real-kind' })
+    store.addFinanceRecord('category', {
+      name: 'Bogus Kind',
+      kind: 'not-a-real-kind',
+    })
     db = store.readFinanceStore()
     expect(db.categories[1].kind).toBe('both')
   })
@@ -883,10 +1057,16 @@ describe('subcategory_entry (PF-110 Subcategories)', () => {
 
   it('adds, edits, then deletes a subcategory', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('subcategory_entry', { name: 'Coffee', parentCategory: 'Dining' })
+    store.addFinanceRecord('subcategory_entry', {
+      name: 'Coffee',
+      parentCategory: 'Dining',
+    })
     let db = store.readFinanceStore()
     expect(db.subcategories).toHaveLength(1)
-    expect(db.subcategories[0]).toMatchObject({ name: 'Coffee', parentCategory: 'Dining' })
+    expect(db.subcategories[0]).toMatchObject({
+      name: 'Coffee',
+      parentCategory: 'Dining',
+    })
     const id = db.subcategories[0].id
 
     store.updateFinanceRecord('subcategory_entry', id, { name: 'Coffee & Tea' })
@@ -925,10 +1105,16 @@ describe('merchant (PF-111 Merchant Registry)', () => {
 
   it('adds, edits, then deletes a merchant', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('merchant', { name: 'Cargills', defaultCategory: 'Groceries' })
+    store.addFinanceRecord('merchant', {
+      name: 'Cargills',
+      defaultCategory: 'Groceries',
+    })
     let db = store.readFinanceStore()
     expect(db.merchants).toHaveLength(1)
-    expect(db.merchants[0]).toMatchObject({ name: 'Cargills', defaultCategory: 'Groceries' })
+    expect(db.merchants[0]).toMatchObject({
+      name: 'Cargills',
+      defaultCategory: 'Groceries',
+    })
     const id = db.merchants[0].id
 
     store.updateFinanceRecord('merchant', id, { name: 'Cargills Food City' })
@@ -968,10 +1154,16 @@ describe('tag (PF-112 Tags)', () => {
 
   it('adds, edits, then deletes a tag', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('tag', { name: 'Travel', notes: 'Trip-related spending' })
+    store.addFinanceRecord('tag', {
+      name: 'Travel',
+      notes: 'Trip-related spending',
+    })
     let db = store.readFinanceStore()
     expect(db.tags).toHaveLength(1)
-    expect(db.tags[0]).toMatchObject({ name: 'Travel', notes: 'Trip-related spending' })
+    expect(db.tags[0]).toMatchObject({
+      name: 'Travel',
+      notes: 'Trip-related spending',
+    })
     const id = db.tags[0].id
 
     store.updateFinanceRecord('tag', id, { name: 'Travel & Leisure' })
@@ -994,7 +1186,12 @@ describe('tag (PF-112 Tags)', () => {
 
   it('round-trips tags on expense and income records through add/update', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('expense', { vendor: 'Test', category: 'Other', amount: 10, tags: 'work, travel' })
+    store.addFinanceRecord('expense', {
+      vendor: 'Test',
+      category: 'Other',
+      amount: 10,
+      tags: 'work, travel',
+    })
     let db = store.readFinanceStore()
     expect(db.expense_records[0].tags).toBe('work, travel')
     const expenseId = db.expense_records[0].id
@@ -1003,7 +1200,12 @@ describe('tag (PF-112 Tags)', () => {
     // Untouched tags survive the shallow-merge update.
     expect(db.expense_records[0].tags).toBe('work, travel')
 
-    store.addFinanceRecord('income', { sourceName: 'Test', incomeType: 'Other income', originalAmount: 10, tags: 'bonus' })
+    store.addFinanceRecord('income', {
+      sourceName: 'Test',
+      incomeType: 'Other income',
+      originalAmount: 10,
+      tags: 'bonus',
+    })
     db = store.readFinanceStore()
     expect(db.income_records[0].tags).toBe('bonus')
   })
@@ -1026,8 +1228,17 @@ describe('reconciliationStatus (PF-113 Pending/Cleared/Reconciled Status)', () =
 
   it('defaults to cleared when status is missing or invalid, for both expense and income', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('expense', { vendor: 'Test', category: 'Other', amount: 10 })
-    store.addFinanceRecord('income', { sourceName: 'Test', incomeType: 'Other income', originalAmount: 10, status: 'bogus' })
+    store.addFinanceRecord('expense', {
+      vendor: 'Test',
+      category: 'Other',
+      amount: 10,
+    })
+    store.addFinanceRecord('income', {
+      sourceName: 'Test',
+      incomeType: 'Other income',
+      originalAmount: 10,
+      status: 'bogus',
+    })
     const db = store.readFinanceStore()
     expect(db.expense_records[0].status).toBe('cleared')
     expect(db.income_records[0].status).toBe('cleared')
@@ -1035,8 +1246,18 @@ describe('reconciliationStatus (PF-113 Pending/Cleared/Reconciled Status)', () =
 
   it('accepts all three valid status values on create, for both expense and income', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('expense', { vendor: 'Test', category: 'Other', amount: 10, status: 'pending' })
-    store.addFinanceRecord('income', { sourceName: 'Test', incomeType: 'Other income', originalAmount: 10, status: 'reconciled' })
+    store.addFinanceRecord('expense', {
+      vendor: 'Test',
+      category: 'Other',
+      amount: 10,
+      status: 'pending',
+    })
+    store.addFinanceRecord('income', {
+      sourceName: 'Test',
+      incomeType: 'Other income',
+      originalAmount: 10,
+      status: 'reconciled',
+    })
     const db = store.readFinanceStore()
     expect(db.expense_records[0].status).toBe('pending')
     expect(db.income_records[0].status).toBe('reconciled')
@@ -1044,7 +1265,12 @@ describe('reconciliationStatus (PF-113 Pending/Cleared/Reconciled Status)', () =
 
   it('round-trips status on expense and income records through update', async () => {
     const store = await import('./finance-store')
-    store.addFinanceRecord('expense', { vendor: 'Test', category: 'Other', amount: 10, status: 'pending' })
+    store.addFinanceRecord('expense', {
+      vendor: 'Test',
+      category: 'Other',
+      amount: 10,
+      status: 'pending',
+    })
     let db = store.readFinanceStore()
     const expenseId = db.expense_records[0].id
     store.updateFinanceRecord('expense', expenseId, { vendor: 'Test Updated' })
@@ -1052,10 +1278,17 @@ describe('reconciliationStatus (PF-113 Pending/Cleared/Reconciled Status)', () =
     // Untouched status survives the shallow-merge update, same as tags/subcategory.
     expect(db.expense_records[0].status).toBe('pending')
 
-    store.addFinanceRecord('income', { sourceName: 'Test', incomeType: 'Other income', originalAmount: 10, status: 'reconciled' })
+    store.addFinanceRecord('income', {
+      sourceName: 'Test',
+      incomeType: 'Other income',
+      originalAmount: 10,
+      status: 'reconciled',
+    })
     db = store.readFinanceStore()
     const incomeId = db.income_records[0].id
-    store.updateFinanceRecord('income', incomeId, { sourceName: 'Test Updated' })
+    store.updateFinanceRecord('income', incomeId, {
+      sourceName: 'Test Updated',
+    })
     db = store.readFinanceStore()
     expect(db.income_records[0].status).toBe('reconciled')
   })
@@ -1200,11 +1433,25 @@ describe('getAverageMonthlyExpensesLkr (PF-303 Emergency Fund Target)', () => {
     return d.toISOString().slice(0, 10)
   }
 
-  function pushExpense(db: ReturnType<typeof createEmptyFinanceDatabase>, monthsAgo: number, amount: number) {
+  function pushExpense(
+    db: ReturnType<typeof createEmptyFinanceDatabase>,
+    monthsAgo: number,
+    amount: number,
+  ) {
     db.expense_records.push({
-      id: `e-${monthsAgo}-${amount}`, date: monthsAgoDateString(monthsAgo), vendor: 'Test', category: 'Other',
-      currency: 'LKR', amount, convertedLkrAmount: amount, recurring: false, workRelated: false,
-      taxDeductiblePossible: false, source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: `e-${monthsAgo}-${amount}`,
+      date: monthsAgoDateString(monthsAgo),
+      vendor: 'Test',
+      category: 'Other',
+      currency: 'LKR',
+      amount,
+      convertedLkrAmount: amount,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
   }
 
@@ -1237,26 +1484,55 @@ describe('getAverageMonthlySavingsRatePct (PF-304 Savings Rate Target)', () => {
     return d.toISOString().slice(0, 10)
   }
 
-  function pushExpense(db: ReturnType<typeof createEmptyFinanceDatabase>, monthsAgo: number, amount: number) {
+  function pushExpense(
+    db: ReturnType<typeof createEmptyFinanceDatabase>,
+    monthsAgo: number,
+    amount: number,
+  ) {
     db.expense_records.push({
-      id: `sr-e-${monthsAgo}-${amount}`, date: monthsAgoDateString(monthsAgo), vendor: 'Test', category: 'Other',
-      currency: 'LKR', amount, convertedLkrAmount: amount, recurring: false, workRelated: false,
-      taxDeductiblePossible: false, source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: `sr-e-${monthsAgo}-${amount}`,
+      date: monthsAgoDateString(monthsAgo),
+      vendor: 'Test',
+      category: 'Other',
+      currency: 'LKR',
+      amount,
+      convertedLkrAmount: amount,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
   }
 
-  function pushIncome(db: ReturnType<typeof createEmptyFinanceDatabase>, monthsAgo: number, amount: number) {
+  function pushIncome(
+    db: ReturnType<typeof createEmptyFinanceDatabase>,
+    monthsAgo: number,
+    amount: number,
+  ) {
     db.income_records.push({
-      id: `sr-i-${monthsAgo}-${amount}`, dateReceived: monthsAgoDateString(monthsAgo), sourceName: 'Test',
-      incomeType: 'Salary', originalCurrency: 'LKR', originalAmount: amount, exchangeRateUsed: 1,
-      convertedLkrAmount: amount, taxable: true, source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: `sr-i-${monthsAgo}-${amount}`,
+      dateReceived: monthsAgoDateString(monthsAgo),
+      sourceName: 'Test',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: amount,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: amount,
+      taxable: true,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
   }
 
   it('returns hasData: false when there is no complete month of history', () => {
     const db = createEmptyFinanceDatabase()
-    expect(getAverageMonthlySavingsRatePct(db)).toEqual({ actualPct: 0, hasData: false })
+    expect(getAverageMonthlySavingsRatePct(db)).toEqual({
+      actualPct: 0,
+      hasData: false,
+    })
   })
 
   it('computes a ratio-of-sums rate across the trailing window, excluding the current month', () => {
@@ -1275,7 +1551,10 @@ describe('getAverageMonthlySavingsRatePct (PF-304 Savings Rate Target)', () => {
   it('returns hasData: false when trailing-window income is 0 (avoids divide-by-zero)', () => {
     const db = createEmptyFinanceDatabase()
     pushExpense(db, 1, 10_000)
-    expect(getAverageMonthlySavingsRatePct(db, 3)).toEqual({ actualPct: 0, hasData: false })
+    expect(getAverageMonthlySavingsRatePct(db, 3)).toEqual({
+      actualPct: 0,
+      hasData: false,
+    })
   })
 })
 
@@ -1295,9 +1574,19 @@ describe('buildFinanceQueryContext (Phase 24 Hermes Finance Analyst)', () => {
     vendor: string,
   ) {
     db.expense_records.push({
-      id: `q-e-${monthsAgo}-${category}-${vendor}-${amount}`, date: monthsAgoDateString(monthsAgo), vendor,
-      category, currency: 'LKR', amount, convertedLkrAmount: amount, recurring: false, workRelated: false,
-      taxDeductiblePossible: false, source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: `q-e-${monthsAgo}-${category}-${vendor}-${amount}`,
+      date: monthsAgoDateString(monthsAgo),
+      vendor,
+      category,
+      currency: 'LKR',
+      amount,
+      convertedLkrAmount: amount,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
   }
 
@@ -1309,7 +1598,10 @@ describe('buildFinanceQueryContext (Phase 24 Hermes Finance Analyst)', () => {
     pushExpense(db, 1, 4000, 'Groceries', 'Store A')
 
     const context = buildFinanceQueryContext(db)
-    expect(context.categoryBreakdown.thisMonth).toEqual({ Groceries: 5000, Dining: 1500 })
+    expect(context.categoryBreakdown.thisMonth).toEqual({
+      Groceries: 5000,
+      Dining: 1500,
+    })
     expect(context.categoryBreakdown.lastMonth).toEqual({ Groceries: 4000 })
     expect(context.topVendors.thisMonth).toEqual([
       { vendor: 'Store A', amount: 3000 },
@@ -1331,11 +1623,25 @@ describe('buildFinanceQueryContext (Phase 24 Hermes Finance Analyst)', () => {
     profitLoss: number,
   ) {
     db.trading_plans.push({
-      id, platform: 'manual', symbol: 'TSLA', assetType: 'stock', decision: 'HOLD',
-      reason: 'test', riskLevel: 'low_risk', riskScore: 10, confidenceScore: 80,
-      dataUsed: [], newsReviewed: [], finalRecommendation: 'test', status: 'executed',
-      userApprovalStatus: 'approved', executionStatus: 'executed', profitLoss,
-      source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id,
+      platform: 'manual',
+      symbol: 'TSLA',
+      assetType: 'stock',
+      decision: 'HOLD',
+      reason: 'test',
+      riskLevel: 'low_risk',
+      riskScore: 10,
+      confidenceScore: 80,
+      dataUsed: [],
+      newsReviewed: [],
+      finalRecommendation: 'test',
+      status: 'executed',
+      userApprovalStatus: 'approved',
+      executionStatus: 'executed',
+      profitLoss,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
   }
 
@@ -1361,19 +1667,46 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
   it('includes stock holdings at current price and active fixed deposit principal', () => {
     const db = createEmptyFinanceDatabase()
     db.stock_holdings.push({
-      id: 's1', symbol: 'JKH.N0000', platform: 'Test', quantity: 10, buyPrice: 100, buyDate: '2026-01-01',
-      currency: 'LKR', lastKnownPrice: 120, priceSource: 'cse_api', source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 's1',
+      symbol: 'JKH.N0000',
+      platform: 'Test',
+      quantity: 10,
+      buyPrice: 100,
+      buyDate: '2026-01-01',
+      currency: 'LKR',
+      lastKnownPrice: 120,
+      priceSource: 'cse_api',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     db.fixed_deposits.push({
-      id: 'f1', bankName: 'Test Bank', principal: 50_000, currency: 'LKR', interestRatePct: 10,
-      interestPayout: 'at_maturity', startDate: '2026-01-01', maturityDate: '2027-01-01', status: 'active',
-      source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 'f1',
+      bankName: 'Test Bank',
+      principal: 50_000,
+      currency: 'LKR',
+      interestRatePct: 10,
+      interestPayout: 'at_maturity',
+      startDate: '2026-01-01',
+      maturityDate: '2027-01-01',
+      status: 'active',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     db.fixed_deposits.push({
-      id: 'f2', bankName: 'Withdrawn Bank', principal: 999_999, currency: 'LKR', interestRatePct: 10,
-      interestPayout: 'at_maturity', startDate: '2026-01-01', maturityDate: '2027-01-01', status: 'withdrawn',
-      source: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 'f2',
+      bankName: 'Withdrawn Bank',
+      principal: 999_999,
+      currency: 'LKR',
+      interestRatePct: 10,
+      interestPayout: 'at_maturity',
+      startDate: '2026-01-01',
+      maturityDate: '2027-01-01',
+      status: 'withdrawn',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
 
     const summary = financeSummary(db)
@@ -1385,22 +1718,50 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
   it('debtLkr (Phase 40) sums active loan currentBalance and card account balances, excluding loan-type accounts and paid-off loans', () => {
     const db = createEmptyFinanceDatabase()
     db.finance_accounts.push({
-      id: 'a1', name: 'Credit Card', type: 'card', currency: 'LKR', balance: -15_000, source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 'a1',
+      name: 'Credit Card',
+      type: 'card',
+      currency: 'LKR',
+      balance: -15_000,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     db.finance_accounts.push({
-      id: 'a2', name: 'Legacy Loan Account', type: 'loan', currency: 'LKR', balance: -999_999, source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 'a2',
+      name: 'Legacy Loan Account',
+      type: 'loan',
+      currency: 'LKR',
+      balance: -999_999,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     db.loans.push({
-      id: 'l1', lender: 'Test Bank', principal: 100_000, currentBalance: 60_000, currency: 'LKR',
-      interestRatePct: 12, startDate: '2026-01-01', status: 'active', source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 'l1',
+      lender: 'Test Bank',
+      principal: 100_000,
+      currentBalance: 60_000,
+      currency: 'LKR',
+      interestRatePct: 12,
+      startDate: '2026-01-01',
+      status: 'active',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     db.loans.push({
-      id: 'l2', lender: 'Paid Off Bank', principal: 50_000, currentBalance: 0, currency: 'LKR',
-      interestRatePct: 8, startDate: '2026-01-01', status: 'paid_off', source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 'l2',
+      lender: 'Paid Off Bank',
+      principal: 50_000,
+      currentBalance: 0,
+      currency: 'LKR',
+      interestRatePct: 8,
+      startDate: '2026-01-01',
+      status: 'paid_off',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
 
     const summary = financeSummary(db)
@@ -1411,14 +1772,28 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
   it('propertyValueLkr (Phase 40) sums current property values and adds to netWorthLkr', () => {
     const db = createEmptyFinanceDatabase()
     db.properties.push({
-      id: 'p1', description: 'Test House', propertyType: 'residential', purchasePrice: 5_000_000,
-      currentValue: 5_500_000, currency: 'LKR', purchaseDate: '2026-01-01', source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 'p1',
+      description: 'Test House',
+      propertyType: 'residential',
+      purchasePrice: 5_000_000,
+      currentValue: 5_500_000,
+      currency: 'LKR',
+      purchaseDate: '2026-01-01',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     db.properties.push({
-      id: 'p2', description: 'Test Land', propertyType: 'land', purchasePrice: 1_000_000,
-      currentValue: 1_200_000, currency: 'LKR', purchaseDate: '2026-01-01', source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 'p2',
+      description: 'Test Land',
+      propertyType: 'land',
+      purchasePrice: 1_000_000,
+      currentValue: 1_200_000,
+      currency: 'LKR',
+      purchaseDate: '2026-01-01',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
 
     const summary = financeSummary(db)
@@ -1429,9 +1804,17 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
   it('falls back to buy price when a stock holding has no cached current price yet', () => {
     const db = createEmptyFinanceDatabase()
     db.stock_holdings.push({
-      id: 's1', symbol: 'JKH.N0000', platform: 'Test', quantity: 5, buyPrice: 200, buyDate: '2026-01-01',
-      currency: 'LKR', priceSource: 'manual', source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 's1',
+      symbol: 'JKH.N0000',
+      platform: 'Test',
+      quantity: 5,
+      buyPrice: 200,
+      buyDate: '2026-01-01',
+      currency: 'LKR',
+      priceSource: 'manual',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     const summary = financeSummary(db)
     expect(summary.stockHoldingsValueLkr).toBe(1000) // 5 * 200 (buy price fallback)
@@ -1440,14 +1823,32 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
   it('computes unrealizedStockPnlLkr as (current - buy) * quantity, summed across holdings', () => {
     const db = createEmptyFinanceDatabase()
     db.stock_holdings.push({
-      id: 's1', symbol: 'JKH.N0000', platform: 'Test', quantity: 10, buyPrice: 100, buyDate: '2026-01-01',
-      currency: 'LKR', lastKnownPrice: 120, priceSource: 'cse_api', source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 's1',
+      symbol: 'JKH.N0000',
+      platform: 'Test',
+      quantity: 10,
+      buyPrice: 100,
+      buyDate: '2026-01-01',
+      currency: 'LKR',
+      lastKnownPrice: 120,
+      priceSource: 'cse_api',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     db.stock_holdings.push({
-      id: 's2', symbol: 'COMB.N0000', platform: 'Test', quantity: 5, buyPrice: 300, buyDate: '2026-01-01',
-      currency: 'LKR', lastKnownPrice: 250, priceSource: 'cse_api', source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 's2',
+      symbol: 'COMB.N0000',
+      platform: 'Test',
+      quantity: 5,
+      buyPrice: 300,
+      buyDate: '2026-01-01',
+      currency: 'LKR',
+      lastKnownPrice: 250,
+      priceSource: 'cse_api',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     const summary = financeSummary(db)
     // (120-100)*10 + (250-300)*5 = 200 - 250 = -50
@@ -1459,9 +1860,17 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
   it('unrealizedStockPnlLkr is 0 when there is no cached current price (falls back to buy price)', () => {
     const db = createEmptyFinanceDatabase()
     db.stock_holdings.push({
-      id: 's1', symbol: 'JKH.N0000', platform: 'Test', quantity: 5, buyPrice: 200, buyDate: '2026-01-01',
-      currency: 'LKR', priceSource: 'manual', source: 'test',
-      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      id: 's1',
+      symbol: 'JKH.N0000',
+      platform: 'Test',
+      quantity: 5,
+      buyPrice: 200,
+      buyDate: '2026-01-01',
+      currency: 'LKR',
+      priceSource: 'manual',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     })
     const summary = financeSummary(db)
     expect(summary.unrealizedStockPnlLkr).toBe(0)
@@ -1527,9 +1936,13 @@ describe('overlaySplitStores (Postgres Migration Phase D)', () => {
     store.writeFinanceStore(store.createEmptyFinanceDatabase())
 
     const db = store.readFinanceStore()
-    expect(db.finance_accounts).toEqual([{ id: 'pg-acc-1', name: 'From Postgres' }])
+    expect(db.finance_accounts).toEqual([
+      { id: 'pg-acc-1', name: 'From Postgres' },
+    ])
     expect(db.settings.savingsRateTargetPct).toBe(42)
-    expect(db.settings.financeQaHistory).toEqual([{ at: 1, question: 'Q', answer: 'A' }])
+    expect(db.settings.financeQaHistory).toEqual([
+      { at: 1, question: 'Q', answer: 'A' },
+    ])
   })
 
   it('falls back to the base file when the Postgres read returns null', async () => {
@@ -1538,7 +1951,12 @@ describe('overlaySplitStores (Postgres Migration Phase D)', () => {
       writePersonalFinancePostgresStore: () => true,
     }))
     const store = await import('./finance-store')
-    store.addFinanceRecord('account', { name: 'From base file fallback', type: 'bank', currency: 'LKR', balance: 100 })
+    store.addFinanceRecord('account', {
+      name: 'From base file fallback',
+      type: 'bank',
+      currency: 'LKR',
+      balance: 100,
+    })
 
     const db = store.readFinanceStore()
     expect(db.finance_accounts).toHaveLength(1)
@@ -1550,17 +1968,36 @@ describe('overlaySplitStores (Postgres Migration Phase D)', () => {
     vi.doMock('./personal-finance-postgres-store', () => ({
       readPersonalFinancePostgresStore: () => ({
         finance_accounts: [{ id: 'pg-acc-1', name: 'Should be ignored' }],
-        income_records: [], expense_records: [], budget_categories: [], savings_goals: [],
-        tax_records: [], exchange_rates: [], investment_accounts: [], pending_ingestions: [],
-        income_sources: [], stock_holdings: [], fixed_deposits: [],
+        income_records: [],
+        expense_records: [],
+        budget_categories: [],
+        savings_goals: [],
+        tax_records: [],
+        exchange_rates: [],
+        investment_accounts: [],
+        pending_ingestions: [],
+        income_sources: [],
+        stock_holdings: [],
+        fixed_deposits: [],
       }),
       writePersonalFinancePostgresStore: () => true,
     }))
     const store = await import('./finance-store')
-    store.addFinanceRecord('account', { name: 'From base file via kill switch', type: 'bank', currency: 'LKR', balance: 100 })
+    store.addFinanceRecord('account', {
+      name: 'From base file via kill switch',
+      type: 'bank',
+      currency: 'LKR',
+      balance: 100,
+    })
 
     const db = store.readFinanceStore()
-    expect(db.finance_accounts.some((a) => a.name === 'Should be ignored')).toBe(false)
-    expect(db.finance_accounts.some((a) => a.name === 'From base file via kill switch')).toBe(true)
+    expect(
+      db.finance_accounts.some((a) => a.name === 'Should be ignored'),
+    ).toBe(false)
+    expect(
+      db.finance_accounts.some(
+        (a) => a.name === 'From base file via kill switch',
+      ),
+    ).toBe(true)
   })
 })

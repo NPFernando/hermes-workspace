@@ -35,7 +35,9 @@ export interface CsePriceResult {
  * symbol, unexpected response shape) returns null so the caller can fall
  * back to manual price entry rather than surfacing this as an app error.
  */
-export async function fetchCsePrice(symbol: string): Promise<CsePriceResult | null> {
+export async function fetchCsePrice(
+  symbol: string,
+): Promise<CsePriceResult | null> {
   const trimmed = symbol.trim()
   if (!trimmed) return null
 
@@ -49,8 +51,10 @@ export async function fetchCsePrice(symbol: string): Promise<CsePriceResult | nu
     if (!res.ok) return null
 
     const data = (await res.json()) as CseCompanyInfoSummeryResponse
-    const price = data.reqSymbolInfo?.lastTradedPrice ?? data.reqSymbolInfo?.closingPrice
-    if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) return null
+    const price =
+      data.reqSymbolInfo?.lastTradedPrice ?? data.reqSymbolInfo?.closingPrice
+    if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0)
+      return null
 
     return { price, asOf: new Date().toISOString() }
   } catch {

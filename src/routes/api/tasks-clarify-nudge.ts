@@ -29,7 +29,8 @@ export const Route = createFileRoute('/api/tasks-clarify-nudge')({
       POST: async ({ request }) => {
         const url = new URL(request.url)
         const hoursParam = Number(url.searchParams.get('hours') ?? '4')
-        const thresholdMs = (isNaN(hoursParam) ? 4 : Math.max(1, hoursParam)) * 60 * 60 * 1000
+        const thresholdMs =
+          (isNaN(hoursParam) ? 4 : Math.max(1, hoursParam)) * 60 * 60 * 1000
 
         const now = Date.now()
         const allTasks = listTasks({ includeDone: false })
@@ -44,7 +45,8 @@ export const Route = createFileRoute('/api/tasks-clarify-nudge')({
           // Under the max nudge cap
           if ((t.clarify_nudge_count ?? 0) >= MAX_NUDGES) return false
           // Check time since last nudge (or since question was asked if never nudged)
-          const lastNudgeOrAsked = t.clarify_nudged_at ?? t.agent_action_at ?? t.updated_at
+          const lastNudgeOrAsked =
+            t.clarify_nudged_at ?? t.agent_action_at ?? t.updated_at
           if (!lastNudgeOrAsked) return false
           return now - Date.parse(lastNudgeOrAsked) >= thresholdMs
         })
@@ -52,7 +54,9 @@ export const Route = createFileRoute('/api/tasks-clarify-nudge')({
         const nudged: Array<{ id: string; title: string }> = []
 
         for (const task of candidates) {
-          const pendingQs = (task.clarification_questions ?? []).filter((q) => !q.answer)
+          const pendingQs = (task.clarification_questions ?? []).filter(
+            (q) => !q.answer,
+          )
           const pointer = await sendTelegramClarificationReminder(
             { id: task.id, title: task.title },
             pendingQs,

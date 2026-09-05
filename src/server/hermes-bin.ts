@@ -36,7 +36,9 @@ export function resolveHermesBin(): string {
     }
   }
   try {
-    cached = spawnSync('which', ['hermes'], { encoding: 'utf-8' }).stdout.trim() || 'hermes'
+    cached =
+      spawnSync('which', ['hermes'], { encoding: 'utf-8' }).stdout.trim() ||
+      'hermes'
   } catch {
     cached = 'hermes'
   }

@@ -4,7 +4,10 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SwarmSession } from '@/stores/agent-swarm-store'
-import type { AgentActivity, AgentBehaviorState } from '@/components/agent-swarm/agent-behaviors'
+import type {
+  AgentActivity,
+  AgentBehaviorState,
+} from '@/components/agent-swarm/agent-behaviors'
 import { assignPersona, releasePersona } from '@/lib/agent-personas'
 import {
   DESK_POSITIONS,

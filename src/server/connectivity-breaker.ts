@@ -102,7 +102,8 @@ export function recordConnectivityOutcome(failureMessage: string | null): void {
     : state.consecutiveCredentialFailures + 1
 
   const shouldTrip =
-    !state.tripped && consecutiveCredentialFailures >= CONSECUTIVE_FAILURE_THRESHOLD
+    !state.tripped &&
+    consecutiveCredentialFailures >= CONSECUTIVE_FAILURE_THRESHOLD
   const trippedReason = shouldTrip
     ? `${consecutiveCredentialFailures} consecutive credential failures within ${FAILURE_WINDOW_MS / 60_000} min. Last: ${failureMessage}`
     : state.trippedReason
@@ -116,7 +117,8 @@ export function recordConnectivityOutcome(failureMessage: string | null): void {
   }
   writeFinanceStore(db)
 
-  if (shouldTrip) sendConnectivityBreakerAlert(trippedReason ?? 'unknown reason')
+  if (shouldTrip)
+    sendConnectivityBreakerAlert(trippedReason ?? 'unknown reason')
 }
 
 export function isConnectivityBreakerTripped(): boolean {

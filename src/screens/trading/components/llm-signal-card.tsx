@@ -52,8 +52,18 @@ export function LlmSignalCard() {
 
   useEffect(() => {
     void load()
-    const id = window.setInterval(load, 30_000)
-    return () => window.clearInterval(id)
+    // Small fixed offset so this panel's poll is staggered relative to the
+    // other trading panels (council/grid/rebalance each poll a different
+    // endpoint every 30s; staggering spreads the resulting requests instead
+    // of bursting them all at once).
+    let id: number | undefined
+    const offset = window.setTimeout(() => {
+      id = window.setInterval(load, 30_000)
+    }, 6_000)
+    return () => {
+      window.clearTimeout(offset)
+      if (id !== undefined) window.clearInterval(id)
+    }
   }, [load])
 
   const runCycle = useCallback(async () => {

@@ -11,7 +11,11 @@ export const Route = createFileRoute('/api/tasks-drain-now')({
     handlers: {
       POST: async ({ request }) => {
         let body: { limit?: number } = {}
-        try { body = (await request.json()) as typeof body } catch { /* empty body ok */ }
+        try {
+          body = (await request.json()) as typeof body
+        } catch {
+          /* empty body ok */
+        }
 
         const { queued, titles } = drainReadyReview({
           ignoreDelay: true,
@@ -22,7 +26,10 @@ export const Route = createFileRoute('/api/tasks-drain-now')({
       },
 
       GET: () => {
-        const { queued, titles } = drainReadyReview({ ignoreDelay: true, limit: 50 })
+        const { queued, titles } = drainReadyReview({
+          ignoreDelay: true,
+          limit: 50,
+        })
         return json({ ok: true, queued, titles })
       },
     },

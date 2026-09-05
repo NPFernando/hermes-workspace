@@ -10,14 +10,19 @@
  * return fewer lines instead of producing nonsense.
  */
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
-import {
-  formatModelName,
-  formatTokens,
-} from '@/screens/dashboard/lib/formatters'
+import { formatModelName } from '@/screens/dashboard/lib/formatters'
 
 export type Insight = {
   text: string
   tone: 'info' | 'positive' | 'warn'
+}
+
+function formatTokens(n: number): string {
+  if (!n || n <= 0) return '0'
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
 }
 
 function shortDate(day: string): string {
@@ -65,8 +70,7 @@ export function buildInsights(
     let priorCache = 0
     let recentCache = 0
     for (let i = 0; i < mid; i += 1) priorCache += daily[i].cacheReadTokens
-    for (let i = mid; i < daily.length; i += 1)
-      recentCache += daily[i].cacheReadTokens
+    for (let i = mid; i < daily.length; i += 1) recentCache += daily[i].cacheReadTokens
     if (priorCache > 0) {
       const delta = ((recentCache - priorCache) / priorCache) * 100
       if (Math.abs(delta) >= 5) {
@@ -83,14 +87,12 @@ export function buildInsights(
   if (cron && cron.nextRunAt) {
     const nextMs = Date.parse(cron.nextRunAt)
     if (Number.isFinite(nextMs) && nextMs - Date.now() < -7 * 86_400_000) {
-      ops.push(`${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`)
+      ops.push(
+        `${cron.total} stale cron job${cron.total === 1 ? '' : 's'}`,
+      )
     }
   }
-  if (
-    status &&
-    status.gatewayState === 'running' &&
-    status.activeAgents === 0
-  ) {
+  if (status && status.gatewayState === 'running' && status.activeAgents === 0) {
     ops.push('no active runs')
   }
   if (status?.restartRequested) ops.push('restart pending')

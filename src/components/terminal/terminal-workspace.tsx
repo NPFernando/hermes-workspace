@@ -194,25 +194,24 @@ export function TerminalWorkspace({
     })
   }, [])
 
-  const captureRecentTerminalOutput = useCallback(
-    function captureRecentOutput(tabId: string): string {
-      const terminal = terminalMapRef.current.get(tabId)
-      if (!terminal) return ''
+  const captureRecentTerminalOutput = useCallback(function captureRecentOutput(
+    tabId: string,
+  ): string {
+    const terminal = terminalMapRef.current.get(tabId)
+    if (!terminal) return ''
 
-      const buffer = terminal.buffer.active
-      const startLine = Math.max(0, buffer.length - 100)
-      const recentLines: Array<string> = []
+    const buffer = terminal.buffer.active
+    const startLine = Math.max(0, buffer.length - 100)
+    const recentLines: Array<string> = []
 
-      for (let index = startLine; index < buffer.length; index += 1) {
-        const line = buffer.getLine(index)
-        if (!line) continue
-        recentLines.push(line.translateToString(true))
-      }
+    for (let index = startLine; index < buffer.length; index += 1) {
+      const line = buffer.getLine(index)
+      if (!line) continue
+      recentLines.push(line.translateToString(true))
+    }
 
-      return recentLines.join('\n').trim()
-    },
-    [],
-  )
+    return recentLines.join('\n').trim()
+  }, [])
 
   const handleAnalyzeDebug = useCallback(
     async function analyzeTerminalDebug() {

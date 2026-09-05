@@ -34,7 +34,8 @@ export function EditModePanel({ layout }: { layout: DashboardLayout }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="sr-only" aria-live="polite">
-            Dashboard layout edit mode. {layout.counts.visible} of {layout.counts.total} widgets shown.
+            Dashboard layout edit mode. {layout.counts.visible} of{' '}
+            {layout.counts.total} widgets shown.
           </span>
           <span
             className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]"
@@ -46,9 +47,7 @@ export function EditModePanel({ layout }: { layout: DashboardLayout }) {
           >
             Edit mode
           </span>
-          <span
-            className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-          >
+          <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
             {layout.counts.visible} of {layout.counts.total} widgets shown
           </span>
         </div>
@@ -96,9 +95,7 @@ function Group({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span
-        className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--theme-muted)]"
-      >
+      <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
         {title}
       </span>
       <div className="flex flex-wrap gap-1.5">
@@ -121,9 +118,7 @@ function Group({
                     ? 'color-mix(in srgb, var(--theme-success) 60%, transparent)'
                     : 'var(--theme-border)'
                 }`,
-                color: visible
-                  ? 'var(--theme-success)'
-                  : 'var(--theme-muted)',
+                color: visible ? 'var(--theme-success)' : 'var(--theme-muted)',
               }}
               title={w.description}
             >

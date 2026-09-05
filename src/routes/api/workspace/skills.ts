@@ -24,9 +24,7 @@ const SKILL_FILE_NAMES = ['SKILL.md', 'DESCRIPTION.md', 'README.md']
 function parseSkillName(dir: string, content: string): string {
   const nameMatch = content.match(/^name:\s*["']?(.+?)["']?\s*$/m)
   if (nameMatch?.[1]) return nameMatch[1].trim()
-  return dir
-    .replace(/-/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+  return dir.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function parseSkillDescription(content: string): string {
@@ -39,7 +37,10 @@ function parseSkillDescription(content: string): string {
 }
 
 function listSkills(): Array<SkillItem> {
-  const hermesHome = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
+  const hermesHome =
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes')
   const skillsDir = path.join(hermesHome, 'skills')
 
   if (!fs.existsSync(skillsDir)) return []

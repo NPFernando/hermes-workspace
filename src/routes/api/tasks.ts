@@ -34,7 +34,12 @@ function toTaskShape(record: ClaudeTaskRecord) {
     title: record.title,
     description: record.description,
     status: toStatus(record.column),
-    priority: record.priority === 'high' ? 'P0' : record.priority === 'medium' ? 'P1' : 'P2',
+    priority:
+      record.priority === 'high'
+        ? 'P0'
+        : record.priority === 'medium'
+          ? 'P1'
+          : 'P2',
     tags: record.tags,
     dueDate: record.due_date ?? undefined,
     createdAt: record.created_at,
@@ -76,14 +81,27 @@ export const Route = createFileRoute('/api/tasks')({
             tags?: Array<string>
           }
           if (!body.title) {
-            return json({ ok: false, error: 'title is required' }, { status: 400 })
+            return json(
+              { ok: false, error: 'title is required' },
+              { status: 400 },
+            )
           }
 
           const record = await createClaudeTask({
             title: body.title,
             description: body.description ?? '',
-            column: body.status === 'in_progress' ? 'in_progress' : body.status === 'review' ? 'review' : 'backlog',
-            priority: body.priority === 'P0' ? 'high' : body.priority === 'P1' ? 'medium' : 'low',
+            column:
+              body.status === 'in_progress'
+                ? 'in_progress'
+                : body.status === 'review'
+                  ? 'review'
+                  : 'backlog',
+            priority:
+              body.priority === 'P0'
+                ? 'high'
+                : body.priority === 'P1'
+                  ? 'medium'
+                  : 'low',
             tags: Array.isArray(body.tags) ? body.tags : [],
             due_date: null,
           })

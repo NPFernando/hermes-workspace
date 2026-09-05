@@ -28,8 +28,7 @@ export const Route = createFileRoute('/api/profiles/rename')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

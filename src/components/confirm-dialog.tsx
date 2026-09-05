@@ -40,7 +40,9 @@ export function ConfirmDialog({
         aria-modal="true"
         className="relative z-10 w-full max-w-xs bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-xl shadow-2xl p-5 flex flex-col gap-4"
       >
-        <p className="text-sm font-semibold text-[var(--theme-text)]">{title}</p>
+        <p className="text-sm font-semibold text-[var(--theme-text)]">
+          {title}
+        </p>
         {body ? (
           <p className="text-[11px] text-[var(--theme-muted)]">{body}</p>
         ) : null}

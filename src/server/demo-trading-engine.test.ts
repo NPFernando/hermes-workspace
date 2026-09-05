@@ -184,6 +184,169 @@ describe('runTradingCycle gating', () => {
     expect(res.reason).toMatch(/testnet_execute/)
   })
 
+  describe('strategy eligibility audit shaping', () => {
+    function auditCandles(withTakerVolume: boolean) {
+      return Array.from({ length: 31 }, (_, index) => {
+        const close = 100 + index * 0.1
+        return {
+          openTime: Date.now() - (30 - index) * 60 * 60_000,
+          open: close,
+          high: close,
+          low: close,
+          close,
+          volume: 100,
+          ...(withTakerVolume ? { takerBuyVolume: 55 } : {}),
+        }
+      })
+    }
+
+    function crossoverCandles() {
+      return Array.from({ length: 22 }, (_, index) => {
+        const close = index === 21 ? 110 : 100
+        return {
+          openTime: Date.now() - (21 - index) * 60 * 60_000,
+          open: close,
+          high: close,
+          low: close,
+          close,
+          volume: 100,
+        }
+      })
+    }
+
+    it('separates disabled strategies from council participants', async () => {
+      const {
+        buildStrategyEligibilityAudit,
+        resolveEngineConfig,
+      } = await import('./demo-trading-engine')
+      const config = resolveEngineConfig({
+        symbols: ['BTCUSDT'],
+        enabledStrategies: ['sma_crossover'],
+      })
+      const audit = buildStrategyEligibilityAudit({
+        executionMode: 'paper',
+        interval: config.interval,
+        asOfMs: 123,
+        config,
+        scores: new Map(),
+        overrides: [],
+        snapshot: {
+          symbols: [{ symbol: 'BTCUSDT', price: 100 }],
+          candlesBySymbol: new Map([
+            ['BTCUSDT', auditCandles(true)],
+          ]),
+        },
+      })
+
+      const btc = audit.symbols[0]
+      const taker = btc.strategies.find(
+        (strategy) => strategy.strategyId === 'taker_imbalance',
+      )
+
+      expect(taker).toMatchObject({
+        active: false,
+        dataAvailable: true,
+        councilEligible: false,
+        exclusionReason: 'disabled in the active strategy roster',
+        regime: null,
+        muted: false,
+      })
+      expect(btc.council.participatingStrategyIds).toEqual(['sma_crossover'])
+    })
+
+    it('reports missing taker volume and excludes the strategy from council', async () => {
+      const {
+        buildStrategyEligibilityAudit,
+        resolveEngineConfig,
+      } = await import('./demo-trading-engine')
+      const config = resolveEngineConfig({
+        symbols: ['BTCUSDT'],
+        enabledStrategies: ['taker_imbalance'],
+      })
+      const audit = buildStrategyEligibilityAudit({
+        executionMode: 'paper',
+        interval: config.interval,
+        asOfMs: 456,
+        config,
+        scores: new Map(),
+        overrides: [],
+        snapshot: {
+          symbols: [{ symbol: 'BTCUSDT', price: 100 }],
+          candlesBySymbol: new Map([
+            ['BTCUSDT', auditCandles(false)],
+          ]),
+        },
+      })
+      const taker = audit.symbols[0]?.strategies.find(
+        (strategy) => strategy.strategyId === 'taker_imbalance',
+      )
+
+      expect(taker).toMatchObject({
+        active: true,
+        dataAvailable: false,
+        councilEligible: false,
+        exclusionReason: 'taker buy volume unavailable',
+      })
+      expect(taker?.dataIssues).toContain('taker buy volume unavailable')
+      expect(audit.symbols[0]?.council.participatingStrategyIds).toEqual([])
+    })
+
+    it('reports council eligibility, threshold, and lead strategy explicitly', async () => {
+      const {
+        buildStrategyEligibilityAudit,
+        resolveEngineConfig,
+      } = await import('./demo-trading-engine')
+      const config = resolveEngineConfig({
+        symbols: ['BTCUSDT'],
+        enabledStrategies: ['sma_crossover'],
+        councilThreshold: 0.6,
+      })
+      const audit = buildStrategyEligibilityAudit({
+        executionMode: 'paper',
+        interval: config.interval,
+        asOfMs: 789,
+        config,
+        scores: new Map(),
+        overrides: [],
+        snapshot: {
+          symbols: [{ symbol: 'BTCUSDT', price: 110 }],
+          candlesBySymbol: new Map([
+            ['BTCUSDT', crossoverCandles()],
+          ]),
+        },
+      })
+
+      expect(audit.symbols[0]?.council).toMatchObject({
+        signal: 'BUY',
+        eligible: true,
+        threshold: 0.6,
+        leadStrategyId: 'sma_crossover',
+        participatingStrategyIds: ['sma_crossover'],
+      })
+    })
+
+    it('returns an explicit empty audit for a warming snapshot', async () => {
+      const {
+        buildStrategyEligibilityAudit,
+        resolveEngineConfig,
+      } = await import('./demo-trading-engine')
+      const config = resolveEngineConfig({ symbols: ['BTCUSDT'] })
+      const audit = buildStrategyEligibilityAudit({
+        executionMode: 'paper',
+        interval: config.interval,
+        asOfMs: 0,
+        config,
+        scores: new Map(),
+        overrides: [],
+        snapshot: { symbols: [], candlesBySymbol: new Map() },
+      })
+
+      expect(audit.asOfMs).toBe(0)
+      expect(audit.symbols).toEqual([])
+      expect(audit.executionMode).toBe('paper')
+    })
+  })
+
   it('halts when the kill switch is active', async () => {
     const store = await import('./finance-store')
     const db = store.readFinanceStore()
@@ -221,7 +384,10 @@ describe('runTradingCycle gating', () => {
       path.join(tmp, '.hermes', 'finance', 'audit.jsonl'),
       'utf8',
     )
-    const lines = auditText.trim().split('\n').map((l) => JSON.parse(l))
+    const lines = auditText
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l))
     const bailed = lines.find((l) => l.action === 'demo_trading_cycle_bailed')
     expect(bailed).toBeTruthy()
     expect(bailed.details.reason).toMatch(/kill switch/)
@@ -407,7 +573,10 @@ describe('runTradingCycle open → close → score', () => {
       enabledStrategies: ['rsi_reversion'],
       atrSizeBaselinePct: 0.0005,
     }
-    const r1 = await runTradingCycle({ client: fakeClient() as never, config: cfg })
+    const r1 = await runTradingCycle({
+      client: fakeClient() as never,
+      config: cfg,
+    })
     expect(r1.actions.some((a) => a.action === 'OPEN')).toBe(true)
     const pos = getEngineState().positions[0]
     expect(pos).toBeTruthy()
@@ -447,19 +616,28 @@ describe('runTradingCycle open → close → score', () => {
 
   it('blocks an entry whose pattern bucket has a proven-bad loss rate, only when patternVetoEnabled', async () => {
     await setMode('testnet_execute')
-    const { buildEntryFeatureVector, bucketKey } = await import(
-      './trading-pattern-veto'
-    )
+    const { buildEntryFeatureVector, bucketKey } =
+      await import('./trading-pattern-veto')
     const store = await import('./finance-store')
 
     // Compute the exact bucket this fixture/strategy will land in, and seed
     // it as a proven-bad bucket (25 trades, 80% loss rate).
-    const features = buildEntryFeatureVector('rsi_reversion', steadyDowntrend(), 14)
+    const features = buildEntryFeatureVector(
+      'rsi_reversion',
+      steadyDowntrend(),
+      14,
+    )
     const key = bucketKey(features)
     const db = store.readFinanceStore()
     db.strategy_results = [
       ...db.strategy_results,
-      { kind: 'demo_pattern_veto_stats', key, trades: 25, losses: 20, lossRate: 0.8 },
+      {
+        kind: 'demo_pattern_veto_stats',
+        key,
+        trades: 25,
+        losses: 20,
+        lossRate: 0.8,
+      },
     ]
     store.writeFinanceStore(db)
 
@@ -476,7 +654,8 @@ describe('runTradingCycle open → close → score', () => {
     })
     expect(
       blocked.actions.some(
-        (a) => a.action === 'BLOCKED' && a.reason.startsWith('pattern_bucket_veto'),
+        (a) =>
+          a.action === 'BLOCKED' && a.reason.startsWith('pattern_bucket_veto'),
       ),
     ).toBe(true)
     expect(getEngineState().positions).toHaveLength(0)
@@ -576,7 +755,8 @@ describe('runTradingCycle open → close → score', () => {
 
   it('does not fetch long/short sentiment when longShortSentimentEnabled is false (the default)', async () => {
     await setMode('testnet_execute')
-    const { fetchTopTraderLongShortRatio } = await import('./long-short-sentiment')
+    const { fetchTopTraderLongShortRatio } =
+      await import('./long-short-sentiment')
     const { runTradingCycle } = await import('./demo-trading-engine')
     await runTradingCycle({
       client: fakeClient() as never,
@@ -587,11 +767,19 @@ describe('runTradingCycle open → close → score', () => {
 
   it('lets a strong long/short-sentiment signal lead the vote and open a position under its own id', async () => {
     await setMode('testnet_execute')
-    const { fetchTopTraderLongShortRatio } = await import('./long-short-sentiment')
+    const { fetchTopTraderLongShortRatio } =
+      await import('./long-short-sentiment')
     vi.mocked(fetchTopTraderLongShortRatio).mockResolvedValue([
-      { symbol: 'BTCUSDT', longShortRatio: 2.5, longAccount: 0.71, shortAccount: 0.29, timestamp: Date.now() },
+      {
+        symbol: 'BTCUSDT',
+        longShortRatio: 2.5,
+        longAccount: 0.71,
+        shortAccount: 0.29,
+        timestamp: Date.now(),
+      },
     ])
-    const { runTradingCycle, getEngineState } = await import('./demo-trading-engine')
+    const { runTradingCycle, getEngineState } =
+      await import('./demo-trading-engine')
     // No strategies enabled -> the sentiment member is the only voice, so a
     // strong (capped-confidence) BUY from it alone should clear the council
     // threshold and open a position under its own strategyId.
@@ -603,14 +791,23 @@ describe('runTradingCycle open → close → score', () => {
         longShortSentimentEnabled: true,
       },
     })
-    expect(r.actions.some((a) => a.action === 'OPEN' && a.strategyId === 'long_short_sentiment')).toBe(true)
-    expect(getEngineState().positions[0]?.strategyId).toBe('long_short_sentiment')
+    expect(
+      r.actions.some(
+        (a) => a.action === 'OPEN' && a.strategyId === 'long_short_sentiment',
+      ),
+    ).toBe(true)
+    expect(getEngineState().positions[0]?.strategyId).toBe(
+      'long_short_sentiment',
+    )
   })
 
   it('completes the cycle normally when the sentiment fetch fails (never breaks the cycle)', async () => {
     await setMode('testnet_execute')
-    const { fetchTopTraderLongShortRatio } = await import('./long-short-sentiment')
-    vi.mocked(fetchTopTraderLongShortRatio).mockRejectedValue(new Error('network error'))
+    const { fetchTopTraderLongShortRatio } =
+      await import('./long-short-sentiment')
+    vi.mocked(fetchTopTraderLongShortRatio).mockRejectedValue(
+      new Error('network error'),
+    )
     const { runTradingCycle } = await import('./demo-trading-engine')
     const r = await runTradingCycle({
       client: fakeClient() as never,
@@ -769,7 +966,12 @@ describe('runTradingCycle open → close → score', () => {
           executedQty: 0.25,
           cummulativeQuoteQty: 25,
           fills: [
-            { price: 100, qty: 0.25, commission: 0.00025, commissionAsset: 'BTC' },
+            {
+              price: 100,
+              qty: 0.25,
+              commission: 0.00025,
+              commissionAsset: 'BTC',
+            },
           ],
           transactTime: Date.now(),
           avgPrice: 100,
@@ -849,16 +1051,30 @@ describe('runTradingCycle open → close → score', () => {
         getKlines: async () => flatCandles(120),
         placeOrder: async (o: any) => {
           if (o.side === 'SELL')
-            throw new Error('Account has insufficient balance for requested action.')
+            throw new Error(
+              'Account has insufficient balance for requested action.',
+            )
           return {
-            symbol: o.symbol, orderId: 3, status: 'FILLED', side: o.side,
-            type: o.type, executedQty: 0.25, cummulativeQuoteQty: 25,
-            fills: [], transactTime: Date.now(), avgPrice: 100,
+            symbol: o.symbol,
+            orderId: 3,
+            status: 'FILLED',
+            side: o.side,
+            type: o.type,
+            executedQty: 0.25,
+            cummulativeQuoteQty: 25,
+            fills: [],
+            transactTime: Date.now(),
+            avgPrice: 100,
           }
         },
       }) as never
-    const r2 = await runTradingCycle({ client: failingSellClient(), config: cfg })
-    expect(r2.actions.some((a) => a.reason?.includes('close failed'))).toBe(true)
+    const r2 = await runTradingCycle({
+      client: failingSellClient(),
+      config: cfg,
+    })
+    expect(r2.actions.some((a) => a.reason?.includes('close failed'))).toBe(
+      true,
+    )
     expect(getEngineState().positions[0]?.closeFailureCount).toBe(1)
     await runTradingCycle({ client: failingSellClient(), config: cfg })
     expect(getEngineState().positions[0]?.closeFailureCount).toBe(2)
@@ -886,9 +1102,16 @@ describe('runTradingCycle open → close → score', () => {
         placeOrder: async (o: any) => {
           if (o.side === 'SELL') sellOrders.push(o)
           return {
-            symbol: o.symbol, orderId: 4, status: 'FILLED', side: o.side,
-            type: o.type, executedQty: 0.25, cummulativeQuoteQty: 30,
-            fills: [], transactTime: Date.now(), avgPrice: 120,
+            symbol: o.symbol,
+            orderId: 4,
+            status: 'FILLED',
+            side: o.side,
+            type: o.type,
+            executedQty: 0.25,
+            cummulativeQuoteQty: 30,
+            fills: [],
+            transactTime: Date.now(),
+            avgPrice: 120,
           }
         },
       }) as never,
@@ -921,9 +1144,16 @@ describe('runTradingCycle open → close → score', () => {
         placeOrder: async (o: any) => {
           if (o.side === 'SELL') sellOrders.push(o)
           return {
-            symbol: o.symbol, orderId: 5, status: 'FILLED', side: o.side,
-            type: o.type, executedQty: 0.25, cummulativeQuoteQty: 30,
-            fills: [], transactTime: Date.now(), avgPrice: 120,
+            symbol: o.symbol,
+            orderId: 5,
+            status: 'FILLED',
+            side: o.side,
+            type: o.type,
+            executedQty: 0.25,
+            cummulativeQuoteQty: 30,
+            fills: [],
+            transactTime: Date.now(),
+            avgPrice: 120,
           }
         },
       }) as never,
@@ -1627,6 +1857,398 @@ describe('strategy overrides', () => {
   })
 })
 
+describe('sandbox experiments', () => {
+  it('rejects starting an experiment targeting live execution', async () => {
+    const { startSandboxExperiment } = await import('./demo-trading-engine')
+    expect(() =>
+      startSandboxExperiment({
+        strategyIds: ['rsi_reversion'],
+        executionMode: 'live',
+        durationMinutes: 60,
+      }),
+    ).toThrow(/never live/)
+  })
+
+  it('rejects an unbounded experiment with neither duration nor trade cap', async () => {
+    const { startSandboxExperiment } = await import('./demo-trading-engine')
+    expect(() =>
+      startSandboxExperiment({
+        strategyIds: ['rsi_reversion'],
+        executionMode: 'testnet',
+      }),
+    ).toThrow(/cannot run unbounded/)
+  })
+
+  it('rejects starting over an existing manual override', async () => {
+    const { setStrategyOverride, startSandboxExperiment } =
+      await import('./demo-trading-engine')
+    setStrategyOverride({
+      strategyId: 'rsi_reversion',
+      overrideAction: 'disabled',
+      reason: 'manual review',
+    })
+    expect(() =>
+      startSandboxExperiment({
+        strategyIds: ['rsi_reversion'],
+        executionMode: 'testnet',
+        durationMinutes: 60,
+      }),
+    ).toThrow(/manual override/)
+  })
+
+  it('rejects a second experiment already active for the same strategy', async () => {
+    const { startSandboxExperiment } = await import('./demo-trading-engine')
+    startSandboxExperiment({
+      strategyIds: ['rsi_reversion'],
+      executionMode: 'testnet',
+      durationMinutes: 60,
+    })
+    expect(() =>
+      startSandboxExperiment({
+        strategyIds: ['rsi_reversion'],
+        executionMode: 'testnet',
+        durationMinutes: 30,
+      }),
+    ).toThrow(/already has an active sandbox experiment/)
+  })
+
+  it('captures a null baseline and applies a capped reduce-size override', async () => {
+    const { startSandboxExperiment, strategyOverrideState } =
+      await import('./demo-trading-engine')
+    const result = startSandboxExperiment({
+      strategyIds: ['rsi_reversion'],
+      reason: 'trial run',
+      executionMode: 'testnet',
+      durationMinutes: 60,
+      sizeMultiplierCap: 0.5,
+    })
+    expect(result.changed).toBe(true)
+    expect(result.experiment?.baseline).toEqual([
+      { strategyId: 'rsi_reversion', override: null },
+    ])
+    const active = strategyOverrideState().active[0]
+    expect(active).toMatchObject({
+      strategyId: 'rsi_reversion',
+      mode: 'reduce_size',
+      multiplier: 0.5,
+      source: 'experiment',
+    })
+  })
+
+  it('does not apply an override when the size cap is 1 (tracking only)', async () => {
+    const { startSandboxExperiment, strategyOverrideState } =
+      await import('./demo-trading-engine')
+    startSandboxExperiment({
+      strategyIds: ['rsi_reversion'],
+      executionMode: 'testnet',
+      tradeCap: 5,
+      sizeMultiplierCap: 1,
+    })
+    expect(strategyOverrideState().active).toHaveLength(0)
+  })
+
+  it('auto-rolls-back and restores a null baseline once the time budget expires', async () => {
+    const { startSandboxExperiment, reviewSandboxExperiments, strategyOverrideState } =
+      await import('./demo-trading-engine')
+    const store = await import('./finance-store')
+    startSandboxExperiment({
+      strategyIds: ['rsi_reversion'],
+      executionMode: 'testnet',
+      durationMinutes: 1,
+      sizeMultiplierCap: 0.5,
+    })
+    // Force the experiment's endsAt into the past to simulate expiry.
+    const db = store.readFinanceStore()
+    const dt = db.settings.demoTrading as Record<string, unknown>
+    const experiments = dt.sandboxExperiments as {
+      active: Array<Record<string, unknown>>
+      history: Array<unknown>
+    }
+    experiments.active[0].endsAt = new Date(
+      Date.now() - 60_000,
+    ).toISOString()
+    store.writeFinanceStore(db)
+
+    const state = reviewSandboxExperiments()
+
+    expect(state.active).toHaveLength(0)
+    expect(state.history).toHaveLength(1)
+    expect(state.history[0]).toMatchObject({ status: 'expired' })
+    expect(strategyOverrideState().active).toHaveLength(0)
+  })
+
+  it('auto-rolls-back once the trade cap is reached, counting only matching trades', async () => {
+    const { startSandboxExperiment, reviewSandboxExperiments } =
+      await import('./demo-trading-engine')
+    const store = await import('./finance-store')
+    startSandboxExperiment({
+      strategyIds: ['rsi_reversion'],
+      executionMode: 'testnet',
+      tradeCap: 2,
+      sizeMultiplierCap: 0.5,
+    })
+    const db = store.readFinanceStore()
+    const startedAt = (
+      (db.settings.demoTrading as Record<string, unknown>)
+        .sandboxExperiments as { active: Array<Record<string, unknown>> }
+    ).active[0].startedAt as string
+    db.strategy_results = [
+      ...db.strategy_results,
+      {
+        kind: 'demo_trade_log',
+        id: 't1',
+        symbol: 'BTCUSDT',
+        strategyId: 'rsi_reversion',
+        entryPrice: 100,
+        exitPrice: 101,
+        quantity: 1,
+        entryQuote: 100,
+        exitQuote: 101,
+        pnlQuote: 1,
+        feesQuote: 0,
+        reason: 'take-profit',
+        openedAt: new Date(Date.parse(startedAt) + 1000).toISOString(),
+        closedAt: new Date(Date.parse(startedAt) + 2000).toISOString(),
+        executionMode: 'testnet',
+      },
+      {
+        kind: 'demo_trade_log',
+        id: 't2',
+        symbol: 'BTCUSDT',
+        strategyId: 'rsi_reversion',
+        entryPrice: 100,
+        exitPrice: 99,
+        quantity: 1,
+        entryQuote: 100,
+        exitQuote: 99,
+        pnlQuote: -1,
+        feesQuote: 0,
+        reason: 'stop-loss',
+        openedAt: new Date(Date.parse(startedAt) + 3000).toISOString(),
+        closedAt: new Date(Date.parse(startedAt) + 4000).toISOString(),
+        executionMode: 'testnet',
+      },
+      // A trade for a different strategy, and one in a different execution
+      // mode — neither should count toward the cap.
+      {
+        kind: 'demo_trade_log',
+        id: 't3',
+        symbol: 'BTCUSDT',
+        strategyId: 'sma_crossover',
+        entryPrice: 100,
+        exitPrice: 101,
+        quantity: 1,
+        entryQuote: 100,
+        exitQuote: 101,
+        pnlQuote: 1,
+        feesQuote: 0,
+        reason: 'take-profit',
+        openedAt: new Date(Date.parse(startedAt) + 1000).toISOString(),
+        closedAt: new Date(Date.parse(startedAt) + 2000).toISOString(),
+        executionMode: 'testnet',
+      },
+    ] as any
+    store.writeFinanceStore(db)
+
+    const state = reviewSandboxExperiments()
+
+    expect(state.active).toHaveLength(0)
+    expect(state.history[0]).toMatchObject({
+      status: 'trade_cap_reached',
+      tradesObserved: 2,
+    })
+  })
+
+  it('leaves an unrelated manual override untouched and clears a null baseline on stop', async () => {
+    const {
+      setStrategyOverride,
+      startSandboxExperiment,
+      stopSandboxExperiment,
+      strategyOverrideState,
+    } = await import('./demo-trading-engine')
+    setStrategyOverride({
+      strategyId: 'rsi_reversion',
+      overrideAction: 'reduce_size',
+      multiplier: 0.75,
+      reason: 'manual 0.75x',
+    })
+    const started = startSandboxExperiment({
+      strategyIds: ['sma_crossover'],
+      executionMode: 'testnet',
+      durationMinutes: 60,
+      sizeMultiplierCap: 0.5,
+    })
+    expect(started.experiment?.baseline).toEqual([
+      { strategyId: 'sma_crossover', override: null },
+    ])
+    const stopped = stopSandboxExperiment(started.experiment!.id, 'done early')
+    expect(stopped.changed).toBe(true)
+    // The unrelated rsi_reversion manual override must remain untouched.
+    const rsiOverride = strategyOverrideState().active.find(
+      (o) => o.strategyId === 'rsi_reversion',
+    )
+    expect(rsiOverride).toMatchObject({ mode: 'reduce_size', multiplier: 0.75 })
+    // sma_crossover had no baseline override, so it should be cleared.
+    const smaOverride = strategyOverrideState().active.find(
+      (o) => o.strategyId === 'sma_crossover',
+    )
+    expect(smaOverride).toBeUndefined()
+  })
+
+  it('restores a non-null (automatic guard) baseline override on stop', async () => {
+    const {
+      setStrategyOverride,
+      startSandboxExperiment,
+      stopSandboxExperiment,
+      strategyOverrideState,
+    } = await import('./demo-trading-engine')
+    setStrategyOverride({
+      strategyId: 'sma_crossover',
+      overrideAction: 'reduce_size',
+      multiplier: 0.5,
+      reason: 'automatic guard baseline',
+      source: 'automatic',
+    })
+    const started = startSandboxExperiment({
+      strategyIds: ['sma_crossover'],
+      executionMode: 'testnet',
+      durationMinutes: 60,
+      sizeMultiplierCap: 0.25,
+    })
+    expect(started.experiment?.baseline[0].override).toMatchObject({
+      mode: 'reduce_size',
+      multiplier: 0.5,
+      source: 'automatic',
+    })
+    expect(strategyOverrideState().active[0]).toMatchObject({
+      multiplier: 0.25,
+      source: 'experiment',
+    })
+    stopSandboxExperiment(started.experiment!.id, 'trial complete')
+    const restored = strategyOverrideState().active.find(
+      (o) => o.strategyId === 'sma_crossover',
+    )
+    expect(restored).toMatchObject({
+      mode: 'reduce_size',
+      multiplier: 0.5,
+      source: 'automatic',
+    })
+  })
+
+  it('does not clobber a newer manual override placed after the experiment started', async () => {
+    const { setStrategyOverride, startSandboxExperiment, stopSandboxExperiment, strategyOverrideState } =
+      await import('./demo-trading-engine')
+    startSandboxExperiment({
+      strategyIds: ['rsi_reversion'],
+      executionMode: 'testnet',
+      durationMinutes: 60,
+      sizeMultiplierCap: 0.5,
+    })
+    // Operator manually disables the strategy mid-experiment.
+    setStrategyOverride({
+      strategyId: 'rsi_reversion',
+      overrideAction: 'disabled',
+      reason: 'manual emergency disable',
+    })
+    const experimentId = (await import('./demo-trading-engine'))
+      .sandboxExperimentState().active[0].id
+    stopSandboxExperiment(experimentId, 'stopping anyway')
+    const override = strategyOverrideState().active.find(
+      (o) => o.strategyId === 'rsi_reversion',
+    )
+    expect(override).toMatchObject({ mode: 'disabled', source: 'manual' })
+  })
+
+  it('re-arms an ended experiment by starting a fresh one with the same parameters', async () => {
+    const {
+      startSandboxExperiment,
+      stopSandboxExperiment,
+      rearmSandboxExperiment,
+      sandboxExperimentState,
+    } = await import('./demo-trading-engine')
+    const started = startSandboxExperiment({
+      strategyIds: ['rsi_reversion'],
+      executionMode: 'testnet',
+      durationMinutes: 60,
+      sizeMultiplierCap: 0.5,
+    })
+    stopSandboxExperiment(started.experiment!.id, 'review complete')
+    const rearmed = rearmSandboxExperiment(started.experiment!.id)
+    expect(rearmed.changed).toBe(true)
+    expect(rearmed.experiment?.strategyIds).toEqual(['rsi_reversion'])
+    expect(rearmed.experiment?.id).not.toBe(started.experiment!.id)
+    expect(sandboxExperimentState().active).toHaveLength(1)
+  })
+
+  it('rollback is idempotent once already rolled back', async () => {
+    const { startSandboxExperiment, stopSandboxExperiment, rollbackSandboxExperiment } =
+      await import('./demo-trading-engine')
+    const started = startSandboxExperiment({
+      strategyIds: ['rsi_reversion'],
+      executionMode: 'testnet',
+      durationMinutes: 60,
+      sizeMultiplierCap: 0.5,
+    })
+    stopSandboxExperiment(started.experiment!.id, 'stopped')
+    const result = rollbackSandboxExperiment(started.experiment!.id, 'again')
+    expect(result.changed).toBe(false)
+    expect(result.message).toMatch(/already rolled back/)
+  })
+
+  it('never honours an experiment override in live mode even if persisted', async () => {
+    await setMode('testnet_execute')
+    const { startSandboxExperiment, runTradingCycle } =
+      await import('./demo-trading-engine')
+    startSandboxExperiment({
+      strategyIds: ['rsi_reversion'],
+      executionMode: 'testnet',
+      durationMinutes: 60,
+      sizeMultiplierCap: 0.5,
+    })
+    await armLiveMode()
+    await seedLiveReadyEvidence()
+    const placeOrder = vi.fn(async (order: any) => ({
+      symbol: order.symbol,
+      orderId: 1,
+      status: 'FILLED',
+      side: order.side,
+      type: order.type,
+      executedQty: 0.1,
+      cummulativeQuoteQty: order.quoteOrderQty ?? 10,
+      fills: [],
+      transactTime: Date.now(),
+      avgPrice: 100,
+    }))
+    const res = await runTradingCycle({
+      client: fakeClient({
+        environment: 'live',
+        host: 'api.binance.com',
+        placeOrder,
+      }) as never,
+      config: {
+        symbols: ['BTCUSDT'],
+        enabledStrategies: ['rsi_reversion'],
+        quotePerTrade: 40,
+      },
+    })
+    expect(res.ran).toBe(true)
+    // The experiment must have been force-rolled-back the moment live mode
+    // was observed, and its override must never gate a live-mode order.
+    const { sandboxExperimentState, strategyOverrideState } =
+      await import('./demo-trading-engine')
+    expect(
+      sandboxExperimentState().history.some(
+        (row) => row.status === 'rolled_back',
+      ),
+    ).toBe(true)
+    expect(
+      strategyOverrideState().active.some(
+        (override) => override.source === 'experiment',
+      ),
+    ).toBe(false)
+  })
+})
+
 describe('decisionQualityReport', () => {
   it('reports insufficient data before closed trades exist', async () => {
     const { decisionQualityReport } = await import('./demo-trading-engine')
@@ -1678,7 +2300,6 @@ describe('decisionQualityReport', () => {
         reason: 'test close',
         openedAt: closedAt(index),
         closedAt: closedAt(index + 1),
-        executionMode: 'paper',
       })),
     ] as any
     store.writeFinanceStore(db)
@@ -1729,7 +2350,6 @@ describe('decisionQualityReport', () => {
         reason: 'test close',
         openedAt: closedAt(index),
         closedAt: closedAt(index + 1),
-        executionMode: 'paper',
       })),
     ] as any
     store.writeFinanceStore(db)
@@ -1909,7 +2529,6 @@ describe('learning cycle', () => {
         reason: 'paper loss',
         openedAt: closedAt(index),
         closedAt: closedAt(index + 1),
-        executionMode: 'paper',
       })),
     ] as any
     store.writeFinanceStore(db)
@@ -2101,7 +2720,6 @@ describe('learning cycle', () => {
         reason: 'stable paper result',
         openedAt: closedAt(index),
         closedAt: closedAt(index + 1),
-        executionMode: 'paper',
       })),
     ] as any
     store.writeFinanceStore(db)
@@ -2119,5 +2737,200 @@ describe('learning cycle', () => {
     expect(nextDb.settings.tradingMode).toBe('paper_trade')
     expect(nextDb.settings.executionAccount).toBe('paper')
     expect(nextDb.settings.liveTradingEnabled).toBe(false)
+  })
+
+  it('summarizes recovery outcomes without counting open positions as recovered', async () => {
+    const { recoveryAnalytics } = await import('./demo-trading-engine')
+    const trades = [
+      {
+        id: 'win',
+        symbol: 'BTCUSDT',
+        strategyId: 'rsi_reversion',
+        entryPrice: 100,
+        exitPrice: 110,
+        quantity: 1,
+        entryQuote: 100,
+        exitQuote: 110,
+        pnlQuote: 10,
+        feesQuote: 0,
+        reason: 'take-profit',
+        openedAt: '2026-01-01T00:00:00.000Z',
+        closedAt: '2026-01-01T02:00:00.000Z',
+      },
+      {
+        id: 'forced',
+        symbol: 'ETHUSDT',
+        strategyId: 'sma_crossover',
+        entryPrice: 100,
+        exitPrice: 90,
+        quantity: 1,
+        entryQuote: 100,
+        exitQuote: 90,
+        pnlQuote: -10,
+        feesQuote: 0,
+        reason: 'force-closed-unsellable',
+        openedAt: '2026-01-02T00:00:00.000Z',
+        closedAt: '2026-01-02T01:00:00.000Z',
+      },
+    ]
+    const positions = [
+      {
+        id: 'open',
+        symbol: 'BTCUSDT',
+        strategyId: 'rsi_reversion',
+        entryPrice: 100,
+        quantity: 1,
+        entryQuote: 100,
+        entryFeeQuote: 0,
+        openedAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+      },
+    ]
+
+    const result = recoveryAnalytics(
+      positions,
+      trades,
+      {
+        clientAvailable: true,
+        balanceFetchOk: true,
+        quoteBalance: 1000,
+        deployedQuote: 100,
+        openUnrealizedPnlQuote: -5,
+        equityQuote: 995,
+        monitoring: [
+          {
+            symbol: 'BTCUSDT',
+            price: 95,
+            signal: 'HOLD',
+            net: 0,
+            held: true,
+            unrealizedPnlQuote: -5,
+          },
+        ],
+        asOfMs: Date.now(),
+      },
+      true,
+    )
+
+    expect(result.sample).toMatchObject({
+      closedTrades: 2,
+      openPositions: 1,
+      recoveredTrades: 1,
+      forcedCloseTrades: 1,
+    })
+    expect(result.closed.recoveryRate).toBe(0.5)
+    expect(result.closed.averageHoldMinutes).toBe(90)
+    expect(result.closed.realizedPnlQuote).toBe(0)
+    expect(result.open.underwaterCount).toBe(1)
+    expect(result.open.underwaterQuote).toBe(100)
+    expect(result.open.unrealizedPnlQuote).toBe(-5)
+  })
+})
+
+describe('strategyGuardReview', () => {
+  it('flags insufficient evidence when the window has too few trades', async () => {
+    const { strategyGuardReview } = await import('./demo-trading-engine')
+    const review = strategyGuardReview()
+    // Default config has an empty history — every enabled strategy should
+    // read as insufficient evidence, never a false trigger.
+    expect(review.length).toBeGreaterThan(0)
+    for (const entry of review) {
+      expect(entry.recommendation).toBe('insufficient_evidence')
+    }
+  })
+
+  it('recommends reduce_size_candidate once the recent window meets the guard trigger', async () => {
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    const now = Date.now()
+    db.settings.demoTrading = {
+      strategyGuardMinClosedTrades: 3,
+      strategyGuardLossRateThreshold: 0.4,
+      strategyGuardMaxPnlQuote: 0,
+      strategyGuardAction: 'reduce_size',
+      guardEvidenceWindowDays: 14,
+    } as never
+    db.strategy_results = [
+      ...Array.from({ length: 4 }, (_, i) => ({
+        kind: 'demo_trade_log',
+        id: `t${i}`,
+        symbol: 'BTCUSDT',
+        strategyId: 'sma_crossover',
+        entryPrice: 100,
+        exitPrice: 98,
+        quantity: 1,
+        entryQuote: 100,
+        exitQuote: 98,
+        pnlQuote: -2,
+        feesQuote: 0,
+        reason: 'stop-loss',
+        openedAt: new Date(now - (10 - i) * 60_000).toISOString(),
+        closedAt: new Date(now - (9 - i) * 60_000).toISOString(),
+        executionMode: 'testnet',
+      })),
+    ] as any
+    store.writeFinanceStore(db)
+
+    const { strategyGuardReview } = await import('./demo-trading-engine')
+    const review = strategyGuardReview()
+    const sma = review.find((r) => r.strategyId === 'sma_crossover')
+
+    expect(sma?.window.sufficientSample).toBe(true)
+    expect(sma?.recommendation).toBe('reduce_size_candidate')
+  })
+
+  it('recommends recovered once an active guard override no longer triggers', async () => {
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    const now = Date.now()
+    db.settings.demoTrading = {
+      strategyGuardMinClosedTrades: 3,
+      strategyGuardLossRateThreshold: 0.4,
+      strategyGuardMaxPnlQuote: 0,
+      strategyGuardAction: 'reduce_size',
+      guardEvidenceWindowDays: 14,
+      strategyOverrides: {
+        active: [
+          {
+            id: 'auto1',
+            strategyId: 'sma_crossover',
+            mode: 'reduce_size',
+            multiplier: 0.5,
+            reason: 'automatic guard',
+            createdAt: new Date(now).toISOString(),
+            updatedAt: new Date(now).toISOString(),
+            reviewAt: null,
+            expiresAt: null,
+            source: 'automatic',
+          },
+        ],
+        history: [],
+      },
+    } as never
+    db.strategy_results = [
+      ...Array.from({ length: 4 }, (_, i) => ({
+        kind: 'demo_trade_log',
+        id: `t${i}`,
+        symbol: 'BTCUSDT',
+        strategyId: 'sma_crossover',
+        entryPrice: 100,
+        exitPrice: 105,
+        quantity: 1,
+        entryQuote: 100,
+        exitQuote: 105,
+        pnlQuote: 5,
+        feesQuote: 0,
+        reason: 'take-profit',
+        openedAt: new Date(now - (10 - i) * 60_000).toISOString(),
+        closedAt: new Date(now - (9 - i) * 60_000).toISOString(),
+        executionMode: 'testnet',
+      })),
+    ] as any
+    store.writeFinanceStore(db)
+
+    const { strategyGuardReview } = await import('./demo-trading-engine')
+    const review = strategyGuardReview()
+    const sma = review.find((r) => r.strategyId === 'sma_crossover')
+
+    expect(sma?.recommendation).toBe('recovered')
   })
 })

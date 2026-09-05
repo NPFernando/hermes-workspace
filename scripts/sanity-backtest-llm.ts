@@ -34,18 +34,34 @@ function arg(name: string, fallback: string): string {
   return idx >= 0 && process.argv[idx + 1] ? process.argv[idx + 1] : fallback
 }
 
-function loadCache(symbol: string, interval: string, days: number): Array<Candle> {
-  const file = path.join(os.homedir(), '.hermes', 'finance', 'candles-cache', `${symbol}-${interval}.json`)
+function loadCache(
+  symbol: string,
+  interval: string,
+  days: number,
+): Array<Candle> {
+  const file = path.join(
+    os.homedir(),
+    '.hermes',
+    'finance',
+    'candles-cache',
+    `${symbol}-${interval}.json`,
+  )
   if (!fs.existsSync(file)) {
-    throw new Error(`no cached candles at ${file} — run scripts/backfill-candles.ts first`)
+    throw new Error(
+      `no cached candles at ${file} — run scripts/backfill-candles.ts first`,
+    )
   }
-  const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { candles: Array<Candle> }
+  const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+    candles: Array<Candle>
+  }
   const cutoff = Date.now() - days * 86_400_000
   return parsed.candles.filter((c) => c.openTime >= cutoff)
 }
 
 async function main() {
-  const symbols = arg('symbols', DEFAULT_LLM_SIGNAL_CONFIG.symbols.join(',')).split(',').map((s) => s.trim().toUpperCase())
+  const symbols = arg('symbols', DEFAULT_LLM_SIGNAL_CONFIG.symbols.join(','))
+    .split(',')
+    .map((s) => s.trim().toUpperCase())
   const days = Number(arg('days', '90'))
   const sampleCount = Number(arg('samples', '20'))
 
@@ -55,15 +71,24 @@ async function main() {
 
   const warmup = 50 // enough history for sma50/rsi14/atr14 to be meaningful
   if (minLength <= warmup + sampleCount) {
-    throw new Error(`not enough candle history for ${sampleCount} samples with ${warmup}-candle warmup`)
+    throw new Error(
+      `not enough candle history for ${sampleCount} samples with ${warmup}-candle warmup`,
+    )
   }
 
-  const routes = selectHarpRoutes(DEFAULT_LLM_SIGNAL_CONFIG.harpTask, DEFAULT_LLM_SIGNAL_CONFIG.harpRisk)
+  const routes = selectHarpRoutes(
+    DEFAULT_LLM_SIGNAL_CONFIG.harpTask,
+    DEFAULT_LLM_SIGNAL_CONFIG.harpRisk,
+  )
   if (routes.length === 0) {
-    console.log('🔴 No HARP OpenRouter route available — cannot run the sanity check.')
+    console.log(
+      '🔴 No HARP OpenRouter route available — cannot run the sanity check.',
+    )
     process.exit(1)
   }
-  console.log(`HARP fallback chain (${routes.length} candidates): ${routes.map((r) => r.model).join(' → ')}`)
+  console.log(
+    `HARP fallback chain (${routes.length} candidates): ${routes.map((r) => r.model).join(' → ')}`,
+  )
 
   const sampleIndices = Array.from({ length: sampleCount }, (_, i) =>
     Math.round(warmup + ((minLength - warmup - 1) * i) / (sampleCount - 1)),
@@ -71,12 +96,25 @@ async function main() {
 
   let validCount = 0
   let invalidCount = 0
-  const signalCounts: Record<string, number> = { BUY: 0, SELL: 0, HOLD: 0, invalid: 0 }
-  const samples: Array<{ index: number; at: string; signal: string; confidence: number | null; symbol: string | null }> = []
+  const signalCounts: Record<string, number> = {
+    BUY: 0,
+    SELL: 0,
+    HOLD: 0,
+    invalid: 0,
+  }
+  const samples: Array<{
+    index: number
+    at: string
+    signal: string
+    confidence: number | null
+    symbol: string | null
+  }> = []
 
   for (const idx of sampleIndices) {
     // No lookahead: only candles up to and including idx are visible.
-    const contexts = symbols.map((s) => buildContextSummary(s, candlesBySymbol[s].slice(0, idx + 1)))
+    const contexts = symbols.map((s) =>
+      buildContextSummary(s, candlesBySymbol[s].slice(0, idx + 1)),
+    )
     const prompt = buildPrompt(contexts, [])
     const callResult = await callWithFallback(routes, prompt)
     const raw = callResult?.content ?? null
@@ -85,14 +123,25 @@ async function main() {
     if (!raw) {
       invalidCount++
       signalCounts.invalid++
-      samples.push({ index: idx, at, signal: 'NO_RESPONSE', confidence: null, symbol: null })
+      samples.push({
+        index: idx,
+        at,
+        signal: 'NO_RESPONSE',
+        confidence: null,
+        symbol: null,
+      })
       console.log(`  [${at}] NO RESPONSE from model`)
       continue
     }
     const decision = parseLlmResponse(raw)
     let decidedSymbol: string | null = null
     try {
-      const parsedRaw = JSON.parse(raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '')) as { symbol?: string | null }
+      const parsedRaw = JSON.parse(
+        raw
+          .trim()
+          .replace(/^```(?:json)?/i, '')
+          .replace(/```$/, ''),
+      ) as { symbol?: string | null }
       decidedSymbol = parsedRaw.symbol ?? null
     } catch {
       /* leave null */
@@ -100,13 +149,25 @@ async function main() {
     if (!decision) {
       invalidCount++
       signalCounts.invalid++
-      samples.push({ index: idx, at, signal: 'UNPARSEABLE', confidence: null, symbol: null })
+      samples.push({
+        index: idx,
+        at,
+        signal: 'UNPARSEABLE',
+        confidence: null,
+        symbol: null,
+      })
       console.log(`  [${at}] UNPARSEABLE response: ${raw.slice(0, 120)}`)
       continue
     }
     validCount++
     signalCounts[decision.signal] = (signalCounts[decision.signal] ?? 0) + 1
-    samples.push({ index: idx, at, signal: decision.signal, confidence: decision.confidence, symbol: decidedSymbol })
+    samples.push({
+      index: idx,
+      at,
+      signal: decision.signal,
+      confidence: decision.confidence,
+      symbol: decidedSymbol,
+    })
     console.log(
       `  [${at}] ${decision.signal.padEnd(4)} ${decidedSymbol ?? '—'} conf=${decision.confidence.toFixed(2)} — ${decision.reasoning.slice(0, 80)}`,
     )

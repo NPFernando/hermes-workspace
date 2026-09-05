@@ -73,8 +73,7 @@ export const Route = createFileRoute('/api/session-history')({
               ok: false,
               messages: [],
               sessionKey: key,
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

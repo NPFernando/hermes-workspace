@@ -50,7 +50,9 @@ export function writeTradingStore(slice: TradingSlice): void {
   }
 }
 
-export function readTradingStore(): (TradingSlice & { schemaVersion: number; updatedAt: string }) | null {
+export function readTradingStore():
+  | (TradingSlice & { schemaVersion: number; updatedAt: string })
+  | null {
   try {
     const raw = fs.readFileSync(DATA_PATH, 'utf-8')
     return JSON.parse(raw)

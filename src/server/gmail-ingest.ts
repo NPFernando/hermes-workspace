@@ -25,7 +25,10 @@ import {
   writeFinanceStore,
 } from './finance-store'
 import { isPdfEncrypted, pdfToImages } from './document-normalizer'
-import { extractTransactionFromImage, extractTransactionFromText } from './finance-extraction'
+import {
+  extractTransactionFromImage,
+  extractTransactionFromText,
+} from './finance-extraction'
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me'
 
@@ -74,11 +77,21 @@ function findPlainTextBody(part: GmailMessagePart | undefined): string {
   return ''
 }
 
-function findAttachments(part: GmailMessagePart | undefined): Array<{ filename: string; attachmentId: string; mimeType: string }> {
+function findAttachments(
+  part: GmailMessagePart | undefined,
+): Array<{ filename: string; attachmentId: string; mimeType: string }> {
   if (!part) return []
-  const results: Array<{ filename: string; attachmentId: string; mimeType: string }> = []
+  const results: Array<{
+    filename: string
+    attachmentId: string
+    mimeType: string
+  }> = []
   if (part.filename && part.body?.attachmentId) {
-    results.push({ filename: part.filename, attachmentId: part.body.attachmentId, mimeType: part.mimeType ?? '' })
+    results.push({
+      filename: part.filename,
+      attachmentId: part.body.attachmentId,
+      mimeType: part.mimeType ?? '',
+    })
   }
   for (const child of part.parts ?? []) {
     results.push(...findAttachments(child))
@@ -98,19 +111,28 @@ async function downloadAttachment(
   filename: string,
   accessToken: string,
 ): Promise<string> {
-  const res = await gmailFetch(`${GMAIL_API}/messages/${messageId}/attachments/${attachmentId}`, accessToken)
+  const res = await gmailFetch(
+    `${GMAIL_API}/messages/${messageId}/attachments/${attachmentId}`,
+    accessToken,
+  )
   if (!res.ok) throw new Error(`Failed to download attachment: ${res.status}`)
   const data = (await res.json()) as { data: string }
   fs.mkdirSync(FINANCE_INGESTION_UPLOAD_DIR, { recursive: true, mode: 0o700 })
   const ext = path.extname(filename) || '.bin'
-  const savedPath = path.join(FINANCE_INGESTION_UPLOAD_DIR, `gmail-${messageId}-${randomUUID()}${ext}`)
+  const savedPath = path.join(
+    FINANCE_INGESTION_UPLOAD_DIR,
+    `gmail-${messageId}-${randomUUID()}${ext}`,
+  )
   fs.writeFileSync(savedPath, decodeBase64Url(data.data), { mode: 0o600 })
   return savedPath
 }
 
 function alreadyQueued(messageId: string): boolean {
   return listPendingIngestions().some(
-    (p) => p.source === 'gmail' && (p.sourceRef === `gmail:${messageId}` || p.sourceRef.includes(`gmail-${messageId}-`)),
+    (p) =>
+      p.source === 'gmail' &&
+      (p.sourceRef === `gmail:${messageId}` ||
+        p.sourceRef.includes(`gmail-${messageId}-`)),
   )
 }
 
@@ -124,13 +146,19 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
   const accessToken = await getGmailAccessToken()
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
-  const gmailIngest = (settings.gmailIngest && typeof settings.gmailIngest === 'object'
-    ? { ...(settings.gmailIngest as Record<string, unknown>) }
-    : {}) as Record<string, unknown>
-  const lastSyncedAtSeconds = typeof gmailIngest.lastSyncedAtSeconds === 'number' ? gmailIngest.lastSyncedAtSeconds : 0
+  const gmailIngest = (
+    settings.gmailIngest && typeof settings.gmailIngest === 'object'
+      ? { ...(settings.gmailIngest as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>
+  const lastSyncedAtSeconds =
+    typeof gmailIngest.lastSyncedAtSeconds === 'number'
+      ? gmailIngest.lastSyncedAtSeconds
+      : 0
 
   // First sync ever: only look back 14 days, not the whole mailbox.
-  const afterSeconds = lastSyncedAtSeconds || Math.floor(Date.now() / 1000) - 14 * 24 * 60 * 60
+  const afterSeconds =
+    lastSyncedAtSeconds || Math.floor(Date.now() / 1000) - 14 * 24 * 60 * 60
   const query = `${SEARCH_QUERY} after:${afterSeconds}`
 
   const listRes = await gmailFetch(
@@ -138,7 +166,9 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
     accessToken,
   )
   if (!listRes.ok) throw new Error(`Gmail list failed: ${listRes.status}`)
-  const listData = (await listRes.json()) as { messages?: Array<{ id: string }> }
+  const listData = (await listRes.json()) as {
+    messages?: Array<{ id: string }>
+  }
   const messageIds = (listData.messages ?? []).map((m) => m.id)
 
   let queued = 0
@@ -151,17 +181,24 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
       continue
     }
 
-    const msgRes = await gmailFetch(`${GMAIL_API}/messages/${messageId}?format=full`, accessToken)
+    const msgRes = await gmailFetch(
+      `${GMAIL_API}/messages/${messageId}?format=full`,
+      accessToken,
+    )
     if (!msgRes.ok) continue
     const message = (await msgRes.json()) as GmailMessage
     const bodyText = findPlainTextBody(message.payload)
     const attachments = findAttachments(message.payload).filter(
-      (a) => a.mimeType === 'application/pdf' || a.mimeType.startsWith('image/'),
+      (a) =>
+        a.mimeType === 'application/pdf' || a.mimeType.startsWith('image/'),
     )
 
     if (attachments.length === 0) {
       if (!bodyText.trim()) continue
-      const extraction = await extractTransactionFromText(bodyText, categoryHints)
+      const extraction = await extractTransactionFromText(
+        bodyText,
+        categoryHints,
+      )
       if (!extraction.ok) continue // no clear transaction in this email — skip rather than queue noise
       addPendingIngestion({
         source: 'gmail',
@@ -175,7 +212,12 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
 
     // One attachment per email is the common case (bill/receipt PDF); handle the first one.
     const attachment = attachments[0]
-    const savedPath = await downloadAttachment(messageId, attachment.attachmentId, attachment.filename, accessToken)
+    const savedPath = await downloadAttachment(
+      messageId,
+      attachment.attachmentId,
+      attachment.filename,
+      accessToken,
+    )
 
     const isPdf = savedPath.toLowerCase().endsWith('.pdf')
     if (isPdf && isPdfEncrypted(savedPath)) {
@@ -205,7 +247,10 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
       previewImagePath = normalized.imagePaths[0]
     }
 
-    const extraction = await extractTransactionFromImage(previewImagePath, categoryHints)
+    const extraction = await extractTransactionFromImage(
+      previewImagePath,
+      categoryHints,
+    )
     addPendingIngestion({
       source: 'gmail',
       sourceRef: savedPath,
@@ -221,7 +266,9 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
   gmailIngest.lastSyncedAtSeconds = now
   // AI-506: capped recent-activity list, not a full audit trail — the
   // unbounded gmail_sync_run audit-log entries already cover that.
-  const priorHistory = Array.isArray(gmailIngest.syncHistory) ? gmailIngest.syncHistory : []
+  const priorHistory = Array.isArray(gmailIngest.syncHistory)
+    ? gmailIngest.syncHistory
+    : []
   gmailIngest.syncHistory = [
     ...priorHistory,
     { at: now, found: messageIds.length, queued, skippedAlreadyQueued },

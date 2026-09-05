@@ -12,15 +12,22 @@ import { isAuthenticated } from '../../server/auth-middleware'
 // Logs live at ~/.hermes/logs/exec-{task_id_prefix}-{timestamp}.log
 // ---------------------------------------------------------------------------
 
-const HERMES_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
-const LOGS_DIR    = path.join(HERMES_HOME, 'logs')
+const HERMES_HOME =
+  process.env.HERMES_HOME ??
+  process.env.CLAUDE_HOME ??
+  path.join(os.homedir(), '.hermes')
+const LOGS_DIR = path.join(HERMES_HOME, 'logs')
 
 function findLatestLog(taskId: string): string | null {
   const prefix = `exec-${taskId.slice(0, 8)}-`
   try {
-    const files = fs.readdirSync(LOGS_DIR)
+    const files = fs
+      .readdirSync(LOGS_DIR)
       .filter((f) => f.startsWith(prefix) && f.endsWith('.log'))
-      .map((f) => ({ name: f, mtime: fs.statSync(path.join(LOGS_DIR, f)).mtimeMs }))
+      .map((f) => ({
+        name: f,
+        mtime: fs.statSync(path.join(LOGS_DIR, f)).mtimeMs,
+      }))
       .sort((a, b) => b.mtime - a.mtime)
     return files[0] ? path.join(LOGS_DIR, files[0].name) : null
   } catch {
@@ -47,10 +54,16 @@ export const Route = createFileRoute('/api/tasks-exec-log')({
         }
         const url = new URL(request.url)
         const taskId = url.searchParams.get('task_id')?.trim()
-        const lines  = Math.min(parseInt(url.searchParams.get('lines') ?? '40', 10), 200)
+        const lines = Math.min(
+          parseInt(url.searchParams.get('lines') ?? '40', 10),
+          200,
+        )
 
         if (!taskId) {
-          return json({ ok: false, error: 'task_id is required' }, { status: 400 })
+          return json(
+            { ok: false, error: 'task_id is required' },
+            { status: 400 },
+          )
         }
 
         const logFile = findLatestLog(taskId)
@@ -59,7 +72,7 @@ export const Route = createFileRoute('/api/tasks-exec-log')({
         }
 
         const stat = fs.statSync(logFile)
-        const log  = tailLines(logFile, lines)
+        const log = tailLines(logFile, lines)
         return json({
           ok: true,
           found: true,

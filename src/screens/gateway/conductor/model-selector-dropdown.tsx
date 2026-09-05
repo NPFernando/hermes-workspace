@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AvailableModel } from './shared'
 import { cn } from '@/lib/utils'
 
-export function getModelDisplayName(model: AvailableModel | undefined, modelId: string | null | undefined): string {
+export function getModelDisplayName(
+  model: AvailableModel | undefined,
+  modelId: string | null | undefined,
+): string {
   if (!modelId) return 'Default (auto)'
   return model?.name?.trim() || model?.id?.trim() || modelId
 }
@@ -36,7 +39,11 @@ export function groupModelsByProvider(models: Array<AvailableModel>) {
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([provider, providerModels]) => ({
       provider,
-      models: [...providerModels].sort((a, b) => getModelDisplayName(a, a.id).localeCompare(getModelDisplayName(b, b.id))),
+      models: [...providerModels].sort((a, b) =>
+        getModelDisplayName(a, a.id).localeCompare(
+          getModelDisplayName(b, b.id),
+        ),
+      ),
     }))
 }
 
@@ -54,7 +61,9 @@ export function getDirectoryPathSegments(pathValue: string): Array<string> {
   return normalized.split('/').filter(Boolean)
 }
 
-export function buildDirectoryPathFromSegments(segments: Array<string>): string {
+export function buildDirectoryPathFromSegments(
+  segments: Array<string>,
+): string {
   if (segments.length === 0) return '~'
   if (segments[0] === '~') {
     return segments.length === 1 ? '~' : `~/${segments.slice(1).join('/')}`
@@ -109,7 +118,9 @@ export function ModelSelectorDropdown({
 
   return (
     <div className="space-y-2">
-      <span className="text-sm font-medium text-[var(--theme-text)]">{label}</span>
+      <span className="text-sm font-medium text-[var(--theme-text)]">
+        {label}
+      </span>
       <div className="relative" ref={containerRef}>
         <button
           type="button"
@@ -119,7 +130,9 @@ export function ModelSelectorDropdown({
           }}
           className={cn(
             'inline-flex min-h-[3rem] w-full items-center justify-between gap-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 text-left text-sm text-[var(--theme-text)] shadow-[0_8px_24px_color-mix(in_srgb,var(--theme-shadow)_18%,transparent)] transition-colors',
-            disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-[var(--theme-accent)] focus:border-[var(--theme-accent)]',
+            disabled
+              ? 'cursor-not-allowed opacity-60'
+              : 'hover:border-[var(--theme-accent)] focus:border-[var(--theme-accent)]',
           )}
           aria-haspopup="listbox"
           aria-expanded={open}
@@ -127,11 +140,28 @@ export function ModelSelectorDropdown({
         >
           <span className="inline-flex min-w-0 items-center gap-2">
             <span className="inline-flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-3 py-1 text-xs font-medium text-[var(--theme-text)]">
-              <span className={cn('size-2 rounded-full', value ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-border2)]')} />
-              <span className="truncate">{getModelDisplayName(selectedModel, value)}</span>
+              <span
+                className={cn(
+                  'size-2 rounded-full',
+                  value
+                    ? 'bg-[var(--theme-accent)]'
+                    : 'bg-[var(--theme-border2)]',
+                )}
+              />
+              <span className="truncate">
+                {getModelDisplayName(selectedModel, value)}
+              </span>
             </span>
           </span>
-          <HugeiconsIcon icon={ArrowDown01Icon} size={16} strokeWidth={1.8} className={cn('shrink-0 text-[var(--theme-muted)] transition-transform', open && 'rotate-180')} />
+          <HugeiconsIcon
+            icon={ArrowDown01Icon}
+            size={16}
+            strokeWidth={1.8}
+            className={cn(
+              'shrink-0 text-[var(--theme-muted)] transition-transform',
+              open && 'rotate-180',
+            )}
+          />
         </button>
 
         {open ? (
@@ -145,19 +175,32 @@ export function ModelSelectorDropdown({
                 }}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
-                  !value ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-text)]' : 'text-[var(--theme-text)] hover:bg-[var(--theme-bg)]',
+                  !value
+                    ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-text)]'
+                    : 'text-[var(--theme-text)] hover:bg-[var(--theme-bg)]',
                 )}
                 role="option"
                 aria-selected={!value}
               >
-                <span className={cn('size-2 rounded-full', !value ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-border2)]')} />
+                <span
+                  className={cn(
+                    'size-2 rounded-full',
+                    !value
+                      ? 'bg-[var(--theme-accent)]'
+                      : 'bg-[var(--theme-border2)]',
+                  )}
+                />
                 <span className="min-w-0 flex-1 truncate">Default (auto)</span>
-                <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">Auto</span>
+                <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+                  Auto
+                </span>
               </button>
 
               {groupedModels.map((group) => (
                 <div key={group.provider} className="mt-2 first:mt-3">
-                  <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">{group.provider}</div>
+                  <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+                    {group.provider}
+                  </div>
                   <div className="space-y-1">
                     {group.models.map((model) => {
                       const modelId = model.id ?? ''
@@ -172,13 +215,24 @@ export function ModelSelectorDropdown({
                           }}
                           className={cn(
                             'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
-                            active ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-text)]' : 'text-[var(--theme-text)] hover:bg-[var(--theme-bg)]',
+                            active
+                              ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-text)]'
+                              : 'text-[var(--theme-text)] hover:bg-[var(--theme-bg)]',
                           )}
                           role="option"
                           aria-selected={active}
                         >
-                          <span className={cn('size-2 rounded-full', active ? 'bg-[var(--theme-accent)]' : 'bg-[var(--theme-border2)]')} />
-                          <span className="min-w-0 flex-1 truncate">{getModelDisplayName(model, modelId)}</span>
+                          <span
+                            className={cn(
+                              'size-2 rounded-full',
+                              active
+                                ? 'bg-[var(--theme-accent)]'
+                                : 'bg-[var(--theme-border2)]',
+                            )}
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {getModelDisplayName(model, modelId)}
+                          </span>
                           <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card2)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
                             {group.provider}
                           </span>
@@ -195,4 +249,3 @@ export function ModelSelectorDropdown({
     </div>
   )
 }
-

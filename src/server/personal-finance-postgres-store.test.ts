@@ -3,17 +3,33 @@ import { snakeRowToCamel } from './personal-finance-postgres-store'
 
 describe('snakeRowToCamel', () => {
   it('converts snake_case column names to camelCase', () => {
-    expect(snakeRowToCamel({ converted_lkr_amount: 5000 })).toEqual({ convertedLkrAmount: 5000 })
-    expect(snakeRowToCamel({ tax_deductible_possible: true })).toEqual({ taxDeductiblePossible: true })
-    expect(snakeRowToCamel({ expected_payday_day_of_month: 5 })).toEqual({ expectedPaydayDayOfMonth: 5 })
+    expect(snakeRowToCamel({ converted_lkr_amount: 5000 })).toEqual({
+      convertedLkrAmount: 5000,
+    })
+    expect(snakeRowToCamel({ tax_deductible_possible: true })).toEqual({
+      taxDeductiblePossible: true,
+    })
+    expect(snakeRowToCamel({ expected_payday_day_of_month: 5 })).toEqual({
+      expectedPaydayDayOfMonth: 5,
+    })
   })
 
   it('leaves single-word and already-camelCase keys unchanged', () => {
-    expect(snakeRowToCamel({ id: 'x', name: 'y' })).toEqual({ id: 'x', name: 'y' })
+    expect(snakeRowToCamel({ id: 'x', name: 'y' })).toEqual({
+      id: 'x',
+      name: 'y',
+    })
   })
 
   it('passes through null, number, string, and boolean values untouched', () => {
-    expect(snakeRowToCamel({ notes: null, amount: 100.5, currency: 'LKR', recurring: false })).toEqual({
+    expect(
+      snakeRowToCamel({
+        notes: null,
+        amount: 100.5,
+        currency: 'LKR',
+        recurring: false,
+      }),
+    ).toEqual({
       notes: null,
       amount: 100.5,
       currency: 'LKR',

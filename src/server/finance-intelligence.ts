@@ -125,14 +125,18 @@ function currentFearGreed(
  */
 export function buildCompositeSentiment(input: {
   symbol: string
-  items: Array<NewsItem>
+  items?: Array<NewsItem>
   sentimentScores?: Array<SentimentScore>
   now: Date
 }): CompositeIntelligence {
   const symbol = input.symbol.trim().toUpperCase()
   const nowMs = input.now.getTime()
+  const items = Array.isArray(input.items) ? input.items : []
+  const sentimentScores = Array.isArray(input.sentimentScores)
+    ? input.sentimentScores
+    : []
   const unique = new Map<string, NewsItem>()
-  for (const item of input.items) {
+  for (const item of items) {
     if (item.relatedSymbol === symbol && !unique.has(item.id))
       unique.set(item.id, item)
   }
@@ -171,7 +175,7 @@ export function buildCompositeSentiment(input: {
   const disagreement = hasPositive && hasNegative
   if (disagreement) blockers.push('conflicting headline evidence')
 
-  const fg = currentFearGreed(input.sentimentScores ?? [], symbol, nowMs)
+  const fg = currentFearGreed(sentimentScores, symbol, nowMs)
   if (fg) sourceIds.push(fg.id)
   const fgScore = fg ? bounded((50 - fg.score) * 2, -100, 100) : null
   const score =

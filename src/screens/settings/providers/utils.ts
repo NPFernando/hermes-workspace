@@ -48,7 +48,6 @@ export function stripProviderPrefix(model: string): string {
   return model
 }
 
-
 export function formatStringList(value: unknown): string {
   if (!Array.isArray(value)) return ''
   return value
@@ -161,7 +160,10 @@ export function getDraftValue(
   return defaultFormatValue(setting, rawValue)
 }
 
-export function parseTextValue(setting: SettingDefinition, rawValue: string): unknown {
+export function parseTextValue(
+  setting: SettingDefinition,
+  rawValue: string,
+): unknown {
   if (setting.parser) return setting.parser(rawValue)
   return rawValue.trim()
 }
@@ -232,8 +234,9 @@ export function searchMatchesSetting(
   return haystack.includes(query)
 }
 
-
-export function readRecord(value: unknown): Record<string, unknown> | undefined {
+export function readRecord(
+  value: unknown,
+): Record<string, unknown> | undefined {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined
@@ -389,7 +392,6 @@ export async function fetchModels(): Promise<{
   }
 }
 
-
 export const SETTINGS: Array<SettingDefinition> = [
   {
     id: 'primary-model',
@@ -485,5 +487,3 @@ export const SETTINGS: Array<SettingDefinition> = [
     step: 5,
   },
 ]
-
-

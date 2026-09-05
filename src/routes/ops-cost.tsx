@@ -15,7 +15,9 @@ export const Route = createFileRoute('/ops-cost')({
           Failed to Load Cost &amp; Routing
         </h2>
         <p className="text-sm text-[var(--theme-muted)] mb-4 max-w-md">
-          {error instanceof Error ? error.message : 'An unexpected error occurred'}
+          {error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred'}
         </p>
         <button
           onClick={() => window.location.reload()}
@@ -31,7 +33,9 @@ export const Route = createFileRoute('/ops-cost')({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="spinner-accent spinner-xl mb-3" />
-          <p className="text-sm text-[var(--theme-muted)]">Loading cost &amp; routing…</p>
+          <p className="text-sm text-[var(--theme-muted)]">
+            Loading cost &amp; routing…
+          </p>
         </div>
       </div>
     )

@@ -10,9 +10,14 @@ import {
   Wifi01Icon,
   WifiOffIcon,
 } from '@hugeicons/core-free-icons'
-import type { CrewMember, CrewOnlineStatus } from '@/hooks/use-crew-status'
+import type {CrewMember, CrewOnlineStatus} from '@/hooks/use-crew-status';
 import { cn } from '@/lib/utils'
-import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
+import {
+  
+  
+  getOnlineStatus,
+  useCrewStatus
+} from '@/hooks/use-crew-status'
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -61,16 +66,16 @@ function StatusDot({ status }: { status: CrewOnlineStatus }) {
       <span
         className={cn(
           'inline-block size-2 rounded-full',
-          status === 'online' && 'bg-[var(--theme-success)] ring-pulse',
-          status === 'offline' && 'bg-[var(--theme-danger)]',
+          status === 'online'  && 'bg-emerald-400 ring-pulse',
+          status === 'offline' && 'bg-red-500',
           status === 'unknown' && 'bg-[var(--theme-muted)]',
         )}
       />
       <span
         className={cn(
           'text-[10px] font-semibold uppercase tracking-widest',
-          status === 'online' && 'text-[var(--theme-success)]',
-          status === 'offline' && 'text-[var(--theme-danger)]',
+          status === 'online'  && 'text-green-400',
+          status === 'offline' && 'text-red-400',
           status === 'unknown' && 'text-[var(--theme-muted)]',
         )}
       >
@@ -93,11 +98,8 @@ function SkeletonCard() {
         <div className="h-7 bg-[var(--theme-hover)] rounded w-28 mb-1" />
         <div className="h-3 bg-[var(--theme-hover)] rounded w-36 mb-4" />
         <div className="grid grid-cols-3 gap-2 mb-3">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="rounded border border-[var(--theme-border)] bg-[var(--theme-hover)] h-14"
-            />
+          {[0,1,2].map(i => (
+            <div key={i} className="rounded border border-[var(--theme-border)] bg-[var(--theme-hover)] h-14" />
           ))}
         </div>
         <div className="flex justify-between">
@@ -117,11 +119,9 @@ function AgentCard({ member }: { member: CrewMember }) {
   const telegramPlatform = member.platforms.telegram
 
   const borderColor =
-    status === 'online'
-      ? '#B87333'
-      : status === 'offline'
-        ? '#ef4444'
-        : '#6b7280'
+    status === 'online'  ? '#B87333' :
+    status === 'offline' ? '#ef4444' :
+    '#6b7280'
 
   const handleViewTasks = () => {
     void navigate({ to: '/tasks', search: { assignee: member.id } })
@@ -152,7 +152,7 @@ function AgentCard({ member }: { member: CrewMember }) {
         </div>
         {/* Agent name + model */}
         <div>
-          <h3 className="text-xl font-bold tracking-tight text-[var(--theme-warning)]">
+          <h3 className="text-xl font-bold tracking-tight text-amber-500">
             {member.displayName || member.id}
           </h3>
           <p className="text-xs text-[var(--theme-muted)] mt-0.5">
@@ -161,16 +161,10 @@ function AgentCard({ member }: { member: CrewMember }) {
           {telegramPlatform && (
             <div className="flex items-center gap-1 mt-1">
               <HugeiconsIcon
-                icon={
-                  telegramPlatform.state === 'connected'
-                    ? Wifi01Icon
-                    : WifiOffIcon
-                }
+                icon={telegramPlatform.state === 'connected' ? Wifi01Icon : WifiOffIcon}
                 size={10}
                 className={cn(
-                  telegramPlatform.state === 'connected'
-                    ? 'text-green-400'
-                    : 'text-[var(--theme-muted)]',
+                  telegramPlatform.state === 'connected' ? 'text-green-400' : 'text-[var(--theme-muted)]',
                 )}
               />
               <span className="text-[10px] text-[var(--theme-muted)]">
@@ -183,10 +177,7 @@ function AgentCard({ member }: { member: CrewMember }) {
         {/* Last active */}
         <div>
           <p className="text-[11px] text-[var(--theme-muted)]">
-            Last active:{' '}
-            <span className="text-[var(--theme-text)]">
-              {formatRelativeTime(member.lastSessionAt)}
-            </span>
+            Last active: <span className="text-[var(--theme-text)]">{formatRelativeTime(member.lastSessionAt)}</span>
           </p>
           {member.lastSessionTitle && (
             <p className="text-[11px] text-[var(--theme-muted)] italic truncate mt-0.5">
@@ -200,16 +191,14 @@ function AgentCard({ member }: { member: CrewMember }) {
           {[
             { label: 'Sessions', value: formatNumber(member.sessionCount) },
             { label: 'Messages', value: formatNumber(member.messageCount) },
-            { label: 'Tools', value: formatNumber(member.toolCallCount) },
+            { label: 'Tools',    value: formatNumber(member.toolCallCount) },
           ].map(({ label, value }) => (
             <div
               key={label}
               className="rounded border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-2 text-center"
             >
-              <div className="text-sm font-bold text-[var(--theme-warning)]">{value}</div>
-              <div className="text-[9px] text-[var(--theme-muted)] uppercase tracking-widest mt-0.5">
-                {label}
-              </div>
+              <div className="text-sm font-bold text-amber-500">{value}</div>
+              <div className="text-[9px] text-[var(--theme-muted)] uppercase tracking-widest mt-0.5">{label}</div>
             </div>
           ))}
         </div>
@@ -217,32 +206,20 @@ function AgentCard({ member }: { member: CrewMember }) {
         {/* Tokens + cost */}
         <div className="flex justify-between text-[11px]">
           <span className="text-[var(--theme-muted)]">
-            Tokens:{' '}
-            <span className="text-[var(--theme-text)]">
-              {formatTokens(member.totalTokens)}
-            </span>
+            Tokens: <span className="text-[var(--theme-text)]">{formatTokens(member.totalTokens)}</span>
           </span>
           <span className="text-[var(--theme-muted)]">
-            Est. cost:{' '}
-            <span className="text-[var(--theme-text)]">
-              {formatCost(member.estimatedCostUsd)}
-            </span>
+            Est. cost: <span className="text-[var(--theme-text)]">{formatCost(member.estimatedCostUsd)}</span>
           </span>
         </div>
 
         {/* Cron + tasks */}
         <div className="flex justify-between text-[11px]">
           <span className="text-[var(--theme-muted)]">
-            Crons:{' '}
-            <span className="text-[var(--theme-text)]">
-              {member.cronJobCount}
-            </span>
+            Crons: <span className="text-[var(--theme-text)]">{member.cronJobCount}</span>
           </span>
           <span className="text-[var(--theme-muted)]">
-            Tasks:{' '}
-            <span className="text-[var(--theme-text)]">
-              {member.assignedTaskCount} assigned
-            </span>
+            Tasks: <span className="text-[var(--theme-text)]">{member.assignedTaskCount} assigned</span>
           </span>
         </div>
 
@@ -307,54 +284,36 @@ export function CrewScreen() {
     return (a.displayName || a.id).localeCompare(b.displayName || b.id)
   })
 
-  const onlineCount = displayCrew.filter(
-    (m) => getOnlineStatus(m) === 'online',
-  ).length
-  const assignedTaskCount = displayCrew.reduce(
-    (sum, member) => sum + member.assignedTaskCount,
-    0,
-  )
-  const runningCronCount = displayCrew.reduce(
-    (sum, member) => sum + member.cronJobCount,
-    0,
-  )
+  const onlineCount = displayCrew.filter(m => getOnlineStatus(m) === 'online').length
+  const assignedTaskCount = displayCrew.reduce((sum, member) => sum + member.assignedTaskCount, 0)
+  const runningCronCount = displayCrew.reduce((sum, member) => sum + member.cronJobCount, 0)
 
   const handleRefresh = useCallback(() => {
     void refetch()
   }, [refetch])
 
   return (
-    <div
-      data-route-page
-      className="flex h-full flex-col gap-6 overflow-auto p-4 md:p-6"
-    >
+    <div data-route-page className="flex h-full flex-col gap-6 overflow-auto p-4 md:p-6">
       {/* ── Header ── */}
       <div className="space-y-4">
-        <div
-          className="h-px"
-          style={{
-            background: 'linear-gradient(to right, #B87333, transparent)',
-          }}
-        />
+        <div className="h-px" style={{ background: 'linear-gradient(to right, #B87333, transparent)' }} />
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="max-w-3xl space-y-2">
             <div>
-              <h1 className="text-2xl font-bold tracking-[0.18em] uppercase text-[var(--theme-warning)]">
+              <h1
+                className="text-2xl font-bold tracking-[0.18em] uppercase text-amber-500"
+              >
                 Crew Status
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--theme-muted)]">
-                Live agent health across profiles, recent session activity,
-                assigned tasks, and cron coverage.
+                Live agent health across profiles, recent session activity, assigned tasks, and cron coverage.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.18em]">
               <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1 text-[var(--theme-muted)]">
-                <span className="text-[var(--theme-text)]">
-                  {displayCrew.length}
-                </span>{' '}
-                crew
+                <span className="text-[var(--theme-text)]">{displayCrew.length}</span> crew
               </span>
-              <span className="rounded-full border border-[color-mix(in_srgb,var(--theme-success)_20%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] px-3 py-1 text-[var(--theme-success)]">
+              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-emerald-300">
                 {onlineCount} online
               </span>
               <span className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1 text-[var(--theme-muted)]">
@@ -388,22 +347,17 @@ export function CrewScreen() {
             Refresh manifest
           </button>
         </div>
-        <div
-          className="h-px"
-          style={{
-            background: 'linear-gradient(to right, #B87333, transparent)',
-          }}
-        />
+        <div className="h-px" style={{ background: 'linear-gradient(to right, #B87333, transparent)' }} />
       </div>
 
       {/* ── Error state ── */}
       {isError && !isLoading && (
-        <div className="rounded-lg border border-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] p-4 text-sm text-[var(--theme-danger)]">
+        <div className="rounded-lg border border-red-800/40 bg-red-900/10 p-4 text-sm text-red-400">
           Failed to load crew status.{' '}
           <button
             type="button"
             onClick={handleRefresh}
-            className="underline hover:text-[var(--theme-danger)]"
+            className="underline hover:text-red-300"
           >
             Retry
           </button>
@@ -414,9 +368,8 @@ export function CrewScreen() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {isLoading
           ? Array.from({ length: 5 }, (_, i) => <SkeletonCard key={i} />)
-          : displayCrew.map((member) => (
-              <AgentCard key={member.id} member={member} />
-            ))}
+          : displayCrew.map(member => <AgentCard key={member.id} member={member} />)
+        }
       </div>
     </div>
   )

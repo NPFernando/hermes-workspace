@@ -12,7 +12,9 @@ import { safeErrorMessage } from './rate-limit'
 function candidatePaths(): Array<string> {
   const home = os.homedir()
   const hermesHome =
-    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(home, '.hermes')
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(home, '.hermes')
   const openClawHome = process.env.OPENCLAW_HOME ?? path.join(home, '.openclaw')
 
   return [
@@ -36,8 +38,12 @@ function resolveHarpConfigPath(): string {
   }
   // Default write location when creating a fresh config
   const hermesHome =
-    process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
-  return process.env.HARP_CONFIG_PATH ?? path.join(hermesHome, 'harp-config.yaml')
+    process.env.HERMES_HOME ??
+    process.env.CLAUDE_HOME ??
+    path.join(os.homedir(), '.hermes')
+  return (
+    process.env.HARP_CONFIG_PATH ?? path.join(hermesHome, 'harp-config.yaml')
+  )
 }
 
 function getHarpCandidatePaths(): Array<string> {
@@ -58,7 +64,12 @@ export type HarpTierModel = {
 }
 
 export type HarpTier = {
-  key: 'tier1_free' | 'tier2_paid' | 'tier3_codex' | 'tier4_gemini' | 'tier5_local'
+  key:
+    | 'tier1_free'
+    | 'tier2_paid'
+    | 'tier3_codex'
+    | 'tier4_gemini'
+    | 'tier5_local'
   label: string
   provider: string
   trigger: unknown
@@ -98,11 +109,37 @@ export type HarpConfig = {
   routing: {
     strategy: string
     free_first: boolean
-    tier1_free: { provider: string; trigger: unknown; models: Array<HarpTierModel> }
-    tier2_paid: { provider: string; trigger: unknown; models: Array<HarpTierModel> }
-    tier3_codex?: { provider: string; trigger: unknown; models: Array<HarpTierModel>; auth_check?: string; setup_instructions?: string }
-    tier4_gemini?: { provider: string; trigger: unknown; models: Array<HarpTierModel>; base_url?: string; key_env?: string; setup_instructions?: string }
-    tier5_local?: { provider: string; trigger: unknown; model?: string; base_url?: string }
+    tier1_free: {
+      provider: string
+      trigger: unknown
+      models: Array<HarpTierModel>
+    }
+    tier2_paid: {
+      provider: string
+      trigger: unknown
+      models: Array<HarpTierModel>
+    }
+    tier3_codex?: {
+      provider: string
+      trigger: unknown
+      models: Array<HarpTierModel>
+      auth_check?: string
+      setup_instructions?: string
+    }
+    tier4_gemini?: {
+      provider: string
+      trigger: unknown
+      models: Array<HarpTierModel>
+      base_url?: string
+      key_env?: string
+      setup_instructions?: string
+    }
+    tier5_local?: {
+      provider: string
+      trigger: unknown
+      model?: string
+      base_url?: string
+    }
   }
   routing_blocklist: Array<HarpBlocklistEntry>
   auto_improve: HarpAutoImprove
@@ -208,9 +245,9 @@ export function applyHarpPatch(patch: HarpPatch): HarpPatchResult {
       }
 
       case 'remove-tier-model': {
-        config.routing[patch.tier].models = config.routing[patch.tier].models.filter(
-          (m) => m.model !== patch.modelId,
-        )
+        config.routing[patch.tier].models = config.routing[
+          patch.tier
+        ].models.filter((m) => m.model !== patch.modelId)
         break
       }
 
@@ -252,7 +289,8 @@ export function applyHarpPatch(patch: HarpPatch): HarpPatchResult {
 
 export function createStarterHarpConfig(): HarpPatchResult {
   const configPath = resolveHarpConfigPath()
-  if (fs.existsSync(configPath)) return { ok: false, error: 'Config already exists' }
+  if (fs.existsSync(configPath))
+    return { ok: false, error: 'Config already exists' }
   const starter: HarpConfig = {
     harp_vm: {
       enabled: true,
@@ -278,7 +316,11 @@ export function createStarterHarpConfig(): HarpPatchResult {
         provider: 'openrouter',
         trigger: ['tier1_exhausted', 'tier1_unavailable'],
         models: [
-          { model: 'deepseek/deepseek-v4-pro', provider: 'openrouter', role: 'primary' },
+          {
+            model: 'deepseek/deepseek-v4-pro',
+            provider: 'openrouter',
+            role: 'primary',
+          },
         ],
       },
     },
@@ -356,7 +398,11 @@ const TIER_META: Record<string, { label: string }> = {
   tier5_local: { label: 'Tier 5 — Local Ollama' },
 }
 
-function runTextCommand(command: string, args: Array<string>, timeout = 8_000): string {
+function runTextCommand(
+  command: string,
+  args: Array<string>,
+  timeout = 8_000,
+): string {
   try {
     return execFileSync(command, args, {
       encoding: 'utf8',
@@ -370,7 +416,12 @@ function runTextCommand(command: string, args: Array<string>, timeout = 8_000): 
 }
 
 function getOpenRouterCreditsSummary(): string {
-  const script = path.join(os.homedir(), '.hermes', 'scripts', 'openrouter_credits_check.sh')
+  const script = path.join(
+    os.homedir(),
+    '.hermes',
+    'scripts',
+    'openrouter_credits_check.sh',
+  )
   if (!fs.existsSync(script)) return 'OpenRouter credit checker not found'
   return runTextCommand(script, [], 10_000)
     .replace(/(sk-or-v1-)[A-Za-z0-9_-]+/g, '$1[REDACTED]')
@@ -424,27 +475,56 @@ print(json.dumps({"source": source, "rows": rows}, default=str))
       timeout: 8_000,
       maxBuffer: 128 * 1024,
     })
-    const parsed = JSON.parse(raw) as { source?: unknown; rows?: Array<Record<string, unknown>> }
+    const parsed = JSON.parse(raw) as {
+      source?: unknown
+      rows?: Array<Record<string, unknown>>
+    }
     const source = String(parsed.source ?? 'none')
     const rows = parsed.rows ?? []
-    return { source, cooldowns: rows.map((row) => ({
-      modelId: String(row.model_id ?? ''),
-      attempts: Number(row.attempts ?? 0),
-      successes: Number(row.successes ?? 0),
-      failures: Number(row.failures ?? 0),
-      rateLimitCount: Number(row.rate_limit_count ?? 0),
-      cooldownUntil: typeof row.cooldown_until === 'string' ? row.cooldown_until : null,
-      cooldownReason: typeof row.cooldown_reason === 'string' ? row.cooldown_reason : null,
-      lastFailureAt: typeof row.last_failure_at === 'string' ? row.last_failure_at : null,
-      lastSuccessAt: typeof row.last_success_at === 'string' ? row.last_success_at : null,
-    })).filter((row) => row.modelId.length > 0) }
+    return {
+      source,
+      cooldowns: rows
+        .map((row) => ({
+          modelId: String(row.model_id ?? ''),
+          attempts: Number(row.attempts ?? 0),
+          successes: Number(row.successes ?? 0),
+          failures: Number(row.failures ?? 0),
+          rateLimitCount: Number(row.rate_limit_count ?? 0),
+          cooldownUntil:
+            typeof row.cooldown_until === 'string' ? row.cooldown_until : null,
+          cooldownReason:
+            typeof row.cooldown_reason === 'string'
+              ? row.cooldown_reason
+              : null,
+          lastFailureAt:
+            typeof row.last_failure_at === 'string'
+              ? row.last_failure_at
+              : null,
+          lastSuccessAt:
+            typeof row.last_success_at === 'string'
+              ? row.last_success_at
+              : null,
+        }))
+        .filter((row) => row.modelId.length > 0),
+    }
   } catch {
     return { source: 'none', cooldowns: [] }
   }
 }
 
-function getRouteHealth(cooldowns: Array<HarpHealthAttempt>): Pick<HarpHealthView, 'routeDecision' | 'routeReason' | 'primaryProvider' | 'primaryModel' | 'routes' | 'deadCatalogModels'> {
-  const selector = '/home/ubuntu/workspace/projects/universal-harp-engine/scripts/harp-select-route.py'
+function getRouteHealth(
+  cooldowns: Array<HarpHealthAttempt>,
+): Pick<
+  HarpHealthView,
+  | 'routeDecision'
+  | 'routeReason'
+  | 'primaryProvider'
+  | 'primaryModel'
+  | 'routes'
+  | 'deadCatalogModels'
+> {
+  const selector =
+    '/home/ubuntu/workspace/projects/universal-harp-engine/scripts/harp-select-route.py'
   if (!fs.existsSync(selector)) {
     return {
       routeDecision: 'unavailable',
@@ -456,11 +536,15 @@ function getRouteHealth(cooldowns: Array<HarpHealthAttempt>): Pick<HarpHealthVie
     }
   }
   try {
-    const raw = execFileSync('python3', [selector, '--task', 'debugging', '--risk', 'complex', '--json'], {
-      encoding: 'utf8',
-      timeout: 10_000,
-      maxBuffer: 256 * 1024,
-    })
+    const raw = execFileSync(
+      'python3',
+      [selector, '--task', 'debugging', '--risk', 'complex', '--json'],
+      {
+        encoding: 'utf8',
+        timeout: 10_000,
+        maxBuffer: 256 * 1024,
+      },
+    )
     const parsed = JSON.parse(raw) as {
       decision?: unknown
       reason?: unknown
@@ -472,7 +556,12 @@ function getRouteHealth(cooldowns: Array<HarpHealthAttempt>): Pick<HarpHealthVie
     const routes = (parsed.routes ?? []).slice(0, 12).map((route) => {
       const model = String(route.model ?? '')
       const role = String(route.role ?? '')
-      const status = role === 'reserve_free' ? 'dead_catalog' : cooldownByModel.has(model) ? 'cooldown' : 'ready'
+      const status =
+        role === 'reserve_free'
+          ? 'dead_catalog'
+          : cooldownByModel.has(model)
+            ? 'cooldown'
+            : 'ready'
       return {
         provider: String(route.provider ?? ''),
         model,
@@ -488,7 +577,9 @@ function getRouteHealth(cooldowns: Array<HarpHealthAttempt>): Pick<HarpHealthVie
       primaryProvider: String(parsed.provider ?? ''),
       primaryModel: String(parsed.model ?? ''),
       routes,
-      deadCatalogModels: routes.filter((route) => route.status === 'dead_catalog').map((route) => route.model),
+      deadCatalogModels: routes
+        .filter((route) => route.status === 'dead_catalog')
+        .map((route) => route.model),
     }
   } catch (error) {
     return {
@@ -508,7 +599,10 @@ function getHarpHealthView(): HarpHealthView {
   const routeHealth = getRouteHealth(cooldowns)
   return {
     generatedAt: new Date().toISOString(),
-    dbPath: source === 'postgres' ? 'postgresql://127.0.0.1:5432/harp (model_runtime_state)' : sqlitePath,
+    dbPath:
+      source === 'postgres'
+        ? 'postgresql://127.0.0.1:5432/harp (model_runtime_state)'
+        : sqlitePath,
     ...routeHealth,
     cooldowns,
     openrouterCredits: getOpenRouterCreditsSummary(),
@@ -546,7 +640,13 @@ export function getHarpConfigView(): HarpConfigView {
     }
   }
 
-  const tierKeys = ['tier1_free', 'tier2_paid', 'tier3_codex', 'tier4_gemini', 'tier5_local'] as const
+  const tierKeys = [
+    'tier1_free',
+    'tier2_paid',
+    'tier3_codex',
+    'tier4_gemini',
+    'tier5_local',
+  ] as const
   const tiers: Array<HarpTier> = tierKeys
     .filter((k) => k in config.routing)
     .map((k) => {
@@ -556,7 +656,9 @@ export function getHarpConfigView(): HarpConfigView {
         label: TIER_META[k].label,
         provider: String(raw.provider ?? ''),
         trigger: (raw.trigger ?? []) as Array<unknown>,
-        models: (raw.models as Array<HarpTierModel> | undefined) ?? (raw.model ? [{ model: String(raw.model), role: 'primary' }] : []),
+        models:
+          (raw.models as Array<HarpTierModel> | undefined) ??
+          (raw.model ? [{ model: String(raw.model), role: 'primary' }] : []),
         base_url: raw.base_url as string | undefined,
         key_env: raw.key_env as string | undefined,
         setup_instructions: raw.setup_instructions as string | undefined,

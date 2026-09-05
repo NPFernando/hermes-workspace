@@ -18,11 +18,18 @@ export const Route = createFileRoute('/api/odysseus-bootstrap')({
           // Check if Odysseus already has LLM endpoints configured
           const listRes = await fetch(`${ODYSSEUS_BASE}/api/model-endpoints`)
           if (!listRes.ok) {
-            return json({ ok: false, error: 'Odysseus unreachable' }, { status: 502 })
+            return json(
+              { ok: false, error: 'Odysseus unreachable' },
+              { status: 502 },
+            )
           }
           const endpoints = (await listRes.json()) as Array<unknown>
           if (Array.isArray(endpoints) && endpoints.length > 0) {
-            return json({ ok: true, created: false, existing: endpoints.length })
+            return json({
+              ok: true,
+              created: false,
+              existing: endpoints.length,
+            })
           }
 
           // Register the Hermes gateway as the default LLM endpoint
@@ -33,15 +40,21 @@ export const Route = createFileRoute('/api/odysseus-bootstrap')({
           form.set('api_key', apiKey)
           form.set('skip_probe', 'false')
 
-          const createRes = await fetch(`${ODYSSEUS_BASE}/api/model-endpoints`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/x-www-form-urlencoded' },
-            body: form.toString(),
-          })
+          const createRes = await fetch(
+            `${ODYSSEUS_BASE}/api/model-endpoints`,
+            {
+              method: 'POST',
+              headers: { 'content-type': 'application/x-www-form-urlencoded' },
+              body: form.toString(),
+            },
+          )
 
           if (!createRes.ok) {
             const body = await createRes.text()
-            return json({ ok: false, error: `Registration failed: ${body}` }, { status: 500 })
+            return json(
+              { ok: false, error: `Registration failed: ${body}` },
+              { status: 500 },
+            )
           }
 
           return json({ ok: true, created: true })

@@ -1,6 +1,18 @@
-import { coerceBoolean, coerceString, getDraftValue, parseNumberValue, parseTextValue, readPath } from './utils'
+import {
+  coerceBoolean,
+  coerceString,
+  getDraftValue,
+  parseNumberValue,
+  parseTextValue,
+  readPath,
+} from './utils'
 import type * as React from 'react'
-import type { ClaudeConfig, SaveSettingPayload, SelectOption, SettingDefinition } from './types'
+import type {
+  ClaudeConfig,
+  SaveSettingPayload,
+  SelectOption,
+  SettingDefinition,
+} from './types'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { toast } from '@/components/ui/toast'
@@ -88,7 +100,9 @@ export function SettingCard(props: {
               </span>
             ) : null}
           </div>
-          <p className="text-sm text-[var(--theme-muted)]">{setting.description}</p>
+          <p className="text-sm text-[var(--theme-muted)]">
+            {setting.description}
+          </p>
           {setting.path ? (
             <p className="text-xs text-[var(--theme-muted)]">{setting.path}</p>
           ) : null}
@@ -227,4 +241,3 @@ export function SettingCard(props: {
     </article>
   )
 }
-

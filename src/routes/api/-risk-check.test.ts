@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-// Note: This is a placeholder test file. In a real implementation, 
+// Note: This is a placeholder test file. In a real implementation,
 // we would set up proper test server instances and make actual HTTP requests.
 
 test('risk-check endpoint structure', () => {
@@ -18,7 +18,7 @@ test('risk-check endpoint structure', () => {
 //       quoteAmount: 25
 //     })
 //   })
-//   
+//
 //   const data = await response.json()
 //   expect(data.ok).toBe(true)
 //   expect(data.riskCheck).toBeDefined()

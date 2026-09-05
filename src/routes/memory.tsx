@@ -29,9 +29,9 @@ const HindsightMemoryScreen = lazy(async () => {
 export const Route = createFileRoute('/memory')({
   ssr: false,
   component: function MemoryRoute() {
-    const [tab, setTab] = useState<'memory' | 'knowledge' | 'external' | 'hindsight'>(
-      'memory',
-    )
+    const [tab, setTab] = useState<
+      'memory' | 'knowledge' | 'external' | 'hindsight'
+    >('memory')
     const memoryAvailable = useFeatureAvailable('memory')
 
     usePageTitle('Memory')
@@ -103,7 +103,9 @@ export const Route = createFileRoute('/memory')({
           <TabsPanel value="hindsight" className="min-h-0 flex-1">
             {tab === 'hindsight' ? (
               <Suspense
-                fallback={<RouteLoadingState label="Loading Hindsight memory..." />}
+                fallback={
+                  <RouteLoadingState label="Loading Hindsight memory..." />
+                }
               >
                 <HindsightMemoryScreen />
               </Suspense>

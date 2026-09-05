@@ -68,7 +68,9 @@ function bucketForSymbol(
 }
 
 /** Sum of open-position quote size per correlation bucket, for GuardianContext.bucketExposureQuote. */
-export function bucketExposureQuote<T extends { symbol: string; entryQuote: number }>(
+export function bucketExposureQuote<
+  T extends { symbol: string; entryQuote: number },
+>(
   positions: Array<T>,
   buckets: Record<string, Array<string>>,
 ): Record<string, number> {
@@ -187,8 +189,13 @@ export function checkOrderProposal(
 }
 
 /** Cooldown end time for a strategy that just hit the loss-streak limit. */
-export function cooldownUntil(config: GuardianConfig, from: Date = new Date()): string {
-  return new Date(from.getTime() + config.cooldownMinutes * 60_000).toISOString()
+export function cooldownUntil(
+  config: GuardianConfig,
+  from: Date = new Date(),
+): string {
+  return new Date(
+    from.getTime() + config.cooldownMinutes * 60_000,
+  ).toISOString()
 }
 
 /** UTC day key (YYYY-MM-DD) used to bucket realized PnL for the daily halt. */

@@ -10,10 +10,13 @@ export const Route = createFileRoute('/api/events')({
     handlers: {
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
-          return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' },
-          })
+          return new Response(
+            JSON.stringify({ ok: false, error: 'Unauthorized' }),
+            {
+              status: 401,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          )
         }
         await ensureBusStarted()
 

@@ -14,7 +14,8 @@ export type AgentPreset = {
 export const AGENT_PRESETS: Record<string, AgentPreset> = {
   luna: {
     emoji: '🌙',
-    description: 'Deep research, literature review, fact-checking, competitive intelligence',
+    description:
+      'Deep research, literature review, fact-checking, competitive intelligence',
     systemPrompt: `You are Luna, a research specialist.
 
 Your role:
@@ -56,7 +57,8 @@ Style: Action-oriented. Prefer small focused changes over big bangs. Always veri
   },
   vitoria: {
     emoji: '🎨',
-    description: 'Thumbnails, visual content, brand assets, and creative direction',
+    description:
+      'Thumbnails, visual content, brand assets, and creative direction',
     systemPrompt: `You are Vitória, a creative director and brand asset specialist.
 
 Your role:
@@ -70,7 +72,8 @@ Style: Visual, decisive, brand-aware. Give specific creative direction rather th
   },
   daiane: {
     emoji: '📊',
-    description: 'Data extraction, formatting, report generation, and metric calculation',
+    description:
+      'Data extraction, formatting, report generation, and metric calculation',
     systemPrompt: `You are Daiane, a data analyst and reporter.
 
 Your role:
@@ -84,7 +87,8 @@ Style: Data-driven, structured, actionable. Every report ends with recommended n
   },
   bia: {
     emoji: '🛡️',
-    description: 'Signal monitoring, alerting, anomaly detection, and risk intelligence',
+    description:
+      'Signal monitoring, alerting, anomaly detection, and risk intelligence',
     systemPrompt: `You are Bia, a signal monitoring and risk intelligence specialist.
 
 Your role:
@@ -98,7 +102,8 @@ Style: Alert-first. Lead with the signal and severity, then context. Use a consi
   },
   novus: {
     emoji: '🔒',
-    description: 'Local/private code execution at zero cost via on-device Ollama',
+    description:
+      'Local/private code execution at zero cost via on-device Ollama',
     systemPrompt: `You are Novus, a local code and task specialist running on-device.
 
 Your role:
@@ -112,7 +117,8 @@ Style: Minimal, efficient, zero-waste. Use local tools first. Only escalate to e
   },
   nova: {
     emoji: '🔎',
-    description: 'Browser automation, screenshots, vision analysis, and paid deep research',
+    description:
+      'Browser automation, screenshots, vision analysis, and paid deep research',
     systemPrompt: `You are Nova, a web research and vision specialist.
 
 Your role:

@@ -18,8 +18,7 @@ export const Route = createFileRoute('/api/external-memory/providers')({
         } catch (error) {
           return json(
             {
-              error:
-                safeErrorMessage(error),
+              error: safeErrorMessage(error),
             },
             { status: 500 },
           )

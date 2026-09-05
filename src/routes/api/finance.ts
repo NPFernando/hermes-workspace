@@ -26,6 +26,7 @@ import {
   maskSensitive,
   readFinanceStore,
   recordCategoryCorrection,
+  setNonLiveExecutionMode,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
   updateFinanceRecord,
@@ -33,7 +34,11 @@ import {
   writeFinanceStore,
 } from '../../server/finance-store'
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
-import { answerFinanceQuestion, extractEmploymentContract, extractTransactionFromImage } from '../../server/finance-extraction'
+import {
+  answerFinanceQuestion,
+  extractEmploymentContract,
+  extractTransactionFromImage,
+} from '../../server/finance-extraction'
 import { syncGmailNow } from '../../server/gmail-ingest'
 import { fetchCsePrice } from '../../server/cse-market.service'
 import {
@@ -49,23 +54,56 @@ import {
   applyStrategyOverrideRecommendations,
   decisionQualityReport,
   demoTradingPerformance,
+  getLastTradingCycleDiagnostics,
+  getLiveMonitor,
+  getStrategyEligibilityAudit,
   learningReport,
   marketLearningReport,
+  rearmSandboxExperiment,
+  reviewSandboxExperiments,
+  rollbackSandboxExperiment,
   runLearningCycle,
   safeguardHistory,
   setStrategyOverride,
+  startSandboxExperiment,
+  stopSandboxExperiment,
   strategyCatalog,
+  strategyGuardReview,
   strategyOverrideState,
 } from '../../server/demo-trading-engine'
 import { startFinanceStorageMonitor } from '../../server/finance-storage-monitor'
 import { fetchAndStoreGoogleNews } from '../../server/finance-news.service'
-import { INTELLIGENCE_FORMULA_VERSION, assessResearchRisk, buildCompositeSentiment } from '../../server/finance-intelligence'
+import { tradingCycleDiagnosticTrends } from '../../server/finance-postgres-store'
+import {
+  INTELLIGENCE_FORMULA_VERSION,
+  assessResearchRisk,
+  buildCompositeSentiment,
+} from '../../server/finance-intelligence'
 import {
   appendPaperDecisionSnapshot,
   readPaperDecisionJournal,
 } from '../../server/paper-decision-journal'
 import { evaluatePaperDecisionQuality } from '../../server/paper-decision-quality'
 import { resetConnectivityBreaker } from '../../server/connectivity-breaker'
+import {
+  ensureValidationRunAutomation,
+  finalizeValidationRun,
+  recoverValidationRunAutomationIfStale,
+  runValidationCycle,
+  startValidationRun,
+  stopValidationRun,
+  validationReconciliationPayload,
+  validationRunsPayload,
+} from '../../server/validation-run'
+import {
+  activateLiveReadiness,
+  approveLiveApproval,
+  assessAndPersistReadiness,
+  assessReadiness,
+  deactivateLiveReadiness,
+  getReadinessState,
+  requestLiveApproval,
+} from '../../server/trading-readiness'
 
 const VALID_LONG_SHORT_PERIODS = new Set([
   '5m',
@@ -82,6 +120,7 @@ const VALID_LONG_SHORT_PERIODS = new Set([
 type JsonRecord = Record<string, unknown>
 
 startFinanceStorageMonitor()
+ensureValidationRunAutomation()
 
 async function parseJsonBody(request: Request): Promise<JsonRecord> {
   try {
@@ -108,13 +147,28 @@ function unauthorized() {
  * on every goal/tax/budget-category edit or delete).
  */
 const PERSONAL_FINANCE_RECORD_KINDS = new Set([
-  'income', 'expense', 'account', 'goal', 'tax', 'budget_category', 'category',
-  'subcategory_entry', 'merchant', 'tag', 'income_source', 'stock_holding', 'fixed_deposit',
+  'income',
+  'expense',
+  'account',
+  'goal',
+  'tax',
+  'budget_category',
+  'category',
+  'subcategory_entry',
+  'merchant',
+  'tag',
+  'income_source',
+  'stock_holding',
+  'fixed_deposit',
   'beneficiary',
 ])
 
 function recordActionResponse(kind: string) {
-  return json(PERSONAL_FINANCE_RECORD_KINDS.has(kind) ? personalFinancePayload() : financePayload())
+  return json(
+    PERSONAL_FINANCE_RECORD_KINDS.has(kind)
+      ? personalFinancePayload()
+      : financePayload(),
+  )
 }
 
 function binanceSymbolFromBody(body: JsonRecord): string {
@@ -152,6 +206,7 @@ function isLiveMode(mode: string): boolean {
 }
 
 function financePayload() {
+  recoverValidationRunAutomationIfStale()
   const db = ensureFinanceStore()
   const storage = financeStorageStatus({ selfHeal: true })
   const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
@@ -194,6 +249,61 @@ function financePayload() {
       },
     },
     summary: financeSummary(db),
+    nextRecommendation: (() => {
+      const mode = String(db.settings.tradingMode ?? 'paper_trade')
+      if (mode === 'live_manual_approval' || mode === 'live_auto_trade') {
+        return {
+          decision: 'live_requires_manual_review',
+          currentMode: mode,
+          liveTradingEnabled: true,
+          requiresExplicitApproval: true,
+          summary:
+            'Live execution is already armed or requested. Keep the safety cutoff engaged and require explicit manual review before any additional live risk.',
+          nextAction:
+            'Pause further live expansion until the operator re-validates the evidence and re-arms only under a tightly bounded approval flow.',
+          safeSandboxCaps: {
+            durationMinutes: 60,
+            maxCycles: 3,
+            maxTrades: 3,
+            maxExposureUsdt: 50,
+          },
+        }
+      }
+      if (mode === 'testnet_execute') {
+        return {
+          decision: 'sandbox_evidence_only',
+          currentMode: mode,
+          liveTradingEnabled: false,
+          requiresExplicitApproval: true,
+          summary:
+            'The engine is in sandbox/testnet evidence mode. Treat it as a controlled validation stage, not a sign of live readiness.',
+          nextAction:
+            'Continue with bounded testnet evidence only, then return to paper mode and reconcile before any stage promotion.',
+          safeSandboxCaps: {
+            durationMinutes: 60,
+            maxCycles: 3,
+            maxTrades: 3,
+            maxExposureUsdt: 50,
+          },
+        }
+      }
+      return {
+        decision: 'stay_paper_only',
+        currentMode: mode,
+        liveTradingEnabled: false,
+        requiresExplicitApproval: true,
+        summary:
+          'Keep the engine in paper mode until explicit approval for one bounded sandbox/testnet pilot.',
+        nextAction:
+          'Use the strategy audit as the evidence gate; no live activation and no strategy tuning unless approval is granted.',
+        safeSandboxCaps: {
+          durationMinutes: 60,
+          maxCycles: 3,
+          maxTrades: 3,
+          maxExposureUsdt: 50,
+        },
+      }
+    })(),
     budgetVsActual: budgetVsActualSummary(db),
     transactions: maskSensitive(getUnifiedTransactions(db)),
     tradingPerformance: tradingPerformanceSummary(db),
@@ -208,10 +318,24 @@ function financePayload() {
     marketLearning: marketLearningReport(),
     safeguardHistory: safeguardHistory(),
     strategyCatalog: strategyCatalog(),
+    strategyEligibilityAudit: getStrategyEligibilityAudit(),
     strategyOverrides: strategyOverrideState(),
+    sandboxExperiments: reviewSandboxExperiments(),
+    validationRuns: validationRunsPayload(),
+    validationReconciliation: validationReconciliationPayload(),
+    lastTradingCycleDiagnostics: getLastTradingCycleDiagnostics(),
+    tradingCycleDiagnosticTrends: {
+      paper: tradingCycleDiagnosticTrends('paper'),
+      sandbox: tradingCycleDiagnosticTrends('sandbox'),
+    },
+    guardEvidence: strategyGuardReview(),
     alerts,
     settings: db.settings,
     connectivityBreaker: db.connectivityBreaker,
+    // Read-only dry-run assessment (never persists) plus whatever
+    // snapshot/approval was last explicitly persisted via the
+    // live_readiness_* actions below — see trading-readiness.ts.
+    liveReadiness: { live: assessReadiness(), stored: getReadinessState() },
     // market_prices/risk_scores are fetched but never rendered anywhere in
     // the UI (confirmed via grep) — dropped here to shrink this response,
     // which finance-screen.tsx's polling/refetch cycle re-fetches in full.
@@ -239,15 +363,24 @@ function personalFinancePayload() {
   const efAvgMonthlyExpensesLkr = getAverageMonthlyExpensesLkr(db, 3)
   const efCurrentLkr = financeSummary(db).cashBalanceLkr
   const efTargetLkr = efTargetMonths * efAvgMonthlyExpensesLkr
-  const efCoverageMonths = efAvgMonthlyExpensesLkr > 0 ? efCurrentLkr / efAvgMonthlyExpensesLkr : 0
-  const efProgressPct = efTargetLkr > 0 ? Math.min(100, (efCurrentLkr / efTargetLkr) * 100) : 0
+  const efCoverageMonths =
+    efAvgMonthlyExpensesLkr > 0 ? efCurrentLkr / efAvgMonthlyExpensesLkr : 0
+  const efProgressPct =
+    efTargetLkr > 0 ? Math.min(100, (efCurrentLkr / efTargetLkr) * 100) : 0
   const srTargetPct = db.settings.savingsRateTargetPct ?? 0
-  const { actualPct: srActualPct, hasData: srHasData } = getAverageMonthlySavingsRatePct(db, 3)
-  const srProgressPct = srTargetPct > 0 ? Math.min(100, Math.max(0, (srActualPct / srTargetPct) * 100)) : 0
+  const { actualPct: srActualPct, hasData: srHasData } =
+    getAverageMonthlySavingsRatePct(db, 3)
+  const srProgressPct =
+    srTargetPct > 0
+      ? Math.min(100, Math.max(0, (srActualPct / srTargetPct) * 100))
+      : 0
   const wgTargetLkr = db.settings.wealthGoalTargetLkr ?? 0
   const wgTargetDate = db.settings.wealthGoalTargetDate ?? null
   const wgCurrentLkr = financeSummary(db).netWorthLkr
-  const wgProgressPct = wgTargetLkr > 0 ? Math.min(100, Math.max(0, (wgCurrentLkr / wgTargetLkr) * 100)) : 0
+  const wgProgressPct =
+    wgTargetLkr > 0
+      ? Math.min(100, Math.max(0, (wgCurrentLkr / wgTargetLkr) * 100))
+      : 0
   return {
     ok: true,
     checkedAt: Date.now(),
@@ -302,24 +435,45 @@ function personalFinancePayload() {
 function refreshIntelligence(symbol: string) {
   const db = readFinanceStore()
   const now = new Date()
-  const composite = buildCompositeSentiment({ symbol, items: db.news_items, sentimentScores: db.sentiment_scores, now })
+  const composite = buildCompositeSentiment({
+    symbol,
+    items: db.news_items,
+    sentimentScores: db.sentiment_scores,
+    now,
+  })
   const risk = assessResearchRisk(composite)
   const createdAt = now.toISOString()
   const scoreId = `sentiment:${symbol}:${INTELLIGENCE_FORMULA_VERSION}:${createdAt}`
   const riskId = `risk:${symbol}:${INTELLIGENCE_FORMULA_VERSION}:${createdAt}`
   const stored = storeIntelligenceRecords({
     sentiment: {
-      id: scoreId, symbol, kind: 'news_composite', score: composite.score ?? 0,
-      label: composite.label, confidenceScore: composite.confidence, freshness: composite.freshness,
-      inputRefs: composite.sourceIds, formulaVersion: composite.formulaVersion,
-      observedAt: composite.observedAt, expiresAt: composite.expiresAt, source: 'finance-intelligence',
-      createdAt, updatedAt: createdAt,
+      id: scoreId,
+      symbol,
+      kind: 'news_composite',
+      score: composite.score ?? 0,
+      label: composite.label,
+      confidenceScore: composite.confidence,
+      freshness: composite.freshness,
+      inputRefs: composite.sourceIds,
+      formulaVersion: composite.formulaVersion,
+      observedAt: composite.observedAt,
+      expiresAt: composite.expiresAt,
+      source: 'finance-intelligence',
+      createdAt,
+      updatedAt: createdAt,
     },
     risk: {
-      id: riskId, platform: 'research_only', symbol, ...risk,
-      formulaVersion: composite.formulaVersion, inputRefs: composite.sourceIds,
-      observedAt: composite.observedAt, expiresAt: composite.expiresAt, source: 'finance-intelligence',
-      createdAt, updatedAt: createdAt,
+      id: riskId,
+      platform: 'research_only',
+      symbol,
+      ...risk,
+      formulaVersion: composite.formulaVersion,
+      inputRefs: composite.sourceIds,
+      observedAt: composite.observedAt,
+      expiresAt: composite.expiresAt,
+      source: 'finance-intelligence',
+      createdAt,
+      updatedAt: createdAt,
     },
   })
   return { composite, stored, researchOnly: true }
@@ -328,10 +482,11 @@ function refreshIntelligence(symbol: string) {
 export const Route = createFileRoute('/api/finance')({
   server: {
     handlers: {
-      GET: ({ request }) => {
+      GET: async ({ request }) => {
         if (!isAuthenticated(request)) return unauthorized()
         const scope = new URL(request.url).searchParams.get('scope')
         if (scope === 'personal_finance') return json(personalFinancePayload())
+        await getLiveMonitor()
         return json(financePayload())
       },
       POST: async ({ request }) => {
@@ -356,14 +511,22 @@ export const Route = createFileRoute('/api/finance')({
               body.payload && typeof body.payload === 'object'
                 ? (body.payload as JsonRecord)
                 : {}
-            if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
+            if (!id)
+              return json(
+                { ok: false, error: 'id is required.' },
+                { status: 400 },
+              )
             updateFinanceRecord(kind, id, payload)
             return recordActionResponse(kind)
           }
           if (action === 'delete_record') {
             const kind = typeof body.kind === 'string' ? body.kind : ''
             const id = typeof body.id === 'string' ? body.id : ''
-            if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
+            if (!id)
+              return json(
+                { ok: false, error: 'id is required.' },
+                { status: 400 },
+              )
             deleteFinanceRecord(kind, id)
             return recordActionResponse(kind)
           }
@@ -407,7 +570,10 @@ export const Route = createFileRoute('/api/finance')({
                 : ''
             if (!idempotencyKey || idempotencyKey.length > 128) {
               return json(
-                { ok: false, error: 'A 1-128 character idempotencyKey is required.' },
+                {
+                  ok: false,
+                  error: 'A 1-128 character idempotencyKey is required.',
+                },
                 { status: 400 },
               )
             }
@@ -464,6 +630,14 @@ export const Route = createFileRoute('/api/finance')({
                 { status: 400 },
               )
             }
+            if (
+              requestedMode === 'observe_only' ||
+              requestedMode === 'paper_trade' ||
+              requestedMode === 'testnet_execute'
+            ) {
+              setNonLiveExecutionMode(requestedMode)
+              return json(financePayload())
+            }
             const db = readFinanceStore()
             if (
               isLiveMode(requestedMode) &&
@@ -511,6 +685,12 @@ export const Route = createFileRoute('/api/finance')({
           if (action === 'set_execution_account') {
             const account =
               typeof body.account === 'string' ? body.account : 'paper'
+            if (account === 'paper' || account === 'binance_testnet') {
+              setNonLiveExecutionMode(
+                account === 'paper' ? 'paper_trade' : 'testnet_execute',
+              )
+              return json(financePayload())
+            }
             const db = readFinanceStore()
             if (account === 'paper') {
               db.settings.executionAccount = 'paper'
@@ -633,12 +813,49 @@ export const Route = createFileRoute('/api/finance')({
             })
             return json(financePayload())
           }
+          if (action === 'assess_live_readiness') {
+            const snapshot = assessAndPersistReadiness()
+            return json({ ...financePayload(), liveReadinessResult: snapshot })
+          }
+          if (action === 'request_live_readiness_approval') {
+            const result = requestLiveApproval()
+            return json(
+              { ...financePayload(), liveReadinessResult: result },
+              { status: result.ok ? 200 : 400 },
+            )
+          }
+          if (action === 'approve_live_readiness') {
+            const phrase =
+              typeof body.approval === 'string' ? body.approval : ''
+            const result = approveLiveApproval(phrase)
+            return json(
+              { ...financePayload(), liveReadinessResult: result },
+              { status: result.ok ? 200 : 400 },
+            )
+          }
+          if (action === 'activate_live_readiness') {
+            const phrase =
+              typeof body.approval === 'string' ? body.approval : ''
+            const result = activateLiveReadiness(phrase)
+            return json(
+              { ...financePayload(), liveReadinessResult: result },
+              { status: result.ok ? 200 : 400 },
+            )
+          }
+          if (action === 'deactivate_live_readiness') {
+            const result = deactivateLiveReadiness(
+              typeof body.reason === 'string' ? body.reason : 'manual deactivation',
+            )
+            return json({ ...financePayload(), liveReadinessResult: result })
+          }
           if (action === 'reset_connectivity_breaker') {
             // Manual-only, same as the kill switch's general philosophy —
             // no auto-recovery, a human should verify the underlying
             // credential problem is actually fixed before trading resumes.
             resetConnectivityBreaker()
-            appendAuditLog('connectivity_breaker_reset', { source: 'finance_api' })
+            appendAuditLog('connectivity_breaker_reset', {
+              source: 'finance_api',
+            })
             return json(financePayload())
           }
           if (action === 'set_alerts_config') {
@@ -650,7 +867,10 @@ export const Route = createFileRoute('/api/finance')({
             const db = readFinanceStore()
             db.settings.alertsEnabled = enabled
             writeFinanceStore(db)
-            appendAuditLog('alerts_config_updated', { enabled, source: 'finance_api' })
+            appendAuditLog('alerts_config_updated', {
+              enabled,
+              source: 'finance_api',
+            })
             return json(financePayload())
           }
           if (action === 'set_emergency_fund_target') {
@@ -679,9 +899,13 @@ export const Route = createFileRoute('/api/finance')({
             // WEALTH-107: user-set long-term net worth target, with an
             // optional target date. 0 clears the target back to "not
             // configured"; an empty/missing targetDate clears the date only.
-            const rawTargetLkr = typeof body.targetLkr === 'number' ? body.targetLkr : 0
+            const rawTargetLkr =
+              typeof body.targetLkr === 'number' ? body.targetLkr : 0
             const targetLkr = Math.max(0, Math.round(rawTargetLkr))
-            const targetDate = typeof body.targetDate === 'string' && body.targetDate ? body.targetDate : undefined
+            const targetDate =
+              typeof body.targetDate === 'string' && body.targetDate
+                ? body.targetDate
+                : undefined
             const db = readFinanceStore()
             db.settings.wealthGoalTargetLkr = targetLkr
             db.settings.wealthGoalTargetDate = targetDate
@@ -695,34 +919,55 @@ export const Route = createFileRoute('/api/finance')({
             // external agent access, so AI-102/103/111 (agent read
             // permissions/action contract/sensitive data classification)
             // don't apply here; deferred for any future agent variant.
-            const question = typeof body.question === 'string' ? body.question.trim() : ''
-            if (!question) return json({ ok: false, error: 'question is required.' }, { status: 400 })
+            const question =
+              typeof body.question === 'string' ? body.question.trim() : ''
+            if (!question)
+              return json(
+                { ok: false, error: 'question is required.' },
+                { status: 400 },
+              )
             // AI-204: client sends its in-session conversation turns; never
             // trust its length, so re-validate shape and cap to the last 3
             // here regardless of what was sent.
-            const rawPriorTurns = Array.isArray(body.priorTurns) ? body.priorTurns : []
+            const rawPriorTurns = Array.isArray(body.priorTurns)
+              ? body.priorTurns
+              : []
             const priorTurns = rawPriorTurns
               .filter(
                 (turn): turn is { question: string; answer: string } =>
                   !!turn &&
                   typeof turn === 'object' &&
-                  typeof (turn as Record<string, unknown>).question === 'string' &&
+                  typeof (turn as Record<string, unknown>).question ===
+                    'string' &&
                   typeof (turn as Record<string, unknown>).answer === 'string',
               )
               .slice(-3)
             const db = readFinanceStore()
             const context = buildFinanceQueryContext(db)
-            const result = await answerFinanceQuestion(question, context, priorTurns)
-            if (!result.ok) return json({ ok: false, error: result.reason }, { status: 502 })
+            const result = await answerFinanceQuestion(
+              question,
+              context,
+              priorTurns,
+            )
+            if (!result.ok)
+              return json({ ok: false, error: result.reason }, { status: 502 })
             // AI-202: capped recent-activity list, same bounded-log
             // convention as AI-506's gmailIngest.syncHistory.
             const priorHistory = db.settings.financeQaHistory ?? []
             db.settings.financeQaHistory = [
               ...priorHistory,
-              { at: Math.floor(Date.now() / 1000), question, answer: result.answer },
+              {
+                at: Math.floor(Date.now() / 1000),
+                question,
+                answer: result.answer,
+              },
             ].slice(-10)
             writeFinanceStore(db)
-            return json({ ...personalFinancePayload(), answer: result.answer, chart: result.chart })
+            return json({
+              ...personalFinancePayload(),
+              answer: result.answer,
+              chart: result.chart,
+            })
           }
           if (action === 'set_demo_config' || action === 'set_engine_config') {
             // Update the demo engine's tunable knobs (settings.demoTrading), merged
@@ -806,7 +1051,8 @@ export const Route = createFileRoute('/api/finance')({
               const ids = cfg.enabledStrategies.filter(
                 (s): s is string => typeof s === 'string' && validIds.has(s),
               )
-              if (ids.length > 0) dt.enabledStrategies = Array.from(new Set(ids))
+              if (ids.length > 0)
+                dt.enabledStrategies = Array.from(new Set(ids))
             }
             // Signal features built 2026-07-10/11: each is its own independent,
             // off-by-default lever (see docs/trading-engine.md for the backtest
@@ -814,7 +1060,11 @@ export const Route = createFileRoute('/api/finance')({
             const atrBaseline = inRange(cfg.atrSizeBaselinePct, 0, 0.1)
             const atrMin = inRange(cfg.atrSizeMinMultiplier, 0.1, 1)
             const atrMax = inRange(cfg.atrSizeMaxMultiplier, 1, 3)
-            const kellyMinTrades = inRange(cfg.kellySizingMinClosedTrades, 5, 200)
+            const kellyMinTrades = inRange(
+              cfg.kellySizingMinClosedTrades,
+              5,
+              200,
+            )
             const kellyMaxFraction = inRange(cfg.kellySizingMaxFraction, 0, 1)
             const vetoMinSamples = inRange(cfg.patternVetoMinSamples, 5, 200)
             const vetoLossThreshold = inRange(
@@ -855,22 +1105,64 @@ export const Route = createFileRoute('/api/finance')({
               VALID_LONG_SHORT_PERIODS.has(cfg.longShortSentimentPeriod)
             )
               dt.longShortSentimentPeriod = cfg.longShortSentimentPeriod
-            const maxBucketExposure = inRange(cfg.guardianMaxBucketExposureQuote, 0, 100000)
+            // "Patient hold" (sandbox/testnet only) — see EngineConfig.noLossExitMode's
+            // doc comment in demo-trading-engine.ts. Defaults to true; this just
+            // lets it be toggled off from Signal Settings if desired.
+            if (typeof cfg.noLossExitMode === 'boolean')
+              dt.noLossExitMode = cfg.noLossExitMode
+            if (typeof cfg.strategyGuardEnabled === 'boolean')
+              dt.strategyGuardEnabled = cfg.strategyGuardEnabled
+            const strategyGuardMinTrades = inRange(
+              cfg.strategyGuardMinClosedTrades,
+              3,
+              200,
+            )
+            const strategyGuardLossRate = inRange(
+              cfg.strategyGuardLossRateThreshold,
+              0,
+              1,
+            )
+            const strategyGuardMaxPnl = inRange(
+              cfg.strategyGuardMaxPnlQuote,
+              -100000,
+              0,
+            )
+            if (strategyGuardMinTrades !== undefined)
+              dt.strategyGuardMinClosedTrades = Math.floor(
+                strategyGuardMinTrades,
+              )
+            if (strategyGuardLossRate !== undefined)
+              dt.strategyGuardLossRateThreshold = strategyGuardLossRate
+            if (strategyGuardMaxPnl !== undefined)
+              dt.strategyGuardMaxPnlQuote = strategyGuardMaxPnl
+            if (
+              cfg.strategyGuardAction === 'reduce_size' ||
+              cfg.strategyGuardAction === 'disabled'
+            )
+              dt.strategyGuardAction = cfg.strategyGuardAction
+            const maxBucketExposure = inRange(
+              cfg.guardianMaxBucketExposureQuote,
+              0,
+              100000,
+            )
             const guardianCorrelationBuckets =
               cfg.guardianCorrelationBuckets &&
               typeof cfg.guardianCorrelationBuckets === 'object' &&
               !Array.isArray(cfg.guardianCorrelationBuckets)
-                ? Object.entries(cfg.guardianCorrelationBuckets as JsonRecord).reduce<
-                    Record<string, Array<string>>
-                  >((acc, [bucket, symbols]) => {
-                    if (!Array.isArray(symbols)) return acc
-                    const syms = symbols
-                      .filter((s): s is string => typeof s === 'string')
-                      .map((s) => s.trim().toUpperCase())
-                      .filter((s) => /^[A-Z0-9]{5,20}$/.test(s))
-                    if (syms.length > 0) acc[bucket] = syms
-                    return acc
-                  }, {})
+                ? Object.entries(
+                    cfg.guardianCorrelationBuckets as JsonRecord,
+                  ).reduce<Record<string, Array<string>>>(
+                    (acc, [bucket, symbols]) => {
+                      if (!Array.isArray(symbols)) return acc
+                      const syms = symbols
+                        .filter((s): s is string => typeof s === 'string')
+                        .map((s) => s.trim().toUpperCase())
+                        .filter((s) => /^[A-Z0-9]{5,20}$/.test(s))
+                      if (syms.length > 0) acc[bucket] = syms
+                      return acc
+                    },
+                    {},
+                  )
                 : undefined
             if (
               maxOpen !== undefined ||
@@ -883,9 +1175,11 @@ export const Route = createFileRoute('/api/finance')({
                   ? { ...(dt.guardian as Record<string, unknown>) }
                   : {}
               ) as Record<string, unknown>
-              if (maxOpen !== undefined) guardian.maxOpenPositions = Math.floor(maxOpen)
+              if (maxOpen !== undefined)
+                guardian.maxOpenPositions = Math.floor(maxOpen)
               if (typeof cfg.guardianCorrelationBucketsEnabled === 'boolean')
-                guardian.correlationBucketsEnabled = cfg.guardianCorrelationBucketsEnabled
+                guardian.correlationBucketsEnabled =
+                  cfg.guardianCorrelationBucketsEnabled
               if (guardianCorrelationBuckets !== undefined)
                 guardian.correlationBuckets = guardianCorrelationBuckets
               if (maxBucketExposure !== undefined)
@@ -911,8 +1205,7 @@ export const Route = createFileRoute('/api/finance')({
                 )
                 if (modes.length > 0) {
                   const existingPolicy = (
-                    dt.learningPolicy &&
-                    typeof dt.learningPolicy === 'object'
+                    dt.learningPolicy && typeof dt.learningPolicy === 'object'
                       ? { ...(dt.learningPolicy as Record<string, unknown>) }
                       : {}
                   ) as Record<string, unknown>
@@ -963,9 +1256,16 @@ export const Route = createFileRoute('/api/finance')({
               regimeSmaPeriod: dt.regimeSmaPeriod,
               regimeSwitchingEnabled: dt.regimeSwitchingEnabled,
               regimeSwitchingVolPeriod: dt.regimeSwitchingVolPeriod,
-              regimeSwitchingBaselineLookback: dt.regimeSwitchingBaselineLookback,
+              regimeSwitchingBaselineLookback:
+                dt.regimeSwitchingBaselineLookback,
               trailingStopPct: dt.trailingStopPct,
               maxHoldMinutes: dt.maxHoldMinutes,
+              strategyGuardEnabled: dt.strategyGuardEnabled,
+              strategyGuardMinClosedTrades: dt.strategyGuardMinClosedTrades,
+              strategyGuardLossRateThreshold:
+                dt.strategyGuardLossRateThreshold,
+              strategyGuardMaxPnlQuote: dt.strategyGuardMaxPnlQuote,
+              strategyGuardAction: dt.strategyGuardAction,
               learningPolicyAutoApplyModes: (
                 dt.learningPolicy as Record<string, unknown> | undefined
               )?.autoApplyModes,
@@ -974,6 +1274,35 @@ export const Route = createFileRoute('/api/finance')({
               )?.enabled,
             })
             return json(financePayload())
+          }
+          if (action === 'record_account_baseline') {
+            // Snapshots the current sandbox/testnet equity as the new
+            // "starting balance" baseline for the Trading Account Overview
+            // card — meant to be called right after the user resets the
+            // Binance testnet account, so historical totals stay meaningful
+            // across resets. Value is supplied by the client (it already
+            // computed current equity from /api/demo-trading's monitor +
+            // /api/trading/summary), we just persist it with a timestamp.
+            const equityQuote =
+              typeof body.equityQuote === 'number' &&
+              Number.isFinite(body.equityQuote)
+                ? body.equityQuote
+                : undefined
+            if (equityQuote === undefined) {
+              return json(
+                { ok: false, error: 'equityQuote (number) is required' },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            const settings = db.settings as Record<string, unknown>
+            settings.accountBaseline = {
+              equityQuote,
+              recordedAt: new Date().toISOString(),
+            }
+            writeFinanceStore(db)
+            appendAuditLog('account_baseline_recorded', { equityQuote })
+            return json({ ok: true, baseline: settings.accountBaseline })
           }
           if (action === 'set_grid_config') {
             // Tunable knobs for the independent paper-only grid engine
@@ -998,17 +1327,26 @@ export const Route = createFileRoute('/api/finance')({
             const db = readFinanceStore()
             const settings = db.settings as Record<string, unknown>
             const gc = (
-              settings.demoTradingGrid && typeof settings.demoTradingGrid === 'object'
+              settings.demoTradingGrid &&
+              typeof settings.demoTradingGrid === 'object'
                 ? { ...(settings.demoTradingGrid as Record<string, unknown>) }
                 : {}
             ) as Record<string, unknown>
 
             const gridCount = inRange(cfg.gridCount, 2, 100)
             const quotePerGrid = inRange(cfg.quotePerGrid, 1, 100000)
-            const rangeLookbackCandles = inRange(cfg.rangeLookbackCandles, 10, 1000)
+            const rangeLookbackCandles = inRange(
+              cfg.rangeLookbackCandles,
+              10,
+              1000,
+            )
             const upperStopPct = inRange(cfg.upperStopPct, 0, 5)
             const lowerStopPct = inRange(cfg.lowerStopPct, 0, 1)
-            const efficiencyLookbackCandles = inRange(cfg.efficiencyLookbackCandles, 2, 1000)
+            const efficiencyLookbackCandles = inRange(
+              cfg.efficiencyLookbackCandles,
+              2,
+              1000,
+            )
             const maxEfficiencyRatio = inRange(cfg.maxEfficiencyRatio, 0, 1)
             if (gridCount !== undefined) gc.gridCount = Math.floor(gridCount)
             if (quotePerGrid !== undefined) gc.quotePerGrid = quotePerGrid
@@ -1017,8 +1355,11 @@ export const Route = createFileRoute('/api/finance')({
             if (upperStopPct !== undefined) gc.upperStopPct = upperStopPct
             if (lowerStopPct !== undefined) gc.lowerStopPct = lowerStopPct
             if (efficiencyLookbackCandles !== undefined)
-              gc.efficiencyLookbackCandles = Math.floor(efficiencyLookbackCandles)
-            if (maxEfficiencyRatio !== undefined) gc.maxEfficiencyRatio = maxEfficiencyRatio
+              gc.efficiencyLookbackCandles = Math.floor(
+                efficiencyLookbackCandles,
+              )
+            if (maxEfficiencyRatio !== undefined)
+              gc.maxEfficiencyRatio = maxEfficiencyRatio
             const rearmOutside = inRange(cfg.rearmOutsideRangeCandles, 0, 1000)
             if (rearmOutside !== undefined)
               gc.rearmOutsideRangeCandles = Math.floor(rearmOutside)
@@ -1026,17 +1367,23 @@ export const Route = createFileRoute('/api/finance')({
             // (mirror paper fills as real testnet orders). Only these two
             // literals are ever accepted — there is deliberately no live
             // mode for the grid engine.
-            if (cfg.executionMode === 'paper' || cfg.executionMode === 'testnet_execute')
+            if (
+              cfg.executionMode === 'paper' ||
+              cfg.executionMode === 'testnet_execute'
+            )
               gc.executionMode = cfg.executionMode
             const gridDailyLoss = inRange(cfg.maxDailyLossQuote, 0, 100000)
-            if (gridDailyLoss !== undefined) gc.maxDailyLossQuote = gridDailyLoss
+            if (gridDailyLoss !== undefined)
+              gc.maxDailyLossQuote = gridDailyLoss
             const gridOrderBudget = inRange(cfg.maxRealOrdersPerCycle, 1, 200)
             if (gridOrderBudget !== undefined)
               gc.maxRealOrdersPerCycle = Math.floor(gridOrderBudget)
             if (cfg.spacing === 'arithmetic' || cfg.spacing === 'geometric')
               gc.spacing = cfg.spacing
-            if (typeof cfg.autoRecenter === 'boolean') gc.autoRecenter = cfg.autoRecenter
-            if (typeof cfg.efficiencyGate === 'boolean') gc.efficiencyGate = cfg.efficiencyGate
+            if (typeof cfg.autoRecenter === 'boolean')
+              gc.autoRecenter = cfg.autoRecenter
+            if (typeof cfg.efficiencyGate === 'boolean')
+              gc.efficiencyGate = cfg.efficiencyGate
             if (typeof cfg.absoluteStopFloorEnabled === 'boolean')
               gc.absoluteStopFloorEnabled = cfg.absoluteStopFloorEnabled
             if (Array.isArray(cfg.symbols)) {
@@ -1067,7 +1414,12 @@ export const Route = createFileRoute('/api/finance')({
             const rc = (
               settings.demoTradingRebalance &&
               typeof settings.demoTradingRebalance === 'object'
-                ? { ...(settings.demoTradingRebalance as Record<string, unknown>) }
+                ? {
+                    ...(settings.demoTradingRebalance as Record<
+                      string,
+                      unknown
+                    >),
+                  }
                 : {}
             ) as Record<string, unknown>
             if (typeof cfg.enabled === 'boolean') rc.enabled = cfg.enabled
@@ -1101,11 +1453,20 @@ export const Route = createFileRoute('/api/finance')({
             const dc = (
               settings.strategyDecayDetection &&
               typeof settings.strategyDecayDetection === 'object'
-                ? { ...(settings.strategyDecayDetection as Record<string, unknown>) }
+                ? {
+                    ...(settings.strategyDecayDetection as Record<
+                      string,
+                      unknown
+                    >),
+                  }
                 : {}
             ) as Record<string, unknown>
             if (typeof cfg.enabled === 'boolean') dc.enabled = cfg.enabled
-            const winRateDropThreshold = inRange(cfg.winRateDropThreshold, 0.01, 1)
+            const winRateDropThreshold = inRange(
+              cfg.winRateDropThreshold,
+              0.01,
+              1,
+            )
             if (winRateDropThreshold !== undefined)
               dc.winRateDropThreshold = winRateDropThreshold
             const minTrailingTrades = inRange(cfg.minTrailingTrades, 1, 1000)
@@ -1142,7 +1503,11 @@ export const Route = createFileRoute('/api/finance')({
               !Number.isFinite(body2.trades)
             ) {
               return json(
-                { ok: false, error: 'strategyId, winRate, avgPnlQuote, trades are required' },
+                {
+                  ok: false,
+                  error:
+                    'strategyId, winRate, avgPnlQuote, trades are required',
+                },
                 { status: 400 },
               )
             }
@@ -1178,7 +1543,8 @@ export const Route = createFileRoute('/api/finance')({
             const db = readFinanceStore()
             const settings = db.settings as Record<string, unknown>
             const lc = (
-              settings.demoTradingLlm && typeof settings.demoTradingLlm === 'object'
+              settings.demoTradingLlm &&
+              typeof settings.demoTradingLlm === 'object'
                 ? { ...(settings.demoTradingLlm as Record<string, unknown>) }
                 : {}
             ) as Record<string, unknown>
@@ -1193,28 +1559,44 @@ export const Route = createFileRoute('/api/finance')({
             // through maskSensitive(), which would redact passwordHint
             // (matches /password/i) even though it's a plain hint the user
             // needs to read, not a secret.
-            return json({ ok: true, pendingIngestions: listPendingIngestions() })
+            return json({
+              ok: true,
+              pendingIngestions: listPendingIngestions(),
+            })
           }
           if (action === 'submit_ingestion_password') {
             const id = typeof body.id === 'string' ? body.id : ''
-            const password = typeof body.password === 'string' ? body.password : ''
+            const password =
+              typeof body.password === 'string' ? body.password : ''
             if (!id || !password) {
-              return json({ ok: false, error: 'id and password are required.' }, { status: 400 })
+              return json(
+                { ok: false, error: 'id and password are required.' },
+                { status: 400 },
+              )
             }
             const pending = listPendingIngestions().find((p) => p.id === id)
-            if (!pending) return json({ ok: false, error: 'Pending ingestion not found.' }, { status: 404 })
+            if (!pending)
+              return json(
+                { ok: false, error: 'Pending ingestion not found.' },
+                { status: 404 },
+              )
 
             const normalized = pdfToImages(pending.sourceRef, password)
             if (!normalized.ok) {
               const updated = updatePendingIngestion(id, {
-                error: normalized.reason === 'bad_password' ? 'Incorrect password, try again.' : normalized.reason,
+                error:
+                  normalized.reason === 'bad_password'
+                    ? 'Incorrect password, try again.'
+                    : normalized.reason,
               })
               return json({ ok: true, pendingIngestion: updated })
             }
 
             const previewImagePath = normalized.imagePaths[0]
             if (pending.documentType === 'contract') {
-              const extraction = await extractEmploymentContract(normalized.imagePaths)
+              const extraction = await extractEmploymentContract(
+                normalized.imagePaths,
+              )
               const updated = updatePendingIngestion(id, {
                 status: 'awaiting_review',
                 rawPreviewImagePath: previewImagePath,
@@ -1223,7 +1605,10 @@ export const Route = createFileRoute('/api/finance')({
               })
               return json({ ok: true, pendingIngestion: updated })
             }
-            const extraction = await extractTransactionFromImage(previewImagePath, getCategoryCorrections())
+            const extraction = await extractTransactionFromImage(
+              previewImagePath,
+              getCategoryCorrections(),
+            )
             const updated = updatePendingIngestion(id, {
               status: 'awaiting_review',
               rawPreviewImagePath: previewImagePath,
@@ -1235,19 +1620,38 @@ export const Route = createFileRoute('/api/finance')({
           if (action === 'confirm_pending_ingestion') {
             const id = typeof body.id === 'string' ? body.id : ''
             const payload =
-              body.payload && typeof body.payload === 'object' ? (body.payload as JsonRecord) : {}
+              body.payload && typeof body.payload === 'object'
+                ? (body.payload as JsonRecord)
+                : {}
             const force = body.force === true
             const pending = listPendingIngestions().find((p) => p.id === id)
-            if (!pending) return json({ ok: false, error: 'Pending ingestion not found.' }, { status: 404 })
+            if (!pending)
+              return json(
+                { ok: false, error: 'Pending ingestion not found.' },
+                { status: 404 },
+              )
 
             if (pending.documentType === 'contract') {
-              const employerName = typeof payload.employerName === 'string' ? payload.employerName.trim() : ''
-              const employmentType = typeof payload.employmentType === 'string' ? payload.employmentType : undefined
+              const employerName =
+                typeof payload.employerName === 'string'
+                  ? payload.employerName.trim()
+                  : ''
+              const employmentType =
+                typeof payload.employmentType === 'string'
+                  ? payload.employmentType
+                  : undefined
               if (!employerName || !employmentType) {
-                return json({ ok: false, error: 'employerName and employmentType are required.' }, { status: 400 })
+                return json(
+                  {
+                    ok: false,
+                    error: 'employerName and employmentType are required.',
+                  },
+                  { status: 400 },
+                )
               }
               const targetIncomeSourceId =
-                typeof payload.targetIncomeSourceId === 'string' && payload.targetIncomeSourceId
+                typeof payload.targetIncomeSourceId === 'string' &&
+                payload.targetIncomeSourceId
                   ? payload.targetIncomeSourceId
                   : undefined
 
@@ -1260,8 +1664,10 @@ export const Route = createFileRoute('/api/finance')({
                       : ''
                   }`.slice(0, 2000)
                 : undefined
-              const userNotes = typeof payload.notes === 'string' ? payload.notes.trim() : ''
-              const combinedNotes = [userNotes, riskNote].filter(Boolean).join('\n\n') || undefined
+              const userNotes =
+                typeof payload.notes === 'string' ? payload.notes.trim() : ''
+              const combinedNotes =
+                [userNotes, riskNote].filter(Boolean).join('\n\n') || undefined
 
               // Whitelist to IncomeSource's actual fields only — payload also
               // carries extraction-only data (risks, riskSummary, confidence,
@@ -1270,16 +1676,26 @@ export const Route = createFileRoute('/api/finance')({
               // updateFinanceRecord does a shallow `{...existing, ...payload}`
               // merge, so an explicit `key: undefined` would wipe an existing
               // field the renewal contract simply didn't restate.
-              const jobPayload: Record<string, unknown> = { employerName, employmentType }
-              if (typeof payload.monthlyIncomeAmount === 'number') jobPayload.monthlyIncomeAmount = payload.monthlyIncomeAmount
-              if (typeof payload.currency === 'string') jobPayload.currency = payload.currency
-              if (typeof payload.contractStartDate === 'string') jobPayload.contractStartDate = payload.contractStartDate
-              if (typeof payload.contractEndDate === 'string') jobPayload.contractEndDate = payload.contractEndDate
-              if (typeof payload.jobTitle === 'string') jobPayload.jobTitle = payload.jobTitle
+              const jobPayload: Record<string, unknown> = {
+                employerName,
+                employmentType,
+              }
+              if (typeof payload.monthlyIncomeAmount === 'number')
+                jobPayload.monthlyIncomeAmount = payload.monthlyIncomeAmount
+              if (typeof payload.currency === 'string')
+                jobPayload.currency = payload.currency
+              if (typeof payload.contractStartDate === 'string')
+                jobPayload.contractStartDate = payload.contractStartDate
+              if (typeof payload.contractEndDate === 'string')
+                jobPayload.contractEndDate = payload.contractEndDate
+              if (typeof payload.jobTitle === 'string')
+                jobPayload.jobTitle = payload.jobTitle
               // Client sends the ExtractedContract field name (paydayDayOfMonth);
               // IncomeSource persists it as expectedPaydayDayOfMonth.
-              if (typeof payload.paydayDayOfMonth === 'number') jobPayload.expectedPaydayDayOfMonth = payload.paydayDayOfMonth
-              if (typeof payload.paySchedule === 'string') jobPayload.paySchedule = payload.paySchedule
+              if (typeof payload.paydayDayOfMonth === 'number')
+                jobPayload.expectedPaydayDayOfMonth = payload.paydayDayOfMonth
+              if (typeof payload.paySchedule === 'string')
+                jobPayload.paySchedule = payload.paySchedule
               if (combinedNotes) jobPayload.notes = combinedNotes
               // Link back to the uploaded contract on both create and a
               // renewal update, so "view original contract" always points
@@ -1287,32 +1703,59 @@ export const Route = createFileRoute('/api/finance')({
               jobPayload.documentRef = pending.sourceRef
 
               if (targetIncomeSourceId) {
-                updateFinanceRecord('income_source', targetIncomeSourceId, jobPayload)
+                updateFinanceRecord(
+                  'income_source',
+                  targetIncomeSourceId,
+                  jobPayload,
+                )
               } else {
                 addFinanceRecord('income_source', {
                   ...jobPayload,
                   source: pending.source,
                 })
               }
-              const updated = updatePendingIngestion(id, { status: 'confirmed' })
+              const updated = updatePendingIngestion(id, {
+                status: 'confirmed',
+              })
               return json({ pendingIngestion: updated, ...financePayload() })
             }
 
-            const kind = typeof payload.kind === 'string' ? payload.kind : pending.extracted?.kind
+            const kind =
+              typeof payload.kind === 'string'
+                ? payload.kind
+                : pending.extracted?.kind
             if (kind !== 'income' && kind !== 'expense') {
-              return json({ ok: false, error: 'kind (income|expense) is required.' }, { status: 400 })
+              return json(
+                { ok: false, error: 'kind (income|expense) is required.' },
+                { status: 400 },
+              )
             }
-            const vendorOrSource = typeof payload.vendorOrSource === 'string' ? payload.vendorOrSource : ''
+            const vendorOrSource =
+              typeof payload.vendorOrSource === 'string'
+                ? payload.vendorOrSource
+                : ''
             const date = typeof payload.date === 'string' ? payload.date : ''
-            const amount = typeof payload.amount === 'number' ? payload.amount : Number(payload.amount)
+            const amount =
+              typeof payload.amount === 'number'
+                ? payload.amount
+                : Number(payload.amount)
 
             // Same-day/vendor/amount already on record — likely the same
             // bill arriving via both Gmail and a manual upload. Warn instead
             // of silently double-counting; the UI can resend with force:true.
             if (!force) {
-              const duplicate = findPossibleDuplicate(kind, vendorOrSource, date, amount)
+              const duplicate = findPossibleDuplicate(
+                kind,
+                vendorOrSource,
+                date,
+                amount,
+              )
               if (duplicate) {
-                return json({ ok: true, duplicateWarning: duplicate, pendingIngestion: pending })
+                return json({
+                  ok: true,
+                  duplicateWarning: duplicate,
+                  pendingIngestion: pending,
+                })
               }
             }
 
@@ -1320,8 +1763,15 @@ export const Route = createFileRoute('/api/finance')({
             // AI-suggested category before confirming, remember it for next
             // time this vendor shows up.
             const suggestedCategory = pending.extracted?.category
-            const finalCategory = typeof payload.category === 'string' ? payload.category : undefined
-            if (vendorOrSource && finalCategory && finalCategory !== suggestedCategory) {
+            const finalCategory =
+              typeof payload.category === 'string'
+                ? payload.category
+                : undefined
+            if (
+              vendorOrSource &&
+              finalCategory &&
+              finalCategory !== suggestedCategory
+            ) {
               recordCategoryCorrection(vendorOrSource, finalCategory)
             }
 
@@ -1330,7 +1780,10 @@ export const Route = createFileRoute('/api/finance')({
               source: pending.source,
               documentRef: pending.sourceRef,
               ...(kind === 'income'
-                ? { sourceName: payload.vendorOrSource, dateReceived: payload.date }
+                ? {
+                    sourceName: payload.vendorOrSource,
+                    dateReceived: payload.date,
+                  }
                 : { vendor: payload.vendorOrSource, date: payload.date }),
             })
             const updated = updatePendingIngestion(id, { status: 'confirmed' })
@@ -1338,17 +1791,35 @@ export const Route = createFileRoute('/api/finance')({
           }
           if (action === 'reject_pending_ingestion') {
             const id = typeof body.id === 'string' ? body.id : ''
-            if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
+            if (!id)
+              return json(
+                { ok: false, error: 'id is required.' },
+                { status: 400 },
+              )
             const updated = updatePendingIngestion(id, { status: 'rejected' })
             return json({ ok: true, pendingIngestion: updated })
           }
           if (action === 'reanalyze_contract') {
-            const incomeSourceId = typeof body.incomeSourceId === 'string' ? body.incomeSourceId : ''
-            if (!incomeSourceId) return json({ ok: false, error: 'incomeSourceId is required.' }, { status: 400 })
-            const job = readFinanceStore().income_sources.find((r) => r.id === incomeSourceId)
-            if (!job) return json({ ok: false, error: 'Job not found.' }, { status: 404 })
+            const incomeSourceId =
+              typeof body.incomeSourceId === 'string' ? body.incomeSourceId : ''
+            if (!incomeSourceId)
+              return json(
+                { ok: false, error: 'incomeSourceId is required.' },
+                { status: 400 },
+              )
+            const job = readFinanceStore().income_sources.find(
+              (r) => r.id === incomeSourceId,
+            )
+            if (!job)
+              return json(
+                { ok: false, error: 'Job not found.' },
+                { status: 404 },
+              )
             if (!job.documentRef) {
-              return json({ ok: false, error: 'No document on file for this job.' }, { status: 400 })
+              return json(
+                { ok: false, error: 'No document on file for this job.' },
+                { status: 400 },
+              )
             }
 
             const isPdf = job.documentRef.toLowerCase().endsWith('.pdf')
@@ -1356,13 +1827,23 @@ export const Route = createFileRoute('/api/finance')({
             if (isPdf) {
               if (isPdfEncrypted(job.documentRef)) {
                 return json(
-                  { ok: false, error: 'This document is password-protected — re-upload it to unlock and re-analyze.' },
+                  {
+                    ok: false,
+                    error:
+                      'This document is password-protected — re-upload it to unlock and re-analyze.',
+                  },
                   { status: 400 },
                 )
               }
               const normalized = pdfToImages(job.documentRef)
               if (!normalized.ok) {
-                return json({ ok: false, error: `Could not process document: ${normalized.reason}` }, { status: 400 })
+                return json(
+                  {
+                    ok: false,
+                    error: `Could not process document: ${normalized.reason}`,
+                  },
+                  { status: 400 },
+                )
               }
               imagePaths = normalized.imagePaths
             }
@@ -1381,10 +1862,18 @@ export const Route = createFileRoute('/api/finance')({
           }
           if (action === 'refresh_stock_price') {
             const id = typeof body.id === 'string' ? body.id : ''
-            if (!id) return json({ ok: false, error: 'id is required.' }, { status: 400 })
+            if (!id)
+              return json(
+                { ok: false, error: 'id is required.' },
+                { status: 400 },
+              )
             const db = readFinanceStore()
             const holding = db.stock_holdings.find((h) => h.id === id)
-            if (!holding) return json({ ok: false, error: 'Stock holding not found.' }, { status: 404 })
+            if (!holding)
+              return json(
+                { ok: false, error: 'Stock holding not found.' },
+                { status: 404 },
+              )
 
             const priceResult = await fetchCsePrice(holding.symbol)
             if (!priceResult) {
@@ -1405,7 +1894,10 @@ export const Route = createFileRoute('/api/finance')({
               appendAuditLog('gmail_sync_run', { ...result })
               return json({ ok: true, result })
             } catch (error) {
-              return json({ ok: false, error: safeErrorMessage(error) }, { status: 502 })
+              return json(
+                { ok: false, error: safeErrorMessage(error) },
+                { status: 502 },
+              )
             }
           }
           if (action === 'apply_recommended_safeguards') {
@@ -1448,6 +1940,83 @@ export const Route = createFileRoute('/api/finance')({
               ...financePayload(),
               strategyOverrideRecommendationResult: applied.result,
             })
+          }
+          if (action === 'start_sandbox_experiment') {
+            const result = startSandboxExperiment({
+              strategyIds: body.strategyIds,
+              label: body.label,
+              reason: body.reason,
+              executionMode: body.executionMode,
+              durationMinutes: body.durationMinutes,
+              tradeCap: body.tradeCap,
+              sizeMultiplierCap: body.sizeMultiplierCap,
+            })
+            return json({
+              ...financePayload(),
+              sandboxExperimentResult: result,
+            })
+          }
+          if (action === 'stop_sandbox_experiment') {
+            const result = stopSandboxExperiment(
+              typeof body.experimentId === 'string' ? body.experimentId : '',
+              body.reason,
+            )
+            return json({
+              ...financePayload(),
+              sandboxExperimentResult: result,
+            })
+          }
+          if (action === 'rollback_sandbox_experiment') {
+            const result = rollbackSandboxExperiment(
+              typeof body.experimentId === 'string' ? body.experimentId : '',
+              body.reason,
+            )
+            return json({
+              ...financePayload(),
+              sandboxExperimentResult: result,
+            })
+          }
+          if (action === 'rearm_sandbox_experiment') {
+            const result = rearmSandboxExperiment(
+              typeof body.experimentId === 'string' ? body.experimentId : '',
+            )
+            return json({
+              ...financePayload(),
+              sandboxExperimentResult: result,
+            })
+          }
+          if (action === 'start_validation_run') {
+            const result = await startValidationRun({
+              stage: body.stage,
+              strategies: body.strategies,
+              budgets: body.budgets,
+              notes: body.notes,
+              autoRun: body.autoRun,
+            })
+            return json({ ...financePayload(), validationRunResult: result })
+          }
+          if (action === 'run_validation_cycle') {
+            if (body.stage !== 'paper' && body.stage !== 'sandbox') {
+              return json(
+                { ok: false, error: 'stage must be "paper" or "sandbox".' },
+                { status: 400 },
+              )
+            }
+            const result = await runValidationCycle(body.stage, {
+              force: body.force === true,
+            })
+            return json(
+              { ...financePayload(), validationRunResult: result },
+              { status: result.ok ? 200 : 400 },
+            )
+          }
+          if (action === 'stop_validation_run') {
+            const result = stopValidationRun(body.stage, body.reason)
+            return json({ ...financePayload(), validationRunResult: result })
+          }
+          if (action === 'finalize_validation_run') {
+            const result = finalizeValidationRun(body.stage, body.notes)
+            return json({ ...financePayload(), validationRunResult: result })
           }
           return json(
             { ok: false, error: `Unsupported finance action: ${action}` },

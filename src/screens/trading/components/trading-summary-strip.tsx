@@ -1,25 +1,7 @@
-import { useEffect, useState } from 'react'
 import { StatCard } from '../../finance/components/stat-card'
 import { formatUsdt } from '../format-helpers'
-
-type TradingEngineArmState = 'live' | 'paper' | 'gated' | 'disabled'
-
-type TradingEngineStatus = {
-  id: string
-  label: string
-  armState: TradingEngineArmState
-  reason: string
-}
-
-type TradingSummary = {
-  tradingMode: string
-  emergencyKillSwitch: boolean
-  todayPnlQuote: number
-  totalPnlQuote: number
-  openPositions: number
-  winRate: number | null
-  engines: Array<TradingEngineStatus>
-}
+import { useTradingSummary } from '../hooks/use-trading-summary'
+import type { TradingEngineArmState } from '../hooks/use-trading-summary'
 
 function pnlTone(value: number): 'good' | 'warn' | 'neutral' {
   if (value > 0) return 'good'
@@ -36,43 +18,7 @@ const CHIP_STYLE: Record<TradingEngineArmState, string> = {
 }
 
 export function TradingSummaryStrip() {
-  const [summary, setSummary] = useState<TradingSummary | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const res = await fetch('/api/trading/summary', { cache: 'no-store' })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = (await res.json()) as {
-          ok: boolean
-          summary?: TradingSummary
-          error?: string
-        }
-        if (!data.ok || !data.summary)
-          throw new Error(data.error || 'Trading summary unavailable')
-        if (!cancelled) {
-          setSummary(data.summary)
-          setError(null)
-        }
-      } catch (nextError) {
-        if (!cancelled) {
-          setError(
-            nextError instanceof Error
-              ? nextError.message
-              : 'Trading summary unavailable',
-          )
-        }
-      }
-    }
-    void load()
-    const interval = setInterval(() => void load(), 30_000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [])
+  const { summary, error } = useTradingSummary()
 
   if (error) {
     return (

@@ -32,9 +32,7 @@ function AutocompleteInput({
   const sizeValue = size ?? 'default'
 
   return (
-    <div
-      className="relative not-has-[>*.w-full]:w-fit w-full has-disabled:opacity-64 text-[var(--theme-text)]"
-    >
+    <div className="relative not-has-[>*.w-full]:w-fit w-full has-disabled:opacity-64 text-[var(--theme-text)]">
       {startAddon && (
         <div
           aria-hidden="true"
@@ -181,7 +179,10 @@ function AutocompleteGroupLabel({
 }: AutocompletePrimitive.GroupLabel.Props) {
   return (
     <AutocompletePrimitive.GroupLabel
-      className={cn('px-2 py-1.5 font-medium text-xs text-[var(--theme-muted)]', className)}
+      className={cn(
+        'px-2 py-1.5 font-medium text-xs text-[var(--theme-muted)]',
+        className,
+      )}
       data-slot="autocomplete-group-label"
       {...props}
     />

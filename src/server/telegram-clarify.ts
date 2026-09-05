@@ -38,7 +38,9 @@ function escapeHtml(text: string): string {
 
 // Build the message text + inline keyboard for the current Q&A state.
 // Answered questions appear in the text as ✅ lines; pending ones get button rows.
-type TgButton = { text: string; callback_data: string } | { text: string; url: string }
+type TgButton =
+  | { text: string; callback_data: string }
+  | { text: string; url: string }
 
 // pending  — some questions still unanswered (show option buttons + edit buttons for answered ones)
 // confirm  — all answered, waiting for user to tap "Confirm & resume" (show edit + confirm buttons)
@@ -73,7 +75,12 @@ function buildMessage(
       text += `✅ <b>Q${qi + 1}.</b> ${escapeHtml(q.question)}\n    → ${escapeHtml(q.answer)}\n\n`
       // Edit button lets user clear and re-answer (not shown in final done state)
       if (mode !== 'done') {
-        keyboard.push([{ text: `✏️ Edit Q${qi + 1}`, callback_data: `tedit:${taskPrefix}:${qi}` }])
+        keyboard.push([
+          {
+            text: `✏️ Edit Q${qi + 1}`,
+            callback_data: `tedit:${taskPrefix}:${qi}`,
+          },
+        ])
       }
     } else if (q.options && q.options.length > 0) {
       text += `<b>Q${qi + 1}.</b> ${escapeHtml(q.question)}\n`
@@ -82,7 +89,10 @@ function buildMessage(
         callback_data: `task:${taskPrefix}:${qi}:${oi}`,
       }))
       // Custom button opens the web app at the specific task
-      row.push({ text: '✏️ Custom', url: `https://agent.fernandofamily.com/tasks?task=${task.id}` })
+      row.push({
+        text: '✏️ Custom',
+        url: `https://agent.fernandofamily.com/tasks?task=${task.id}`,
+      })
       keyboard.push(row)
     } else {
       // Freeform question — mark it for reply note
@@ -93,25 +103,46 @@ function buildMessage(
 
   if (pendingApp.length > 0 && mode === 'pending') {
     text += `\n<i>${pendingApp.join(', ')}: reply to this message with your answer.</i>\n`
-    keyboard.push([{ text: '🔗 Open task', url: `https://agent.fernandofamily.com/tasks?task=${task.id}` } satisfies TgButton])
+    keyboard.push([
+      {
+        text: '🔗 Open task',
+        url: `https://agent.fernandofamily.com/tasks?task=${task.id}`,
+      } satisfies TgButton,
+    ])
   }
 
   // Confirm button — shown only when all questions are answered and awaiting confirmation
   if (mode === 'confirm') {
-    keyboard.push([{ text: '✅ Confirm & resume agent', callback_data: `tconf:${taskPrefix}` }])
+    keyboard.push([
+      {
+        text: '✅ Confirm & resume agent',
+        callback_data: `tconf:${taskPrefix}`,
+      },
+    ])
   }
 
   return { text, keyboard }
 }
 
-async function tgPost(cfg: TgConfig, method: string, body: Record<string, unknown>): Promise<unknown> {
+async function tgPost(
+  cfg: TgConfig,
+  method: string,
+  body: Record<string, unknown>,
+): Promise<unknown> {
   const res = await fetch(`${cfg.relayBase}/bot${cfg.token}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const data = await res.json() as { ok: boolean; result?: unknown; description?: string }
-  if (!data.ok) throw new Error(`Telegram ${method} failed: ${data.description ?? res.status}`)
+  const data = (await res.json()) as {
+    ok: boolean
+    result?: unknown
+    description?: string
+  }
+  if (!data.ok)
+    throw new Error(
+      `Telegram ${method} failed: ${data.description ?? res.status}`,
+    )
   return data.result
 }
 
@@ -124,15 +155,20 @@ async function sendClarificationMessage(
   const cfg = loadTgConfig()
   if (!cfg || questions.length === 0) return null
 
-  const { text, keyboard } = buildMessage(task, questions, 'pending', isReminder)
+  const { text, keyboard } = buildMessage(
+    task,
+    questions,
+    'pending',
+    isReminder,
+  )
 
   try {
-    const result = await tgPost(cfg, 'sendMessage', {
+    const result = (await tgPost(cfg, 'sendMessage', {
       chat_id: cfg.chatId,
       text,
       parse_mode: 'HTML',
       reply_markup: { inline_keyboard: keyboard },
-    }) as { message_id: number }
+    })) as { message_id: number }
     return { chat_id: cfg.chatId, message_id: result.message_id }
   } catch (err) {
     console.error('[telegram-clarify] sendMessage failed:', err)
@@ -166,18 +202,31 @@ export async function sendTelegramProgressPing(
   if (!cfg) return
 
   const elapsedMin = Math.round(elapsedMs / 60_000)
-  const elapsedStr = elapsedMin < 60 ? `${elapsedMin} min` : `${Math.floor(elapsedMin / 60)}h ${elapsedMin % 60}min`
+  const elapsedStr =
+    elapsedMin < 60
+      ? `${elapsedMin} min`
+      : `${Math.floor(elapsedMin / 60)}h ${elapsedMin % 60}min`
 
   const SISTER_EMOJIS: Record<string, string> = {
-    astra: '🌟', luna: '🌙', ada: '💻', maya: '🔨', nova: '🔬', novus: '⚙️',
+    astra: '🌟',
+    luna: '🌙',
+    ada: '💻',
+    maya: '🔨',
+    nova: '🔬',
+    novus: '⚙️',
   }
   const agentName = task.agent_name ?? 'astra'
   const agentEmoji = SISTER_EMOJIS[agentName] ?? '🤖'
 
   const text = `⏳ <b>Agent still working…</b>\n<b>Task:</b> ${escapeHtml(task.title)}\n⏱ ${escapeHtml(agentName)} ${agentEmoji} running for ${elapsedStr}`
-  const keyboard: Array<Array<TgButton>> = [[
-    { text: '🔗 Open task', url: `https://agent.fernandofamily.com/tasks?task=${task.id}` },
-  ]]
+  const keyboard: Array<Array<TgButton>> = [
+    [
+      {
+        text: '🔗 Open task',
+        url: `https://agent.fernandofamily.com/tasks?task=${task.id}`,
+      },
+    ],
+  ]
 
   try {
     await tgPost(cfg, 'sendMessage', {
@@ -187,7 +236,10 @@ export async function sendTelegramProgressPing(
       reply_markup: { inline_keyboard: keyboard },
     })
   } catch (err) {
-    console.warn('[telegram-clarify] sendTelegramProgressPing failed:', err instanceof Error ? err.message : err)
+    console.warn(
+      '[telegram-clarify] sendTelegramProgressPing failed:',
+      err instanceof Error ? err.message : err,
+    )
   }
 }
 
@@ -201,13 +253,21 @@ export async function sendTelegramTaskDone(
   if (!cfg) return
 
   const header =
-    status === 'done' ? '✅ <b>Task completed</b>' :
-    status === 'blocked' ? '🚫 <b>Task blocked</b>' : '⏳ <b>Task update</b>'
+    status === 'done'
+      ? '✅ <b>Task completed</b>'
+      : status === 'blocked'
+        ? '🚫 <b>Task blocked</b>'
+        : '⏳ <b>Task update</b>'
 
   const text = `${header}\n<b>Task:</b> ${escapeHtml(task.title)}\n\n${escapeHtml(note.slice(0, 400))}`
-  const keyboard: Array<Array<TgButton>> = [[
-    { text: '🔗 Open task', url: `https://agent.fernandofamily.com/tasks?task=${task.id}` },
-  ]]
+  const keyboard: Array<Array<TgButton>> = [
+    [
+      {
+        text: '🔗 Open task',
+        url: `https://agent.fernandofamily.com/tasks?task=${task.id}`,
+      },
+    ],
+  ]
 
   try {
     await tgPost(cfg, 'sendMessage', {
@@ -217,7 +277,10 @@ export async function sendTelegramTaskDone(
       reply_markup: { inline_keyboard: keyboard },
     })
   } catch (err) {
-    console.warn('[telegram-clarify] sendTelegramTaskDone failed:', err instanceof Error ? err.message : err)
+    console.warn(
+      '[telegram-clarify] sendTelegramTaskDone failed:',
+      err instanceof Error ? err.message : err,
+    )
   }
 }
 

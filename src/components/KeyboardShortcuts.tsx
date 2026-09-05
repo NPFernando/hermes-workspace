@@ -13,9 +13,16 @@ const KeyboardShortcuts = () => {
         case 'n': {
           // Ctrl+N → new chat (only when not in an input/textarea)
           const tag = (event.target as HTMLElement).tagName
-          if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !(event.target as HTMLElement).isContentEditable) {
+          if (
+            tag !== 'INPUT' &&
+            tag !== 'TEXTAREA' &&
+            !(event.target as HTMLElement).isContentEditable
+          ) {
             event.preventDefault()
-            void navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })
+            void navigate({
+              to: '/chat/$sessionKey',
+              params: { sessionKey: 'new' },
+            })
           }
           break
         }

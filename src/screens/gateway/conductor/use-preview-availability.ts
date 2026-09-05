@@ -1,7 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 
-export function usePreviewAvailability(previewUrl: string | null, enabled: boolean) {
+export function usePreviewAvailability(
+  previewUrl: string | null,
+  enabled: boolean,
+) {
   const [failedProbes, setFailedProbes] = useState(0)
   const [timedOut, setTimedOut] = useState(false)
   const lastProbeRef = useRef(0)
@@ -35,12 +38,19 @@ export function usePreviewAvailability(previewUrl: string | null, enabled: boole
     },
     enabled: enabled && !!previewUrl && !exhausted,
     retry: false,
-    refetchInterval: (query) => (query.state.data === true || exhausted ? false : 1_500),
+    refetchInterval: (query) =>
+      query.state.data === true || exhausted ? false : 1_500,
     staleTime: 5_000,
   })
 
   useEffect(() => {
-    if (!enabled || !previewUrl || probeQuery.data === true || probeQuery.dataUpdatedAt === 0) return
+    if (
+      !enabled ||
+      !previewUrl ||
+      probeQuery.data === true ||
+      probeQuery.dataUpdatedAt === 0
+    )
+      return
     if (lastProbeRef.current === probeQuery.dataUpdatedAt) return
     lastProbeRef.current = probeQuery.dataUpdatedAt
     setFailedProbes((current) => current + 1)
@@ -49,7 +59,7 @@ export function usePreviewAvailability(previewUrl: string | null, enabled: boole
   return {
     ready: probeQuery.data === true,
     loading: enabled && !!previewUrl && !exhausted && probeQuery.data !== true,
-    unavailable: enabled && !!previewUrl && exhausted && probeQuery.data !== true,
+    unavailable:
+      enabled && !!previewUrl && exhausted && probeQuery.data !== true,
   }
 }
-
