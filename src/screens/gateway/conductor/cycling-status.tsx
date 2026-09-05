@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 
-const PLANNING_STEPS = ['Planning the mission…', 'Analyzing requirements…', 'Preparing agents…', 'Writing the spec…']
+const PLANNING_STEPS = [
+  'Planning the mission…',
+  'Analyzing requirements…',
+  'Preparing agents…',
+  'Writing the spec…',
+]
 export const WORKING_STEPS = [
   '📋 Reviewing the brief…',
   '🔍 Scanning existing patterns…',
@@ -13,19 +18,32 @@ export const WORKING_STEPS = [
   '🚀 Almost there…',
 ]
 
-export function CyclingStatus({ steps, intervalMs = 3000, isPaused = false }: { steps: Array<string>; intervalMs?: number; isPaused?: boolean }) {
+export function CyclingStatus({
+  steps,
+  intervalMs = 3000,
+  isPaused = false,
+}: {
+  steps: Array<string>
+  intervalMs?: number
+  isPaused?: boolean
+}) {
   const [step, setStep] = useState(0)
 
   useEffect(() => {
     if (isPaused) return
-    const timer = window.setInterval(() => setStep((current) => (current + 1) % steps.length), intervalMs)
+    const timer = window.setInterval(
+      () => setStep((current) => (current + 1) % steps.length),
+      intervalMs,
+    )
     return () => window.clearInterval(timer)
   }, [isPaused, steps.length, intervalMs])
 
   if (isPaused) {
     return (
       <div className="flex items-center gap-3 py-3">
-        <div className="flex size-3.5 items-center justify-center rounded-full border border-amber-400/60 bg-amber-500/10 text-[9px] text-amber-300">||</div>
+        <div className="flex size-3.5 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--theme-warning)_60%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[9px] text-[var(--theme-warning)]">
+          ||
+        </div>
         <p className="text-sm text-[var(--theme-muted)]">Paused</p>
       </div>
     )
@@ -34,7 +52,9 @@ export function CyclingStatus({ steps, intervalMs = 3000, isPaused = false }: { 
   return (
     <div className="flex items-center gap-3 py-3">
       <div className="spinner-accent spinner-sm" />
-      <p className="text-sm text-[var(--theme-muted)] transition-opacity duration-500">{steps[step]}</p>
+      <p className="text-sm text-[var(--theme-muted)] transition-opacity duration-500">
+        {steps[step]}
+      </p>
     </div>
   )
 }
@@ -42,4 +62,3 @@ export function CyclingStatus({ steps, intervalMs = 3000, isPaused = false }: { 
 export function PlanningIndicator() {
   return <CyclingStatus steps={PLANNING_STEPS} intervalMs={2500} />
 }
-
