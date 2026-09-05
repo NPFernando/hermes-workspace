@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlertCircleIcon,
@@ -145,6 +145,17 @@ function LogsModal({
   const [logs, setLogs] = useState<typeof initial>(initial)
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState<'all' | 'errors' | 'warns'>('all')
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const titleId = useId()
+
+  useEffect(() => {
+    closeButtonRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   // Refresh log tail every 3s while modal is open. Keeps it lightweight
   // (200 lines) and bails on errors silently.
@@ -184,6 +195,7 @@ function LogsModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6"
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
       onClick={onClose}
     >
       <div
@@ -202,6 +214,7 @@ function LogsModal({
             />
             <div>
               <h2
+                id={titleId}
                 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
               >
                 Live tail · {logs.file}
@@ -220,6 +233,7 @@ function LogsModal({
               <button
                 key={opt}
                 type="button"
+                aria-pressed={filter === opt}
                 onClick={() => setFilter(opt)}
                 className="rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors"
                 style={{
@@ -238,6 +252,7 @@ function LogsModal({
               </button>
             ))}
             <button
+              ref={closeButtonRef}
               type="button"
               onClick={onClose}
               aria-label="Close"

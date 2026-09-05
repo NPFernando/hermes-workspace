@@ -229,6 +229,12 @@ function writeLayout(layout: StoredLayout) {
   }
 }
 
+export function shouldExitDashboardEditMode(
+  event: Pick<KeyboardEvent, 'key' | 'defaultPrevented'>,
+): boolean {
+  return event.key === 'Escape' && !event.defaultPrevented
+}
+
 /**
  * Dashboard widget layout hook. Owns:
  * - which widgets are hidden (persisted to localStorage)
@@ -252,6 +258,23 @@ export function useDashboardLayout() {
   useEffect(() => {
     writeLayout({ hidden: Array.from(hidden) })
   }, [hidden])
+
+  // Edit mode has an explicit button, but closing it from the keyboard keeps
+  // the dashboard controls quick to use without requiring pointer precision.
+  // Respect another component that has already claimed Escape (for example a
+  // dialog) by leaving default-prevented events alone.
+  useEffect(() => {
+    if (!editMode || typeof window === 'undefined') return undefined
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (shouldExitDashboardEditMode(event)) {
+        setEditMode(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [editMode])
 
   const toggleEdit = useCallback(() => setEditMode((v) => !v), [])
 

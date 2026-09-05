@@ -121,7 +121,8 @@ export function OpsStrip({
   const next = cron ? formatNextRun(cron.nextRunAt) : null
 
   return (
-    <div
+    <section
+      aria-label="Workspace operations status"
       className="surface-card card-glow flex flex-col gap-2 rounded-md border bg-[var(--theme-card)]/50 px-3 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4 border-[var(--theme-border)]"
     >
       {/* Gateway block: state + version + active agents */}
@@ -130,7 +131,7 @@ export function OpsStrip({
           <span
             className={cn(
               'inline-flex h-1.5 w-1.5 rounded-full',
-              ok ? 'animate-pulse' : '',
+              ok ? 'motion-safe:animate-pulse' : '',
             )}
             style={{
               background: ok
@@ -183,6 +184,7 @@ export function OpsStrip({
           <button
             type="button"
             onClick={() => navigate({ to: '/settings', search: {} })}
+            aria-label={`Open Settings: ${drift} configuration difference${drift === 1 ? '' : 's'} detected`}
             className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
             style={{
               background:
@@ -226,6 +228,7 @@ export function OpsStrip({
           <button
             type="button"
             onClick={() => navigate({ to: '/swarm2' })}
+            aria-label={`Open Kanban board: ${kanban.total} total, ${kanban.ready} ready, ${kanban.running} running, ${kanban.blocked} blocked`}
             className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
             style={{
               borderColor:
@@ -264,6 +267,7 @@ export function OpsStrip({
             <button
               type="button"
               onClick={() => navigate({ to: '/jobs' })}
+              aria-label={`Open cron jobs: ${cron.total} total, ${cron.paused} paused, ${cron.running} running${next ? `; next run ${next.text}` : ''}`}
               className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
               style={{
                 borderColor: isWarn
@@ -302,6 +306,7 @@ export function OpsStrip({
         <button
           type="button"
           onClick={() => { setHasUnread(false); navigate({ to: '/settings', search: { section: 'whatsnew' } }) }}
+          aria-label={hasUnread ? "Open What's New: unread release notes" : 'Open release notes'}
           className={cn(
             'inline-flex items-center gap-1.5 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80',
             hasUnread
@@ -311,12 +316,12 @@ export function OpsStrip({
           title={hasUnread ? "What's New — unread" : 'View release notes'}
         >
           {hasUnread && (
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--theme-accent)] animate-pulse" />
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--theme-accent)] motion-safe:animate-pulse" />
           )}
           <span>ws</span>
           <span className="text-[var(--theme-accent)]">v{CHANGELOG[0].version}</span>
         </button>
       </div>
-    </div>
+    </section>
   )
 }
