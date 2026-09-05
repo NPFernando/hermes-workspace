@@ -4,6 +4,14 @@ This file is the source of truth for every change made on top of upstream
 `outsourc-e/hermes-workspace`. It is read by `scripts/upstream-sync.py` to
 decide what needs review when upstream changes those files.
 
+> **De-forked (2026-09-05):** `NPFernando/hermes-workspace` was migrated off
+> GitHub's fork mechanism into a standalone repository (full history/branches
+> mirrored, branch protection re-applied). The old fork was archived
+> (not deleted) at `NPFernando/hermes-workspace-fork-archive` as a safety
+> rollback point. `outsourc-e/hermes-workspace` is now referenced here purely
+> as a documentation link for later manual diffing — it is no longer a live
+> GitHub dependency of this repo.
+
 ---
 
 ## How to use this file during an upstream update

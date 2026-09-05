@@ -16,6 +16,8 @@
 
 > **v2 — zero-fork.** Clone, don't fork. Runs on vanilla [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) installed via Nous's own installer. Chat, sessions, memory, skills, jobs, MCP, terminal, dashboard, Agent View, and Operations are all in vanilla parity. **Conductor** uses the dashboard mission API when available and falls back to Workspace-native Swarm dispatch (`mode: native-swarm`) when the dashboard endpoint is absent, preserving zero-fork behavior ([#262](https://github.com/outsourc-e/hermes-workspace/issues/262)).
 
+> **Repository note (this checkout):** `NPFernando/hermes-workspace` is a standalone repository — it is **not** a GitHub fork of `outsourc-e/hermes-workspace`. The original project this was based on is kept only as a reference link for manual comparison: [`outsourc-e/hermes-workspace`](https://github.com/outsourc-e/hermes-workspace). This repo does not depend on that relationship for builds, deploys, or CI.
+
 ![Hermes Workspace](./docs/screenshots/splash.png)
 
 </div>
