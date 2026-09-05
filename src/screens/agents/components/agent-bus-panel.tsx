@@ -1,26 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
-
-type SisterEntry = {
-  id: string
-  name: string
-  emoji: string
-  role: string
-  type: string
-  handoffTo?: string
-}
-
-async function fetchSistersForBus(): Promise<Array<SisterEntry>> {
-  try {
-    const res = await fetch('/api/sisters')
-    if (!res.ok) return []
-    const payload = (await res.json()) as { ok?: boolean; sisters?: Array<SisterEntry> }
-    return Array.isArray(payload.sisters) ? payload.sisters : []
-  } catch {
-    return []
-  }
-}
+import { fetchSisters } from '@/screens/agents/hooks/use-operations'
 
 type AgentBusSummary = {
   total?: number
@@ -91,7 +72,11 @@ function formatDate(value?: string): string {
 }
 
 function firstLine(value?: string): string {
-  return String(value || '').split('\n').find(Boolean) || 'no detail'
+  return (
+    String(value || '')
+      .split('\n')
+      .find(Boolean) || 'no detail'
+  )
 }
 
 function missionTitle(mission: AgentBusMission): string {
@@ -117,13 +102,19 @@ function StatTile({
     <div
       className={cn(
         'rounded-2xl border px-4 py-3',
-        tone === 'good' && 'border-emerald-400/40 bg-[var(--theme-card)] text-emerald-400',
-        tone === 'warn' && 'border-amber-400/40 bg-[var(--theme-card)] text-amber-400',
-        tone === 'bad' && 'border-red-400/40 bg-[var(--theme-card)] text-red-400',
-        tone === 'neutral' && 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]',
+        tone === 'good' &&
+          'border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)] bg-[var(--theme-card)] text-[var(--theme-success)]',
+        tone === 'warn' &&
+          'border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] bg-[var(--theme-card)] text-[var(--theme-warning)]',
+        tone === 'bad' &&
+          'border-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] bg-[var(--theme-card)] text-[var(--theme-danger)]',
+        tone === 'neutral' &&
+          'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)]',
       )}
     >
-      <div className="text-2xl font-semibold leading-none terminal-glow-soft">{value}</div>
+      <div className="text-2xl font-semibold leading-none terminal-glow-soft">
+        {value}
+      </div>
       <div className="mt-1 text-xs font-medium uppercase tracking-[0.08em] opacity-70">
         {label}
       </div>
@@ -132,44 +123,44 @@ function StatTile({
 }
 
 export function AgentBusPanel() {
-  const [data, setData] = useState<AgentBusPayload | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [action, setAction] = useState<ActionState>(initialActionState)
 
   const sistersQuery = useQuery({
     queryKey: ['sisters'],
-    queryFn: fetchSistersForBus,
-    staleTime: 60_000,
+    queryFn: fetchSisters,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   })
   const sisters = sistersQuery.data ?? []
-  const businessSisters = useMemo(() => sisters.filter((s) => s.type === 'business_agent'), [sisters])
-  const creativeSister = useMemo(() => businessSisters.find((s) => s.role === 'creative'), [businessSisters])
-  const handoffPairs = useMemo(() =>
-    businessSisters.filter((s) => s.handoffTo),
-    [businessSisters]
+  const businessSisters = useMemo(
+    () => sisters.filter((s) => s.type === 'business_agent'),
+    [sisters],
+  )
+  const creativeSister = useMemo(
+    () => businessSisters.find((s) => s.role === 'creative'),
+    [businessSisters],
+  )
+  const handoffPairs = useMemo(
+    () => businessSisters.filter((s) => s.handoffTo),
+    [businessSisters],
   )
 
-  async function load() {
-    setError(null)
-    try {
+  const busQuery = useQuery({
+    queryKey: ['agent-bus'],
+    queryFn: async () => {
       const response = await fetch('/api/agent-bus', {
         headers: { Accept: 'application/json' },
       })
-      if (!response.ok) throw new Error(`Agent Bus returned HTTP ${response.status}`)
-      setData((await response.json()) as AgentBusPayload)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load Agent Bus')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void load()
-    const timer = window.setInterval(() => void load(), 30_000)
-    return () => window.clearInterval(timer)
-  }, [])
+      if (!response.ok)
+        throw new Error(`Agent Bus returned HTTP ${response.status}`)
+      return (await response.json()) as AgentBusPayload
+    },
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  })
+  const data = busQuery.data ?? null
+  const loading = busQuery.isPending
+  const error = busQuery.error instanceof Error ? busQuery.error.message : null
 
   const summary = data?.status?.summary ?? {}
   const missions = data?.missions ?? []
@@ -177,7 +168,10 @@ export function AgentBusPanel() {
   const events = data?.events ?? []
   const visibleIssues = useMemo(() => issues.slice(0, 5), [issues])
 
-  async function runAction(body: Record<string, unknown>, successMessage: string) {
+  async function runAction(
+    body: Record<string, unknown>,
+    successMessage: string,
+  ) {
     setAction({ status: 'running', message: 'Running safe action…' })
     try {
       const response = await fetch('/api/agent-bus', {
@@ -185,12 +179,15 @@ export function AgentBusPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const payload = (await response.json()) as { ok?: boolean; error?: string }
+      const payload = (await response.json()) as {
+        ok?: boolean
+        error?: string
+      }
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error || `HTTP ${response.status}`)
       }
       setAction({ status: 'ok', message: successMessage })
-      await load()
+      await busQuery.refetch()
     } catch (err) {
       setAction({
         status: 'error',
@@ -223,7 +220,7 @@ export function AgentBusPanel() {
           Loading Agent Bus…
         </div>
       ) : error ? (
-        <div className="mt-5 rounded-2xl border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-4 py-4 text-sm text-red-400">
+        <div className="mt-5 rounded-2xl border border-[var(--theme-danger-border)] bg-[var(--theme-danger-soft)] px-4 py-4 text-sm text-[var(--theme-danger)]">
           {error}
         </div>
       ) : (
@@ -231,17 +228,37 @@ export function AgentBusPanel() {
           <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-6">
             <StatTile label="total" value={summary.total ?? 0} />
             <StatTile label="online" value={summary.up ?? 0} tone="good" />
-            <StatTile label="down" value={summary.down ?? 0} tone={(summary.down ?? 0) > 0 ? 'bad' : 'good'} />
-            <StatTile label="no endpoint" value={summary.no_endpoint ?? 0} tone={(summary.no_endpoint ?? 0) > 0 ? 'warn' : 'good'} />
-            <StatTile label="off ops." value={summary.non_operational ?? 0} tone={(summary.non_operational ?? 0) > 0 ? 'warn' : 'good'} />
-            <StatTile label="events" value={events.length || summary.events || 0} tone={events.length > 0 ? 'bad' : 'good'} />
+            <StatTile
+              label="down"
+              value={summary.down ?? 0}
+              tone={(summary.down ?? 0) > 0 ? 'bad' : 'good'}
+            />
+            <StatTile
+              label="no endpoint"
+              value={summary.no_endpoint ?? 0}
+              tone={(summary.no_endpoint ?? 0) > 0 ? 'warn' : 'good'}
+            />
+            <StatTile
+              label="off ops."
+              value={summary.non_operational ?? 0}
+              tone={(summary.non_operational ?? 0) > 0 ? 'warn' : 'good'}
+            />
+            <StatTile
+              label="events"
+              value={events.length || summary.events || 0}
+              tone={events.length > 0 ? 'bad' : 'good'}
+            />
           </div>
 
           <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
             <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-4">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-[var(--theme-text)]">Active Issues</h3>
-                <span className="text-xs text-[var(--theme-muted)]">{issues.length} items</span>
+                <h3 className="text-sm font-semibold text-[var(--theme-text)]">
+                  Active Issues
+                </h3>
+                <span className="text-xs text-[var(--theme-muted)]">
+                  {issues.length} items
+                </span>
               </div>
               <div className="mt-3 space-y-2">
                 {visibleIssues.length ? (
@@ -255,11 +272,14 @@ export function AgentBusPanel() {
                           {agent.name || agent.id}
                         </span>
                         <span className="text-xs text-[var(--theme-muted)]">
-                          {agent.status_config || 'no status'} / {agent.health || 'no health'}
+                          {agent.status_config || 'no status'} /{' '}
+                          {agent.health || 'no health'}
                         </span>
                       </div>
                       {agent.error ? (
-                        <p className="mt-1 text-xs text-[var(--theme-muted)]">{firstLine(agent.error)}</p>
+                        <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                          {firstLine(agent.error)}
+                        </p>
                       ) : null}
                     </div>
                   ))
@@ -273,8 +293,12 @@ export function AgentBusPanel() {
 
             <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-4">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-[var(--theme-text)]">Latest Missions</h3>
-                <span className="text-xs text-[var(--theme-muted)]">{missions.length} records</span>
+                <h3 className="text-sm font-semibold text-[var(--theme-text)]">
+                  Latest Missions
+                </h3>
+                <span className="text-xs text-[var(--theme-muted)]">
+                  {missions.length} records
+                </span>
               </div>
               <div className="mt-3 space-y-2">
                 {missions.slice(0, 5).map((mission, index) => (
@@ -307,15 +331,23 @@ export function AgentBusPanel() {
           <div className="mt-5 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-[var(--theme-text)]">Safe Actions</h3>
+                <h3 className="text-sm font-semibold text-[var(--theme-text)]">
+                  Safe Actions
+                </h3>
                 <p className="mt-1 text-xs text-[var(--theme-muted)]">
-                  No restarts, no external messaging, no automatic paid spending.
+                  No restarts, no external messaging, no automatic paid
+                  spending.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => runAction({ action: 'sync-roadmap' }, 'Roadmap synced with current events.')}
+                  onClick={() =>
+                    runAction(
+                      { action: 'sync-roadmap' },
+                      'Roadmap synced with current events.',
+                    )
+                  }
                   className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]"
                 >
                   Sync Roadmap
@@ -325,31 +357,24 @@ export function AgentBusPanel() {
                     type="button"
                     onClick={() =>
                       runAction(
-                        { action: 'thumbnail-mission', target: creativeSister.id },
+                        {
+                          action: 'thumbnail-mission',
+                          target: creativeSister.id,
+                        },
                         `Thumbnail mission for ${creativeSister.name} registered.`,
                       )
                     }
                     className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]"
                   >
-                    {creativeSister.emoji} Thumbnail Mission ({creativeSister.name})
+                    {creativeSister.emoji} Thumbnail Mission (
+                    {creativeSister.name})
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      runAction(
-                        { action: 'thumbnail-mission', target: 'vitoria' },
-                        'Thumbnail mission for Vitoria registered.',
-                      )
-                    }
-                    className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]"
-                  >
-                    🎨 Thumbnail Mission (Vitoria)
-                  </button>
-                )}
+                ) : null}
                 {handoffPairs.length > 0 ? (
                   handoffPairs.map((source) => {
-                    const target = sisters.find((s) => s.id === source.handoffTo)
+                    const target = sisters.find(
+                      (s) => s.id === source.handoffTo,
+                    )
                     if (!target) return null
                     return (
                       <button
@@ -357,7 +382,11 @@ export function AgentBusPanel() {
                         type="button"
                         onClick={() =>
                           runAction(
-                            { action: 'handoff-mission', source: source.id, target: target.id },
+                            {
+                              action: 'handoff-mission',
+                              source: source.id,
+                              target: target.id,
+                            },
                             `Handoff ${source.name} → ${target.name} registered.`,
                           )
                         }
@@ -367,28 +396,16 @@ export function AgentBusPanel() {
                       </button>
                     )
                   })
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      runAction(
-                        { action: 'handoff-mission', source: 'helena', target: 'larissa' },
-                        'Handoff Helena → Larissa registered.',
-                      )
-                    }
-                    className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm font-medium text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-card2)]"
-                  >
-                    ⚖️ Handoff Helena → Larissa
-                  </button>
-                )}
+                ) : null}
               </div>
             </div>
             <p
               className={cn(
                 'mt-3 text-sm',
-                action.status === 'ok' && 'text-emerald-700',
-                action.status === 'error' && 'text-red-700',
-                action.status === 'running' && 'text-[var(--theme-accent-strong)]',
+                action.status === 'ok' && 'text-[var(--theme-success)]',
+                action.status === 'error' && 'text-[var(--theme-danger)]',
+                action.status === 'running' &&
+                  'text-[var(--theme-accent-strong)]',
                 action.status === 'idle' && 'text-[var(--theme-muted)]',
               )}
             >

@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
-import {
-  AiBrain03Icon,
-  Settings01Icon,
-} from '@hugeicons/core-free-icons'
+import { AiBrain03Icon, Settings01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { seedAgentPresets } from './agent-presets'
 import { OrchestratorCard } from './components/orchestrator-card'
@@ -14,7 +11,7 @@ import { OperationsSettingsModal } from './components/operations-settings-modal'
 import { FullOutputsView } from './components/full-outputs-view'
 import { AgentBusPanel } from './components/agent-bus-panel'
 import { useOperations } from './hooks/use-operations'
-import type {CSSProperties} from 'react';
+import type { CSSProperties } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/screens/dashboard/lib/formatters'
@@ -48,14 +45,20 @@ function HealthTile({
     <div
       className={cn(
         'rounded-2xl border px-4 py-3',
-        tone === 'good' && 'border-emerald-400/40 bg-[var(--theme-card)] text-emerald-500',
-        tone === 'warn' && 'border-amber-400/40 bg-[var(--theme-card)] text-amber-500',
-        tone === 'bad' && 'border-red-400/40 bg-[var(--theme-card)] text-red-500',
-        tone === 'loading' && 'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)]',
+        tone === 'good' &&
+          'border-[color-mix(in_srgb,var(--theme-success)_40%,transparent)] bg-[var(--theme-card)] text-[var(--theme-success)]',
+        tone === 'warn' &&
+          'border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] bg-[var(--theme-card)] text-[var(--theme-warning)]',
+        tone === 'bad' &&
+          'border-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] bg-[var(--theme-card)] text-[var(--theme-danger)]',
+        tone === 'loading' &&
+          'border-[var(--theme-border)] bg-[var(--theme-bg)] text-[var(--theme-muted)]',
       )}
     >
       <div className="text-sm font-semibold">{label}</div>
-      <div className="mt-2 text-2xl font-bold leading-none terminal-glow-soft">{value}</div>
+      <div className="mt-2 text-2xl font-bold leading-none terminal-glow-soft">
+        {value}
+      </div>
       <div className="mt-1 text-xs opacity-70">{detail}</div>
     </div>
   )
@@ -96,8 +99,11 @@ function OperationsHealthSummary({
   agentBusError: string | null
   lastChecked: number | null
 }) {
-  const agentBusIssues = agentBus?.issues?.length ?? agentBus?.status?.summary?.down ?? 0
-  const checkedLabel = lastChecked ? `Last checked ${formatRelativeTime(lastChecked)}` : 'Waiting for first check'
+  const agentBusIssues =
+    agentBus?.issues?.length ?? agentBus?.status?.summary?.down ?? 0
+  const checkedLabel = lastChecked
+    ? `Last checked ${formatRelativeTime(lastChecked)}`
+    : 'Waiting for first check'
 
   return (
     <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 shadow-[0_24px_80px_var(--theme-shadow)]">
@@ -113,7 +119,9 @@ function OperationsHealthSummary({
             Live checks for profiles, sessions, cron, sisters, and Agent Bus.
           </p>
         </div>
-        <span className="text-xs text-[var(--theme-muted)]">{checkedLabel}</span>
+        <span className="text-xs text-[var(--theme-muted)]">
+          {checkedLabel}
+        </span>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -143,9 +151,25 @@ function OperationsHealthSummary({
         />
         <HealthTile
           label="Agent Bus"
-          value={agentBusPending ? '…' : String(agentBus?.status?.summary?.total ?? 0)}
-          detail={agentBusError ? agentBusError : `${agentBusIssues} issue${agentBusIssues === 1 ? '' : 's'}`}
-          tone={agentBusPending ? 'loading' : agentBusError ? 'bad' : agentBusIssues > 0 ? 'warn' : 'good'}
+          value={
+            agentBusPending
+              ? '…'
+              : String(agentBus?.status?.summary?.total ?? 0)
+          }
+          detail={
+            agentBusError
+              ? agentBusError
+              : `${agentBusIssues} issue${agentBusIssues === 1 ? '' : 's'}`
+          }
+          tone={
+            agentBusPending
+              ? 'loading'
+              : agentBusError
+                ? 'bad'
+                : agentBusIssues > 0
+                  ? 'warn'
+                  : 'good'
+          }
         />
       </div>
     </section>
@@ -163,28 +187,41 @@ export const THEME_STYLE: CSSProperties = {
   ['--theme-muted-2' as string]: 'var(--color-primary-600)',
   ['--theme-accent' as string]: 'var(--color-accent-500)',
   ['--theme-accent-strong' as string]: 'var(--color-accent-600)',
-  ['--theme-accent-soft' as string]: 'color-mix(in srgb, var(--color-accent-500) 12%, transparent)',
-  ['--theme-accent-soft-strong' as string]: 'color-mix(in srgb, var(--color-accent-500) 18%, transparent)',
-  ['--theme-shadow' as string]: 'color-mix(in srgb, var(--color-primary-950) 14%, transparent)',
+  ['--theme-accent-soft' as string]:
+    'color-mix(in srgb, var(--color-accent-500) 12%, transparent)',
+  ['--theme-accent-soft-strong' as string]:
+    'color-mix(in srgb, var(--color-accent-500) 18%, transparent)',
+  ['--theme-shadow' as string]:
+    'color-mix(in srgb, var(--color-primary-950) 14%, transparent)',
   ['--theme-danger' as string]: 'var(--color-red-600, #dc2626)',
-  ['--theme-danger-soft' as string]: 'color-mix(in srgb, var(--theme-danger) 12%, transparent)',
-  ['--theme-danger-soft-strong' as string]: 'color-mix(in srgb, var(--theme-danger) 18%, transparent)',
-  ['--theme-danger-border' as string]: 'color-mix(in srgb, var(--theme-danger) 35%, white)',
+  ['--theme-danger-soft' as string]:
+    'color-mix(in srgb, var(--theme-danger) 12%, transparent)',
+  ['--theme-danger-soft-strong' as string]:
+    'color-mix(in srgb, var(--theme-danger) 18%, transparent)',
+  ['--theme-danger-border' as string]:
+    'color-mix(in srgb, var(--theme-danger) 35%, white)',
   ['--theme-warning' as string]: 'var(--color-amber-600, #d97706)',
-  ['--theme-warning-soft' as string]: 'color-mix(in srgb, var(--theme-warning) 12%, transparent)',
-  ['--theme-warning-soft-strong' as string]: 'color-mix(in srgb, var(--theme-warning) 18%, transparent)',
-  ['--theme-warning-border' as string]: 'color-mix(in srgb, var(--theme-warning) 35%, white)',
+  ['--theme-warning-soft' as string]:
+    'color-mix(in srgb, var(--theme-warning) 12%, transparent)',
+  ['--theme-warning-soft-strong' as string]:
+    'color-mix(in srgb, var(--theme-warning) 18%, transparent)',
+  ['--theme-warning-border' as string]:
+    'color-mix(in srgb, var(--theme-warning) 35%, white)',
 }
 
 export function OperationsScreen() {
-  useEffect(() => { seedAgentPresets() }, [])
+  useEffect(() => {
+    seedAgentPresets()
+  }, [])
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsAgentId, setSettingsAgentId] = useState<string | null>(null)
   const [view, setView] = useState<'overview' | 'outputs'>('overview')
   const agentBusQuery = useQuery({
     queryKey: ['agent-bus'],
     queryFn: async () => {
-      const res = await fetch('/api/agent-bus', { headers: { Accept: 'application/json' } })
+      const res = await fetch('/api/agent-bus', {
+        headers: { Accept: 'application/json' },
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return res.json() as Promise<AgentBusHealth>
     },
@@ -200,7 +237,6 @@ export function OperationsScreen() {
     sistersQuery,
     settings,
     saveSettings,
-    defaultModel,
     saveAgent,
     isSavingAgent,
     deleteAgent,
@@ -208,7 +244,7 @@ export function OperationsScreen() {
   } = useOperations()
 
   // Split: AI sisters + delegation profiles first (sorted by priority), then others
-  const { sisterAgents } = useMemo(() => {
+  const { sisterAgents, otherAgents } = useMemo(() => {
     const si: typeof agents = []
     const ot: typeof agents = []
     for (const agent of agents) {
@@ -220,7 +256,7 @@ export function OperationsScreen() {
       const pb = sisterMap[b.id]?.priority ?? 99
       return pa - pb
     })
-    return { sisterAgents: si }
+    return { sisterAgents: si, otherAgents: ot }
   }, [agents, sisterMap])
   const rosterEntries = useMemo(
     () =>
@@ -237,7 +273,8 @@ export function OperationsScreen() {
     (sessionsQuery.error instanceof Error && sessionsQuery.error.message) ||
     (cronJobsQuery.error instanceof Error && cronJobsQuery.error.message) ||
     null
-  const settingsAgent = agents.find((agent) => agent.id === settingsAgentId) ?? null
+  const settingsAgent =
+    agents.find((agent) => agent.id === settingsAgentId) ?? null
 
   return (
     <main
@@ -252,7 +289,9 @@ export function OperationsScreen() {
               <HugeiconsIcon icon={AiBrain03Icon} size={22} strokeWidth={1.8} />
             </div>
             <div>
-              <h1 className="text-base font-semibold text-[var(--theme-text)]">Operations</h1>
+              <h1 className="text-base font-semibold text-[var(--theme-text)]">
+                Operations
+              </h1>
               <p className="mt-1 text-sm text-[var(--theme-muted)]">
                 Your persistent agent team
               </p>
@@ -290,7 +329,11 @@ export function OperationsScreen() {
               className="border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
               onClick={() => setSettingsOpen(true)}
             >
-              <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.8} />
+              <HugeiconsIcon
+                icon={Settings01Icon}
+                size={16}
+                strokeWidth={1.8}
+              />
               Settings
             </Button>
           </div>
@@ -314,7 +357,7 @@ export function OperationsScreen() {
               transition={{ duration: 0.25 }}
             >
               <OrchestratorCard
-                totalAgents={sisterAgents.length}
+                totalAgents={agents.length}
                 sisterCount={sisterAgents.length}
               />
             </motion.div>
@@ -327,7 +370,7 @@ export function OperationsScreen() {
               <OperationsHealthSummary
                 configPending={configQuery.isPending}
                 configError={configQuery.error}
-                profilesCount={sisterAgents.length}
+                profilesCount={agents.length}
                 sessionsPending={sessionsQuery.isPending}
                 sessionsError={sessionsQuery.error}
                 sessionsCount={sessionsQuery.data?.length ?? 0}
@@ -339,7 +382,11 @@ export function OperationsScreen() {
                 sistersCount={sistersQuery.data?.length ?? 0}
                 agentBus={agentBusQuery.data ?? null}
                 agentBusPending={agentBusQuery.isPending}
-                agentBusError={agentBusQuery.error instanceof Error ? agentBusQuery.error.message : null}
+                agentBusError={
+                  agentBusQuery.error instanceof Error
+                    ? agentBusQuery.error.message
+                    : null
+                }
                 lastChecked={agentBusQuery.dataUpdatedAt || null}
               />
             </motion.div>
@@ -355,9 +402,13 @@ export function OperationsScreen() {
             {sisterAgents.length > 0 ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 px-1">
-                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--theme-accent)]">AI Sisters</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--theme-accent)]">
+                    AI Sisters
+                  </span>
                   <span className="h-px flex-1 bg-[var(--theme-accent)]/20" />
-                  <span className="text-[10px] text-[var(--theme-muted)]">{sisterAgents.length} active</span>
+                  <span className="text-[10px] text-[var(--theme-muted)]">
+                    {sisterAgents.length} active
+                  </span>
                 </div>
                 <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {sisterAgents.map((agent, index) => (
@@ -370,7 +421,9 @@ export function OperationsScreen() {
                       <OperationsAgentCard
                         agent={agent}
                         sisterInfo={sisterMap[agent.id]}
-                        onOpenSettings={(agentId) => setSettingsAgentId(agentId)}
+                        onOpenSettings={(agentId) =>
+                          setSettingsAgentId(agentId)
+                        }
                       />
                     </motion.div>
                   ))}
@@ -378,12 +431,47 @@ export function OperationsScreen() {
               </div>
             ) : null}
 
+            {otherAgents.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+                    Other Agents
+                  </span>
+                  <span className="h-px flex-1 bg-[var(--theme-border)]" />
+                  <span className="text-[10px] text-[var(--theme-muted)]">
+                    {otherAgents.length} configured
+                  </span>
+                </div>
+                <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {otherAgents.map((agent, index) => (
+                    <motion.div
+                      key={agent.id}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.04, duration: 0.22 }}
+                    >
+                      <OperationsAgentCard
+                        agent={agent}
+                        onOpenSettings={(agentId) =>
+                          setSettingsAgentId(agentId)
+                        }
+                      />
+                    </motion.div>
+                  ))}
+                </section>
+              </div>
+            ) : null}
 
             {rosterEntries.length > 0 ? (
               <section className="rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-5 shadow-[0_24px_80px_var(--theme-shadow)]">
                 <div className="mb-4">
-                  <h2 className="text-base font-semibold text-[var(--theme-text)]">Team Personality Roster</h2>
-                  <p className="mt-0.5 text-xs text-[var(--theme-muted-2)]">Live personas from the sisters registry — no hard-coded roster</p>
+                  <h2 className="text-base font-semibold text-[var(--theme-text)]">
+                    Team Personality Roster
+                  </h2>
+                  <p className="mt-0.5 text-xs text-[var(--theme-muted-2)]">
+                    Live personas from the sisters registry — no hard-coded
+                    roster
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   {rosterEntries.map((sister) => (
@@ -395,7 +483,9 @@ export function OperationsScreen() {
                         <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-[var(--theme-accent-soft-strong)] bg-[var(--theme-accent-soft)] text-xs font-bold text-[var(--theme-accent)]">
                           {sister.emoji || sister.name.charAt(0)}
                         </span>
-                        <span className="truncate text-sm font-semibold text-[var(--theme-text)]">{sister.name}</span>
+                        <span className="truncate text-sm font-semibold text-[var(--theme-text)]">
+                          {sister.name}
+                        </span>
                       </div>
                       <p className="micro-label">{sister.role}</p>
                     </div>
@@ -418,15 +508,21 @@ export function OperationsScreen() {
               <div className="mt-4 space-y-3">
                 {recentActivity.length > 0 ? (
                   recentActivity.map((activity) => {
-                    const agent = sisterAgents.find((entry) => entry.id === activity.agentId)
+                    const agent = sisterAgents.find(
+                      (entry) => entry.id === activity.agentId,
+                    )
                     return (
                       <div
                         key={activity.id}
                         className="domino-item flex flex-col gap-2 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-4 py-3 transition-all hover:-translate-y-px hover:shadow-sm md:flex-row md:items-center md:justify-between"
                       >
                         <p className="text-sm text-[var(--theme-text)]">
-                          <span className="mr-2">{agent?.meta.emoji ?? '🤖'}</span>
-                          <span className="font-medium">{agent?.name ?? activity.agentId}:</span>{' '}
+                          <span className="mr-2">
+                            {agent?.meta.emoji ?? '🤖'}
+                          </span>
+                          <span className="font-medium">
+                            {agent?.name ?? activity.agentId}:
+                          </span>{' '}
                           {activity.summary}
                         </p>
                         <span className="shrink-0 text-sm text-[var(--theme-muted)]">
@@ -460,7 +556,9 @@ export function OperationsScreen() {
         onSave={saveAgent}
         onDelete={async (agentId) => {
           await deleteAgent(agentId)
-          setSettingsAgentId((current) => (current === agentId ? null : current))
+          setSettingsAgentId((current) =>
+            current === agentId ? null : current,
+          )
         }}
         isSaving={isSavingAgent}
         isDeleting={isDeletingAgent}
