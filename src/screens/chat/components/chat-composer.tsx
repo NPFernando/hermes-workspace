@@ -88,6 +88,7 @@ type ChatComposerProps = {
   ) => void
   isLoading: boolean
   disabled: boolean
+  disabledReason?: string
   sessionKey?: string
   wrapperRef?: Ref<HTMLDivElement>
   composerRef?: Ref<ChatComposerHandle>
@@ -892,6 +893,7 @@ function ChatComposerComponent({
   onSubmit,
   isLoading,
   disabled,
+  disabledReason,
   sessionKey,
   wrapperRef,
   composerRef,
@@ -1127,8 +1129,12 @@ function ChatComposerComponent({
   // Drives both the composer label and the model passed to startStreaming.
   // Replaces an earlier flow that PATCHed ~/.hermes/config.yaml — that path
   // 404s and would clobber the global default for every channel anyway.
+  const modelPreferenceKey = useMemo(
+    () => normalizeDraftSessionKey(sessionKey),
+    [sessionKey],
+  )
   const persistedSessionModel = useSessionModelStore((s) =>
-    s.getModel(sessionKey),
+    s.getModel(modelPreferenceKey),
   )
   const setPersistedSessionModel = useSessionModelStore((s) => s.setModel)
 
@@ -1142,10 +1148,6 @@ function ChatComposerComponent({
     function handleModelSelect(nextModel: string, provider?: string) {
       const model = nextModel.trim()
       if (!model) return
-      const normalizedSessionKey =
-        typeof sessionKey === 'string' && sessionKey.trim().length > 0
-          ? sessionKey.trim()
-          : undefined
       if (
         shouldBlockZeroForkModelSwitch(
           gatewayModeQuery.data,
@@ -1161,14 +1163,12 @@ function ChatComposerComponent({
       // Per-session, browser-local persistence. No global config write —
       // picking a model here only affects this chat. The actual model is
       // passed on each request via the chat-completion `model` field.
-      if (normalizedSessionKey) {
-        setPersistedSessionModel(normalizedSessionKey, resolved)
-      }
+      setPersistedSessionModel(modelPreferenceKey, resolved)
       setIsModelMenuOpen(false)
     },
     [
       gatewayModeQuery.data,
-      sessionKey,
+      modelPreferenceKey,
       setPersistedSessionModel,
       zeroForkModelInfoFlags,
     ],
@@ -2173,6 +2173,11 @@ function ChatComposerComponent({
         className="hidden"
         onChange={handleAttachmentInputChange}
       />
+      {disabledReason ? (
+        <div className="mx-3 mb-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
+          {disabledReason} &mdash; cannot send messages
+        </div>
+      ) : null}
       <PromptInput
         value={value}
         onValueChange={handleValueChange}

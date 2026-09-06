@@ -1148,9 +1148,13 @@ export function ChatScreen({
       resolvedSessionKey ||
       activeCanonicalKey ||
       activeSessionKey
+  const modelPreferenceKey = isNewChat ? 'new' : composerSessionKey
   const persistedSessionModel = useSessionModelStore((s) =>
-    s.getModel(composerSessionKey),
+    s.getModel(modelPreferenceKey),
   )
+  const setSessionModelPreference = useSessionModelStore((s) => s.setModel)
+  const clearSessionModelPreference = useSessionModelStore((s) => s.clearModel)
+  const selectedModelForSend = persistedSessionModel || currentModel
   // Status query with the composer's exact key semantics: NO sessionKey param
   // on a new chat (the server then reports the live default session), unlike
   // currentModelQuery above which asks for the not-yet-created key and gets
@@ -1804,6 +1808,12 @@ export function ChatScreen({
   const serverError = statusError?.message ?? sessionsError ?? historyError
   const serverErrorStatus = statusError?.status
   const showErrorNotice = Boolean(serverError) && !isNewChat
+  // When a non-default model is explicitly selected and the gateway reports
+  // an error, show a disabled reason so the user knows the provider is down.
+  const modelProviderDownReason =
+    persistedSessionModel && statusError
+      ? `Provider unreachable: ${selectedModelForSend}`
+      : null
   const handleRefetch = useCallback(() => {
     void statusQuery.refetch()
     void sessionsQuery.refetch()
@@ -2264,7 +2274,7 @@ export function ChatScreen({
           thinking:
             currentThinkingLevel === 'off' ? undefined : currentThinkingLevel,
           fastMode,
-          model: currentModel || undefined,
+          model: selectedModelForSend || undefined,
           idempotencyKey: optimisticClientId || crypto.randomUUID(),
           systemMessage: effectiveSisterPrompt,
         }).catch((err: unknown) => {
@@ -2282,7 +2292,7 @@ export function ChatScreen({
       startStreaming,
       streamFinish,
       streamStart,
-      currentModel,
+      selectedModelForSend,
     ],
   )
 
@@ -2477,8 +2487,15 @@ export function ChatScreen({
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(
             preferredFriendlyId && preferredFriendlyId.trim().length > 0
-              ? { friendlyId: preferredFriendlyId }
-              : {},
+              ? {
+                  friendlyId: preferredFriendlyId,
+                  ...(selectedModelForSend
+                    ? { model: selectedModelForSend }
+                    : {}),
+                }
+              : selectedModelForSend
+                ? { model: selectedModelForSend }
+                : {},
           ),
         })
         if (!res.ok) throw new Error(await readError(res))
@@ -2507,7 +2524,7 @@ export function ChatScreen({
         setCreatingSession(false)
       }
     },
-    [queryClient],
+    [queryClient, selectedModelForSend],
   )
 
   const upsertSessionInCache = useCallback(
@@ -2719,6 +2736,10 @@ export function ChatScreen({
         // In portable mode, use 'main' — no server-side sessions exist.
         // In enhanced mode, create a UUID thread for the sessions API.
         const threadId = isPortableMode ? 'main' : crypto.randomUUID()
+        if (persistedSessionModel?.trim()) {
+          setSessionModelPreference(threadId, persistedSessionModel.trim())
+          clearSessionModelPreference('new')
+        }
         const { optimisticMessage } = createOptimisticMessage(
           trimmedBody,
           attachmentPayload,
@@ -2777,12 +2798,15 @@ export function ChatScreen({
       activeFriendlyId,
       activeSessionKey,
       createSessionForMessage,
+      clearSessionModelPreference,
       forcedSessionKey,
       isNewChat,
       navigate,
       onSessionResolved,
+      persistedSessionModel,
       scrollChatToBottom,
       sendMessage,
+      setSessionModelPreference,
       upsertSessionInCache,
       queryClient,
       resolvedSessionKey,
@@ -3239,7 +3263,8 @@ export function ChatScreen({
               onAbort={handleAbortStreaming}
               onResearch={handleResearch}
               isLoading={sending || waitingForResponse}
-              disabled={sending || hideUi}
+              disabled={sending || hideUi || Boolean(modelProviderDownReason)}
+              disabledReason={modelProviderDownReason ?? undefined}
               sessionKey={
                 isNewChat
                   ? undefined
