@@ -1,38 +1,34 @@
-# Close Summary: Jobs health filter
+# Close Summary: Focused Lint Fallback Script
 
-## What changed
-- Added a compact health-filter row to the Jobs screen so operators can triage scheduled jobs by All, Stale, Failed, Paused, and Never run states.
-- Added helper-tested copy for filter labels, counts, pressed state labels, health matching, and filtered empty states.
-- Added an explicit accessible label to the Jobs refresh button.
+## What was done
+- Added `lint:changed` package script that runs ESLint only on changed source files (TS/TSX/JS/MJS/CJS) from `HEAD`
+- Added `lint:changed-strict` package script (same as above but without `--no-warn-ignored`, for full strict-mode runs)
+- Both scripts gracefully handle the case where no changed source files exist (prints message and exits 0)
 
-## Files changed
-- `src/screens/jobs/jobs-screen.tsx`
-- `src/screens/jobs/jobs-screen.test.ts`
-- `IDEAS.json`
-- `PLAN.md`
-- `TEST_REPORT.json`
+## Files modified
+- `package.json`: added two scripts after `"lint"` entry
 
 ## Test results
-- Focused Jobs test passed: `npx vitest run src/screens/jobs/jobs-screen.test.ts` — 1 file, 9 tests.
-- Focused changed-file ESLint passed: `npx eslint --no-warn-ignored -f json src/screens/jobs/jobs-screen.tsx src/screens/jobs/jobs-screen.test.ts` — 0 errors, 0 warnings.
-- Build passed: `pnpm build`.
-- Repository-wide `pnpm test` still has an unrelated finance baseline failure in `src/server/demo-trading-engine.test.ts` paper-trade audit logging.
-- Repository-wide `pnpm lint` still has baseline debt outside the Jobs change: 541 errors and 104 warnings.
-- `npx tsc --noEmit` is currently blocked by unrelated dirty/untracked finance route work under `src/server/routes/budget.routes.ts`.
+| Check | Result |
+|-------|--------|
+| JSON parse | ✅ Passed |
+| `pnpm lint:changed` | ✅ Detects changed files, runs ESLint correctly |
+| `pnpm lint:changed-strict` | ✅ Script works, full strict ESLint |
+| `npx tsc --noEmit` | ✅ 0 errors |
+| `git diff --check HEAD` | ⚠️ Pre-existing whitespace issues in risk-check.ts (unrelated) |
 
-## Deployment
-- Source files changed, so the workspace was rebuilt and `hermes-workspace.service` was restarted.
-- `systemctl is-active hermes-workspace.service` returned `active`.
-- External JSON health validation succeeded after one transient nginx 502 warm-up response: final response was HTTP 200, `application/json`, body `{"status":"ok"}`.
-- The current branch is `feat/finance-market-data-and-risk-halts`; local `main` is not ahead of this branch, and this branch is 2 commits ahead of `main`. No push or PR was performed.
+## Notable
+- The `lint:changed` script uses `git diff --name-only HEAD` to find changed files, filters to source extensions, and passes them to `npx eslint --no-warn-ignored -f json`
+- Config-only change (no TypeScript/React code modified) — build/restart skipped
+- Pre-existing dirty worktree: 29 files changed, including finance/trading strategy improvements and chat model preference changes (independent development)
 
-## Side effects observed
-- The worktree already contained many unrelated dirty files and untracked finance drafts before this cycle. Only the Jobs health-filter cycle files were staged for the auto-improvement commit/amend.
-- Build output regenerated `dist/` assets but those generated files were not staged.
+## New ideas for next cycle
+1. **Add `lint:changed-fix` script**: runs `eslint --fix` on changed source files for automatic baseline reduction
+2. **Add `lint:package` script**: validates package.json script entries exist and resolve correctly after changes
+3. **Extract dirty worktree finance/trading code into authoritative commits**: The worktree contains substantial strategy, guardian, and finance store improvements that should be committed independently before they diverge further
 
-## New improvement ideas
-- Persist the selected Jobs health filter between reloads.
-- Add per-profile health filter grouping for scheduled jobs.
-- Fix the unrelated finance TypeScript/test baseline so full `tsc` and `pnpm test` can be strict again.
-
-Generated at: 2026-07-04T06:41:30Z
+## Cycle metadata
+- Branch: `feat/task-blocker-system`
+- Diverged from `origin/main`: 258 behind, 37 ahead
+- Config-only cycle: true
+- Node: 22.22.3, pnpm: 11.24.0

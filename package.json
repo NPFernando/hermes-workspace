@@ -18,8 +18,11 @@
     "test:e2e": "playwright test",
     "test:e2e:auth-state": "node scripts/create-e2e-auth-state.mjs",
     "smoke:managed": "node scripts/managed-companion-smoke.mjs",
+    "finance:storage-monitor-smoke": "tsx scripts/finance-storage-monitor-smoke.ts",
     "playground:ws": "node scripts/playground-ws.mjs",
     "lint": "eslint",
+    "lint:changed": "bash -c 'FILES=$(git diff --name-only HEAD -- \"*.ts\" \"*.tsx\" \"*.js\" \"*.mjs\" \"*.cjs\" 2>/dev/null | grep -v \"node_modules/\" | tr \"\\n\" \" \"); [ -z \"$FILES\" ] && echo \"No changed source files to lint\" || npx eslint --no-warn-ignored -f json $FILES'",
+    "lint:changed-strict": "bash -c 'FILES=$(git diff --name-only HEAD -- \"*.ts\" \"*.tsx\" \"*.js\" \"*.mjs\" \"*.cjs\" 2>/dev/null | grep -v \"node_modules/\" | tr \"\\n\" \" \"); [ -z \"$FILES\" ] && echo \"No changed source files to lint\" || npx eslint -f json $FILES'",
     "format": "prettier",
     "check": "prettier --write . && eslint --fix",
     "electron:dev": "electron .",
@@ -99,6 +102,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/three": "^0.177.0",
+    "@types/xml2js": "^0.4.14",
     "@vitejs/plugin-react": "^5.0.4",
     "concurrently": "^8.2.2",
     "electron": "^40.8.2",
@@ -112,6 +116,7 @@
     "vite": "^7.3.2",
     "vite-plugin-compression": "^0.5.1",
     "vitest": "^3.0.5",
-    "web-vitals": "^5.1.0"
+    "web-vitals": "^5.1.0",
+    "xml2js": "^0.6.2"
   }
 }

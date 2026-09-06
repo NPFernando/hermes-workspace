@@ -1,146 +1,31 @@
-# Implementation Plan: Add API route for workspace performance metrics
+# Implementation Plan: Turn Focused Lint Fallback into a Package Script
 
-## Summary of the change
-Add a new API endpoint `/api/metrics` that returns workspace performance metrics, including bundle sizes of the client and server builds. This endpoint will be accessible only to authenticated users and will help in monitoring the size of the deployed application over time.
+## Summary
+Add a `lint:changed` package script that runs ESLint only on changed source files with `--no-warn-ignored`, making auto-improvement verification repeatable and less ad-hoc. Also add a corresponding `lint:changed-strict` variant without rule overrides to document baseline debt separately.
 
-## Exact files to modify
-- `src/routes/api/metrics.ts` (new file)
+## Files to modify
+- `package.json` — add `lint:changed` and `lint:changed-strict` scripts
+- (No new source files — this is a config-only change)
 
-## Step-by-step implementation instructions
-1. Create a new file at `src/routes/api/metrics.ts` with the following content:
-   ```typescript
-   import { createFileRoute } from '@tanstack/react-router'
-   import { json } from '@tanstack/react-start'
-   import { isAuthenticated } from '../../server/auth-middleware'
-   import { readdirSync, statSync } from 'node:fs'
-   import { join } from 'node:path'
-
-   export const Route = createFileRoute('/api/metrics')({
-     server: {
-       handlers: {
-         GET: async ({ request }) => {
-           if (!isAuthenticated(request)) {
-             return json({ error: 'Unauthorized' }, { status: 401 })
-           }
-
-           const distDir = join(process.cwd(), 'dist')
-           const bundleSizes: Record<string, number> = {}
-
-           try {
-             const clientDir = join(distDir, 'client')
-             const serverDir = join(distDir, 'server')
-
-             // Read client directory
-             if (await fs.promises.access(clientDir).then(() => true).catch(() => false)) {
-               const clientFiles = readdirSync(clientDir)
-               for (const file of clientFiles) {
-                 const filePath = join(clientDir, file)
-                 const stats = statSync(filePath)
-                 bundleSizes[`client/${file}`] = stats.size
-               }
-             }
-
-             // Read server directory
-             if (await fs.promises.access(serverDir).then(() => true).catch(() => false)) {
-               const serverFiles = readdirSync(serverDir)
-               for (const file of serverFiles) {
-                 const filePath = join(serverDir, file)
-                 const stats = statSync(filePath)
-                 bundleSizes[`server/${file}`] = stats.size
-               }
-             }
-           } catch (error) {
-             // If dist directory doesn't exist or any other error, return empty bundle sizes
-             console.warn('Failed to read bundle sizes:', error)
-           }
-
-           return json({
-             bundleSizes,
-             timestamp: Date.now(),
-           })
-         },
-       },
-     },
-   })
+## Step-by-step implementation
+1. Open `package.json`
+2. Add a `lint:changed` script:
+   ```json
+   "lint:changed": "bash -c 'FILES=$(git diff --name-only HEAD -- \"*.ts\" \"*.tsx\" \"*.js\" \"*.mjs\" \"*.cjs\" 2>/dev/null | grep -v \"node_modules/\" | tr \"\\n\" \" \"); [ -z \"$FILES\" ] && echo \"No changed source files to lint\" || npx eslint --no-warn-ignored -f json $FILES'"
    ```
-   Note: The above code uses `fs.promises.access` which requires importing `fs/promises`. Adjust the imports accordingly.
-
-   Alternatively, use synchronous versions for simplicity in a server route:
-   ```typescript
-   import { createFileRoute } from '@tanstack/react-router'
-   import { json } from '@tanstack/react-start'
-   import { isAuthenticated } from '../../server/auth-middleware'
-   import { readdirSync, statSync } from 'node:fs'
-   import { join } from 'node:path'
-
-   export const Route = createFileRoute('/api/metrics')({
-     server: {
-       handlers: {
-         GET: async ({ request }) => {
-           if (!isAuthenticated(request)) {
-             return json({ error: 'Unauthorized' }, { status: 401 })
-           }
-
-           const distDir = join(process.cwd(), 'dist')
-           const bundleSizes: Record<string, number> = {}
-
-           try {
-             const clientDir = join(distDir, 'client')
-             const serverDir = join(distDir, 'server')
-
-             // Read client directory
-             if (fs.existsSync(clientDir)) {
-               const clientFiles = readdirSync(clientDir)
-               for (const file of clientFiles) {
-                 const filePath = join(clientDir, file)
-                 const stats = statSync(filePath)
-                 bundleSizes[`client/${file}`] = stats.size
-               }
-             }
-
-             // Read server directory
-             if (fs.existsSync(serverDir)) {
-               const serverFiles = readdirSync(serverDir)
-               for (const file of serverFiles) {
-                 const filePath = join(serverDir, file)
-                 const stats = statSync(filePath)
-                 bundleSizes[`server/${file}`] = stats.size
-               }
-             }
-           } catch (error) {
-             // If dist directory doesn't exist or any other error, return empty bundle sizes
-             console.warn('Failed to read bundle sizes:', error)
-           }
-
-           return json({
-             bundleSizes,
-             timestamp: Date.now(),
-           })
-         },
-       },
-     },
-   })
+3. Add a `lint:changed-strict` (strict, without `--no-warn-ignored`):
+   ```json
+   "lint:changed-strict": "bash -c 'FILES=$(git diff --name-only HEAD -- \"*.ts\" \"*.tsx\" \"*.js\" \"*.mjs\" \"*.cjs\" 2>/dev/null | grep -v \"node_modules/\" | tr \"\\n\" \" \"); [ -z \"$FILES\" ] && echo \"No changed source files to lint\" || npx eslint -f json $FILES'"
    ```
 
-2. Ensure the new route is automatically picked up by the TanStack router (no additional registration needed).
+## Verification
+1. Run `pnpm lint:changed` and confirm it runs ESLint on changed files only
+2. Run `pnpm lint:changed-strict` and confirm the full (stricter) lint result
 
-## How to verify the change works
-1. Start the Hermes workspace in development mode (if not already running):
-   ```bash
-   cd ~/hermes-workspace && pnpm dev
-   ```
-2. Once the dev server is running, authenticate and access the endpoint:
-   ```bash
-   curl -H "Cookie: <your-auth-cookie>" http://localhost:3000/api/metrics
-   ```
-   Replace `<your-auth-cookie>` with a valid session cookie from logging into the workspace.
-3. Verify the response is a JSON object with `bundleSizes` (containing client and server file sizes) and a `timestamp`.
-4. Check that the bundle sizes are non-zero numbers for existing files in the `dist/client` and `dist/server` directories.
-5. Ensure that unauthenticated requests return a 401 Unauthorized error.
+## Test cases
+- No changed files → prints "No changed source files to lint" and exits 0
+- Changed source files present → runs ESLint on only those files
+- Non-source changed files (json, md, yaml) → excluded, still prints "No changed source files to lint"
 
-## Rollback procedure
-To rollback, simply delete the newly created file:
-```bash
-rm ~/hermes-workspace/src/routes/api/metrics.ts
-```
-Then restart the Hermes workspace server if it was running in production mode.
+## Rollback
+Revert the two script lines in `package.json` to remove `lint:changed` and `lint:changed-strict`.
