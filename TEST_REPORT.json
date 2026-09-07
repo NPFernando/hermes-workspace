@@ -1,21 +1,35 @@
 {
   "passed": true,
-  "summary": "Add keyboard shortcut discoverability trigger in Electron title bar",
-  "focus_tests_pass": 12,
-  "focus_tests_fail": 0,
+  "cycle": "2026-09-07-sidebar-session-skeleton",
+  "summary": "Add sidebar session loading states with skeleton placeholders",
+  "changed_files": [
+    "src/screens/chat/components/sidebar/sidebar-sessions.tsx",
+    "src/screens/chat/components/sidebar/sidebar-sessions.test.ts"
+  ],
   "typecheck": true,
   "tsc_exit": 0,
-  "changed_files": ["src/components/workspace-shell.tsx", "src/components/keyboard-shortcuts-modal.tsx"],
+  "note": "npx tsc --noEmit reports 0 errors in changed files; repo-wide errors are all in pre-existing untracked files (src/screens/personal-finance/, src/screens/sister/, src/screens/settings/sections/dashboard-settings-section.tsx, src/server/financial-institution-enrichment.ts) — baseline debt, not introduced by this cycle.",
+  "focus_tests": {
+    "command": "npx vitest run src/screens/chat/components/sidebar/sidebar-sessions.test.ts",
+    "passed": 7,
+    "failed": 0,
+    "note": "7/7 helper tests for shouldShowSessionSkeleton pass on Node 22."
+  },
   "lint_changed_files": {
+    "command": "npx eslint --no-warn-ignored -f json src/screens/chat/components/sidebar/sidebar-sessions.tsx src/screens/chat/components/sidebar/sidebar-sessions.test.ts",
     "errors": 0,
-    "warnings": 0,
-    "note": "Enforced --no-warn-ignored; both changed files have 0 errors"
+    "warnings": 0
+  },
+  "build": {
+    "command": "pnpm build",
+    "exit": 0,
+    "duration_s": 15.32,
+    "note": "Built under Node 22 (Hermes-managed node)."
   },
   "deployment": {
     "branch": "feat/task-blocker-system",
     "behind_main": 3,
     "ahead_of_main": 40,
-    "merge_blocked": true,
-    "note": "Branch is 3 commits behind main; merge would create unreviewed merge commits. Build and deploy from current branch instead."
+    "plan": "Source changed, so build + restart hermes-workspace.service + validate JSON health body. Do not push."
   }
 }

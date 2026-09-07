@@ -32,6 +32,41 @@ type SidebarSessionsProps = {
   onRetry: () => void
 }
 
+/**
+ * Show skeleton placeholder rows while sessions are being fetched,
+ * matching the SessionItem layout to avoid visual jank on load.
+ */
+function SessionItemSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="flex flex-col gap-px" aria-hidden="true">
+      {Array.from({ length: rows }, (_, index) => (
+        <div
+          key={index}
+          className="flex items-center w-full h-14 rounded-lg pl-1.5 pr-0.5"
+        >
+          <div className="flex-1 min-w-0 py-1.5">
+            <div className="h-3.5 w-3/5 rounded bg-[var(--theme-hover)] animate-pulse" />
+            <div className="mt-2 h-2.5 w-2/5 rounded bg-[var(--theme-hover)] animate-pulse" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Decide whether to show the skeleton loading state instead of actual
+ * session content. Returns true during the initial fetch or when a
+ * background refresh has no data to show yet.
+ */
+export function shouldShowSessionSkeleton(
+  loading: boolean,
+  fetching: boolean,
+  sessionCount: number,
+): boolean {
+  return loading || (fetching && sessionCount === 0)
+}
+
 export const SidebarSessions = memo(function SidebarSessionsComponent({
   sessions,
   activeFriendlyId,
@@ -106,9 +141,14 @@ export const SidebarSessions = memo(function SidebarSessionsComponent({
         <ScrollAreaRoot className="flex-1 min-h-0">
           <ScrollAreaViewport className="min-h-0">
             <div className="flex flex-col gap-px pl-3 pr-2">
-              {loading ? (
-                <div className="px-2 py-2 text-xs text-[var(--theme-muted)]">
-                  Loading sessions…
+              {shouldShowSessionSkeleton(loading, fetching, sessions.length) ? (
+                <div
+                  role="status"
+                  aria-busy="true"
+                  aria-label="Loading sessions"
+                  className="flex flex-col gap-px pl-1 pr-0.5 py-1"
+                >
+                  <SessionItemSkeleton rows={3} />
                 </div>
               ) : error ? (
                 <div className="px-2 py-2 text-xs text-[var(--theme-muted)]">

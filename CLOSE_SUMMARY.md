@@ -1,29 +1,32 @@
-# Close Summary — Add keyboard shortcut discoverability trigger
+# Close Summary — Add sidebar session skeleton loading states
 
 ## What was changed
-- **`src/components/keyboard-shortcuts-modal.tsx`** — Added a custom event listener for `open-keyboard-shortcuts` that opens the modal alongside the existing `?` key handler
-- **`src/components/workspace-shell.tsx`** — Replaced the Electron title bar right spacer with a flex container holding a keyboard icon button (`⌨` SVG) that dispatches the custom event
+
+- **`src/screens/chat/components/sidebar/sidebar-sessions.tsx`** — Added a `SessionItemSkeleton` component that renders 3 compact skeleton rows (title line + subtitle line using `animate-pulse`), matching the `SessionItem` layout. Replaced the plain "Loading sessions…" text with the skeleton placeholder. Added `shouldShowSessionSkeleton()` helper that shows skeletons during initial load or during background fetch with no data yet. Used `role="status"` and `aria-busy="true"` for screen-reader support.
+
+- **`src/screens/chat/components/sidebar/sidebar-sessions.test.ts`** — Focused unit tests for `shouldShowSessionSkeleton` covering all 7 loading/fetching/data combinations.
 
 ## Test results
+
 | Gate | Result |
 |---|---|
-| `npx tsc --noEmit` (Node 22) | ✅ 0 errors |
-| Focused UX tests (12 tests) | ✅ All passed |
+| `npx tsc --noEmit` (Node 22) | ✅ 0 errors in changed files |
+| Focused helper tests (7 tests) | ✅ All passed |
 | Focused ESLint on changed files | ✅ 0 errors, 0 warnings |
-| `pnpm build` | ✅ Built in 15.41s |
+| `git diff --check` on changed files | ✅ Clean |
+| `pnpm build` | ✅ Built in 15.32s |
 | Service restart | ✅ `hermes-workspace.service` active |
 | Health check | ✅ `{"status":"ok"}` |
 
 ## Deployment
-- Branch `feat/task-blocker-system` is 3 commits behind main, 40 ahead — cannot merge without unreviewed merge commits
-- Built and deployed from current branch, service restarted, JSON health validated
+
+- Branch: `feat/task-blocker-system` (3 behind main, 40 ahead — merge blocked, deployed from current branch)
+- Source files changed → built, restarted service, validated JSON health body
+- No push to remote
 
 ## Side-effects observed
-- Only Electron users see the button (in the browser, `?` key remains the only way)
-- All keyboard behavior unchanged — `?` and `Esc` still work as before
-- No regressions in any workspace components
 
-## New ideas for next cycle
-1. **Add workspace header keyboard shortcut button for browser users** — Extend the keyboard icon button to the main workspace header (not just Electron title bar) so browser users also have a visible affordance
-2. **Add workspace shell component regression tests** — workspace-shell.tsx has uncommitted navigation changes; add focused unit tests to lock in expected mobile/desktop shell behavior
-3. **Add sidebar session skeleton loading states** — Show compact skeleton placeholder rows during initial sidebar data fetch to prevent empty flash
+- Existing "Updating…" indicator during background fetch with existing data is preserved unchanged
+- Skeleton uses the workspace's standard `animate-pulse` with `bg-[var(--theme-hover)]` — consistent with other loading patterns in the codebase
+- The `shouldShowSessionSkeleton` logic is a pure exported function, testable without rendering
+- All unrelated dirty worktree files (finance/trading/dashboard work) left unstaged
