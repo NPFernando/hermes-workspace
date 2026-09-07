@@ -1966,7 +1966,7 @@ export function TasksScreen() {
                     <div className="flex flex-col gap-2 p-2 flex-1 min-h-0">
                       <div className="flex flex-col items-center justify-center py-8 gap-2 text-[var(--theme-muted)] opacity-60">
                         <HugeiconsIcon icon={CheckListIcon} size={22} />
-                        <p className="text-xs font-medium">No tasks</p>
+                        <p className="text-xs font-medium">No {columnLabel.toLowerCase()} tasks</p>
                         <p className="text-[10px]">Drop here or click + to add</p>
                       </div>
                     </div>
