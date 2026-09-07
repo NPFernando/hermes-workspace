@@ -1472,6 +1472,13 @@ export function setNonLiveExecutionMode(
   return db
 }
 
+/**
+ * Postgres `audit_logs` is the system of record. The local
+ * `~/.hermes/finance/audit.jsonl` is a best-effort **recovery buffer** —
+ * written only when the Postgres insert did not land, so a later run (or the
+ * `finance-pg-sync` cron) can replay it. Neither write can suppress the other,
+ * and neither may ever throw back into a finance mutation or trading cycle.
+ */
 export function appendAuditLog(
   action: string,
   details: Record<string, unknown>,
@@ -1483,24 +1490,24 @@ export function appendAuditLog(
     source: 'hermes-finance',
     createdAt: nowIso(),
   }
+
+  let pgOk = false
   try {
-    fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
-    fs.appendFileSync(FINANCE_AUDIT_PATH, `${JSON.stringify(entry)}\n`, {
-      mode: 0o600,
-    })
-    if (process.env.VITEST || process.env.NODE_ENV === 'test') {
-      appendFinanceAuditPostgres(entry)
-      return
-    }
-    if (!appendFinanceAuditPostgres(entry)) {
-      // Best-effort persistence: keep the local audit trail authoritative even
-      // when Postgres is temporarily unavailable, rather than crashing a live
-      // trading cycle or dashboard request.
-      return
-    }
+    pgOk = appendFinanceAuditPostgres(entry)
   } catch {
-    // Fall back silently to the local JSONL file; the local audit trail is still
-    // valuable even when the database is unavailable.
+    pgOk = false
+  }
+
+  if (!pgOk) {
+    try {
+      fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+      fs.appendFileSync(FINANCE_AUDIT_PATH, `${JSON.stringify(entry)}\n`, {
+        mode: 0o600,
+      })
+    } catch {
+      // Buffer write failed too — the entry is lost. Swallowed on purpose so
+      // audit-log I/O can never crash the caller.
+    }
   }
 }
 
