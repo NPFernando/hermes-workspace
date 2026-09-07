@@ -118,6 +118,7 @@ When `upstream-sync.py` reports that upstream touched one of our files:
 | `src/components/ui/skeleton.tsx` (+ `.test.tsx`) | 2026-09 NEW — single `<Skeleton>` primitive over the theme-aware `.skeleton-shimmer` utility (single block or `count` stacked lines); `data-slot="skeleton"`, `aria-hidden`. Replaces the deleted light-only `src/components/Skeleton.tsx` + `Skeleton.css` | Personal customization | Keep; adopt upstream's if they ship a shared skeleton |
 | `src/screens/dashboard/components/widget-skeleton.tsx` | 2026-09 NEW — per-`WidgetId` `switch` returning shape/height-matched skeletons so the dashboard grid doesn't reflow when real cards mount; rendered by `WidgetShell` | Personal customization (dashboard is forked) | Keep |
 | `src/components/Skeleton.tsx` + `Skeleton.css` | 2026-09 DELETED — legacy light-mode-only skeleton (hard-coded greys, broken in dark themes), unreferenced (a test even guarded against importing it). Superseded by `src/components/ui/skeleton.tsx` | Personal customization | Do not restore |
+| `MOTION.md` | 2026-09 NEW — house motion & loading standard (easing tokens, `--motion-*` duration scale, first-load-vs-refetch rule, reduced-motion requirement). Written alongside the dashboard loading-animation rebuild | Personal documentation | Keep always |
 
 ---
 
