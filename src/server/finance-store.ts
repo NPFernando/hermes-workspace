@@ -806,30 +806,25 @@ export type FinanceDatabase = {
   connectivityBreaker: ConnectivityBreakerState
 }
 
+/**
+ * Postgres is the sole finance persistence layer, so storage health is now a
+ * plain reachability signal — there is no second store to drift against.
+ * - `healthy`             — Postgres reachable, finance data present.
+ * - `postgres_unavailable` — Postgres enabled but unreachable / no data yet.
+ * - `json_primary`        — Postgres disabled (HERMES_FINANCE_STORE=json) or a
+ *                           dev / in-memory backend is active.
+ */
 export type FinanceStorageHealthStatus =
   | 'healthy'
-  | 'json_primary'
   | 'postgres_unavailable'
-  | 'postgres_behind'
-  | 'mirror_mismatch'
+  | 'json_primary'
 
 export type FinanceStorageHealth = {
   status: FinanceStorageHealthStatus
   warnings: Array<string>
-  jsonUpdatedAt: string | null
   postgresUpdatedAt: string | null
-  postgresLagMs: number
-  isPostgresBehindJson: boolean
-  selfHeal: {
-    attempted: boolean
-    attempts: number
-    succeeded: boolean
-    lastAttemptAt: string | null
-  }
   rowCounts: {
-    json: Record<string, number>
     postgres: Record<string, number>
-    lagging: Record<string, { json: number; postgres: number }>
   }
 }
 
@@ -973,16 +968,7 @@ export function readFinanceStore(): FinanceDatabase {
 }
 
 function readFinanceStoreUncached(): FinanceDatabase {
-  if (process.env.VITEST || process.env.NODE_ENV === 'test') {
-    return readFinanceStoreJsonCompatibility()
-  }
-  const postgresDb = readFinancePostgresNormalized()
-  if (!postgresDb) {
-    throw new Error(
-      'Finance PostgreSQL runtime store is unavailable; refusing JSON fallback.',
-    )
-  }
-  return migrateFinanceStore(postgresDb)
+  return financeBackend.read()
 }
 
 function readFinanceStoreJsonCompatibility(): FinanceDatabase {
@@ -1258,7 +1244,6 @@ function shouldPreferPostgresStore(
 }
 
 export function buildFinanceStorageHealth(input: {
-  jsonDb: FinanceDatabase | null
   postgresDb: FinanceDatabase | null
   postgres: {
     enabled: boolean
@@ -1267,77 +1252,39 @@ export function buildFinanceStorageHealth(input: {
     reason?: string
     lastWriteError?: string
   }
-  selfHeal?: FinanceStorageHealth['selfHeal']
 }): FinanceStorageHealth {
-  const jsonUpdatedAt = input.jsonDb?.updatedAt ?? null
-  const postgresUpdatedAt = input.postgresDb?.updatedAt ?? null
-  const jsonUpdatedMs = input.jsonDb ? updatedAtMs(input.jsonDb) : 0
-  const postgresUpdatedMs = input.postgresDb ? updatedAtMs(input.postgresDb) : 0
-  const postgresLagMs =
-    jsonUpdatedMs > postgresUpdatedMs ? jsonUpdatedMs - postgresUpdatedMs : 0
-  const jsonCounts = financeCollectionCounts(input.jsonDb)
-  const postgresCounts = financeCollectionCounts(input.postgresDb)
-  const lagging: Record<string, { json: number; postgres: number }> = {}
-  for (const key of STORAGE_HEALTH_COLLECTIONS) {
-    if (jsonCounts[key] > postgresCounts[key]) {
-      lagging[key] = { json: jsonCounts[key], postgres: postgresCounts[key] }
-    }
-  }
-
   const warnings: Array<string> = []
   let status: FinanceStorageHealthStatus = 'healthy'
 
   if (!input.postgres.enabled) {
     status = 'json_primary'
-  } else if (!input.postgres.available) {
+    warnings.push(
+      'Postgres persistence is disabled (dev / in-memory backend).',
+    )
+  } else if (
+    !input.postgres.available ||
+    !input.postgres.snapshotAvailable ||
+    !input.postgresDb
+  ) {
     status = 'postgres_unavailable'
     warnings.push(
       input.postgres.reason
-        ? `Postgres mirror unavailable: ${input.postgres.reason}.`
-        : 'Postgres mirror unavailable; using JSON fallback.',
-    )
-  } else if (!input.postgres.snapshotAvailable || !input.postgresDb) {
-    status = 'postgres_unavailable'
-    warnings.push('Postgres mirror has no finance snapshot yet.')
-  } else if (postgresLagMs > 0) {
-    status = 'postgres_behind'
-    warnings.push(
-      `Postgres mirror is ${Math.ceil(postgresLagMs / 1000)}s behind JSON finance storage.`,
-    )
-  } else if (Object.keys(lagging).length > 0) {
-    status = 'mirror_mismatch'
-    const summary = Object.entries(lagging)
-      .slice(0, 3)
-      .map(([key, counts]) => `${key} ${counts.postgres}/${counts.json}`)
-      .join(', ')
-    warnings.push(
-      `Postgres mirror has fewer rows than JSON storage (${summary}).`,
+        ? `Postgres finance store unavailable: ${input.postgres.reason}.`
+        : 'Postgres finance store unavailable.',
     )
   }
   if (input.postgres.lastWriteError) {
     warnings.push(
-      `Last Postgres mirror write failed: ${input.postgres.lastWriteError}.`,
+      `Last Postgres write failed: ${input.postgres.lastWriteError}.`,
     )
   }
 
   return {
     status,
     warnings,
-    jsonUpdatedAt,
-    postgresUpdatedAt,
-    postgresLagMs,
-    isPostgresBehindJson:
-      status === 'postgres_behind' || status === 'mirror_mismatch',
-    selfHeal: input.selfHeal ?? {
-      attempted: false,
-      attempts: 0,
-      succeeded: false,
-      lastAttemptAt: null,
-    },
+    postgresUpdatedAt: input.postgresDb?.updatedAt ?? null,
     rowCounts: {
-      json: jsonCounts,
-      postgres: postgresCounts,
-      lagging,
+      postgres: financeCollectionCounts(input.postgresDb),
     },
   }
 }
@@ -1352,25 +1299,96 @@ function migrateFinanceStore(db: FinanceDatabase): FinanceDatabase {
   }
 }
 
+/**
+ * Persistence backend seam for `readFinanceStore` / `writeFinanceStore`.
+ *
+ * Production: the `finance` Postgres normalized store
+ * (`readFinancePostgresNormalized` / `writeFinancePostgresNormalized`).
+ * Under vitest: the JSON-compat store (tmp-`HOME` isolated), unchanged from
+ * before this seam existed.
+ *
+ * Tests can also swap in a pure in-memory backend via `__setFinanceBackend()`
+ * so no test can reach a real database — this upholds the 2026-07-27
+ * anti-pollution guard by construction rather than by an env check.
+ */
+export interface FinanceStoreBackend {
+  read: () => FinanceDatabase
+  write: (db: FinanceDatabase) => void
+}
+
+const postgresFinanceBackend: FinanceStoreBackend = {
+  read() {
+    const db = readFinancePostgresNormalized()
+    if (!db) {
+      throw new Error(
+        'Finance PostgreSQL runtime store is unavailable; refusing JSON fallback.',
+      )
+    }
+    return migrateFinanceStore(db)
+  },
+  write(db) {
+    if (!writeFinancePostgresNormalized(db)) {
+      throw new Error(
+        'Finance PostgreSQL runtime store is unavailable; write was not persisted.',
+      )
+    }
+  },
+}
+
+const jsonCompatFinanceBackend: FinanceStoreBackend = {
+  read: () => readFinanceStoreJsonCompatibility(),
+  write(db) {
+    fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+    writeFinanceJsonStore(db)
+    writeFinancePostgresStore(db)
+  },
+}
+
+function defaultFinanceBackend(): FinanceStoreBackend {
+  return process.env.VITEST || process.env.NODE_ENV === 'test'
+    ? jsonCompatFinanceBackend
+    : postgresFinanceBackend
+}
+
+let financeBackend: FinanceStoreBackend = defaultFinanceBackend()
+
+/** Test-only: swap the persistence backend and drop the read cache. */
+export function __setFinanceBackend(backend: FinanceStoreBackend): void {
+  financeBackend = backend
+  financeStoreCache = null
+}
+
+/** Test-only: restore the environment default backend. */
+export function __resetFinanceBackend(): void {
+  financeBackend = defaultFinanceBackend()
+  financeStoreCache = null
+}
+
+/**
+ * Test-only: a pure in-memory backend seeded from `initial` (or an empty DB).
+ * Holds one migrated `FinanceDatabase` in a closure; every read/write is a
+ * deep-ish copy via `migrateFinanceStore` so callers can't mutate the store
+ * through a returned reference.
+ */
+export function __inMemoryFinanceBackend(
+  initial?: FinanceDatabase,
+): FinanceStoreBackend {
+  let current = migrateFinanceStore(initial ?? createEmptyFinanceDatabase())
+  return {
+    read: () => migrateFinanceStore(current),
+    write: (db) => {
+      current = migrateFinanceStore(db)
+    },
+  }
+}
+
 export function writeFinanceStore(db: FinanceDatabase): void {
   const updated = { ...db, updatedAt: nowIso() }
-  if (process.env.VITEST || process.env.NODE_ENV === 'test') {
-    fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
-    writeFinanceJsonStore(updated)
-    writeFinancePostgresStore(updated)
-  } else if (!writeFinancePostgresNormalized(updated)) {
-    throw new Error(
-      'Finance PostgreSQL runtime store is unavailable; write was not persisted.',
-    )
-  }
+  financeBackend.write(updated)
   // Invalidate (rather than repopulate) the read cache: `updated` here is
   // the raw pre-overlay object, not the merged result readFinanceStore()
-  // normally returns (Postgres-sourced personal-finance collections/settings,
-  // split-store trading data, etc. — see overlaySplitStores()). Caching it
-  // directly would let callers observe a write that skips that merge.
-  // Invalidating just means the very next read after a write pays the full
-  // uncached cost once, which is rare next to the read-heavy dashboard
-  // access pattern this cache targets.
+  // normally returns. Invalidating just means the next read pays the full
+  // uncached cost once, rare next to the read-heavy dashboard access pattern.
   financeStoreCache = null
 }
 
@@ -1410,6 +1428,13 @@ export function setNonLiveExecutionMode(
   return db
 }
 
+/**
+ * Postgres `audit_logs` is the system of record. The local
+ * `~/.hermes/finance/audit.jsonl` is a best-effort **recovery buffer** —
+ * written only when the Postgres insert did not land, so a later run (or the
+ * `finance-pg-sync` cron) can replay it. Neither write can suppress the other,
+ * and neither may ever throw back into a finance mutation or trading cycle.
+ */
 export function appendAuditLog(
   action: string,
   details: Record<string, unknown>,
@@ -1421,120 +1446,39 @@ export function appendAuditLog(
     source: 'hermes-finance',
     createdAt: nowIso(),
   }
+
+  let pgOk = false
   try {
-    fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
-    fs.appendFileSync(FINANCE_AUDIT_PATH, `${JSON.stringify(entry)}\n`, {
-      mode: 0o600,
-    })
-    if (process.env.VITEST || process.env.NODE_ENV === 'test') {
-      appendFinanceAuditPostgres(entry)
-      return
-    }
-    if (!appendFinanceAuditPostgres(entry)) {
-      // Best-effort persistence: keep the local audit trail authoritative even
-      // when Postgres is temporarily unavailable, rather than crashing a live
-      // trading cycle or dashboard request.
-      return
-    }
+    pgOk = appendFinanceAuditPostgres(entry)
   } catch {
-    // Fall back silently to the local JSONL file; the local audit trail is still
-    // valuable even when the database is unavailable.
+    pgOk = false
   }
-}
 
-function storageHealthNeedsSelfHeal(health: FinanceStorageHealth): boolean {
-  return (
-    health.status === 'postgres_behind' ||
-    health.status === 'mirror_mismatch' ||
-    health.status === 'postgres_unavailable'
-  )
-}
-
-export function financeStorageStatus(
-  options: { selfHeal?: boolean; selfHealRetries?: number } = {},
-) {
-  if (!(process.env.VITEST || process.env.NODE_ENV === 'test')) {
-    const pg = financePostgresStatus()
-    const postgresDb = readFinancePostgresNormalized()
-    const health = buildFinanceStorageHealth({
-      jsonDb: null,
-      postgresDb,
-      postgres: {
-        ...pg,
-        snapshotAvailable: postgresDb !== null,
-      },
-    })
-    return {
-      active: postgresDb ? 'postgres' : 'unavailable',
-      fallback: 'none',
-      jsonPath: FINANCE_DATA_PATH,
-      auditPath: FINANCE_AUDIT_PATH,
-      postgres: pg,
-      health,
-    }
-  }
-  let pg = financePostgresStatus()
-  const jsonDb = readFinanceJsonStore()
-  let postgresDb = readFinancePostgresStore()
-  let selfHeal: FinanceStorageHealth['selfHeal'] = {
-    attempted: false,
-    attempts: 0,
-    succeeded: false,
-    lastAttemptAt: null,
-  }
-  let health = buildFinanceStorageHealth({
-    jsonDb,
-    postgresDb,
-    postgres: pg,
-    selfHeal,
-  })
-
-  if (
-    options.selfHeal &&
-    jsonDb &&
-    pg.enabled &&
-    pg.available &&
-    storageHealthNeedsSelfHeal(health)
-  ) {
-    const retries = Math.max(1, Math.min(options.selfHealRetries ?? 2, 5))
-    for (let attempt = 1; attempt <= retries; attempt += 1) {
-      selfHeal = {
-        attempted: true,
-        attempts: attempt,
-        succeeded: false,
-        lastAttemptAt: nowIso(),
-      }
-      const ok = writeFinancePostgresStore(jsonDb)
-      pg = financePostgresStatus()
-      postgresDb = readFinancePostgresStore()
-      health = buildFinanceStorageHealth({
-        jsonDb,
-        postgresDb,
-        postgres: pg,
-        selfHeal: { ...selfHeal, succeeded: ok },
+  if (!pgOk) {
+    try {
+      fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+      fs.appendFileSync(FINANCE_AUDIT_PATH, `${JSON.stringify(entry)}\n`, {
+        mode: 0o600,
       })
-      if (ok && !storageHealthNeedsSelfHeal(health)) break
+    } catch {
+      // Buffer write failed too — the entry is lost. Swallowed on purpose so
+      // audit-log I/O can never crash the caller.
     }
-    const healed = !storageHealthNeedsSelfHeal(health)
-    appendAuditLog(
-      healed
-        ? 'finance_postgres_mirror_self_healed'
-        : 'finance_postgres_mirror_self_heal_failed',
-      {
-        attempts: selfHeal.attempts,
-        status: health.status,
-        warnings: health.warnings,
-      },
-    )
   }
+}
 
+export function financeStorageStatus() {
+  const pg = financePostgresStatus()
+  const postgresDb = readFinancePostgresNormalized()
+  const health = buildFinanceStorageHealth({
+    postgresDb,
+    postgres: {
+      ...pg,
+      snapshotAvailable: postgresDb !== null,
+    },
+  })
   return {
-    active:
-      pg.available && pg.snapshotAvailable && !health.isPostgresBehindJson
-        ? 'postgres'
-        : 'json',
-    fallback: 'json',
-    jsonPath: FINANCE_DATA_PATH,
+    active: postgresDb ? ('postgres' as const) : ('unavailable' as const),
     auditPath: FINANCE_AUDIT_PATH,
     postgres: pg,
     health,
@@ -1550,12 +1494,8 @@ export function financeStorageAlerts(health: FinanceStorageHealth): Array<{
   return [
     {
       level: health.status === 'postgres_unavailable' ? 'critical' : 'warning',
-      title: 'Finance storage mirror unhealthy',
-      detail: `${health.warnings.join(' ')}${
-        health.selfHeal.attempted
-          ? ` Self-heal ${health.selfHeal.succeeded ? 'succeeded' : 'did not resolve it'} after ${health.selfHeal.attempts} attempt(s).`
-          : ''
-      }`,
+      title: 'Finance storage unhealthy',
+      detail: health.warnings.join(' '),
     },
   ]
 }

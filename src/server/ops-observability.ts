@@ -457,8 +457,6 @@ export interface FinanceStorageMonitorSummary {
   consecutiveFailures: number
   lastStatus: string | null
   lastWarnings: Array<string>
-  lastSelfHealAttempts: number
-  lastSelfHealSucceeded: boolean | null
   heartbeatAgeMs: number | null
   stale: boolean
 }
@@ -497,8 +495,6 @@ export function getFinanceStorageMonitorSummary(
     consecutiveFailures: state.consecutiveFailures,
     lastStatus: state.lastStatus,
     lastWarnings: state.lastWarnings,
-    lastSelfHealAttempts: state.lastSelfHealAttempts,
-    lastSelfHealSucceeded: state.lastSelfHealSucceeded,
     heartbeatAgeMs,
     stale: heartbeatAgeMs === null || heartbeatAgeMs > staleAfterMs,
   }

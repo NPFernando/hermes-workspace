@@ -4,7 +4,6 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { safeErrorMessage } from '../../server/rate-limit'
 import {
   FINANCE_AUDIT_PATH,
-  FINANCE_DATA_PATH,
   TRADING_MODES,
   addFinanceRecord,
   addPendingIngestion,
@@ -208,14 +207,15 @@ function isLiveMode(mode: string): boolean {
 function financePayload() {
   recoverValidationRunAutomationIfStale()
   const db = ensureFinanceStore()
-  const storage = financeStorageStatus({ selfHeal: true })
+  const storage = financeStorageStatus()
   const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
   return {
     ok: true,
     checkedAt: Date.now(),
     storage,
     paths: {
-      database: FINANCE_DATA_PATH,
+      // Postgres is the sole store; this used to be a finance.json path.
+      database: `postgres:${storage.postgres.database}`,
       postgresDatabase: storage.postgres.database,
       auditLog: FINANCE_AUDIT_PATH,
       secretStorage:
@@ -357,7 +357,7 @@ function financePayload() {
  */
 function personalFinancePayload() {
   const db = ensureFinanceStore()
-  const storage = financeStorageStatus({ selfHeal: true })
+  const storage = financeStorageStatus()
   const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
   const efTargetMonths = db.settings.emergencyFundTargetMonths ?? 0
   const efAvgMonthlyExpensesLkr = getAverageMonthlyExpensesLkr(db, 3)

@@ -19,7 +19,6 @@ const DEFAULT_INTERVAL_MS = 10 * 60_000
 const DEFAULT_INITIAL_DELAY_MS = 60_000
 const DEFAULT_ALERT_REPEAT_MS = 6 * 60 * 60_000
 const DEFAULT_FAILURE_THRESHOLD = 3
-const DEFAULT_SELF_HEAL_RETRIES = 2
 const DEFAULT_ALERT_TARGET = 'telegram:2130622225'
 
 export type FinanceStorageMonitorState = {
@@ -29,8 +28,6 @@ export type FinanceStorageMonitorState = {
   consecutiveFailures: number
   lastStatus: FinanceStorageHealthStatus | null
   lastWarnings: Array<string>
-  lastSelfHealAttempts: number
-  lastSelfHealSucceeded: boolean | null
 }
 
 export type FinanceStorageHeartbeatResult = {
@@ -54,7 +51,6 @@ type FinanceStorageHeartbeatOptions = {
   auditLogger?: (action: string, details: Record<string, unknown>) => void
   failureAlertThreshold?: number
   alertRepeatMs?: number
-  selfHealRetries?: number
 }
 
 type FinanceStorageMonitorStartOptions = FinanceStorageHeartbeatOptions & {
@@ -69,8 +65,6 @@ const EMPTY_STATE: FinanceStorageMonitorState = {
   consecutiveFailures: 0,
   lastStatus: null,
   lastWarnings: [],
-  lastSelfHealAttempts: 0,
-  lastSelfHealSucceeded: null,
 }
 
 let monitorTimer: ReturnType<typeof setInterval> | null = null
@@ -135,15 +129,6 @@ export function readFinanceStorageMonitorState(
             (warning): warning is string => typeof warning === 'string',
           )
         : [],
-      lastSelfHealAttempts:
-        typeof parsed.lastSelfHealAttempts === 'number' &&
-        Number.isFinite(parsed.lastSelfHealAttempts)
-          ? Math.max(0, Math.floor(parsed.lastSelfHealAttempts))
-          : 0,
-      lastSelfHealSucceeded:
-        typeof parsed.lastSelfHealSucceeded === 'boolean'
-          ? parsed.lastSelfHealSucceeded
-          : null,
     }
   } catch {
     return { ...EMPTY_STATE }
@@ -176,17 +161,11 @@ export function formatFinanceStorageOpsAlert(input: {
 }): string {
   const { health } = input.storage
   const lines = [
-    'Finance storage mirror alert',
+    'Finance storage alert',
     `Status: ${health.status}`,
     `Consecutive failed heartbeats: ${input.consecutiveFailures}`,
     `Active storage: ${input.storage.active}`,
-    `JSON updated: ${health.jsonUpdatedAt ?? 'unknown'}`,
     `Postgres updated: ${health.postgresUpdatedAt ?? 'unknown'}`,
-    `Self-heal: ${
-      health.selfHeal.attempted
-        ? `${health.selfHeal.succeeded ? 'resolved' : 'unresolved'} after ${health.selfHeal.attempts} attempt(s)`
-        : 'not attempted'
-    }`,
     `Checked at: ${input.checkedAt}`,
   ]
   if (health.warnings.length > 0) {
@@ -231,18 +210,7 @@ export function runFinanceStorageHeartbeat(
   const nowMs = parseTimeMs(checkedAt)
   const statePath = options.statePath ?? defaultStatePath()
   const previous = readFinanceStorageMonitorState(statePath)
-  const selfHealRetries =
-    positiveNumber(options.selfHealRetries) ??
-    envCount(
-      'HERMES_FINANCE_STORAGE_SELF_HEAL_RETRIES',
-      DEFAULT_SELF_HEAL_RETRIES,
-    )
-  const storage =
-    options.storageStatus?.() ??
-    financeStorageStatus({
-      selfHeal: true,
-      selfHealRetries,
-    })
+  const storage = options.storageStatus?.() ?? financeStorageStatus()
   const storageAlerts = financeStorageAlerts(storage.health)
   const unhealthy = storageAlerts.length > 0
   const consecutiveFailures = unhealthy ? previous.consecutiveFailures + 1 : 0
@@ -290,10 +258,6 @@ export function runFinanceStorageHeartbeat(
     consecutiveFailures,
     lastStatus: storage.health.status,
     lastWarnings: storage.health.warnings,
-    lastSelfHealAttempts: storage.health.selfHeal.attempts,
-    lastSelfHealSucceeded: storage.health.selfHeal.attempted
-      ? storage.health.selfHeal.succeeded
-      : null,
   }
 
   writeFinanceStorageMonitorState(nextState, statePath)
@@ -307,7 +271,6 @@ export function runFinanceStorageHeartbeat(
       warnings: storage.health.warnings,
       notificationSent,
       notificationReason,
-      selfHeal: storage.health.selfHeal,
     })
   } else if (!unhealthy && previous.consecutiveFailures > 0) {
     audit('finance_storage_monitor_recovered', {

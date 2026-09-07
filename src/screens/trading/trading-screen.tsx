@@ -445,8 +445,6 @@ type FinancePayload = {
   checkedAt: number
   storage: {
     active: string
-    fallback: string
-    jsonPath: string
     auditPath: string
     postgres: {
       enabled: boolean
@@ -457,27 +455,11 @@ type FinancePayload = {
       lastWriteError?: string
     }
     health?: {
-      status:
-        | 'healthy'
-        | 'json_primary'
-        | 'postgres_unavailable'
-        | 'postgres_behind'
-        | 'mirror_mismatch'
+      status: 'healthy' | 'postgres_unavailable' | 'json_primary'
       warnings: Array<string>
-      jsonUpdatedAt: string | null
       postgresUpdatedAt: string | null
-      postgresLagMs: number
-      isPostgresBehindJson: boolean
-      selfHeal: {
-        attempted: boolean
-        attempts: number
-        succeeded: boolean
-        lastAttemptAt: string | null
-      }
       rowCounts: {
-        json: Record<string, number>
         postgres: Record<string, number>
-        lagging: Record<string, { json: number; postgres: number }>
       }
     }
   }
@@ -4830,7 +4812,7 @@ export function TradingScreen() {
           payload.storage.health.warnings.length > 0 && (
             <div className="mt-3 rounded-2xl border border-[color-mix(in_srgb,var(--theme-warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] p-3 text-[var(--theme-warning)]">
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--theme-warning)]">
-                Storage mirror warning
+                Storage warning
               </div>
               <div className="mt-1 space-y-1">
                 {payload.storage.health.warnings.map((warning) => (
@@ -4838,19 +4820,9 @@ export function TradingScreen() {
                 ))}
               </div>
               <p className="mt-2 text-xs text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)]">
-                JSON updated:{' '}
-                {payload.storage.health.jsonUpdatedAt ?? 'unknown'} · Postgres
-                updated: {payload.storage.health.postgresUpdatedAt ?? 'unknown'}
+                Postgres updated:{' '}
+                {payload.storage.health.postgresUpdatedAt ?? 'unknown'}
               </p>
-              {payload.storage.health.selfHeal.attempted && (
-                <p className="mt-1 text-xs text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)]">
-                  Self-heal:{' '}
-                  {payload.storage.health.selfHeal.succeeded
-                    ? 'resolved'
-                    : 'still unhealthy'}{' '}
-                  after {payload.storage.health.selfHeal.attempts} attempt(s)
-                </p>
-              )}
             </div>
           )}
         <p>Audit log: {payload.paths.auditLog}</p>

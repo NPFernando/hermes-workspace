@@ -53,8 +53,6 @@ interface FinanceStorageMonitorSummary {
   consecutiveFailures: number
   lastStatus: string | null
   lastWarnings: Array<string>
-  lastSelfHealAttempts: number
-  lastSelfHealSucceeded: boolean | null
   heartbeatAgeMs: number | null
   stale: boolean
 }
@@ -417,15 +415,6 @@ export function OpsCostScreen() {
                 {financeStorageMonitor.lastHealthyAt
                   ? ` · healthy ${new Date(financeStorageMonitor.lastHealthyAt).toLocaleString()}`
                   : ''}
-              </p>
-              <p className="text-[var(--theme-muted)]">
-                Self-heal:{' '}
-                {financeStorageMonitor.lastSelfHealSucceeded == null
-                  ? 'not needed'
-                  : financeStorageMonitor.lastSelfHealSucceeded
-                    ? 'resolved'
-                    : 'unresolved'}{' '}
-                after {financeStorageMonitor.lastSelfHealAttempts} attempt(s)
               </p>
               {financeStorageMonitor.lastWarnings.length > 0 ? (
                 <ul className="space-y-1 text-[var(--theme-muted)]">

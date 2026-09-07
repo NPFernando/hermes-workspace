@@ -31,61 +31,42 @@ function tempStatePath(): string {
 
 function storageStatusFor(health: FinanceStorageHealth): StorageStatus {
   return {
-    active: health.isPostgresBehindJson ? 'json' : 'postgres',
-    fallback: 'json',
-    jsonPath: '/tmp/finance.json',
+    active: health.status === 'postgres_unavailable' ? 'unavailable' : 'postgres',
     auditPath: '/tmp/audit.jsonl',
     postgres: {
       enabled: true,
-      available: true,
+      available: health.status !== 'postgres_unavailable',
       database: 'finance',
-      snapshotAvailable: true,
+      snapshotAvailable: health.status !== 'postgres_unavailable',
     },
     health,
   }
 }
 
+/** Postgres unreachable — the only "unhealthy" state now that there's one store. */
 function unhealthyStorageHealth(): FinanceStorageHealth {
-  const jsonDb = createEmptyFinanceDatabase()
-  const postgresDb = createEmptyFinanceDatabase()
-  jsonDb.updatedAt = '2026-07-08T00:00:30.000Z'
-  postgresDb.updatedAt = '2026-07-08T00:00:00.000Z'
   return buildFinanceStorageHealth({
-    jsonDb,
-    postgresDb,
+    postgresDb: null,
     postgres: {
       enabled: true,
-      available: true,
-      snapshotAvailable: true,
-      lastWriteError: 'psql exited 1',
-    },
-    selfHeal: {
-      attempted: true,
-      attempts: 2,
-      succeeded: false,
-      lastAttemptAt: '2026-07-08T00:00:31.000Z',
+      available: false,
+      snapshotAvailable: false,
+      reason: 'connection refused',
     },
   })
 }
 
 function healthyStorageHealth(): FinanceStorageHealth {
-  const jsonDb = createEmptyFinanceDatabase()
   const postgresDb = createEmptyFinanceDatabase()
-  jsonDb.updatedAt = '2026-07-08T00:00:30.000Z'
-  postgresDb.updatedAt = jsonDb.updatedAt
+  postgresDb.updatedAt = '2026-07-08T00:00:30.000Z'
   return buildFinanceStorageHealth({
-    jsonDb,
     postgresDb,
-    postgres: {
-      enabled: true,
-      available: true,
-      snapshotAvailable: true,
-    },
+    postgres: { enabled: true, available: true, snapshotAvailable: true },
   })
 }
 
 describe('finance-storage-monitor', () => {
-  it('sends an ops alert only after repeated unresolved mirror failures', () => {
+  it('sends an ops alert only after repeated unresolved storage failures', () => {
     const statePath = tempStatePath()
     const health = unhealthyStorageHealth()
     const sent: Array<string> = []
@@ -133,12 +114,12 @@ describe('finance-storage-monitor', () => {
       reason: null,
     })
     expect(sent).toHaveLength(1)
-    expect(sent[0]).toContain('Finance storage mirror alert')
-    expect(sent[0]).toContain('Self-heal: unresolved after 2 attempt(s)')
+    expect(sent[0]).toContain('Finance storage alert')
+    expect(sent[0]).toContain('connection refused')
     expect(auditLogger).toHaveBeenCalledWith(
       'finance_storage_monitor_alerted',
       expect.objectContaining({
-        status: 'postgres_behind',
+        status: 'postgres_unavailable',
         consecutiveFailures: 2,
         notificationSent: true,
       }),
@@ -181,7 +162,7 @@ describe('finance-storage-monitor', () => {
       'finance_storage_monitor_recovered',
       expect.objectContaining({
         previousConsecutiveFailures: 1,
-        previousStatus: 'postgres_behind',
+        previousStatus: 'postgres_unavailable',
       }),
     )
   })
