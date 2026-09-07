@@ -520,6 +520,8 @@ const config = defineConfig(({ mode, command }) => {
         'testCurrencyConversion.ts',
         'testCurrencyConversion.js',
       ],
+      // Reset the in-process finance-store test backend before every test.
+      setupFiles: ['./src/test/setup-finance-store.ts'],
       // Force vitest to run React through its own transform pipeline so ESM
       // `import` and CJS `require('react')` share a single module instance.
       // Without this, react-dom sets the dispatcher on its CJS React copy while
