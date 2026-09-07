@@ -1,32 +1,34 @@
-# Close Summary — Add sidebar session skeleton loading states
+# Close Summary — Cycle 2026-09-08
 
-## What was changed
+## What Was Done
+- **Created** `scripts/lint-changed-commit.mjs` — a reusable commit-scoped lint gate that checks only files changed in the last commit, with baseline-rule overrides for known strict-type debt (`@typescript-eslint/no-unnecessary-condition: off`).
+- **Wired** `pnpm lint:changed-commit` in `package.json` so it's discoverable via the package manager.
+- Sits alongside existing `lint:changed` (working tree vs HEAD) and `lint:changed-strict` (no baseline overrides).
 
-- **`src/screens/chat/components/sidebar/sidebar-sessions.tsx`** — Added a `SessionItemSkeleton` component that renders 3 compact skeleton rows (title line + subtitle line using `animate-pulse`), matching the `SessionItem` layout. Replaced the plain "Loading sessions…" text with the skeleton placeholder. Added `shouldShowSessionSkeleton()` helper that shows skeletons during initial load or during background fetch with no data yet. Used `role="status"` and `aria-busy="true"` for screen-reader support.
+## Files Changed
+- `scripts/lint-changed-commit.mjs` — new script (112 lines)
+- `package.json` — added `lint:changed-commit` script entry
 
-- **`src/screens/chat/components/sidebar/sidebar-sessions.test.ts`** — Focused unit tests for `shouldShowSessionSkeleton` covering all 7 loading/fetching/data combinations.
+## Why This Matters
+Auto-improvement cycles previously relied on ad-hoc shell commands for focused lint verification. Having a repeatable `pnpm lint:changed-commit` with documented baseline-rule overrides makes future cycles faster and more consistent.
 
-## Test results
-
-| Gate | Result |
-|---|---|
-| `npx tsc --noEmit` (Node 22) | ✅ 0 errors in changed files |
-| Focused helper tests (7 tests) | ✅ All passed |
-| Focused ESLint on changed files | ✅ 0 errors, 0 warnings |
-| `git diff --check` on changed files | ✅ Clean |
-| `pnpm build` | ✅ Built in 15.32s |
-| Service restart | ✅ `hermes-workspace.service` active |
-| Health check | ✅ `{"status":"ok"}` |
+## Test Results
+- `pnpm run lint:changed-commit` → exits 0, correctly reports "No src/ files changed in this config-only commit"
+- `pnpm run lint` → 288 errors, 84 warnings (all pre-existing baseline from untracked/in-progress files)
+- `npx vitest run` → 144/147 files passed, 1157/1171 tests passed (3 failing files are pre-existing baseline)
+- `pnpm build` → successful (0 errors)
+- Service restart → `active`, health check → `200 application/json {"status":"ok"}`
 
 ## Deployment
+- Build: ✓ (client + SSR)
+- Service restart: ✓ (hermes-workspace.service active)
+- Health: ✓ (JSON body verified)
+- Merge blocked: branch `feat/task-blocker-system` is 7 commits ahead of `origin/main`; local commit only, no push
 
-- Branch: `feat/task-blocker-system` (3 behind main, 40 ahead — merge blocked, deployed from current branch)
-- Source files changed → built, restarted service, validated JSON health body
-- No push to remote
+## Side Effects
+None observed. Config-only change — no source files modified.
 
-## Side-effects observed
-
-- Existing "Updating…" indicator during background fetch with existing data is preserved unchanged
-- Skeleton uses the workspace's standard `animate-pulse` with `bg-[var(--theme-hover)]` — consistent with other loading patterns in the codebase
-- The `shouldShowSessionSkeleton` logic is a pure exported function, testable without rendering
-- All unrelated dirty worktree files (finance/trading/dashboard work) left unstaged
+## New Ideas for Next Cycle
+1. **Add `scripts/lint-changed-commit.mjs` fallback to staged changes** — When `HEAD~1` fails (e.g., fresh repo), the script already falls back to `HEAD` vs working tree. Could also fall back to `--cached` (staged changes) for partial-commit scenarios.
+2. **Add `pnpm lint:changed-commit` to the workspace CI gate** — Wire it as a pre-commit or pre-push hook so every commit's source changes are linted automatically.
+3. **Document the three lint scripts in workspace README** — `lint:changed`, `lint:changed-strict`, and `lint:changed-commit` have different scopes; a brief README note would help future agents and operators pick the right one.

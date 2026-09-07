@@ -23,6 +23,7 @@
     "lint": "eslint",
     "lint:changed": "bash -c 'FILES=$(git diff --name-only HEAD -- \"*.ts\" \"*.tsx\" \"*.js\" \"*.mjs\" \"*.cjs\" 2>/dev/null | grep -v \"node_modules/\" | tr \"\\n\" \" \"); [ -z \"$FILES\" ] && echo \"No changed source files to lint\" || npx eslint --no-warn-ignored -f json $FILES'",
     "lint:changed-strict": "bash -c 'FILES=$(git diff --name-only HEAD -- \"*.ts\" \"*.tsx\" \"*.js\" \"*.mjs\" \"*.cjs\" 2>/dev/null | grep -v \"node_modules/\" | tr \"\\n\" \" \"); [ -z \"$FILES\" ] && echo \"No changed source files to lint\" || npx eslint -f json $FILES'",
+    "lint:changed-commit": "node scripts/lint-changed-commit.mjs",
     "format": "prettier",
     "check": "prettier --write . && eslint --fix",
     "electron:dev": "electron .",
