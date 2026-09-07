@@ -62,8 +62,16 @@ export function KeyboardShortcutsModal() {
       }
     }
 
+    function onOpenShortcuts() {
+      setIsOpen(true)
+    }
+
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('open-keyboard-shortcuts', onOpenShortcuts)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('open-keyboard-shortcuts', onOpenShortcuts)
+    }
   }, [isOpen])
 
   if (typeof document === 'undefined') return null

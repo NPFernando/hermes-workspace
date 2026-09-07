@@ -1,39 +1,21 @@
 {
-  "cycle": "2026-09-06",
-  "idea": "Turn focused lint fallback into a package script",
-  "files_changed": ["package.json"],
-  "config_only": true,
-  "verification": {
-    "tsc_noEmit": { "passed": true, "errors": 0 },
-    "lint_changed": {
-      "passed": true,
-      "note": "Only package.json changed which ESLint does not check. All 10 changed-file errors are pre-existing baseline issues in src/server/trading-guardian.ts (unnecessary assertions, fixable)."
-    },
-    "git_diff_check": {
-      "passed": true,
-      "note": "Pre-existing whitespace issues in src/routes/api/risk-check.ts (unrelated)."
-    },
-    "script_works": {
-      "pnpm_lint_changed": {
-        "works": true,
-        "detects_changed_source_files": true,
-        "runs_eslint_on_them": true
-      },
-      "pnpm_lint_changed_strict": {
-        "works": true,
-        "runs_eslint_with_full_strict_mode": true
-      }
-    },
-    "json_parse": { "passed": true }
-  },
   "passed": true,
-  "metadata": {
-    "node_version": "22.22.3",
-    "pnpm_version": "11.24.0",
+  "summary": "Add keyboard shortcut discoverability trigger in Electron title bar",
+  "focus_tests_pass": 12,
+  "focus_tests_fail": 0,
+  "typecheck": true,
+  "tsc_exit": 0,
+  "changed_files": ["src/components/workspace-shell.tsx", "src/components/keyboard-shortcuts-modal.tsx"],
+  "lint_changed_files": {
+    "errors": 0,
+    "warnings": 0,
+    "note": "Enforced --no-warn-ignored; both changed files have 0 errors"
+  },
+  "deployment": {
     "branch": "feat/task-blocker-system",
-    "diverged_from_main": true,
-    "commits_behind_main": 258,
-    "commits_ahead_of_main": 37,
-    "pre_existing_dirty_files": 29
+    "behind_main": 3,
+    "ahead_of_main": 40,
+    "merge_blocked": true,
+    "note": "Branch is 3 commits behind main; merge would create unreviewed merge commits. Build and deploy from current branch instead."
   }
 }

@@ -394,8 +394,24 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 Hermes
               </span>
             </div>
-            {/* Right spacer to balance */}
-            <div className="w-[78px] shrink-0" />
+            {/* Right spacer to balance — with keyboard shortcut button */}
+            <div className="flex w-[78px] shrink-0 items-center justify-end pr-2">
+              <span style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.dispatchEvent(new CustomEvent('open-keyboard-shortcuts'))
+                  }
+                  className="rounded-md p-1 text-[var(--theme-muted)] transition hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)]"
+                  aria-label="Keyboard shortcuts"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                    <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M8 16h8" />
+                  </svg>
+                </button>
+              </span>
+            </div>
           </div>
         )}
         <div
