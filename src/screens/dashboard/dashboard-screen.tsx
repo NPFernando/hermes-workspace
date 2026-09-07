@@ -9,7 +9,7 @@ import {
   Sun02Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { AchievementsCard } from './components/achievements-card'
@@ -30,6 +30,7 @@ import { TokenMixHourCard } from './components/token-mix-hour-card'
 import { TopModelsCard } from './components/top-models-card'
 import { VelocityCard } from './components/velocity-card'
 import { WidgetShell } from './components/widget-shell'
+import { WidgetSkeleton } from './components/widget-skeleton'
 import { normalizeDashboardSessionsPayload } from './lib/sessions-query'
 import { useDashboardLayout } from './lib/use-dashboard-layout'
 import type { SessionRowData } from './components/sessions-intelligence-card'
@@ -37,6 +38,7 @@ import type { AnalyticsPeriod } from './components/analytics-chart-card'
 import type { ReactNode } from 'react'
 import type { ClaudeSession } from '@/server/claude-api'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { Skeleton } from '@/components/ui/skeleton'
 import { getUnavailableReason } from '@/lib/feature-gates'
 import { cn } from '@/lib/utils'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
@@ -284,7 +286,7 @@ function ActivityChart({
       accentColor={palette.accent}
       className="h-full"
     >
-      <Suspense fallback={<div className="h-[200px] w-full skeleton-shimmer rounded-lg" />}>
+      <Suspense fallback={<Skeleton className="h-[200px] w-full" />}>
         <ActivityChartInner chartData={chartData} palette={palette} />
       </Suspense>
     </GlassCard>
@@ -562,6 +564,9 @@ export function DashboardScreen() {
     staleTime: 10_000,
     refetchInterval: 30_000,
     retry: 1,
+    // Keep the prior dataset on screen while a refetch is in flight so a
+    // background poll never drops the grid back to skeletons.
+    placeholderData: keepPreviousData,
   })
 
   const sessionsResult = sessionsQuery.data
@@ -727,6 +732,10 @@ export function DashboardScreen() {
     },
     staleTime: 5_000,
     refetchInterval: 30_000,
+    // Switching period (7/14/30) re-keys this query; keep the last period's
+    // data visible during the fetch instead of flashing the whole grid to
+    // skeletons. First load still has no data → isPending → skeletons.
+    placeholderData: keepPreviousData,
   })
   const overview = overviewQuery.data ?? null
 
@@ -739,8 +748,22 @@ export function DashboardScreen() {
     return !dt.endsWith('-light')
   })
 
+  // First load → skeletons (isPending). A later refetch — 30s poll or a
+  // period switch (placeholderData keeps the old grid on screen) — must NOT
+  // re-skeleton; it gets this thin top-edge bar instead.
+  const backgroundRefreshing =
+    (overviewQuery.isFetching && !overviewQuery.isPending) ||
+    (sessionsQuery.isFetching && !sessionsQuery.isPending)
+
   return (
-    <div data-route-page className="min-h-full">
+    <div data-route-page className="relative min-h-full">
+      {backgroundRefreshing ? (
+        <div
+          role="status"
+          aria-label="Refreshing dashboard"
+          className="refresh-bar pointer-events-none absolute inset-x-0 top-0 z-50"
+        />
+      ) : null}
       {/* Floating mobile nav: hamburger left, theme toggle right */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-2 h-12" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <button
@@ -971,8 +994,12 @@ export function DashboardScreen() {
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         {layout.isVisible('analytics_chart') ? (
           <div className="lg:col-span-8">
-            <WidgetShell id="analytics_chart" layout={layout}>
-              <Suspense fallback={<div className="h-64 skeleton-shimmer rounded-xl" />}>
+            <WidgetShell
+              id="analytics_chart"
+              layout={layout}
+              loading={overviewQuery.isPending}
+            >
+              <Suspense fallback={<WidgetSkeleton id="analytics_chart" />}>
                 <AnalyticsChartCard
                   analytics={overview?.analytics ?? null}
                   insights={overview?.insights ?? []}
@@ -997,29 +1024,49 @@ export function DashboardScreen() {
             }
           >
             {layout.isVisible('top_models') ? (
-              <WidgetShell id="top_models" layout={layout}>
+              <WidgetShell
+                id="top_models"
+                layout={layout}
+                loading={overviewQuery.isPending}
+              >
                 <TopModelsCard analytics={overview?.analytics ?? null} />
               </WidgetShell>
             ) : null}
             {layout.isVisible('cache_efficiency') ? (
-              <WidgetShell id="cache_efficiency" layout={layout}>
+              <WidgetShell
+                id="cache_efficiency"
+                layout={layout}
+                loading={overviewQuery.isPending}
+              >
                 <CacheEfficiencyCard
                   analytics={overview?.analytics ?? null}
                 />
               </WidgetShell>
             ) : null}
             {layout.isVisible('provider_mix') ? (
-              <WidgetShell id="provider_mix" layout={layout}>
+              <WidgetShell
+                id="provider_mix"
+                layout={layout}
+                loading={overviewQuery.isPending}
+              >
                 <ProviderMixCard analytics={overview?.analytics ?? null} />
               </WidgetShell>
             ) : null}
             {layout.isVisible('velocity') ? (
-              <WidgetShell id="velocity" layout={layout}>
+              <WidgetShell
+                id="velocity"
+                layout={layout}
+                loading={overviewQuery.isPending}
+              >
                 <VelocityCard analytics={overview?.analytics ?? null} />
               </WidgetShell>
             ) : null}
             {layout.isVisible('cost_ledger') ? (
-              <WidgetShell id="cost_ledger" layout={layout}>
+              <WidgetShell
+                id="cost_ledger"
+                layout={layout}
+                loading={overviewQuery.isPending}
+              >
                 <CostLedgerCard
                   analytics={overview?.analytics ?? null}
                 />
@@ -1045,13 +1092,21 @@ export function DashboardScreen() {
             child Sessions card's `flex-1` actually expands. */}
         <div className="flex min-h-full flex-col gap-3 lg:col-span-8">
           {layout.isVisible('operator_tip') ? (
-            <WidgetShell id="operator_tip" layout={layout}>
+            <WidgetShell
+              id="operator_tip"
+              layout={layout}
+              loading={overviewQuery.isPending}
+            >
               <OperatorTipCard overview={overview ?? null} />
             </WidgetShell>
           ) : null}
           {layout.isVisible('sessions_intelligence') ? (
             <div className="flex min-h-0 flex-1 flex-col">
-              <WidgetShell id="sessions_intelligence" layout={layout}>
+              <WidgetShell
+                id="sessions_intelligence"
+                layout={layout}
+                loading={sessionsQuery.isPending}
+              >
                 {sessionsQuery.isError || sessionsUnavailable ? (
                   <UnavailableWidget
                     title="Recent Sessions"
@@ -1068,7 +1123,11 @@ export function DashboardScreen() {
             </div>
           ) : null}
           {layout.isVisible('logs_tail') ? (
-            <WidgetShell id="logs_tail" layout={layout}>
+            <WidgetShell
+              id="logs_tail"
+              layout={layout}
+              loading={overviewQuery.isPending}
+            >
               <LogsTailCard logs={overview?.logs ?? null} />
             </WidgetShell>
           ) : null}
@@ -1081,12 +1140,20 @@ export function DashboardScreen() {
             stretch the rail to match Sessions Intelligence height so
             we don't get the dangling gap Eric flagged in iter 007. */}
         <div className="flex min-h-full flex-col gap-3 lg:col-span-4">
-          <WidgetShell id="achievements" layout={layout}>
+          <WidgetShell
+            id="achievements"
+            layout={layout}
+            loading={overviewQuery.isPending}
+          >
             <AchievementsCard
               achievements={overview?.achievements ?? null}
             />
           </WidgetShell>
-          <WidgetShell id="skills_usage" layout={layout}>
+          <WidgetShell
+            id="skills_usage"
+            layout={layout}
+            loading={overviewQuery.isPending}
+          >
             <SkillsUsageCard
               usage={overview?.skillsUsage ?? null}
               installedCount={skillsInstalled}
@@ -1094,7 +1161,11 @@ export function DashboardScreen() {
             />
           </WidgetShell>
           {layout.isVisible('proactive_suggestions') ? (
-            <WidgetShell id="proactive_suggestions" layout={layout}>
+            <WidgetShell
+              id="proactive_suggestions"
+              layout={layout}
+              loading={overviewQuery.isPending}
+            >
               <ProactiveSuggestionsCard overview={overview} />
             </WidgetShell>
           ) : null}
@@ -1103,7 +1174,11 @@ export function DashboardScreen() {
               with Sessions Intelligence. The card itself uses
               h-full + flex-1 to honor the stretch. */}
           <div className="flex min-h-0 flex-1 flex-col">
-            <WidgetShell id="mix_rhythm" layout={layout}>
+            <WidgetShell
+              id="mix_rhythm"
+              layout={layout}
+              loading={overviewQuery.isPending}
+            >
               <TokenMixHourCard
                 analytics={overview?.analytics ?? null}
                 sessions={sessionRows}

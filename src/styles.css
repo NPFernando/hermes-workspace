@@ -68,6 +68,14 @@
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --snappy: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 
+  /* Motion duration scale — pair with --spring / --snappy above.
+   * Kept here in :root (NOT the @theme block, which is owned by upstream
+   * PR #673) so new tokens don't widen that PR's conflict surface. */
+  --motion-fast: 150ms; /* micro-interactions, hovers */
+  --motion-base: 220ms; /* entrances, expand/collapse — matches page-enter */
+  --motion-slow: 320ms; /* spring entrances */
+  --motion-skeleton: 1.6s; /* skeleton shimmer loop */
+
   /* Accent soft — fallback to already-defined accent vars so all themes inherit */
   --theme-accent-soft: var(--theme-accent-subtle, rgba(128, 128, 128, 0.1));
   --theme-accent-soft-strong: var(
@@ -370,26 +378,10 @@ code {
     'JetBrains Mono Variable', Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: 200% 50%;
-  }
-  100% {
-    background-position: -200% 50%;
-  }
-}
-
-/* Widget skeleton shimmer */
-.animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--color-primary-200) 25%,
-    var(--color-primary-100) 50%,
-    var(--color-primary-200) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
-}
+/* Skeleton shimmer keyframe + .skeleton-shimmer utility live together lower in
+ * this file (search "Shimmer skeleton"). An earlier duplicate @keyframes shimmer
+ * + orphaned .animate-shimmer class used to sit here; removed — the theme-aware
+ * definition below is the single source. */
 
 /* iOS-style widget jiggle for edit mode */
 @keyframes wiggle {
@@ -462,7 +454,7 @@ code {
     transparent 65%
   );
   width: 60%;
-  animation: thinking-shimmer 1.6s ease-in-out infinite;
+  animation: thinking-shimmer var(--motion-skeleton) ease-in-out infinite;
 }
 
 /* Three bouncing dots */
@@ -1064,7 +1056,30 @@ code {
     var(--theme-card) 100%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.6s ease-in-out infinite;
+  animation: shimmer var(--motion-skeleton) ease-in-out infinite;
+}
+
+/* Background-refresh affordance — a thin sweeping bar shown while a screen
+ * refetches without a full skeleton pass (e.g. dashboard period switch). */
+.refresh-bar {
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--theme-accent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer var(--motion-skeleton) linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer,
+  .refresh-bar {
+    animation: none;
+    background: color-mix(in srgb, var(--theme-text) 6%, var(--theme-card));
+  }
 }
 
 /* ── Glass dropdown — frosted panel for menus/popovers ── */

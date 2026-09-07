@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 import type {DashboardLayout, WidgetId} from '@/screens/dashboard/lib/use-dashboard-layout';
 import {
-  
+
   WIDGET_CATALOG
-  
+
 } from '@/screens/dashboard/lib/use-dashboard-layout'
+import { WidgetSkeleton } from '@/screens/dashboard/components/widget-skeleton'
 
 /**
  * Wraps a dashboard widget so it participates in edit mode without
@@ -20,25 +21,33 @@ import {
  *
  * If the widget is hidden (`!layout.isVisible(id)`), this returns
  * null in both modes — restoration happens through the EditPanel.
+ *
+ * When `loading` is true (first data load only — callers gate on
+ * `isPending`, never `isFetching`), the widget body is replaced by a
+ * shape-matched `<WidgetSkeleton>` so the grid doesn't reflow when the
+ * real card mounts.
  */
 export function WidgetShell({
   id,
   layout,
+  loading = false,
   children,
 }: {
   id: WidgetId
   layout: DashboardLayout
+  loading?: boolean
   children: ReactNode
 }) {
   if (!layout.isVisible(id)) return null
 
   const meta = WIDGET_CATALOG.find((w) => w.id === id)
   const canHide = meta?.hideable ?? true
+  const body = loading ? <WidgetSkeleton id={id} /> : children
 
   if (!layout.editMode) {
     // Plain passthrough. Wrapping in a fragment-equivalent div would
     // change the flexbox layout above us, so we skip the wrapper.
-    return <>{children}</>
+    return <>{body}</>
   }
 
   // Use `h-full` on the edit-mode wrapper so children that opted
@@ -57,7 +66,7 @@ export function WidgetShell({
           borderRadius: 12,
         }}
       />
-      <div className="relative h-full">{children}</div>
+      <div className="relative h-full">{body}</div>
       {canHide ? (
         <button
           type="button"
