@@ -29,7 +29,10 @@ import {
   ONBOARDING_COMPLETE_EVENT,
   ONBOARDING_KEY,
 } from '@/components/onboarding/onboarding-constants'
-import { ErrorBoundary } from '@/components/error-boundary'
+import {
+  ErrorBoundary,
+  StaleAssetRecoveryListener,
+} from '@/components/error-boundary'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import { safeErrorMessage } from '@/lib/error-utils'
@@ -414,6 +417,7 @@ function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <Toaster />
+      <StaleAssetRecoveryListener />
       {isPublicSurface ? (
         <ErrorBoundary
           className="min-h-dvh"
