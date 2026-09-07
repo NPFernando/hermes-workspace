@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { MessageTimestamp } from '@/screens/chat/components/message-timestamp'
 import { MessageContent } from '@/components/prompt-kit/message'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 export type AgentChatMessage = {
@@ -35,9 +36,9 @@ export function AgentChatMessages({
   if (isLoading) {
     return (
       <div className="space-y-2 p-4">
-        <div className="h-12 w-[72%] animate-pulse rounded-2xl bg-[var(--theme-hover)]/70" />
-        <div className="ml-auto h-10 w-[56%] animate-pulse rounded-2xl bg-[var(--theme-hover)]/70" />
-        <div className="h-11 w-[64%] animate-pulse rounded-2xl bg-[var(--theme-hover)]/70" />
+        <Skeleton className="h-12 w-[72%] rounded-2xl" />
+        <Skeleton className="ml-auto h-10 w-[56%] rounded-2xl" />
+        <Skeleton className="h-11 w-[64%] rounded-2xl" />
       </div>
     )
   }

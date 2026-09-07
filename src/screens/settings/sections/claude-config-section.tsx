@@ -18,6 +18,7 @@ import { GROQ_STT_MODELS, STT_PROVIDER_OPTIONS } from '@/lib/stt-config'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type ClaudeProvider = {
   id: string
@@ -365,9 +366,7 @@ export function ClaudeConfigSection({
         description="Loading configuration..."
         icon={Settings02Icon}
       >
-        <div
-          className="h-20 animate-pulse rounded-lg bg-[var(--theme-panel)]"
-        />
+        <Skeleton className="h-20" />
       </SettingsSection>
     )
   }

@@ -17,6 +17,7 @@ import {
   ScrollAreaViewport,
 } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { usePinnedSessions } from '@/hooks/use-pinned-sessions'
 
 type SidebarSessionsProps = {
@@ -45,8 +46,8 @@ function SessionItemSkeleton({ rows = 3 }: { rows?: number }) {
           className="flex items-center w-full h-14 rounded-lg pl-1.5 pr-0.5"
         >
           <div className="flex-1 min-w-0 py-1.5">
-            <div className="h-3.5 w-3/5 rounded bg-[var(--theme-hover)] animate-pulse" />
-            <div className="mt-2 h-2.5 w-2/5 rounded bg-[var(--theme-hover)] animate-pulse" />
+            <Skeleton className="h-3.5 w-3/5 rounded" />
+            <Skeleton className="mt-2 h-2.5 w-2/5 rounded" />
           </div>
         </div>
       ))}
