@@ -1,9 +1,8 @@
 /**
  * One-click export of all personal-finance data as a downloadable JSON
  * file — a safety net now that a meaningful amount of data (including AI
- * contract reviews) lives only in this app. Re-selects the same
- * personal-finance-only field set mirrorIntoSplitStores() already uses
- * (finance-store.ts) — deliberately excludes the trading-only collections,
+ * contract reviews) lives only in this app. Exports the personal-finance
+ * collections only — deliberately excludes the trading-only collections,
  * which stay out of scope for this export.
  */
 import { createFileRoute } from '@tanstack/react-router'

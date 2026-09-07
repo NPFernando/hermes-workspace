@@ -6,26 +6,19 @@ import {
   appendFinanceAuditPostgres,
   financePostgresStatus,
   readFinancePostgresNormalized,
-  readFinancePostgresStore,
   writeFinancePostgresNormalized,
-  writeFinancePostgresStore,
 } from './finance-postgres-store'
-import {
-  readPersonalFinancePostgresStore,
-  writePersonalFinancePostgresStore,
-} from './personal-finance-postgres-store'
-import { readTradingStore, writeTradingStore } from './trading-store'
 import type { ConnectivityBreakerState } from './connectivity-breaker'
 
 export const FINANCE_SCHEMA_VERSION = 1
-// Respect HOME overrides used by isolated tests while retaining the normal
-// ~/.hermes/finance location in production.
+// Still used for the audit-log recovery buffer and ingestion uploads. Honours
+// a HOME override so isolated tests never touch the real ~/.hermes/finance.
 export const FINANCE_DATA_DIR = path.join(
   process.env.HOME || os.homedir(),
   '.hermes',
   'finance',
 )
-export const FINANCE_DATA_PATH = path.join(FINANCE_DATA_DIR, 'finance.json')
+/** Recovery buffer for audit entries that could not reach Postgres (see appendAuditLog). */
 export const FINANCE_AUDIT_PATH = path.join(FINANCE_DATA_DIR, 'audit.jsonl')
 /** Original documents/photos from both ingestion paths (upload, Gmail attachments) — referenced by pending_ingestions.sourceRef. */
 export const FINANCE_INGESTION_UPLOAD_DIR = path.join(
@@ -971,235 +964,6 @@ function readFinanceStoreUncached(): FinanceDatabase {
   return financeBackend.read()
 }
 
-function readFinanceStoreJsonCompatibility(): FinanceDatabase {
-  const jsonDb = readFinanceJsonStore()
-  const pgDb = readFinancePostgresStore()
-  if (pgDb && shouldPreferPostgresStore(pgDb, jsonDb)) {
-    const migrated = migrateFinanceStore(pgDb)
-    writeFinanceJsonStore(migrated)
-    return migrated
-  }
-  if (jsonDb) {
-    const migrated = migrateFinanceStore(jsonDb)
-    writeFinancePostgresStore(migrated)
-    return migrated
-  }
-  const db = createEmptyFinanceDatabase()
-  writeFinanceStore(db)
-  appendAuditLog('database_recreated_after_read_failure', {})
-  return db
-}
-
-function writeFinanceJsonStore(db: FinanceDatabase): void {
-  fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
-  fs.writeFileSync(FINANCE_DATA_PATH, `${JSON.stringify(db, null, 2)}\n`, {
-    mode: 0o600,
-  })
-  mirrorIntoSplitStores(db)
-}
-
-/**
- * Phase 5 (dual-write step) of the finance/trading backend split — mirror
- * into the two split stores in preparation for the eventual read cutover.
- * Best-effort only: writeFinanceJsonStore's own write above (and the
- * Postgres mirror alongside it) remain the sole source of truth. Never let
- * a mirror failure propagate — see each store's own module doc.
- *
- * Hooked into writeFinanceJsonStore() specifically (not writeFinanceStore())
- * because readFinanceStore()'s self-heal path calls writeFinanceJsonStore()
- * directly when Postgres data should be preferred over local JSON — that
- * path bypasses writeFinanceStore() entirely, and since Postgres is
- * generally preferred in this environment, it's the dominant write path in
- * practice. Confirmed via production journal: the JSON file's mtime updates
- * on plain reads through that self-heal branch even with no engine cycle
- * having run.
- */
-function mirrorIntoSplitStores(db: FinanceDatabase): void {
-  // Postgres Migration Phase D: calls the Postgres write directly instead of
-  // through the now-removed personal-finance-store.ts JSON split-store
-  // mirror (frozen at ~/.hermes/finance/personal-finance.json.frozen-phaseD-*
-  // as a rollback-only snapshot, no longer written to).
-  writePersonalFinancePostgresStore({
-    finance_accounts: db.finance_accounts,
-    income_records: db.income_records,
-    expense_records: db.expense_records,
-    budget_categories: db.budget_categories,
-    categories: db.categories,
-    subcategories: db.subcategories,
-    merchants: db.merchants,
-    tags: db.tags,
-    savings_goals: db.savings_goals,
-    tax_records: db.tax_records,
-    exchange_rates: db.exchange_rates,
-    investment_accounts: db.investment_accounts,
-    pending_ingestions: db.pending_ingestions,
-    income_sources: db.income_sources,
-    stock_holdings: db.stock_holdings,
-    fixed_deposits: db.fixed_deposits,
-    loans: db.loans,
-    properties: db.properties,
-    beneficiaries: db.beneficiaries,
-    personalFinanceSettings: {
-      emergencyFundTargetMonths: db.settings.emergencyFundTargetMonths,
-      savingsRateTargetPct: db.settings.savingsRateTargetPct,
-      wealthGoalTargetLkr: db.settings.wealthGoalTargetLkr,
-      wealthGoalTargetDate: db.settings.wealthGoalTargetDate,
-      financeQaHistory: db.settings.financeQaHistory,
-      gmailIngestState: (db.settings as unknown as Record<string, unknown>)
-        .gmailIngest as
-        | {
-            lastSyncedAtSeconds?: number
-            syncHistory?: Array<{
-              at: number
-              found: number
-              queued: number
-              skippedAlreadyQueued: number
-            }>
-          }
-        | undefined,
-      categoryCorrections: (db.settings as unknown as Record<string, unknown>)
-        .categoryCorrections as Record<string, string> | undefined,
-    },
-  })
-  writeTradingStore({
-    assets: db.assets,
-    market_prices: db.market_prices,
-    historical_candles: db.historical_candles,
-    news_items: db.news_items,
-    sentiment_scores: db.sentiment_scores,
-    risk_scores: db.risk_scores,
-    intelligence_records: db.intelligence_records,
-    trading_plans: db.trading_plans,
-    trade_orders: db.trade_orders,
-    trade_executions: db.trade_executions,
-    virtual_accounts: db.virtual_accounts,
-    portfolio_positions: db.portfolio_positions,
-    account_balances: db.account_balances,
-    strategy_results: db.strategy_results,
-    prediction_results: db.prediction_results,
-    trading_signals: db.trading_signals,
-    riskState: db.riskState,
-    connectivityBreaker: db.connectivityBreaker,
-  })
-}
-
-function readFinanceJsonStore(): FinanceDatabase | null {
-  let base: FinanceDatabase
-  try {
-    base = JSON.parse(
-      fs.readFileSync(FINANCE_DATA_PATH, 'utf8'),
-    ) as FinanceDatabase
-  } catch {
-    return null
-  }
-  return overlaySplitStores(base)
-}
-
-/**
- * Phase 5 (read cutover step) of the finance/trading backend split.
- * mirrorIntoSplitStores() writes the trading split store from this same
- * base file's own data on every write, so in the normal case it's never
- * staler than it — overlay it here so callers gradually source trading
- * collections from the split file, while the trading-shared remainder of
- * settings and the still-unsplit misc collections (trading_platforms,
- * api_connections, agent_memory, audit_logs, error_logs) keep coming from
- * this shared base file (never split — see the plan's own rationale).
- *
- * Postgres Migration Phase D: personal-finance collections and settings are
- * now a clean TWO-tier fallback: Postgres (via
- * readPersonalFinancePostgresStore()) when it succeeds, otherwise whatever
- * is already in `base` (no explicit override applied) — the old JSON split
- * store (personal-finance.json) is retired (frozen as a rollback snapshot,
- * see personal-finance-store.ts's history) since nothing writes it anymore
- * and it would otherwise silently go stale forever. The base file itself
- * never goes stale for these fields despite having no dedicated mirror-
- * write step: overlaySplitStores() already populates it with fresh
- * Postgres data on every read, and the app's normal read-mutate-write cycle
- * serializes that already-current object straight back to disk. Set
- * HERMES_PERSONAL_FINANCE_READ_SOURCE=json to skip Postgres and use the
- * base file directly — still an instant, no-redeploy rollback.
- */
-function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
-  const baseUpdatedMs = updatedAtMs(base)
-  const personalSource =
-    process.env.HERMES_PERSONAL_FINANCE_READ_SOURCE === 'json'
-      ? null
-      : readPersonalFinancePostgresStore()
-  const trading = readTradingStore()
-  const tradingFresh = trading && Date.parse(trading.updatedAt) >= baseUpdatedMs
-  const postgresSettings = personalSource?.personalFinanceSettings
-
-  return {
-    ...base,
-    ...(personalSource
-      ? {
-          finance_accounts: personalSource.finance_accounts,
-          income_records: personalSource.income_records,
-          expense_records: personalSource.expense_records,
-          budget_categories: personalSource.budget_categories,
-          categories: personalSource.categories ?? [],
-          subcategories: personalSource.subcategories ?? [],
-          merchants: personalSource.merchants ?? [],
-          tags: personalSource.tags ?? [],
-          savings_goals: personalSource.savings_goals,
-          tax_records: personalSource.tax_records,
-          exchange_rates: personalSource.exchange_rates,
-          investment_accounts: personalSource.investment_accounts,
-          pending_ingestions: personalSource.pending_ingestions,
-          income_sources: personalSource.income_sources,
-          stock_holdings: personalSource.stock_holdings,
-          fixed_deposits: personalSource.fixed_deposits,
-          loans: personalSource.loans ?? [],
-          properties: personalSource.properties ?? [],
-          beneficiaries: personalSource.beneficiaries ?? [],
-        }
-      : {}),
-    ...(postgresSettings
-      ? {
-          settings: {
-            ...base.settings,
-            emergencyFundTargetMonths:
-              postgresSettings.emergencyFundTargetMonths,
-            savingsRateTargetPct: postgresSettings.savingsRateTargetPct,
-            wealthGoalTargetLkr: postgresSettings.wealthGoalTargetLkr,
-            wealthGoalTargetDate: postgresSettings.wealthGoalTargetDate,
-            financeQaHistory: postgresSettings.financeQaHistory,
-            gmailIngest: postgresSettings.gmailIngestState,
-            categoryCorrections: postgresSettings.categoryCorrections,
-          } as FinanceSettings,
-        }
-      : {}),
-    ...(tradingFresh
-      ? {
-          assets: trading.assets,
-          market_prices: trading.market_prices,
-          historical_candles: trading.historical_candles,
-          news_items: trading.news_items,
-          sentiment_scores: trading.sentiment_scores,
-          risk_scores: trading.risk_scores,
-          intelligence_records: trading.intelligence_records,
-          trading_plans: trading.trading_plans,
-          trade_orders: trading.trade_orders,
-          trade_executions: trading.trade_executions,
-          virtual_accounts: trading.virtual_accounts,
-          portfolio_positions: trading.portfolio_positions,
-          account_balances: trading.account_balances,
-          strategy_results: trading.strategy_results,
-          prediction_results: trading.prediction_results,
-          trading_signals: trading.trading_signals,
-          riskState: trading.riskState as RiskState,
-          connectivityBreaker:
-            trading.connectivityBreaker as ConnectivityBreakerState,
-        }
-      : {}),
-  } as FinanceDatabase
-}
-
-function updatedAtMs(db: FinanceDatabase): number {
-  const value = Date.parse(db.updatedAt)
-  return Number.isFinite(value) ? value : 0
-}
-
 const STORAGE_HEALTH_COLLECTIONS = [
   'finance_accounts',
   'income_records',
@@ -1223,24 +987,6 @@ export function financeCollectionCounts(
     counts[key] = Array.isArray(value) ? value.length : 0
   }
   return counts
-}
-
-function financeDataWeight(db: FinanceDatabase): number {
-  return Object.values(financeCollectionCounts(db)).reduce(
-    (sum, count) => sum + count,
-    0,
-  )
-}
-
-function shouldPreferPostgresStore(
-  pgDb: FinanceDatabase,
-  jsonDb: FinanceDatabase | null,
-): boolean {
-  if (!jsonDb) return true
-  const pgUpdated = updatedAtMs(pgDb)
-  const jsonUpdated = updatedAtMs(jsonDb)
-  if (pgUpdated !== jsonUpdated) return pgUpdated > jsonUpdated
-  return financeDataWeight(pgDb) >= financeDataWeight(jsonDb)
 }
 
 export function buildFinanceStorageHealth(input: {
@@ -1303,13 +1049,17 @@ function migrateFinanceStore(db: FinanceDatabase): FinanceDatabase {
  * Persistence backend seam for `readFinanceStore` / `writeFinanceStore`.
  *
  * Production: the `finance` Postgres normalized store
- * (`readFinancePostgresNormalized` / `writeFinancePostgresNormalized`).
- * Under vitest: the JSON-compat store (tmp-`HOME` isolated), unchanged from
- * before this seam existed.
+ * (`readFinancePostgresNormalized` / `writeFinancePostgresNormalized`) — the
+ * only place finance data is ever saved.
  *
- * Tests can also swap in a pure in-memory backend via `__setFinanceBackend()`
- * so no test can reach a real database — this upholds the 2026-07-27
- * anti-pollution guard by construction rather than by an env check.
+ * Under vitest / `NODE_ENV=test`: an in-process store held on `globalThis` so
+ * it survives `vi.resetModules()` and is shared by every `finance-store`
+ * module instance in a run (many suites pin this module via `vi.importActual`
+ * and reset it by writing through the store in `beforeEach` — the old
+ * tmp-`HOME` `finance.json` gave them that persistence; the global slot
+ * replaces it). No filesystem, no real database — upholds the 2026-07-27
+ * anti-pollution guard by construction. A suite wanting hard isolation still
+ * calls `__setFinanceBackend(__inMemoryFinanceBackend(seed))`.
  */
 export interface FinanceStoreBackend {
   read: () => FinanceDatabase
@@ -1321,7 +1071,7 @@ const postgresFinanceBackend: FinanceStoreBackend = {
     const db = readFinancePostgresNormalized()
     if (!db) {
       throw new Error(
-        'Finance PostgreSQL runtime store is unavailable; refusing JSON fallback.',
+        'Finance PostgreSQL store is unavailable; refusing to continue without persistence.',
       )
     }
     return migrateFinanceStore(db)
@@ -1329,24 +1079,47 @@ const postgresFinanceBackend: FinanceStoreBackend = {
   write(db) {
     if (!writeFinancePostgresNormalized(db)) {
       throw new Error(
-        'Finance PostgreSQL runtime store is unavailable; write was not persisted.',
+        'Finance PostgreSQL store is unavailable; write was not persisted.',
       )
     }
   },
 }
 
-const jsonCompatFinanceBackend: FinanceStoreBackend = {
-  read: () => readFinanceStoreJsonCompatibility(),
-  write(db) {
-    fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
-    writeFinanceJsonStore(db)
-    writeFinancePostgresStore(db)
+const FINANCE_TEST_STORE_KEY = '__hermesFinanceTestStore__'
+
+const globalTestFinanceBackend: FinanceStoreBackend = {
+  read() {
+    const g = globalThis as Record<string, unknown>
+    let db = g[FINANCE_TEST_STORE_KEY] as FinanceDatabase | undefined
+    if (!db) {
+      db = migrateFinanceStore(createEmptyFinanceDatabase())
+      g[FINANCE_TEST_STORE_KEY] = db
+    }
+    return migrateFinanceStore(db)
   },
+  write(db) {
+    // Some readiness checks (e.g. emergencyStopReadinessGate) stat
+    // FINANCE_DATA_DIR for writability; the old JSON backend created it on
+    // every write, so keep doing that even though nothing is written to disk.
+    try {
+      fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+    } catch {
+      /* best-effort — tests that don't set HOME still work */
+    }
+    ;(globalThis as Record<string, unknown>)[FINANCE_TEST_STORE_KEY] =
+      migrateFinanceStore(db)
+  },
+}
+
+/** Test-only: wipe the shared global finance store back to empty. */
+export function __resetFinanceTestStore(): void {
+  delete (globalThis as Record<string, unknown>)[FINANCE_TEST_STORE_KEY]
+  financeStoreCache = null
 }
 
 function defaultFinanceBackend(): FinanceStoreBackend {
   return process.env.VITEST || process.env.NODE_ENV === 'test'
-    ? jsonCompatFinanceBackend
+    ? globalTestFinanceBackend
     : postgresFinanceBackend
 }
 
