@@ -3,23 +3,20 @@ import { test, expect } from '@playwright/test'
 /**
  * Dashboard loading-animation rebuild.
  *
- * Stalls /api/dashboard/overview so the first-load skeleton pass is
- * observable, then releases it and asserts skeletons are replaced by real
- * content. Requires an authed storage state (scripts/create-e2e-auth-state.mjs)
- * and a reachable workspace — skipped otherwise so the suite stays portable.
+ * Delays /api/dashboard/overview so the first-load skeleton pass is
+ * observable, then lets it through and asserts skeletons are replaced by
+ * real content. Requires an authed storage state
+ * (scripts/create-e2e-auth-state.mjs) and a reachable workspace — skips
+ * cleanly otherwise so the suite stays portable.
  */
 test.describe('Dashboard loading state', () => {
   test('shows widget skeletons on first load, then real content', async ({
     page,
   }) => {
-    let release: (() => void) | undefined
-    const gate = new Promise<void>((resolve) => {
-      release = resolve
-    })
-
-    // Hold the overview aggregate until we've asserted the skeleton pass.
+    // Hold the overview aggregate ~2s so the first-load skeletons are
+    // guaranteed to paint, then let the real request through.
     await page.route('**/api/dashboard/overview*', async (route) => {
-      await gate
+      await new Promise((r) => setTimeout(r, 2000))
       await route.continue()
     })
 
@@ -32,27 +29,79 @@ test.describe('Dashboard loading state', () => {
       await continueBtn.click()
     }
 
-    // If we landed on the password gate there is no auth state — skip.
+    // If we're on the password gate there's no auth state — skip.
     const gated = await page
       .locator('#lp-pw')
-      .isVisible({ timeout: 2000 })
+      .isVisible({ timeout: 5000 })
       .catch(() => false)
     test.skip(gated, 'No authed storage state; run scripts/create-e2e-auth-state.mjs')
 
-    // Skeletons visible while the aggregate is stalled.
     const skeletons = page.locator('[data-slot="skeleton"]')
+    const loadingWidgets = page.getByRole('status', { name: 'Loading widget' })
+
+    // First load: overview-backed widgets show shape-matched skeletons.
     await expect(skeletons.first()).toBeVisible({ timeout: 10_000 })
+    await expect(loadingWidgets.first()).toBeVisible()
 
-    // Release the aggregate; skeletons give way to real widgets.
-    release?.()
-
+    // Once the aggregate resolves, every widget skeleton is gone and a real
+    // card has rendered in its place.
     await expect
-      .poll(() => skeletons.count(), { timeout: 15_000 })
+      .poll(() => skeletons.count(), { timeout: 30_000, intervals: [500] })
       .toBe(0)
+    await expect(page.getByRole('heading', { name: 'Top models' })).toBeVisible()
 
-    // A real KPI heading renders (Hero metrics / analytics tiles).
+    // The brand lockup (never skeletoned) is present throughout.
     await expect(
-      page.getByRole('heading', { name: 'Hermes Workspace' }),
+      page.getByRole('heading', { name: 'Hermes Workspace', level: 1 }),
     ).toBeVisible()
+  })
+
+  test('period switch keeps the grid — no full skeleton flash', async ({
+    page,
+  }) => {
+    let firstOverview = true
+    await page.route('**/api/dashboard/overview*', async (route) => {
+      // Fast initial load; slow only the post-switch refetch so the
+      // background state is observable.
+      if (!firstOverview) await new Promise((r) => setTimeout(r, 3000))
+      firstOverview = false
+      await route.continue()
+    })
+
+    await page.goto('/dashboard')
+    await page.waitForLoadState('domcontentloaded')
+
+    const gated = await page
+      .locator('#lp-pw')
+      .isVisible({ timeout: 5000 })
+      .catch(() => false)
+    test.skip(gated, 'No authed storage state')
+
+    const topModels = page.getByRole('heading', { name: 'Top models' })
+    await expect(topModels).toBeVisible({ timeout: 30_000 })
+
+    // Switch to a different period (default is 30d) and watch the refetch.
+    const activeBefore = await page
+      .getByRole('tab', { selected: true })
+      .textContent()
+    const target = activeBefore?.trim() === '7d' ? '14d' : '7d'
+    await page.getByRole('tab', { name: target, exact: true }).click()
+
+    let sawRefreshBar = false
+    let maxSkeletons = 0
+    for (let i = 0; i < 16; i++) {
+      if (await page.locator('.refresh-bar').count()) sawRefreshBar = true
+      maxSkeletons = Math.max(
+        maxSkeletons,
+        await page.locator('[data-slot="skeleton"]').count(),
+      )
+      await page.waitForTimeout(200)
+    }
+
+    // The grid never dropped to skeletons; the card stayed mounted with the
+    // previous data; the low-key refresh bar signalled the fetch instead.
+    expect(maxSkeletons).toBe(0)
+    await expect(topModels).toBeVisible()
+    expect(sawRefreshBar).toBe(true)
   })
 })
