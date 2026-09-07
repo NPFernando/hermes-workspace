@@ -19,6 +19,17 @@ import {
   tradingPerformanceSummary,
 } from './finance-store'
 
+/**
+ * Fresh `finance-store` module instance backed by a pure in-memory store — no
+ * filesystem, no Postgres. Relies on the enclosing `beforeEach` having called
+ * `vi.resetModules()`. Replaces the old tmp-`HOME` JSON-file round-trip.
+ */
+async function freshFinanceStore() {
+  const store = await import('./finance-store')
+  store.__setFinanceBackend(store.__inMemoryFinanceBackend())
+  return store
+}
+
 describe('finance-store', () => {
   it('summarises personal finance records in LKR', () => {
     const db = createEmptyFinanceDatabase()
@@ -344,7 +355,7 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
   })
 
   it('adds, then edits, then deletes an expense record', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('expense', {
       vendor: 'Cafe',
       category: 'Dining',
@@ -365,7 +376,7 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
   })
 
   it('throws when deleting an id that does not exist, instead of silently no-oping', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('income', {
       sourceName: 'Salary',
       originalAmount: 1000,
@@ -379,21 +390,21 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
   })
 
   it('throws for an unsupported kind on delete', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     expect(() => store.deleteFinanceRecord('trading_plan', 'some-id')).toThrow(
       /Unsupported/,
     )
   })
 
   it('throws when updating a record that does not exist', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     expect(() =>
       store.updateFinanceRecord('expense', 'does-not-exist', { amount: 1 }),
     ).toThrow(/not found/)
   })
 
   it('goalKind (PF-1007 Sinking Funds) defaults to general and accepts sinking', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('goal', { name: 'Untyped goal', targetAmount: 1000 })
     store.addFinanceRecord('goal', {
       name: 'Car fund',
@@ -419,7 +430,7 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
   })
 
   it('loan (Phase 40) round-trips through add, update, delete, and defaults status to active', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('loan', {
       lender: 'Test Bank',
       principal: 100_000,
@@ -453,7 +464,7 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
   })
 
   it('loan status defaults to active on add when omitted or invalid', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('loan', {
       lender: 'A',
       principal: 1000,
@@ -479,7 +490,7 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
   })
 
   it('property (Phase 40) round-trips through add, update, delete, and defaults propertyType to residential', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('property', {
       description: 'Test House',
       purchasePrice: 5_000_000,
@@ -505,7 +516,7 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
   })
 
   it('propertyType defaults to residential on add when omitted or invalid', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('property', {
       description: 'A',
       purchasePrice: 1000,
@@ -553,7 +564,7 @@ describe('findPossibleDuplicate', () => {
   })
 
   it('finds a same-day/vendor/amount expense match, case-insensitive on vendor', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('expense', {
       date: '2026-03-01',
       vendor: 'Cafe Nero',
@@ -575,7 +586,7 @@ describe('findPossibleDuplicate', () => {
   })
 
   it('treats amounts within 1% as the same', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('expense', {
       date: '2026-03-01',
       vendor: 'Cafe Nero',
@@ -588,7 +599,7 @@ describe('findPossibleDuplicate', () => {
   })
 
   it('does not match a different date, vendor, or amount beyond tolerance', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('expense', {
       date: '2026-03-01',
       vendor: 'Cafe Nero',
@@ -613,7 +624,7 @@ describe('findPossibleDuplicate', () => {
   })
 
   it('checks income and expense collections independently', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('income', {
       dateReceived: '2026-03-01',
       sourceName: 'Client A',
@@ -645,7 +656,7 @@ describe('recordCategoryCorrection / getCategoryCorrections', () => {
   })
 
   it('records and retrieves a vendor -> category correction, keyed case-insensitively', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     expect(store.getCategoryCorrections()).toEqual({})
 
     store.recordCategoryCorrection('Keells Super', 'Groceries')
@@ -655,7 +666,7 @@ describe('recordCategoryCorrection / getCategoryCorrections', () => {
   })
 
   it('overwrites a prior correction for the same vendor', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.recordCategoryCorrection('Keells Super', 'Groceries')
     store.recordCategoryCorrection('keells super', 'Household')
     expect(store.getCategoryCorrections()).toEqual({
@@ -664,7 +675,7 @@ describe('recordCategoryCorrection / getCategoryCorrections', () => {
   })
 
   it('ignores an empty vendor or category', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.recordCategoryCorrection('', 'Groceries')
     store.recordCategoryCorrection('Vendor', '')
     expect(store.getCategoryCorrections()).toEqual({})
@@ -687,7 +698,7 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
   })
 
   it('adds, edits, then deletes an income source (job)', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('income_source', {
       employerName: 'Acme Corp',
       employmentType: 'contract',
@@ -716,7 +727,7 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
   })
 
   it('persists jobTitle through add and update (e.g. contract-driven intake)', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('income_source', {
       employerName: 'Acme Corp',
       employmentType: 'contract',
@@ -734,7 +745,7 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
   })
 
   it('persists documentRef so the original uploaded contract can be retrieved later', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('income_source', {
       employerName: 'Acme Corp',
       employmentType: 'contract',
@@ -748,7 +759,7 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
   })
 
   it('persists expectedPaydayDayOfMonth/paySchedule on a job, and incomeSourceId on an income record', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('income_source', {
       employerName: 'Acme Corp',
       employmentType: 'full_time',
@@ -771,7 +782,7 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
   })
 
   it('a partial contract-renewal update merges onto the existing job without clobbering untouched fields', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('income_source', {
       employerName: 'Acme Corp',
       employmentType: 'contract',
@@ -801,7 +812,7 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
   })
 
   it('defaults employmentType to other for an unrecognized value', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('income_source', {
       employerName: 'X',
       employmentType: 'bogus',
@@ -811,7 +822,7 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
   })
 
   it('supports an income source with no monthlyIncomeAmount (irregular income)', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('income_source', {
       employerName: 'Freelance Clients',
       employmentType: 'freelance',
@@ -821,7 +832,7 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
   })
 
   it('adds, edits, then deletes a stock holding', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('stock_holding', {
       symbol: 'JKH.N0000',
       platform: 'NDB Zone X',
@@ -856,7 +867,7 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
   })
 
   it('adds, edits, then deletes a fixed deposit', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('fixed_deposit', {
       bankName: 'Sampath Bank',
       principal: 500_000,
@@ -901,7 +912,7 @@ describe('account (PF-100 Account Model)', () => {
   })
 
   it('persists openingBalance/openingBalanceDate through add and update', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('account', {
       name: 'Test Savings',
       type: 'bank',
@@ -929,7 +940,7 @@ describe('account (PF-100 Account Model)', () => {
   })
 
   it('supports an account with no opening balance (optional field)', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('account', {
       name: 'Wallet Cash',
       type: 'cash',
@@ -942,7 +953,7 @@ describe('account (PF-100 Account Model)', () => {
   })
 
   it('defaults account type to other for an unrecognized value', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('account', {
       name: 'Mystery',
       type: 'bogus',
@@ -954,7 +965,7 @@ describe('account (PF-100 Account Model)', () => {
   })
 
   it('adds, edits, then deletes an account', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('account', {
       name: 'Crypto Wallet',
       type: 'crypto_wallet',
@@ -991,7 +1002,7 @@ describe('category (PF-109 Categories)', () => {
   })
 
   it('adds, edits, then deletes a category', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('category', {
       name: 'Groceries',
       kind: 'expense',
@@ -1018,7 +1029,7 @@ describe('category (PF-109 Categories)', () => {
   })
 
   it('defaults kind to both for an unrecognized or missing value', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('category', { name: 'Misc' })
     let db = store.readFinanceStore()
     expect(db.categories[0].kind).toBe('both')
@@ -1032,7 +1043,7 @@ describe('category (PF-109 Categories)', () => {
   })
 
   it('supports a category with no color or notes (optional fields)', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('category', { name: 'Salary', kind: 'income' })
     const db = store.readFinanceStore()
     expect(db.categories[0].color).toBeUndefined()
@@ -1056,7 +1067,7 @@ describe('subcategory_entry (PF-110 Subcategories)', () => {
   })
 
   it('adds, edits, then deletes a subcategory', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('subcategory_entry', {
       name: 'Coffee',
       parentCategory: 'Dining',
@@ -1081,7 +1092,7 @@ describe('subcategory_entry (PF-110 Subcategories)', () => {
   })
 
   it('defaults parentCategory to Other when missing', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('subcategory_entry', { name: 'Misc Sub' })
     const db = store.readFinanceStore()
     expect(db.subcategories[0].parentCategory).toBe('Other')
@@ -1104,7 +1115,7 @@ describe('merchant (PF-111 Merchant Registry)', () => {
   })
 
   it('adds, edits, then deletes a merchant', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('merchant', {
       name: 'Cargills',
       defaultCategory: 'Groceries',
@@ -1129,7 +1140,7 @@ describe('merchant (PF-111 Merchant Registry)', () => {
   })
 
   it('supports a merchant with no default category or notes (optional fields)', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('merchant', { name: 'Unknown Vendor' })
     const db = store.readFinanceStore()
     expect(db.merchants[0].defaultCategory).toBeUndefined()
@@ -1153,7 +1164,7 @@ describe('tag (PF-112 Tags)', () => {
   })
 
   it('adds, edits, then deletes a tag', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('tag', {
       name: 'Travel',
       notes: 'Trip-related spending',
@@ -1178,14 +1189,14 @@ describe('tag (PF-112 Tags)', () => {
   })
 
   it('supports a tag with no notes (optional field)', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('tag', { name: 'Work' })
     const db = store.readFinanceStore()
     expect(db.tags[0].notes).toBeUndefined()
   })
 
   it('round-trips tags on expense and income records through add/update', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('expense', {
       vendor: 'Test',
       category: 'Other',
@@ -1227,7 +1238,7 @@ describe('reconciliationStatus (PF-113 Pending/Cleared/Reconciled Status)', () =
   })
 
   it('defaults to cleared when status is missing or invalid, for both expense and income', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('expense', {
       vendor: 'Test',
       category: 'Other',
@@ -1245,7 +1256,7 @@ describe('reconciliationStatus (PF-113 Pending/Cleared/Reconciled Status)', () =
   })
 
   it('accepts all three valid status values on create, for both expense and income', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('expense', {
       vendor: 'Test',
       category: 'Other',
@@ -1264,7 +1275,7 @@ describe('reconciliationStatus (PF-113 Pending/Cleared/Reconciled Status)', () =
   })
 
   it('round-trips status on expense and income records through update', async () => {
-    const store = await import('./finance-store')
+    const store = await freshFinanceStore()
     store.addFinanceRecord('expense', {
       vendor: 'Test',
       category: 'Other',
@@ -1881,123 +1892,5 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     const db = createEmptyFinanceDatabase()
     const summary = financeSummary(db)
     expect(summary.unrealizedStockPnlPct).toBe(0)
-  })
-})
-
-// Postgres Migration Phase C/D: overlaySplitStores() tries Postgres first
-// for personal-finance collections/settings; Phase D removed the JSON
-// split-store middle tier, so a failed Postgres read now falls through to
-// whatever's already in the base file (no explicit override). Mock
-// readPersonalFinancePostgresStore (real Postgres access is already
-// disabled under VITEST by that module's own guard, so without this mock
-// these tests would just exercise the Postgres-unavailable path
-// unconditionally) and isolate HOME so writeFinanceStore()/readFinanceStore()
-// never touch the real ~/.hermes/finance store.
-describe('overlaySplitStores (Postgres Migration Phase D)', () => {
-  let tmp: string
-  let realHome: string | undefined
-  beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-store-pg-overlay-'))
-    realHome = process.env.HOME
-    process.env.HOME = tmp
-    vi.resetModules()
-  })
-  afterEach(() => {
-    if (realHome === undefined) delete process.env.HOME
-    else process.env.HOME = realHome
-    delete process.env.HERMES_PERSONAL_FINANCE_READ_SOURCE
-    fs.rmSync(tmp, { recursive: true, force: true })
-    vi.doUnmock('./personal-finance-postgres-store')
-  })
-
-  it('uses the Postgres result for personal-finance collections and settings when it succeeds', async () => {
-    vi.doMock('./personal-finance-postgres-store', () => ({
-      readPersonalFinancePostgresStore: () => ({
-        finance_accounts: [{ id: 'pg-acc-1', name: 'From Postgres' }],
-        income_records: [],
-        expense_records: [],
-        budget_categories: [],
-        savings_goals: [],
-        tax_records: [],
-        exchange_rates: [],
-        investment_accounts: [],
-        pending_ingestions: [],
-        income_sources: [],
-        stock_holdings: [],
-        fixed_deposits: [],
-        personalFinanceSettings: {
-          savingsRateTargetPct: 42,
-          financeQaHistory: [{ at: 1, question: 'Q', answer: 'A' }],
-        },
-      }),
-      writePersonalFinancePostgresStore: () => true,
-    }))
-    const store = await import('./finance-store')
-    store.writeFinanceStore(store.createEmptyFinanceDatabase())
-
-    const db = store.readFinanceStore()
-    expect(db.finance_accounts).toEqual([
-      { id: 'pg-acc-1', name: 'From Postgres' },
-    ])
-    expect(db.settings.savingsRateTargetPct).toBe(42)
-    expect(db.settings.financeQaHistory).toEqual([
-      { at: 1, question: 'Q', answer: 'A' },
-    ])
-  })
-
-  it('falls back to the base file when the Postgres read returns null', async () => {
-    vi.doMock('./personal-finance-postgres-store', () => ({
-      readPersonalFinancePostgresStore: () => null,
-      writePersonalFinancePostgresStore: () => true,
-    }))
-    const store = await import('./finance-store')
-    store.addFinanceRecord('account', {
-      name: 'From base file fallback',
-      type: 'bank',
-      currency: 'LKR',
-      balance: 100,
-    })
-
-    const db = store.readFinanceStore()
-    expect(db.finance_accounts).toHaveLength(1)
-    expect(db.finance_accounts[0].name).toBe('From base file fallback')
-  })
-
-  it('HERMES_PERSONAL_FINANCE_READ_SOURCE=json bypasses Postgres even when it would succeed', async () => {
-    process.env.HERMES_PERSONAL_FINANCE_READ_SOURCE = 'json'
-    vi.doMock('./personal-finance-postgres-store', () => ({
-      readPersonalFinancePostgresStore: () => ({
-        finance_accounts: [{ id: 'pg-acc-1', name: 'Should be ignored' }],
-        income_records: [],
-        expense_records: [],
-        budget_categories: [],
-        savings_goals: [],
-        tax_records: [],
-        exchange_rates: [],
-        investment_accounts: [],
-        pending_ingestions: [],
-        income_sources: [],
-        stock_holdings: [],
-        fixed_deposits: [],
-      }),
-      writePersonalFinancePostgresStore: () => true,
-    }))
-    const store = await import('./finance-store')
-    store.addFinanceRecord('account', {
-      name: 'From base file via kill switch',
-      type: 'bank',
-      currency: 'LKR',
-      balance: 100,
-    })
-
-    const db = store.readFinanceStore()
-    expect(
-      db.finance_accounts.some((a) => a.name === 'Should be ignored'),
-    ).toBe(false)
-    expect(
-      db.finance_accounts.some(
-        (a) => a.name === 'From base file via kill switch',
-      ),
-    ).toBe(true)
   })
 })
