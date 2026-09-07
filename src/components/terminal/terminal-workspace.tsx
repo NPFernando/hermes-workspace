@@ -48,6 +48,10 @@ type ContextMenuState = {
   tabId: string
   x: number
   y: number
+  // 'tab' = right-clicked a tab header (rename/close); 'surface' =
+  // right-clicked the terminal content itself (copy/paste). Defaults to
+  // 'tab' at call sites that don't set it, preserving existing behavior.
+  kind?: 'tab' | 'surface'
 }
 
 type TerminalWorkspaceProps = {
@@ -171,6 +175,50 @@ export function TerminalWorkspace({
     }).catch(function ignore() {
       return undefined
     })
+  }, [])
+
+  // Copies the active terminal's current selection to the system clipboard.
+  // No-ops silently if there's nothing selected or the Clipboard API is
+  // blocked (e.g. insecure context) — there's nothing useful to surface to
+  // the user in that case, and failing loudly would be more disruptive
+  // than a copy that quietly did nothing.
+  const copySelection = useCallback(function copyTerminalSelection(
+    tabId: string,
+  ) {
+    const terminal = terminalMapRef.current.get(tabId)
+    if (!terminal?.hasSelection()) return
+    try {
+      void navigator.clipboard.writeText(terminal.getSelection()).catch(
+        function ignore() {
+          return undefined
+        },
+      )
+    } catch {
+      // Clipboard API unavailable (e.g. insecure context) — nothing to do.
+    }
+  }, [])
+
+  // Pastes system clipboard contents into the active terminal via xterm's
+  // own `paste()` API (not raw sendInput) so bracketed-paste mode and any
+  // other paste-specific escape sequencing xterm handles internally still
+  // applies.
+  const pasteClipboard = useCallback(function pasteIntoTerminal(
+    tabId: string,
+  ) {
+    const terminal = terminalMapRef.current.get(tabId)
+    if (!terminal) return
+    try {
+      navigator.clipboard
+        .readText()
+        .then(function onClipboardText(text) {
+          if (text) terminal.paste(text)
+        })
+        .catch(function ignore() {
+          return undefined
+        })
+    } catch {
+      // Clipboard API unavailable (e.g. insecure context) — nothing to do.
+    }
   }, [])
 
   const resizeSession = useCallback(async function resizeTerminalSession(
@@ -559,12 +607,31 @@ export function TerminalWorkspace({
         void sendInput(tab.id, data)
       })
 
+      // Intercept Ctrl/Cmd+C (only when text is selected, so plain Ctrl+C
+      // still reaches the shell as SIGINT) and Ctrl/Cmd+V here, before xterm
+      // forwards the raw key to the pty — returning false stops xterm's
+      // default handling so the shell never also receives a literal ^C/^V.
+      terminal.attachCustomKeyEventHandler(function handleCustomKey(event) {
+        if (event.type !== 'keydown') return true
+        if (!event.ctrlKey && !event.metaKey) return true
+        const key = event.key.toLowerCase()
+        if (key === 'c' && terminal.hasSelection()) {
+          copySelection(tab.id)
+          return false
+        }
+        if (key === 'v') {
+          pasteClipboard(tab.id)
+          return false
+        }
+        return true
+      })
+
       terminalMapRef.current.set(tab.id, terminal)
       fitMapRef.current.set(tab.id, fitAddon)
       void resizeSession(tab.id, terminal)
       void connectTab(tab)
     },
-    [connectTab, resizeSession, sendInput],
+    [connectTab, copySelection, pasteClipboard, resizeSession, sendInput],
   )
 
   const handleCreateTab = useCallback(
@@ -740,6 +807,7 @@ export function TerminalWorkspace({
                     tabId: tab.id,
                     x: event.clientX,
                     y: event.clientY,
+                    kind: 'tab',
                   })
                 }}
                 className={cn(
@@ -888,6 +956,20 @@ export function TerminalWorkspace({
                 onClick={function tapToFocus() {
                   terminalMapRef.current.get(tab.id)?.focus()
                 }}
+                onContextMenu={function onSurfaceContextMenu(event) {
+                  // Right-click copy/paste — the primary way to copy/paste
+                  // without a keyboard shortcut (mobile, no-modifier-key
+                  // setups). Suppress the native browser menu, which would
+                  // otherwise offer to "paste" into xterm's off-screen
+                  // helper textarea and silently do nothing useful.
+                  event.preventDefault()
+                  setContextMenu({
+                    tabId: tab.id,
+                    x: event.clientX,
+                    y: event.clientY,
+                    kind: 'surface',
+                  })
+                }}
                 className="h-full w-full bg-[var(--theme-panel)] font-mono text-[var(--theme-text)]"
                 style={{ backgroundColor: TERMINAL_BG }}
               />
@@ -915,35 +997,66 @@ export function TerminalWorkspace({
             event.stopPropagation()
           }}
         >
-          <button
-            type="button"
-            className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
-            onClick={function renameTabFromMenu() {
-              const menuTab = tabs.find((tab) => tab.id === contextMenu.tabId)
-              setContextMenu(null)
-              if (!menuTab) return
-              const nextName = window.prompt(
-                'Rename terminal tab',
-                menuTab.title,
-              )
-              if (!nextName) return
-              renameTab(menuTab.id, nextName)
-            }}
-          >
-            Rename
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
-            onClick={function closeTabFromMenu() {
-              const menuTab = tabs.find((tab) => tab.id === contextMenu.tabId)
-              setContextMenu(null)
-              if (!menuTab) return
-              handleCloseTab(menuTab)
-            }}
-          >
-            Close
-          </button>
+          {contextMenu.kind === 'surface' ? (
+            <>
+              <button
+                type="button"
+                className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
+                onClick={function copyFromMenu() {
+                  copySelection(contextMenu.tabId)
+                  setContextMenu(null)
+                }}
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
+                onClick={function pasteFromMenu() {
+                  pasteClipboard(contextMenu.tabId)
+                  setContextMenu(null)
+                }}
+              >
+                Paste
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
+                onClick={function renameTabFromMenu() {
+                  const menuTab = tabs.find(
+                    (tab) => tab.id === contextMenu.tabId,
+                  )
+                  setContextMenu(null)
+                  if (!menuTab) return
+                  const nextName = window.prompt(
+                    'Rename terminal tab',
+                    menuTab.title,
+                  )
+                  if (!nextName) return
+                  renameTab(menuTab.id, nextName)
+                }}
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center rounded px-2 py-1.5 text-left text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
+                onClick={function closeTabFromMenu() {
+                  const menuTab = tabs.find(
+                    (tab) => tab.id === contextMenu.tabId,
+                  )
+                  setContextMenu(null)
+                  if (!menuTab) return
+                  handleCloseTab(menuTab)
+                }}
+              >
+                Close
+              </button>
+            </>
+          )}
         </div>
       ) : null}
     </div>
