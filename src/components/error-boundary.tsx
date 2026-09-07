@@ -1,4 +1,4 @@
-import { Component } from 'react'
+import { Component, useEffect } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -17,6 +17,8 @@ type ErrorBoundaryState = {
 
 const REACT_DOM_RECOVERY_KEY = 'hermes-react-dom-recovery-at'
 const REACT_DOM_RECOVERY_TTL_MS = 30_000
+const STALE_ASSET_RECOVERY_KEY = 'hermes-stale-asset-recovery-at'
+const STALE_ASSET_RECOVERY_TTL_MS = 30_000
 
 function isReactDomReconciliationError(error: Error): boolean {
   const message = `${error.name}: ${error.message}`
@@ -25,6 +27,47 @@ function isReactDomReconciliationError(error: Error): boolean {
     (message.includes('insertBefore') || message.includes('removeChild')) &&
     message.includes('not a child of this node')
   )
+}
+
+/**
+ * Detects the "stale tab after redeploy" failure: a live deploy rebuilds
+ * dist/ (deleting the old hashed JS/CSS chunks) before an already-open tab
+ * requests one of them, so the fetch 404s. Bundlers/browsers surface this
+ * with a range of wordings depending on chunk vs. CSS vs. Vite's own
+ * preload-error event, so match on the common substrings rather than one
+ * exact string.
+ */
+export function isStaleAssetError(error: Error): boolean {
+  const message = `${error.name}: ${error.message}`.toLowerCase()
+  return (
+    message.includes('failed to fetch dynamically imported module') ||
+    message.includes('importing a module script failed') ||
+    message.includes('loading chunk') ||
+    message.includes('loading css chunk') ||
+    message.includes('unable to preload css') ||
+    message.includes('load failed') // Safari's generic dynamic-import/module error text
+  )
+}
+
+/**
+ * Shared "clear caches, mark that we already tried, reload once" recovery
+ * used for both the React-DOM-reconciliation and stale-asset error classes.
+ * The sessionStorage TTL guard prevents an infinite reload loop if the
+ * reload doesn't actually fix the underlying issue.
+ */
+function recoverOnce(storageKey: string, ttlMs: number): boolean {
+  if (typeof window === 'undefined') return false
+  const previous = Number(window.sessionStorage.getItem(storageKey) ?? '0')
+  const alreadyRetried = Number.isFinite(previous)
+    ? Date.now() - previous < ttlMs
+    : false
+  if (alreadyRetried) return false
+
+  window.sessionStorage.setItem(storageKey, String(Date.now()))
+  void clearStaleRuntimeCaches().finally(() => {
+    window.location.reload()
+  })
+  return true
 }
 
 async function clearStaleRuntimeCaches(): Promise<void> {
@@ -65,26 +108,20 @@ export class ErrorBoundary extends Component<
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Unhandled UI error', error, errorInfo)
 
-    if (
-      typeof window === 'undefined' ||
-      !isReactDomReconciliationError(error)
-    ) {
+    if (typeof window === 'undefined') return
+
+    if (isReactDomReconciliationError(error)) {
+      if (recoverOnce(REACT_DOM_RECOVERY_KEY, REACT_DOM_RECOVERY_TTL_MS)) {
+        this.setState({ recovering: true })
+      }
       return
     }
 
-    const previous = Number(
-      window.sessionStorage.getItem(REACT_DOM_RECOVERY_KEY) ?? '0',
-    )
-    const alreadyRetried = Number.isFinite(previous)
-      ? Date.now() - previous < REACT_DOM_RECOVERY_TTL_MS
-      : false
-    if (alreadyRetried) return
-
-    window.sessionStorage.setItem(REACT_DOM_RECOVERY_KEY, String(Date.now()))
-    this.setState({ recovering: true })
-    void clearStaleRuntimeCaches().finally(() => {
-      window.location.reload()
-    })
+    if (isStaleAssetError(error)) {
+      if (recoverOnce(STALE_ASSET_RECOVERY_KEY, STALE_ASSET_RECOVERY_TTL_MS)) {
+        this.setState({ recovering: true })
+      }
+    }
   }
 
   reloadPage() {
@@ -98,7 +135,7 @@ export class ErrorBoundary extends Component<
 
     const title = this.props.title ?? 'Something went wrong'
     const description = this.state.recovering
-      ? 'Recovering from a stale DOM/runtime mismatch. The page will reload automatically.'
+      ? 'Recovering from a stale DOM/runtime mismatch or an outdated app build. The page will reload automatically.'
       : (this.props.description ??
         'The chat encountered an unexpected issue. Reload to try again.')
 
@@ -128,4 +165,44 @@ export class ErrorBoundary extends Component<
       </div>
     )
   }
+}
+
+/**
+ * Belt-and-suspenders for stale-asset recovery: dynamic import failures
+ * (e.g. TanStack Router lazy route loading) reject a promise rather than
+ * throwing during render, so they can bypass React error boundaries
+ * entirely and surface only as an `unhandledrejection`. Vite also emits its
+ * own `vite:preloadError` event for this exact case. Mount this once near
+ * the app root (see routes/__root.tsx) alongside the other global listener
+ * components.
+ */
+export function StaleAssetRecoveryListener(): null {
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const tryRecover = (error: unknown) => {
+      if (!(error instanceof Error) || !isStaleAssetError(error)) return
+      recoverOnce(STALE_ASSET_RECOVERY_KEY, STALE_ASSET_RECOVERY_TTL_MS)
+    }
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      tryRecover(event.reason)
+    }
+    // Vite-specific event fired when a dynamically-imported module fails to
+    // load; calling preventDefault() suppresses Vite's own console warning
+    // since we're already handling recovery here.
+    const handleVitePreloadError = (event: Event) => {
+      event.preventDefault()
+      tryRecover((event as ErrorEvent).error ?? new Error(event.type))
+    }
+
+    window.addEventListener('unhandledrejection', handleRejection)
+    window.addEventListener('vite:preloadError', handleVitePreloadError)
+    return () => {
+      window.removeEventListener('unhandledrejection', handleRejection)
+      window.removeEventListener('vite:preloadError', handleVitePreloadError)
+    }
+  }, [])
+
+  return null
 }
