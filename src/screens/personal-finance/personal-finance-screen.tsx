@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -41,6 +41,11 @@ import {
   stringField,
 } from './field-helpers'
 import { buttonClass } from './shared-styles'
+import {
+  usePendingIngestionCount,
+  usePersonalFinance,
+  useSetPersonalFinancePayload,
+} from './hooks/use-personal-finance'
 import type { PersonalFinancePayload } from './types'
 
 type Tab = 'overview' | 'income' | 'investments' | 'records' | 'ingestion'
@@ -93,78 +98,15 @@ const TABS: Array<{ id: Tab; label: string }> = [
 ]
 
 export function PersonalFinanceScreen() {
-  const [payload, setPayload] = useState<PersonalFinancePayload | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('overview')
-  const [pendingIngestionCount, setPendingIngestionCount] = useState(0)
+  const financeQuery = usePersonalFinance()
+  const setPayload = useSetPersonalFinancePayload()
+  const pendingIngestionCount = usePendingIngestionCount()
 
-  useEffect(() => {
-    let cancelled = false
-    async function loadPendingCount() {
-      try {
-        const res = await fetch('/api/finance', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ action: 'list_pending_ingestions' }),
-        })
-        const data = (await res.json()) as {
-          ok?: boolean
-          pendingIngestions?: Array<{ status: string }>
-        }
-        if (!cancelled && data.ok) {
-          const count = (data.pendingIngestions ?? []).filter(
-            (p) =>
-              p.status === 'awaiting_review' ||
-              p.status === 'awaiting_password',
-          ).length
-          setPendingIngestionCount(count)
-        }
-      } catch {
-        /* transient */
-      }
-    }
-    void loadPendingCount()
-    const interval = setInterval(() => void loadPendingCount(), 30_000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      try {
-        const response = await fetch('/api/finance?scope=personal_finance', {
-          cache: 'no-store',
-        })
-        if (!response.ok)
-          throw new Error(`Finance API returned HTTP ${response.status}`)
-        const data = (await response.json()) as PersonalFinancePayload
-        if (!cancelled) {
-          setPayload(data)
-          setError(null)
-        }
-      } catch (nextError) {
-        if (!cancelled)
-          setError(
-            nextError instanceof Error
-              ? nextError.message
-              : 'Finance API failed',
-          )
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  if (loading) {
+  // isPending (not isLoading) — true only while there is no cached payload at
+  // all, i.e. the genuine first load. A background refetch (staleTime expiry,
+  // window-focus) keeps isPending false, so it never blanks the dashboard.
+  if (financeQuery.isPending) {
     return (
       <main className="min-h-dvh bg-[var(--theme-bg)] p-6 text-[var(--theme-muted)]">
         Loading Personal Finance section…
@@ -172,15 +114,24 @@ export function PersonalFinanceScreen() {
     )
   }
 
-  if (error || !payload) {
+  // Hard-fail only when we have never loaded a payload. If a background
+  // refetch (window-focus / staleTime) fails but we still hold the last good
+  // payload, keep rendering it rather than blanking the whole dashboard on a
+  // transient blip.
+  if (financeQuery.isError && financeQuery.data === undefined) {
     return (
       <main className="min-h-dvh bg-[var(--theme-bg)] p-6 text-[var(--theme-danger)]">
         <h1 className="text-2xl font-semibold">Personal finance unavailable</h1>
-        <p className="mt-2 text-sm">{error ?? 'No payload returned.'}</p>
+        <p className="mt-2 text-sm">
+          {financeQuery.error instanceof Error
+            ? financeQuery.error.message
+            : 'Finance API failed'}
+        </p>
       </main>
     )
   }
 
+  const payload = financeQuery.data
   const { summary } = payload
 
   const netWorthBreakdown = [
