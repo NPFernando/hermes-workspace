@@ -8,6 +8,10 @@ import {
   readFinancePostgresNormalized,
   writeFinancePostgresNormalized,
 } from './finance-postgres-store'
+import {
+  getCachedCategoryPreferences,
+  proposeCategoryPreference,
+} from './harp-memory-client'
 import type { ConnectivityBreakerState } from './connectivity-breaker'
 
 export const FINANCE_SCHEMA_VERSION = 1
@@ -1954,15 +1958,27 @@ export function recordCategoryCorrection(
   corrections[vendor.trim().toLowerCase()] = category.trim()
   settings.categoryCorrections = corrections
   writeFinanceStore(db)
+  // Also propose it to HARP memory as a governed `preference` candidate.
+  // Best-effort, non-blocking — the flat map above stays authoritative for
+  // prompt hints until (and if) the candidate is approved.
+  void proposeCategoryPreference({ vendor, category })
 }
 
+/**
+ * The flat `settings.categoryCorrections` map merged with any *approved* HARP
+ * category rules (a HARP rule wins a key conflict — it reflects review). When
+ * HARP memory is disabled or unreachable this is exactly the flat map.
+ */
 export function getCategoryCorrections(): Record<string, string> {
   const db = ensureFinanceStore()
   const settings = db.settings as Record<string, unknown>
-  return settings.categoryCorrections &&
+  const flat =
+    settings.categoryCorrections &&
     typeof settings.categoryCorrections === 'object'
-    ? (settings.categoryCorrections as Record<string, string>)
-    : {}
+      ? (settings.categoryCorrections as Record<string, string>)
+      : {}
+  const harp = getCachedCategoryPreferences()
+  return Object.keys(harp).length > 0 ? { ...flat, ...harp } : flat
 }
 
 export function listPendingIngestions(): Array<PendingIngestion> {
