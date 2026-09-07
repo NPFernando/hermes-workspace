@@ -973,16 +973,7 @@ export function readFinanceStore(): FinanceDatabase {
 }
 
 function readFinanceStoreUncached(): FinanceDatabase {
-  if (process.env.VITEST || process.env.NODE_ENV === 'test') {
-    return readFinanceStoreJsonCompatibility()
-  }
-  const postgresDb = readFinancePostgresNormalized()
-  if (!postgresDb) {
-    throw new Error(
-      'Finance PostgreSQL runtime store is unavailable; refusing JSON fallback.',
-    )
-  }
-  return migrateFinanceStore(postgresDb)
+  return financeBackend.read()
 }
 
 function readFinanceStoreJsonCompatibility(): FinanceDatabase {
@@ -1352,25 +1343,96 @@ function migrateFinanceStore(db: FinanceDatabase): FinanceDatabase {
   }
 }
 
+/**
+ * Persistence backend seam for `readFinanceStore` / `writeFinanceStore`.
+ *
+ * Production: the `finance` Postgres normalized store
+ * (`readFinancePostgresNormalized` / `writeFinancePostgresNormalized`).
+ * Under vitest: the JSON-compat store (tmp-`HOME` isolated), unchanged from
+ * before this seam existed.
+ *
+ * Tests can also swap in a pure in-memory backend via `__setFinanceBackend()`
+ * so no test can reach a real database — this upholds the 2026-07-27
+ * anti-pollution guard by construction rather than by an env check.
+ */
+export interface FinanceStoreBackend {
+  read: () => FinanceDatabase
+  write: (db: FinanceDatabase) => void
+}
+
+const postgresFinanceBackend: FinanceStoreBackend = {
+  read() {
+    const db = readFinancePostgresNormalized()
+    if (!db) {
+      throw new Error(
+        'Finance PostgreSQL runtime store is unavailable; refusing JSON fallback.',
+      )
+    }
+    return migrateFinanceStore(db)
+  },
+  write(db) {
+    if (!writeFinancePostgresNormalized(db)) {
+      throw new Error(
+        'Finance PostgreSQL runtime store is unavailable; write was not persisted.',
+      )
+    }
+  },
+}
+
+const jsonCompatFinanceBackend: FinanceStoreBackend = {
+  read: () => readFinanceStoreJsonCompatibility(),
+  write(db) {
+    fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+    writeFinanceJsonStore(db)
+    writeFinancePostgresStore(db)
+  },
+}
+
+function defaultFinanceBackend(): FinanceStoreBackend {
+  return process.env.VITEST || process.env.NODE_ENV === 'test'
+    ? jsonCompatFinanceBackend
+    : postgresFinanceBackend
+}
+
+let financeBackend: FinanceStoreBackend = defaultFinanceBackend()
+
+/** Test-only: swap the persistence backend and drop the read cache. */
+export function __setFinanceBackend(backend: FinanceStoreBackend): void {
+  financeBackend = backend
+  financeStoreCache = null
+}
+
+/** Test-only: restore the environment default backend. */
+export function __resetFinanceBackend(): void {
+  financeBackend = defaultFinanceBackend()
+  financeStoreCache = null
+}
+
+/**
+ * Test-only: a pure in-memory backend seeded from `initial` (or an empty DB).
+ * Holds one migrated `FinanceDatabase` in a closure; every read/write is a
+ * deep-ish copy via `migrateFinanceStore` so callers can't mutate the store
+ * through a returned reference.
+ */
+export function __inMemoryFinanceBackend(
+  initial?: FinanceDatabase,
+): FinanceStoreBackend {
+  let current = migrateFinanceStore(initial ?? createEmptyFinanceDatabase())
+  return {
+    read: () => migrateFinanceStore(current),
+    write: (db) => {
+      current = migrateFinanceStore(db)
+    },
+  }
+}
+
 export function writeFinanceStore(db: FinanceDatabase): void {
   const updated = { ...db, updatedAt: nowIso() }
-  if (process.env.VITEST || process.env.NODE_ENV === 'test') {
-    fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
-    writeFinanceJsonStore(updated)
-    writeFinancePostgresStore(updated)
-  } else if (!writeFinancePostgresNormalized(updated)) {
-    throw new Error(
-      'Finance PostgreSQL runtime store is unavailable; write was not persisted.',
-    )
-  }
+  financeBackend.write(updated)
   // Invalidate (rather than repopulate) the read cache: `updated` here is
   // the raw pre-overlay object, not the merged result readFinanceStore()
-  // normally returns (Postgres-sourced personal-finance collections/settings,
-  // split-store trading data, etc. — see overlaySplitStores()). Caching it
-  // directly would let callers observe a write that skips that merge.
-  // Invalidating just means the very next read after a write pays the full
-  // uncached cost once, which is rare next to the read-heavy dashboard
-  // access pattern this cache targets.
+  // normally returns. Invalidating just means the next read pays the full
+  // uncached cost once, rare next to the read-heavy dashboard access pattern.
   financeStoreCache = null
 }
 
