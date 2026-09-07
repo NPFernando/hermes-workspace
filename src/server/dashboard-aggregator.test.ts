@@ -146,8 +146,6 @@ describe('buildDashboardOverview', () => {
         consecutiveFailures: 3,
         lastStatus: 'postgres_behind',
         lastWarnings: ['Postgres mirror is 45s behind JSON finance storage.'],
-        lastSelfHealAttempts: 2,
-        lastSelfHealSucceeded: false,
         heartbeatAgeMs: 5 * 60_000,
         stale: false,
       },

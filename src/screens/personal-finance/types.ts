@@ -53,8 +53,7 @@ export type PersonalFinancePayload = {
   }
   financeQaHistory: Array<{ at: number; question: string; answer: string }>
   storage: {
-    active: 'postgres' | 'json'
-    fallback: 'json'
+    active: 'postgres' | 'unavailable'
     postgres: {
       enabled: boolean
       available: boolean
@@ -64,27 +63,11 @@ export type PersonalFinancePayload = {
       lastWriteError?: string
     }
     health: {
-      status:
-        | 'healthy'
-        | 'json_primary'
-        | 'postgres_unavailable'
-        | 'postgres_behind'
-        | 'mirror_mismatch'
+      status: 'healthy' | 'postgres_unavailable' | 'json_primary'
       warnings: Array<string>
-      jsonUpdatedAt: string | null
       postgresUpdatedAt: string | null
-      postgresLagMs: number
-      isPostgresBehindJson: boolean
-      selfHeal: {
-        attempted: boolean
-        attempts: number
-        succeeded: boolean
-        lastAttemptAt: string | null
-      }
       rowCounts: {
-        json: Record<string, number>
         postgres: Record<string, number>
-        lagging: Record<string, { json: number; postgres: number }>
       }
     }
   }

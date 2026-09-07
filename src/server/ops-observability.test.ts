@@ -40,8 +40,6 @@ describe('ops-observability finance storage monitor', () => {
       consecutiveFailures: 3,
       lastStatus: 'postgres_behind',
       lastWarnings: ['Postgres mirror is 45s behind JSON finance storage.'],
-      lastSelfHealAttempts: 2,
-      lastSelfHealSucceeded: false,
     })
 
     expect(
@@ -56,8 +54,6 @@ describe('ops-observability finance storage monitor', () => {
       consecutiveFailures: 3,
       heartbeatAgeMs: 45 * 60_000,
       stale: true,
-      lastSelfHealAttempts: 2,
-      lastSelfHealSucceeded: false,
     })
   })
 

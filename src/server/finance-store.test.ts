@@ -118,44 +118,38 @@ describe('finance-store', () => {
     )
   })
 
-  it('warns when the Postgres mirror has fewer rows than JSON storage', () => {
-    const jsonDb = createEmptyFinanceDatabase()
+  it('reports healthy when Postgres is reachable with data', () => {
     const postgresDb = createEmptyFinanceDatabase()
-    jsonDb.updatedAt = '2026-07-08T00:00:00.000Z'
-    postgresDb.updatedAt = jsonDb.updatedAt
-    jsonDb.historical_candles.push({
-      id: 'binance:BTCUSDT:1h:1',
-      platform: 'binance',
-      symbol: 'BTCUSDT',
-      interval: '1h',
-    })
+    postgresDb.updatedAt = '2026-07-08T00:00:00.000Z'
 
     const health = buildFinanceStorageHealth({
-      jsonDb,
       postgresDb,
+      postgres: { enabled: true, available: true, snapshotAvailable: true },
+    })
+
+    expect(health.status).toBe('healthy')
+    expect(health.warnings).toEqual([])
+    expect(health.postgresUpdatedAt).toBe('2026-07-08T00:00:00.000Z')
+  })
+
+  it('flags postgres_unavailable when the store cannot be read', () => {
+    const health = buildFinanceStorageHealth({
+      postgresDb: null,
       postgres: {
         enabled: true,
-        available: true,
-        snapshotAvailable: true,
+        available: false,
+        snapshotAvailable: false,
+        reason: 'connection refused',
       },
     })
 
-    expect(health.status).toBe('mirror_mismatch')
-    expect(health.isPostgresBehindJson).toBe(true)
-    expect(health.rowCounts.lagging.historical_candles).toEqual({
-      json: 1,
-      postgres: 0,
-    })
-    expect(health.warnings[0]).toContain('historical_candles 0/1')
+    expect(health.status).toBe('postgres_unavailable')
+    expect(health.warnings[0]).toContain('connection refused')
   })
 
-  it('turns unresolved storage health warnings into a visible alert', () => {
-    const jsonDb = createEmptyFinanceDatabase()
+  it('turns a last-write-error into a visible alert', () => {
     const postgresDb = createEmptyFinanceDatabase()
-    jsonDb.updatedAt = '2026-07-08T00:00:30.000Z'
-    postgresDb.updatedAt = '2026-07-08T00:00:00.000Z'
     const health = buildFinanceStorageHealth({
-      jsonDb,
       postgresDb,
       postgres: {
         enabled: true,
@@ -163,22 +157,15 @@ describe('finance-store', () => {
         snapshotAvailable: true,
         lastWriteError: 'psql exited 1',
       },
-      selfHeal: {
-        attempted: true,
-        attempts: 2,
-        succeeded: false,
-        lastAttemptAt: '2026-07-08T00:00:31.000Z',
-      },
     })
 
     const [alert] = financeStorageAlerts(health)
 
     expect(alert).toMatchObject({
       level: 'warning',
-      title: 'Finance storage mirror unhealthy',
+      title: 'Finance storage unhealthy',
     })
-    expect(alert.detail).toContain('Postgres mirror is 30s behind')
-    expect(alert.detail).toContain('Self-heal did not resolve it')
+    expect(alert.detail).toContain('psql exited 1')
   })
 
   it('excludes categories with no budget set for the requested month', () => {

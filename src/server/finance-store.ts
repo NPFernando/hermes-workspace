@@ -806,30 +806,25 @@ export type FinanceDatabase = {
   connectivityBreaker: ConnectivityBreakerState
 }
 
+/**
+ * Postgres is the sole finance persistence layer, so storage health is now a
+ * plain reachability signal — there is no second store to drift against.
+ * - `healthy`             — Postgres reachable, finance data present.
+ * - `postgres_unavailable` — Postgres enabled but unreachable / no data yet.
+ * - `json_primary`        — Postgres disabled (HERMES_FINANCE_STORE=json) or a
+ *                           dev / in-memory backend is active.
+ */
 export type FinanceStorageHealthStatus =
   | 'healthy'
-  | 'json_primary'
   | 'postgres_unavailable'
-  | 'postgres_behind'
-  | 'mirror_mismatch'
+  | 'json_primary'
 
 export type FinanceStorageHealth = {
   status: FinanceStorageHealthStatus
   warnings: Array<string>
-  jsonUpdatedAt: string | null
   postgresUpdatedAt: string | null
-  postgresLagMs: number
-  isPostgresBehindJson: boolean
-  selfHeal: {
-    attempted: boolean
-    attempts: number
-    succeeded: boolean
-    lastAttemptAt: string | null
-  }
   rowCounts: {
-    json: Record<string, number>
     postgres: Record<string, number>
-    lagging: Record<string, { json: number; postgres: number }>
   }
 }
 
@@ -1249,7 +1244,6 @@ function shouldPreferPostgresStore(
 }
 
 export function buildFinanceStorageHealth(input: {
-  jsonDb: FinanceDatabase | null
   postgresDb: FinanceDatabase | null
   postgres: {
     enabled: boolean
@@ -1258,77 +1252,39 @@ export function buildFinanceStorageHealth(input: {
     reason?: string
     lastWriteError?: string
   }
-  selfHeal?: FinanceStorageHealth['selfHeal']
 }): FinanceStorageHealth {
-  const jsonUpdatedAt = input.jsonDb?.updatedAt ?? null
-  const postgresUpdatedAt = input.postgresDb?.updatedAt ?? null
-  const jsonUpdatedMs = input.jsonDb ? updatedAtMs(input.jsonDb) : 0
-  const postgresUpdatedMs = input.postgresDb ? updatedAtMs(input.postgresDb) : 0
-  const postgresLagMs =
-    jsonUpdatedMs > postgresUpdatedMs ? jsonUpdatedMs - postgresUpdatedMs : 0
-  const jsonCounts = financeCollectionCounts(input.jsonDb)
-  const postgresCounts = financeCollectionCounts(input.postgresDb)
-  const lagging: Record<string, { json: number; postgres: number }> = {}
-  for (const key of STORAGE_HEALTH_COLLECTIONS) {
-    if (jsonCounts[key] > postgresCounts[key]) {
-      lagging[key] = { json: jsonCounts[key], postgres: postgresCounts[key] }
-    }
-  }
-
   const warnings: Array<string> = []
   let status: FinanceStorageHealthStatus = 'healthy'
 
   if (!input.postgres.enabled) {
     status = 'json_primary'
-  } else if (!input.postgres.available) {
+    warnings.push(
+      'Postgres persistence is disabled (dev / in-memory backend).',
+    )
+  } else if (
+    !input.postgres.available ||
+    !input.postgres.snapshotAvailable ||
+    !input.postgresDb
+  ) {
     status = 'postgres_unavailable'
     warnings.push(
       input.postgres.reason
-        ? `Postgres mirror unavailable: ${input.postgres.reason}.`
-        : 'Postgres mirror unavailable; using JSON fallback.',
-    )
-  } else if (!input.postgres.snapshotAvailable || !input.postgresDb) {
-    status = 'postgres_unavailable'
-    warnings.push('Postgres mirror has no finance snapshot yet.')
-  } else if (postgresLagMs > 0) {
-    status = 'postgres_behind'
-    warnings.push(
-      `Postgres mirror is ${Math.ceil(postgresLagMs / 1000)}s behind JSON finance storage.`,
-    )
-  } else if (Object.keys(lagging).length > 0) {
-    status = 'mirror_mismatch'
-    const summary = Object.entries(lagging)
-      .slice(0, 3)
-      .map(([key, counts]) => `${key} ${counts.postgres}/${counts.json}`)
-      .join(', ')
-    warnings.push(
-      `Postgres mirror has fewer rows than JSON storage (${summary}).`,
+        ? `Postgres finance store unavailable: ${input.postgres.reason}.`
+        : 'Postgres finance store unavailable.',
     )
   }
   if (input.postgres.lastWriteError) {
     warnings.push(
-      `Last Postgres mirror write failed: ${input.postgres.lastWriteError}.`,
+      `Last Postgres write failed: ${input.postgres.lastWriteError}.`,
     )
   }
 
   return {
     status,
     warnings,
-    jsonUpdatedAt,
-    postgresUpdatedAt,
-    postgresLagMs,
-    isPostgresBehindJson:
-      status === 'postgres_behind' || status === 'mirror_mismatch',
-    selfHeal: input.selfHeal ?? {
-      attempted: false,
-      attempts: 0,
-      succeeded: false,
-      lastAttemptAt: null,
-    },
+    postgresUpdatedAt: input.postgresDb?.updatedAt ?? null,
     rowCounts: {
-      json: jsonCounts,
-      postgres: postgresCounts,
-      lagging,
+      postgres: financeCollectionCounts(input.postgresDb),
     },
   }
 }
@@ -1511,99 +1467,18 @@ export function appendAuditLog(
   }
 }
 
-function storageHealthNeedsSelfHeal(health: FinanceStorageHealth): boolean {
-  return (
-    health.status === 'postgres_behind' ||
-    health.status === 'mirror_mismatch' ||
-    health.status === 'postgres_unavailable'
-  )
-}
-
-export function financeStorageStatus(
-  options: { selfHeal?: boolean; selfHealRetries?: number } = {},
-) {
-  if (!(process.env.VITEST || process.env.NODE_ENV === 'test')) {
-    const pg = financePostgresStatus()
-    const postgresDb = readFinancePostgresNormalized()
-    const health = buildFinanceStorageHealth({
-      jsonDb: null,
-      postgresDb,
-      postgres: {
-        ...pg,
-        snapshotAvailable: postgresDb !== null,
-      },
-    })
-    return {
-      active: postgresDb ? 'postgres' : 'unavailable',
-      fallback: 'none',
-      jsonPath: FINANCE_DATA_PATH,
-      auditPath: FINANCE_AUDIT_PATH,
-      postgres: pg,
-      health,
-    }
-  }
-  let pg = financePostgresStatus()
-  const jsonDb = readFinanceJsonStore()
-  let postgresDb = readFinancePostgresStore()
-  let selfHeal: FinanceStorageHealth['selfHeal'] = {
-    attempted: false,
-    attempts: 0,
-    succeeded: false,
-    lastAttemptAt: null,
-  }
-  let health = buildFinanceStorageHealth({
-    jsonDb,
+export function financeStorageStatus() {
+  const pg = financePostgresStatus()
+  const postgresDb = readFinancePostgresNormalized()
+  const health = buildFinanceStorageHealth({
     postgresDb,
-    postgres: pg,
-    selfHeal,
+    postgres: {
+      ...pg,
+      snapshotAvailable: postgresDb !== null,
+    },
   })
-
-  if (
-    options.selfHeal &&
-    jsonDb &&
-    pg.enabled &&
-    pg.available &&
-    storageHealthNeedsSelfHeal(health)
-  ) {
-    const retries = Math.max(1, Math.min(options.selfHealRetries ?? 2, 5))
-    for (let attempt = 1; attempt <= retries; attempt += 1) {
-      selfHeal = {
-        attempted: true,
-        attempts: attempt,
-        succeeded: false,
-        lastAttemptAt: nowIso(),
-      }
-      const ok = writeFinancePostgresStore(jsonDb)
-      pg = financePostgresStatus()
-      postgresDb = readFinancePostgresStore()
-      health = buildFinanceStorageHealth({
-        jsonDb,
-        postgresDb,
-        postgres: pg,
-        selfHeal: { ...selfHeal, succeeded: ok },
-      })
-      if (ok && !storageHealthNeedsSelfHeal(health)) break
-    }
-    const healed = !storageHealthNeedsSelfHeal(health)
-    appendAuditLog(
-      healed
-        ? 'finance_postgres_mirror_self_healed'
-        : 'finance_postgres_mirror_self_heal_failed',
-      {
-        attempts: selfHeal.attempts,
-        status: health.status,
-        warnings: health.warnings,
-      },
-    )
-  }
-
   return {
-    active:
-      pg.available && pg.snapshotAvailable && !health.isPostgresBehindJson
-        ? 'postgres'
-        : 'json',
-    fallback: 'json',
-    jsonPath: FINANCE_DATA_PATH,
+    active: postgresDb ? ('postgres' as const) : ('unavailable' as const),
     auditPath: FINANCE_AUDIT_PATH,
     postgres: pg,
     health,
@@ -1619,12 +1494,8 @@ export function financeStorageAlerts(health: FinanceStorageHealth): Array<{
   return [
     {
       level: health.status === 'postgres_unavailable' ? 'critical' : 'warning',
-      title: 'Finance storage mirror unhealthy',
-      detail: `${health.warnings.join(' ')}${
-        health.selfHeal.attempted
-          ? ` Self-heal ${health.selfHeal.succeeded ? 'succeeded' : 'did not resolve it'} after ${health.selfHeal.attempts} attempt(s).`
-          : ''
-      }`,
+      title: 'Finance storage unhealthy',
+      detail: health.warnings.join(' '),
     },
   ]
 }

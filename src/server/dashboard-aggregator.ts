@@ -78,8 +78,6 @@ export type DashboardFinanceStorageMonitorSection = {
   consecutiveFailures: number
   lastStatus: string | null
   lastWarnings: Array<string>
-  lastSelfHealAttempts: number
-  lastSelfHealSucceeded: boolean | null
   heartbeatAgeMs: number | null
   stale: boolean
 }

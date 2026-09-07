@@ -238,8 +238,10 @@ function evidenceGate(
 }
 
 function ledgerIntegrityGate(): ReadinessGate {
-  const storage = financeStorageStatus({ selfHeal: false })
-  const storageOk = storage.health.status !== 'mirror_mismatch' && storage.health.status !== 'postgres_behind'
+  const storage = financeStorageStatus()
+  // Postgres is the sole store now — only a genuinely unreachable store blocks
+  // ledger trust. A transient last-write-error stays a warning, not a halt.
+  const storageOk = storage.health.status !== 'postgres_unavailable'
   const records = Array.isArray(buildLedgerRecords()) ? buildLedgerRecords() : []
   const anomalies = records.filter((r) => {
     if (r.status === 'open') {
@@ -259,7 +261,7 @@ function ledgerIntegrityGate(): ReadinessGate {
   })
   const pass = storageOk && anomalies.length === 0
   const detail = !storageOk
-    ? `finance storage health is "${storage.health.status}" — resolve the mirror mismatch before trusting the ledger`
+    ? `finance storage health is "${storage.health.status}" — Postgres is unreachable, ledger cannot be trusted`
     : anomalies.length > 0
       ? `${anomalies.length} ledger record(s) have missing/invalid price or quantity data`
       : `storage healthy (${storage.health.status}), ${records.length} ledger record(s), no anomalies`
