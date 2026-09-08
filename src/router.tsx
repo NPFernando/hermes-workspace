@@ -2,7 +2,6 @@ import { createRouter } from '@tanstack/react-router'
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
-import { RoutePending } from './components/route-pending'
 
 declare global {
   interface Window {
@@ -40,10 +39,6 @@ export const getRouter = () => {
 
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
-    // Consistent hold state for any route whose loader is pending past the
-    // default threshold. Routes that want a specific label override with
-    // their own `pendingComponent` (still <RoutePending label=…>).
-    defaultPendingComponent: () => <RoutePending />,
   })
 
   return router
