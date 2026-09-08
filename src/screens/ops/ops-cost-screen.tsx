@@ -235,7 +235,7 @@ export function OpsCostScreen() {
     : []
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 overflow-y-auto p-4">
+    <div data-route-page className="mx-auto max-w-5xl space-y-4 overflow-y-auto p-4">
       <header>
         <h1 className="text-lg font-semibold text-[var(--theme-text)]">
           Cost &amp; Routing Observability

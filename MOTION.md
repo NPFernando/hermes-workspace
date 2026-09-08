@@ -36,10 +36,17 @@ reach for the CSS tokens when a custom keyframe is involved.
 
 Every keyframe animation **must** be named in one of the
 `@media (prefers-reduced-motion: reduce)` blocks in `src/styles.css` (there are
-8+; group with a related one). The block sets `animation: none` and, for
+8+; group with a related one, or add to the consolidated "Reduced-motion safety
+net" block after `[data-route-page]`). The block sets `animation: none` and, for
 shimmer-type effects, swaps in a static tint. A keyframe not covered there is
 the one animation that keeps moving for users who asked it to stop — treat a
 missing entry as a failing review.
+
+**Exception — functional loading indicators keep moving.** `.spinner-accent`
+and the shimmer skeletons are intentionally *not* frozen under reduced motion:
+a stalled progress indicator reads as a broken UI. This is the WCAG 2.2.2
+"essential animation" carve-out. Everything decorative (pulses, glows, shine,
+wiggle, entrance transforms) stops.
 
 JS side: use framer-motion's `useReducedMotion()` (already in-tree at
 `src/components/agent-view/agent-view-panel.tsx`). Do not add a new hook.
@@ -71,7 +78,9 @@ Reference implementation: `src/screens/dashboard/dashboard-screen.tsx` +
 ### Route transitions
 - Add `data-route-page` to a screen's root element; it gets
   `page-enter 0.22s var(--snappy)` automatically. That's the whole mechanism —
-  no per-route `AnimatePresence`.
+  no per-route `AnimatePresence`. Every `*-screen.tsx` carries it **except
+  `chat-screen.tsx`**, which is deliberately excluded — its own message-list
+  scroll/layout fights a page-level transform.
 
 ## 5. What not to do
 

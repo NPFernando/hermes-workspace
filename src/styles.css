@@ -1157,6 +1157,35 @@ code {
   animation: page-enter 0.22s var(--snappy) both;
 }
 
+/* ── Reduced-motion safety net ──────────────────────────────────────
+ * Route/entrance transitions collapse to instant; infinite decorative
+ * loops stop. Functional loading indicators (.spinner-accent, the
+ * shimmer skeletons — handled in their own blocks) are intentionally
+ * left running: a frozen progress indicator reads as broken (WCAG 2.2.2
+ * "essential" carve-out). Keep new animation classes covered here. */
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  [data-route-page],
+  .page-transition,
+  .page-transition.slide-enter-left,
+  .page-transition.slide-enter-right,
+  .route-enter,
+  .lifecycle-entry,
+  .message-fade-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .animate-pulse-glow,
+  .ring-pulse,
+  .terminal-dot-live,
+  .badge-shine,
+  .animate-wiggle,
+  .chat-streaming-lobster {
+    animation: none !important;
+  }
+}
+
 /* ── Unified surface system: container, highlight, motion ── */
 .surface-card {
   position: relative;

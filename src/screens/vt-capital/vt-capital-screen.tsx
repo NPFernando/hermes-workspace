@@ -304,6 +304,7 @@ export function VtCapitalScreen() {
 
   return (
     <div
+      data-route-page
       data-plugin-surface="vt-capital"
       className="min-h-full p-4 pb-28 pt-14 md:p-6 md:pb-28 lg:p-10 lg:pb-28 bg-[var(--theme-bg)] text-[var(--theme-text)]"
     >

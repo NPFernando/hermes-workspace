@@ -59,12 +59,13 @@ test.describe('Dashboard loading state', () => {
   test('period switch keeps the grid — no full skeleton flash', async ({
     page,
   }) => {
-    let firstOverview = true
+    let overviewHits = 0
     await page.route('**/api/dashboard/overview*', async (route) => {
-      // Fast initial load; slow only the post-switch refetch so the
-      // background state is observable.
-      if (!firstOverview) await new Promise((r) => setTimeout(r, 3000))
-      firstOverview = false
+      overviewHits += 1
+      // Fast initial load; hold every later refetch long enough that the
+      // background state is unambiguously observable regardless of dev-server
+      // compile jitter.
+      if (overviewHits > 1) await new Promise((r) => setTimeout(r, 6000))
       await route.continue()
     })
 
@@ -87,21 +88,22 @@ test.describe('Dashboard loading state', () => {
     const target = activeBefore?.trim() === '7d' ? '14d' : '7d'
     await page.getByRole('tab', { name: target, exact: true }).click()
 
-    let sawRefreshBar = false
+    // The low-key refresh bar appears during the (6s-held) refetch.
+    await expect
+      .poll(() => page.locator('.refresh-bar').count(), { timeout: 8_000 })
+      .toBeGreaterThan(0)
+
+    // …and throughout that window the grid never drops to skeletons — the
+    // card stays mounted with the previous period's data.
     let maxSkeletons = 0
-    for (let i = 0; i < 16; i++) {
-      if (await page.locator('.refresh-bar').count()) sawRefreshBar = true
+    for (let i = 0; i < 15; i++) {
       maxSkeletons = Math.max(
         maxSkeletons,
         await page.locator('[data-slot="skeleton"]').count(),
       )
       await page.waitForTimeout(200)
     }
-
-    // The grid never dropped to skeletons; the card stayed mounted with the
-    // previous data; the low-key refresh bar signalled the fetch instead.
     expect(maxSkeletons).toBe(0)
     await expect(topModels).toBeVisible()
-    expect(sawRefreshBar).toBe(true)
   })
 })
