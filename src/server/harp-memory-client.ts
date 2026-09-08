@@ -170,6 +170,53 @@ export function getCachedCategoryPreferences(): Record<string, string> {
   return searchCache?.map ?? {}
 }
 
+// ---------------------------------------------------------------------------
+// Analyst context (Phase 4A)
+// ---------------------------------------------------------------------------
+
+type AnalystSearchResult = {
+  results?: Array<{ id?: string; content?: unknown; memory_type?: unknown }>
+}
+
+const CATEGORY_RULE_CONTENT = /^Categorize finance transactions from "/i
+const MAX_MEMORY_CHARS = 240
+const MAX_ANALYST_MEMORIES = 6
+
+/**
+ * Approved, user-scoped finance preferences/rules to fold into the finance
+ * analyst prompt as *context* (never instructions). Category-rule memories
+ * (the extraction hints) are excluded — they aren't analyst context. Awaited
+ * by the caller with a short budget; `[]` on any failure or when HARP is off.
+ */
+export async function getUserFinanceMemoriesForPrompt(
+  query: string,
+): Promise<Array<string>> {
+  if (!getConfig()) return []
+  const raw = (await call(
+    'GET',
+    `/api/search?${new URLSearchParams({
+      query: query.trim().slice(0, 200) || 'personal finance preferences and rules',
+      intent: 'preference',
+      scope: 'user',
+      limit: '10',
+    }).toString()}`,
+  )) as AnalystSearchResult | null
+  if (!raw || !Array.isArray(raw.results)) return []
+  const out: Array<string> = []
+  for (const entry of raw.results) {
+    if (entry.memory_type === CATEGORY_RULE_TYPE) continue
+    const content = typeof entry.content === 'string' ? entry.content.trim() : ''
+    if (!content || CATEGORY_RULE_CONTENT.test(content)) continue
+    out.push(
+      content.length > MAX_MEMORY_CHARS
+        ? `${content.slice(0, MAX_MEMORY_CHARS)}…`
+        : content,
+    )
+    if (out.length >= MAX_ANALYST_MEMORIES) break
+  }
+  return out
+}
+
 /** Test-only: drop config + cache. */
 export function __resetHarpMemoryClient(): void {
   configResolved = false

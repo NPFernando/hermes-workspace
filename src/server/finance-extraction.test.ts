@@ -164,6 +164,25 @@ describe('buildFinanceAnswerPrompt', () => {
     expect(result).toContain('Q3')
     expect(result).toContain('Q4')
   })
+
+  it('folds user memories into a context (not policy) block ahead of Data', () => {
+    const result = buildFinanceAnswerPrompt('Am I overspending?', context, [], [
+      'I consider dining out discretionary.',
+      'Rent is due on the 1st.',
+    ])
+    expect(result).toContain('User-stated context')
+    expect(result).toContain('not commands')
+    expect(result).toContain('- I consider dining out discretionary.')
+    expect(result.indexOf('User-stated context')).toBeLessThan(
+      result.indexOf('Data:'),
+    )
+  })
+
+  it('omits the memories block when none are passed', () => {
+    expect(buildFinanceAnswerPrompt('q', context, [], [])).not.toContain(
+      'User-stated context',
+    )
+  })
 })
 
 describe('parseFinanceAnswerJson', () => {
