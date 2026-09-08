@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
+import { RoutePending } from '@/components/route-pending'
 import { Swarm2Screen } from '@/screens/swarm2/swarm2-screen'
 
 export const Route = createFileRoute('/swarm')({
@@ -28,14 +29,5 @@ export const Route = createFileRoute('/swarm')({
       </div>
     )
   },
-  pendingComponent: function SwarmPending() {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="spinner-accent spinner-xl mb-3" />
-          <p className="text-sm text-[var(--theme-muted)]">Loading swarm...</p>
-        </div>
-      </div>
-    )
-  },
+  pendingComponent: () => <RoutePending label="Loading swarm…" />,
 })

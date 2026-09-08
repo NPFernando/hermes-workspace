@@ -81,6 +81,18 @@ Reference implementation: `src/screens/dashboard/dashboard-screen.tsx` +
   no per-route `AnimatePresence`. Every `*-screen.tsx` carries it **except
   `chat-screen.tsx`**, which is deliberately excluded — its own message-list
   scroll/layout fights a page-level transform.
+- The router's `defaultPendingComponent` is `<RoutePending>`
+  (`src/components/route-pending.tsx`) — a route that wants a specific label
+  passes `pendingComponent: () => <RoutePending label="…" />` rather than
+  hand-rolling the spinner markup.
+
+### Element entrance animations
+- `animate-in` + `fade-in` / `zoom-in-95` / `slide-in-from-{side}-N` (used on
+  modals, toasts, drawers, menus) are a **local minimal port** of
+  `tailwindcss-animate` living at the bottom of `styles.css` — Tailwind v4 core
+  has no such utilities and we ship no plugin. `animate-in` runs the `enter`
+  keyframe at `var(--motion-fast)`; `duration-*` overrides it. Covered by
+  `prefers-reduced-motion`.
 
 ## 5. What not to do
 

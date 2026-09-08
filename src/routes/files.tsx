@@ -9,6 +9,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import type { FileEntry } from '@/components/file-explorer/file-explorer-sidebar'
 import { Markdown } from '@/components/prompt-kit/markdown'
+import { RoutePending } from '@/components/route-pending'
 import {
   ScrollAreaCorner,
   ScrollAreaRoot,
@@ -109,16 +110,7 @@ export const Route = createFileRoute('/files')({
       </div>
     )
   },
-  pendingComponent: function FilesPending() {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="spinner-accent spinner-xl mb-3" />
-          <p className="text-sm text-[var(--theme-muted)]">Loading file explorer...</p>
-        </div>
-      </div>
-    )
-  },
+  pendingComponent: () => <RoutePending label="Loading file explorer…" />,
 })
 
 function FilesRoute() {

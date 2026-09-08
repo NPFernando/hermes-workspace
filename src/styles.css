@@ -137,7 +137,7 @@
 *::-webkit-scrollbar-thumb {
   background-color: transparent;
   border-radius: 3px;
-  transition: background-color 0.2s;
+  transition: background-color var(--motion-base);
 }
 *:hover::-webkit-scrollbar-thumb {
   background-color: color-mix(
@@ -1108,7 +1108,7 @@ code {
   border-radius: 2px 2px 0 0;
   transform: scaleX(0);
   transform-origin: center;
-  transition: transform 0.22s var(--spring);
+  transition: transform var(--motion-base) var(--spring);
 }
 .tab-underline[aria-selected='true']::after,
 .tab-underline[data-active='true']::after,
@@ -1218,7 +1218,7 @@ code {
       color-mix(in srgb, var(--theme-text) 4%, transparent)
     );
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--motion-base) ease;
 }
 .surface-card:hover::before,
 .surface-card:focus-within::before {
@@ -1280,7 +1280,7 @@ code {
   [data-theme='odysseus'] .kpi-card,
   [data-theme='matrix'] .kpi-card,
   [data-theme='scifi'] .kpi-card {
-    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    transition: border-color var(--motion-base) ease, box-shadow var(--motion-base) ease;
   }
   [data-theme='odysseus'] .card-glow:hover,
   [data-theme='matrix'] .card-glow:hover,
@@ -1320,7 +1320,7 @@ code {
       transparent 42%
     );
   opacity: 0;
-  transition: opacity 0.18s ease;
+  transition: opacity var(--motion-base) ease;
 }
 .chat-message-bubble > * {
   position: relative;
@@ -1357,7 +1357,7 @@ code {
 }
 @media (prefers-reduced-motion: reduce) {
   .chat-message-bubble {
-    transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
   }
   [data-theme='odysseus'] .chat-message-bubble:hover,
   [data-theme='matrix'] .chat-message-bubble:hover,
@@ -1436,7 +1436,7 @@ code {
   padding: 0.375rem 0.625rem;
   font-size: 0.8125rem;
   outline: none;
-  transition: border-color 0.15s ease;
+  transition: border-color var(--motion-fast) ease;
 }
 .input-group input:focus,
 .input-group textarea:focus,
@@ -1547,7 +1547,7 @@ code {
 a.ghost-link {
   color: var(--theme-muted);
   text-decoration: none;
-  transition: color 0.15s ease;
+  transition: color var(--motion-fast) ease;
 }
 a.ghost-link:hover {
   color: var(--theme-accent);
@@ -2569,5 +2569,62 @@ kbd {
   }
   *::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* ── Enter animations (minimal tailwindcss-animate port) ────────────
+ * ~13 components use `animate-in fade-in slide-in-from-*` / `zoom-in-95`
+ * on modals, toasts, drawers and menus. Tailwind v4 core has no such
+ * utilities and this project ships no plugin, so those classes were
+ * previously inert — the panels appeared with no entrance motion. This
+ * restores them. `duration-*` (native Tailwind) still overrides timing.
+ * Enter-only; no `animate-out` is used in the app. */
+@keyframes enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(
+        var(--tw-enter-translate-x, 0),
+        var(--tw-enter-translate-y, 0),
+        0
+      )
+      scale(var(--tw-enter-scale, 1));
+  }
+}
+.animate-in {
+  animation: enter var(--motion-fast) var(--snappy) both;
+}
+.fade-in {
+  --tw-enter-opacity: 0;
+}
+.zoom-in-95 {
+  --tw-enter-scale: 0.95;
+}
+.slide-in-from-top-1 {
+  --tw-enter-translate-y: -0.25rem;
+}
+.slide-in-from-top-2 {
+  --tw-enter-translate-y: -0.5rem;
+}
+.slide-in-from-bottom-2 {
+  --tw-enter-translate-y: 0.5rem;
+}
+.slide-in-from-bottom-4 {
+  --tw-enter-translate-y: 1rem;
+}
+.slide-in-from-bottom-10 {
+  --tw-enter-translate-y: 2.5rem;
+}
+.slide-in-from-left-8 {
+  --tw-enter-translate-x: -2rem;
+}
+.slide-in-from-right {
+  --tw-enter-translate-x: 100%;
+}
+.slide-in-from-right-5 {
+  --tw-enter-translate-x: 1.25rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-in {
+    animation: none !important;
   }
 }

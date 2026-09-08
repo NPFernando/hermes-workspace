@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
+import { RoutePending } from '@/components/route-pending'
 import { OperationsScreen } from '@/screens/agents/operations-screen'
 
 export const Route = createFileRoute('/operations')({
@@ -28,14 +29,5 @@ export const Route = createFileRoute('/operations')({
       </div>
     )
   },
-  pendingComponent: function OperationsPending() {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="spinner-accent spinner-xl mb-3" />
-          <p className="text-sm text-[var(--theme-muted)]">Loading operations...</p>
-        </div>
-      </div>
-    )
-  },
+  pendingComponent: () => <RoutePending label="Loading operations…" />,
 })
