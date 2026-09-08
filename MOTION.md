@@ -48,8 +48,12 @@ a stalled progress indicator reads as a broken UI. This is the WCAG 2.2.2
 "essential animation" carve-out. Everything decorative (pulses, glows, shine,
 wiggle, entrance transforms) stops.
 
-JS side: use framer-motion's `useReducedMotion()` (already in-tree at
+JS side: use `useReducedMotion()` from `motion/react` (already in-tree at
 `src/components/agent-view/agent-view-panel.tsx`). Do not add a new hook.
+
+**One JS animation library: `motion`.** Import from `motion/react` only —
+never `framer-motion` (no longer a declared dependency; it remains resolvable
+transitively via `motion` but must not be imported directly).
 
 ## 4. Loading states
 
