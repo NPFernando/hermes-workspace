@@ -22,6 +22,8 @@ import {
   FINANCE_STORAGE_MONITOR_STATE_PATH,
   readFinanceStorageMonitorState,
 } from './finance-storage-monitor'
+import { getHeadroomStats } from './headroom-client'
+import type { HeadroomStats } from './headroom-client'
 
 const execFileAsync = promisify(execFile)
 
@@ -511,13 +513,16 @@ export interface OpsObservability {
   cronJobs: Array<OpsCronJob> | null
   financeStorageMonitor: FinanceStorageMonitorSummary | null
   financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
+  /** Local Headroom compression proxy stats; null when the proxy isn't running. */
+  headroom: HeadroomStats | null
 }
 
 export async function getOpsObservability(): Promise<OpsObservability> {
-  const [cost, liveness, modelUsage7d] = await Promise.all([
+  const [cost, liveness, modelUsage7d, headroom] = await Promise.all([
     getCostSummary().catch(() => null),
     getModelLiveness().catch(() => null),
     getSessionModelCosts(7).catch(() => null),
+    getHeadroomStats().catch(() => null),
   ])
   return {
     generatedAt: new Date().toISOString(),
@@ -528,5 +533,6 @@ export async function getOpsObservability(): Promise<OpsObservability> {
     cronJobs: getOpsCronJobs(),
     financeStorageMonitor: getFinanceStorageMonitorSummary(),
     financeStorageSmokeCron: getFinanceStorageSmokeCronSummary(),
+    headroom,
   }
 }
