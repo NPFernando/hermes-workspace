@@ -17,12 +17,25 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import type * as React from 'react'
 import type {
   HarpBlocklistEntry,
+  HarpComboEntry,
+  HarpCombosView,
   HarpConfigView,
   HarpHealthView,
   HarpTier,
   HarpTierModel,
 } from '@/server/harp-config-store'
 import { cn } from '@/lib/utils'
+
+// Kept in sync with harp-select-route.py (TASK_MAP keys / RISK_LEVELS).
+const COMBO_TASKS = [
+  'monitoring', 'text_summary', 'documentation', 'code_understanding',
+  'code_generation', 'code_review', 'audit', 'debugging', 'issue_fix',
+  'repo_analysis', 'architecture_reasoning', 'structured_output',
+  'security_review', 'production_risk',
+] as const
+const COMBO_RISKS = [
+  'trivial', 'low', 'standard', 'complex', 'high_risk', 'production', 'unknown',
+] as const
 
 type HarpApiResponse = { ok: boolean; error?: string } & Partial<HarpConfigView>
 
@@ -513,6 +526,306 @@ function BlocklistSection({
   )
 }
 
+// ── Route Combos ───────────────────────────────────────────────────────────
+
+function ComboStepRow({
+  step,
+  index,
+  total,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
+}: {
+  step: string
+  index: number
+  total: number
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onRemove: () => void
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-surface px-3 py-2 text-sm">
+      <div className="flex flex-col gap-0.5">
+        <button
+          type="button"
+          onClick={onMoveUp}
+          disabled={index === 0}
+          className="rounded p-0.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] disabled:opacity-30"
+        >
+          <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          onClick={onMoveDown}
+          disabled={index === total - 1}
+          className="rounded p-0.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] disabled:opacity-30"
+        >
+          <HugeiconsIcon icon={ArrowDown01Icon} size={13} strokeWidth={2} />
+        </button>
+      </div>
+      <span className="min-w-0 flex-1 truncate font-mono text-xs font-medium text-[var(--theme-text)]">
+        {step}
+      </span>
+      <span className="shrink-0 text-[10px] text-[var(--theme-muted)]">#{index + 1}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="ml-1 rounded p-1 text-[var(--theme-muted)] hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30"
+      >
+        <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} />
+      </button>
+    </div>
+  )
+}
+
+function AddStepForm({ onAdd }: { onAdd: (step: string) => void }) {
+  const [value, setValue] = useState('')
+  function submit() {
+    const v = value.trim()
+    if (!v) return
+    onAdd(v)
+    setValue('')
+  }
+  return (
+    <div className="flex gap-2 pt-1">
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && submit()}
+        placeholder="provider/model-id  (e.g. openrouter/deepseek/deepseek-v4-flash:free)"
+        className="h-8 flex-1 rounded-lg border border-[var(--theme-border)] bg-surface px-2 font-mono text-xs outline-none focus:border-accent-400"
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!value.trim()}
+        className="h-8 rounded-lg bg-accent-500 px-3 text-xs font-medium text-white hover:bg-accent-600 disabled:opacity-50"
+      >
+        Add step
+      </button>
+    </div>
+  )
+}
+
+function ComboCard({
+  combo,
+  onRename,
+  onRemove,
+  onSetMatch,
+  onReorderSteps,
+  onAddStep,
+  onRemoveStep,
+}: {
+  combo: HarpComboEntry
+  onRename: (newName: string) => void
+  onRemove: () => void
+  onSetMatch: (match: { task?: string; risk?: string }) => void
+  onReorderSteps: (steps: Array<string>) => void
+  onAddStep: (step: string) => void
+  onRemoveStep: (step: string) => void
+}) {
+  const [name, setName] = useState(combo.name)
+  useEffect(() => setName(combo.name), [combo.name])
+  const task = combo.match?.task ?? ''
+  const risk = combo.match?.risk ?? ''
+  const explicitOnly = !task && !risk
+
+  function commitName() {
+    const v = name.trim()
+    if (v && v !== combo.name) onRename(v)
+    else setName(combo.name)
+  }
+
+  return (
+    <div className="space-y-2 rounded-xl border border-[var(--theme-border)] bg-surface p-3">
+      <div className="flex items-center gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            if (e.key === 'Escape') setName(combo.name)
+          }}
+          className="h-8 min-w-0 flex-1 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2 text-xs font-semibold outline-none focus:border-accent-400"
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded p-1 text-[var(--theme-muted)] hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30"
+          title="Delete combo"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} />
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-muted)]">
+          Applies to
+        </span>
+        <select
+          value={task}
+          onChange={(e) => onSetMatch({ task: e.target.value || undefined, risk: risk || undefined })}
+          className="h-7 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2 text-xs outline-none focus:border-accent-400"
+        >
+          <option value="">— any task —</option>
+          {COMBO_TASKS.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <select
+          value={risk}
+          onChange={(e) => onSetMatch({ task: task || undefined, risk: e.target.value || undefined })}
+          className="h-7 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2 text-xs outline-none focus:border-accent-400"
+        >
+          <option value="">— any risk —</option>
+          {COMBO_RISKS.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+        {explicitOnly && (
+          <span className="text-[11px] italic text-[var(--theme-muted)]">
+            explicit only — select with <code className="font-mono">--combo {combo.name}</code>
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {combo.steps.map((step, i) => (
+          <ComboStepRow
+            key={step}
+            step={step}
+            index={i}
+            total={combo.steps.length}
+            onMoveUp={() => {
+              if (i === 0) return
+              const next = [...combo.steps]
+              ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
+              onReorderSteps(next)
+            }}
+            onMoveDown={() => {
+              if (i === combo.steps.length - 1) return
+              const next = [...combo.steps]
+              ;[next[i], next[i + 1]] = [next[i + 1], next[i]]
+              onReorderSteps(next)
+            }}
+            onRemove={() => onRemoveStep(step)}
+          />
+        ))}
+        {combo.steps.length === 0 && (
+          <p className="py-1 text-center text-xs text-[var(--theme-muted)]">No steps yet.</p>
+        )}
+      </div>
+
+      <AddStepForm onAdd={onAddStep} />
+    </div>
+  )
+}
+
+function AddComboForm({ onAdd }: { onAdd: (name: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [value, setValue] = useState('')
+  function submit() {
+    const v = value.trim()
+    if (!v) return
+    onAdd(v)
+    setValue('')
+    setOpen(false)
+  }
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center gap-2 rounded-xl border border-dashed border-[var(--theme-border)] px-3 py-2 text-xs text-[var(--theme-muted)] transition-colors hover:border-accent-400 hover:text-accent-500"
+      >
+        <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={2} />
+        Add combo
+      </button>
+    )
+  }
+  return (
+    <div className="flex gap-2">
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') submit()
+          if (e.key === 'Escape') setOpen(false)
+        }}
+        placeholder="combo name (kebab-case)"
+        className="h-8 flex-1 rounded-lg border border-[var(--theme-border)] bg-surface px-2 text-xs outline-none focus:border-accent-400"
+        autoFocus
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!value.trim()}
+        className="h-8 rounded-lg bg-accent-500 px-3 text-xs font-medium text-white hover:bg-accent-600 disabled:opacity-50"
+      >
+        Create
+      </button>
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        className="h-8 rounded-lg px-3 text-xs text-[var(--theme-muted)] hover:bg-[var(--theme-hover)]"
+      >
+        Cancel
+      </button>
+    </div>
+  )
+}
+
+function CombosSection({
+  combos,
+  patch,
+}: {
+  combos: HarpCombosView
+  patch: (p: Record<string, unknown>) => void
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <Toggle
+          checked={combos.enabled}
+          onChange={(v) => patch({ action: 'set-combos-global', field: 'enabled', value: v })}
+          label="Combos enabled"
+        />
+        <Toggle
+          checked={combos.enforce}
+          onChange={(v) => patch({ action: 'set-combos-global', field: 'enforce', value: v })}
+          label="Enforce (override the default chain)"
+        />
+      </div>
+      <p className="text-[11px] text-[var(--theme-muted)]">
+        Combos are <strong>shadow-only</strong> (logged, not routed) until <em>Enforce</em> is on.
+        Every step still passes the same cooldown / liveness / risk-policy gates as the default
+        chain. Needs a HARP engine build with combo support to take effect.
+      </p>
+
+      <div className="space-y-2">
+        {combos.entries.map((combo) => (
+          <ComboCard
+            key={combo.name}
+            combo={combo}
+            onRename={(newName) => patch({ action: 'rename-combo', name: combo.name, newName })}
+            onRemove={() => patch({ action: 'remove-combo', name: combo.name })}
+            onSetMatch={(match) => patch({ action: 'set-combo-match', name: combo.name, match })}
+            onReorderSteps={(steps) => patch({ action: 'reorder-combo-steps', name: combo.name, steps })}
+            onAddStep={(step) => patch({ action: 'add-combo-step', name: combo.name, step })}
+            onRemoveStep={(step) => patch({ action: 'remove-combo-step', name: combo.name, step })}
+          />
+        ))}
+        {combos.entries.length === 0 && (
+          <p className="py-1 text-xs text-[var(--theme-muted)]">No combos defined.</p>
+        )}
+      </div>
+
+      <AddComboForm onAdd={(name) => patch({ action: 'add-combo', name })} />
+    </div>
+  )
+}
+
 // ── Cap widget ─────────────────────────────────────────────────────────────
 
 type CapPeriod = 'day' | 'week' | 'month'
@@ -664,7 +977,7 @@ export function HarpConfigScreen() {
     )
   }
 
-  const { global: g, tiers, blocklist, autoImprove } = data
+  const { global: g, tiers, blocklist, autoImprove, combos } = data
 
   const savingIndicator = mutation.isPending ? (
     <span className="text-[11px] text-[var(--theme-muted)]">Saving…</span>
@@ -775,6 +1088,15 @@ export function HarpConfigScreen() {
             </div>
           ))}
         </div>
+      </SectionCard>
+
+      {/* Route Combos */}
+      <SectionCard
+        title="Route Combos"
+        description="Named, operator-defined fallback chains that override the default tier order for a matching task/risk"
+        icon={FlowCircleIcon}
+      >
+        <CombosSection combos={combos} patch={patch} />
       </SectionCard>
 
       {/* Blocklist */}
