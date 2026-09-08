@@ -82,6 +82,25 @@ interface FinanceStorageSmokeCronOutput {
   status: string | null
   failed: boolean
 }
+interface HeadroomAgent {
+  label: string
+  requests: number
+  tokensSaved: number
+  savingsPercent: number
+  topModels: Array<{ model: string; requests: number }>
+}
+interface HeadroomStats {
+  running: true
+  apiRequests: number
+  requestsCompressed: number
+  avgCompressionPct: number
+  bestCompressionPct: number
+  tokensSaved: number
+  tokensBefore: number
+  costSavedUsd: number
+  savingsPct: number
+  agents: Array<HeadroomAgent>
+}
 interface OpsPayload {
   ok: boolean
   error?: string
@@ -93,6 +112,7 @@ interface OpsPayload {
   cronJobs: Array<OpsCronJob> | null
   financeStorageMonitor: FinanceStorageMonitorSummary | null
   financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
+  headroom: HeadroomStats | null
 }
 
 function money(v: number | null | undefined): string {
@@ -203,6 +223,7 @@ export function OpsCostScreen() {
     cronJobs,
     financeStorageMonitor,
     financeStorageSmokeCron,
+    headroom,
   } = opsQuery.data
   const runwayDays =
     cost?.remaining != null &&
@@ -269,6 +290,88 @@ export function OpsCostScreen() {
           }
         />
       </div>
+
+      {/* Headroom context-compression proxy (delegated-subagent OpenRouter traffic) */}
+      <Panel title="Context compression — Headroom proxy">
+        {headroom == null ? (
+          <p className="text-sm text-[var(--theme-muted)]">
+            Headroom proxy not running (or unreachable at{' '}
+            <code>127.0.0.1:8787</code>). Delegated subagent traffic goes direct.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <StatTile
+                label="Avg compression"
+                value={`${headroom.avgCompressionPct.toFixed(1)}%`}
+                hint={`best ${headroom.bestCompressionPct.toFixed(0)}%`}
+              />
+              <StatTile
+                label="Tokens saved"
+                value={headroom.tokensSaved.toLocaleString()}
+                hint={
+                  headroom.tokensBefore > 0
+                    ? `of ${headroom.tokensBefore.toLocaleString()} sent`
+                    : undefined
+                }
+              />
+              <StatTile
+                label="Requests compressed"
+                value={`${headroom.requestsCompressed} / ${headroom.apiRequests}`}
+              />
+              <StatTile
+                label="Cost saved"
+                value={money(headroom.costSavedUsd)}
+                hint={
+                  headroom.savingsPct > 0
+                    ? `${headroom.savingsPct.toFixed(1)}%`
+                    : undefined
+                }
+              />
+            </div>
+            {headroom.agents.length > 0 && (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-[var(--theme-muted)]">
+                    <th className="pb-2 font-normal">Client</th>
+                    <th className="pb-2 font-normal text-right">Requests</th>
+                    <th className="pb-2 font-normal text-right">Saved %</th>
+                    <th className="pb-2 font-normal text-right">Tokens saved</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {headroom.agents.map((a) => (
+                    <tr
+                      key={a.label}
+                      className="border-t border-[var(--theme-border,rgba(128,128,128,0.15))]"
+                    >
+                      <td className="py-1.5 text-[var(--theme-text)]">
+                        {a.label}
+                        {a.topModels.length > 0 && (
+                          <span className="ml-2 text-xs text-[var(--theme-muted)]">
+                            {a.topModels
+                              .map((m) => m.model.split('/').pop())
+                              .join(', ')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        {a.requests}
+                      </td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        {a.savingsPercent.toFixed(1)}%
+                      </td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        {a.tokensSaved.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </Panel>
 
       {/* Per-model costs (single-series magnitude → table with inline accent bars) */}
       <Panel title="Per-model cost — last 7 days (billed; subscription/free estimates are phantom)">
