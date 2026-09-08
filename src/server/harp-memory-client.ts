@@ -217,6 +217,95 @@ export async function getUserFinanceMemoriesForPrompt(
   return out
 }
 
+// ---------------------------------------------------------------------------
+// "What the assistant knows" — dashboard panel (Phase 4C)
+// ---------------------------------------------------------------------------
+
+const FINANCIAL_RULE_TYPE = 'financial_rule'
+
+export type AssistantMemoryKind =
+  | 'category_rule'
+  | 'financial_rule'
+  | 'other'
+
+export type AssistantMemory = {
+  id: string
+  content: string
+  kind: AssistantMemoryKind
+}
+
+/** Whether the HARP memory service is configured for this process. */
+export function isHarpMemoryEnabled(): boolean {
+  return getConfig() !== null
+}
+
+function classifyMemory(
+  memoryType: unknown,
+  content: string,
+): AssistantMemoryKind {
+  if (memoryType === CATEGORY_RULE_TYPE || CATEGORY_RULE_CONTENT.test(content)) {
+    return 'category_rule'
+  }
+  if (memoryType === FINANCIAL_RULE_TYPE) return 'financial_rule'
+  return 'other'
+}
+
+/** Active (approved) user-scoped finance memories, for the dashboard panel. */
+export async function listActiveFinanceMemories(): Promise<Array<AssistantMemory>> {
+  if (!getConfig()) return []
+  const raw = (await call(
+    'GET',
+    `/api/search?${new URLSearchParams({
+      query: 'personal finance rules preferences vendor category',
+      intent: 'preference',
+      scope: 'user',
+      limit: '50',
+    }).toString()}`,
+  )) as AnalystSearchResult | null
+  if (!raw || !Array.isArray(raw.results)) return []
+  const out: Array<AssistantMemory> = []
+  for (const entry of raw.results) {
+    const id = typeof entry.id === 'string' ? entry.id : ''
+    const content = typeof entry.content === 'string' ? entry.content.trim() : ''
+    if (!id || !content) continue
+    out.push({ id, content, kind: classifyMemory(entry.memory_type, content) })
+  }
+  return out
+}
+
+/**
+ * Propose a free-text financial rule ("I keep 6 months of expenses in cash")
+ * as a governed `preference` candidate. Returns whether it was submitted;
+ * it becomes visible in `listActiveFinanceMemories()` only after approval.
+ */
+export async function proposeFinancialRule(
+  rule: string,
+): Promise<{ submitted: boolean }> {
+  const text = rule.trim()
+  if (!text) return { submitted: false }
+  const res = (await call('POST', '/api/propose', {
+    content: text,
+    memory_type: FINANCIAL_RULE_TYPE,
+    scope: 'user',
+    intent: 'preference',
+    data_class: 'confidential',
+    source_ref: SOURCE_REF,
+    tags: ['finance', 'financial-rule'],
+  })) as { accepted?: boolean } | null
+  return { submitted: res?.accepted === true }
+}
+
+/** Record that a shown memory is wrong / no longer wanted (a review signal). */
+export async function flagFinanceMemory(memoryId: string): Promise<void> {
+  if (!memoryId) return
+  await call('POST', '/api/feedback', {
+    memory_id: memoryId,
+    useful: false,
+    user_corrected: true,
+    notes: 'flagged from the personal-finance dashboard',
+  })
+}
+
 /** Test-only: drop config + cache. */
 export function __resetHarpMemoryClient(): void {
   configResolved = false

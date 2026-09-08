@@ -30,6 +30,35 @@ export async function fetchPersonalFinancePayload(): Promise<PersonalFinancePayl
   return (await response.json()) as PersonalFinancePayload
 }
 
+export const assistantMemoryKey = ['finance', 'assistant-memory'] as const
+
+export type AssistantMemory = {
+  id: string
+  content: string
+  kind: 'category_rule' | 'financial_rule' | 'other'
+}
+
+export async function fetchAssistantMemories(): Promise<{
+  harpEnabled: boolean
+  memories: Array<AssistantMemory>
+}> {
+  const res = await fetch('/api/finance', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'list_finance_memories' }),
+  })
+  const data = (await res.json()) as {
+    ok?: boolean
+    harpEnabled?: boolean
+    memories?: Array<AssistantMemory>
+  }
+  if (!data.ok) return { harpEnabled: false, memories: [] }
+  return {
+    harpEnabled: data.harpEnabled === true,
+    memories: Array.isArray(data.memories) ? data.memories : [],
+  }
+}
+
 export async function fetchPendingIngestionCount(): Promise<number> {
   const res = await fetch('/api/finance', {
     method: 'POST',

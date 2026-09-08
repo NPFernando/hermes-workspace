@@ -38,7 +38,13 @@ import {
   extractEmploymentContract,
   extractTransactionFromImage,
 } from '../../server/finance-extraction'
-import { getUserFinanceMemoriesForPrompt } from '../../server/harp-memory-client'
+import {
+  flagFinanceMemory,
+  getUserFinanceMemoriesForPrompt,
+  isHarpMemoryEnabled,
+  listActiveFinanceMemories,
+  proposeFinancialRule,
+} from '../../server/harp-memory-client'
 import { syncGmailNow } from '../../server/gmail-ingest'
 import { fetchCsePrice } from '../../server/cse-market.service'
 import {
@@ -974,6 +980,38 @@ export const Route = createFileRoute('/api/finance')({
               answer: result.answer,
               chart: result.chart,
             })
+          }
+          if (action === 'list_finance_memories') {
+            // Phase 4C: "what the assistant knows" — the approved HARP
+            // preference/rule memories scoped to this user's finances.
+            return json({
+              ok: true,
+              harpEnabled: isHarpMemoryEnabled(),
+              memories: await listActiveFinanceMemories(),
+            })
+          }
+          if (action === 'add_financial_rule') {
+            const rule =
+              typeof body.rule === 'string' ? body.rule.trim() : ''
+            if (!rule)
+              return json(
+                { ok: false, error: 'rule is required.' },
+                { status: 400 },
+              )
+            const { submitted } = await proposeFinancialRule(rule)
+            // Candidate needs approval before it shows in list_finance_memories.
+            return json({ ok: true, submitted })
+          }
+          if (action === 'flag_finance_memory') {
+            const memoryId =
+              typeof body.memoryId === 'string' ? body.memoryId.trim() : ''
+            if (!memoryId)
+              return json(
+                { ok: false, error: 'memoryId is required.' },
+                { status: 400 },
+              )
+            await flagFinanceMemory(memoryId)
+            return json({ ok: true })
           }
           if (action === 'set_demo_config' || action === 'set_engine_config') {
             // Update the demo engine's tunable knobs (settings.demoTrading), merged

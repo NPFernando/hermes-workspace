@@ -2,9 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   __resetHarpMemoryClient,
+  flagFinanceMemory,
   getCachedCategoryPreferences,
   getUserFinanceMemoriesForPrompt,
+  isHarpMemoryEnabled,
+  listActiveFinanceMemories,
   proposeCategoryPreference,
+  proposeFinancialRule,
 } from './harp-memory-client'
 
 const realFetch = globalThis.fetch
@@ -117,5 +121,58 @@ describe('harp-memory-client — enabled', () => {
       'I consider dining out discretionary spending.',
       `${'x'.repeat(240)}…`,
     ])
+  })
+
+  it('isHarpMemoryEnabled reflects the token', () => {
+    expect(isHarpMemoryEnabled()).toBe(true)
+    delete process.env.HARP_MEMORY_API_TOKEN
+    __resetHarpMemoryClient()
+    expect(isHarpMemoryEnabled()).toBe(false)
+  })
+
+  it('listActiveFinanceMemories classifies each entry', async () => {
+    const payload = {
+      results: [
+        { id: 'a', memory_type: 'category_rule', content: 'Categorize finance transactions from "keells" as "Groceries".' },
+        { id: 'b', memory_type: 'financial_rule', content: 'Keep 6 months of expenses in cash.' },
+        { id: 'c', content: 'I prefer conservative estimates.' },
+        { id: '', content: 'dropped — no id' },
+      ],
+    }
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(payload), { status: 200 })) as unknown as typeof fetch
+
+    expect(await listActiveFinanceMemories()).toEqual([
+      { id: 'a', content: 'Categorize finance transactions from "keells" as "Groceries".', kind: 'category_rule' },
+      { id: 'b', content: 'Keep 6 months of expenses in cash.', kind: 'financial_rule' },
+      { id: 'c', content: 'I prefer conservative estimates.', kind: 'other' },
+    ])
+  })
+
+  it('proposeFinancialRule POSTs a financial_rule candidate; flagFinanceMemory POSTs feedback', async () => {
+    const spy = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string)
+      return new Response(
+        JSON.stringify(body.memory_id ? { ok: true } : { accepted: true }),
+        { status: 200 },
+      )
+    })
+    globalThis.fetch = spy as unknown as typeof fetch
+
+    expect(await proposeFinancialRule('  Keep 6 months in cash  ')).toEqual({ submitted: true })
+    await flagFinanceMemory('m-9')
+
+    const bodies = spy.mock.calls.map(
+      (c) => JSON.parse((c[1] as RequestInit).body as string) as Record<string, unknown>,
+    )
+    expect(bodies[0]).toMatchObject({ memory_type: 'financial_rule', scope: 'user', data_class: 'confidential' })
+    expect(bodies[1]).toMatchObject({ memory_id: 'm-9', useful: false, user_corrected: true })
+  })
+
+  it('proposeFinancialRule ignores an empty rule', async () => {
+    const spy = vi.fn()
+    globalThis.fetch = spy as unknown as typeof fetch
+    expect(await proposeFinancialRule('   ')).toEqual({ submitted: false })
+    expect(spy).not.toHaveBeenCalled()
   })
 })
