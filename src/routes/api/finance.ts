@@ -45,6 +45,7 @@ import {
   isHarpMemoryEnabled,
   listActiveFinanceMemories,
   listPendingFinanceCandidates,
+  proposeCategoryPreference,
   proposeFinancialRule,
   rejectMemory,
 } from '../../server/harp-memory-client'
@@ -212,6 +213,27 @@ function isLiveMode(mode: string): boolean {
     mode === 'live_auto_trade' ||
     mode === 'live_monitored'
   )
+}
+
+/**
+ * Phase 4A (optional / opt-in): when the operator asks the finance analyst a
+ * question that *states* a durable personal rule ("I always keep 6 months of
+ * expenses in cash", "I never invest in crypto"), capture that statement so it
+ * can become a governed HARP preference after review. Heuristic only — no extra
+ * model call — and gated behind FINANCE_LEARNED_FACTS_ENABLED so nothing
+ * accumulates in the review queue unless the operator opts in.
+ */
+export function detectDurableFinancePreference(question: string): string | null {
+  if (!/^(1|true|yes|on)$/i.test(process.env.FINANCE_LEARNED_FACTS_ENABLED ?? ''))
+    return null
+  const q = question.trim()
+  if (q.length < 12 || q.length > 240) return null
+  if (q.endsWith('?')) return null // a question, not a statement of intent
+  const durable =
+    /\bI (?:always|never|prefer(?:\s+to)?|want to|try to|keep|aim to|won'?t|don'?t want to|refuse to|only)\b/i
+  const rulePhrase = /\bmy (?:rule|policy|plan|budget|target|goal) is\b/i
+  if (!durable.test(q) && !rulePhrase.test(q)) return null
+  return q
 }
 
 function financePayload() {
@@ -981,6 +1003,10 @@ export const Route = createFileRoute('/api/finance')({
               },
             ].slice(-10)
             writeFinanceStore(db)
+            // Opt-in: if the question stated a durable personal rule, propose it
+            // as a HARP candidate for the operator to review. Best-effort.
+            const learned = detectDurableFinancePreference(question)
+            if (learned) void proposeFinancialRule(learned)
             return json({
               ...personalFinancePayload(),
               answer: result.answer,
@@ -1029,6 +1055,26 @@ export const Route = createFileRoute('/api/finance')({
             const { submitted } = await proposeFinancialRule(rule)
             // Candidate needs approval before it shows in list_finance_memories.
             return json({ ok: true, submitted })
+          }
+          if (action === 'set_category_rule') {
+            // Panel "edit" for a vendor -> category rule: propose the new
+            // mapping as a governed candidate and, if this replaces an existing
+            // rule, flag the old one so review supersedes it. Both are
+            // best-effort HARP writes; neither blocks.
+            const vendor =
+              typeof body.vendor === 'string' ? body.vendor.trim() : ''
+            const category =
+              typeof body.category === 'string' ? body.category.trim() : ''
+            const replacesId =
+              typeof body.replacesId === 'string' ? body.replacesId.trim() : ''
+            if (!vendor || !category)
+              return json(
+                { ok: false, error: 'vendor and category are required.' },
+                { status: 400 },
+              )
+            await proposeCategoryPreference({ vendor, category })
+            if (replacesId) await flagFinanceMemory(replacesId)
+            return json({ ok: true, submitted: true })
           }
           if (action === 'flag_finance_memory') {
             const memoryId =
