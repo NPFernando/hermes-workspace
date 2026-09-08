@@ -2273,29 +2273,74 @@ export function financeSummary(db: FinanceDatabase) {
     db.loans
       .filter((loan) => loan.status === 'active')
       .reduce((sum, loan) => sum + loan.currentBalance, 0)
+  // PF-206: holdings / FDs / properties may be denominated in a non-LKR
+  // currency. Resolve a currency->LKR rate from THIS db's `exchange_rates`
+  // (latest by date; direct or 1/inverse). Keep it pure over `db` — do not
+  // reach through `convertCurrency`/`getExchangeRate`, which re-read the
+  // backing store and would disagree with the `db` passed here. If no rate is
+  // on file the raw amount is still counted (better than dropping it from net
+  // worth) and the currency is reported in `fxUnconverted` for the UI.
+  const latestRate = (base: string, target: string): number | undefined => {
+    const rows = (
+      db.exchange_rates as Array<{
+        base?: unknown
+        target?: unknown
+        rate?: unknown
+        date?: unknown
+      }>
+    )
+      .filter(
+        (r) => r.base === base && r.target === target && typeof r.rate === 'number',
+      )
+      .sort(
+        (a, b) =>
+          new Date(String(b.date ?? 0)).getTime() -
+          new Date(String(a.date ?? 0)).getTime(),
+      )
+    return rows.length ? (rows[0].rate as number) : undefined
+  }
+  const fxUnconverted = new Set<string>()
+  const toLkr = (amount: number, currency: CurrencyCode | undefined): number => {
+    if (!currency || currency === 'LKR') return amount
+    const direct = latestRate(currency, 'LKR')
+    if (direct !== undefined) return amount * direct
+    const inverse = latestRate('LKR', currency)
+    if (inverse) return amount / inverse
+    fxUnconverted.add(currency)
+    return amount
+  }
+
   // Never blocked on a live CSE price fetch succeeding — falls back to the
   // buy price when no cached/manual current price is available yet.
   const stockHoldingsValueLkr = db.stock_holdings.reduce(
     (sum, holding) =>
-      sum + (holding.lastKnownPrice ?? holding.buyPrice) * holding.quantity,
+      sum +
+      toLkr(
+        (holding.lastKnownPrice ?? holding.buyPrice) * holding.quantity,
+        holding.currency,
+      ),
     0,
   )
   const fixedDepositsValueLkr = db.fixed_deposits
     .filter((fd) => fd.status !== 'withdrawn')
-    .reduce((sum, fd) => sum + fd.principal, 0)
+    .reduce((sum, fd) => sum + toLkr(fd.principal, fd.currency), 0)
   const propertyValueLkr = db.properties.reduce(
-    (sum, p) => sum + p.currentValue,
+    (sum, p) => sum + toLkr(p.currentValue, p.currency),
     0,
   )
   const unrealizedStockPnlLkr = db.stock_holdings.reduce(
     (sum, holding) =>
       sum +
-      ((holding.lastKnownPrice ?? holding.buyPrice) - holding.buyPrice) *
-        holding.quantity,
+      toLkr(
+        ((holding.lastKnownPrice ?? holding.buyPrice) - holding.buyPrice) *
+          holding.quantity,
+        holding.currency,
+      ),
     0,
   )
   const totalStockCostBasisLkr = db.stock_holdings.reduce(
-    (sum, holding) => sum + holding.buyPrice * holding.quantity,
+    (sum, holding) =>
+      sum + toLkr(holding.buyPrice * holding.quantity, holding.currency),
     0,
   )
   const unrealizedStockPnlPct =
@@ -2330,6 +2375,9 @@ export function financeSummary(db: FinanceDatabase) {
     propertyValueLkr,
     unrealizedStockPnlLkr,
     unrealizedStockPnlPct,
+    /** PF-206: currencies held on assets that had no exchange rate on file —
+     * their raw amounts are still in the LKR totals above, unconverted. */
+    fxUnconverted: [...fxUnconverted].sort(),
     accountCount: db.finance_accounts.length,
     goalCount: db.savings_goals.length,
     taxRecordCount: db.tax_records.length,
@@ -2391,6 +2439,15 @@ export function financeAlerts(db: FinanceDatabase): Array<{
       level: 'info',
       title: 'Emergency kill switch active',
       detail: 'Real order execution is disabled.',
+    })
+  }
+  if (summary.fxUnconverted.length > 0) {
+    alerts.push({
+      level: 'warning',
+      title: 'Missing exchange rate',
+      detail: `Some assets are held in ${summary.fxUnconverted.join(
+        ', ',
+      )} with no exchange rate on file — their value is counted at face amount, not converted to LKR. Add a rate to fix the totals.`,
     })
   }
   return alerts
