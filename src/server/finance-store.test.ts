@@ -10,6 +10,7 @@ import {
   financeAlerts,
   financeSummary,
   financeStorageAlerts,
+  getBudgetVsActual,
   getAverageMonthlyExpensesLkr,
   getAverageMonthlySavingsRatePct,
   buildFinanceQueryContext,
@@ -1289,6 +1290,78 @@ describe('reconciliationStatus (PF-113 Pending/Cleared/Reconciled Status)', () =
     })
     db = store.readFinanceStore()
     expect(db.income_records[0].status).toBe('reconciled')
+  })
+})
+
+describe('reconciliation status gates aggregate money figures (PF-113)', () => {
+  function seed() {
+    const db = createEmptyFinanceDatabase()
+    const baseExp = {
+      date: '2026-06-10',
+      vendor: 'V',
+      category: 'Food',
+      currency: 'LKR',
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      tags: '',
+      source: 'test',
+      createdAt: '2026-06-10T00:00:00.000Z',
+      updatedAt: '2026-06-10T00:00:00.000Z',
+    }
+    const baseInc = {
+      dateReceived: '2026-06-05',
+      sourceName: 'Emp',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      exchangeRateUsed: 1,
+      taxable: true,
+      tags: '',
+      source: 'test',
+      createdAt: '2026-06-05T00:00:00.000Z',
+      updatedAt: '2026-06-05T00:00:00.000Z',
+    }
+    db.income_records.push(
+      { ...baseInc, id: 'i-cleared', originalAmount: 100_000, convertedLkrAmount: 100_000, status: 'cleared' },
+      { ...baseInc, id: 'i-pending', originalAmount: 50_000, convertedLkrAmount: 50_000, status: 'pending' },
+      { ...baseInc, id: 'i-nostatus', originalAmount: 10_000, convertedLkrAmount: 10_000 },
+    )
+    db.expense_records.push(
+      { ...baseExp, id: 'e-cleared', amount: 30_000, convertedLkrAmount: 30_000, status: 'cleared' },
+      { ...baseExp, id: 'e-pending', amount: 20_000, convertedLkrAmount: 20_000, status: 'pending' },
+      { ...baseExp, id: 'e-nostatus', amount: 5_000, convertedLkrAmount: 5_000 },
+    )
+    return db
+  }
+
+  it('financeSummary excludes pending rows but keeps cleared/reconciled/missing', () => {
+    const s = financeSummary(seed())
+    // 100k + 10k (no-status ⇒ cleared); 50k pending dropped
+    expect(s.totalIncomeLkr).toBe(110_000)
+    // 30k + 5k; 20k pending dropped
+    expect(s.totalExpensesLkr).toBe(35_000)
+    expect(s.netSavingsLkr).toBe(75_000)
+  })
+
+  it('getMonthlySummary excludes pending rows', () => {
+    const row = getMonthlySummary(seed(), 2026, 6)[0]
+    expect(row).toMatchObject({ income: 110_000, expense: 35_000, savings: 75_000 })
+  })
+
+  it('getBudgetVsActual counts only non-pending expenses', () => {
+    const db = seed()
+    db.budget_categories.push({
+      id: 'b-1',
+      category: 'Food',
+      month: '2026-06',
+      currency: 'LKR',
+      budgetAmount: 100_000,
+      source: 'test',
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    const r = getBudgetVsActual(db, 'Food', 2026, 6)
+    expect(r).toEqual({ budget: 100_000, actual: 35_000, variance: 65_000 })
   })
 })
 
