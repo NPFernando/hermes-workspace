@@ -197,18 +197,17 @@ describe('harp-memory-client — enabled', () => {
     ])
   })
 
-  it('approveMemory / rejectMemory POST reviewer=naveen and read review_status', async () => {
-    const spy = vi.fn(async (_url: string, init: RequestInit) => {
-      const body = JSON.parse(init.body as string)
-      return new Response(
-        JSON.stringify({ review_status: _url.endsWith('approve') ? 'approved' : 'rejected', got: body }),
-        { status: 200 },
-      )
-    })
+  it('approveMemory / rejectMemory POST reviewer=naveen; ok on any 2xx, not on failure', async () => {
+    const spy = vi.fn(async (url: string, _init: RequestInit) =>
+      // service returns { id, status, reviewed_by } — we only care that it 2xx'd
+      new Response(JSON.stringify({ id: 'x', status: 'active' }), {
+        status: url.endsWith('reject') ? 503 : 200,
+      }),
+    )
     globalThis.fetch = spy as unknown as typeof fetch
 
     expect(await approveMemory('p1')).toEqual({ ok: true })
-    expect(await rejectMemory('p2')).toEqual({ ok: true })
+    expect(await rejectMemory('p2')).toEqual({ ok: false }) // 503 → call() returns null
     const bodies = spy.mock.calls.map(
       (c) => JSON.parse((c[1] as RequestInit).body as string) as Record<string, unknown>,
     )

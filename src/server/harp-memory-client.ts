@@ -356,24 +356,27 @@ export async function listPendingFinanceCandidates(): Promise<
   return out
 }
 
-/** Promote a pending candidate to an active memory. */
+/**
+ * Promote a pending candidate to an active memory. `call()` returns null on
+ * any non-2xx / failure, so a non-null response means the review landed.
+ */
 export async function approveMemory(memoryId: string): Promise<{ ok: boolean }> {
   if (!memoryId) return { ok: false }
-  const res = (await call('POST', '/api/approve', {
+  const res = await call('POST', '/api/approve', {
     memory_id: memoryId,
     reviewer: 'naveen',
-  })) as { review_status?: string } | null
-  return { ok: res?.review_status === 'approved' }
+  })
+  return { ok: res !== null }
 }
 
 /** Mark a pending candidate rejected. */
 export async function rejectMemory(memoryId: string): Promise<{ ok: boolean }> {
   if (!memoryId) return { ok: false }
-  const res = (await call('POST', '/api/reject', {
+  const res = await call('POST', '/api/reject', {
     memory_id: memoryId,
     reviewer: 'naveen',
-  })) as { review_status?: string } | null
-  return { ok: res?.review_status === 'rejected' }
+  })
+  return { ok: res !== null }
 }
 
 /** Test-only: drop config + cache. */
