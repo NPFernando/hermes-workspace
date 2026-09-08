@@ -39,11 +39,14 @@ import {
   extractTransactionFromImage,
 } from '../../server/finance-extraction'
 import {
+  approveMemory,
   flagFinanceMemory,
   getUserFinanceMemoriesForPrompt,
   isHarpMemoryEnabled,
   listActiveFinanceMemories,
+  listPendingFinanceCandidates,
   proposeFinancialRule,
+  rejectMemory,
 } from '../../server/harp-memory-client'
 import { syncGmailNow } from '../../server/gmail-ingest'
 import { fetchCsePrice } from '../../server/cse-market.service'
@@ -982,13 +985,35 @@ export const Route = createFileRoute('/api/finance')({
             })
           }
           if (action === 'list_finance_memories') {
-            // Phase 4C: "what the assistant knows" — the approved HARP
-            // preference/rule memories scoped to this user's finances.
+            // Phase 4C: "what the assistant knows" — approved rules plus the
+            // pending candidates awaiting the user's review.
+            const [memories, pending] = await Promise.all([
+              listActiveFinanceMemories(),
+              listPendingFinanceCandidates(),
+            ])
             return json({
               ok: true,
               harpEnabled: isHarpMemoryEnabled(),
-              memories: await listActiveFinanceMemories(),
+              memories,
+              pending,
             })
+          }
+          if (
+            action === 'approve_finance_memory' ||
+            action === 'reject_finance_memory'
+          ) {
+            const memoryId =
+              typeof body.memoryId === 'string' ? body.memoryId.trim() : ''
+            if (!memoryId)
+              return json(
+                { ok: false, error: 'memoryId is required.' },
+                { status: 400 },
+              )
+            const result =
+              action === 'approve_finance_memory'
+                ? await approveMemory(memoryId)
+                : await rejectMemory(memoryId)
+            return json(result)
           }
           if (action === 'add_financial_rule') {
             const rule =

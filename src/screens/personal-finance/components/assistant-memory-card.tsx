@@ -59,12 +59,21 @@ export function AssistantMemoryCard() {
       post('flag_finance_memory', { memoryId }),
     onSuccess: invalidate,
   })
+  const review = useMutation({
+    mutationFn: (v: { memoryId: string; approve: boolean }) =>
+      post(
+        v.approve ? 'approve_finance_memory' : 'reject_finance_memory',
+        { memoryId: v.memoryId },
+      ),
+    onSuccess: invalidate,
+  })
 
   if (memoriesQuery.isPending) return null
 
   const data = memoriesQuery.data
   const harpUnavailable = memoriesQuery.isError || !data?.harpEnabled
   const memories = data?.memories ?? []
+  const pending = data?.pending ?? []
 
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
@@ -114,6 +123,51 @@ export function AssistantMemoryCard() {
             <p className="mt-2 text-xs text-[var(--theme-danger)]">
               Couldn’t add the rule — try again.
             </p>
+          )}
+
+          {pending.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-medium text-[var(--theme-warning)]">
+                Pending your review ({pending.length})
+              </p>
+              <ul className="mt-1.5 space-y-1.5">
+                {pending.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-start justify-between gap-3 rounded-xl border border-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_8%,transparent)] px-3 py-2 text-xs text-[var(--theme-text)]"
+                  >
+                    <span>
+                      <span className="text-[var(--theme-muted)]">
+                        {KIND_LABEL[p.kind]}:
+                      </span>{' '}
+                      {p.content}
+                    </span>
+                    <span className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        className="text-[var(--theme-success)] hover:underline disabled:opacity-40"
+                        disabled={review.isPending}
+                        onClick={() =>
+                          review.mutate({ memoryId: p.id, approve: true })
+                        }
+                      >
+                        approve
+                      </button>
+                      <button
+                        type="button"
+                        className="text-[var(--theme-danger)] hover:underline disabled:opacity-40"
+                        disabled={review.isPending}
+                        onClick={() =>
+                          review.mutate({ memoryId: p.id, approve: false })
+                        }
+                      >
+                        reject
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {memories.length === 0 ? (

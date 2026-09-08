@@ -306,6 +306,76 @@ export async function flagFinanceMemory(memoryId: string): Promise<void> {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Pending-candidate review (Phase 4C follow-up)
+// ---------------------------------------------------------------------------
+
+export type PendingFinanceMemory = {
+  id: string
+  content: string
+  kind: AssistantMemoryKind
+  createdAt: string | null
+}
+
+type CandidatesResult = {
+  candidates?: Array<{
+    memory_id?: unknown
+    content?: unknown
+    memory_type?: unknown
+    created_at?: unknown
+  }>
+}
+
+/**
+ * Pending finance candidates awaiting review (category_rule / financial_rule
+ * only — other repos' candidates are not shown in the finance dashboard).
+ */
+export async function listPendingFinanceCandidates(): Promise<
+  Array<PendingFinanceMemory>
+> {
+  if (!getConfig()) return []
+  const raw = (await call(
+    'GET',
+    '/api/candidates?limit=100',
+  )) as CandidatesResult | null
+  if (!raw || !Array.isArray(raw.candidates)) return []
+  const out: Array<PendingFinanceMemory> = []
+  for (const c of raw.candidates) {
+    const id = typeof c.memory_id === 'string' ? c.memory_id : ''
+    const content = typeof c.content === 'string' ? c.content.trim() : ''
+    if (!id || !content) continue
+    const kind = classifyMemory(c.memory_type, content)
+    if (kind === 'other') continue // not a finance rule the user authored
+    out.push({
+      id,
+      content,
+      kind,
+      createdAt: typeof c.created_at === 'string' ? c.created_at : null,
+    })
+  }
+  return out
+}
+
+/** Promote a pending candidate to an active memory. */
+export async function approveMemory(memoryId: string): Promise<{ ok: boolean }> {
+  if (!memoryId) return { ok: false }
+  const res = (await call('POST', '/api/approve', {
+    memory_id: memoryId,
+    reviewer: 'naveen',
+  })) as { review_status?: string } | null
+  return { ok: res?.review_status === 'approved' }
+}
+
+/** Mark a pending candidate rejected. */
+export async function rejectMemory(memoryId: string): Promise<{ ok: boolean }> {
+  if (!memoryId) return { ok: false }
+  const res = (await call('POST', '/api/reject', {
+    memory_id: memoryId,
+    reviewer: 'naveen',
+  })) as { review_status?: string } | null
+  return { ok: res?.review_status === 'rejected' }
+}
+
 /** Test-only: drop config + cache. */
 export function __resetHarpMemoryClient(): void {
   configResolved = false
