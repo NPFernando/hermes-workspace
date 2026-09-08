@@ -2,13 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   __resetHarpMemoryClient,
+  approveMemory,
   flagFinanceMemory,
   getCachedCategoryPreferences,
   getUserFinanceMemoriesForPrompt,
   isHarpMemoryEnabled,
   listActiveFinanceMemories,
+  listPendingFinanceCandidates,
   proposeCategoryPreference,
   proposeFinancialRule,
+  rejectMemory,
 } from './harp-memory-client'
 
 const realFetch = globalThis.fetch
@@ -174,5 +177,42 @@ describe('harp-memory-client — enabled', () => {
     globalThis.fetch = spy as unknown as typeof fetch
     expect(await proposeFinancialRule('   ')).toEqual({ submitted: false })
     expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('listPendingFinanceCandidates keeps only rule candidates', async () => {
+    const payload = {
+      candidates: [
+        { memory_id: 'p1', memory_type: 'financial_rule', content: 'Keep 6 months in cash.', created_at: '2026-09-08T00:00:00Z' },
+        { memory_id: 'p2', memory_type: 'category_rule', content: 'Categorize finance transactions from "keells" as "Groceries".' },
+        { memory_id: 'p3', memory_type: 'temporary_context', content: 'unrelated repo candidate' },
+        { memory_id: '', content: 'no id' },
+      ],
+    }
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(payload), { status: 200 })) as unknown as typeof fetch
+
+    expect(await listPendingFinanceCandidates()).toEqual([
+      { id: 'p1', content: 'Keep 6 months in cash.', kind: 'financial_rule', createdAt: '2026-09-08T00:00:00Z' },
+      { id: 'p2', content: 'Categorize finance transactions from "keells" as "Groceries".', kind: 'category_rule', createdAt: null },
+    ])
+  })
+
+  it('approveMemory / rejectMemory POST reviewer=naveen and read review_status', async () => {
+    const spy = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string)
+      return new Response(
+        JSON.stringify({ review_status: _url.endsWith('approve') ? 'approved' : 'rejected', got: body }),
+        { status: 200 },
+      )
+    })
+    globalThis.fetch = spy as unknown as typeof fetch
+
+    expect(await approveMemory('p1')).toEqual({ ok: true })
+    expect(await rejectMemory('p2')).toEqual({ ok: true })
+    const bodies = spy.mock.calls.map(
+      (c) => JSON.parse((c[1] as RequestInit).body as string) as Record<string, unknown>,
+    )
+    expect(bodies[0]).toEqual({ memory_id: 'p1', reviewer: 'naveen' })
+    expect(bodies[1]).toEqual({ memory_id: 'p2', reviewer: 'naveen' })
   })
 })
