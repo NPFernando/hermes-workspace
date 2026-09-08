@@ -38,6 +38,7 @@ import {
   extractEmploymentContract,
   extractTransactionFromImage,
 } from '../../server/finance-extraction'
+import { getUserFinanceMemoriesForPrompt } from '../../server/harp-memory-client'
 import { syncGmailNow } from '../../server/gmail-ingest'
 import { fetchCsePrice } from '../../server/cse-market.service'
 import {
@@ -944,10 +945,15 @@ export const Route = createFileRoute('/api/finance')({
               .slice(-3)
             const db = readFinanceStore()
             const context = buildFinanceQueryContext(db)
+            // Phase 4A: fold in approved user preferences/rules from HARP
+            // memory. Best-effort — an empty list (HARP off / slow / nothing)
+            // just means the analyst runs on the aggregated context alone.
+            const userMemories = await getUserFinanceMemoriesForPrompt(question)
             const result = await answerFinanceQuestion(
               question,
               context,
               priorTurns,
+              userMemories,
             )
             if (!result.ok)
               return json({ ok: false, error: result.reason }, { status: 502 })

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   __resetHarpMemoryClient,
   getCachedCategoryPreferences,
+  getUserFinanceMemoriesForPrompt,
   proposeCategoryPreference,
 } from './harp-memory-client'
 
@@ -27,6 +28,15 @@ describe('harp-memory-client — disabled (no token)', () => {
     const spy = vi.fn()
     globalThis.fetch = spy as unknown as typeof fetch
     expect(getCachedCategoryPreferences()).toEqual({})
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('getUserFinanceMemoriesForPrompt returns [] without calling fetch', async () => {
+    const spy = vi.fn()
+    globalThis.fetch = spy as unknown as typeof fetch
+    expect(await getUserFinanceMemoriesForPrompt('am I overspending?')).toEqual(
+      [],
+    )
     expect(spy).not.toHaveBeenCalled()
   })
 })
@@ -84,5 +94,28 @@ describe('harp-memory-client — enabled', () => {
     getCachedCategoryPreferences()
     await new Promise((r) => setTimeout(r, 10))
     expect(getCachedCategoryPreferences()).toEqual({})
+  })
+
+  it('getUserFinanceMemoriesForPrompt filters category rules and truncates', async () => {
+    const payload = {
+      results: [
+        { id: '1', content: 'I consider dining out discretionary spending.' },
+        {
+          id: '2',
+          memory_type: 'category_rule',
+          content: 'Categorize finance transactions from "keells" as "Groceries".',
+        },
+        { id: '3', content: 'Categorize finance transactions from "uber" as "Transport".' },
+        { id: '4', content: 'x'.repeat(500) },
+      ],
+    }
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(payload), { status: 200 })) as unknown as typeof fetch
+
+    const mems = await getUserFinanceMemoriesForPrompt('am I overspending?')
+    expect(mems).toEqual([
+      'I consider dining out discretionary spending.',
+      `${'x'.repeat(240)}…`,
+    ])
   })
 })
