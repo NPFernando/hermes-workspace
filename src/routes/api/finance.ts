@@ -215,6 +215,27 @@ function isLiveMode(mode: string): boolean {
   )
 }
 
+/**
+ * Phase 4A (optional / opt-in): when the operator asks the finance analyst a
+ * question that *states* a durable personal rule ("I always keep 6 months of
+ * expenses in cash", "I never invest in crypto"), capture that statement so it
+ * can become a governed HARP preference after review. Heuristic only — no extra
+ * model call — and gated behind FINANCE_LEARNED_FACTS_ENABLED so nothing
+ * accumulates in the review queue unless the operator opts in.
+ */
+export function detectDurableFinancePreference(question: string): string | null {
+  if (!/^(1|true|yes|on)$/i.test(process.env.FINANCE_LEARNED_FACTS_ENABLED ?? ''))
+    return null
+  const q = question.trim()
+  if (q.length < 12 || q.length > 240) return null
+  if (q.endsWith('?')) return null // a question, not a statement of intent
+  const durable =
+    /\bI (?:always|never|prefer(?:\s+to)?|want to|try to|keep|aim to|won'?t|don'?t want to|refuse to|only)\b/i
+  const rulePhrase = /\bmy (?:rule|policy|plan|budget|target|goal) is\b/i
+  if (!durable.test(q) && !rulePhrase.test(q)) return null
+  return q
+}
+
 function financePayload() {
   recoverValidationRunAutomationIfStale()
   const db = ensureFinanceStore()
@@ -982,6 +1003,10 @@ export const Route = createFileRoute('/api/finance')({
               },
             ].slice(-10)
             writeFinanceStore(db)
+            // Opt-in: if the question stated a durable personal rule, propose it
+            // as a HARP candidate for the operator to review. Best-effort.
+            const learned = detectDurableFinancePreference(question)
+            if (learned) void proposeFinancialRule(learned)
             return json({
               ...personalFinancePayload(),
               answer: result.answer,
