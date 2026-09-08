@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { buildFinanceAnswerMarkdown } from '../utils'
+import { buildFinanceAnswerMarkdown, formatLkr } from '../utils'
 import { buttonClass, wideInputClass } from '../shared-styles'
 import type { FinanceAnswerChartExport } from '../utils'
 import type { PersonalFinancePayload } from '../types'
@@ -226,7 +226,7 @@ export function FinanceAnalystCard({
                     borderRadius: 8,
                     fontSize: 11,
                   }}
-                  formatter={(value: number) => value.toLocaleString()}
+                  formatter={(value: number) => formatLkr(value)}
                 />
                 <Bar dataKey="value" fill="var(--theme-accent)" radius={[0, 4, 4, 0]} />
               </BarChart>
