@@ -13,15 +13,24 @@ vi.mock('@tanstack/react-start', () => ({
 
 const state = vi.hoisted(() => ({
   authenticated: true,
-  assessResearchRisk: vi.fn(() => ({ ok: true, risk: 'low' })),
-  buildCompositeSentiment: vi.fn(() => ({
+  // Generics kept wide (like readPaperDecisionJournal below) so per-test
+  // `.mockReturnValueOnce({...})` overrides with richer shapes don't trip
+  // TS2353 excess-property checks.
+  assessResearchRisk: vi.fn<(...a: Array<unknown>) => unknown>(() => ({
+    ok: true,
+    risk: 'low',
+  })),
+  buildCompositeSentiment: vi.fn<(...a: Array<unknown>) => unknown>(() => ({
     symbol: 'BTCUSDT',
     score: 0,
     confidence: 0.5,
     label: 'neutral',
   })),
-  fetchNews: vi.fn(async () => ({ fetched: 2, stored: 1 })),
-  appendPaperDecisionSnapshot: vi.fn(() => ({
+  fetchNews: vi.fn<(...a: Array<unknown>) => Promise<unknown>>(async () => ({
+    fetched: 2,
+    stored: 1,
+  })),
+  appendPaperDecisionSnapshot: vi.fn<(...a: Array<unknown>) => unknown>(() => ({
     id: 'decision-1',
     symbol: 'BTCUSDT',
     composite: { score: 0, confidence: 0.5 },
@@ -36,6 +45,19 @@ const state = vi.hoisted(() => ({
     validations: { enoughPaperData: false },
   })),
   storeIntelligenceRecords: vi.fn(() => ({ stored: true })),
+  // A stand-in FinanceDatabase: known keys are real, any other collection the
+  // handler reads (financePayload / recoverValidationRunAutomationIfStale touch
+  // several) resolves to an empty array instead of `undefined` — so an added
+  // `db.<collection>.filter(...)` upstream can't turn into a runtime TypeError
+  // in this fully-mocked test.
+  mockFinanceDb: (overrides: Record<string, unknown> = {}) =>
+    new Proxy(
+      { settings: {}, connectivityBreaker: {}, ...overrides },
+      {
+        get: (t, p) =>
+          p in t ? (t as Record<string | symbol, unknown>)[p] : [],
+      },
+    ),
 }))
 vi.mock('../../server/auth-middleware', () => ({
   isAuthenticated: () => state.authenticated,
@@ -65,14 +87,7 @@ vi.mock('../../server/finance-store', () => ({
   addFinanceRecord: vi.fn(),
   appendAuditLog: vi.fn(),
   budgetVsActualSummary: vi.fn(() => []),
-  ensureFinanceStore: vi.fn(() => ({
-    settings: {},
-    connectivityBreaker: {},
-    historical_candles: [],
-    strategy_results: [],
-    news_items: [],
-    sentiment_scores: [],
-  })),
+  ensureFinanceStore: vi.fn(() => state.mockFinanceDb()),
   financeAlerts: vi.fn(() => []),
   financeStorageAlerts: vi.fn(() => []),
   financeStorageStatus: vi.fn(() => ({
@@ -82,14 +97,7 @@ vi.mock('../../server/finance-store', () => ({
   financeSummary: vi.fn(() => ({})),
   getUnifiedTransactions: vi.fn(() => []),
   maskSensitive: vi.fn((obj) => obj),
-  readFinanceStore: vi.fn(() => ({
-    settings: {},
-    connectivityBreaker: {},
-    historical_candles: [],
-    strategy_results: [],
-    news_items: [],
-    sentiment_scores: [],
-  })),
+  readFinanceStore: vi.fn(() => state.mockFinanceDb()),
   storeIntelligenceRecords: state.storeIntelligenceRecords,
   tradingPerformanceSummary: vi.fn(() => ({})),
   writeFinanceStore: vi.fn(),
@@ -258,10 +266,12 @@ describe('/api/finance fetch_news', () => {
   it('records an authenticated paper research snapshot without touching intelligence storage or execution state', async () => {
     state.authenticated = true
     const store = await import('../../server/finance-store')
-    vi.mocked(store.readFinanceStore).mockReturnValue({
-      news_items: [{ id: 'news-1' }],
-      sentiment_scores: [{ id: 'fg-1' }],
-    } as any)
+    vi.mocked(store.readFinanceStore).mockReturnValue(
+      state.mockFinanceDb({
+        news_items: [{ id: 'news-1' }],
+        sentiment_scores: [{ id: 'fg-1' }],
+      }) as any,
+    )
     const composite = {
       symbol: 'BTCUSDT',
       score: 20,
@@ -341,10 +351,12 @@ describe('/api/finance fetch_news', () => {
   it('derives and stores research-only intelligence from existing data', async () => {
     state.authenticated = true
     const store = await import('../../server/finance-store')
-    vi.mocked(store.readFinanceStore).mockReturnValue({
-      news_items: [{ id: 'news-1' }],
-      sentiment_scores: [{ id: 'fg-1' }],
-    } as any)
+    vi.mocked(store.readFinanceStore).mockReturnValue(
+      state.mockFinanceDb({
+        news_items: [{ id: 'news-1' }],
+        sentiment_scores: [{ id: 'fg-1' }],
+      }) as any,
+    )
     state.buildCompositeSentiment.mockReturnValueOnce({
       score: 20,
       label: 'positive',
