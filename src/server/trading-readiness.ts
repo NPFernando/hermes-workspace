@@ -391,6 +391,10 @@ function exposureCapsGate(db: FinanceDatabase): ReadinessGate {
 }
 
 function patientHoldIsolationGate(): ReadinessGate {
+  // Defensive fallback kept despite the non-nullable return type — this gate
+  // must never throw during readiness evaluation if the engine history is
+  // unavailable.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const history = getFullEngineHistory() ?? {
     positions: [],
     archivedPositions: [],

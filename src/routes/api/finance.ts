@@ -260,6 +260,9 @@ function financePayload() {
     },
     summary: financeSummary(db),
     nextRecommendation: (() => {
+      // Defensive: `settings` is PG JSONB and a row written before `tradingMode`
+      // existed has no such key at runtime, whatever the static type says.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       const mode = String(db.settings.tradingMode ?? 'paper_trade')
       if (mode === 'live_manual_approval' || mode === 'live_auto_trade') {
         return {
