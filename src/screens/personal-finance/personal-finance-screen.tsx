@@ -21,6 +21,7 @@ import { SinkingFundsPanel } from './components/sinking-funds-panel'
 import { UpcomingMoney } from './components/upcoming-money'
 import { RecurringBillsInsight } from './components/recurring-bills-insight'
 import { DataHealthCard } from './components/data-health-card'
+import { AssistantMemoryCard } from './components/assistant-memory-card'
 import { EmergencyFundCard } from './components/emergency-fund-card'
 import { SavingsRateTargetCard } from './components/savings-rate-target-card'
 import { WealthGoalCard } from './components/wealth-goal-card'
@@ -343,6 +344,7 @@ export function PersonalFinanceScreen() {
           <WealthGoalCard payload={payload} onPayload={setPayload} />
           <UpcomingMoney payload={payload} />
           <RecurringBillsInsight payload={payload} />
+          <AssistantMemoryCard />
           <DataHealthCard payload={payload} />
         </>
       )}
