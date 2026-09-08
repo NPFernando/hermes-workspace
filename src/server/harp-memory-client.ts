@@ -19,6 +19,33 @@ const SEARCH_CACHE_TTL_MS = 60_000
 const CATEGORY_RULE_TYPE = 'category_rule'
 const SOURCE_REF = 'hermes-finance'
 
+/**
+ * Build a `/api/search` path scoped to this client's governed finance memories.
+ *
+ * Two non-obvious requirements, both learned the hard way:
+ *  - `data_class: 'confidential'` MUST be sent. The service clears a result only
+ *    when `memory.data_class <= request.data_class`, and the request defaults to
+ *    `internal`; without this every finance memory (all proposed `confidential`)
+ *    is filtered out and the search returns nothing.
+ *  - No `query` unless we actually have search text. The service matches the
+ *    query as a single `content ILIKE '%<whole string>%'` (no tokenisation), so
+ *    a descriptive phrase like "finance vendor category rule" never matches.
+ *    Omitting it means "no lexical filter" — enumerate under the scope.
+ * Callers still filter results by `source_ref === SOURCE_REF` so unrelated
+ * confidential user memories from other tools never leak in.
+ */
+function financeSearchPath(opts: { query?: string; limit: number }): string {
+  const params = new URLSearchParams({
+    intent: 'preference',
+    scope: 'user',
+    data_class: 'confidential',
+    limit: String(opts.limit),
+  })
+  const q = opts.query?.trim()
+  if (q) params.set('query', q.slice(0, 200))
+  return `/api/search?${params.toString()}`
+}
+
 type Config = { url: string; token: string } | null
 
 let configResolved = false
@@ -101,8 +128,14 @@ type SearchResult = {
   results?: Array<{
     id?: string
     content?: string
+    source_ref?: unknown
     metadata?: { vendor?: unknown; category?: unknown }
   }>
+}
+
+/** Keep only rows this client authored (scope/data_class can't fully isolate). */
+function isOwnFinanceMemory(entry: { source_ref?: unknown }): boolean {
+  return entry.source_ref === SOURCE_REF
 }
 
 let searchCache: { at: number; map: Record<string, string> } | null = null
@@ -136,16 +169,12 @@ function refreshCategoryPreferenceCache(): void {
   searchInFlight = (async () => {
     const raw = (await call(
       'GET',
-      `/api/search?${new URLSearchParams({
-        query: 'finance vendor category rule',
-        intent: 'preference',
-        scope: 'user',
-        limit: '50',
-      }).toString()}`,
+      financeSearchPath({ limit: 50 }),
     )) as SearchResult | null
     if (raw && Array.isArray(raw.results)) {
       const map: Record<string, string> = {}
       for (const entry of raw.results) {
+        if (!isOwnFinanceMemory(entry)) continue
         const rule = extractRule(entry)
         if (rule) map[rule[0]] = rule[1]
       }
@@ -175,7 +204,12 @@ export function getCachedCategoryPreferences(): Record<string, string> {
 // ---------------------------------------------------------------------------
 
 type AnalystSearchResult = {
-  results?: Array<{ id?: string; content?: unknown; memory_type?: unknown }>
+  results?: Array<{
+    id?: string
+    content?: unknown
+    memory_type?: unknown
+    source_ref?: unknown
+  }>
 }
 
 const CATEGORY_RULE_CONTENT = /^Categorize finance transactions from "/i
@@ -189,21 +223,22 @@ const MAX_ANALYST_MEMORIES = 6
  * by the caller with a short budget; `[]` on any failure or when HARP is off.
  */
 export async function getUserFinanceMemoriesForPrompt(
-  query: string,
+  // The service matches a query as one un-tokenised `content ILIKE` and has no
+  // relevance ranking we can lean on, so passing the question here matches
+  // nothing. At personal scale the honest thing is to fold in *all* stated
+  // finance preferences (capped below); kept in the signature for when the
+  // service grows real retrieval.
+  _query: string,
 ): Promise<Array<string>> {
   if (!getConfig()) return []
   const raw = (await call(
     'GET',
-    `/api/search?${new URLSearchParams({
-      query: query.trim().slice(0, 200) || 'personal finance preferences and rules',
-      intent: 'preference',
-      scope: 'user',
-      limit: '10',
-    }).toString()}`,
+    financeSearchPath({ limit: 25 }),
   )) as AnalystSearchResult | null
   if (!raw || !Array.isArray(raw.results)) return []
   const out: Array<string> = []
   for (const entry of raw.results) {
+    if (!isOwnFinanceMemory(entry)) continue
     if (entry.memory_type === CATEGORY_RULE_TYPE) continue
     const content = typeof entry.content === 'string' ? entry.content.trim() : ''
     if (!content || CATEGORY_RULE_CONTENT.test(content)) continue
@@ -255,16 +290,12 @@ export async function listActiveFinanceMemories(): Promise<Array<AssistantMemory
   if (!getConfig()) return []
   const raw = (await call(
     'GET',
-    `/api/search?${new URLSearchParams({
-      query: 'personal finance rules preferences vendor category',
-      intent: 'preference',
-      scope: 'user',
-      limit: '50',
-    }).toString()}`,
+    financeSearchPath({ limit: 50 }),
   )) as AnalystSearchResult | null
   if (!raw || !Array.isArray(raw.results)) return []
   const out: Array<AssistantMemory> = []
   for (const entry of raw.results) {
+    if (!isOwnFinanceMemory(entry)) continue
     const id = typeof entry.id === 'string' ? entry.id : ''
     const content = typeof entry.content === 'string' ? entry.content.trim() : ''
     if (!id || !content) continue

@@ -79,12 +79,17 @@ describe('harp-memory-client — enabled', () => {
   it('getCachedCategoryPreferences returns {} on the first (async) call, then the mapped rules', async () => {
     const payload = {
       results: [
-        { id: '1', metadata: { vendor: 'keells', category: 'Groceries' } },
-        { id: '2', content: 'Categorize finance transactions from "uber" as "Transport".' },
+        { id: '1', source_ref: 'hermes-finance', metadata: { vendor: 'keells', category: 'Groceries' } },
+        { id: '2', source_ref: 'hermes-finance', content: 'Categorize finance transactions from "uber" as "Transport".' },
+        // a confidential user memory from another tool — must be ignored
+        { id: '3', source_ref: 'some-other-tool', content: 'Categorize finance transactions from "spy" as "Espionage".' },
       ],
     }
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify(payload), { status: 200 })) as unknown as typeof fetch
+    let calledUrl = ''
+    globalThis.fetch = (async (url: string) => {
+      calledUrl = url
+      return new Response(JSON.stringify(payload), { status: 200 })
+    }) as unknown as typeof fetch
 
     expect(getCachedCategoryPreferences()).toEqual({}) // kicks off the refresh
     await vi.waitFor(() => {
@@ -93,6 +98,9 @@ describe('harp-memory-client — enabled', () => {
         uber: 'Transport',
       })
     })
+    // Contract: confidential clearance is sent, and no un-tokenised phrase query.
+    expect(calledUrl).toContain('data_class=confidential')
+    expect(calledUrl).not.toContain('query=')
   })
 
   it('a failing search leaves the cache empty (never throws)', async () => {
@@ -106,24 +114,33 @@ describe('harp-memory-client — enabled', () => {
   it('getUserFinanceMemoriesForPrompt filters category rules and truncates', async () => {
     const payload = {
       results: [
-        { id: '1', content: 'I consider dining out discretionary spending.' },
+        { id: '1', source_ref: 'hermes-finance', content: 'I consider dining out discretionary spending.' },
         {
           id: '2',
+          source_ref: 'hermes-finance',
           memory_type: 'category_rule',
           content: 'Categorize finance transactions from "keells" as "Groceries".',
         },
-        { id: '3', content: 'Categorize finance transactions from "uber" as "Transport".' },
-        { id: '4', content: 'x'.repeat(500) },
+        { id: '3', source_ref: 'hermes-finance', content: 'Categorize finance transactions from "uber" as "Transport".' },
+        { id: '4', source_ref: 'hermes-finance', content: 'x'.repeat(500) },
+        // not ours — excluded even though it's confidential + user-scoped
+        { id: '5', source_ref: 'notes-app', content: 'Unrelated confidential note.' },
       ],
     }
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify(payload), { status: 200 })) as unknown as typeof fetch
+    let calledUrl = ''
+    globalThis.fetch = (async (url: string) => {
+      calledUrl = url
+      return new Response(JSON.stringify(payload), { status: 200 })
+    }) as unknown as typeof fetch
 
     const mems = await getUserFinanceMemoriesForPrompt('am I overspending?')
     expect(mems).toEqual([
       'I consider dining out discretionary spending.',
       `${'x'.repeat(240)}…`,
     ])
+    // The question is NOT sent as a lexical filter (the service can't tokenise).
+    expect(calledUrl).not.toContain('query=')
+    expect(calledUrl).toContain('data_class=confidential')
   })
 
   it('isHarpMemoryEnabled reflects the token', () => {
@@ -136,10 +153,11 @@ describe('harp-memory-client — enabled', () => {
   it('listActiveFinanceMemories classifies each entry', async () => {
     const payload = {
       results: [
-        { id: 'a', memory_type: 'category_rule', content: 'Categorize finance transactions from "keells" as "Groceries".' },
-        { id: 'b', memory_type: 'financial_rule', content: 'Keep 6 months of expenses in cash.' },
-        { id: 'c', content: 'I prefer conservative estimates.' },
-        { id: '', content: 'dropped — no id' },
+        { id: 'a', source_ref: 'hermes-finance', memory_type: 'category_rule', content: 'Categorize finance transactions from "keells" as "Groceries".' },
+        { id: 'b', source_ref: 'hermes-finance', memory_type: 'financial_rule', content: 'Keep 6 months of expenses in cash.' },
+        { id: 'c', source_ref: 'hermes-finance', content: 'I prefer conservative estimates.' },
+        { id: '', source_ref: 'hermes-finance', content: 'dropped — no id' },
+        { id: 'd', source_ref: 'other-tool', memory_type: 'financial_rule', content: 'Not a finance-dashboard memory.' },
       ],
     }
     globalThis.fetch = (async () =>
