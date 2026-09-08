@@ -1734,6 +1734,73 @@ describe('buildFinanceQueryContext (Phase 24 Hermes Finance Analyst)', () => {
   })
 })
 
+describe('financeSummary FX conversion for non-LKR assets (PF-206)', () => {
+  const usdHolding = {
+    id: 's-usd',
+    symbol: 'AAPL',
+    platform: 'IBKR',
+    quantity: 2,
+    buyPrice: 100,
+    buyDate: '2026-01-01',
+    currency: 'USD' as const,
+    lastKnownPrice: 150,
+    priceSource: 'manual' as const,
+    source: 'test',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  }
+
+  it('converts a non-LKR holding via a stored exchange rate', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push({
+      base: 'USD',
+      target: 'LKR',
+      rate: 300,
+      date: '2026-01-01',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.stock_holdings.push({ ...usdHolding })
+
+    const s = financeSummary(db)
+    expect(s.stockHoldingsValueLkr).toBe(2 * 150 * 300) // 90,000 LKR
+    expect(s.unrealizedStockPnlLkr).toBe(2 * (150 - 100) * 300) // 30,000 LKR
+    expect(s.fxUnconverted).toEqual([])
+  })
+
+  it('counts a non-LKR asset raw and reports it when no rate is on file', () => {
+    const db = createEmptyFinanceDatabase()
+    db.stock_holdings.push({ ...usdHolding })
+    db.fixed_deposits.push({
+      id: 'f-eur',
+      bankName: 'EuroBank',
+      principal: 1_000,
+      currency: 'EUR',
+      interestRatePct: 3,
+      interestPayout: 'at_maturity',
+      startDate: '2026-01-01',
+      maturityDate: '2027-01-01',
+      status: 'active',
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+
+    const s = financeSummary(db)
+    expect(s.stockHoldingsValueLkr).toBe(2 * 150) // raw, unconverted
+    expect(s.fixedDepositsValueLkr).toBe(1_000)
+    expect(s.fxUnconverted).toEqual(['EUR', 'USD'])
+
+    const alerts = financeAlerts(db)
+    expect(alerts.some((a) => a.title === 'Missing exchange rate')).toBe(true)
+  })
+
+  it('leaves fxUnconverted empty for an all-LKR portfolio', () => {
+    const db = createEmptyFinanceDatabase()
+    db.stock_holdings.push({ ...usdHolding, currency: 'LKR' })
+    expect(financeSummary(db).fxUnconverted).toEqual([])
+  })
+})
+
 describe('financeSummary net worth with stock holdings and fixed deposits', () => {
   it('includes stock holdings at current price and active fixed deposit principal', () => {
     const db = createEmptyFinanceDatabase()

@@ -28,6 +28,7 @@ import {
   setNonLiveExecutionMode,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
+  updateExchangeRate,
   updateFinanceRecord,
   updatePendingIngestion,
   writeFinanceStore,
@@ -928,6 +929,35 @@ export const Route = createFileRoute('/api/finance')({
             db.settings.savingsRateTargetPct = pct
             writeFinanceStore(db)
             appendAuditLog('savings_rate_target_updated', { pct })
+            return json(personalFinancePayload())
+          }
+          if (action === 'update_exchange_rate') {
+            // PF-206: store a currency->LKR (or any pair) rate so non-LKR
+            // holdings/FDs/properties convert in the net-worth math. Fixes the
+            // "Missing exchange rate" alert.
+            const base = typeof body.base === 'string' ? body.base.trim().toUpperCase() : ''
+            const target =
+              typeof body.target === 'string' && body.target.trim()
+                ? body.target.trim().toUpperCase()
+                : 'LKR'
+            const rate = typeof body.rate === 'number' ? body.rate : NaN
+            const date =
+              typeof body.date === 'string' && body.date.trim()
+                ? body.date.trim()
+                : undefined
+            if (!/^[A-Z]{3}$/.test(base) || !/^[A-Z]{3}$/.test(target)) {
+              return json(
+                { ok: false, error: 'base and target must be 3-letter currency codes.' },
+                { status: 400 },
+              )
+            }
+            if (!Number.isFinite(rate) || rate <= 0) {
+              return json(
+                { ok: false, error: 'rate must be a positive number.' },
+                { status: 400 },
+              )
+            }
+            updateExchangeRate(base, target, rate, date)
             return json(personalFinancePayload())
           }
           if (action === 'set_wealth_goal') {

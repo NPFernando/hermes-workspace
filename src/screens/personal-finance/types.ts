@@ -14,6 +14,8 @@ export type PersonalFinancePayload = {
     unrealizedStockPnlLkr: number
     unrealizedStockPnlPct: number
     accountCount: number
+    /** PF-206: asset currencies with no exchange rate on file — counted raw. */
+    fxUnconverted?: Array<string>
   }
   budgetVsActual: Array<{
     category: string
