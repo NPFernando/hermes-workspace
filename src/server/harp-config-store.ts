@@ -84,6 +84,31 @@ export type HarpBlocklistEntry = {
   reason: string
 }
 
+// ── Route Combos ───────────────────────────────────────────────────────────
+// Operator-editable named fallback chains. Written to a TOP-LEVEL `combos:`
+// key in harp-config.yaml and read by harp-select-route.py::load_combos_config
+// (universal-harp-engine). See docs/9router-combos-design.md there.
+
+export type HarpComboStep = string // "<provider>/<model-id>"
+
+export type HarpComboMatch = {
+  task?: string
+  risk?: string
+}
+
+export type HarpComboEntry = {
+  name: string
+  match?: HarpComboMatch
+  steps: Array<HarpComboStep>
+}
+
+export type HarpCombosConfig = {
+  enabled: boolean
+  enforce: boolean
+  override_policy?: boolean
+  entries: Array<HarpComboEntry>
+}
+
 export type HarpGlobalSettings = {
   enabled: boolean
   mode: string
@@ -143,7 +168,39 @@ export type HarpConfig = {
   }
   routing_blocklist: Array<HarpBlocklistEntry>
   auto_improve: HarpAutoImprove
+  combos?: HarpCombosConfig
   [key: string]: unknown
+}
+
+const EMPTY_COMBOS: HarpCombosConfig = { enabled: false, enforce: false, entries: [] }
+
+/** Coerce whatever is on disk under `combos:` into a well-formed config. */
+function normalizeCombos(raw: unknown): HarpCombosConfig {
+  const src = (raw ?? {}) as Record<string, unknown>
+  const entriesRaw = Array.isArray(src.entries) ? src.entries : []
+  const entries: Array<HarpComboEntry> = entriesRaw
+    .map((e) => {
+      const entry = (e ?? {}) as Record<string, unknown>
+      const name = typeof entry.name === 'string' ? entry.name.trim() : ''
+      if (!name) return null
+      const matchRaw = (entry.match ?? {}) as Record<string, unknown>
+      const match: HarpComboMatch = {}
+      if (typeof matchRaw.task === 'string' && matchRaw.task) match.task = matchRaw.task
+      if (typeof matchRaw.risk === 'string' && matchRaw.risk) match.risk = matchRaw.risk
+      const steps = (Array.isArray(entry.steps) ? entry.steps : [])
+        .map((s) => (typeof s === 'string' ? s.trim() : ''))
+        .filter(Boolean)
+      const out: HarpComboEntry = { name, steps }
+      if (Object.keys(match).length) out.match = match
+      return out
+    })
+    .filter((e): e is HarpComboEntry => e !== null)
+  return {
+    enabled: src.enabled === true,
+    enforce: src.enforce === true,
+    override_policy: src.override_policy === true,
+    entries,
+  }
 }
 
 // ── Read ───────────────────────────────────────────────────────────────────
@@ -209,6 +266,40 @@ export type HarpPatchSetAutoImprove = {
   value: unknown
 }
 
+export type HarpPatchSetCombosGlobal = {
+  action: 'set-combos-global'
+  field: 'enabled' | 'enforce'
+  value: boolean
+}
+
+export type HarpPatchAddCombo = { action: 'add-combo'; name: string }
+export type HarpPatchRemoveCombo = { action: 'remove-combo'; name: string }
+export type HarpPatchRenameCombo = {
+  action: 'rename-combo'
+  name: string
+  newName: string
+}
+export type HarpPatchSetComboMatch = {
+  action: 'set-combo-match'
+  name: string
+  match: HarpComboMatch
+}
+export type HarpPatchReorderComboSteps = {
+  action: 'reorder-combo-steps'
+  name: string
+  steps: Array<HarpComboStep>
+}
+export type HarpPatchAddComboStep = {
+  action: 'add-combo-step'
+  name: string
+  step: HarpComboStep
+}
+export type HarpPatchRemoveComboStep = {
+  action: 'remove-combo-step'
+  name: string
+  step: HarpComboStep
+}
+
 export type HarpPatch =
   | HarpPatchSetGlobal
   | HarpPatchReorderTierModels
@@ -217,6 +308,14 @@ export type HarpPatch =
   | HarpPatchAddBlocklist
   | HarpPatchRemoveBlocklist
   | HarpPatchSetAutoImprove
+  | HarpPatchSetCombosGlobal
+  | HarpPatchAddCombo
+  | HarpPatchRemoveCombo
+  | HarpPatchRenameCombo
+  | HarpPatchSetComboMatch
+  | HarpPatchReorderComboSteps
+  | HarpPatchAddComboStep
+  | HarpPatchRemoveComboStep
 
 export type HarpPatchResult = { ok: boolean; error?: string }
 
@@ -272,6 +371,87 @@ export function applyHarpPatch(patch: HarpPatch): HarpPatchResult {
         const ai = config.auto_improve as Record<string, unknown>
         ai[patch.field] = patch.value
         break
+      }
+
+      case 'set-combos-global': {
+        const combos = (config.combos ??= { ...EMPTY_COMBOS, entries: [] })
+        combos[patch.field] = patch.value === true
+        break
+      }
+
+      case 'add-combo': {
+        const combos = (config.combos ??= { ...EMPTY_COMBOS, entries: [] })
+        const name = patch.name.trim()
+        if (!name) return { ok: false, error: 'Combo name is required' }
+        if (combos.entries.some((c) => c.name === name)) {
+          return { ok: false, error: `Combo "${name}" already exists` }
+        }
+        combos.entries.push({ name, steps: [] })
+        break
+      }
+
+      case 'remove-combo': {
+        const combos = (config.combos ??= { ...EMPTY_COMBOS, entries: [] })
+        combos.entries = combos.entries.filter((c) => c.name !== patch.name)
+        break
+      }
+
+      case 'rename-combo': {
+        const combos = (config.combos ??= { ...EMPTY_COMBOS, entries: [] })
+        const newName = patch.newName.trim()
+        if (!newName) return { ok: false, error: 'New combo name is required' }
+        if (newName !== patch.name && combos.entries.some((c) => c.name === newName)) {
+          return { ok: false, error: `Combo "${newName}" already exists` }
+        }
+        const entry = combos.entries.find((c) => c.name === patch.name)
+        if (entry) entry.name = newName
+        break
+      }
+
+      case 'set-combo-match': {
+        const combos = (config.combos ??= { ...EMPTY_COMBOS, entries: [] })
+        const entry = combos.entries.find((c) => c.name === patch.name)
+        if (entry) {
+          const match: HarpComboMatch = {}
+          if (patch.match.task) match.task = patch.match.task
+          if (patch.match.risk) match.risk = patch.match.risk
+          if (Object.keys(match).length) entry.match = match
+          else delete entry.match
+        }
+        break
+      }
+
+      case 'reorder-combo-steps': {
+        const combos = (config.combos ??= { ...EMPTY_COMBOS, entries: [] })
+        const entry = combos.entries.find((c) => c.name === patch.name)
+        if (entry) {
+          entry.steps = patch.steps.map((s) => s.trim()).filter(Boolean)
+        }
+        break
+      }
+
+      case 'add-combo-step': {
+        const combos = (config.combos ??= { ...EMPTY_COMBOS, entries: [] })
+        const entry = combos.entries.find((c) => c.name === patch.name)
+        const step = patch.step.trim()
+        if (entry && step && !entry.steps.includes(step)) {
+          entry.steps.push(step)
+        }
+        break
+      }
+
+      case 'remove-combo-step': {
+        const combos = (config.combos ??= { ...EMPTY_COMBOS, entries: [] })
+        const entry = combos.entries.find((c) => c.name === patch.name)
+        if (entry) entry.steps = entry.steps.filter((s) => s !== patch.step)
+        break
+      }
+
+      default: {
+        return {
+          ok: false,
+          error: `unknown patch action: ${String((patch as { action?: unknown }).action)}`,
+        }
       }
     }
 
@@ -333,6 +513,7 @@ export function createStarterHarpConfig(): HarpPatchResult {
       report_dir: '',
       deliver: '',
     },
+    combos: { enabled: false, enforce: false, entries: [] },
   }
   try {
     fs.mkdirSync(path.dirname(configPath), { recursive: true })
@@ -379,6 +560,12 @@ export type HarpHealthView = {
   openrouterCredits: string
 }
 
+export type HarpCombosView = {
+  enabled: boolean
+  enforce: boolean
+  entries: Array<HarpComboEntry>
+}
+
 export type HarpConfigView = {
   available: boolean
   configPath: string
@@ -387,6 +574,7 @@ export type HarpConfigView = {
   tiers: Array<HarpTier>
   blocklist: Array<HarpBlocklistEntry>
   autoImprove: HarpAutoImprove
+  combos: HarpCombosView
   health?: HarpHealthView
 }
 
@@ -637,6 +825,7 @@ export function getHarpConfigView(): HarpConfigView {
         report_dir: '',
         deliver: '',
       },
+      combos: { enabled: false, enforce: false, entries: [] },
     }
   }
 
@@ -665,6 +854,8 @@ export function getHarpConfigView(): HarpConfigView {
       }
     })
 
+  const combosFull = normalizeCombos(config.combos)
+
   return {
     available: true,
     configPath,
@@ -673,6 +864,11 @@ export function getHarpConfigView(): HarpConfigView {
     tiers,
     blocklist: config.routing_blocklist,
     autoImprove: config.auto_improve,
+    combos: {
+      enabled: combosFull.enabled,
+      enforce: combosFull.enforce,
+      entries: combosFull.entries,
+    },
     health: getHarpHealthView(),
   }
 }
