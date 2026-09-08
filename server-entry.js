@@ -105,10 +105,8 @@ const MIME_TYPES = {
 }
 
 async function tryServeStatic(req, res) {
-  const url = new URL(
-    req.url || '/',
-    `http://${req.headers.host || 'localhost'}`,
-  )
+  const url = parseRequestUrl(req.url, req.headers.host)
+  if (!url) return false
   const pathname = decodeURIComponent(url.pathname)
 
   // Prevent directory traversal
@@ -171,6 +169,23 @@ async function tryServeStatic(req, res) {
   }
 }
 
+/**
+ * Parse an HTTP request target without allowing a protocol-relative target
+ * such as `//?pp=env` to escape the local base URL and crash the server.
+ * Malformed targets are rejected by the request handler with a 400 response.
+ */
+function parseRequestUrl(rawUrl, host) {
+  const requestTarget = rawUrl || '/'
+  const normalizedTarget = requestTarget.startsWith('//')
+    ? `/${requestTarget.slice(2)}`
+    : requestTarget
+  try {
+    return new URL(normalizedTarget, `http://${host || 'localhost'}`)
+  } catch {
+    return null
+  }
+}
+
 async function requestHandler(req, res) {
   // Try static files first (client assets)
   if (req.method === 'GET' || req.method === 'HEAD') {
@@ -179,10 +194,15 @@ async function requestHandler(req, res) {
   }
 
   // Fall through to SSR handler
-  const url = new URL(
-    req.url || '/',
-    `http://${req.headers.host || 'localhost'}`,
-  )
+  const url = parseRequestUrl(req.url, req.headers.host)
+  if (!url) {
+    res.writeHead(400, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+    })
+    res.end(JSON.stringify({ error: 'Invalid request target' }))
+    return
+  }
 
   const headers = new Headers()
   for (const [key, value] of Object.entries(req.headers)) {
