@@ -2227,15 +2227,31 @@ export function createTradingSignal(
   }
 }
 
+/**
+ * PF-113: a row's reconciliation `status` gates whether it counts toward
+ * *aggregate* money figures (net worth, savings rate, budget-vs-actual,
+ * monthly rollups). A `pending` transaction is shown in the raw tables /
+ * `getUnifiedTransactions()` but must not move the totals until it clears.
+ * `status` is optional and predates the feature, so a missing value counts
+ * as `cleared` (unchanged behaviour for existing data).
+ */
+const TOTALS_STATUSES: ReadonlyArray<'pending' | 'cleared' | 'reconciled'> = [
+  'cleared',
+  'reconciled',
+]
+function includeInTotals(row: {
+  status?: 'pending' | 'cleared' | 'reconciled'
+}): boolean {
+  return TOTALS_STATUSES.includes(row.status ?? 'cleared')
+}
+
 export function financeSummary(db: FinanceDatabase) {
-  const totalIncomeLkr = db.income_records.reduce(
-    (sum, row) => sum + row.convertedLkrAmount,
-    0,
-  )
-  const totalExpensesLkr = db.expense_records.reduce(
-    (sum, row) => sum + row.convertedLkrAmount,
-    0,
-  )
+  const totalIncomeLkr = db.income_records
+    .filter(includeInTotals)
+    .reduce((sum, row) => sum + row.convertedLkrAmount, 0)
+  const totalExpensesLkr = db.expense_records
+    .filter(includeInTotals)
+    .reduce((sum, row) => sum + row.convertedLkrAmount, 0)
   const netSavingsLkr = totalIncomeLkr - totalExpensesLkr
   const savingsRate =
     totalIncomeLkr > 0 ? (netSavingsLkr / totalIncomeLkr) * 100 : 0
@@ -2699,6 +2715,7 @@ export function getMonthlySummary(
   const expenseMap = new Map<string, number>()
 
   for (const inc of db.income_records) {
+    if (!includeInTotals(inc)) continue
     const dateInfo = parseDate(inc.dateReceived)
     if (!dateInfo) continue
     if (year !== undefined && dateInfo.year !== year) continue
@@ -2709,6 +2726,7 @@ export function getMonthlySummary(
   }
 
   for (const exp of db.expense_records) {
+    if (!includeInTotals(exp)) continue
     const dateInfo = parseDate(exp.date)
     if (!dateInfo) continue
     if (year !== undefined && dateInfo.year !== year) continue
@@ -2877,6 +2895,7 @@ export function getBudgetVsActual(
   // Calculate actual expenses for that category, year, month
   let actual = 0
   for (const exp of db.expense_records) {
+    if (!includeInTotals(exp)) continue
     const dateInfo = parseDate(exp.date)
     if (!dateInfo) continue
     if (
