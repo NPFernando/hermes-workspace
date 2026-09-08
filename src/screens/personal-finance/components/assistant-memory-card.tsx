@@ -22,6 +22,14 @@ const KIND_LABEL: Record<AssistantMemory['kind'], string> = {
   other: 'Preference',
 }
 
+/** Pull vendor + category out of a `Categorize … from "X" as "Y".` rule. */
+function parseCategoryRule(
+  content: string,
+): { vendor: string; category: string } | null {
+  const m = content.match(/from "([^"]+)" as "([^"]+)"/i)
+  return m ? { vendor: m[1], category: m[2] } : null
+}
+
 async function post(action: string, extra: Record<string, unknown>) {
   const res = await fetch('/api/finance', {
     method: 'POST',
@@ -58,6 +66,17 @@ export function AssistantMemoryCard() {
     mutationFn: (memoryId: string) =>
       post('flag_finance_memory', { memoryId }),
     onSuccess: invalidate,
+  })
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editCategory, setEditCategory] = useState('')
+  const setCategoryRule = useMutation({
+    mutationFn: (v: { vendor: string; category: string; replacesId: string }) =>
+      post('set_category_rule', v),
+    onSuccess: () => {
+      setEditingId(null)
+      setEditCategory('')
+      invalidate()
+    },
   })
   const review = useMutation({
     mutationFn: (v: { memoryId: string; approve: boolean }) =>
@@ -176,28 +195,94 @@ export function AssistantMemoryCard() {
             </p>
           ) : (
             <ul className="mt-3 space-y-1.5">
-              {memories.map((m) => (
-                <li
-                  key={m.id}
-                  className="flex items-start justify-between gap-3 rounded-xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_6%,transparent)] px-3 py-2 text-xs text-[var(--theme-text)]"
-                >
-                  <span>
-                    <span className="text-[var(--theme-muted)]">
-                      {KIND_LABEL[m.kind]}:
-                    </span>{' '}
-                    {m.content}
-                  </span>
-                  <button
-                    type="button"
-                    className="shrink-0 text-[var(--theme-muted)] hover:text-[var(--theme-danger)] disabled:opacity-40"
-                    disabled={flag.isPending}
-                    title="This rule is wrong / no longer wanted"
-                    onClick={() => flag.mutate(m.id)}
+              {memories.map((m) => {
+                const parsed =
+                  m.kind === 'category_rule' ? parseCategoryRule(m.content) : null
+                const isEditing = editingId === m.id
+                return (
+                  <li
+                    key={m.id}
+                    className="rounded-xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_6%,transparent)] px-3 py-2 text-xs text-[var(--theme-text)]"
                   >
-                    not right
-                  </button>
-                </li>
-              ))}
+                    <div className="flex items-start justify-between gap-3">
+                      <span>
+                        <span className="text-[var(--theme-muted)]">
+                          {KIND_LABEL[m.kind]}:
+                        </span>{' '}
+                        {m.content}
+                      </span>
+                      <span className="flex shrink-0 gap-2">
+                        {parsed && (
+                          <button
+                            type="button"
+                            className="text-[var(--theme-muted)] hover:text-[var(--theme-text)] disabled:opacity-40"
+                            onClick={() => {
+                              setEditingId(isEditing ? null : m.id)
+                              setEditCategory(parsed.category)
+                            }}
+                          >
+                            {isEditing ? 'cancel' : 'edit'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="text-[var(--theme-muted)] hover:text-[var(--theme-danger)] disabled:opacity-40"
+                          disabled={flag.isPending}
+                          title="This rule is wrong / no longer wanted"
+                          onClick={() => flag.mutate(m.id)}
+                        >
+                          not right
+                        </button>
+                      </span>
+                    </div>
+                    {isEditing && parsed && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="text-[var(--theme-muted)]">
+                          {parsed.vendor} →
+                        </span>
+                        <input
+                          value={editCategory}
+                          onChange={(e) => setEditCategory(e.target.value)}
+                          className={wideInputClass}
+                          placeholder="new category"
+                          onKeyDown={(e) => {
+                            if (
+                              e.key === 'Enter' &&
+                              editCategory.trim() &&
+                              editCategory.trim() !== parsed.category &&
+                              !setCategoryRule.isPending
+                            ) {
+                              setCategoryRule.mutate({
+                                vendor: parsed.vendor,
+                                category: editCategory.trim(),
+                                replacesId: m.id,
+                              })
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className={buttonClass}
+                          disabled={
+                            !editCategory.trim() ||
+                            editCategory.trim() === parsed.category ||
+                            setCategoryRule.isPending
+                          }
+                          onClick={() =>
+                            setCategoryRule.mutate({
+                              vendor: parsed.vendor,
+                              category: editCategory.trim(),
+                              replacesId: m.id,
+                            })
+                          }
+                        >
+                          {setCategoryRule.isPending ? 'Sending…' : 'Save for review'}
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </>

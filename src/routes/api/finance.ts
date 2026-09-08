@@ -45,6 +45,7 @@ import {
   isHarpMemoryEnabled,
   listActiveFinanceMemories,
   listPendingFinanceCandidates,
+  proposeCategoryPreference,
   proposeFinancialRule,
   rejectMemory,
 } from '../../server/harp-memory-client'
@@ -1029,6 +1030,26 @@ export const Route = createFileRoute('/api/finance')({
             const { submitted } = await proposeFinancialRule(rule)
             // Candidate needs approval before it shows in list_finance_memories.
             return json({ ok: true, submitted })
+          }
+          if (action === 'set_category_rule') {
+            // Panel "edit" for a vendor -> category rule: propose the new
+            // mapping as a governed candidate and, if this replaces an existing
+            // rule, flag the old one so review supersedes it. Both are
+            // best-effort HARP writes; neither blocks.
+            const vendor =
+              typeof body.vendor === 'string' ? body.vendor.trim() : ''
+            const category =
+              typeof body.category === 'string' ? body.category.trim() : ''
+            const replacesId =
+              typeof body.replacesId === 'string' ? body.replacesId.trim() : ''
+            if (!vendor || !category)
+              return json(
+                { ok: false, error: 'vendor and category are required.' },
+                { status: 400 },
+              )
+            await proposeCategoryPreference({ vendor, category })
+            if (replacesId) await flagFinanceMemory(replacesId)
+            return json({ ok: true, submitted: true })
           }
           if (action === 'flag_finance_memory') {
             const memoryId =
