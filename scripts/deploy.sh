@@ -23,9 +23,17 @@ if [ "${1:-}" = "--quiet-if-unchanged" ]; then
 fi
 
 if [ -n "$(git status --porcelain)" ]; then
-  echo "error: deploy directory has uncommitted changes — this directory should only ever hold a clean checkout of origin/main." >&2
-  git status --short >&2
-  exit 1
+  # This directory must only ever hold a clean checkout of origin/main, but
+  # stray writes land here (a cron editing the served tree, a hot-patch). A
+  # hard `exit 1` used to just repeat every poll forever with no alert, leaving
+  # auto-deploy silently broken for hours. Instead: park the changes in a
+  # recoverable stash and carry on. `proactive_alert.sh` flags parked stashes
+  # to Telegram; recover with `git -C <dir> stash list` / `stash show -p`.
+  STASH_MSG="auto-deploy-parked: $(date -Iseconds)"
+  echo "WARNING: deploy directory had uncommitted changes — parking them in a stash and continuing."
+  git status --short
+  git stash push --include-untracked -m "$STASH_MSG" >/dev/null
+  echo "WARNING: parked as: $STASH_MSG  (recover: git -C $(pwd) stash list)"
 fi
 
 git fetch origin main --quiet
