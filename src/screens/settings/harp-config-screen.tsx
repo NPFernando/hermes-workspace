@@ -1089,7 +1089,7 @@ function AddComboForm({ onAdd }: { onAdd: (name: string) => void }) {
   )
 }
 
-function CombosSection({
+export function CombosSection({
   combos,
   patch,
 }: {
