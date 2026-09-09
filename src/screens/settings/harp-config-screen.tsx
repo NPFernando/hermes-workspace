@@ -24,6 +24,7 @@ import type {
   HarpTier,
   HarpTierModel,
 } from '@/server/harp-config-store'
+import type { HarpObservabilityView } from '@/server/harp-observability'
 import { cn } from '@/lib/utils'
 
 // Kept in sync with harp-select-route.py (TASK_MAP keys / RISK_LEVELS).
@@ -57,6 +58,15 @@ async function patchHarpConfig(
   const data = (await res.json()) as HarpApiResponse
   if (!data.ok) throw new Error(data.error ?? 'Failed to save')
   return data as HarpConfigView
+}
+
+type HarpObsApiResponse = { ok: boolean; error?: string } & Partial<HarpObservabilityView>
+
+async function fetchHarpObservability(): Promise<HarpObservabilityView> {
+  const res = await fetch('/api/harp-observability')
+  const data = (await res.json()) as HarpObsApiResponse
+  if (!data.ok) throw new Error(data.error ?? 'Failed to load HARP observability')
+  return data as HarpObservabilityView
 }
 
 // ── Small primitives ───────────────────────────────────────────────────────
@@ -307,6 +317,210 @@ function HarpHealthPanel({ health }: { health?: HarpHealthView }) {
             {health.cooldowns.length === 0 && (
               <p className="text-xs text-[var(--theme-muted)]">
                 No active cooldowns.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </SectionCard>
+  )
+}
+
+// ── Routing observability ──────────────────────────────────────────────────
+
+function decisionStatusClass(status: string): string {
+  if (status === 'selected')
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+  if (status === 'policy_blocked')
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+  return 'bg-[var(--theme-hover)] text-[var(--theme-muted)]'
+}
+
+function HarpObservabilityPanel({
+  view,
+  isLoading,
+  error,
+}: {
+  view?: HarpObservabilityView
+  isLoading: boolean
+  error: unknown
+}) {
+  if (isLoading && !view) return null
+  if (error && !view) {
+    return (
+      <SectionCard
+        title="Routing Activity"
+        description="Recent HARP routing decisions, combo shadow, and discovery status"
+        icon={FlowCircleIcon}
+      >
+        <p className="text-xs text-red-500">
+          {error instanceof Error ? error.message : 'Failed to load'}
+        </p>
+      </SectionCard>
+    )
+  }
+  if (!view) return null
+
+  const { decisions, decisionSummary: s, comboShadow, discovery } = view
+  const lastCombo = comboShadow.length > 0 ? comboShadow[0] : null
+
+  return (
+    <SectionCard
+      title="Routing Activity"
+      description="Recent HARP routing decisions, combo shadow, and discovery status"
+      icon={FlowCircleIcon}
+    >
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+            Recent decisions
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--theme-text)]">
+            {s.total}
+          </p>
+          <p className="mt-1 text-[11px] text-[var(--theme-muted)]">
+            {s.selected} selected · {s.policyBlocked} policy-blocked
+          </p>
+        </div>
+        <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+            Model discovery
+          </p>
+          {discovery.source === 'postgres' ? (
+            <>
+              <p className="mt-1 text-xs text-[var(--theme-text)]">
+                {discovery.activeModels ?? '—'} active /{' '}
+                {discovery.catalogModels ?? '—'} catalog
+              </p>
+              <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
+                +{discovery.newModels ?? 0} new · -{discovery.removedModels ?? 0}{' '}
+                delisted · ~{discovery.changedModels ?? 0} changed ·{' '}
+                {compactDateTime(discovery.startedAt)}
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-[11px] text-[var(--theme-muted)]">
+              {discovery.error ?? 'Postgres unavailable'}
+            </p>
+          )}
+        </div>
+        <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+            Combo shadow
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--theme-text)]">
+            {comboShadow.length}
+          </p>
+          <p className="mt-1 truncate text-[11px] text-[var(--theme-muted)]">
+            {lastCombo
+              ? `${lastCombo.combo} · ${lastCombo.decision}`
+              : 'no evaluations logged'}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-semibold text-[var(--theme-text)]">
+              Routing decisions
+            </p>
+            <span className="text-[10px] text-[var(--theme-muted)]">
+              gateway telemetry
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {decisions.slice(0, 12).map((d, i) => (
+              <div
+                key={`${d.at}:${i}`}
+                className="rounded-lg bg-[var(--theme-panel)] px-2 py-1.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                      decisionStatusClass(d.status),
+                    )}
+                  >
+                    {d.status}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--theme-text)]">
+                    {d.model
+                      ? `${d.provider ?? '?'}/${d.model}`
+                      : (d.reason ?? '—')}
+                  </span>
+                  <span className="shrink-0 text-[10px] text-[var(--theme-muted)]">
+                    {compactDateTime(d.at)}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[10px] text-[var(--theme-muted)]">
+                  {d.task || '?'} / {d.risk || '?'}
+                  {d.tier ? ` · ${d.tier}` : ''}
+                  {typeof d.fallbackCount === 'number'
+                    ? ` · ${d.fallbackCount} fallback${d.fallbackCount === 1 ? '' : 's'}`
+                    : ''}
+                </p>
+              </div>
+            ))}
+            {decisions.length === 0 && (
+              <p className="text-xs text-[var(--theme-muted)]">
+                No routing decisions logged yet. The gateway appends to{' '}
+                <code className="font-mono text-[10px]">harp-routing.jsonl</code>{' '}
+                when HARP routing runs on a request (Telegram, dashboard chat,
+                Hermes CLI).
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[var(--theme-border)] bg-surface p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-semibold text-[var(--theme-text)]">
+              Combo shadow
+            </p>
+            <span className="text-[10px] text-[var(--theme-muted)]">
+              shadow-only
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {comboShadow.slice(0, 12).map((c, i) => (
+              <div
+                key={`${c.ts}:${i}`}
+                className="rounded-lg bg-[var(--theme-panel)] px-2 py-1.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--theme-text)]">
+                    {c.combo}
+                  </span>
+                  <span
+                    className={cn(
+                      'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                      c.applied
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
+                        : 'bg-[var(--theme-hover)] text-[var(--theme-muted)]',
+                    )}
+                  >
+                    {c.decision || (c.applied ? 'applied' : 'shadow')}
+                  </span>
+                  <span className="shrink-0 text-[10px] text-[var(--theme-muted)]">
+                    {compactDateTime(c.ts)}
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-[10px] text-[var(--theme-muted)]">
+                  {c.task || '?'} / {c.risk || '?'}
+                  {c.comboWouldSelect
+                    ? ` · would: ${c.comboWouldSelect.provider}/${c.comboWouldSelect.model}`
+                    : ''}
+                  {c.actual
+                    ? ` · actual: ${c.actual.provider}/${c.actual.model}`
+                    : ''}
+                </p>
+              </div>
+            ))}
+            {comboShadow.length === 0 && (
+              <p className="text-xs text-[var(--theme-muted)]">
+                No combo evaluations yet. A row lands here when a request matches
+                a combo&apos;s task/risk (see Route Combos below).
               </p>
             )}
           </div>
@@ -1019,6 +1233,15 @@ export function HarpConfigScreen() {
     retry: 1,
   })
 
+  const observability = useQuery({
+    queryKey: ['harp-observability'],
+    queryFn: fetchHarpObservability,
+    retry: 1,
+    // Read-only tail of log files + one PG SELECT; cheap to poll.
+    refetchInterval: () => 20_000,
+    refetchOnWindowFocus: true,
+  })
+
   const mutation = useMutation({
     mutationFn: patchHarpConfig,
     onSuccess: (updated) => {
@@ -1124,6 +1347,12 @@ export function HarpConfigScreen() {
       </div>
 
       <HarpHealthPanel health={data.health} />
+
+      <HarpObservabilityPanel
+        view={observability.data}
+        isLoading={observability.isLoading}
+        error={observability.error}
+      />
 
       {/* Global settings */}
       <SectionCard
