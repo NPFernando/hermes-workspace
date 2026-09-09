@@ -22,6 +22,7 @@ import {
   getAverageMonthlyExpensesLkr,
   getAverageMonthlySavingsRatePct,
   getCategoryCorrections,
+  getExchangeRate,
   getUnifiedTransactions,
   listPendingIngestions,
   maskSensitive,
@@ -1023,16 +1024,48 @@ export const Route = createFileRoute('/api/finance')({
             // configured"; an empty/missing targetDate clears the date only.
             const rawTargetLkr =
               typeof body.targetLkr === 'number' ? body.targetLkr : 0
-            const targetLkr = Math.max(0, Math.round(rawTargetLkr))
+            const enteredAmount = Math.max(0, Math.round(rawTargetLkr))
             const targetDate =
               typeof body.targetDate === 'string' && body.targetDate
                 ? body.targetDate
                 : undefined
+            // PF-201: the amount is entered in the configured reporting
+            // currency. Storage stays LKR-denominated, so convert base->LKR
+            // here. Resolve the rate exactly the way financeSummary.toBase
+            // does — LKR->base direct first, then the base->LKR inverse — and
+            // invert it, so a set -> reload round-trip is the identity.
+            const enteredCurrency =
+              typeof body.currency === 'string' && body.currency.trim()
+                ? body.currency.trim().toUpperCase()
+                : 'LKR'
+            let targetLkr = enteredAmount
+            if (enteredAmount > 0 && enteredCurrency !== 'LKR') {
+              const lkrToBase = getExchangeRate('LKR', enteredCurrency)
+              const baseToLkr = getExchangeRate(enteredCurrency, 'LKR')
+              if (lkrToBase !== undefined && lkrToBase !== 0) {
+                targetLkr = Math.round(enteredAmount / lkrToBase)
+              } else if (baseToLkr !== undefined) {
+                targetLkr = Math.round(enteredAmount * baseToLkr)
+              } else {
+                return json(
+                  {
+                    ok: false,
+                    error: `No exchange rate on file for ${enteredCurrency}. Add one under Accounts & Records first.`,
+                  },
+                  { status: 400 },
+                )
+              }
+            }
             const db = readFinanceStore()
             db.settings.wealthGoalTargetLkr = targetLkr
             db.settings.wealthGoalTargetDate = targetDate
             writeFinanceStore(db)
-            appendAuditLog('wealth_goal_updated', { targetLkr, targetDate })
+            appendAuditLog('wealth_goal_updated', {
+              targetLkr,
+              targetDate,
+              enteredCurrency,
+              enteredAmount,
+            })
             return json(personalFinancePayload())
           }
           if (action === 'ask_finance_question') {
