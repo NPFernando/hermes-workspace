@@ -212,7 +212,7 @@ export function BudgetPanel({
               <StatCard
                 key={`${row.month}-${row.category}`}
                 label={`${row.category} — ${Math.round(row.percentUsed)}% used`}
-                value={`${formatLkr(row.actual, payload.baseCurrency)} / ${formatLkr(row.budget, payload.baseCurrency)} · ${row.variance >= 0 ? 'Remaining' : 'Over by'} ${formatLkr(Math.abs(row.variance), payload.baseCurrency)}`}
+                value={`${formatLkr(row.actual, row.currency)} / ${formatLkr(row.budget, row.currency)} · ${row.variance >= 0 ? 'Remaining' : 'Over by'} ${formatLkr(Math.abs(row.variance), row.currency)}`}
                 tone={budgetTone(row.percentUsed)}
               />
             ))}
