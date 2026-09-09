@@ -403,8 +403,11 @@ describe('/api/finance fetch_news', () => {
     const store = await import('../../server/finance-store')
     vi.mocked(store.writeFinanceStore).mockClear()
     // getExchangeRate('LKR', 'USD') -> LKR->base rate; the handler inverts it.
-    vi.mocked(store.getExchangeRate).mockImplementation((from: string, to: string) =>
-      from === 'LKR' && to === 'USD' ? 0.0033 : undefined,
+    // Once — the handler makes exactly one getExchangeRate('LKR', ...) call
+    // before it resolves, and this must not leak into later tests in the file.
+    vi.mocked(store.getExchangeRate).mockImplementationOnce(
+      (from: string, to: string) =>
+        from === 'LKR' && to === 'USD' ? 0.0033 : undefined,
     )
 
     const response = await (
