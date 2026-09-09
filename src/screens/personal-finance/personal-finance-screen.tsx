@@ -11,6 +11,7 @@ import {
 } from 'recharts'
 import { StatCard } from '../finance/components/stat-card'
 import { DataTable } from '../finance/components/data-table'
+import { BaseCurrencySelect } from './components/base-currency-select'
 import { BudgetPanel } from './components/budget-panel'
 import { PendingIngestionPanel } from './components/pending-ingestion-panel'
 import { FinanceAlertsCard } from './components/finance-alerts-card'
@@ -134,6 +135,11 @@ export function PersonalFinanceScreen() {
 
   const payload = financeQuery.data
   const { summary } = payload
+  // PF-201: `summary.*Lkr` and `payload.budgetVsActual` are expressed in the
+  // configured reporting currency (default 'LKR'). Per-entity amounts (accounts,
+  // holdings, currency exposure) keep their own currency and are not routed here.
+  const base = summary.baseCurrency
+  const fmt = (value: number) => formatLkr(value, base)
 
   const netWorthBreakdown = [
     {
@@ -186,14 +192,14 @@ export function PersonalFinanceScreen() {
       </section>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Net worth" value={formatLkr(summary.netWorthLkr)} />
+        <StatCard label="Net worth" value={fmt(summary.netWorthLkr)} />
         <StatCard
           label="Cash balance"
-          value={formatLkr(summary.cashBalanceLkr)}
+          value={fmt(summary.cashBalanceLkr)}
         />
         <StatCard
           label="Net savings"
-          value={formatLkr(summary.netSavingsLkr)}
+          value={fmt(summary.netSavingsLkr)}
           tone={summary.netSavingsLkr >= 0 ? 'good' : 'danger'}
         />
         <StatCard
@@ -203,12 +209,12 @@ export function PersonalFinanceScreen() {
         />
         <StatCard
           label="Total income"
-          value={formatLkr(summary.totalIncomeLkr)}
+          value={fmt(summary.totalIncomeLkr)}
           tone="good"
         />
         <StatCard
           label="Total expenses"
-          value={formatLkr(summary.totalExpensesLkr)}
+          value={fmt(summary.totalExpensesLkr)}
           tone={
             summary.totalExpensesLkr > summary.totalIncomeLkr &&
             summary.totalIncomeLkr > 0
@@ -218,16 +224,16 @@ export function PersonalFinanceScreen() {
         />
         <StatCard
           label="Stock holdings"
-          value={formatLkr(summary.stockHoldingsValueLkr)}
+          value={fmt(summary.stockHoldingsValueLkr)}
         />
         <StatCard
           label="Unrealized P/L"
-          value={`${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatLkr(summary.unrealizedStockPnlLkr)} (${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatPct(summary.unrealizedStockPnlPct)})`}
+          value={`${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${fmt(summary.unrealizedStockPnlLkr)} (${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatPct(summary.unrealizedStockPnlPct)})`}
           tone={summary.unrealizedStockPnlLkr >= 0 ? 'good' : 'danger'}
         />
         <StatCard
           label="Fixed deposits"
-          value={formatLkr(summary.fixedDepositsValueLkr)}
+          value={fmt(summary.fixedDepositsValueLkr)}
         />
       </section>
 
@@ -273,7 +279,7 @@ export function PersonalFinanceScreen() {
                     borderRadius: 8,
                     fontSize: 11,
                   }}
-                  formatter={(value: number) => formatLkr(value)}
+                  formatter={(value: number) => fmt(value)}
                 />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                   {netWorthBreakdown.map((entry) => (
@@ -335,6 +341,7 @@ export function PersonalFinanceScreen() {
       {tab === 'overview' && (
         <>
           <FinanceAlertsCard payload={payload} />
+          <BaseCurrencySelect payload={payload} onPayload={setPayload} />
           <FinanceAnalystCard payload={payload} onPayload={setPayload} />
           <FinanceTrendsCard payload={payload} />
           <SavingsGoalsProgress payload={payload} onPayload={setPayload} />

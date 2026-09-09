@@ -1,6 +1,14 @@
 export type PersonalFinancePayload = {
   ok: boolean
+  /** PF-201: reporting currency every `*Lkr` figure in this payload is expressed
+   * in (default 'LKR'). Storage stays LKR-denominated. */
+  baseCurrency: string
+  /** PF-201: LKR->baseCurrency multiplier for components that sum raw
+   * LKR-denominated records client-side. 1 when base is 'LKR' or no rate exists. */
+  fxToBase: number
   summary: {
+    /** PF-201: reporting currency of the `*Lkr` figures below (default 'LKR'). */
+    baseCurrency: string
     netWorthLkr: number
     cashBalanceLkr: number
     netSavingsLkr: number

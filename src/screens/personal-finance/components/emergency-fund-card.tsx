@@ -88,7 +88,8 @@ export function EmergencyFundCard({
         />
       </div>
       <p className="mt-2 text-xs text-[var(--theme-muted)]">
-        {formatLkr(ef.currentLkr)} / {formatLkr(ef.targetLkr)} —{' '}
+        {formatLkr(ef.currentLkr, payload.baseCurrency)} /{' '}
+        {formatLkr(ef.targetLkr, payload.baseCurrency)} —{' '}
         {ef.coverageMonths.toFixed(1)} of {ef.targetMonths} months covered
       </p>
       {ef.avgMonthlyExpensesLkr === 0 && (

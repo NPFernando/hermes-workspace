@@ -4,12 +4,14 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { safeErrorMessage } from '../../server/rate-limit'
 import {
   FINANCE_AUDIT_PATH,
+  SUPPORTED_CURRENCIES,
   TRADING_MODES,
   addFinanceRecord,
   addPendingIngestion,
   appendAuditLog,
   budgetVsActualSummary,
   buildFinanceQueryContext,
+  convertCurrency,
   deleteFinanceRecord,
   ensureFinanceStore,
   financeAlerts,
@@ -395,9 +397,20 @@ function personalFinancePayload() {
   const db = ensureFinanceStore()
   const storage = financeStorageStatus()
   const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
+  const summary = financeSummary(db)
+  // PF-201: express LKR-denominated stored values (targets, budgets, averages)
+  // in the reporting currency so the whole payload is consistent with
+  // `summary`. Falls back to the LKR number when no rate is on file.
+  const base = summary.baseCurrency
+  const inBase = (lkr: number): number =>
+    base === 'LKR' ? lkr : (convertCurrency(lkr, 'LKR', base) ?? lkr)
+  // PF-201: LKR->base multiplier for client components that still sum raw
+  // LKR-denominated records locally (e.g. the trends chart). 1 when base is
+  // 'LKR' or no rate is on file.
+  const fxToBase = inBase(1)
   const efTargetMonths = db.settings.emergencyFundTargetMonths ?? 0
-  const efAvgMonthlyExpensesLkr = getAverageMonthlyExpensesLkr(db, 3)
-  const efCurrentLkr = financeSummary(db).cashBalanceLkr
+  const efAvgMonthlyExpensesLkr = inBase(getAverageMonthlyExpensesLkr(db, 3))
+  const efCurrentLkr = summary.cashBalanceLkr
   const efTargetLkr = efTargetMonths * efAvgMonthlyExpensesLkr
   const efCoverageMonths =
     efAvgMonthlyExpensesLkr > 0 ? efCurrentLkr / efAvgMonthlyExpensesLkr : 0
@@ -410,9 +423,9 @@ function personalFinancePayload() {
     srTargetPct > 0
       ? Math.min(100, Math.max(0, (srActualPct / srTargetPct) * 100))
       : 0
-  const wgTargetLkr = db.settings.wealthGoalTargetLkr ?? 0
+  const wgTargetLkr = inBase(db.settings.wealthGoalTargetLkr ?? 0)
   const wgTargetDate = db.settings.wealthGoalTargetDate ?? null
-  const wgCurrentLkr = financeSummary(db).netWorthLkr
+  const wgCurrentLkr = summary.netWorthLkr
   const wgProgressPct =
     wgTargetLkr > 0
       ? Math.min(100, Math.max(0, (wgCurrentLkr / wgTargetLkr) * 100))
@@ -421,8 +434,15 @@ function personalFinancePayload() {
     ok: true,
     checkedAt: Date.now(),
     storage,
-    summary: financeSummary(db),
-    budgetVsActual: budgetVsActualSummary(db),
+    baseCurrency: base,
+    fxToBase,
+    summary,
+    budgetVsActual: budgetVsActualSummary(db).map((b) => ({
+      ...b,
+      budget: inBase(b.budget),
+      actual: inBase(b.actual),
+      variance: inBase(b.variance),
+    })),
     transactions: maskSensitive(getUnifiedTransactions(db)),
     alerts,
     emergencyFund: {
@@ -929,6 +949,34 @@ export const Route = createFileRoute('/api/finance')({
             db.settings.savingsRateTargetPct = pct
             writeFinanceStore(db)
             appendAuditLog('savings_rate_target_updated', { pct })
+            return json(personalFinancePayload())
+          }
+          if (action === 'set_base_currency') {
+            // PF-201: the reporting currency every aggregate `*Lkr` figure in
+            // the personal-finance payload is expressed in. Storage stays
+            // LKR-denominated — this is display only. Accepts a known currency
+            // or any 3-letter ISO code (rate must then be on file, else the
+            // figure falls back to LKR and lands in `summary.fxUnconverted`).
+            const currency =
+              typeof body.currency === 'string'
+                ? body.currency.trim().toUpperCase()
+                : ''
+            const known = (SUPPORTED_CURRENCIES as ReadonlyArray<string>).includes(
+              currency,
+            )
+            if (!known && !/^[A-Z]{3}$/.test(currency)) {
+              return json(
+                {
+                  ok: false,
+                  error: 'currency must be a 3-letter currency code.',
+                },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            db.settings.baseCurrency = currency
+            writeFinanceStore(db)
+            appendAuditLog('base_currency_updated', { currency })
             return json(personalFinancePayload())
           }
           if (action === 'update_exchange_rate') {

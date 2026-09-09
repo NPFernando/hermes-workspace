@@ -98,6 +98,10 @@ vi.mock('../../server/finance-store', () => ({
   getUnifiedTransactions: vi.fn(() => []),
   maskSensitive: vi.fn((obj) => obj),
   readFinanceStore: vi.fn(() => state.mockFinanceDb()),
+  SUPPORTED_CURRENCIES: ['LKR', 'AUD', 'USD'],
+  convertCurrency: vi.fn((amount: number) => amount),
+  getAverageMonthlyExpensesLkr: vi.fn(() => 0),
+  getAverageMonthlySavingsRatePct: vi.fn(() => ({ actualPct: 0, hasData: false })),
   storeIntelligenceRecords: state.storeIntelligenceRecords,
   tradingPerformanceSummary: vi.fn(() => ({})),
   writeFinanceStore: vi.fn(),
@@ -346,6 +350,26 @@ describe('/api/finance fetch_news', () => {
     expect(response.status).toBe(401)
     expect(vi.mocked(store.readFinanceStore)).not.toHaveBeenCalled()
     expect(state.appendPaperDecisionSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('rejects set_base_currency with an invalid currency code (PF-201)', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.writeFinanceStore).mockClear()
+    vi.mocked(store.appendAuditLog).mockClear()
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'set_base_currency', currency: 'dollars' }),
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(vi.mocked(store.writeFinanceStore)).not.toHaveBeenCalled()
+    expect(vi.mocked(store.appendAuditLog)).not.toHaveBeenCalled()
   })
 
   it('derives and stores research-only intelligence from existing data', async () => {

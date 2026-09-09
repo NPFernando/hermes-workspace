@@ -1801,6 +1801,97 @@ describe('financeSummary FX conversion for non-LKR assets (PF-206)', () => {
   })
 })
 
+describe('financeSummary reporting currency (PF-201)', () => {
+  const seedIncomeExpense = () => {
+    const db = createEmptyFinanceDatabase()
+    db.income_records.push({
+      id: 'income-1',
+      dateReceived: '2026-06-28',
+      sourceName: 'Salary',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: 300_000,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 300_000,
+      taxable: true,
+      source: 'test',
+      createdAt: '2026-06-28T00:00:00.000Z',
+      updatedAt: '2026-06-28T00:00:00.000Z',
+    })
+    db.expense_records.push({
+      id: 'expense-1',
+      date: '2026-06-28',
+      vendor: 'Rent',
+      category: 'Housing',
+      currency: 'LKR',
+      amount: 100_000,
+      convertedLkrAmount: 100_000,
+      recurring: true,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-06-28T00:00:00.000Z',
+      updatedAt: '2026-06-28T00:00:00.000Z',
+    })
+    return db
+  }
+
+  it('defaults to LKR and leaves every figure unchanged', () => {
+    const db = seedIncomeExpense()
+    const s = financeSummary(db)
+    expect(s.baseCurrency).toBe('LKR')
+    expect(s.totalIncomeLkr).toBe(300_000)
+    expect(s.totalExpensesLkr).toBe(100_000)
+    expect(s.netSavingsLkr).toBe(200_000)
+    expect(s.fxUnconverted).toEqual([])
+  })
+
+  it('expresses aggregate figures in the base currency via a direct LKR->base rate', () => {
+    const db = seedIncomeExpense()
+    db.settings.baseCurrency = 'USD'
+    db.exchange_rates.push({
+      base: 'LKR',
+      target: 'USD',
+      rate: 1 / 300,
+      date: '2026-06-01',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    const s = financeSummary(db)
+    expect(s.baseCurrency).toBe('USD')
+    expect(s.totalIncomeLkr).toBeCloseTo(1_000)
+    expect(s.totalExpensesLkr).toBeCloseTo(1_000 / 3)
+    expect(s.netSavingsLkr).toBeCloseTo(2_000 / 3)
+    // percentages stay currency-free
+    expect(s.savingsRate).toBeCloseTo((200_000 / 300_000) * 100)
+    expect(s.fxUnconverted).toEqual([])
+  })
+
+  it('falls back to the inverse base->LKR rate when no LKR->base rate is on file', () => {
+    const db = seedIncomeExpense()
+    db.settings.baseCurrency = 'USD'
+    db.exchange_rates.push({
+      base: 'USD',
+      target: 'LKR',
+      rate: 300,
+      date: '2026-06-01',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    const s = financeSummary(db)
+    expect(s.totalIncomeLkr).toBeCloseTo(1_000)
+    expect(s.netSavingsLkr).toBeCloseTo(2_000 / 3)
+    expect(s.fxUnconverted).toEqual([])
+  })
+
+  it('counts figures raw and flags the base currency when no rate exists', () => {
+    const db = seedIncomeExpense()
+    db.settings.baseCurrency = 'USD'
+    const s = financeSummary(db)
+    expect(s.totalIncomeLkr).toBe(300_000)
+    expect(s.netSavingsLkr).toBe(200_000)
+    expect(s.fxUnconverted).toEqual(['USD'])
+  })
+})
+
 describe('financeSummary net worth with stock holdings and fixed deposits', () => {
   it('includes stock holdings at current price and active fixed deposit principal', () => {
     const db = createEmptyFinanceDatabase()

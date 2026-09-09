@@ -104,6 +104,10 @@ export function FinanceTrendsCard({
   payload: PersonalFinancePayload
 }) {
   const months = useMemo(() => lastNMonths(MONTHS_BACK), [])
+  // PF-201: buildTrendData/buildCategoryData sum raw LKR-denominated records.
+  // Scale to the reporting currency (fxToBase is 1 for 'LKR' or no rate).
+  const base = payload.baseCurrency
+  const fx = payload.fxToBase
 
   const trendData = useMemo(
     () =>
@@ -111,8 +115,13 @@ export function FinanceTrendsCard({
         months,
         payload.data.income_records,
         payload.data.expense_records,
-      ),
-    [payload, months],
+      ).map((d) => ({
+        ...d,
+        income: d.income * fx,
+        expense: d.expense * fx,
+        net: d.net * fx,
+      })),
+    [payload, months, fx],
   )
 
   const categoryData = useMemo(
@@ -120,8 +129,8 @@ export function FinanceTrendsCard({
       buildCategoryData(
         months[months.length - 1],
         payload.data.expense_records,
-      ),
-    [payload, months],
+      ).map((d) => ({ ...d, amount: d.amount * fx })),
+    [payload, months, fx],
   )
 
   const hasTrendData = trendData.some((d) => d.income > 0 || d.expense > 0)
@@ -134,13 +143,13 @@ export function FinanceTrendsCard({
           Income vs. expense
         </h2>
         <p className="text-xs text-[var(--theme-muted)]">
-          Last {MONTHS_BACK} months, LKR-converted totals.
+          Last {MONTHS_BACK} months, in {base}.
         </p>
         {hasTrendData && (
           <p className="text-xs text-[var(--theme-muted)]">
             This month&apos;s net:{' '}
             {trendData[trendData.length - 1].net >= 0 ? '+' : ''}
-            {formatLkr(trendData[trendData.length - 1].net)}
+            {formatLkr(trendData[trendData.length - 1].net, base)}
           </p>
         )}
         {hasTrendData ? (
@@ -188,7 +197,7 @@ export function FinanceTrendsCard({
                     fontSize: 11,
                   }}
                   formatter={(value: number, name: string) => [
-                    formatLkr(value),
+                    formatLkr(value, base),
                     name,
                   ]}
                 />
@@ -235,7 +244,7 @@ export function FinanceTrendsCard({
           Spending by category
         </h2>
         <p className="text-xs text-[var(--theme-muted)]">
-          This month, LKR-converted totals.
+          This month, in {base}.
         </p>
         {hasCategoryData ? (
           <div className="mt-3 h-[220px] w-full">
@@ -275,7 +284,7 @@ export function FinanceTrendsCard({
                     borderRadius: 8,
                     fontSize: 11,
                   }}
-                  formatter={(value: number) => formatLkr(value)}
+                  formatter={(value: number) => formatLkr(value, base)}
                 />
                 <Bar dataKey="amount" fill="var(--theme-accent)" radius={[0, 4, 4, 0]} />
               </BarChart>

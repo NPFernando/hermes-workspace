@@ -20,6 +20,8 @@ export function WealthGoalCard({
   const [draftTargetDate, setDraftTargetDate] = useState('')
   const [saving, setSaving] = useState(false)
   const wg = payload.wealthGoal
+  // PF-201: payload.wealthGoal figures are already in the reporting currency.
+  const c = payload.baseCurrency
 
   async function saveTarget() {
     const targetLkr = Number(draftTargetLkr)
@@ -96,7 +98,7 @@ export function WealthGoalCard({
       } else {
         const monthsUntil = Math.max(1, Math.ceil(daysUntil / 30))
         requiredLine = {
-          text: `Needs ${formatLkr(remaining / monthsUntil)}/mo to reach by ${wg.targetDate}`,
+          text: `Needs ${formatLkr(remaining / monthsUntil, c)}/mo to reach by ${wg.targetDate}`,
           tone: 'text-[var(--theme-muted)]',
         }
       }
@@ -118,7 +120,7 @@ export function WealthGoalCard({
         />
       </div>
       <p className="mt-2 text-xs text-[var(--theme-muted)]">
-        {formatLkr(wg.currentLkr)} / {formatLkr(wg.targetLkr)}
+        {formatLkr(wg.currentLkr, c)} / {formatLkr(wg.targetLkr, c)}
       </p>
       {requiredLine && (
         <p className={`mt-1 text-xs ${requiredLine.tone}`}>
