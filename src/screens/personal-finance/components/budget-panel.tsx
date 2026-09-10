@@ -28,7 +28,13 @@ export function BudgetPanel({
   const [budgetMonth, setBudgetMonth] = useState(currentMonth)
   const [budgetCategory, setBudgetCategory] = useState('')
   const [budgetAmount, setBudgetAmount] = useState('')
-  const [budgetCurrency, setBudgetCurrency] = useState('LKR')
+  // PF-201: a budget is a plan in the currency the user thinks in — default it
+  // to the configured reporting currency. It's stored in that currency;
+  // getBudgetVsActual converts it to LKR for the vs-actual comparison.
+  const [budgetCurrency, setBudgetCurrency] = useState(payload.baseCurrency)
+  const budgetCurrencyOptions = [
+    ...new Set([payload.baseCurrency, 'LKR', 'USD', 'AUD']),
+  ]
   const [expenseDate, setExpenseDate] = useState(
     new Date().toISOString().slice(0, 10),
   )
@@ -131,9 +137,11 @@ export function BudgetPanel({
               onChange={(e) => setBudgetCurrency(e.target.value)}
               className={inputClass}
             >
-              <option value="LKR">LKR</option>
-              <option value="USD">USD</option>
-              <option value="AUD">AUD</option>
+              {budgetCurrencyOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
             <button
               type="button"
