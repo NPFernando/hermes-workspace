@@ -1,5 +1,7 @@
 export type PersonalFinancePayload = {
   ok: boolean
+  /** Epoch ms the server built this payload — drives the "updated HH:MM" line. */
+  checkedAt: number
   /** PF-201: reporting currency every `*Lkr` figure in this payload is expressed
    * in (default 'LKR'). Storage stays LKR-denominated. */
   baseCurrency: string
@@ -62,7 +64,16 @@ export type PersonalFinancePayload = {
     contracts: Array<{ name: string; days: number }>
     fdMaturities: Array<{ name: string; days: number }>
   }
-  currencyExposure: Array<{ currency: string; amount: number }>
+  currencyExposure: Array<{
+    currency: string
+    amount: number
+    breakdown: Array<{
+      source: 'jobs' | 'holdings' | 'fixed_deposits'
+      label: string
+      amount: number
+      count: number
+    }>
+  }>
   /** PF review item 1: `data.income_records` / `data.expense_records` carry
    * only the trailing N months. Older rows: `list_transactions` + JSON export. */
   transactionsWindowMonths: number
