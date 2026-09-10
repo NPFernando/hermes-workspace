@@ -55,6 +55,7 @@ import {
 } from '../../server/harp-memory-client'
 import { syncGmailNow } from '../../server/gmail-ingest'
 import { fetchCsePrice } from '../../server/cse-market.service'
+import { fetchLkrExchangeRates } from '../../server/exchange-rate.service'
 import {
   addBinanceCandles,
   addMarketPrice,
@@ -983,6 +984,74 @@ export const Route = createFileRoute('/api/finance')({
             writeFinanceStore(db)
             appendAuditLog('base_currency_updated', { currency })
             return json(personalFinancePayload())
+          }
+          if (action === 'refresh_exchange_rates') {
+            // PF-201: pull today's LKR<->reporting-currency rates from the FX
+            // source so non-LKR base mode works without hand entry and the
+            // "Missing exchange rate" alert clears. Idempotent per day
+            // (updateExchangeRate upserts by base/target/date). Intended for a
+            // daily cron; the manual `update_exchange_rate` action stays.
+            const db = readFinanceStore()
+            const spreadPct =
+              typeof db.settings.exchangeRateSpreadPct === 'number' &&
+              Number.isFinite(db.settings.exchangeRateSpreadPct)
+                ? Math.max(0, db.settings.exchangeRateSpreadPct)
+                : 0
+            const configured = db.settings.reportingCurrencies as
+              | Array<string>
+              | undefined
+            const targets = (
+              configured && configured.length > 0
+                ? configured
+                : ['USD', 'AUD']
+            ).filter((c): c is string => typeof c === 'string' && c !== 'LKR')
+            const fetched = await fetchLkrExchangeRates(targets)
+            if (!fetched) {
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Exchange-rate source unavailable — no rates changed, try again later.',
+                  updated: [],
+                  failed: targets,
+                },
+                { status: 502 },
+              )
+            }
+            const date = new Date().toISOString().slice(0, 10)
+            const updated: Array<{ pair: string; lkrPerUnit: number }> = []
+            for (const [cur, midLkrPerUnit] of Object.entries(fetched.lkrPer)) {
+              // Spread = the markup on *buying* the foreign currency. The
+              // reverse leg is the exact reciprocal, so the set_wealth_goal /
+              // inBase display round-trip stays the identity.
+              const lkrPerUnit = midLkrPerUnit * (1 + spreadPct / 100)
+              updateExchangeRate(cur, 'LKR', lkrPerUnit, date)
+              updateExchangeRate('LKR', cur, 1 / lkrPerUnit, date)
+              updated.push({
+                pair: `${cur}/LKR`,
+                lkrPerUnit: Number(lkrPerUnit.toFixed(6)),
+              })
+            }
+            const failed = targets.filter(
+              (c) =>
+                !Object.prototype.hasOwnProperty.call(fetched.lkrPer, c),
+            )
+            appendAuditLog('exchange_rates_refreshed', {
+              source: fetched.source,
+              asOf: fetched.asOf,
+              spreadPct,
+              updated: updated.map((u) => u.pair),
+              failed,
+            })
+            return json({
+              ok: true,
+              source: fetched.source,
+              asOf: fetched.asOf,
+              date,
+              spreadPct,
+              updated,
+              failed,
+            })
           }
           if (action === 'update_exchange_rate') {
             // PF-206: store a currency->LKR (or any pair) rate so non-LKR

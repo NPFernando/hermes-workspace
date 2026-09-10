@@ -105,7 +105,11 @@ vi.mock('../../server/finance-store', () => ({
   getAverageMonthlySavingsRatePct: vi.fn(() => ({ actualPct: 0, hasData: false })),
   storeIntelligenceRecords: state.storeIntelligenceRecords,
   tradingPerformanceSummary: vi.fn(() => ({})),
+  updateExchangeRate: vi.fn(),
   writeFinanceStore: vi.fn(),
+}))
+vi.mock('../../server/exchange-rate.service', () => ({
+  fetchLkrExchangeRates: vi.fn(),
 }))
 vi.mock('../../server/binance-market.service', () => ({
   addBinanceCandles: vi.fn(),
@@ -429,6 +433,64 @@ describe('/api/finance fetch_news', () => {
     const savedDb = writes[0][0] as { settings: { wealthGoalTargetLkr: number } }
     // 1000 USD / 0.0033 ~= 303030 LKR — stored, not the entered 1000.
     expect(savedDb.settings.wealthGoalTargetLkr).toBe(Math.round(1000 / 0.0033))
+  })
+
+  it('refresh_exchange_rates writes both legs per currency, reverse = reciprocal (PF-201)', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const svc = await import('../../server/exchange-rate.service')
+    vi.mocked(store.updateExchangeRate).mockClear()
+    vi.mocked(svc.fetchLkrExchangeRates).mockResolvedValue({
+      lkrPer: { USD: 300, AUD: 200 },
+      asOf: '2026-09-10T00:02:31.000Z',
+      source: 'open.er-api.com',
+    })
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'refresh_exchange_rates' }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as {
+      ok: boolean
+      source: string
+      updated: Array<{ pair: string }>
+    }
+    expect(body.ok).toBe(true)
+    expect(body.source).toBe('open.er-api.com')
+    expect(body.updated.map((u) => u.pair).sort()).toEqual(['AUD/LKR', 'USD/LKR'])
+
+    const calls = vi.mocked(store.updateExchangeRate).mock.calls
+    // USD: <cur>->LKR at 300, LKR-><cur> at 1/300
+    expect(calls).toContainEqual(['USD', 'LKR', 300, '2026-09-10'])
+    const usdBack = calls.find((c) => c[0] === 'LKR' && c[1] === 'USD')
+    expect(usdBack?.[2]).toBeCloseTo(1 / 300)
+    expect(calls).toContainEqual(['AUD', 'LKR', 200, '2026-09-10'])
+  })
+
+  it('refresh_exchange_rates returns 502 and writes nothing when the source is down', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const svc = await import('../../server/exchange-rate.service')
+    vi.mocked(store.updateExchangeRate).mockClear()
+    vi.mocked(svc.fetchLkrExchangeRates).mockResolvedValue(null)
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'refresh_exchange_rates' }),
+      }),
+    })
+
+    expect(response.status).toBe(502)
+    expect(vi.mocked(store.updateExchangeRate)).not.toHaveBeenCalled()
   })
 
   it('derives and stores research-only intelligence from existing data', async () => {

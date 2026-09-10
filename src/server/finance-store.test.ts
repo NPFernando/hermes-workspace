@@ -420,6 +420,26 @@ describe('budget-vs-actual normalises a non-LKR budget to LKR (PF-201)', () => {
   })
 })
 
+describe('updateExchangeRate upsert by (base, target, date) (PF-201)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('replaces the same-day row in place instead of piling up duplicates', async () => {
+    const store = await freshFinanceStore()
+    store.updateExchangeRate('USD', 'LKR', 300, '2026-09-10')
+    store.updateExchangeRate('USD', 'LKR', 328.4, '2026-09-10') // refresh, same day
+    store.updateExchangeRate('USD', 'LKR', 331, '2026-09-11') // next day
+
+    const rows = store
+      .readFinanceStore()
+      .exchange_rates.filter((r) => r.base === 'USD' && r.target === 'LKR')
+    expect(rows).toHaveLength(2)
+    expect(store.getExchangeRate('USD', 'LKR', '2026-09-10')).toBe(328.4)
+    expect(store.getExchangeRate('USD', 'LKR')).toBe(331)
+  })
+})
+
 // Same isolation pattern as trading-summary.test.ts / rebalance-engine.test.ts —
 // point HOME at a temp dir so these never touch the real ~/.hermes/finance store.
 describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {

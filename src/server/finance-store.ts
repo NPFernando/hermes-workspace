@@ -698,6 +698,12 @@ export type FinanceSettings = {
    * Defaults to 'LKR'. */
   baseCurrency: CurrencyCode
   reportingCurrencies: Array<CurrencyCode>
+  /** PF-201: percentage markup applied by `refresh_exchange_rates` on top of
+   * the fetched mid-market rate, to approximate the user's actual bank
+   * transfer rate (the cost of *buying* the foreign currency). The reverse
+   * leg is written as the exact reciprocal so display round-trips stay
+   * stable. Defaults to 0 (pure mid-market). */
+  exchangeRateSpreadPct?: number
   tradingMode: TradingMode
   liveTradingEnabled: boolean
   emergencyKillSwitch: boolean
@@ -3096,7 +3102,15 @@ export function updateExchangeRate(
     updatedAt: new Date().toISOString(),
   }
 
-  db.exchange_rates.push(rateRecord)
+  // Upsert by (base, target, date): getExchangeRate/latestRateFromDb both pick
+  // "latest by date", so a same-day duplicate makes the winner arbitrary. A
+  // daily refresh cron (or a manual re-entry) replaces the day's row in place
+  // rather than piling up.
+  const idx = db.exchange_rates.findIndex(
+    (r) => r.base === base && r.target === target && r.date === dateStr,
+  )
+  if (idx >= 0) db.exchange_rates[idx] = rateRecord
+  else db.exchange_rates.push(rateRecord)
   writeFinanceStore(db)
   appendAuditLog('exchange_rate_updated', { base, target, rate, date: dateStr })
   return db
