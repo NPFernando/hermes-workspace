@@ -1631,14 +1631,19 @@ export function addFinanceRecord(
     })
   } else if (kind === 'transfer') {
     const amount = numberField(payload, 'amount', 0)
+    const currency = stringField(payload, 'currency', 'LKR')
     db.transfers.push({
       ...base,
       date: stringField(payload, 'date', createdAt.slice(0, 10)),
       fromAccountId: optionalString(payload, 'fromAccountId'),
       toAccountId: optionalString(payload, 'toAccountId'),
       amount,
-      currency: stringField(payload, 'currency', 'LKR'),
-      convertedLkrAmount: numberField(payload, 'convertedLkrAmount', amount),
+      currency,
+      // Convert-on-write: derive the LKR figure from the FX table rather
+      // than trust the client, which posts the raw amount as
+      // `convertedLkrAmount`. Same shape as `set_wealth_goal`. Falls back
+      // to the raw amount when no rate is on file (matches financeSummary).
+      convertedLkrAmount: amountToLkr(db, amount, currency),
       notes: optionalString(payload, 'notes'),
     })
   } else if (kind === 'trading_plan') {
@@ -1822,9 +1827,12 @@ export function updateFinanceRecord(
   } else if (kind === 'transfer') {
     const index = db.transfers.findIndex((r) => r.id === id)
     if (index !== -1) {
+      const merged = { ...db.transfers[index], ...payload }
       db.transfers[index] = {
-        ...db.transfers[index],
-        ...payload,
+        ...merged,
+        // `convertedLkrAmount` is derived, never trusted from the client —
+        // recompute from the merged amount/currency on every update.
+        convertedLkrAmount: amountToLkr(db, merged.amount, merged.currency),
         updatedAt: nowIso(),
       }
       updated = true

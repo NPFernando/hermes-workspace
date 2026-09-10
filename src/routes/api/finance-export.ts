@@ -17,6 +17,7 @@ import {
   getUnifiedTransactions,
   readFinanceStore,
 } from '../../server/finance-store'
+import { formatMoney } from '../../screens/personal-finance/utils'
 import type { FinanceDatabase, UnifiedTransaction } from '../../server/finance-store'
 
 function accountNameLookup(db: FinanceDatabase): (id?: string) => string {
@@ -90,8 +91,7 @@ function escapeHtml(value: unknown): string {
 export function reportHtml(db: FinanceDatabase): string {
   const s = financeSummary(db)
   const cur = db.settings.baseCurrency || 'LKR'
-  const money = (n: number) =>
-    `${cur} ${Math.round(n).toLocaleString('en-LK')}`
+  const money = (n: number) => formatMoney(n, cur)
   const generatedAt = new Date().toLocaleString()
   const accountName = accountNameLookup(db)
   const txns = getUnifiedTransactions(db).slice(0, 250)
@@ -109,9 +109,7 @@ export function reportHtml(db: FinanceDatabase): string {
         <td>${escapeHtml(
           accountName(t.kind === 'transfer' ? t.fromAccountId : t.accountId),
         )}</td>
-        <td class="num">${escapeHtml(t.currency)} ${escapeHtml(
-          Math.round(t.amount).toLocaleString('en-LK'),
-        )}</td>
+        <td class="num">${escapeHtml(formatMoney(t.amount, t.currency))}</td>
       </tr>`,
     )
     .join('')
