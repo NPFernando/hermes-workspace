@@ -385,7 +385,7 @@ export type Property = {
   currency: CurrencyCode
   purchaseDate: string
   notes?: string
-  /** Informational only (PF-1004 precedent) — does not affect debtLkr/propertyValueLkr/netWorthLkr, each already counted once independently. */
+  /** Informational only (PF-1004 precedent) — does not affect debtBase/propertyValueBase/netWorthBase, each already counted once independently. */
   linkedLoanId?: string
   source: string
   createdAt: string
@@ -2335,16 +2335,16 @@ export function financeSummary(db: FinanceDatabase) {
     return lkr
   }
 
-  const totalIncomeLkr = db.income_records
+  const totalIncomeBase = db.income_records
     .filter(includeInTotals)
     .reduce((sum, row) => sum + row.convertedLkrAmount, 0)
-  const totalExpensesLkr = db.expense_records
+  const totalExpensesBase = db.expense_records
     .filter(includeInTotals)
     .reduce((sum, row) => sum + row.convertedLkrAmount, 0)
-  const netSavingsLkr = totalIncomeLkr - totalExpensesLkr
+  const netSavingsBase = totalIncomeBase - totalExpensesBase
   const savingsRate =
-    totalIncomeLkr > 0 ? (netSavingsLkr / totalIncomeLkr) * 100 : 0
-  const cashBalanceLkr = db.finance_accounts.reduce(
+    totalIncomeBase > 0 ? (netSavingsBase / totalIncomeBase) * 100 : 0
+  const cashBalanceBase = db.finance_accounts.reduce(
     (sum, row) => sum + toLkr(row.balance, row.currency),
     0,
   )
@@ -2353,14 +2353,14 @@ export function financeSummary(db: FinanceDatabase) {
   // effect only — a missing rate then lands in `fxUnconverted`, raising the
   // "Missing exchange rate" alert the same way an un-priced holding does.
   for (const b of db.budget_categories) toLkr(b.budgetAmount, b.currency)
-  const taxReserveLkr = db.savings_goals
+  const taxReserveBase = db.savings_goals
     .filter((goal) => goal.name.toLowerCase().includes('tax'))
     .reduce((sum, goal) => sum + goal.currentAmount, 0)
   // 'loan'-type accounts no longer contribute here — Phase 40 gives loans a
   // dedicated entity (principal/rate/term, remaining balance tracked
   // separately from the original amount); 'card' stays account-based since
   // credit cards have no term/rate model.
-  const debtLkr =
+  const debtBase =
     db.finance_accounts
       .filter((account) => account.type === 'card')
       .reduce((sum, row) => sum + Math.abs(row.balance), 0) +
@@ -2372,7 +2372,7 @@ export function financeSummary(db: FinanceDatabase) {
   // `exchange_rates`. Never blocked on a live CSE price fetch succeeding —
   // falls back to the buy price when no cached/manual current price is
   // available yet.
-  const stockHoldingsValueLkr = db.stock_holdings.reduce(
+  const stockHoldingsValueBase = db.stock_holdings.reduce(
     (sum, holding) =>
       sum +
       toLkr(
@@ -2381,14 +2381,14 @@ export function financeSummary(db: FinanceDatabase) {
       ),
     0,
   )
-  const fixedDepositsValueLkr = db.fixed_deposits
+  const fixedDepositsValueBase = db.fixed_deposits
     .filter((fd) => fd.status !== 'withdrawn')
     .reduce((sum, fd) => sum + toLkr(fd.principal, fd.currency), 0)
-  const propertyValueLkr = db.properties.reduce(
+  const propertyValueBase = db.properties.reduce(
     (sum, p) => sum + toLkr(p.currentValue, p.currency),
     0,
   )
-  const unrealizedStockPnlLkr = db.stock_holdings.reduce(
+  const unrealizedStockPnlBase = db.stock_holdings.reduce(
     (sum, holding) =>
       sum +
       toLkr(
@@ -2405,15 +2405,15 @@ export function financeSummary(db: FinanceDatabase) {
   )
   const unrealizedStockPnlPct =
     totalStockCostBasisLkr > 0
-      ? (unrealizedStockPnlLkr / totalStockCostBasisLkr) * 100
+      ? (unrealizedStockPnlBase / totalStockCostBasisLkr) * 100
       : 0
-  const netWorthLkr =
-    cashBalanceLkr +
+  const netWorthBase =
+    cashBalanceBase +
     db.savings_goals.reduce((sum, goal) => sum + goal.currentAmount, 0) +
-    stockHoldingsValueLkr +
-    fixedDepositsValueLkr +
-    propertyValueLkr -
-    debtLkr
+    stockHoldingsValueBase +
+    fixedDepositsValueBase +
+    propertyValueBase -
+    debtBase
   const openPlans = db.trading_plans.filter(
     (plan) =>
       !['cancelled', 'expired', 'failed', 'blocked'].includes(plan.status),
@@ -2426,18 +2426,18 @@ export function financeSummary(db: FinanceDatabase) {
     // 'LKR', in which case `toBase` is the identity). Percentages
     // (savingsRate, unrealizedStockPnlPct) are currency-free — not converted.
     baseCurrency: base,
-    totalIncomeLkr: toBase(totalIncomeLkr),
-    totalExpensesLkr: toBase(totalExpensesLkr),
-    netSavingsLkr: toBase(netSavingsLkr),
+    totalIncomeBase: toBase(totalIncomeBase),
+    totalExpensesBase: toBase(totalExpensesBase),
+    netSavingsBase: toBase(netSavingsBase),
     savingsRate,
-    cashBalanceLkr: toBase(cashBalanceLkr),
-    taxReserveLkr: toBase(taxReserveLkr),
-    debtLkr: toBase(debtLkr),
-    netWorthLkr: toBase(netWorthLkr),
-    stockHoldingsValueLkr: toBase(stockHoldingsValueLkr),
-    fixedDepositsValueLkr: toBase(fixedDepositsValueLkr),
-    propertyValueLkr: toBase(propertyValueLkr),
-    unrealizedStockPnlLkr: toBase(unrealizedStockPnlLkr),
+    cashBalanceBase: toBase(cashBalanceBase),
+    taxReserveBase: toBase(taxReserveBase),
+    debtBase: toBase(debtBase),
+    netWorthBase: toBase(netWorthBase),
+    stockHoldingsValueBase: toBase(stockHoldingsValueBase),
+    fixedDepositsValueBase: toBase(fixedDepositsValueBase),
+    propertyValueBase: toBase(propertyValueBase),
+    unrealizedStockPnlBase: toBase(unrealizedStockPnlBase),
     unrealizedStockPnlPct,
     /** Currencies (an asset's own, or `baseCurrency` itself) with no exchange
      * rate on file — the affected amounts are still counted, unconverted. */
@@ -2471,8 +2471,8 @@ export function financeAlerts(db: FinanceDatabase): Array<{
     detail: string
   }> = []
   if (
-    summary.totalExpensesLkr > summary.totalIncomeLkr &&
-    summary.totalIncomeLkr > 0
+    summary.totalExpensesBase > summary.totalIncomeBase &&
+    summary.totalIncomeBase > 0
   ) {
     alerts.push({
       level: 'warning',

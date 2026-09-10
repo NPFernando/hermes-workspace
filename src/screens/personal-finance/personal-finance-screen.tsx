@@ -99,22 +99,22 @@ export function PersonalFinanceScreen() {
   const netWorthBreakdown = [
     {
       name: 'Cash',
-      value: Math.max(0, summary.cashBalanceLkr),
+      value: Math.max(0, summary.cashBalanceBase),
       fill: 'var(--theme-accent)',
     },
     {
       name: 'Stocks',
-      value: Math.max(0, summary.stockHoldingsValueLkr),
+      value: Math.max(0, summary.stockHoldingsValueBase),
       fill: 'var(--theme-accent-secondary)',
     },
     {
       name: 'Fixed deposits',
-      value: Math.max(0, summary.fixedDepositsValueLkr),
+      value: Math.max(0, summary.fixedDepositsValueBase),
       fill: 'var(--theme-success)',
     },
     {
       name: 'Debt',
-      value: Math.max(0, summary.debtLkr),
+      value: Math.max(0, summary.debtBase),
       fill: 'var(--theme-danger)',
     },
   ].filter((entry) => entry.value > 0)
@@ -147,15 +147,15 @@ export function PersonalFinanceScreen() {
       </section>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Net worth" value={fmt(summary.netWorthLkr)} />
+        <StatCard label="Net worth" value={fmt(summary.netWorthBase)} />
         <StatCard
           label="Cash balance"
-          value={fmt(summary.cashBalanceLkr)}
+          value={fmt(summary.cashBalanceBase)}
         />
         <StatCard
           label="Net savings"
-          value={fmt(summary.netSavingsLkr)}
-          tone={summary.netSavingsLkr >= 0 ? 'good' : 'danger'}
+          value={fmt(summary.netSavingsBase)}
+          tone={summary.netSavingsBase >= 0 ? 'good' : 'danger'}
         />
         <StatCard
           label="Savings rate"
@@ -164,31 +164,31 @@ export function PersonalFinanceScreen() {
         />
         <StatCard
           label="Total income"
-          value={fmt(summary.totalIncomeLkr)}
+          value={fmt(summary.totalIncomeBase)}
           tone="good"
         />
         <StatCard
           label="Total expenses"
-          value={fmt(summary.totalExpensesLkr)}
+          value={fmt(summary.totalExpensesBase)}
           tone={
-            summary.totalExpensesLkr > summary.totalIncomeLkr &&
-            summary.totalIncomeLkr > 0
+            summary.totalExpensesBase > summary.totalIncomeBase &&
+            summary.totalIncomeBase > 0
               ? 'danger'
               : 'neutral'
           }
         />
         <StatCard
           label="Stock holdings"
-          value={fmt(summary.stockHoldingsValueLkr)}
+          value={fmt(summary.stockHoldingsValueBase)}
         />
         <StatCard
           label="Unrealized P/L"
-          value={`${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${fmt(summary.unrealizedStockPnlLkr)} (${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatPct(summary.unrealizedStockPnlPct)})`}
-          tone={summary.unrealizedStockPnlLkr >= 0 ? 'good' : 'danger'}
+          value={`${summary.unrealizedStockPnlBase >= 0 ? '+' : ''}${fmt(summary.unrealizedStockPnlBase)} (${summary.unrealizedStockPnlBase >= 0 ? '+' : ''}${formatPct(summary.unrealizedStockPnlPct)})`}
+          tone={summary.unrealizedStockPnlBase >= 0 ? 'good' : 'danger'}
         />
         <StatCard
           label="Fixed deposits"
-          value={fmt(summary.fixedDepositsValueLkr)}
+          value={fmt(summary.fixedDepositsValueBase)}
         />
       </section>
 

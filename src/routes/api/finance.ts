@@ -432,7 +432,7 @@ function personalFinancePayload() {
   const fxToBase = inBase(1)
   const efTargetMonths = db.settings.emergencyFundTargetMonths ?? 0
   const efAvgMonthlyExpensesLkr = inBase(getAverageMonthlyExpensesLkr(db, 3))
-  const efCurrentLkr = summary.cashBalanceLkr
+  const efCurrentLkr = summary.cashBalanceBase
   const efTargetLkr = efTargetMonths * efAvgMonthlyExpensesLkr
   const efCoverageMonths =
     efAvgMonthlyExpensesLkr > 0 ? efCurrentLkr / efAvgMonthlyExpensesLkr : 0
@@ -447,7 +447,7 @@ function personalFinancePayload() {
       : 0
   const wgTargetLkr = inBase(db.settings.wealthGoalTargetLkr ?? 0)
   const wgTargetDate = db.settings.wealthGoalTargetDate ?? null
-  const wgCurrentLkr = summary.netWorthLkr
+  const wgCurrentLkr = summary.netWorthBase
   const wgProgressPct =
     wgTargetLkr > 0
       ? Math.min(100, Math.max(0, (wgCurrentLkr / wgTargetLkr) * 100))
@@ -486,9 +486,9 @@ function personalFinancePayload() {
     alerts,
     emergencyFund: {
       targetMonths: efTargetMonths,
-      avgMonthlyExpensesLkr: efAvgMonthlyExpensesLkr,
-      currentLkr: efCurrentLkr,
-      targetLkr: efTargetLkr,
+      avgMonthlyExpensesBase: efAvgMonthlyExpensesLkr,
+      currentBase: efCurrentLkr,
+      targetBase: efTargetLkr,
       coverageMonths: efCoverageMonths,
       progressPct: efProgressPct,
     },
@@ -499,9 +499,9 @@ function personalFinancePayload() {
       hasData: srHasData,
     },
     wealthGoal: {
-      targetLkr: wgTargetLkr,
+      targetBase: wgTargetLkr,
       targetDate: wgTargetDate,
-      currentLkr: wgCurrentLkr,
+      currentBase: wgCurrentLkr,
       progressPct: wgProgressPct,
     },
     financeQaHistory: db.settings.financeQaHistory ?? [],

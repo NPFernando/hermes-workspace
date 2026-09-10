@@ -69,9 +69,9 @@ describe('finance-store', () => {
     })
 
     expect(financeSummary(db)).toMatchObject({
-      totalIncomeLkr: 100_000,
-      totalExpensesLkr: 3_000,
-      netSavingsLkr: 97_000,
+      totalIncomeBase: 100_000,
+      totalExpensesBase: 3_000,
+      netSavingsBase: 97_000,
       savingsRate: 97,
     })
   })
@@ -1456,10 +1456,10 @@ describe('reconciliation status gates aggregate money figures (PF-113)', () => {
   it('financeSummary excludes pending rows but keeps cleared/reconciled/missing', () => {
     const s = financeSummary(seed())
     // 100k + 10k (no-status ⇒ cleared); 50k pending dropped
-    expect(s.totalIncomeLkr).toBe(110_000)
+    expect(s.totalIncomeBase).toBe(110_000)
     // 30k + 5k; 20k pending dropped
-    expect(s.totalExpensesLkr).toBe(35_000)
-    expect(s.netSavingsLkr).toBe(75_000)
+    expect(s.totalExpensesBase).toBe(35_000)
+    expect(s.netSavingsBase).toBe(75_000)
   })
 
   it('getMonthlySummary excludes pending rows', () => {
@@ -1836,7 +1836,7 @@ describe('buildFinanceQueryContext (Phase 24 Hermes Finance Analyst)', () => {
     // financeSummary(db) here would be in USD (~1000); the context pins LKR.
     expect(context.currency).toBe('LKR')
     expect(context.summary.baseCurrency).toBe('LKR')
-    expect(context.summary.totalIncomeLkr).toBe(300_000)
+    expect(context.summary.totalIncomeBase).toBe(300_000)
   })
 
   function pushExecutedTrade(
@@ -1913,8 +1913,8 @@ describe('financeSummary FX conversion for non-LKR assets (PF-206)', () => {
     db.stock_holdings.push({ ...usdHolding })
 
     const s = financeSummary(db)
-    expect(s.stockHoldingsValueLkr).toBe(2 * 150 * 300) // 90,000 LKR
-    expect(s.unrealizedStockPnlLkr).toBe(2 * (150 - 100) * 300) // 30,000 LKR
+    expect(s.stockHoldingsValueBase).toBe(2 * 150 * 300) // 90,000 LKR
+    expect(s.unrealizedStockPnlBase).toBe(2 * (150 - 100) * 300) // 30,000 LKR
     expect(s.fxUnconverted).toEqual([])
   })
 
@@ -1937,8 +1937,8 @@ describe('financeSummary FX conversion for non-LKR assets (PF-206)', () => {
     })
 
     const s = financeSummary(db)
-    expect(s.stockHoldingsValueLkr).toBe(2 * 150) // raw, unconverted
-    expect(s.fixedDepositsValueLkr).toBe(1_000)
+    expect(s.stockHoldingsValueBase).toBe(2 * 150) // raw, unconverted
+    expect(s.fixedDepositsValueBase).toBe(1_000)
     expect(s.fxUnconverted).toEqual(['EUR', 'USD'])
 
     const alerts = financeAlerts(db)
@@ -1991,9 +1991,9 @@ describe('financeSummary reporting currency (PF-201)', () => {
     const db = seedIncomeExpense()
     const s = financeSummary(db)
     expect(s.baseCurrency).toBe('LKR')
-    expect(s.totalIncomeLkr).toBe(300_000)
-    expect(s.totalExpensesLkr).toBe(100_000)
-    expect(s.netSavingsLkr).toBe(200_000)
+    expect(s.totalIncomeBase).toBe(300_000)
+    expect(s.totalExpensesBase).toBe(100_000)
+    expect(s.netSavingsBase).toBe(200_000)
     expect(s.fxUnconverted).toEqual([])
   })
 
@@ -2009,9 +2009,9 @@ describe('financeSummary reporting currency (PF-201)', () => {
     })
     const s = financeSummary(db)
     expect(s.baseCurrency).toBe('USD')
-    expect(s.totalIncomeLkr).toBeCloseTo(1_000)
-    expect(s.totalExpensesLkr).toBeCloseTo(1_000 / 3)
-    expect(s.netSavingsLkr).toBeCloseTo(2_000 / 3)
+    expect(s.totalIncomeBase).toBeCloseTo(1_000)
+    expect(s.totalExpensesBase).toBeCloseTo(1_000 / 3)
+    expect(s.netSavingsBase).toBeCloseTo(2_000 / 3)
     // percentages stay currency-free
     expect(s.savingsRate).toBeCloseTo((200_000 / 300_000) * 100)
     expect(s.fxUnconverted).toEqual([])
@@ -2028,8 +2028,8 @@ describe('financeSummary reporting currency (PF-201)', () => {
       updatedAt: '2026-06-01T00:00:00.000Z',
     })
     const s = financeSummary(db)
-    expect(s.totalIncomeLkr).toBeCloseTo(1_000)
-    expect(s.netSavingsLkr).toBeCloseTo(2_000 / 3)
+    expect(s.totalIncomeBase).toBeCloseTo(1_000)
+    expect(s.netSavingsBase).toBeCloseTo(2_000 / 3)
     expect(s.fxUnconverted).toEqual([])
   })
 
@@ -2037,8 +2037,8 @@ describe('financeSummary reporting currency (PF-201)', () => {
     const db = seedIncomeExpense()
     db.settings.baseCurrency = 'USD'
     const s = financeSummary(db)
-    expect(s.totalIncomeLkr).toBe(300_000)
-    expect(s.netSavingsLkr).toBe(200_000)
+    expect(s.totalIncomeBase).toBe(300_000)
+    expect(s.netSavingsBase).toBe(200_000)
     expect(s.fxUnconverted).toEqual(['USD'])
   })
 })
@@ -2090,12 +2090,12 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     })
 
     const summary = financeSummary(db)
-    expect(summary.stockHoldingsValueLkr).toBe(1200) // 10 * 120 (current price, not buy price)
-    expect(summary.fixedDepositsValueLkr).toBe(50_000) // withdrawn FD excluded
-    expect(summary.netWorthLkr).toBe(1200 + 50_000)
+    expect(summary.stockHoldingsValueBase).toBe(1200) // 10 * 120 (current price, not buy price)
+    expect(summary.fixedDepositsValueBase).toBe(50_000) // withdrawn FD excluded
+    expect(summary.netWorthBase).toBe(1200 + 50_000)
   })
 
-  it('debtLkr (Phase 40) sums active loan currentBalance and card account balances, excluding loan-type accounts and paid-off loans', () => {
+  it('debtBase (Phase 40) sums active loan currentBalance and card account balances, excluding loan-type accounts and paid-off loans', () => {
     const db = createEmptyFinanceDatabase()
     db.finance_accounts.push({
       id: 'a1',
@@ -2146,10 +2146,10 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
 
     const summary = financeSummary(db)
     // 15_000 (card) + 60_000 (active loan) — the 999_999 loan-type account and the paid-off loan are excluded
-    expect(summary.debtLkr).toBe(75_000)
+    expect(summary.debtBase).toBe(75_000)
   })
 
-  it('propertyValueLkr (Phase 40) sums current property values and adds to netWorthLkr', () => {
+  it('propertyValueBase (Phase 40) sums current property values and adds to netWorthBase', () => {
     const db = createEmptyFinanceDatabase()
     db.properties.push({
       id: 'p1',
@@ -2177,8 +2177,8 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     })
 
     const summary = financeSummary(db)
-    expect(summary.propertyValueLkr).toBe(6_700_000)
-    expect(summary.netWorthLkr).toBe(6_700_000)
+    expect(summary.propertyValueBase).toBe(6_700_000)
+    expect(summary.netWorthBase).toBe(6_700_000)
   })
 
   it('falls back to buy price when a stock holding has no cached current price yet', () => {
@@ -2197,10 +2197,10 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
     const summary = financeSummary(db)
-    expect(summary.stockHoldingsValueLkr).toBe(1000) // 5 * 200 (buy price fallback)
+    expect(summary.stockHoldingsValueBase).toBe(1000) // 5 * 200 (buy price fallback)
   })
 
-  it('computes unrealizedStockPnlLkr as (current - buy) * quantity, summed across holdings', () => {
+  it('computes unrealizedStockPnlBase as (current - buy) * quantity, summed across holdings', () => {
     const db = createEmptyFinanceDatabase()
     db.stock_holdings.push({
       id: 's1',
@@ -2232,12 +2232,12 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     })
     const summary = financeSummary(db)
     // (120-100)*10 + (250-300)*5 = 200 - 250 = -50
-    expect(summary.unrealizedStockPnlLkr).toBe(-50)
+    expect(summary.unrealizedStockPnlBase).toBe(-50)
     // cost basis = 10*100 + 5*300 = 2500; pct = -50/2500*100 = -2
     expect(summary.unrealizedStockPnlPct).toBe(-2)
   })
 
-  it('unrealizedStockPnlLkr is 0 when there is no cached current price (falls back to buy price)', () => {
+  it('unrealizedStockPnlBase is 0 when there is no cached current price (falls back to buy price)', () => {
     const db = createEmptyFinanceDatabase()
     db.stock_holdings.push({
       id: 's1',
@@ -2253,7 +2253,7 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
     const summary = financeSummary(db)
-    expect(summary.unrealizedStockPnlLkr).toBe(0)
+    expect(summary.unrealizedStockPnlBase).toBe(0)
     expect(summary.unrealizedStockPnlPct).toBe(0)
   })
 

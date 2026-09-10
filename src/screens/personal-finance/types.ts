@@ -9,17 +9,17 @@ export type PersonalFinancePayload = {
   summary: {
     /** PF-201: reporting currency of the `*Lkr` figures below (default 'LKR'). */
     baseCurrency: string
-    netWorthLkr: number
-    cashBalanceLkr: number
-    netSavingsLkr: number
+    netWorthBase: number
+    cashBalanceBase: number
+    netSavingsBase: number
     savingsRate: number
-    totalIncomeLkr: number
-    totalExpensesLkr: number
-    taxReserveLkr: number
-    stockHoldingsValueLkr: number
-    fixedDepositsValueLkr: number
-    debtLkr: number
-    unrealizedStockPnlLkr: number
+    totalIncomeBase: number
+    totalExpensesBase: number
+    taxReserveBase: number
+    stockHoldingsValueBase: number
+    fixedDepositsValueBase: number
+    debtBase: number
+    unrealizedStockPnlBase: number
     unrealizedStockPnlPct: number
     accountCount: number
     /** PF-206: asset currencies with no exchange rate on file — counted raw. */
@@ -68,9 +68,9 @@ export type PersonalFinancePayload = {
   transactionsWindowMonths: number
   emergencyFund: {
     targetMonths: number
-    avgMonthlyExpensesLkr: number
-    currentLkr: number
-    targetLkr: number
+    avgMonthlyExpensesBase: number
+    currentBase: number
+    targetBase: number
     coverageMonths: number
     progressPct: number
   }
@@ -81,9 +81,9 @@ export type PersonalFinancePayload = {
     hasData: boolean
   }
   wealthGoal: {
-    targetLkr: number
+    targetBase: number
     targetDate: string | null
-    currentLkr: number
+    currentBase: number
     progressPct: number
   }
   financeQaHistory: Array<{ at: number; question: string; answer: string }>

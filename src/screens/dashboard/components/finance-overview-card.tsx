@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 
 type FinanceSummary = {
-  netWorthLkr: number
-  netSavingsLkr: number
+  netWorthBase: number
+  netSavingsBase: number
   savingsRate: number
   tradingMode: string
   emergencyKillSwitch: boolean
@@ -67,7 +67,7 @@ export function FinanceOverviewCard({ onOpen }: { onOpen: () => void }) {
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-lg bg-black/10 p-2.5">
               <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)]">Net worth</div>
-              <div className="mt-1 text-sm font-semibold tabular-nums text-[var(--theme-text)]">{formatLkr(summary.netWorthLkr)}</div>
+              <div className="mt-1 text-sm font-semibold tabular-nums text-[var(--theme-text)]">{formatLkr(summary.netWorthBase)}</div>
             </div>
             <div className="rounded-lg bg-black/10 p-2.5">
               <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--theme-muted)]">Savings rate</div>

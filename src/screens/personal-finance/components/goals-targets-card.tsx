@@ -80,7 +80,7 @@ export function GoalsTargetsCard({
   const [wgTarget, setWgTarget] = useState('')
   const [wgDate, setWgDate] = useState('')
 
-  const wgRemaining = wg.targetLkr - wg.currentLkr
+  const wgRemaining = wg.targetBase - wg.currentBase
   let wgNote: string | null = null
   if (wgRemaining > 0 && wg.targetDate) {
     const days = Math.ceil(
@@ -106,12 +106,12 @@ export function GoalsTargetsCard({
           percent={Math.round(ef.progressPct)}
           detail={
             <>
-              {formatLkr(ef.currentLkr, c)} / {formatLkr(ef.targetLkr, c)} —{' '}
+              {formatLkr(ef.currentBase, c)} / {formatLkr(ef.targetBase, c)} —{' '}
               {ef.coverageMonths.toFixed(1)} of {ef.targetMonths} months
             </>
           }
           note={
-            ef.avgMonthlyExpensesLkr === 0 ? (
+            ef.avgMonthlyExpensesBase === 0 ? (
               <span className="text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)]">
                 No complete month of expense history yet.
               </span>
@@ -190,11 +190,11 @@ export function GoalsTargetsCard({
 
         <GoalRow
           title="Long-term wealth goal"
-          configured={wg.targetLkr > 0}
+          configured={wg.targetBase > 0}
           percent={Math.round(wg.progressPct)}
           detail={
             <>
-              {formatLkr(wg.currentLkr, c)} / {formatLkr(wg.targetLkr, c)}
+              {formatLkr(wg.currentBase, c)} / {formatLkr(wg.targetBase, c)}
             </>
           }
           note={
