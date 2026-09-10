@@ -232,6 +232,7 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 | 12 · unified ledger | ✅ **first slice done** — `transfer` record kind: `Transfer` type + `db.transfers` collection (auto-migrated via `migrateFinanceStore`'s spread; `'transfers'` added to `FINANCE_COLLECTIONS` → persists through the generic `finance_engine_collections` table, no DDL); `add`/`update`/`delete` branches; `getUnifiedTransactions` + client `unifyTransactions` emit it (parity-tested); windowed on the payload. **`financeSummary` untouched** — transfers never enter income/expense/savings totals (asserted). Remaining ledger work (own PRs, roadmap-sequenced): ledger-derived account balances (ADR-001), splits, a transfer entry form, transfer-aware filters. | PR #46 |
 | U5 · header copy is developer-facing | ✅ done — eyebrow → "Personal finance", H1 → "Your money at a glance", body → "…all in one place" (no "DollarWise", no "trading workspace") | PR-followups-batch1 |
 | M2 · `formatMoney` always groups with `en-LK` | ✅ done — `CURRENCY_LOCALE` map keys the grouping locale off the currency (LKR→en-LK, AUD→en-AU, USD→en-US, INR→en-IN, EUR→de-DE, GBP→en-GB), falls back to `en-LK` | PR-followups-batch1 |
+| U7 · export is JSON-only | ✅ done — `/api/finance-export?format=csv` (unified transactions spreadsheet, account ids resolved to names, RFC-4180 quoting) + `?format=report` (printable HTML summary → browser Print → Save as PDF); hero now offers all three. `transfers` also added to the JSON dump. | PR-followups-export |
 
 **Tier 0 — shipped in this pass**
 

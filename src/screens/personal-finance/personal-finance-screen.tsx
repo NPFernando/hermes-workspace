@@ -136,9 +136,26 @@ export function PersonalFinanceScreen() {
               Your money at a glance
             </h1>
           </div>
-          <a href="/api/finance-export" download className={buttonClass}>
-            Export data (JSON)
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="/api/finance-export?format=csv"
+              download
+              className={buttonClass}
+            >
+              Transactions (CSV)
+            </a>
+            <a
+              href="/api/finance-export?format=report"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClass}
+            >
+              Printable summary
+            </a>
+            <a href="/api/finance-export" download className={buttonClass}>
+              All data (JSON)
+            </a>
+          </div>
         </div>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--theme-muted)]">
           Track your accounts, spending, budgets, savings goals, investments, and
