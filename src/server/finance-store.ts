@@ -207,6 +207,24 @@ export type Transfer = {
   updatedAt: string
 }
 
+/**
+ * A daily point-in-time snapshot of net worth (and its main components), all
+ * LKR-denominated like every other stored figure. Written by the
+ * `snapshot_net_worth` action / the nightly cron; upserted by `date` so at
+ * most one row per calendar day. Drives the net-worth history chart.
+ */
+export type NetWorthSnapshot = {
+  id: string
+  date: string
+  netWorthLkr: number
+  cashLkr: number
+  investmentsLkr: number
+  debtLkr: number
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
 /** Read-only unified view over income_records + expense_records + transfers for a single combined transaction list/UI. Storage stays split; this is computed on read, never persisted. */
 export type UnifiedTransaction = {
   id: string
@@ -828,6 +846,7 @@ export type FinanceDatabase = {
   income_records: Array<IncomeRecord>
   expense_records: Array<ExpenseRecord>
   transfers: Array<Transfer>
+  net_worth_snapshots: Array<NetWorthSnapshot>
   budget_categories: Array<BudgetCategory>
   categories: Array<Category>
   subcategories: Array<Subcategory>
@@ -927,6 +946,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     income_records: [],
     expense_records: [],
     transfers: [],
+    net_worth_snapshots: [],
     budget_categories: [],
     categories: [],
     subcategories: [],
@@ -2705,6 +2725,40 @@ export function financeSummary(db: FinanceDatabase) {
     liveBinanceApproved: Boolean(db.settings.liveBinanceApprovedAt),
     ibkrStatus: db.settings.ibkrStatus,
   }
+}
+
+/**
+ * Compute today's net-worth snapshot (all LKR) and upsert it into
+ * `db.net_worth_snapshots` by `date` — at most one row per calendar day, so
+ * re-running is idempotent. Mutates and returns `db`; the caller persists.
+ */
+export function recordNetWorthSnapshot(
+  db: FinanceDatabase,
+  today: string = nowIso().slice(0, 10),
+): { db: FinanceDatabase; snapshot: NetWorthSnapshot } {
+  // Pin to LKR — snapshots are stored LKR-denominated like every other figure.
+  const lkrDb = { ...db, settings: { ...db.settings, baseCurrency: 'LKR' } }
+  const s = financeSummary(lkrDb)
+  const investmentsLkr =
+    s.stockHoldingsValueBase + s.fixedDepositsValueBase + s.propertyValueBase
+  const now = nowIso()
+  const existing = db.net_worth_snapshots.find((r) => r.date === today)
+  const snapshot: NetWorthSnapshot = {
+    id: existing?.id ?? `nws-${today}`,
+    date: today,
+    netWorthLkr: s.netWorthBase,
+    cashLkr: s.cashBalanceBase,
+    investmentsLkr,
+    debtLkr: s.debtBase,
+    source: 'snapshot',
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  }
+  db.net_worth_snapshots = [
+    ...db.net_worth_snapshots.filter((r) => r.date !== today),
+    snapshot,
+  ].sort((a, b) => (a.date < b.date ? -1 : 1))
+  return { db, snapshot }
 }
 
 export function financeAlerts(db: FinanceDatabase): Array<{

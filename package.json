@@ -15,6 +15,7 @@
     "start:dev": "vite dev",
     "preview": "vite preview",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "test:finance": "vitest run src/server/finance-store.test.ts src/server/finance-extraction.test.ts src/server/finance-postgres-store.test.ts src/server/finance-storage-monitor.test.ts src/server/harp-memory-client.test.ts src/server/trading-readiness.test.ts src/routes/api/-finance.test.ts src/routes/api/-finance-learned-facts.test.ts src/screens/personal-finance/utils.test.ts src/screens/personal-finance/components/-assistant-memory-card.test.tsx",
     "test:pg-integration": "tsx scripts/finance-pg-integration.ts",
     "finance:postgres-cutover": "tsx scripts/finance-postgres-cutover.ts",
