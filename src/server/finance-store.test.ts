@@ -2885,3 +2885,71 @@ describe('recordNetWorthSnapshot', () => {
     expect(all.map((s) => s.date)).toEqual(['2026-09-10', '2026-09-11'])
   })
 })
+
+describe('financeAlerts — category budget thresholds', () => {
+  function seedBudget(db: ReturnType<typeof createEmptyFinanceDatabase>, opts: {
+    budget: number
+    spent: number
+  }) {
+    const now = new Date()
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    db.budget_categories.push({
+      id: 'b-groc',
+      month,
+      category: 'Groceries',
+      currency: 'LKR',
+      budgetAmount: opts.budget,
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.expense_records.push({
+      id: 'e-groc',
+      date: `${month}-01`,
+      vendor: 'Keells',
+      category: 'Groceries',
+      currency: 'LKR',
+      amount: opts.spent,
+      convertedLkrAmount: opts.spent,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+  }
+
+  it('raises a critical alert when a category is over budget', () => {
+    const db = createEmptyFinanceDatabase()
+    seedBudget(db, { budget: 10_000, spent: 12_500 })
+    const alert = financeAlerts(db).find((a) => a.title === 'Over budget: Groceries')
+    expect(alert?.level).toBe('critical')
+    expect(alert?.detail).toContain('125%')
+  })
+
+  it('raises a warning near the limit only while days remain in the month', () => {
+    const db = createEmptyFinanceDatabase()
+    seedBudget(db, { budget: 10_000, spent: 9_400 }) // 94%
+    const now = new Date()
+    const daysLeft =
+      new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() -
+      now.getDate()
+    const has = financeAlerts(db).some(
+      (a) => a.title === 'Budget nearly spent: Groceries',
+    )
+    // matches the >=3-days-left guard in financeAlerts
+    expect(has).toBe(daysLeft >= 3)
+  })
+
+  it('is silent for a category comfortably under budget', () => {
+    const db = createEmptyFinanceDatabase()
+    seedBudget(db, { budget: 10_000, spent: 4_000 })
+    expect(
+      financeAlerts(db).some((a) => a.title.startsWith('Budget')),
+    ).toBe(false)
+    expect(
+      financeAlerts(db).some((a) => a.title.startsWith('Over budget')),
+    ).toBe(false)
+  })
+})

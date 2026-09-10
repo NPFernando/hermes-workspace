@@ -2816,6 +2816,34 @@ export function financeAlerts(db: FinanceDatabase): Array<{
       )} with no exchange rate on file — their value is counted at face amount, not converted to LKR. Add a rate to fix the totals.`,
     })
   }
+
+  // Category-level budget alerts (this calendar month). Over budget is
+  // critical regardless of timing; "nearly spent" only fires while there is
+  // still a meaningful part of the month left, so it doesn't nag on the 30th.
+  const now = new Date()
+  const daysInMonth = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+  ).getDate()
+  const daysLeft = daysInMonth - now.getDate()
+  const lkr = (n: number) => `LKR ${Math.round(n).toLocaleString('en-LK')}`
+  for (const row of budgetVsActualSummary(db)) {
+    if (row.budget <= 0) continue
+    if (row.overBudget) {
+      alerts.push({
+        level: 'critical',
+        title: `Over budget: ${row.category}`,
+        detail: `Spent ${lkr(row.actual)} of a ${lkr(row.budget)} budget this month (${Math.round(row.percentUsed)}%).`,
+      })
+    } else if (row.percentUsed >= 90 && daysLeft >= 3) {
+      alerts.push({
+        level: 'warning',
+        title: `Budget nearly spent: ${row.category}`,
+        detail: `${Math.round(row.percentUsed)}% of the ${row.category} budget used with ${daysLeft} days left in the month.`,
+      })
+    }
+  }
   return alerts
 }
 
