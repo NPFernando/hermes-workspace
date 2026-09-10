@@ -340,6 +340,12 @@ export function PersonalFinanceScreen() {
 
       {tab === 'overview' && (
         <>
+          {/* Money first: alerts, currency, AI Q&A, trend charts, then the
+              goal/insight cards. The assistant-memory + storage-health
+              diagnostics are collapsed at the bottom — they're not the daily
+              view (see docs/personal-finance-ux-review.md U1). Merging the
+              three target cards / relocating the currency picker to a settings
+              area is a follow-up (U2/U3, review Tier 2). */}
           <FinanceAlertsCard payload={payload} />
           <BaseCurrencySelect payload={payload} onPayload={setPayload} />
           <FinanceAnalystCard payload={payload} onPayload={setPayload} />
@@ -351,8 +357,16 @@ export function PersonalFinanceScreen() {
           <WealthGoalCard payload={payload} onPayload={setPayload} />
           <UpcomingMoney payload={payload} />
           <RecurringBillsInsight payload={payload} />
-          <AssistantMemoryCard />
-          <DataHealthCard payload={payload} />
+
+          <details className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/50">
+            <summary className="cursor-pointer list-none px-5 py-3 text-sm font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)]">
+              Assistant memory &amp; data health
+            </summary>
+            <div className="px-2 pb-2">
+              <AssistantMemoryCard />
+              <DataHealthCard payload={payload} />
+            </div>
+          </details>
         </>
       )}
 

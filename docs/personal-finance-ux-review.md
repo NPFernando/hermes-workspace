@@ -220,12 +220,21 @@ across ~15 panels. That work is done and good; the duplication that remains is *
   currency and the server converts base→LKR on write, same shape as `set_wealth_goal`. Closes
   the last genuinely *remaining* item from the PF-201 thread.
 
-**Tier 1 — small, safe, high user impact (post-merge of #45)**
+**Tier 1 — small, safe, high user impact**
 
 1. Window `income_records` / `expense_records` in the dashboard payload to 24 months (D2/P1).
-2. Cap `TransactionsPanel` initial render at ~100 rows + "show more" (D3/P2).
-3. Narrow `finance-trends-card` `useMemo` deps (P3).
-4. Overview information hierarchy: 2-col grid, collapse diagnostics (U1).
+   **Not standalone — see the Appendix; do it with items 6 + 9.**
+2. ✅ **DONE** (`feat/pf-dashboard-perf`) — `TransactionsPanel` renders the first 100 filtered
+   rows + "Show more"; totals/counts still span the full list; visible count resets on filter
+   change (D3/P2).
+3. ✅ **DONE** (`feat/pf-dashboard-perf`) — `finance-trends-card` memos depend on the record
+   arrays, not the whole `payload`, so an unrelated mutation no longer recomputes both charts
+   (P3).
+4. Overview information hierarchy (U1). **Partial** (`feat/pf-dashboard-perf`): the two pure
+   diagnostics (`AssistantMemoryCard`, `DataHealthCard`) are now in a collapsed `<details>` at
+   the bottom. The 2-col grid + "today" focal block is left with item 5 — it needs each goal
+   card's baked-in `mt-*` margin removed, which overlaps the item-5 card merge, so they should
+   land together.
 
 **Tier 2 — medium, structural**
 
