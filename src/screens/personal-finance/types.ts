@@ -35,7 +35,6 @@ export type PersonalFinancePayload = {
     percentUsed: number
     overBudget: boolean
   }>
-  transactions: Array<Record<string, unknown>>
   alerts: Array<{
     level: 'info' | 'warning' | 'critical'
     title: string

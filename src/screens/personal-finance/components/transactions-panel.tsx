@@ -12,6 +12,66 @@ type TxnKind = 'income' | 'expense'
  *  many-year history. Filters/search still run over the whole list. */
 const RENDER_PAGE = 100
 
+/**
+ * PF review D1: the payload no longer ships a pre-unified `transactions` array
+ * (it duplicated `data.income_records` + `data.expense_records`). This mirrors
+ * the server's `getUnifiedTransactions` shape from the two raw arrays, which
+ * are already `maskSensitive`-d in the payload.
+ */
+export function unifyTransactions(
+  income: ReadonlyArray<Record<string, unknown>>,
+  expense: ReadonlyArray<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+  const rows: Array<Record<string, unknown>> = [
+    ...income.map((r) => ({
+      id: r.id,
+      kind: 'income',
+      date: r.dateReceived,
+      counterparty: r.sourceName,
+      category: r.incomeType,
+      accountId: r.accountId,
+      currency: r.originalCurrency,
+      amount: r.originalAmount,
+      convertedLkrAmount: r.convertedLkrAmount,
+      notes: r.notes,
+      documentRef: r.documentRef,
+      taxable: r.taxable,
+      incomeSourceId: r.incomeSourceId,
+      tags: r.tags,
+      status: r.status,
+      source: r.source,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    })),
+    ...expense.map((r) => ({
+      id: r.id,
+      kind: 'expense',
+      date: r.date,
+      counterparty: r.vendor,
+      category: r.category,
+      accountId: r.accountId,
+      currency: r.currency,
+      amount: r.amount,
+      convertedLkrAmount: r.convertedLkrAmount,
+      notes: r.notes,
+      documentRef: r.documentRef,
+      recurring: r.recurring,
+      subcategory: r.subcategory,
+      tags: r.tags,
+      status: r.status,
+      source: r.source,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    })),
+  ]
+  return rows.sort((a, b) => {
+    const ad = String(a.date ?? '')
+    const bd = String(b.date ?? '')
+    if (ad !== bd) return ad < bd ? 1 : -1
+    return String(a.createdAt ?? '') < String(b.createdAt ?? '') ? 1 : -1
+  })
+}
+
 function boolField(row: Record<string, unknown>, key: string): boolean {
   return row[key] === true
 }
@@ -93,7 +153,12 @@ export function TransactionsPanel({
   const [amountMax, setAmountMax] = useState('')
 
   const accounts = payload.data.finance_accounts
-  const transactions = payload.transactions
+  const incomeRecords = payload.data.income_records
+  const expenseRecords = payload.data.expense_records
+  const transactions = useMemo(
+    () => unifyTransactions(incomeRecords, expenseRecords),
+    [incomeRecords, expenseRecords],
+  )
 
   async function submitTransaction() {
     if (!counterparty.trim()) {

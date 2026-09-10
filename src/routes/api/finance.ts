@@ -449,7 +449,11 @@ function personalFinancePayload() {
       actual: inBase(b.actual),
       variance: inBase(b.variance),
     })),
-    transactions: maskSensitive(getUnifiedTransactions(db)),
+    // PF review D1: `transactions` (a re-shaped copy of every income + expense
+    // row) used to ship here alongside `data.income_records` / `.expense_records`
+    // — the same rows twice. TransactionsPanel now unifies the two raw arrays
+    // client-side. `getUnifiedTransactions` stays for buildFinanceQueryContext
+    // and the future paged history endpoint.
     alerts,
     emergencyFund: {
       targetMonths: efTargetMonths,
