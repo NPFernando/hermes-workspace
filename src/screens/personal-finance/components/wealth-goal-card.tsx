@@ -19,12 +19,18 @@ export function WealthGoalCard({
   const [draftTargetLkr, setDraftTargetLkr] = useState('')
   const [draftTargetDate, setDraftTargetDate] = useState('')
   const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
   const wg = payload.wealthGoal
+  // PF-201: payload.wealthGoal figures are already in the reporting currency,
+  // and the target is *entered* in it too — the server converts base->LKR for
+  // storage (needs an exchange rate on file when base isn't LKR).
+  const c = payload.baseCurrency
 
   async function saveTarget() {
     const targetLkr = Number(draftTargetLkr)
     if (!Number.isFinite(targetLkr) || targetLkr <= 0) return
     setSaving(true)
+    setErr(null)
     try {
       const res = await fetch('/api/finance', {
         method: 'POST',
@@ -32,11 +38,15 @@ export function WealthGoalCard({
         body: JSON.stringify({
           action: 'set_wealth_goal',
           targetLkr,
+          currency: c,
           targetDate: draftTargetDate || undefined,
         }),
       })
-      const data = (await res.json()) as PersonalFinancePayload
+      const data = (await res.json()) as PersonalFinancePayload & {
+        error?: string
+      }
       if (data.ok) onPayload(data)
+      else setErr(data.error ?? 'Could not save the target.')
     } finally {
       setSaving(false)
     }
@@ -56,7 +66,7 @@ export function WealthGoalCard({
           <input
             type="number"
             min={1}
-            placeholder="Target net worth (LKR)"
+            placeholder={`Target net worth (${c})`}
             value={draftTargetLkr}
             onChange={(e) => setDraftTargetLkr(e.target.value)}
             className="w-44 rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-2 py-1 text-sm text-[var(--theme-text)]"
@@ -77,6 +87,14 @@ export function WealthGoalCard({
             Set target
           </button>
         </div>
+        {c !== 'LKR' && (
+          <p className="mt-2 text-xs text-[var(--theme-muted)]">
+            Entered in {c}; stored as LKR at the exchange rate on file.
+          </p>
+        )}
+        {err && (
+          <p className="mt-2 text-xs text-[var(--theme-danger)]">{err}</p>
+        )}
       </section>
     )
   }
@@ -96,7 +114,7 @@ export function WealthGoalCard({
       } else {
         const monthsUntil = Math.max(1, Math.ceil(daysUntil / 30))
         requiredLine = {
-          text: `Needs ${formatLkr(remaining / monthsUntil)}/mo to reach by ${wg.targetDate}`,
+          text: `Needs ${formatLkr(remaining / monthsUntil, c)}/mo to reach by ${wg.targetDate}`,
           tone: 'text-[var(--theme-muted)]',
         }
       }
@@ -118,7 +136,7 @@ export function WealthGoalCard({
         />
       </div>
       <p className="mt-2 text-xs text-[var(--theme-muted)]">
-        {formatLkr(wg.currentLkr)} / {formatLkr(wg.targetLkr)}
+        {formatLkr(wg.currentLkr, c)} / {formatLkr(wg.targetLkr, c)}
       </p>
       {requiredLine && (
         <p className={`mt-1 text-xs ${requiredLine.tone}`}>

@@ -325,6 +325,121 @@ describe('finance-store', () => {
   })
 })
 
+describe('budget-vs-actual normalises a non-LKR budget to LKR (PF-201)', () => {
+  const usdBudget = {
+    id: 'b-usd',
+    category: 'Software',
+    month: '2026-07',
+    currency: 'USD' as const,
+    budgetAmount: 100,
+    source: 'test',
+    createdAt: '2026-07-01T00:00:00.000Z',
+    updatedAt: '2026-07-01T00:00:00.000Z',
+  }
+  const usdSpend = {
+    id: 'e-usd',
+    date: '2026-07-10',
+    vendor: 'SaaS',
+    category: 'Software',
+    currency: 'USD',
+    amount: 40,
+    convertedLkrAmount: 12_000, // already LKR-converted at ingest
+    recurring: false,
+    workRelated: false,
+    taxDeductiblePossible: false,
+    source: 'test',
+    createdAt: '2026-07-10T00:00:00.000Z',
+    updatedAt: '2026-07-10T00:00:00.000Z',
+  }
+
+  it('converts the budget via a stored USD->LKR rate before comparing', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push({
+      base: 'USD',
+      target: 'LKR',
+      rate: 300,
+      date: '2026-07-01',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    })
+    db.budget_categories.push({ ...usdBudget })
+    db.expense_records.push({ ...usdSpend })
+
+    const r = getBudgetVsActual(db, 'Software', 2026, 7)
+    expect(r).toEqual({ budget: 30_000, actual: 12_000, variance: 18_000 })
+
+    const [row] = budgetVsActualSummary(db, '2026-07')
+    expect(row).toMatchObject({
+      currency: 'LKR',
+      budget: 30_000,
+      actual: 12_000,
+      variance: 18_000,
+      percentUsed: 40,
+      overBudget: false,
+    })
+  })
+
+  it('falls back to the inverse LKR->USD rate when no direct rate is on file', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push({
+      base: 'LKR',
+      target: 'USD',
+      rate: 1 / 300,
+      date: '2026-07-01',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    })
+    db.budget_categories.push({ ...usdBudget })
+
+    const r = getBudgetVsActual(db, 'Software', 2026, 7)
+    expect(r?.budget).toBeCloseTo(30_000)
+  })
+
+  it('falls back to the raw amount when no rate exists, and flags the currency', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push({ ...usdBudget })
+
+    // getBudgetVsActual still returns a number (better than dropping the row)…
+    const r = getBudgetVsActual(db, 'Software', 2026, 7)
+    expect(r).toEqual({ budget: 100, actual: 0, variance: 100 })
+
+    // …but the missing rate surfaces via financeSummary.fxUnconverted ->
+    // the "Missing exchange rate" alert, so it isn't a silent wrong number.
+    expect(financeSummary(db).fxUnconverted).toContain('USD')
+    expect(
+      financeAlerts(db).some((a) => a.title === 'Missing exchange rate'),
+    ).toBe(true)
+  })
+
+  it('leaves an all-LKR budget untouched', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push({ ...usdBudget, currency: 'LKR', budgetAmount: 50_000 })
+    expect(getBudgetVsActual(db, 'Software', 2026, 7)).toEqual({
+      budget: 50_000,
+      actual: 0,
+      variance: 50_000,
+    })
+  })
+})
+
+describe('updateExchangeRate upsert by (base, target, date) (PF-201)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('replaces the same-day row in place instead of piling up duplicates', async () => {
+    const store = await freshFinanceStore()
+    store.updateExchangeRate('USD', 'LKR', 300, '2026-09-10')
+    store.updateExchangeRate('USD', 'LKR', 328.4, '2026-09-10') // refresh, same day
+    store.updateExchangeRate('USD', 'LKR', 331, '2026-09-11') // next day
+
+    const rows = store
+      .readFinanceStore()
+      .exchange_rates.filter((r) => r.base === 'USD' && r.target === 'LKR')
+    expect(rows).toHaveLength(2)
+    expect(store.getExchangeRate('USD', 'LKR', '2026-09-10')).toBe(328.4)
+    expect(store.getExchangeRate('USD', 'LKR')).toBe(331)
+  })
+})
+
 // Same isolation pattern as trading-summary.test.ts / rebalance-engine.test.ts —
 // point HOME at a temp dir so these never touch the real ~/.hermes/finance store.
 describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
@@ -1798,6 +1913,97 @@ describe('financeSummary FX conversion for non-LKR assets (PF-206)', () => {
     const db = createEmptyFinanceDatabase()
     db.stock_holdings.push({ ...usdHolding, currency: 'LKR' })
     expect(financeSummary(db).fxUnconverted).toEqual([])
+  })
+})
+
+describe('financeSummary reporting currency (PF-201)', () => {
+  const seedIncomeExpense = () => {
+    const db = createEmptyFinanceDatabase()
+    db.income_records.push({
+      id: 'income-1',
+      dateReceived: '2026-06-28',
+      sourceName: 'Salary',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: 300_000,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 300_000,
+      taxable: true,
+      source: 'test',
+      createdAt: '2026-06-28T00:00:00.000Z',
+      updatedAt: '2026-06-28T00:00:00.000Z',
+    })
+    db.expense_records.push({
+      id: 'expense-1',
+      date: '2026-06-28',
+      vendor: 'Rent',
+      category: 'Housing',
+      currency: 'LKR',
+      amount: 100_000,
+      convertedLkrAmount: 100_000,
+      recurring: true,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-06-28T00:00:00.000Z',
+      updatedAt: '2026-06-28T00:00:00.000Z',
+    })
+    return db
+  }
+
+  it('defaults to LKR and leaves every figure unchanged', () => {
+    const db = seedIncomeExpense()
+    const s = financeSummary(db)
+    expect(s.baseCurrency).toBe('LKR')
+    expect(s.totalIncomeLkr).toBe(300_000)
+    expect(s.totalExpensesLkr).toBe(100_000)
+    expect(s.netSavingsLkr).toBe(200_000)
+    expect(s.fxUnconverted).toEqual([])
+  })
+
+  it('expresses aggregate figures in the base currency via a direct LKR->base rate', () => {
+    const db = seedIncomeExpense()
+    db.settings.baseCurrency = 'USD'
+    db.exchange_rates.push({
+      base: 'LKR',
+      target: 'USD',
+      rate: 1 / 300,
+      date: '2026-06-01',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    const s = financeSummary(db)
+    expect(s.baseCurrency).toBe('USD')
+    expect(s.totalIncomeLkr).toBeCloseTo(1_000)
+    expect(s.totalExpensesLkr).toBeCloseTo(1_000 / 3)
+    expect(s.netSavingsLkr).toBeCloseTo(2_000 / 3)
+    // percentages stay currency-free
+    expect(s.savingsRate).toBeCloseTo((200_000 / 300_000) * 100)
+    expect(s.fxUnconverted).toEqual([])
+  })
+
+  it('falls back to the inverse base->LKR rate when no LKR->base rate is on file', () => {
+    const db = seedIncomeExpense()
+    db.settings.baseCurrency = 'USD'
+    db.exchange_rates.push({
+      base: 'USD',
+      target: 'LKR',
+      rate: 300,
+      date: '2026-06-01',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    const s = financeSummary(db)
+    expect(s.totalIncomeLkr).toBeCloseTo(1_000)
+    expect(s.netSavingsLkr).toBeCloseTo(2_000 / 3)
+    expect(s.fxUnconverted).toEqual([])
+  })
+
+  it('counts figures raw and flags the base currency when no rate exists', () => {
+    const db = seedIncomeExpense()
+    db.settings.baseCurrency = 'USD'
+    const s = financeSummary(db)
+    expect(s.totalIncomeLkr).toBe(300_000)
+    expect(s.netSavingsLkr).toBe(200_000)
+    expect(s.fxUnconverted).toEqual(['USD'])
   })
 })
 

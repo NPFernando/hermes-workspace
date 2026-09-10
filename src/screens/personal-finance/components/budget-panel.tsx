@@ -28,7 +28,13 @@ export function BudgetPanel({
   const [budgetMonth, setBudgetMonth] = useState(currentMonth)
   const [budgetCategory, setBudgetCategory] = useState('')
   const [budgetAmount, setBudgetAmount] = useState('')
-  const [budgetCurrency, setBudgetCurrency] = useState('LKR')
+  // PF-201: a budget is a plan in the currency the user thinks in — default it
+  // to the configured reporting currency. It's stored in that currency;
+  // getBudgetVsActual converts it to LKR for the vs-actual comparison.
+  const [budgetCurrency, setBudgetCurrency] = useState(payload.baseCurrency)
+  const budgetCurrencyOptions = [
+    ...new Set([payload.baseCurrency, 'LKR', 'USD', 'AUD']),
+  ]
   const [expenseDate, setExpenseDate] = useState(
     new Date().toISOString().slice(0, 10),
   )
@@ -94,8 +100,9 @@ export function BudgetPanel({
           <h2 className="text-lg font-semibold">Budget vs. actual spending</h2>
           <p className="text-xs text-[var(--theme-muted)]">
             Set a monthly budget per category, log expenses, and see how actual
-            spending compares — updates instantly below. Enter budgets in LKR;
-            actual spend is always compared in LKR-converted terms.
+            spending compares — updates instantly below. A non-LKR budget is
+            converted at the exchange rate on file; the comparison is always in
+            LKR-converted terms.
           </p>
         </div>
       </div>
@@ -130,9 +137,11 @@ export function BudgetPanel({
               onChange={(e) => setBudgetCurrency(e.target.value)}
               className={inputClass}
             >
-              <option value="LKR">LKR</option>
-              <option value="USD">USD</option>
-              <option value="AUD">AUD</option>
+              {budgetCurrencyOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
             <button
               type="button"
@@ -212,7 +221,7 @@ export function BudgetPanel({
               <StatCard
                 key={`${row.month}-${row.category}`}
                 label={`${row.category} — ${Math.round(row.percentUsed)}% used`}
-                value={`${formatLkr(row.actual)} / ${formatLkr(row.budget)} · ${row.variance >= 0 ? 'Remaining' : 'Over by'} ${formatLkr(Math.abs(row.variance))}`}
+                value={`${formatLkr(row.actual, row.currency)} / ${formatLkr(row.budget, row.currency)} · ${row.variance >= 0 ? 'Remaining' : 'Over by'} ${formatLkr(Math.abs(row.variance), row.currency)}`}
                 tone={budgetTone(row.percentUsed)}
               />
             ))}

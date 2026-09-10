@@ -4,12 +4,14 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { safeErrorMessage } from '../../server/rate-limit'
 import {
   FINANCE_AUDIT_PATH,
+  SUPPORTED_CURRENCIES,
   TRADING_MODES,
   addFinanceRecord,
   addPendingIngestion,
   appendAuditLog,
   budgetVsActualSummary,
   buildFinanceQueryContext,
+  convertCurrency,
   deleteFinanceRecord,
   ensureFinanceStore,
   financeAlerts,
@@ -20,6 +22,7 @@ import {
   getAverageMonthlyExpensesLkr,
   getAverageMonthlySavingsRatePct,
   getCategoryCorrections,
+  getExchangeRate,
   getUnifiedTransactions,
   listPendingIngestions,
   maskSensitive,
@@ -52,6 +55,7 @@ import {
 } from '../../server/harp-memory-client'
 import { syncGmailNow } from '../../server/gmail-ingest'
 import { fetchCsePrice } from '../../server/cse-market.service'
+import { fetchLkrExchangeRates } from '../../server/exchange-rate.service'
 import {
   addBinanceCandles,
   addMarketPrice,
@@ -395,9 +399,20 @@ function personalFinancePayload() {
   const db = ensureFinanceStore()
   const storage = financeStorageStatus()
   const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
+  const summary = financeSummary(db)
+  // PF-201: express LKR-denominated stored values (targets, budgets, averages)
+  // in the reporting currency so the whole payload is consistent with
+  // `summary`. Falls back to the LKR number when no rate is on file.
+  const base = summary.baseCurrency
+  const inBase = (lkr: number): number =>
+    base === 'LKR' ? lkr : (convertCurrency(lkr, 'LKR', base) ?? lkr)
+  // PF-201: LKR->base multiplier for client components that still sum raw
+  // LKR-denominated records locally (e.g. the trends chart). 1 when base is
+  // 'LKR' or no rate is on file.
+  const fxToBase = inBase(1)
   const efTargetMonths = db.settings.emergencyFundTargetMonths ?? 0
-  const efAvgMonthlyExpensesLkr = getAverageMonthlyExpensesLkr(db, 3)
-  const efCurrentLkr = financeSummary(db).cashBalanceLkr
+  const efAvgMonthlyExpensesLkr = inBase(getAverageMonthlyExpensesLkr(db, 3))
+  const efCurrentLkr = summary.cashBalanceLkr
   const efTargetLkr = efTargetMonths * efAvgMonthlyExpensesLkr
   const efCoverageMonths =
     efAvgMonthlyExpensesLkr > 0 ? efCurrentLkr / efAvgMonthlyExpensesLkr : 0
@@ -410,9 +425,9 @@ function personalFinancePayload() {
     srTargetPct > 0
       ? Math.min(100, Math.max(0, (srActualPct / srTargetPct) * 100))
       : 0
-  const wgTargetLkr = db.settings.wealthGoalTargetLkr ?? 0
+  const wgTargetLkr = inBase(db.settings.wealthGoalTargetLkr ?? 0)
   const wgTargetDate = db.settings.wealthGoalTargetDate ?? null
-  const wgCurrentLkr = financeSummary(db).netWorthLkr
+  const wgCurrentLkr = summary.netWorthLkr
   const wgProgressPct =
     wgTargetLkr > 0
       ? Math.min(100, Math.max(0, (wgCurrentLkr / wgTargetLkr) * 100))
@@ -421,8 +436,19 @@ function personalFinancePayload() {
     ok: true,
     checkedAt: Date.now(),
     storage,
-    summary: financeSummary(db),
-    budgetVsActual: budgetVsActualSummary(db),
+    baseCurrency: base,
+    fxToBase,
+    summary,
+    // PF-201: budgetVsActualSummary now returns budget/actual/variance already
+    // LKR-normalised (a non-LKR budget category is converted at the join), so
+    // every row goes through `inBase` and carries the reporting currency.
+    budgetVsActual: budgetVsActualSummary(db).map((b) => ({
+      ...b,
+      currency: base,
+      budget: inBase(b.budget),
+      actual: inBase(b.actual),
+      variance: inBase(b.variance),
+    })),
     transactions: maskSensitive(getUnifiedTransactions(db)),
     alerts,
     emergencyFund: {
@@ -931,6 +957,102 @@ export const Route = createFileRoute('/api/finance')({
             appendAuditLog('savings_rate_target_updated', { pct })
             return json(personalFinancePayload())
           }
+          if (action === 'set_base_currency') {
+            // PF-201: the reporting currency every aggregate `*Lkr` figure in
+            // the personal-finance payload is expressed in. Storage stays
+            // LKR-denominated — this is display only. Accepts a known currency
+            // or any 3-letter ISO code (rate must then be on file, else the
+            // figure falls back to LKR and lands in `summary.fxUnconverted`).
+            const currency =
+              typeof body.currency === 'string'
+                ? body.currency.trim().toUpperCase()
+                : ''
+            const known = (SUPPORTED_CURRENCIES as ReadonlyArray<string>).includes(
+              currency,
+            )
+            if (!known && !/^[A-Z]{3}$/.test(currency)) {
+              return json(
+                {
+                  ok: false,
+                  error: 'currency must be a 3-letter currency code.',
+                },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            db.settings.baseCurrency = currency
+            writeFinanceStore(db)
+            appendAuditLog('base_currency_updated', { currency })
+            return json(personalFinancePayload())
+          }
+          if (action === 'refresh_exchange_rates') {
+            // PF-201: pull today's LKR<->reporting-currency rates from the FX
+            // source so non-LKR base mode works without hand entry and the
+            // "Missing exchange rate" alert clears. Idempotent per day
+            // (updateExchangeRate upserts by base/target/date). Intended for a
+            // daily cron; the manual `update_exchange_rate` action stays.
+            const db = readFinanceStore()
+            const spreadPct =
+              typeof db.settings.exchangeRateSpreadPct === 'number' &&
+              Number.isFinite(db.settings.exchangeRateSpreadPct)
+                ? Math.max(0, db.settings.exchangeRateSpreadPct)
+                : 0
+            const configured = db.settings.reportingCurrencies as
+              | Array<string>
+              | undefined
+            const targets = (
+              configured && configured.length > 0
+                ? configured
+                : ['USD', 'AUD']
+            ).filter((c): c is string => typeof c === 'string' && c !== 'LKR')
+            const fetched = await fetchLkrExchangeRates(targets)
+            if (!fetched) {
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Exchange-rate source unavailable — no rates changed, try again later.',
+                  updated: [],
+                  failed: targets,
+                },
+                { status: 502 },
+              )
+            }
+            const date = new Date().toISOString().slice(0, 10)
+            const updated: Array<{ pair: string; lkrPerUnit: number }> = []
+            for (const [cur, midLkrPerUnit] of Object.entries(fetched.lkrPer)) {
+              // Spread = the markup on *buying* the foreign currency. The
+              // reverse leg is the exact reciprocal, so the set_wealth_goal /
+              // inBase display round-trip stays the identity.
+              const lkrPerUnit = midLkrPerUnit * (1 + spreadPct / 100)
+              updateExchangeRate(cur, 'LKR', lkrPerUnit, date)
+              updateExchangeRate('LKR', cur, 1 / lkrPerUnit, date)
+              updated.push({
+                pair: `${cur}/LKR`,
+                lkrPerUnit: Number(lkrPerUnit.toFixed(6)),
+              })
+            }
+            const failed = targets.filter(
+              (c) =>
+                !Object.prototype.hasOwnProperty.call(fetched.lkrPer, c),
+            )
+            appendAuditLog('exchange_rates_refreshed', {
+              source: fetched.source,
+              asOf: fetched.asOf,
+              spreadPct,
+              updated: updated.map((u) => u.pair),
+              failed,
+            })
+            return json({
+              ok: true,
+              source: fetched.source,
+              asOf: fetched.asOf,
+              date,
+              spreadPct,
+              updated,
+              failed,
+            })
+          }
           if (action === 'update_exchange_rate') {
             // PF-206: store a currency->LKR (or any pair) rate so non-LKR
             // holdings/FDs/properties convert in the net-worth math. Fixes the
@@ -966,16 +1088,48 @@ export const Route = createFileRoute('/api/finance')({
             // configured"; an empty/missing targetDate clears the date only.
             const rawTargetLkr =
               typeof body.targetLkr === 'number' ? body.targetLkr : 0
-            const targetLkr = Math.max(0, Math.round(rawTargetLkr))
+            const enteredAmount = Math.max(0, Math.round(rawTargetLkr))
             const targetDate =
               typeof body.targetDate === 'string' && body.targetDate
                 ? body.targetDate
                 : undefined
+            // PF-201: the amount is entered in the configured reporting
+            // currency. Storage stays LKR-denominated, so convert base->LKR
+            // here. Resolve the rate exactly the way financeSummary.toBase
+            // does — LKR->base direct first, then the base->LKR inverse — and
+            // invert it, so a set -> reload round-trip is the identity.
+            const enteredCurrency =
+              typeof body.currency === 'string' && body.currency.trim()
+                ? body.currency.trim().toUpperCase()
+                : 'LKR'
+            let targetLkr = enteredAmount
+            if (enteredAmount > 0 && enteredCurrency !== 'LKR') {
+              const lkrToBase = getExchangeRate('LKR', enteredCurrency)
+              const baseToLkr = getExchangeRate(enteredCurrency, 'LKR')
+              if (lkrToBase !== undefined && lkrToBase !== 0) {
+                targetLkr = Math.round(enteredAmount / lkrToBase)
+              } else if (baseToLkr !== undefined) {
+                targetLkr = Math.round(enteredAmount * baseToLkr)
+              } else {
+                return json(
+                  {
+                    ok: false,
+                    error: `No exchange rate on file for ${enteredCurrency}. Add one under Accounts & Records first.`,
+                  },
+                  { status: 400 },
+                )
+              }
+            }
             const db = readFinanceStore()
             db.settings.wealthGoalTargetLkr = targetLkr
             db.settings.wealthGoalTargetDate = targetDate
             writeFinanceStore(db)
-            appendAuditLog('wealth_goal_updated', { targetLkr, targetDate })
+            appendAuditLog('wealth_goal_updated', {
+              targetLkr,
+              targetDate,
+              enteredCurrency,
+              enteredAmount,
+            })
             return json(personalFinancePayload())
           }
           if (action === 'ask_finance_question') {

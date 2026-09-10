@@ -693,8 +693,17 @@ export type RiskState = {
 }
 
 export type FinanceSettings = {
-  baseCurrency: 'LKR'
+  /** PF-201: the reporting currency all aggregate `*Lkr` figures are expressed
+   * in. Storage stays LKR-denominated; this is display/reporting only.
+   * Defaults to 'LKR'. */
+  baseCurrency: CurrencyCode
   reportingCurrencies: Array<CurrencyCode>
+  /** PF-201: percentage markup applied by `refresh_exchange_rates` on top of
+   * the fetched mid-market rate, to approximate the user's actual bank
+   * transfer rate (the cost of *buying* the foreign currency). The reverse
+   * leg is written as the exact reciprocal so display round-trips stay
+   * stable. Defaults to 0 (pure mid-market). */
+  exchangeRateSpreadPct?: number
   tradingMode: TradingMode
   liveTradingEnabled: boolean
   emergencyKillSwitch: boolean
@@ -2245,7 +2254,87 @@ function includeInTotals(row: {
   return TOTALS_STATUSES.includes(row.status ?? 'cleared')
 }
 
+/**
+ * Latest `from`->`to` rate in THIS db's `exchange_rates` (most recent by date).
+ * Pure over `db` — never reaches through `ensureFinanceStore`/`getExchangeRate`,
+ * which re-read the backing store and would disagree with the `db` passed here.
+ */
+function latestRateFromDb(
+  db: FinanceDatabase,
+  from: string,
+  to: string,
+): number | undefined {
+  const rows = (
+    db.exchange_rates as Array<{
+      base?: unknown
+      target?: unknown
+      rate?: unknown
+      date?: unknown
+    }>
+  )
+    .filter(
+      (r) => r.base === from && r.target === to && typeof r.rate === 'number',
+    )
+    .sort(
+      (a, b) =>
+        new Date(String(b.date ?? 0)).getTime() -
+        new Date(String(a.date ?? 0)).getTime(),
+    )
+  return rows.length ? (rows[0].rate as number) : undefined
+}
+
+/**
+ * Convert `amount`, denominated in `currency`, to LKR via `latestRateFromDb`
+ * (direct `currency->LKR`, else `1/inverse`). Returns `amount` unchanged when no
+ * rate is on file — same fallback as `financeSummary`'s `toLkr`.
+ */
+function amountToLkr(
+  db: FinanceDatabase,
+  amount: number,
+  currency: string | undefined,
+): number {
+  if (!currency || currency === 'LKR') return amount
+  const direct = latestRateFromDb(db, currency, 'LKR')
+  if (direct !== undefined) return amount * direct
+  const inverse = latestRateFromDb(db, 'LKR', currency)
+  if (inverse) return amount / inverse
+  return amount
+}
+
 export function financeSummary(db: FinanceDatabase) {
+  // PF-201: the reporting currency. Stored amounts stay LKR-denominated
+  // (`convertedLkrAmount`, `wealthGoalTargetLkr`, …); this only changes what
+  // the aggregate `*Lkr` figures below are *expressed* in. Default 'LKR' keeps
+  // every existing install byte-identical.
+  const base = db.settings.baseCurrency || 'LKR'
+
+  // Latest currency->currency rate from THIS db's `exchange_rates` (direct, or
+  // 1/inverse). Kept pure over `db` — see PF-206. `fxUnconverted` collects
+  // currencies with no rate on file; their raw amounts are still counted.
+  const fxUnconverted = new Set<string>()
+  const latestRate = (from: string, to: string): number | undefined =>
+    latestRateFromDb(db, from, to)
+  /** Convert an amount in `currency` to LKR. */
+  const toLkr = (amount: number, currency: CurrencyCode | undefined): number => {
+    if (!currency || currency === 'LKR') return amount
+    const direct = latestRate(currency, 'LKR')
+    if (direct !== undefined) return amount * direct
+    const inverse = latestRate('LKR', currency)
+    if (inverse) return amount / inverse
+    fxUnconverted.add(currency)
+    return amount
+  }
+  /** Convert an LKR amount to the configured reporting currency. */
+  const toBase = (lkr: number): number => {
+    if (base === 'LKR') return lkr
+    const direct = latestRate('LKR', base)
+    if (direct !== undefined) return lkr * direct
+    const inverse = latestRate(base, 'LKR')
+    if (inverse) return lkr / inverse
+    fxUnconverted.add(base)
+    return lkr
+  }
+
   const totalIncomeLkr = db.income_records
     .filter(includeInTotals)
     .reduce((sum, row) => sum + row.convertedLkrAmount, 0)
@@ -2256,9 +2345,14 @@ export function financeSummary(db: FinanceDatabase) {
   const savingsRate =
     totalIncomeLkr > 0 ? (netSavingsLkr / totalIncomeLkr) * 100 : 0
   const cashBalanceLkr = db.finance_accounts.reduce(
-    (sum, row) => sum + (row.currency === 'LKR' ? row.balance : 0),
+    (sum, row) => sum + toLkr(row.balance, row.currency),
     0,
   )
+  // PF-201: budget categories may be non-LKR (getBudgetVsActual converts them
+  // to LKR for the comparison). Run them through `toLkr` here for its side
+  // effect only — a missing rate then lands in `fxUnconverted`, raising the
+  // "Missing exchange rate" alert the same way an un-priced holding does.
+  for (const b of db.budget_categories) toLkr(b.budgetAmount, b.currency)
   const taxReserveLkr = db.savings_goals
     .filter((goal) => goal.name.toLowerCase().includes('tax'))
     .reduce((sum, goal) => sum + goal.currentAmount, 0)
@@ -2274,44 +2368,10 @@ export function financeSummary(db: FinanceDatabase) {
       .filter((loan) => loan.status === 'active')
       .reduce((sum, loan) => sum + loan.currentBalance, 0)
   // PF-206: holdings / FDs / properties may be denominated in a non-LKR
-  // currency. Resolve a currency->LKR rate from THIS db's `exchange_rates`
-  // (latest by date; direct or 1/inverse). Keep it pure over `db` — do not
-  // reach through `convertCurrency`/`getExchangeRate`, which re-read the
-  // backing store and would disagree with the `db` passed here. If no rate is
-  // on file the raw amount is still counted (better than dropping it from net
-  // worth) and the currency is reported in `fxUnconverted` for the UI.
-  const latestRate = (base: string, target: string): number | undefined => {
-    const rows = (
-      db.exchange_rates as Array<{
-        base?: unknown
-        target?: unknown
-        rate?: unknown
-        date?: unknown
-      }>
-    )
-      .filter(
-        (r) => r.base === base && r.target === target && typeof r.rate === 'number',
-      )
-      .sort(
-        (a, b) =>
-          new Date(String(b.date ?? 0)).getTime() -
-          new Date(String(a.date ?? 0)).getTime(),
-      )
-    return rows.length ? (rows[0].rate as number) : undefined
-  }
-  const fxUnconverted = new Set<string>()
-  const toLkr = (amount: number, currency: CurrencyCode | undefined): number => {
-    if (!currency || currency === 'LKR') return amount
-    const direct = latestRate(currency, 'LKR')
-    if (direct !== undefined) return amount * direct
-    const inverse = latestRate('LKR', currency)
-    if (inverse) return amount / inverse
-    fxUnconverted.add(currency)
-    return amount
-  }
-
-  // Never blocked on a live CSE price fetch succeeding — falls back to the
-  // buy price when no cached/manual current price is available yet.
+  // currency — `toLkr` (hoisted above) converts each via this db's
+  // `exchange_rates`. Never blocked on a live CSE price fetch succeeding —
+  // falls back to the buy price when no cached/manual current price is
+  // available yet.
   const stockHoldingsValueLkr = db.stock_holdings.reduce(
     (sum, holding) =>
       sum +
@@ -2362,21 +2422,25 @@ export function financeSummary(db: FinanceDatabase) {
     (plan) => plan.status === 'blocked' || plan.decision === 'BLOCKED',
   ).length
   return {
-    totalIncomeLkr,
-    totalExpensesLkr,
-    netSavingsLkr,
+    // PF-201: every `*Lkr` figure is expressed in `baseCurrency` (default
+    // 'LKR', in which case `toBase` is the identity). Percentages
+    // (savingsRate, unrealizedStockPnlPct) are currency-free — not converted.
+    baseCurrency: base,
+    totalIncomeLkr: toBase(totalIncomeLkr),
+    totalExpensesLkr: toBase(totalExpensesLkr),
+    netSavingsLkr: toBase(netSavingsLkr),
     savingsRate,
-    cashBalanceLkr,
-    taxReserveLkr,
-    debtLkr,
-    netWorthLkr,
-    stockHoldingsValueLkr,
-    fixedDepositsValueLkr,
-    propertyValueLkr,
-    unrealizedStockPnlLkr,
+    cashBalanceLkr: toBase(cashBalanceLkr),
+    taxReserveLkr: toBase(taxReserveLkr),
+    debtLkr: toBase(debtLkr),
+    netWorthLkr: toBase(netWorthLkr),
+    stockHoldingsValueLkr: toBase(stockHoldingsValueLkr),
+    fixedDepositsValueLkr: toBase(fixedDepositsValueLkr),
+    propertyValueLkr: toBase(propertyValueLkr),
+    unrealizedStockPnlLkr: toBase(unrealizedStockPnlLkr),
     unrealizedStockPnlPct,
-    /** PF-206: currencies held on assets that had no exchange rate on file —
-     * their raw amounts are still in the LKR totals above, unconverted. */
+    /** Currencies (an asset's own, or `baseCurrency` itself) with no exchange
+     * rate on file — the affected amounts are still counted, unconverted. */
     fxUnconverted: [...fxUnconverted].sort(),
     accountCount: db.finance_accounts.length,
     goalCount: db.savings_goals.length,
@@ -2949,7 +3013,11 @@ export function getBudgetVsActual(
   )
   if (!budgetEntry) return null
 
-  // Calculate actual expenses for that category, year, month
+  // Calculate actual expenses for that category, year, month. Expenses are
+  // already stored LKR-converted (`convertedLkrAmount`), so the budget side
+  // must be LKR too — PF-201: a budget category may be denominated in a
+  // non-LKR currency, so normalise `budgetAmount` here rather than comparing
+  // (say) a USD budget against an LKR spend total.
   let actual = 0
   for (const exp of db.expense_records) {
     if (!includeInTotals(exp)) continue
@@ -2964,10 +3032,11 @@ export function getBudgetVsActual(
     }
   }
 
+  const budget = amountToLkr(db, budgetEntry.budgetAmount, budgetEntry.currency)
   return {
-    budget: budgetEntry.budgetAmount,
+    budget,
     actual,
-    variance: budgetEntry.budgetAmount - actual,
+    variance: budget - actual,
   }
 }
 
@@ -3000,12 +3069,14 @@ export function budgetVsActualSummary(
     })
     .map((b) => {
       const result = getBudgetVsActual(db, b.category, year, monthNum)
-      const budget = result?.budget ?? b.budgetAmount
+      const budget =
+        result?.budget ?? amountToLkr(db, b.budgetAmount, b.currency)
       const actual = result?.actual ?? 0
       return {
         category: b.category,
         month: b.month,
-        currency: b.currency,
+        // PF-201: budget/actual/variance below are all LKR-normalised.
+        currency: 'LKR' as CurrencyCode,
         budget,
         actual,
         variance: result?.variance ?? budget,
@@ -3031,7 +3102,15 @@ export function updateExchangeRate(
     updatedAt: new Date().toISOString(),
   }
 
-  db.exchange_rates.push(rateRecord)
+  // Upsert by (base, target, date): getExchangeRate/latestRateFromDb both pick
+  // "latest by date", so a same-day duplicate makes the winner arbitrary. A
+  // daily refresh cron (or a manual re-entry) replaces the day's row in place
+  // rather than piling up.
+  const idx = db.exchange_rates.findIndex(
+    (r) => r.base === base && r.target === target && r.date === dateStr,
+  )
+  if (idx >= 0) db.exchange_rates[idx] = rateRecord
+  else db.exchange_rates.push(rateRecord)
   writeFinanceStore(db)
   appendAuditLog('exchange_rate_updated', { base, target, rate, date: dateStr })
   return db
@@ -3085,7 +3164,8 @@ export function convertCurrency(
     return amount * rate
   }
 
-  // Try via base currency (LKR) if both legs exist
+  // Pivot via LKR (the storage currency — rates are stored LKR-denominated
+  // regardless of the configured reporting currency) if both legs exist.
   const baseCurrency = 'LKR'
   const rateFromToBase = getExchangeRate(fromCurrency, baseCurrency, date)
   const rateBaseTo = getExchangeRate(baseCurrency, toCurrency, date)

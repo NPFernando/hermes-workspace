@@ -2,8 +2,13 @@ export function formatMoney(amount: number, currency: string): string {
   return `${currency} ${Math.round(amount).toLocaleString('en-LK')}`
 }
 
-export function formatLkr(value: number): string {
-  return formatMoney(value, 'LKR')
+/**
+ * PF-201: formats a base-currency amount. The name is historical — the value is
+ * expressed in the payload's configured `baseCurrency` (default 'LKR', in which
+ * case this is unchanged). Pass `payload.baseCurrency` at call sites that have it.
+ */
+export function formatLkr(value: number, currency: string = 'LKR'): string {
+  return formatMoney(value, currency)
 }
 
 export function formatPct(value: number): string {
