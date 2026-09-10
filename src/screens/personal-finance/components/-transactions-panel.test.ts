@@ -62,11 +62,32 @@ describe('unifyTransactions (client) matches getUnifiedTransactions (server)', (
       createdAt: '2026-06-10T09:00:00.000Z',
       updatedAt: '2026-06-10T09:00:00.000Z',
     })
+    db.transfers.push({
+      id: 't-1',
+      date: '2026-06-08',
+      fromAccountId: 'acc-a',
+      toAccountId: 'acc-b',
+      amount: 20_000,
+      currency: 'LKR',
+      convertedLkrAmount: 20_000,
+      source: 'test',
+      createdAt: '2026-06-08T00:00:00.000Z',
+      updatedAt: '2026-06-08T00:00:00.000Z',
+    })
 
     const server = getUnifiedTransactions(db)
-    const client = unifyTransactions(db.income_records, db.expense_records)
+    const client = unifyTransactions(
+      db.income_records,
+      db.expense_records,
+      db.transfers,
+    )
 
     expect(client).toEqual(server)
+    expect(server.find((r) => r.id === 't-1')).toMatchObject({
+      kind: 'transfer',
+      counterparty: 'acc-a → acc-b',
+      category: 'Transfer',
+    })
   })
 
   it('returns [] for empty inputs', () => {

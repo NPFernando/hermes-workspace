@@ -42,6 +42,7 @@ const FINANCE_COLLECTIONS = [
   'finance_accounts',
   'income_records',
   'expense_records',
+  'transfers',
   'budget_categories',
   'categories',
   'subcategories',

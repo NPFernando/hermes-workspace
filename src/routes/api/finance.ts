@@ -168,6 +168,7 @@ function unauthorized() {
 const PERSONAL_FINANCE_RECORD_KINDS = new Set([
   'income',
   'expense',
+  'transfer',
   'account',
   'goal',
   'tax',
@@ -515,6 +516,7 @@ function personalFinancePayload() {
       finance_accounts: db.finance_accounts,
       income_records: withinWindow(db.income_records, 'dateReceived'),
       expense_records: withinWindow(db.expense_records, 'date'),
+      transfers: withinWindow(db.transfers, 'date'),
       budget_categories: db.budget_categories,
       categories: db.categories,
       subcategories: db.subcategories,

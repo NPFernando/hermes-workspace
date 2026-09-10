@@ -162,10 +162,31 @@ export type ExpenseRecord = {
   updatedAt: string
 }
 
-/** Read-only unified view over income_records + expense_records for a single combined transaction list/UI. Storage stays split; this is computed on read, never persisted. */
+/**
+ * PF review item 12 (unified-ledger, first slice): an account-to-account move.
+ * Modelling it as its own kind — rather than a paired fake income + fake
+ * expense — keeps it out of `financeSummary`'s income/expense/savings totals,
+ * which it should never affect. Amount is informational; per-account balances
+ * remain manually maintained (roadmap ADR-001 — no derived ledger yet).
+ */
+export type Transfer = {
+  id: string
+  date: string
+  fromAccountId?: string
+  toAccountId?: string
+  amount: number
+  currency: CurrencyCode
+  convertedLkrAmount: number
+  notes?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Read-only unified view over income_records + expense_records + transfers for a single combined transaction list/UI. Storage stays split; this is computed on read, never persisted. */
 export type UnifiedTransaction = {
   id: string
-  kind: 'income' | 'expense'
+  kind: 'income' | 'expense' | 'transfer'
   date: string
   counterparty: string
   category: string
@@ -771,6 +792,7 @@ export type FinanceDatabase = {
   finance_accounts: Array<FinanceAccount>
   income_records: Array<IncomeRecord>
   expense_records: Array<ExpenseRecord>
+  transfers: Array<Transfer>
   budget_categories: Array<BudgetCategory>
   categories: Array<Category>
   subcategories: Array<Subcategory>
@@ -869,6 +891,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     finance_accounts: [],
     income_records: [],
     expense_records: [],
+    transfers: [],
     budget_categories: [],
     categories: [],
     subcategories: [],
@@ -1603,6 +1626,18 @@ export function addFinanceRecord(
       relationship: stringField(payload, 'relationship', ''),
       note: optionalString(payload, 'note'),
     })
+  } else if (kind === 'transfer') {
+    const amount = numberField(payload, 'amount', 0)
+    db.transfers.push({
+      ...base,
+      date: stringField(payload, 'date', createdAt.slice(0, 10)),
+      fromAccountId: optionalString(payload, 'fromAccountId'),
+      toAccountId: optionalString(payload, 'toAccountId'),
+      amount,
+      currency: stringField(payload, 'currency', 'LKR'),
+      convertedLkrAmount: numberField(payload, 'convertedLkrAmount', amount),
+      notes: optionalString(payload, 'notes'),
+    })
   } else if (kind === 'trading_plan') {
     db.trading_plans.push(createTradingPlan(payload, base))
   } else if (kind === 'virtual_account') {
@@ -1781,6 +1816,16 @@ export function updateFinanceRecord(
       }
       updated = true
     }
+  } else if (kind === 'transfer') {
+    const index = db.transfers.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.transfers[index] = {
+        ...db.transfers[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
+      updated = true
+    }
   } else {
     throw new Error(`Unsupported finance record kind for update: ${kind}`)
   }
@@ -1870,6 +1915,10 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.beneficiaries.length
     db.beneficiaries = db.beneficiaries.filter((r) => r.id !== id)
     removed = db.beneficiaries.length !== before
+  } else if (kind === 'transfer') {
+    const before = db.transfers.length
+    db.transfers = db.transfers.filter((r) => r.id !== id)
+    removed = db.transfers.length !== before
   } else {
     throw new Error(`Unsupported finance record kind for delete: ${kind}`)
   }
@@ -2815,7 +2864,23 @@ export function getUnifiedTransactions(
     }),
   )
 
-  return [...fromIncome, ...fromExpense].sort((a, b) => {
+  const fromTransfer: Array<UnifiedTransaction> = db.transfers.map((t) => ({
+    id: t.id,
+    kind: 'transfer',
+    date: t.date,
+    counterparty: [t.fromAccountId, t.toAccountId].filter(Boolean).join(' → '),
+    category: 'Transfer',
+    accountId: t.fromAccountId,
+    currency: t.currency,
+    amount: t.amount,
+    convertedLkrAmount: t.convertedLkrAmount,
+    notes: t.notes,
+    source: t.source,
+    createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
+  }))
+
+  return [...fromIncome, ...fromExpense, ...fromTransfer].sort((a, b) => {
     if (a.date !== b.date) return a.date < b.date ? 1 : -1
     return a.createdAt < b.createdAt ? 1 : -1
   })

@@ -110,6 +110,7 @@ export type PersonalFinancePayload = {
     finance_accounts: Array<Record<string, unknown>>
     income_records: Array<Record<string, unknown>>
     expense_records: Array<Record<string, unknown>>
+    transfers: Array<Record<string, unknown>>
     budget_categories: Array<Record<string, unknown>>
     categories: Array<Record<string, unknown>>
     subcategories: Array<Record<string, unknown>>

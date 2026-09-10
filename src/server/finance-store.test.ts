@@ -510,6 +510,46 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
     ).toThrow(/not found/)
   })
 
+  it('transfer kind: add/edit/delete, and it never touches income/expense totals (PF review item 12)', async () => {
+    const store = await freshFinanceStore()
+    store.addFinanceRecord('income', {
+      dateReceived: '2026-06-01',
+      sourceName: 'Salary',
+      originalAmount: 300_000,
+      convertedLkrAmount: 300_000,
+    })
+    store.addFinanceRecord('transfer', {
+      date: '2026-06-05',
+      fromAccountId: 'checking',
+      toAccountId: 'savings',
+      amount: 50_000,
+      convertedLkrAmount: 50_000,
+    })
+    let db = store.readFinanceStore()
+    expect(db.transfers).toHaveLength(1)
+    const id = db.transfers[0].id
+
+    // Transfers are NOT income or expense.
+    const s = store.financeSummary(db)
+    expect(s.totalIncomeBase).toBe(300_000)
+    expect(s.totalExpensesBase).toBe(0)
+    expect(s.netSavingsBase).toBe(300_000)
+
+    // …and they appear in the unified list as their own kind.
+    const unified = store.getUnifiedTransactions(db)
+    expect(unified.find((t) => t.id === id)).toMatchObject({
+      kind: 'transfer',
+      counterparty: 'checking → savings',
+    })
+
+    store.updateFinanceRecord('transfer', id, { amount: 60_000 })
+    db = store.readFinanceStore()
+    expect(db.transfers[0].amount).toBe(60_000)
+
+    store.deleteFinanceRecord('transfer', id)
+    expect(store.readFinanceStore().transfers).toHaveLength(0)
+  })
+
   it('goalKind (PF-1007 Sinking Funds) defaults to general and accepts sinking', async () => {
     const store = await freshFinanceStore()
     store.addFinanceRecord('goal', { name: 'Untyped goal', targetAmount: 1000 })

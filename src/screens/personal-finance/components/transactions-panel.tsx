@@ -21,6 +21,7 @@ const RENDER_PAGE = 100
 export function unifyTransactions(
   income: ReadonlyArray<Record<string, unknown>>,
   expense: ReadonlyArray<Record<string, unknown>>,
+  transfers: ReadonlyArray<Record<string, unknown>> = [],
 ): Array<Record<string, unknown>> {
   const rows: Array<Record<string, unknown>> = [
     ...income.map((r) => ({
@@ -59,6 +60,21 @@ export function unifyTransactions(
       subcategory: r.subcategory,
       tags: r.tags,
       status: r.status,
+      source: r.source,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    })),
+    ...transfers.map((r) => ({
+      id: r.id,
+      kind: 'transfer',
+      date: r.date,
+      counterparty: [r.fromAccountId, r.toAccountId].filter(Boolean).join(' → '),
+      category: 'Transfer',
+      accountId: r.fromAccountId,
+      currency: r.currency,
+      amount: r.amount,
+      convertedLkrAmount: r.convertedLkrAmount,
+      notes: r.notes,
       source: r.source,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
@@ -155,9 +171,10 @@ export function TransactionsPanel({
   const accounts = payload.data.finance_accounts
   const incomeRecords = payload.data.income_records
   const expenseRecords = payload.data.expense_records
+  const transferRecords = payload.data.transfers
   const transactions = useMemo(
-    () => unifyTransactions(incomeRecords, expenseRecords),
-    [incomeRecords, expenseRecords],
+    () => unifyTransactions(incomeRecords, expenseRecords, transferRecords),
+    [incomeRecords, expenseRecords, transferRecords],
   )
 
   async function submitTransaction() {
