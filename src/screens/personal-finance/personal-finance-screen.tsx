@@ -19,13 +19,11 @@ import { FinanceAnalystCard } from './components/finance-analyst-card'
 import { FinanceTrendsCard } from './components/finance-trends-card'
 import { SavingsGoalsProgress } from './components/savings-goals-progress'
 import { SinkingFundsPanel } from './components/sinking-funds-panel'
+import { GoalsTargetsCard } from './components/goals-targets-card'
 import { UpcomingMoney } from './components/upcoming-money'
 import { RecurringBillsInsight } from './components/recurring-bills-insight'
 import { DataHealthCard } from './components/data-health-card'
 import { AssistantMemoryCard } from './components/assistant-memory-card'
-import { EmergencyFundCard } from './components/emergency-fund-card'
-import { SavingsRateTargetCard } from './components/savings-rate-target-card'
-import { WealthGoalCard } from './components/wealth-goal-card'
 import { IncomeSourcesPanel } from './components/income-sources-panel'
 import { StockHoldingsPanel } from './components/stock-holdings-panel'
 import { FixedDepositsPanel } from './components/fixed-deposits-panel'
@@ -298,27 +296,25 @@ export function PersonalFinanceScreen() {
       {tab === 'overview' && (
         <>
           {/* Information hierarchy (docs/personal-finance-ux-review.md U1–U3):
-              money first (alerts → AI Q&A → trends), then goals/insights in a
-              2-col grid, then the currency picker, then a collapsed drawer for
-              the diagnostics. The currency picker stays visible (not in the
-              drawer) so it's reachable when the alerts card flags a missing
-              rate. A true settings *screen* for it (U3) and merging the three
-              target widgets into one component (U2) are still open — this is
-              the layout-only slice. */}
+              money first (alerts → AI Q&A → trends), then the merged
+              "Goals & targets" widget + the savings/sinking lists, then
+              "Coming up", then a collapsed drawer holding the reporting-
+              currency picker and the storage / assistant-memory diagnostics
+              — settings and health, not the daily view. The missing-rate
+              warning still shows up top via FinanceAlertsCard. */}
           <FinanceAlertsCard payload={payload} />
           <FinanceAnalystCard payload={payload} onPayload={setPayload} />
           <FinanceTrendsCard payload={payload} />
 
+          <GoalsTargetsCard payload={payload} onPayload={setPayload} />
+
           <section className="mt-6">
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
-              Goals &amp; targets
+              Savings &amp; sinking funds
             </h2>
             <div className="mt-1 grid items-start gap-4 lg:grid-cols-2 [&>*]:mt-0">
               <SavingsGoalsProgress payload={payload} onPayload={setPayload} />
               <SinkingFundsPanel payload={payload} onPayload={setPayload} />
-              <EmergencyFundCard payload={payload} onPayload={setPayload} />
-              <SavingsRateTargetCard payload={payload} onPayload={setPayload} />
-              <WealthGoalCard payload={payload} onPayload={setPayload} />
             </div>
           </section>
 
@@ -332,13 +328,12 @@ export function PersonalFinanceScreen() {
             </div>
           </section>
 
-          <BaseCurrencySelect payload={payload} onPayload={setPayload} />
-
           <details className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/50">
             <summary className="cursor-pointer list-none px-5 py-3 text-sm font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)]">
-              Assistant memory &amp; data health
+              Settings, assistant memory &amp; data health
             </summary>
             <div className="px-2 pb-2 [&>*]:mt-3">
+              <BaseCurrencySelect payload={payload} onPayload={setPayload} />
               <AssistantMemoryCard />
               <DataHealthCard payload={payload} />
             </div>
