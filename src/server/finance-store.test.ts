@@ -5,8 +5,10 @@ import * as path from 'node:path'
 import {
   buildFinanceStorageHealth,
   budgetVsActualSummary,
+  computeAccountLedgerBalance,
   createEmptyFinanceDatabase,
   createTradingPlan,
+  effectiveAccountBalance,
   financeAlerts,
   financeSummary,
   financeStorageAlerts,
@@ -20,9 +22,11 @@ import {
   getRecurringBills,
   getUnifiedTransactions,
   getUpcomingMoney,
+  ledgerTransactionsForDb,
   maskSensitive,
   tradingPerformanceSummary,
 } from './finance-store'
+import type { FinanceAccount } from './finance-store'
 
 /**
  * Fresh `finance-store` module instance backed by a pure in-memory store — no
@@ -2603,5 +2607,171 @@ describe('PF review item 7: server-side dashboard derivations', () => {
       { currency: 'LKR', amount: 500_000 },
       { currency: 'USD', amount: 3_000 },
     ])
+  })
+})
+
+describe('ledger-derived account balances (item 3 + 4)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  function acc(over: Partial<FinanceAccount>): FinanceAccount {
+    return {
+      id: 'a1',
+      name: 'A',
+      type: 'bank',
+      currency: 'LKR',
+      balance: 0,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      ...over,
+    }
+  }
+
+  it('computeAccountLedgerBalance: null without openingBalance, else opening + tagged movements', () => {
+    const db = createEmptyFinanceDatabase()
+    expect(
+      computeAccountLedgerBalance(db, { id: 'a1', currency: 'LKR' }, []),
+    ).toBeNull()
+    const legs = [
+      { accountId: 'a1', currency: 'LKR', amount: 5_000, kind: 'income' as const },
+      { accountId: 'a1', currency: 'LKR', amount: 2_000, kind: 'expense' as const },
+      { accountId: 'a2', currency: 'LKR', amount: 9_999, kind: 'income' as const },
+    ]
+    expect(
+      computeAccountLedgerBalance(
+        db,
+        { id: 'a1', currency: 'LKR', openingBalance: 10_000 },
+        legs,
+      ),
+    ).toBe(13_000)
+  })
+
+  it('converts a cross-currency leg via the FX table instead of skipping it (item 4)', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push({
+      id: 'r1',
+      base: 'USD',
+      target: 'LKR',
+      rate: 300,
+      date: '2026-06-01',
+      source: 'test',
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    // LKR account, a USD 100 income leg → +30_000 LKR
+    const legs = [
+      { accountId: 'a1', currency: 'USD', amount: 100, kind: 'income' as const },
+    ]
+    expect(
+      computeAccountLedgerBalance(
+        db,
+        { id: 'a1', currency: 'LKR', openingBalance: 0 },
+        legs,
+      ),
+    ).toBe(30_000)
+    // still excluded when there is no rate on file
+    const noRate = [
+      { accountId: 'a1', currency: 'AUD', amount: 100, kind: 'income' as const },
+    ]
+    expect(
+      computeAccountLedgerBalance(
+        db,
+        { id: 'a1', currency: 'LKR', openingBalance: 0 },
+        noRate,
+      ),
+    ).toBe(0)
+  })
+
+  it('ledgerTransactionsForDb turns income/expense/transfers into signed legs', () => {
+    const db = createEmptyFinanceDatabase()
+    db.income_records.push({
+      id: 'i1',
+      dateReceived: '2026-06-01',
+      sourceName: 'x',
+      incomeType: 'x',
+      originalCurrency: 'LKR',
+      originalAmount: 100,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 100,
+      accountId: 'a1',
+      taxable: true,
+      source: 'test',
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    db.transfers.push({
+      id: 't1',
+      date: '2026-06-02',
+      fromAccountId: 'a1',
+      toAccountId: 'a2',
+      amount: 40,
+      currency: 'LKR',
+      convertedLkrAmount: 40,
+      source: 'test',
+      createdAt: '2026-06-02T00:00:00.000Z',
+      updatedAt: '2026-06-02T00:00:00.000Z',
+    })
+    const legs = ledgerTransactionsForDb(db)
+    expect(legs).toEqual([
+      { accountId: 'a1', currency: 'LKR', amount: 100, kind: 'income' },
+      { accountId: 'a1', currency: 'LKR', amount: 40, kind: 'expense' },
+      { accountId: 'a2', currency: 'LKR', amount: 40, kind: 'income' },
+    ])
+  })
+
+  it('effectiveAccountBalance: opt-in uses ledger, off uses manual, fails closed when null', () => {
+    const db = createEmptyFinanceDatabase()
+    const legs = [
+      { accountId: 'a1', currency: 'LKR', amount: 500, kind: 'expense' as const },
+    ]
+    // opt-out → manual balance
+    expect(
+      effectiveAccountBalance(db, acc({ balance: 7_777 }), legs),
+    ).toBe(7_777)
+    // opt-in with opening balance → derived
+    expect(
+      effectiveAccountBalance(
+        db,
+        acc({ balance: 7_777, openingBalance: 1_000, deriveBalanceFromLedger: true }),
+        legs,
+      ),
+    ).toBe(500)
+    // opt-in but NO opening balance → falls back to manual (never 0)
+    expect(
+      effectiveAccountBalance(
+        db,
+        acc({ balance: 7_777, deriveBalanceFromLedger: true }),
+        legs,
+      ),
+    ).toBe(7_777)
+  })
+
+  it('financeSummary cash/net-worth honour an opted-in account, and fall back when not computable', () => {
+    const db = createEmptyFinanceDatabase()
+    db.finance_accounts.push(
+      acc({ id: 'led', balance: 999, openingBalance: 1_000, deriveBalanceFromLedger: true }),
+      acc({ id: 'man', balance: 2_000 }),
+      acc({ id: 'noOpen', balance: 3_000, deriveBalanceFromLedger: true }),
+    )
+    db.expense_records.push({
+      id: 'e1',
+      date: '2026-06-01',
+      vendor: 'v',
+      category: 'c',
+      currency: 'LKR',
+      amount: 250,
+      convertedLkrAmount: 250,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      accountId: 'led',
+      source: 'test',
+      createdAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    // led: 1000 - 250 = 750 (not 999) · man: 2000 · noOpen: 3000 (fallback)
+    expect(financeSummary(db).cashBalanceBase).toBe(750 + 2_000 + 3_000)
   })
 })
