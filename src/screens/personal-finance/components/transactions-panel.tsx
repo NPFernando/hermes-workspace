@@ -166,6 +166,16 @@ export function TransactionsPanel({
   const [transferFrom, setTransferFrom] = useState('')
   const [transferTo, setTransferTo] = useState('')
 
+  // Item 7: the payload only ships the trailing `transactionsWindowMonths` of
+  // history. "Load full history" pages the rest in via the `list_transactions`
+  // action; once loaded it becomes the source list until the next mutation
+  // (which would make it stale) or an explicit reset.
+  const [fullHistory, setFullHistory] = useState<Array<
+    Record<string, unknown>
+  > | null>(null)
+  const [historyBusy, setHistoryBusy] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+
   const [search, setSearch] = useState('')
   const [filterKind, setFilterKind] = useState<'all' | TxnKind>('all')
   const [filterStatus, setFilterStatus] = useState<
@@ -180,10 +190,61 @@ export function TransactionsPanel({
   const incomeRecords = payload.data.income_records
   const expenseRecords = payload.data.expense_records
   const transferRecords = payload.data.transfers
-  const transactions = useMemo(
+  const windowedTransactions = useMemo(
     () => unifyTransactions(incomeRecords, expenseRecords, transferRecords),
     [incomeRecords, expenseRecords, transferRecords],
   )
+  const transactions = fullHistory ?? windowedTransactions
+
+  async function loadFullHistory() {
+    setHistoryBusy(true)
+    setHistoryError(null)
+    try {
+      const rows: Array<Record<string, unknown>> = []
+      let cursor: string | null = null
+      // Bounded loop — 500 rows/page, cap at 200 pages (100k txns).
+      for (let guard = 0; guard < 200; guard += 1) {
+        const res: Response = await fetch('/api/finance', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: 'list_transactions',
+            limit: 500,
+            cursor: cursor ?? undefined,
+          }),
+        })
+        const data = (await res.json()) as {
+          ok?: boolean
+          error?: string
+          transactions?: Array<Record<string, unknown>>
+          nextCursor?: string | null
+        }
+        if (!res.ok || !data.ok) {
+          setHistoryError(data.error ?? 'Could not load full history.')
+          return
+        }
+        rows.push(...(data.transactions ?? []))
+        cursor = data.nextCursor ?? null
+        if (!cursor) break
+      }
+      setFullHistory(rows)
+    } catch {
+      setHistoryError('Could not load full history.')
+    } finally {
+      setHistoryBusy(false)
+    }
+  }
+
+  // A mutation invalidates a loaded full-history snapshot — drop back to the
+  // (freshly refetched) payload window so edited rows don't linger.
+  async function mutate(
+    body: Record<string, unknown>,
+    busyKey?: string,
+  ): Promise<PersonalFinancePayload | undefined> {
+    const data = await post(body, busyKey)
+    if (data) setFullHistory(null)
+    return data
+  }
 
   async function submitTransaction() {
     const busyKey = 'add-transaction'
@@ -198,7 +259,7 @@ export function TransactionsPanel({
         setErr('“From” and “To” accounts must differ')
         return
       }
-      const data = await post(
+      const data = await mutate(
         {
           action: 'add_record',
           kind: 'transfer',
@@ -238,7 +299,7 @@ export function TransactionsPanel({
     }
     const data =
       addKind === 'income'
-        ? await post(
+        ? await mutate(
             {
               action: 'add_record',
               kind: 'income',
@@ -255,7 +316,7 @@ export function TransactionsPanel({
             },
             busyKey,
           )
-        : await post(
+        : await mutate(
             {
               action: 'add_record',
               kind: 'expense',
@@ -330,7 +391,7 @@ export function TransactionsPanel({
         setErr('“From” and “To” accounts must differ')
         return
       }
-      const data = await post(
+      const data = await mutate(
         {
           action: 'update_record',
           kind: 'transfer',
@@ -365,7 +426,7 @@ export function TransactionsPanel({
     }
     const data =
       kind === 'income'
-        ? await post(
+        ? await mutate(
             {
               action: 'update_record',
               kind: 'income',
@@ -383,7 +444,7 @@ export function TransactionsPanel({
             },
             `edit-${id}`,
           )
-        : await post(
+        : await mutate(
             {
               action: 'update_record',
               kind: 'expense',
@@ -406,7 +467,7 @@ export function TransactionsPanel({
   }
 
   async function deleteTransaction(id: string, kind: TxnKind) {
-    const data = await post(
+    const data = await mutate(
       { action: 'delete_record', kind, id },
       `delete-${id}`,
     )
@@ -450,7 +511,16 @@ export function TransactionsPanel({
   const [visibleCount, setVisibleCount] = useState(RENDER_PAGE)
   useEffect(() => {
     setVisibleCount(RENDER_PAGE)
-  }, [search, filterKind, filterStatus, dateFrom, dateTo, amountMin, amountMax])
+  }, [
+    search,
+    filterKind,
+    filterStatus,
+    dateFrom,
+    dateTo,
+    amountMin,
+    amountMax,
+    fullHistory,
+  ])
   const visible = filtered.slice(0, visibleCount)
 
   const totalsByCurrency = new Map<string, number>()
@@ -760,11 +830,39 @@ export function TransactionsPanel({
         />
       </div>
 
-      {payload.transactionsWindowMonths > 0 && (
-        <p className="mt-2 text-xs text-[var(--theme-muted)]">
-          Showing the last {payload.transactionsWindowMonths} months. Older
-          transactions are in the JSON export.
+      {fullHistory ? (
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-[var(--theme-muted)]">
+          <span>
+            Showing full history —{' '}
+            {fullHistory.length.toLocaleString('en-LK')} transactions.
+          </span>
+          <button
+            type="button"
+            onClick={() => setFullHistory(null)}
+            className="font-medium text-[var(--theme-text)] underline"
+          >
+            Back to last {payload.transactionsWindowMonths} months
+          </button>
         </p>
+      ) : (
+        payload.transactionsWindowMonths > 0 && (
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-[var(--theme-muted)]">
+            <span>
+              Showing the last {payload.transactionsWindowMonths} months.
+            </span>
+            <button
+              type="button"
+              onClick={() => void loadFullHistory()}
+              disabled={historyBusy}
+              className="rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_12%,transparent)] px-2 py-0.5 font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_20%,transparent)] disabled:opacity-50"
+            >
+              {historyBusy ? 'Loading…' : 'Load full history'}
+            </button>
+          </p>
+        )
+      )}
+      {historyError && (
+        <p className="mt-1 text-xs text-[var(--theme-danger)]">{historyError}</p>
       )}
 
       <div className="mt-3 grid gap-2">
