@@ -1799,8 +1799,40 @@ describe('buildFinanceQueryContext (Phase 24 Hermes Finance Analyst)', () => {
   it('passes through the already-tested summary and monthlySummary unchanged', () => {
     const db = createEmptyFinanceDatabase()
     const context = buildFinanceQueryContext(db)
+    expect(context.currency).toBe('LKR')
     expect(context.summary).toEqual(financeSummary(db))
     expect(context.monthlySummary).toEqual(getMonthlySummary(db).slice(-6))
+  })
+
+  it('keeps the summary in LKR even when a non-LKR reporting currency is set (PF-201)', () => {
+    const db = createEmptyFinanceDatabase()
+    db.settings.baseCurrency = 'USD'
+    db.exchange_rates.push({
+      base: 'LKR',
+      target: 'USD',
+      rate: 1 / 300,
+      date: '2026-06-01',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    db.income_records.push({
+      id: 'i-1',
+      dateReceived: '2026-06-10',
+      sourceName: 'Salary',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: 300_000,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 300_000,
+      taxable: true,
+      source: 'test',
+      createdAt: '2026-06-10T00:00:00.000Z',
+      updatedAt: '2026-06-10T00:00:00.000Z',
+    })
+    const context = buildFinanceQueryContext(db)
+    // financeSummary(db) here would be in USD (~1000); the context pins LKR.
+    expect(context.currency).toBe('LKR')
+    expect(context.summary.baseCurrency).toBe('LKR')
+    expect(context.summary.totalIncomeLkr).toBe(300_000)
   })
 
   function pushExecutedTrade(

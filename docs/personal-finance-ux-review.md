@@ -246,12 +246,22 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 6. De-duplicate the transaction representation — one of `transactions` vs raw arrays (D1).
 7. Server-side `trends` / `recurringBills` / `upcomingMoney` / `currencyExposure` in the
    payload; delete the Python port in the digest cron (D4).
-8. Consolidate on `useFinanceAction` (M1).
+8. ✅ **DONE** (`feat/pf-dashboard-perf`) — 6 Overview cards (`savings-rate-target-card`,
+   `emergency-fund-card`, `base-currency-select`, `wealth-goal-card`, and the
+   `LinkedAccountControl` in `savings-goals-progress` / `sinking-funds-panel`) now use
+   `useFinanceAction`; cards that silently swallowed failures now surface the server error.
+   `finance-analyst-card` keeps its own fetch (streaming Q&A + chart, not a single mutation).
 
 **Tier 3 — larger / roadmap-level**
 
 9. Paged transaction-history endpoint (D2).
-10. Lighter mutation responses + explicit cache patching (P5).
+10. ✅ **DONE** (`feat/pf-dashboard-perf`) — Finance Analyst units pass:
+    `buildFinanceQueryContext` pins its `summary` to LKR (computed against a `baseCurrency:'LKR'`
+    clone of the db) and stamps `currency: 'LKR'`, so the LLM prompt no longer mixes a
+    base-currency `summary` with the raw-LKR `monthlySummary` / `categoryBreakdown` /
+    `topVendors`. The prompt now states the currency explicitly.
+    *(was item 10 "Finance Analyst units pass" in the original table — the "lighter mutation
+    responses" idea moves down.)*
 11. `*Lkr` → `*Base` rename (M3).
 12. The unified ledger (already `personal-finance-os-roadmap.md` Phase 1).
 

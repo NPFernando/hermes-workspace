@@ -2942,6 +2942,10 @@ export function getAverageMonthlySavingsRatePct(
  * here is new, grouping getUnifiedTransactions()'s expense rows by month.
  */
 export function buildFinanceQueryContext(db: FinanceDatabase): {
+  /** PF-201: every figure in this context is LKR, including `summary` — the
+   *  Finance Analyst prompt must not see base-currency aggregates next to the
+   *  raw-LKR `monthlySummary` / `categoryBreakdown` / `topVendors`. */
+  currency: 'LKR'
   summary: ReturnType<typeof financeSummary>
   monthlySummary: ReturnType<typeof getMonthlySummary>
   categoryBreakdown: {
@@ -2981,8 +2985,14 @@ export function buildFinanceQueryContext(db: FinanceDatabase): {
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 10)
 
+  // Pin the summary to LKR regardless of the configured reporting currency —
+  // the rest of this context (monthlySummary, categoryBreakdown, topVendors)
+  // is raw `convertedLkrAmount`, so a base-currency summary would be a
+  // units mismatch inside one LLM prompt.
+  const lkrDb = { ...db, settings: { ...db.settings, baseCurrency: 'LKR' } }
   return {
-    summary: financeSummary(db),
+    currency: 'LKR' as const,
+    summary: financeSummary(lkrDb),
     monthlySummary: getMonthlySummary(db).slice(-6),
     categoryBreakdown: {
       thisMonth: byCategory(thisMonthKey),
