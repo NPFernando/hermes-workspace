@@ -1018,11 +1018,26 @@ export function writeFinancePostgresNormalized(db: FinanceDatabase): boolean {
     const rowsSql = FINANCE_COLLECTIONS.flatMap((collection) => {
       const value = (db as unknown as Record<string, unknown>)[collection]
       if (!Array.isArray(value)) return []
-      return value.map((record, index) => {
+      // finance_engine_collections has a (collection_name, record_id) primary
+      // key, so any two rows in one collection that resolve to the same
+      // record_id abort the whole mirror transaction (ON_ERROR_STOP=1) and
+      // `persist()` in the trading engine then throws -> 500 on every cycle.
+      // This bit for real once strategy_results grew past ~6000 rows: an
+      // id-less row appended near the end got the old positional fallback
+      // `strategy_results:<index+1>`, which collided with an *explicit*
+      // stableId of the same `<collection>:<n>` shape. Fix: namespace the
+      // fallback with `#row` (a shape stableId never produces) and de-dupe by
+      // record_id, last write wins.
+      const byId = new Map<string, string>()
+      value.forEach((record, index) => {
         const row = isRecord(record) ? record : { value: record }
-        const id = firstText(row, ['id'], `${collection}:${index + 1}`)
-        return `(${sqlText(collection)}, ${sqlText(id)}, ${sqlJsonb(row)}, ${sqlText(timestampValue(row, ['createdAt', 'created_at'], updatedAt))}, ${sqlText(timestampValue(row, ['updatedAt', 'updated_at'], updatedAt))})`
+        const id = firstText(row, ['id']) || `${collection}#row${index + 1}`
+        byId.set(
+          id,
+          `(${sqlText(collection)}, ${sqlText(id)}, ${sqlJsonb(row)}, ${sqlText(timestampValue(row, ['createdAt', 'created_at'], updatedAt))}, ${sqlText(timestampValue(row, ['updatedAt', 'updated_at'], updatedAt))})`,
+        )
       })
+      return [...byId.values()]
     })
     const specialRows = [
       `('riskState', 'default', ${sqlJsonb(db.riskState)}, ${sqlText(updatedAt)}, ${sqlText(updatedAt)})`,

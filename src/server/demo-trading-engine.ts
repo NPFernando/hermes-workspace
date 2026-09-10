@@ -2772,14 +2772,25 @@ async function runTradingCycleInner(
     }
   }
 
-  persist({
-    scores,
-    positions,
-    trades,
-    blocks,
-    patternVetoStats,
-    sentimentObservations,
-  })
+  try {
+    persist({
+      scores,
+      positions,
+      trades,
+      blocks,
+      patternVetoStats,
+      sentimentObservations,
+    })
+  } catch (err) {
+    // A persistence failure (e.g. the finance PG mirror rejecting the write)
+    // must surface as a diagnostic bail, not an uncaught 500 that leaves the
+    // engine silently dead — this was the P1 that took both engines down for
+    // ~5 days after 2026-09-05 (a record_id collision in
+    // writeFinancePostgresNormalized, fixed there; this guard is defence in
+    // depth). The in-memory `positions`/`trades` for this cycle are lost, but
+    // the next cycle re-reads from the store and re-derives.
+    return bail(`persist failed: ${(err as Error).message}`)
+  }
   let learning: LearningCycleResult | undefined
   if (mode === 'paper_trade' || mode === 'testnet_execute') {
     try {
