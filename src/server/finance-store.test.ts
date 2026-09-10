@@ -550,6 +550,42 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
     expect(store.readFinanceStore().transfers).toHaveLength(0)
   })
 
+  it('transfer convertedLkrAmount is derived from the FX table on write, not trusted from the client', async () => {
+    const store = await freshFinanceStore()
+    store.updateExchangeRate('USD', 'LKR', 320, '2026-06-01')
+
+    // client posts the raw amount as convertedLkrAmount (as the add/edit
+    // forms do) — the store must override it with the real LKR value.
+    store.addFinanceRecord('transfer', {
+      date: '2026-06-05',
+      fromAccountId: 'usd-checking',
+      toAccountId: 'usd-savings',
+      amount: 100,
+      currency: 'USD',
+      convertedLkrAmount: 100,
+    })
+    let t = store.readFinanceStore().transfers[0]
+    expect(t.convertedLkrAmount).toBe(32_000)
+
+    // …and again on update, from the merged amount/currency.
+    store.updateFinanceRecord('transfer', t.id, { amount: 250 })
+    t = store.readFinanceStore().transfers[0]
+    expect(t.amount).toBe(250)
+    expect(t.convertedLkrAmount).toBe(80_000)
+
+    // no rate on file ⇒ falls back to the raw amount (matches financeSummary)
+    store.addFinanceRecord('transfer', {
+      date: '2026-06-06',
+      amount: 500,
+      currency: 'AUD',
+      convertedLkrAmount: 500,
+    })
+    const aud = store
+      .readFinanceStore()
+      .transfers.find((r) => r.currency === 'AUD')!
+    expect(aud.convertedLkrAmount).toBe(500)
+  })
+
   it('goalKind (PF-1007 Sinking Funds) defaults to general and accepts sinking', async () => {
     const store = await freshFinanceStore()
     store.addFinanceRecord('goal', { name: 'Untyped goal', targetAmount: 1000 })
