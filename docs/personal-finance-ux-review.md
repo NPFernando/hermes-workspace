@@ -230,16 +230,19 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 3. ✅ **DONE** (`feat/pf-dashboard-perf`) — `finance-trends-card` memos depend on the record
    arrays, not the whole `payload`, so an unrelated mutation no longer recomputes both charts
    (P3).
-4. Overview information hierarchy (U1). **Partial** (`feat/pf-dashboard-perf`): the two pure
-   diagnostics (`AssistantMemoryCard`, `DataHealthCard`) are now in a collapsed `<details>` at
-   the bottom. The 2-col grid + "today" focal block is left with item 5 — it needs each goal
-   card's baked-in `mt-*` margin removed, which overlaps the item-5 card merge, so they should
-   land together.
+4. ✅ **DONE** (`feat/pf-dashboard-perf`) — Overview hierarchy (U1): money first
+   (alerts → AI Q&A → trends), then a labelled **"Goals & targets"** section and a **"Coming
+   up"** section each in a `lg:grid-cols-2` grid (the cards' baked-in `mt-*` is zeroed by a
+   `[&>*]:mt-0` container variant, no per-card edits), then the currency picker, then a
+   collapsed `<details>` for `AssistantMemoryCard` + `DataHealthCard`.
 
 **Tier 2 — medium, structural**
 
-5. Merge the 3 target cards into one "Goals & targets" section (U2); move `BaseCurrencySelect`
-   to settings (U3).
+5. **Partial** (`feat/pf-dashboard-perf`): the 3 target cards are now visually grouped under a
+   "Goals & targets" heading in a grid (item 4). Still open — collapsing
+   `EmergencyFundCard` + `SavingsRateTargetCard` + `WealthGoalCard` into **one component**
+   with a shared row layout (U2), and giving `BaseCurrencySelect` a real settings-screen home
+   (U3) rather than a bottom-of-Overview slot.
 6. De-duplicate the transaction representation — one of `transactions` vs raw arrays (D1).
 7. Server-side `trends` / `recurringBills` / `upcomingMoney` / `currencyExposure` in the
    payload; delete the Python port in the digest cron (D4).

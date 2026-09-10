@@ -340,29 +340,48 @@ export function PersonalFinanceScreen() {
 
       {tab === 'overview' && (
         <>
-          {/* Money first: alerts, currency, AI Q&A, trend charts, then the
-              goal/insight cards. The assistant-memory + storage-health
-              diagnostics are collapsed at the bottom — they're not the daily
-              view (see docs/personal-finance-ux-review.md U1). Merging the
-              three target cards / relocating the currency picker to a settings
-              area is a follow-up (U2/U3, review Tier 2). */}
+          {/* Information hierarchy (docs/personal-finance-ux-review.md U1–U3):
+              money first (alerts → AI Q&A → trends), then goals/insights in a
+              2-col grid, then the currency picker, then a collapsed drawer for
+              the diagnostics. The currency picker stays visible (not in the
+              drawer) so it's reachable when the alerts card flags a missing
+              rate. A true settings *screen* for it (U3) and merging the three
+              target widgets into one component (U2) are still open — this is
+              the layout-only slice. */}
           <FinanceAlertsCard payload={payload} />
-          <BaseCurrencySelect payload={payload} onPayload={setPayload} />
           <FinanceAnalystCard payload={payload} onPayload={setPayload} />
           <FinanceTrendsCard payload={payload} />
-          <SavingsGoalsProgress payload={payload} onPayload={setPayload} />
-          <SinkingFundsPanel payload={payload} onPayload={setPayload} />
-          <EmergencyFundCard payload={payload} onPayload={setPayload} />
-          <SavingsRateTargetCard payload={payload} onPayload={setPayload} />
-          <WealthGoalCard payload={payload} onPayload={setPayload} />
-          <UpcomingMoney payload={payload} />
-          <RecurringBillsInsight payload={payload} />
+
+          <section className="mt-6">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+              Goals &amp; targets
+            </h2>
+            <div className="mt-1 grid items-start gap-4 lg:grid-cols-2 [&>*]:mt-0">
+              <SavingsGoalsProgress payload={payload} onPayload={setPayload} />
+              <SinkingFundsPanel payload={payload} onPayload={setPayload} />
+              <EmergencyFundCard payload={payload} onPayload={setPayload} />
+              <SavingsRateTargetCard payload={payload} onPayload={setPayload} />
+              <WealthGoalCard payload={payload} onPayload={setPayload} />
+            </div>
+          </section>
+
+          <section className="mt-6">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+              Coming up
+            </h2>
+            <div className="mt-1 grid items-start gap-4 lg:grid-cols-2 [&>*]:mt-0">
+              <UpcomingMoney payload={payload} />
+              <RecurringBillsInsight payload={payload} />
+            </div>
+          </section>
+
+          <BaseCurrencySelect payload={payload} onPayload={setPayload} />
 
           <details className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/50">
             <summary className="cursor-pointer list-none px-5 py-3 text-sm font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)]">
               Assistant memory &amp; data health
             </summary>
-            <div className="px-2 pb-2">
+            <div className="px-2 pb-2 [&>*]:mt-3">
               <AssistantMemoryCard />
               <DataHealthCard payload={payload} />
             </div>
