@@ -1,8 +1,25 @@
 # Strategy lifecycle: making auto upgrade/degrade symmetric
 
-**Status:** proposal — needs sign-off before implementation (touches live
-strategy sizing thresholds).
+**Status:** IMPLEMENTED inert, 2026-09-10 — ships behind
+`learningPolicy.autoRestore` (**default false**), so it changes nothing until
+explicitly enabled. Turning it on, plus the final threshold values
+(`STRATEGY_RESTORE_WINRATE` 0.53, `STRATEGY_RESTORE_HEALTHY_RUNS` 2, the
+`0.5 → 0.75 → clear` ladder), still need sign-off.
 **Author:** finance-section audit, 2026-09-10.
+
+## What shipped
+
+`demo-trading-engine.ts`: `LearningPolicy.autoRestore`, pure helpers
+`strategyRecoveryEligible()` / `restoreStepForOverride()`, a per-strategy
+`strategyRestoreProgress` streak map on `settings.demoTrading`, and a recovery
+loop appended to `applyStrategyOverrideRecommendations()` (the same daily
+applier — no new cron). Result gains a `restored: StrategyOverrideRestoreStep[]`
+field; the audit row gains `restoredCount`. 5 tests cover flag-off no-op, the
+2-run gate, the full `disabled → 0.5 → 0.75 → clear` ladder, the flap reset,
+and manual-override immunity. The design below is unchanged; the recovery-band
+line landed at **0.53** (not 0.52) for a clean 8-pt gap over the 0.45 demote
+line. The dashboard chip + `demo-trading-auto-throttle.sh` Telegram line are
+still TODO.
 
 ## The gap
 

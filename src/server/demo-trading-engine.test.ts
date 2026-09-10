@@ -1857,6 +1857,166 @@ describe('strategy overrides', () => {
   })
 })
 
+describe('auto-restore recovery ladder (learningPolicy.autoRestore)', () => {
+  // A score that is BOTH `keep` (winRate>=0.45) and recovery-eligible
+  // (trades>=5, winRate>=0.53, avgPnl>0, score>-0.2).
+  const recoveredScore = (strategyId: string) => ({
+    kind: 'demo_strategy_score',
+    strategyId,
+    trades: 10,
+    wins: 6,
+    losses: 4,
+    totalPnlQuote: 20,
+    score: 0.3,
+    winRate: 0.6,
+    avgPnlQuote: 2,
+    lossStreak: 0,
+    updatedAt: new Date().toISOString(),
+  })
+
+  async function seed(
+    scoreRow: Record<string, unknown>,
+    opts: { autoRestore: boolean },
+  ) {
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    db.strategy_results = [scoreRow] as never
+    const dt = ((db.settings as Record<string, unknown>).demoTrading ??
+      {}) as Record<string, unknown>
+    dt.learningPolicy = { ...(dt.learningPolicy as object), autoRestore: opts.autoRestore }
+    ;(db.settings as Record<string, unknown>).demoTrading = dt
+    store.writeFinanceStore(db)
+  }
+
+  it('does nothing when autoRestore is off, even for a fully recovered strategy', async () => {
+    await seed(recoveredScore('sma_crossover'), { autoRestore: false })
+    const { setStrategyOverride, applyStrategyOverrideRecommendations } =
+      await import('./demo-trading-engine')
+    setStrategyOverride({
+      strategyId: 'sma_crossover',
+      overrideAction: 'disabled',
+      reason: 'auto throttle',
+      source: 'automatic',
+    })
+    const r1 = applyStrategyOverrideRecommendations()
+    const r2 = applyStrategyOverrideRecommendations()
+    expect(r1.result.restored).toHaveLength(0)
+    expect(r2.result.restored).toHaveLength(0)
+    expect(
+      r2.result.activeOverrides.find((o) => o.strategyId === 'sma_crossover')
+        ?.mode,
+    ).toBe('disabled')
+  })
+
+  it('steps disabled -> reduce_size(0.5) only after 2 consecutive healthy runs', async () => {
+    await seed(recoveredScore('sma_crossover'), { autoRestore: true })
+    const { setStrategyOverride, applyStrategyOverrideRecommendations } =
+      await import('./demo-trading-engine')
+    setStrategyOverride({
+      strategyId: 'sma_crossover',
+      overrideAction: 'disabled',
+      reason: 'auto throttle',
+      source: 'automatic',
+    })
+
+    const r1 = applyStrategyOverrideRecommendations()
+    expect(r1.result.restored).toHaveLength(0) // healthyRuns = 1
+    expect(
+      r1.result.activeOverrides.find((o) => o.strategyId === 'sma_crossover')
+        ?.mode,
+    ).toBe('disabled')
+
+    const r2 = applyStrategyOverrideRecommendations()
+    expect(r2.result.restored).toEqual([
+      expect.objectContaining({
+        strategyId: 'sma_crossover',
+        fromMode: 'disabled',
+        action: 'reduce_size',
+        toMultiplier: 0.5,
+      }),
+    ])
+    expect(
+      r2.result.activeOverrides.find((o) => o.strategyId === 'sma_crossover'),
+    ).toMatchObject({ mode: 'reduce_size', multiplier: 0.5 })
+  })
+
+  it('walks the full ladder disabled -> 0.5 -> 0.75 -> clear, 2 runs per step', async () => {
+    await seed(recoveredScore('rsi_reversion'), { autoRestore: true })
+    const { setStrategyOverride, applyStrategyOverrideRecommendations, strategyOverrideState } =
+      await import('./demo-trading-engine')
+    setStrategyOverride({
+      strategyId: 'rsi_reversion',
+      overrideAction: 'disabled',
+      reason: 'auto throttle',
+      source: 'automatic',
+    })
+    const modeNow = () =>
+      strategyOverrideState().active.find((o) => o.strategyId === 'rsi_reversion')
+
+    applyStrategyOverrideRecommendations() // run 1
+    applyStrategyOverrideRecommendations() // run 2 -> 0.5
+    expect(modeNow()).toMatchObject({ mode: 'reduce_size', multiplier: 0.5 })
+    applyStrategyOverrideRecommendations() // run 3
+    applyStrategyOverrideRecommendations() // run 4 -> 0.75
+    expect(modeNow()).toMatchObject({ mode: 'reduce_size', multiplier: 0.75 })
+    applyStrategyOverrideRecommendations() // run 5
+    const last = applyStrategyOverrideRecommendations() // run 6 -> clear
+    expect(last.result.restored[0]).toMatchObject({ action: 'clear' })
+    expect(modeNow()).toBeUndefined()
+  })
+
+  it('resets the streak if the strategy dips back into the hysteresis band', async () => {
+    await seed(recoveredScore('sma_crossover'), { autoRestore: true })
+    const store = await import('./finance-store')
+    const { setStrategyOverride, applyStrategyOverrideRecommendations } =
+      await import('./demo-trading-engine')
+    setStrategyOverride({
+      strategyId: 'sma_crossover',
+      overrideAction: 'disabled',
+      reason: 'auto throttle',
+      source: 'automatic',
+    })
+    applyStrategyOverrideRecommendations() // healthyRuns = 1
+
+    // win rate falls to 0.48 — still `keep`, but inside [0.45, 0.53): not eligible
+    const db = store.readFinanceStore()
+    db.strategy_results = [
+      { ...recoveredScore('sma_crossover'), wins: 5, losses: 5, winRate: 0.48 },
+    ] as never
+    store.writeFinanceStore(db)
+    const dip = applyStrategyOverrideRecommendations()
+    expect(dip.result.restored).toHaveLength(0)
+
+    // back to recovered — must count from 1 again, so the very next run does NOT step
+    const db2 = store.readFinanceStore()
+    db2.strategy_results = [recoveredScore('sma_crossover')] as never
+    store.writeFinanceStore(db2)
+    const back1 = applyStrategyOverrideRecommendations()
+    expect(back1.result.restored).toHaveLength(0)
+    const back2 = applyStrategyOverrideRecommendations()
+    expect(back2.result.restored).toHaveLength(1)
+  })
+
+  it('never touches a manual override', async () => {
+    await seed(recoveredScore('sma_crossover'), { autoRestore: true })
+    const { setStrategyOverride, applyStrategyOverrideRecommendations } =
+      await import('./demo-trading-engine')
+    setStrategyOverride({
+      strategyId: 'sma_crossover',
+      overrideAction: 'disabled',
+      reason: 'manual hold',
+      source: 'manual',
+    })
+    const r1 = applyStrategyOverrideRecommendations()
+    const r2 = applyStrategyOverrideRecommendations()
+    expect(r1.result.restored).toHaveLength(0)
+    expect(r2.result.restored).toHaveLength(0)
+    expect(
+      r2.result.activeOverrides.find((o) => o.strategyId === 'sma_crossover'),
+    ).toMatchObject({ mode: 'disabled', reason: 'manual hold' })
+  })
+})
+
 describe('sandbox experiments', () => {
   it('rejects starting an experiment targeting live execution', async () => {
     const { startSandboxExperiment } = await import('./demo-trading-engine')
