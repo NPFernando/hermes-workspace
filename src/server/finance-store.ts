@@ -191,6 +191,9 @@ export type UnifiedTransaction = {
   counterparty: string
   category: string
   accountId?: string
+  // transfer-only: the two legs, so a transfer row can be edited in place.
+  fromAccountId?: string
+  toAccountId?: string
   currency: CurrencyCode
   amount: number
   convertedLkrAmount: number
@@ -2871,6 +2874,8 @@ export function getUnifiedTransactions(
     counterparty: [t.fromAccountId, t.toAccountId].filter(Boolean).join(' → '),
     category: 'Transfer',
     accountId: t.fromAccountId,
+    fromAccountId: t.fromAccountId,
+    toAccountId: t.toAccountId,
     currency: t.currency,
     amount: t.amount,
     convertedLkrAmount: t.convertedLkrAmount,
