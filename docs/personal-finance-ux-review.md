@@ -242,3 +242,51 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 10. Lighter mutation responses + explicit cache patching (P5).
 11. `*Lkr` → `*Base` rename (M3).
 12. The unified ledger (already `personal-finance-os-roadmap.md` Phase 1).
+
+---
+
+## Appendix — the transaction-payload cluster (items 1 + 6 + 9 are one change)
+
+Items 1, 6 and 9 look independent in the table but must land together. Item 1 as written
+("window `income_records`/`expense_records` to 24 months in the dashboard payload") is **lossy on
+its own**: `payload.transactions` is the *sole* feed for `TransactionsPanel` (the Records-tab
+transaction browser), so a 24-month window makes a 2023 transaction unviewable anywhere in the UI.
+
+### Do it in this order, one PR
+
+**Step A — item 6 (pick one representation).** Drop `payload.transactions`; keep only
+`data.income_records` / `data.expense_records`. `transactions-panel.tsx` is the only consumer of
+`transactions` and already does field-normalisation via `stringField`/`numberField` — give it a
+local `useMemo` that maps + merges the two raw arrays (the exact logic of `getUnifiedTransactions`,
+moved client-side). Net payload change: the larger of the two representations is gone.
+
+Consumers to leave untouched (they already read the raw arrays): `accounts-panel`,
+`categories-panel`, `merchants-panel`, `tags-panel`, `income-sources-panel`, `finance-trends-card`,
+`upcoming-money`, `recurring-bills-insight`.
+
+**Step B — item 9 (paged history endpoint).** New `?scope=transactions&before=<cursor>&limit=200`
+(or a `list_transactions` action) returning a page of unified rows, newest first. `TransactionsPanel`
+switches from "map the whole payload array" to "first page + cursor, load more". This is the
+history surface, so it must exist before Step C removes old rows from the main payload.
+
+**Step C — item 1 (window the dashboard payload).** Now safe: `personalFinancePayload().data`
+returns only the trailing 24 months of `income_records` / `expense_records`. The 8 aggregation/insight
+consumers all operate on recent windows already (`finance-trends-card` = 6 months,
+`recurring-bills-insight` = recent cadence, `upcoming-money` = forward-looking). `financeSummary`'s
+all-time totals are **unaffected** — it reads `db.*` server-side, not the windowed payload.
+`TransactionsPanel` is unaffected — it's on the Step-B endpoint by now.
+
+### Risks to cover in that PR
+
+- `recurring-bills-insight`'s `detectRecurringVendors` needs enough months to see a cadence — verify
+  24 is comfortably more than its longest look-back before shipping Step C.
+- Any entity panel that shows "all records tagged to this account/merchant/…" now shows "records in
+  the last 24 months tagged to …". Decide whether that's acceptable or whether those panels move to
+  the paged endpoint too.
+- `getUnifiedTransactions` stays in `finance-store.ts` for the Step-B endpoint; only its use inside
+  `personalFinancePayload` goes away.
+
+### Not started here
+
+This appendix is the plan; no code for items 1/6/9 is in the `feat/pf-dashboard-perf` branch —
+that branch carries only items 2 and 3 (see the PR).

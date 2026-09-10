@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatMoney } from '../utils'
@@ -7,6 +7,10 @@ import { numberField, splitTags, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
 type TxnKind = 'income' | 'expense'
+
+/** Rows rendered before the "show more" cut — keeps the DOM bounded on a
+ *  many-year history. Filters/search still run over the whole list. */
+const RENDER_PAGE = 100
 
 function boolField(row: Record<string, unknown>, key: string): boolean {
   return row[key] === true
@@ -276,6 +280,14 @@ export function TransactionsPanel({
     amountMax,
   ])
 
+  // Cap how many rows are in the DOM. Reset to the first page whenever the
+  // filters change, so narrowing to 5 results never shows a stale "300 of 5".
+  const [visibleCount, setVisibleCount] = useState(RENDER_PAGE)
+  useEffect(() => {
+    setVisibleCount(RENDER_PAGE)
+  }, [search, filterKind, filterStatus, dateFrom, dateTo, amountMin, amountMax])
+  const visible = filtered.slice(0, visibleCount)
+
   const totalsByCurrency = new Map<string, number>()
   let incomeCount = 0
   let expenseCount = 0
@@ -526,7 +538,7 @@ export function TransactionsPanel({
             No transactions match.
           </p>
         )}
-        {filtered.map((txn, index) => {
+        {visible.map((txn, index) => {
           const id = stringField(txn, 'id') || String(index)
           const kind = (stringField(txn, 'kind') || 'expense') as TxnKind
           const isEditing = editOpenId === id
@@ -818,6 +830,23 @@ export function TransactionsPanel({
             </div>
           )
         })}
+        {filtered.length > visibleCount && (
+          <div className="flex items-center justify-between gap-3 pt-1 text-xs text-[var(--theme-muted)]">
+            <span>
+              Showing {visibleCount.toLocaleString('en-LK')} of{' '}
+              {filtered.length.toLocaleString('en-LK')}
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setVisibleCount((n) => n + RENDER_PAGE * 5)
+              }
+              className={buttonClass}
+            >
+              Show more
+            </button>
+          </div>
+        )}
       </div>
 
       {confirmDeleteId && (

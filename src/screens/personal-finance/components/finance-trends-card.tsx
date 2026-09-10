@@ -109,28 +109,33 @@ export function FinanceTrendsCard({
   const base = payload.baseCurrency
   const fx = payload.fxToBase
 
+  // Depend on the specific record arrays, not the whole `payload`. Every
+  // mutation response replaces `payload` wholesale, but React Query's default
+  // structuralSharing keeps `data.income_records` / `data.expense_records`
+  // referentially stable when a mutation didn't touch them (a tag edit, an
+  // account rename, …) — so an unrelated edit no longer forces both charts to
+  // recompute.
+  const incomeRecords = payload.data.income_records
+  const expenseRecords = payload.data.expense_records
+
   const trendData = useMemo(
     () =>
-      buildTrendData(
-        months,
-        payload.data.income_records,
-        payload.data.expense_records,
-      ).map((d) => ({
+      buildTrendData(months, incomeRecords, expenseRecords).map((d) => ({
         ...d,
         income: d.income * fx,
         expense: d.expense * fx,
         net: d.net * fx,
       })),
-    [payload, months, fx],
+    [incomeRecords, expenseRecords, months, fx],
   )
 
   const categoryData = useMemo(
     () =>
-      buildCategoryData(
-        months[months.length - 1],
-        payload.data.expense_records,
-      ).map((d) => ({ ...d, amount: d.amount * fx })),
-    [payload, months, fx],
+      buildCategoryData(months[months.length - 1], expenseRecords).map((d) => ({
+        ...d,
+        amount: d.amount * fx,
+      })),
+    [expenseRecords, months, fx],
   )
 
   const hasTrendData = trendData.some((d) => d.income > 0 || d.expense > 0)
