@@ -177,6 +177,12 @@ export function buildFinanceAnswerPrompt(
   priorTurns: Array<FinanceQaTurn> = [],
   userMemories: Array<string> = [],
 ): string {
+  // PF-201: buildFinanceQueryContext pins everything to LKR and stamps
+  // `currency`. Fall back to 'LKR' for any other caller shape.
+  const currency =
+    context && typeof context === 'object' && 'currency' in context
+      ? String((context as { currency: unknown }).currency)
+      : 'LKR'
   const recentTurns = priorTurns.slice(-3)
   const conversationBlock =
     recentTurns.length > 0
@@ -206,7 +212,8 @@ Respond with STRICT JSON only, no markdown fences, no commentary, matching exact
 }
 Only include "chart" (non-null) when the question specifically calls for a breakdown/comparison across categories, vendors, or months that a bar chart would make clearer — plain factual questions (e.g. a single total) should have "chart": null.
 
-${memoriesBlock}${conversationBlock}Data:
+${memoriesBlock}${conversationBlock}All monetary figures below are in ${currency} (fields named *Lkr hold ${currency} amounts).
+Data:
 ${JSON.stringify(context)}
 
 Question: ${question}`

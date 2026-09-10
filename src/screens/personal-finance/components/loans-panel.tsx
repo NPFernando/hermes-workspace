@@ -69,7 +69,7 @@ function payoffProjection(
  * Phase 40 (WEALTH-100/101): dedicated loan tracking — principal is the
  * original amount, currentBalance is the remaining balance the user updates
  * as they pay it down (unlike FixedDeposit's principal, which never
- * changes). currentBalance feeds financeSummary()'s debtLkr when active.
+ * changes). currentBalance feeds financeSummary()'s debtBase when active.
  */
 export function LoansPanel({
   payload,

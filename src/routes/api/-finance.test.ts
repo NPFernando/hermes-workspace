@@ -101,6 +101,14 @@ vi.mock('../../server/finance-store', () => ({
   SUPPORTED_CURRENCIES: ['LKR', 'AUD', 'USD'],
   convertCurrency: vi.fn((amount: number) => amount),
   getExchangeRate: vi.fn(() => undefined),
+  getFinanceTrends: vi.fn(() => ({ series: [], categoriesThisMonth: [] })),
+  getRecurringBills: vi.fn(() => []),
+  getUpcomingMoney: vi.fn(() => ({
+    paydays: [],
+    contracts: [],
+    fdMaturities: [],
+  })),
+  getCurrencyExposure: vi.fn(() => []),
   getAverageMonthlyExpensesLkr: vi.fn(() => 0),
   getAverageMonthlySavingsRatePct: vi.fn(() => ({ actualPct: 0, hasData: false })),
   storeIntelligenceRecords: state.storeIntelligenceRecords,
@@ -198,6 +206,61 @@ async function handlers() {
   const module = await import('./finance')
   return (module.Route as any).server.handlers
 }
+
+describe('/api/finance?scope=personal_finance windowing (PF review item 1)', () => {
+  it('drops income/expense rows older than the window and stamps transactionsWindowMonths', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const old = new Date()
+    old.setFullYear(old.getFullYear() - 5)
+    const recent = new Date().toISOString().slice(0, 10)
+    vi.mocked(store.financeSummary).mockReturnValue({
+      baseCurrency: 'LKR',
+    } as never)
+    vi.mocked(store.readFinanceStore).mockReturnValue(
+      state.mockFinanceDb({
+        income_records: [
+          { id: 'i-old', dateReceived: old.toISOString().slice(0, 10) },
+          { id: 'i-new', dateReceived: recent },
+        ],
+        expense_records: [
+          { id: 'e-old', date: old.toISOString().slice(0, 10) },
+          { id: 'e-new', date: recent },
+        ],
+      }) as never,
+    )
+    vi.mocked(store.ensureFinanceStore).mockReturnValue(
+      state.mockFinanceDb({
+        income_records: [
+          { id: 'i-old', dateReceived: old.toISOString().slice(0, 10) },
+          { id: 'i-new', dateReceived: recent },
+        ],
+        expense_records: [
+          { id: 'e-old', date: old.toISOString().slice(0, 10) },
+          { id: 'e-new', date: recent },
+        ],
+      }) as never,
+    )
+
+    const response = await (
+      await handlers()
+    ).GET({
+      request: new Request(
+        'http://localhost/api/finance?scope=personal_finance',
+      ),
+    })
+    const body = (await response.json()) as {
+      transactionsWindowMonths: number
+      data: {
+        income_records: Array<{ id: string }>
+        expense_records: Array<{ id: string }>
+      }
+    }
+    expect(body.transactionsWindowMonths).toBe(36)
+    expect(body.data.income_records.map((r) => r.id)).toEqual(['i-new'])
+    expect(body.data.expense_records.map((r) => r.id)).toEqual(['e-new'])
+  })
+})
 
 describe('/api/finance fetch_news', () => {
   it('exposes read-only paper-decision quality only through the authenticated finance payload', async () => {
@@ -491,6 +554,74 @@ describe('/api/finance fetch_news', () => {
 
     expect(response.status).toBe(502)
     expect(vi.mocked(store.updateExchangeRate)).not.toHaveBeenCalled()
+  })
+
+  it('list_transactions pages the unified history by id cursor (PF review item 9)', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const rows = Array.from({ length: 5 }, (_, i) => ({
+      id: `t-${i}`,
+      kind: i % 2 ? 'income' : 'expense',
+      date: `2026-06-${10 - i}`,
+      amount: 100 + i,
+    }))
+    vi.mocked(store.getUnifiedTransactions).mockReturnValue(rows as never)
+
+    const call = (bodyObj: Record<string, unknown>) =>
+      handlers().then((h) =>
+        h.POST({
+          request: new Request('http://localhost/api/finance', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'list_transactions', ...bodyObj }),
+          }),
+        }),
+      )
+
+    const first = (await (await call({ limit: 2 })).json()) as {
+      ok: boolean
+      transactions: Array<{ id: string }>
+      nextCursor: string | null
+      total: number
+    }
+    expect(first.ok).toBe(true)
+    expect(first.transactions.map((t) => t.id)).toEqual(['t-0', 't-1'])
+    expect(first.nextCursor).toBe('t-1')
+    expect(first.total).toBe(5)
+
+    const second = (await (
+      await call({ limit: 2, cursor: first.nextCursor })
+    ).json()) as { transactions: Array<{ id: string }>; nextCursor: string | null }
+    expect(second.transactions.map((t) => t.id)).toEqual(['t-2', 't-3'])
+    expect(second.nextCursor).toBe('t-3')
+
+    const third = (await (
+      await call({ limit: 2, cursor: second.nextCursor })
+    ).json()) as { transactions: Array<{ id: string }>; nextCursor: string | null }
+    expect(third.transactions.map((t) => t.id)).toEqual(['t-4'])
+    expect(third.nextCursor).toBeNull()
+  })
+
+  it('list_transactions clamps limit and restarts on an unknown cursor', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const rows = Array.from({ length: 3 }, (_, i) => ({ id: `x-${i}`, date: '2026-06-01' }))
+    vi.mocked(store.getUnifiedTransactions).mockReturnValue(rows as never)
+
+    const res = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'list_transactions',
+          limit: 9999,
+          cursor: 'nope',
+        }),
+      }),
+    })
+    const data = (await res.json()) as { transactions: Array<{ id: string }> }
+    // limit clamped to 500 (> 3 rows) and unknown cursor -> from the top
+    expect(data.transactions.map((t) => t.id)).toEqual(['x-0', 'x-1', 'x-2'])
   })
 
   it('derives and stores research-only intelligence from existing data', async () => {

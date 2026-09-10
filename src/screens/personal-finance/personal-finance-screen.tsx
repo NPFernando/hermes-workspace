@@ -19,13 +19,11 @@ import { FinanceAnalystCard } from './components/finance-analyst-card'
 import { FinanceTrendsCard } from './components/finance-trends-card'
 import { SavingsGoalsProgress } from './components/savings-goals-progress'
 import { SinkingFundsPanel } from './components/sinking-funds-panel'
+import { GoalsTargetsCard } from './components/goals-targets-card'
 import { UpcomingMoney } from './components/upcoming-money'
 import { RecurringBillsInsight } from './components/recurring-bills-insight'
 import { DataHealthCard } from './components/data-health-card'
 import { AssistantMemoryCard } from './components/assistant-memory-card'
-import { EmergencyFundCard } from './components/emergency-fund-card'
-import { SavingsRateTargetCard } from './components/savings-rate-target-card'
-import { WealthGoalCard } from './components/wealth-goal-card'
 import { IncomeSourcesPanel } from './components/income-sources-panel'
 import { StockHoldingsPanel } from './components/stock-holdings-panel'
 import { FixedDepositsPanel } from './components/fixed-deposits-panel'
@@ -38,10 +36,6 @@ import { CategoriesPanel } from './components/categories-panel'
 import { MerchantsPanel } from './components/merchants-panel'
 import { TagsPanel } from './components/tags-panel'
 import { formatLkr, formatMoney, formatPct } from './utils'
-import {
-  optionalNumberField as numberField,
-  stringField,
-} from './field-helpers'
 import { buttonClass } from './shared-styles'
 import {
   usePendingIngestionCount,
@@ -51,45 +45,6 @@ import {
 import type { PersonalFinancePayload } from './types'
 
 type Tab = 'overview' | 'income' | 'investments' | 'records' | 'ingestion'
-
-/**
- * Grouped by currency, not converted to one figure — this codebase has no
- * FX-conversion service (only a manually-entered per-record rate on one-off
- * income entries), so summing across currencies here would invent a
- * conversion the rest of the app deliberately doesn't do either.
- */
-function currencyExposure(
-  payload: PersonalFinancePayload,
-): Array<{ currency: string; amount: number }> {
-  const totals = new Map<string, number>()
-  const add = (currency: string, amount: number) =>
-    totals.set(currency, (totals.get(currency) ?? 0) + amount)
-
-  for (const job of payload.data.income_sources) {
-    if (stringField(job, 'status') !== 'active') continue
-    const amount = numberField(job, 'monthlyIncomeAmount')
-    if (amount !== undefined) add(stringField(job, 'currency') || 'LKR', amount)
-  }
-  for (const holding of payload.data.stock_holdings) {
-    const qty = numberField(holding, 'quantity') ?? 0
-    const price =
-      numberField(holding, 'lastKnownPrice') ??
-      numberField(holding, 'buyPrice') ??
-      0
-    add(stringField(holding, 'currency') || 'LKR', qty * price)
-  }
-  for (const fd of payload.data.fixed_deposits) {
-    if (stringField(fd, 'status') === 'withdrawn') continue
-    const principal = numberField(fd, 'principal')
-    if (principal !== undefined)
-      add(stringField(fd, 'currency') || 'LKR', principal)
-  }
-
-  return Array.from(totals.entries())
-    .filter(([, amount]) => amount > 0)
-    .map(([currency, amount]) => ({ currency, amount }))
-    .sort((a, b) => b.amount - a.amount)
-}
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -144,22 +99,22 @@ export function PersonalFinanceScreen() {
   const netWorthBreakdown = [
     {
       name: 'Cash',
-      value: Math.max(0, summary.cashBalanceLkr),
+      value: Math.max(0, summary.cashBalanceBase),
       fill: 'var(--theme-accent)',
     },
     {
       name: 'Stocks',
-      value: Math.max(0, summary.stockHoldingsValueLkr),
+      value: Math.max(0, summary.stockHoldingsValueBase),
       fill: 'var(--theme-accent-secondary)',
     },
     {
       name: 'Fixed deposits',
-      value: Math.max(0, summary.fixedDepositsValueLkr),
+      value: Math.max(0, summary.fixedDepositsValueBase),
       fill: 'var(--theme-success)',
     },
     {
       name: 'Debt',
-      value: Math.max(0, summary.debtLkr),
+      value: Math.max(0, summary.debtBase),
       fill: 'var(--theme-danger)',
     },
   ].filter((entry) => entry.value > 0)
@@ -167,7 +122,7 @@ export function PersonalFinanceScreen() {
   const overBudgetCount = payload.budgetVsActual.filter(
     (b) => b.overBudget,
   ).length
-  const exposure = currencyExposure(payload)
+  const exposure = payload.currencyExposure
 
   return (
     <main className="min-h-dvh overflow-y-auto bg-[var(--theme-bg)] px-4 py-5 text-[var(--theme-text)] md:px-8 md:py-8">
@@ -192,15 +147,15 @@ export function PersonalFinanceScreen() {
       </section>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Net worth" value={fmt(summary.netWorthLkr)} />
+        <StatCard label="Net worth" value={fmt(summary.netWorthBase)} />
         <StatCard
           label="Cash balance"
-          value={fmt(summary.cashBalanceLkr)}
+          value={fmt(summary.cashBalanceBase)}
         />
         <StatCard
           label="Net savings"
-          value={fmt(summary.netSavingsLkr)}
-          tone={summary.netSavingsLkr >= 0 ? 'good' : 'danger'}
+          value={fmt(summary.netSavingsBase)}
+          tone={summary.netSavingsBase >= 0 ? 'good' : 'danger'}
         />
         <StatCard
           label="Savings rate"
@@ -209,31 +164,31 @@ export function PersonalFinanceScreen() {
         />
         <StatCard
           label="Total income"
-          value={fmt(summary.totalIncomeLkr)}
+          value={fmt(summary.totalIncomeBase)}
           tone="good"
         />
         <StatCard
           label="Total expenses"
-          value={fmt(summary.totalExpensesLkr)}
+          value={fmt(summary.totalExpensesBase)}
           tone={
-            summary.totalExpensesLkr > summary.totalIncomeLkr &&
-            summary.totalIncomeLkr > 0
+            summary.totalExpensesBase > summary.totalIncomeBase &&
+            summary.totalIncomeBase > 0
               ? 'danger'
               : 'neutral'
           }
         />
         <StatCard
           label="Stock holdings"
-          value={fmt(summary.stockHoldingsValueLkr)}
+          value={fmt(summary.stockHoldingsValueBase)}
         />
         <StatCard
           label="Unrealized P/L"
-          value={`${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${fmt(summary.unrealizedStockPnlLkr)} (${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatPct(summary.unrealizedStockPnlPct)})`}
-          tone={summary.unrealizedStockPnlLkr >= 0 ? 'good' : 'danger'}
+          value={`${summary.unrealizedStockPnlBase >= 0 ? '+' : ''}${fmt(summary.unrealizedStockPnlBase)} (${summary.unrealizedStockPnlBase >= 0 ? '+' : ''}${formatPct(summary.unrealizedStockPnlPct)})`}
+          tone={summary.unrealizedStockPnlBase >= 0 ? 'good' : 'danger'}
         />
         <StatCard
           label="Fixed deposits"
-          value={fmt(summary.fixedDepositsValueLkr)}
+          value={fmt(summary.fixedDepositsValueBase)}
         />
       </section>
 
@@ -340,19 +295,49 @@ export function PersonalFinanceScreen() {
 
       {tab === 'overview' && (
         <>
+          {/* Information hierarchy (docs/personal-finance-ux-review.md U1–U3):
+              money first (alerts → AI Q&A → trends), then the merged
+              "Goals & targets" widget + the savings/sinking lists, then
+              "Coming up", then a collapsed drawer holding the reporting-
+              currency picker and the storage / assistant-memory diagnostics
+              — settings and health, not the daily view. The missing-rate
+              warning still shows up top via FinanceAlertsCard. */}
           <FinanceAlertsCard payload={payload} />
-          <BaseCurrencySelect payload={payload} onPayload={setPayload} />
           <FinanceAnalystCard payload={payload} onPayload={setPayload} />
           <FinanceTrendsCard payload={payload} />
-          <SavingsGoalsProgress payload={payload} onPayload={setPayload} />
-          <SinkingFundsPanel payload={payload} onPayload={setPayload} />
-          <EmergencyFundCard payload={payload} onPayload={setPayload} />
-          <SavingsRateTargetCard payload={payload} onPayload={setPayload} />
-          <WealthGoalCard payload={payload} onPayload={setPayload} />
-          <UpcomingMoney payload={payload} />
-          <RecurringBillsInsight payload={payload} />
-          <AssistantMemoryCard />
-          <DataHealthCard payload={payload} />
+
+          <GoalsTargetsCard payload={payload} onPayload={setPayload} />
+
+          <section className="mt-6">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+              Savings &amp; sinking funds
+            </h2>
+            <div className="mt-1 grid items-start gap-4 lg:grid-cols-2 [&>*]:mt-0">
+              <SavingsGoalsProgress payload={payload} onPayload={setPayload} />
+              <SinkingFundsPanel payload={payload} onPayload={setPayload} />
+            </div>
+          </section>
+
+          <section className="mt-6">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+              Coming up
+            </h2>
+            <div className="mt-1 grid items-start gap-4 lg:grid-cols-2 [&>*]:mt-0">
+              <UpcomingMoney payload={payload} />
+              <RecurringBillsInsight payload={payload} />
+            </div>
+          </section>
+
+          <details className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/50">
+            <summary className="cursor-pointer list-none px-5 py-3 text-sm font-medium text-[var(--theme-muted)] hover:text-[var(--theme-text)]">
+              Settings, assistant memory &amp; data health
+            </summary>
+            <div className="px-2 pb-2 [&>*]:mt-3">
+              <BaseCurrencySelect payload={payload} onPayload={setPayload} />
+              <AssistantMemoryCard />
+              <DataHealthCard payload={payload} />
+            </div>
+          </details>
         </>
       )}
 

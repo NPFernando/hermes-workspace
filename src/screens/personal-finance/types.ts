@@ -9,17 +9,17 @@ export type PersonalFinancePayload = {
   summary: {
     /** PF-201: reporting currency of the `*Lkr` figures below (default 'LKR'). */
     baseCurrency: string
-    netWorthLkr: number
-    cashBalanceLkr: number
-    netSavingsLkr: number
+    netWorthBase: number
+    cashBalanceBase: number
+    netSavingsBase: number
     savingsRate: number
-    totalIncomeLkr: number
-    totalExpensesLkr: number
-    taxReserveLkr: number
-    stockHoldingsValueLkr: number
-    fixedDepositsValueLkr: number
-    debtLkr: number
-    unrealizedStockPnlLkr: number
+    totalIncomeBase: number
+    totalExpensesBase: number
+    taxReserveBase: number
+    stockHoldingsValueBase: number
+    fixedDepositsValueBase: number
+    debtBase: number
+    unrealizedStockPnlBase: number
     unrealizedStockPnlPct: number
     accountCount: number
     /** PF-206: asset currencies with no exchange rate on file — counted raw. */
@@ -35,17 +35,42 @@ export type PersonalFinancePayload = {
     percentUsed: number
     overBudget: boolean
   }>
-  transactions: Array<Record<string, unknown>>
   alerts: Array<{
     level: 'info' | 'warning' | 'critical'
     title: string
     detail: string
   }>
+  /** PF review item 7: server-computed dashboard derivations. Amounts are raw
+   * LKR — scale by `fxToBase` for display. */
+  trends: {
+    series: Array<{
+      month: string
+      income: number
+      expense: number
+      net: number
+    }>
+    categoriesThisMonth: Array<{ category: string; amount: number }>
+  }
+  recurringBills: Array<{
+    vendor: string
+    category: string
+    monthsSeen: number
+    averageAmount: number
+  }>
+  upcomingMoney: {
+    paydays: Array<{ name: string; state: 'due_soon' | 'overdue'; days: number }>
+    contracts: Array<{ name: string; days: number }>
+    fdMaturities: Array<{ name: string; days: number }>
+  }
+  currencyExposure: Array<{ currency: string; amount: number }>
+  /** PF review item 1: `data.income_records` / `data.expense_records` carry
+   * only the trailing N months. Older rows: `list_transactions` + JSON export. */
+  transactionsWindowMonths: number
   emergencyFund: {
     targetMonths: number
-    avgMonthlyExpensesLkr: number
-    currentLkr: number
-    targetLkr: number
+    avgMonthlyExpensesBase: number
+    currentBase: number
+    targetBase: number
     coverageMonths: number
     progressPct: number
   }
@@ -56,9 +81,9 @@ export type PersonalFinancePayload = {
     hasData: boolean
   }
   wealthGoal: {
-    targetLkr: number
+    targetBase: number
     targetDate: string | null
-    currentLkr: number
+    currentBase: number
     progressPct: number
   }
   financeQaHistory: Array<{ at: number; question: string; answer: string }>
@@ -85,6 +110,7 @@ export type PersonalFinancePayload = {
     finance_accounts: Array<Record<string, unknown>>
     income_records: Array<Record<string, unknown>>
     expense_records: Array<Record<string, unknown>>
+    transfers: Array<Record<string, unknown>>
     budget_categories: Array<Record<string, unknown>>
     categories: Array<Record<string, unknown>>
     subcategories: Array<Record<string, unknown>>

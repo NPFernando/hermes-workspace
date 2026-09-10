@@ -22,8 +22,12 @@ import {
   getAverageMonthlyExpensesLkr,
   getAverageMonthlySavingsRatePct,
   getCategoryCorrections,
+  getCurrencyExposure,
   getExchangeRate,
+  getFinanceTrends,
+  getRecurringBills,
   getUnifiedTransactions,
+  getUpcomingMoney,
   listPendingIngestions,
   maskSensitive,
   readFinanceStore,
@@ -164,6 +168,7 @@ function unauthorized() {
 const PERSONAL_FINANCE_RECORD_KINDS = new Set([
   'income',
   'expense',
+  'transfer',
   'account',
   'goal',
   'tax',
@@ -395,6 +400,22 @@ function financePayload() {
  * underlying read/write/migration path. The Trading screen keeps using the
  * unscoped GET (financePayload()) unchanged.
  */
+/** PF review item 1: how many trailing months of income/expense rows the
+ *  dashboard payload carries. Older rows are reachable via `list_transactions`
+ *  and the JSON export. `financeSummary`'s all-time figures are computed from
+ *  `db` server-side and are NOT windowed. */
+const TRANSACTIONS_WINDOW_MONTHS = 36
+
+function withinWindow<T extends Record<string, unknown>>(
+  rows: Array<T>,
+  dateKey: keyof T & string,
+): Array<T> {
+  const cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - TRANSACTIONS_WINDOW_MONTHS)
+  const cutoffIso = cutoff.toISOString().slice(0, 10)
+  return rows.filter((r) => String(r[dateKey] ?? '') >= cutoffIso)
+}
+
 function personalFinancePayload() {
   const db = ensureFinanceStore()
   const storage = financeStorageStatus()
@@ -412,7 +433,7 @@ function personalFinancePayload() {
   const fxToBase = inBase(1)
   const efTargetMonths = db.settings.emergencyFundTargetMonths ?? 0
   const efAvgMonthlyExpensesLkr = inBase(getAverageMonthlyExpensesLkr(db, 3))
-  const efCurrentLkr = summary.cashBalanceLkr
+  const efCurrentLkr = summary.cashBalanceBase
   const efTargetLkr = efTargetMonths * efAvgMonthlyExpensesLkr
   const efCoverageMonths =
     efAvgMonthlyExpensesLkr > 0 ? efCurrentLkr / efAvgMonthlyExpensesLkr : 0
@@ -427,7 +448,7 @@ function personalFinancePayload() {
       : 0
   const wgTargetLkr = inBase(db.settings.wealthGoalTargetLkr ?? 0)
   const wgTargetDate = db.settings.wealthGoalTargetDate ?? null
-  const wgCurrentLkr = summary.netWorthLkr
+  const wgCurrentLkr = summary.netWorthBase
   const wgProgressPct =
     wgTargetLkr > 0
       ? Math.min(100, Math.max(0, (wgCurrentLkr / wgTargetLkr) * 100))
@@ -449,13 +470,26 @@ function personalFinancePayload() {
       actual: inBase(b.actual),
       variance: inBase(b.variance),
     })),
-    transactions: maskSensitive(getUnifiedTransactions(db)),
+    // PF review D1: `transactions` (a re-shaped copy of every income + expense
+    // row) used to ship here alongside `data.income_records` / `.expense_records`
+    // — the same rows twice. TransactionsPanel now unifies the two raw arrays
+    // client-side. `getUnifiedTransactions` stays for buildFinanceQueryContext
+    // and the future paged history endpoint.
+    //
+    // PF review item 7: trends / recurring bills / upcoming money / currency
+    // exposure are computed here once (were recomputed in 4 components + a
+    // Python port in personal-finance-digest.sh). Amounts are raw LKR — the
+    // client scales by `fxToBase` for display.
+    trends: getFinanceTrends(db),
+    recurringBills: getRecurringBills(db),
+    upcomingMoney: getUpcomingMoney(db),
+    currencyExposure: getCurrencyExposure(db),
     alerts,
     emergencyFund: {
       targetMonths: efTargetMonths,
-      avgMonthlyExpensesLkr: efAvgMonthlyExpensesLkr,
-      currentLkr: efCurrentLkr,
-      targetLkr: efTargetLkr,
+      avgMonthlyExpensesBase: efAvgMonthlyExpensesLkr,
+      currentBase: efCurrentLkr,
+      targetBase: efTargetLkr,
       coverageMonths: efCoverageMonths,
       progressPct: efProgressPct,
     },
@@ -466,16 +500,23 @@ function personalFinancePayload() {
       hasData: srHasData,
     },
     wealthGoal: {
-      targetLkr: wgTargetLkr,
+      targetBase: wgTargetLkr,
       targetDate: wgTargetDate,
-      currentLkr: wgCurrentLkr,
+      currentBase: wgCurrentLkr,
       progressPct: wgProgressPct,
     },
     financeQaHistory: db.settings.financeQaHistory ?? [],
+    // PF review item 1: bound the two fastest-growing collections. The
+    // dashboard's own consumers all look at recent windows (trends 6mo,
+    // recurring-bills 3mo, upcoming-money forward-looking) and `financeSummary`
+    // reads `db` directly server-side, so its all-time totals are unaffected.
+    // Full history is on the `list_transactions` endpoint + the JSON export.
+    transactionsWindowMonths: TRANSACTIONS_WINDOW_MONTHS,
     data: maskSensitive({
       finance_accounts: db.finance_accounts,
-      income_records: db.income_records,
-      expense_records: db.expense_records,
+      income_records: withinWindow(db.income_records, 'dateReceived'),
+      expense_records: withinWindow(db.expense_records, 'date'),
+      transfers: withinWindow(db.transfers, 'date'),
       budget_categories: db.budget_categories,
       categories: db.categories,
       subcategories: db.subcategories,
@@ -1855,6 +1896,37 @@ export const Route = createFileRoute('/api/finance')({
             writeFinanceStore(db)
             appendAuditLog('llm_config_updated', { enabled: lc.enabled })
             return json(financePayload())
+          }
+          if (action === 'list_transactions') {
+            // PF review item 9: paged unified transaction history. Lets the
+            // dashboard payload window `income_records`/`expense_records` to a
+            // recent slice (item 1) while the Records tab can still page back
+            // through everything. Cursor = the `id` of the last row seen (rows
+            // are date-desc then createdAt-desc, a stable order); the next page
+            // is the rows after it. An unknown cursor restarts from the top.
+            const rawLimit =
+              typeof body.limit === 'number' ? Math.floor(body.limit) : 200
+            const limit = Math.max(1, Math.min(500, rawLimit))
+            const cursor =
+              typeof body.cursor === 'string' && body.cursor.trim()
+                ? body.cursor.trim()
+                : null
+            const db = readFinanceStore()
+            const all = getUnifiedTransactions(db)
+            const startIdx = cursor
+              ? all.findIndex((t) => t.id === cursor) + 1
+              : 0
+            const page = all.slice(startIdx, startIdx + limit)
+            const nextCursor =
+              startIdx + limit < all.length && page.length > 0
+                ? page[page.length - 1].id
+                : null
+            return json({
+              ok: true,
+              transactions: maskSensitive(page),
+              nextCursor,
+              total: all.length,
+            })
           }
           if (action === 'list_pending_ingestions') {
             // Unmasked on purpose — financePayload()'s `data` blob runs

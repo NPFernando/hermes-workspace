@@ -14,8 +14,12 @@ import {
   getAverageMonthlyExpensesLkr,
   getAverageMonthlySavingsRatePct,
   buildFinanceQueryContext,
+  getCurrencyExposure,
+  getFinanceTrends,
   getMonthlySummary,
+  getRecurringBills,
   getUnifiedTransactions,
+  getUpcomingMoney,
   maskSensitive,
   tradingPerformanceSummary,
 } from './finance-store'
@@ -65,9 +69,9 @@ describe('finance-store', () => {
     })
 
     expect(financeSummary(db)).toMatchObject({
-      totalIncomeLkr: 100_000,
-      totalExpensesLkr: 3_000,
-      netSavingsLkr: 97_000,
+      totalIncomeBase: 100_000,
+      totalExpensesBase: 3_000,
+      netSavingsBase: 97_000,
       savingsRate: 97,
     })
   })
@@ -504,6 +508,46 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
     expect(() =>
       store.updateFinanceRecord('expense', 'does-not-exist', { amount: 1 }),
     ).toThrow(/not found/)
+  })
+
+  it('transfer kind: add/edit/delete, and it never touches income/expense totals (PF review item 12)', async () => {
+    const store = await freshFinanceStore()
+    store.addFinanceRecord('income', {
+      dateReceived: '2026-06-01',
+      sourceName: 'Salary',
+      originalAmount: 300_000,
+      convertedLkrAmount: 300_000,
+    })
+    store.addFinanceRecord('transfer', {
+      date: '2026-06-05',
+      fromAccountId: 'checking',
+      toAccountId: 'savings',
+      amount: 50_000,
+      convertedLkrAmount: 50_000,
+    })
+    let db = store.readFinanceStore()
+    expect(db.transfers).toHaveLength(1)
+    const id = db.transfers[0].id
+
+    // Transfers are NOT income or expense.
+    const s = store.financeSummary(db)
+    expect(s.totalIncomeBase).toBe(300_000)
+    expect(s.totalExpensesBase).toBe(0)
+    expect(s.netSavingsBase).toBe(300_000)
+
+    // …and they appear in the unified list as their own kind.
+    const unified = store.getUnifiedTransactions(db)
+    expect(unified.find((t) => t.id === id)).toMatchObject({
+      kind: 'transfer',
+      counterparty: 'checking → savings',
+    })
+
+    store.updateFinanceRecord('transfer', id, { amount: 60_000 })
+    db = store.readFinanceStore()
+    expect(db.transfers[0].amount).toBe(60_000)
+
+    store.deleteFinanceRecord('transfer', id)
+    expect(store.readFinanceStore().transfers).toHaveLength(0)
   })
 
   it('goalKind (PF-1007 Sinking Funds) defaults to general and accepts sinking', async () => {
@@ -1452,10 +1496,10 @@ describe('reconciliation status gates aggregate money figures (PF-113)', () => {
   it('financeSummary excludes pending rows but keeps cleared/reconciled/missing', () => {
     const s = financeSummary(seed())
     // 100k + 10k (no-status ⇒ cleared); 50k pending dropped
-    expect(s.totalIncomeLkr).toBe(110_000)
+    expect(s.totalIncomeBase).toBe(110_000)
     // 30k + 5k; 20k pending dropped
-    expect(s.totalExpensesLkr).toBe(35_000)
-    expect(s.netSavingsLkr).toBe(75_000)
+    expect(s.totalExpensesBase).toBe(35_000)
+    expect(s.netSavingsBase).toBe(75_000)
   })
 
   it('getMonthlySummary excludes pending rows', () => {
@@ -1799,8 +1843,40 @@ describe('buildFinanceQueryContext (Phase 24 Hermes Finance Analyst)', () => {
   it('passes through the already-tested summary and monthlySummary unchanged', () => {
     const db = createEmptyFinanceDatabase()
     const context = buildFinanceQueryContext(db)
+    expect(context.currency).toBe('LKR')
     expect(context.summary).toEqual(financeSummary(db))
     expect(context.monthlySummary).toEqual(getMonthlySummary(db).slice(-6))
+  })
+
+  it('keeps the summary in LKR even when a non-LKR reporting currency is set (PF-201)', () => {
+    const db = createEmptyFinanceDatabase()
+    db.settings.baseCurrency = 'USD'
+    db.exchange_rates.push({
+      base: 'LKR',
+      target: 'USD',
+      rate: 1 / 300,
+      date: '2026-06-01',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    db.income_records.push({
+      id: 'i-1',
+      dateReceived: '2026-06-10',
+      sourceName: 'Salary',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: 300_000,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 300_000,
+      taxable: true,
+      source: 'test',
+      createdAt: '2026-06-10T00:00:00.000Z',
+      updatedAt: '2026-06-10T00:00:00.000Z',
+    })
+    const context = buildFinanceQueryContext(db)
+    // financeSummary(db) here would be in USD (~1000); the context pins LKR.
+    expect(context.currency).toBe('LKR')
+    expect(context.summary.baseCurrency).toBe('LKR')
+    expect(context.summary.totalIncomeBase).toBe(300_000)
   })
 
   function pushExecutedTrade(
@@ -1877,8 +1953,8 @@ describe('financeSummary FX conversion for non-LKR assets (PF-206)', () => {
     db.stock_holdings.push({ ...usdHolding })
 
     const s = financeSummary(db)
-    expect(s.stockHoldingsValueLkr).toBe(2 * 150 * 300) // 90,000 LKR
-    expect(s.unrealizedStockPnlLkr).toBe(2 * (150 - 100) * 300) // 30,000 LKR
+    expect(s.stockHoldingsValueBase).toBe(2 * 150 * 300) // 90,000 LKR
+    expect(s.unrealizedStockPnlBase).toBe(2 * (150 - 100) * 300) // 30,000 LKR
     expect(s.fxUnconverted).toEqual([])
   })
 
@@ -1901,8 +1977,8 @@ describe('financeSummary FX conversion for non-LKR assets (PF-206)', () => {
     })
 
     const s = financeSummary(db)
-    expect(s.stockHoldingsValueLkr).toBe(2 * 150) // raw, unconverted
-    expect(s.fixedDepositsValueLkr).toBe(1_000)
+    expect(s.stockHoldingsValueBase).toBe(2 * 150) // raw, unconverted
+    expect(s.fixedDepositsValueBase).toBe(1_000)
     expect(s.fxUnconverted).toEqual(['EUR', 'USD'])
 
     const alerts = financeAlerts(db)
@@ -1955,9 +2031,9 @@ describe('financeSummary reporting currency (PF-201)', () => {
     const db = seedIncomeExpense()
     const s = financeSummary(db)
     expect(s.baseCurrency).toBe('LKR')
-    expect(s.totalIncomeLkr).toBe(300_000)
-    expect(s.totalExpensesLkr).toBe(100_000)
-    expect(s.netSavingsLkr).toBe(200_000)
+    expect(s.totalIncomeBase).toBe(300_000)
+    expect(s.totalExpensesBase).toBe(100_000)
+    expect(s.netSavingsBase).toBe(200_000)
     expect(s.fxUnconverted).toEqual([])
   })
 
@@ -1973,9 +2049,9 @@ describe('financeSummary reporting currency (PF-201)', () => {
     })
     const s = financeSummary(db)
     expect(s.baseCurrency).toBe('USD')
-    expect(s.totalIncomeLkr).toBeCloseTo(1_000)
-    expect(s.totalExpensesLkr).toBeCloseTo(1_000 / 3)
-    expect(s.netSavingsLkr).toBeCloseTo(2_000 / 3)
+    expect(s.totalIncomeBase).toBeCloseTo(1_000)
+    expect(s.totalExpensesBase).toBeCloseTo(1_000 / 3)
+    expect(s.netSavingsBase).toBeCloseTo(2_000 / 3)
     // percentages stay currency-free
     expect(s.savingsRate).toBeCloseTo((200_000 / 300_000) * 100)
     expect(s.fxUnconverted).toEqual([])
@@ -1992,8 +2068,8 @@ describe('financeSummary reporting currency (PF-201)', () => {
       updatedAt: '2026-06-01T00:00:00.000Z',
     })
     const s = financeSummary(db)
-    expect(s.totalIncomeLkr).toBeCloseTo(1_000)
-    expect(s.netSavingsLkr).toBeCloseTo(2_000 / 3)
+    expect(s.totalIncomeBase).toBeCloseTo(1_000)
+    expect(s.netSavingsBase).toBeCloseTo(2_000 / 3)
     expect(s.fxUnconverted).toEqual([])
   })
 
@@ -2001,8 +2077,8 @@ describe('financeSummary reporting currency (PF-201)', () => {
     const db = seedIncomeExpense()
     db.settings.baseCurrency = 'USD'
     const s = financeSummary(db)
-    expect(s.totalIncomeLkr).toBe(300_000)
-    expect(s.netSavingsLkr).toBe(200_000)
+    expect(s.totalIncomeBase).toBe(300_000)
+    expect(s.netSavingsBase).toBe(200_000)
     expect(s.fxUnconverted).toEqual(['USD'])
   })
 })
@@ -2054,12 +2130,12 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     })
 
     const summary = financeSummary(db)
-    expect(summary.stockHoldingsValueLkr).toBe(1200) // 10 * 120 (current price, not buy price)
-    expect(summary.fixedDepositsValueLkr).toBe(50_000) // withdrawn FD excluded
-    expect(summary.netWorthLkr).toBe(1200 + 50_000)
+    expect(summary.stockHoldingsValueBase).toBe(1200) // 10 * 120 (current price, not buy price)
+    expect(summary.fixedDepositsValueBase).toBe(50_000) // withdrawn FD excluded
+    expect(summary.netWorthBase).toBe(1200 + 50_000)
   })
 
-  it('debtLkr (Phase 40) sums active loan currentBalance and card account balances, excluding loan-type accounts and paid-off loans', () => {
+  it('debtBase (Phase 40) sums active loan currentBalance and card account balances, excluding loan-type accounts and paid-off loans', () => {
     const db = createEmptyFinanceDatabase()
     db.finance_accounts.push({
       id: 'a1',
@@ -2110,10 +2186,10 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
 
     const summary = financeSummary(db)
     // 15_000 (card) + 60_000 (active loan) — the 999_999 loan-type account and the paid-off loan are excluded
-    expect(summary.debtLkr).toBe(75_000)
+    expect(summary.debtBase).toBe(75_000)
   })
 
-  it('propertyValueLkr (Phase 40) sums current property values and adds to netWorthLkr', () => {
+  it('propertyValueBase (Phase 40) sums current property values and adds to netWorthBase', () => {
     const db = createEmptyFinanceDatabase()
     db.properties.push({
       id: 'p1',
@@ -2141,8 +2217,8 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     })
 
     const summary = financeSummary(db)
-    expect(summary.propertyValueLkr).toBe(6_700_000)
-    expect(summary.netWorthLkr).toBe(6_700_000)
+    expect(summary.propertyValueBase).toBe(6_700_000)
+    expect(summary.netWorthBase).toBe(6_700_000)
   })
 
   it('falls back to buy price when a stock holding has no cached current price yet', () => {
@@ -2161,10 +2237,10 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
     const summary = financeSummary(db)
-    expect(summary.stockHoldingsValueLkr).toBe(1000) // 5 * 200 (buy price fallback)
+    expect(summary.stockHoldingsValueBase).toBe(1000) // 5 * 200 (buy price fallback)
   })
 
-  it('computes unrealizedStockPnlLkr as (current - buy) * quantity, summed across holdings', () => {
+  it('computes unrealizedStockPnlBase as (current - buy) * quantity, summed across holdings', () => {
     const db = createEmptyFinanceDatabase()
     db.stock_holdings.push({
       id: 's1',
@@ -2196,12 +2272,12 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     })
     const summary = financeSummary(db)
     // (120-100)*10 + (250-300)*5 = 200 - 250 = -50
-    expect(summary.unrealizedStockPnlLkr).toBe(-50)
+    expect(summary.unrealizedStockPnlBase).toBe(-50)
     // cost basis = 10*100 + 5*300 = 2500; pct = -50/2500*100 = -2
     expect(summary.unrealizedStockPnlPct).toBe(-2)
   })
 
-  it('unrealizedStockPnlLkr is 0 when there is no cached current price (falls back to buy price)', () => {
+  it('unrealizedStockPnlBase is 0 when there is no cached current price (falls back to buy price)', () => {
     const db = createEmptyFinanceDatabase()
     db.stock_holdings.push({
       id: 's1',
@@ -2217,7 +2293,7 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
     const summary = financeSummary(db)
-    expect(summary.unrealizedStockPnlLkr).toBe(0)
+    expect(summary.unrealizedStockPnlBase).toBe(0)
     expect(summary.unrealizedStockPnlPct).toBe(0)
   })
 
@@ -2225,5 +2301,173 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     const db = createEmptyFinanceDatabase()
     const summary = financeSummary(db)
     expect(summary.unrealizedStockPnlPct).toBe(0)
+  })
+})
+
+describe('PF review item 7: server-side dashboard derivations', () => {
+  const isoDaysFromNow = (n: number) =>
+    new Date(Date.now() + n * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const thisMonth = () => new Date().toISOString().slice(0, 7)
+
+  it('getFinanceTrends returns a 6-month series and this-month top categories', () => {
+    const db = createEmptyFinanceDatabase()
+    const m = thisMonth()
+    db.income_records.push({
+      id: 'i',
+      dateReceived: `${m}-05`,
+      sourceName: 'x',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: 200_000,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 200_000,
+      taxable: true,
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.expense_records.push(
+      {
+        id: 'e1',
+        date: `${m}-06`,
+        vendor: 'A',
+        category: 'Food',
+        currency: 'LKR',
+        amount: 30_000,
+        convertedLkrAmount: 30_000,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'e2',
+        date: `${m}-07`,
+        vendor: 'B',
+        category: 'Transport',
+        currency: 'LKR',
+        amount: 5_000,
+        convertedLkrAmount: 5_000,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    )
+    const t = getFinanceTrends(db)
+    expect(t.series).toHaveLength(6)
+    const current = t.series[t.series.length - 1]
+    expect(current).toMatchObject({
+      month: m,
+      income: 200_000,
+      expense: 35_000,
+      net: 165_000,
+    })
+    expect(t.categoriesThisMonth).toEqual([
+      { category: 'Food', amount: 30_000 },
+      { category: 'Transport', amount: 5_000 },
+    ])
+  })
+
+  it('getRecurringBills flags a vendor seen with a stable amount in 2+ recent months', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    for (let i = 0; i < 2; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 15)
+      db.expense_records.push({
+        id: `r-${i}`,
+        date: d.toISOString().slice(0, 10),
+        vendor: 'Netflix',
+        category: 'Subscriptions',
+        currency: 'LKR',
+        amount: 1_990,
+        convertedLkrAmount: 1_990,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    }
+    const bills = getRecurringBills(db)
+    expect(bills).toHaveLength(1)
+    expect(bills[0]).toMatchObject({
+      vendor: 'netflix',
+      category: 'Subscriptions',
+      monthsSeen: 2,
+      averageAmount: 1_990,
+    })
+  })
+
+  it('getUpcomingMoney surfaces an FD maturing within 30 days and a due-soon payday', () => {
+    const db = createEmptyFinanceDatabase()
+    db.fixed_deposits.push({
+      id: 'fd',
+      bankName: 'BOC',
+      principal: 100_000,
+      currency: 'LKR',
+      interestRatePct: 10,
+      interestPayout: 'at_maturity',
+      startDate: '2026-01-01',
+      maturityDate: isoDaysFromNow(10),
+      status: 'active',
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.income_sources.push({
+      id: 'job',
+      employerName: 'Acme',
+      employmentType: 'full_time',
+      status: 'active',
+      monthlyIncomeAmount: 200_000,
+      currency: 'LKR',
+      expectedPaydayDayOfMonth: new Date().getDate(),
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    const u = getUpcomingMoney(db)
+    expect(u.fdMaturities).toEqual([{ name: 'BOC', days: 10 }])
+    expect(u.paydays).toHaveLength(1)
+    expect(u.paydays[0]).toMatchObject({ name: 'Acme', state: 'due_soon' })
+  })
+
+  it('getCurrencyExposure groups active jobs / holdings / FDs by currency, never summed across', () => {
+    const db = createEmptyFinanceDatabase()
+    db.income_sources.push({
+      id: 'j',
+      employerName: 'Remote Co',
+      employmentType: 'contract',
+      status: 'active',
+      monthlyIncomeAmount: 3_000,
+      currency: 'USD',
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.fixed_deposits.push({
+      id: 'fd',
+      bankName: 'X',
+      principal: 500_000,
+      currency: 'LKR',
+      interestRatePct: 10,
+      interestPayout: 'at_maturity',
+      startDate: '2026-01-01',
+      maturityDate: '2027-01-01',
+      status: 'active',
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    expect(getCurrencyExposure(db)).toEqual([
+      { currency: 'LKR', amount: 500_000 },
+      { currency: 'USD', amount: 3_000 },
+    ])
   })
 })

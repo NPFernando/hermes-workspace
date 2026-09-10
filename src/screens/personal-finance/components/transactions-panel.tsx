@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatMoney } from '../utils'
@@ -7,6 +7,86 @@ import { numberField, splitTags, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
 type TxnKind = 'income' | 'expense'
+
+/** Rows rendered before the "show more" cut — keeps the DOM bounded on a
+ *  many-year history. Filters/search still run over the whole list. */
+const RENDER_PAGE = 100
+
+/**
+ * PF review D1: the payload no longer ships a pre-unified `transactions` array
+ * (it duplicated `data.income_records` + `data.expense_records`). This mirrors
+ * the server's `getUnifiedTransactions` shape from the two raw arrays, which
+ * are already `maskSensitive`-d in the payload.
+ */
+export function unifyTransactions(
+  income: ReadonlyArray<Record<string, unknown>>,
+  expense: ReadonlyArray<Record<string, unknown>>,
+  transfers: ReadonlyArray<Record<string, unknown>> = [],
+): Array<Record<string, unknown>> {
+  const rows: Array<Record<string, unknown>> = [
+    ...income.map((r) => ({
+      id: r.id,
+      kind: 'income',
+      date: r.dateReceived,
+      counterparty: r.sourceName,
+      category: r.incomeType,
+      accountId: r.accountId,
+      currency: r.originalCurrency,
+      amount: r.originalAmount,
+      convertedLkrAmount: r.convertedLkrAmount,
+      notes: r.notes,
+      documentRef: r.documentRef,
+      taxable: r.taxable,
+      incomeSourceId: r.incomeSourceId,
+      tags: r.tags,
+      status: r.status,
+      source: r.source,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    })),
+    ...expense.map((r) => ({
+      id: r.id,
+      kind: 'expense',
+      date: r.date,
+      counterparty: r.vendor,
+      category: r.category,
+      accountId: r.accountId,
+      currency: r.currency,
+      amount: r.amount,
+      convertedLkrAmount: r.convertedLkrAmount,
+      notes: r.notes,
+      documentRef: r.documentRef,
+      recurring: r.recurring,
+      subcategory: r.subcategory,
+      tags: r.tags,
+      status: r.status,
+      source: r.source,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    })),
+    ...transfers.map((r) => ({
+      id: r.id,
+      kind: 'transfer',
+      date: r.date,
+      counterparty: [r.fromAccountId, r.toAccountId].filter(Boolean).join(' → '),
+      category: 'Transfer',
+      accountId: r.fromAccountId,
+      currency: r.currency,
+      amount: r.amount,
+      convertedLkrAmount: r.convertedLkrAmount,
+      notes: r.notes,
+      source: r.source,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    })),
+  ]
+  return rows.sort((a, b) => {
+    const ad = String(a.date ?? '')
+    const bd = String(b.date ?? '')
+    if (ad !== bd) return ad < bd ? 1 : -1
+    return String(a.createdAt ?? '') < String(b.createdAt ?? '') ? 1 : -1
+  })
+}
 
 function boolField(row: Record<string, unknown>, key: string): boolean {
   return row[key] === true
@@ -89,7 +169,13 @@ export function TransactionsPanel({
   const [amountMax, setAmountMax] = useState('')
 
   const accounts = payload.data.finance_accounts
-  const transactions = payload.transactions
+  const incomeRecords = payload.data.income_records
+  const expenseRecords = payload.data.expense_records
+  const transferRecords = payload.data.transfers
+  const transactions = useMemo(
+    () => unifyTransactions(incomeRecords, expenseRecords, transferRecords),
+    [incomeRecords, expenseRecords, transferRecords],
+  )
 
   async function submitTransaction() {
     if (!counterparty.trim()) {
@@ -275,6 +361,14 @@ export function TransactionsPanel({
     amountMin,
     amountMax,
   ])
+
+  // Cap how many rows are in the DOM. Reset to the first page whenever the
+  // filters change, so narrowing to 5 results never shows a stale "300 of 5".
+  const [visibleCount, setVisibleCount] = useState(RENDER_PAGE)
+  useEffect(() => {
+    setVisibleCount(RENDER_PAGE)
+  }, [search, filterKind, filterStatus, dateFrom, dateTo, amountMin, amountMax])
+  const visible = filtered.slice(0, visibleCount)
 
   const totalsByCurrency = new Map<string, number>()
   let incomeCount = 0
@@ -520,13 +614,20 @@ export function TransactionsPanel({
         />
       </div>
 
+      {payload.transactionsWindowMonths > 0 && (
+        <p className="mt-2 text-xs text-[var(--theme-muted)]">
+          Showing the last {payload.transactionsWindowMonths} months. Older
+          transactions are in the JSON export.
+        </p>
+      )}
+
       <div className="mt-3 grid gap-2">
         {filtered.length === 0 && (
           <p className="text-sm text-[var(--theme-muted)]">
             No transactions match.
           </p>
         )}
-        {filtered.map((txn, index) => {
+        {visible.map((txn, index) => {
           const id = stringField(txn, 'id') || String(index)
           const kind = (stringField(txn, 'kind') || 'expense') as TxnKind
           const isEditing = editOpenId === id
@@ -818,6 +919,23 @@ export function TransactionsPanel({
             </div>
           )
         })}
+        {filtered.length > visibleCount && (
+          <div className="flex items-center justify-between gap-3 pt-1 text-xs text-[var(--theme-muted)]">
+            <span>
+              Showing {visibleCount.toLocaleString('en-LK')} of{' '}
+              {filtered.length.toLocaleString('en-LK')}
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setVisibleCount((n) => n + RENDER_PAGE * 5)
+              }
+              className={buttonClass}
+            >
+              Show more
+            </button>
+          </div>
+        )}
       </div>
 
       {confirmDeleteId && (

@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { formatLkr } from '../utils'
 import { numberField, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
@@ -73,10 +72,11 @@ export function RecurringBillsInsight({
 }: {
   payload: PersonalFinancePayload
 }) {
-  const recurring = useMemo(
-    () => detectRecurringVendors(payload.data.expense_records),
-    [payload],
-  )
+  // PF review item 7: computed server-side now (was `detectRecurringVendors`
+  // here + a Python port in the digest cron). `detectRecurringVendors` stays
+  // exported for its unit test.
+  const recurring = payload.recurringBills
+  const fx = payload.fxToBase
   if (recurring.length === 0) return null
 
   return (
@@ -95,7 +95,8 @@ export function RecurringBillsInsight({
             className="rounded-xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs text-[var(--theme-text)]"
           >
             <span className="capitalize">{r.vendor}</span> · {r.category} · ~
-            {formatLkr(r.averageAmount)} · {r.monthsSeen} months
+            {formatLkr(r.averageAmount * fx, payload.baseCurrency)} ·{' '}
+            {r.monthsSeen} months
           </span>
         ))}
       </div>

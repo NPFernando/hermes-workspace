@@ -126,7 +126,7 @@ describe('promptWithCategoryHints', () => {
 })
 
 describe('buildFinanceAnswerPrompt', () => {
-  const context = { summary: { netWorthLkr: 100 } }
+  const context = { summary: { netWorthBase: 100 } }
 
   it('matches the original single-turn shape when there are no prior turns', () => {
     const result = buildFinanceAnswerPrompt('What is my net worth?', context)

@@ -213,6 +213,24 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 
 ## Part 5 — Recommended order of work
 
+### Status (2026-09-10)
+
+| Item | State | Where |
+|---|---|---|
+| Budget currency default | ✅ done | PR #45 |
+| 2 · cap TransactionsPanel render | ✅ done | PR #46 |
+| 3 · trends memo deps | ✅ done | PR #46 |
+| 4 · Overview hierarchy | ✅ done | PR #46 |
+| 8 · one mutation pattern | ✅ done | PR #46 |
+| 10 · analyst units | ✅ done | PR #46 |
+| 6 · de-dup transaction representation | ✅ done — `transactions` off the payload; panel unifies raw arrays client-side, parity-tested | PR #46 |
+| 7 · server-side derivations | ✅ done — `getFinanceTrends`/`getRecurringBills`/`getUpcomingMoney`/`getCurrencyExposure` on the payload; 4 components + `personal-finance-digest.sh` rewired; ~90 lines of digest Python deleted | PR #46 |
+| 9 · paged transaction-history endpoint | ✅ done — `list_transactions` action (id cursor, 1..500) | PR #46 |
+| 5 · merge target cards / settings screen | ✅ done — `GoalsTargetsCard` (one section, `GoalRow` layout, each row keeps its `set_*` action); the 3 old card files deleted; `BaseCurrencySelect` moved into the collapsed settings drawer (U3) | PR #46 |
+| 1 · window payload | ✅ done — `data.{income_records,expense_records}` capped to the trailing **36 months** (`TRANSACTIONS_WINDOW_MONTHS`); `financeSummary`'s all-time figures untouched (reads `db`); `TransactionsPanel` shows a "last 36 months" note; full history via `list_transactions` + JSON export | PR #46 |
+| 11 · `*Lkr` → `*Base` rename | ✅ done — `financeSummary`'s aggregate outputs + the `emergencyFund` / `wealthGoal` payload fields renamed `*Lkr` → `*Base`; storage fields (`convertedLkrAmount`), the `set_wealth_goal` request param `targetLkr`, and the `wealthGoalTargetLkr` settings key **kept** (contract/storage). Touches `src/screens/dashboard/finance-overview-card.tsx` too. `personal-finance-digest.sh` reads both names for the deploy window. | PR #46 |
+| 12 · unified ledger | ✅ **first slice done** — `transfer` record kind: `Transfer` type + `db.transfers` collection (auto-migrated via `migrateFinanceStore`'s spread; `'transfers'` added to `FINANCE_COLLECTIONS` → persists through the generic `finance_engine_collections` table, no DDL); `add`/`update`/`delete` branches; `getUnifiedTransactions` + client `unifyTransactions` emit it (parity-tested); windowed on the payload. **`financeSummary` untouched** — transfers never enter income/expense/savings totals (asserted). Remaining ledger work (own PRs, roadmap-sequenced): ledger-derived account balances (ADR-001), splits, a transfer entry form, transfer-aware filters. | PR #46 |
+
 **Tier 0 — shipped in this pass**
 
 - **Budget-panel currency default + convert-on-write.** The `getBudgetVsActual` LKR-normalisation
@@ -220,25 +238,111 @@ across ~15 panels. That work is done and good; the duplication that remains is *
   currency and the server converts base→LKR on write, same shape as `set_wealth_goal`. Closes
   the last genuinely *remaining* item from the PF-201 thread.
 
-**Tier 1 — small, safe, high user impact (post-merge of #45)**
+**Tier 1 — small, safe, high user impact**
 
-1. Window `income_records` / `expense_records` in the dashboard payload to 24 months (D2/P1).
-2. Cap `TransactionsPanel` initial render at ~100 rows + "show more" (D3/P2).
-3. Narrow `finance-trends-card` `useMemo` deps (P3).
-4. Overview information hierarchy: 2-col grid, collapse diagnostics (U1).
+1. ✅ **DONE** (`feat/pf-dashboard-perf`) — `data.{income_records,expense_records}` capped to
+   the trailing **36 months** (`TRANSACTIONS_WINDOW_MONTHS`, `withinWindow()`). `financeSummary`
+   reads `db` server-side so its all-time figures are unaffected; `TransactionsPanel` shows a
+   "last 36 months" note; the entity panels' "records tagged to X" lists are likewise bounded.
+   Full history: `list_transactions` (item 9) + the JSON export (D2/P1).
+2. ✅ **DONE** (`feat/pf-dashboard-perf`) — `TransactionsPanel` renders the first 100 filtered
+   rows + "Show more"; totals/counts still span the full list; visible count resets on filter
+   change (D3/P2).
+3. ✅ **DONE** (`feat/pf-dashboard-perf`) — `finance-trends-card` memos depend on the record
+   arrays, not the whole `payload`, so an unrelated mutation no longer recomputes both charts
+   (P3).
+4. ✅ **DONE** (`feat/pf-dashboard-perf`) — Overview hierarchy (U1): money first
+   (alerts → AI Q&A → trends), then a labelled **"Goals & targets"** section and a **"Coming
+   up"** section each in a `lg:grid-cols-2` grid (the cards' baked-in `mt-*` is zeroed by a
+   `[&>*]:mt-0` container variant, no per-card edits), then the currency picker, then a
+   collapsed `<details>` for `AssistantMemoryCard` + `DataHealthCard`.
 
 **Tier 2 — medium, structural**
 
-5. Merge the 3 target cards into one "Goals & targets" section (U2); move `BaseCurrencySelect`
-   to settings (U3).
-6. De-duplicate the transaction representation — one of `transactions` vs raw arrays (D1).
-7. Server-side `trends` / `recurringBills` / `upcomingMoney` / `currencyExposure` in the
-   payload; delete the Python port in the digest cron (D4).
-8. Consolidate on `useFinanceAction` (M1).
+5. ✅ **DONE** (`feat/pf-dashboard-perf`) — `EmergencyFundCard` + `SavingsRateTargetCard` +
+   `WealthGoalCard` folded into one **`GoalsTargetsCard`** (one section, a `GoalRow` layout,
+   each row keeps its own set-form and `set_*` action). The 3 old files deleted.
+   `BaseCurrencySelect` moved into the collapsed "Settings, assistant memory & data health"
+   drawer (U3) — the missing-rate warning still surfaces up top via `FinanceAlertsCard`.
+6. ✅ **DONE** (`feat/pf-dashboard-perf`) — `transactions` dropped from the payload;
+   `TransactionsPanel` unifies `data.income_records` + `data.expense_records` client-side via
+   `unifyTransactions`, parity-tested against the server's `getUnifiedTransactions` (D1).
+7. ✅ **DONE** (`feat/pf-dashboard-perf`) — `getFinanceTrends` / `getRecurringBills` /
+   `getUpcomingMoney` / `getCurrencyExposure` compute once in `finance-store.ts` and ride the
+   payload; `finance-trends-card` / `recurring-bills-insight` / `upcoming-money` / the screen's
+   exposure block read them; `personal-finance-digest.sh` switched to `?scope=personal_finance`
+   and its ~90-line Python payday/FD/contract port is deleted (D4). +4 tests.
+8. ✅ **DONE** (`feat/pf-dashboard-perf`) — 6 Overview cards (`savings-rate-target-card`,
+   `emergency-fund-card`, `base-currency-select`, `wealth-goal-card`, and the
+   `LinkedAccountControl` in `savings-goals-progress` / `sinking-funds-panel`) now use
+   `useFinanceAction`; cards that silently swallowed failures now surface the server error.
+   `finance-analyst-card` keeps its own fetch (streaming Q&A + chart, not a single mutation).
 
 **Tier 3 — larger / roadmap-level**
 
-9. Paged transaction-history endpoint (D2).
-10. Lighter mutation responses + explicit cache patching (P5).
-11. `*Lkr` → `*Base` rename (M3).
-12. The unified ledger (already `personal-finance-os-roadmap.md` Phase 1).
+9. ✅ **DONE** (`feat/pf-dashboard-perf`) — `list_transactions` action: paged unified history,
+   id cursor, `limit` 1..500. Prerequisite for item 1; not yet wired into `TransactionsPanel`
+   (that's part of item 1).
+10. ✅ **DONE** (`feat/pf-dashboard-perf`) — Finance Analyst units pass:
+    `buildFinanceQueryContext` pins its `summary` to LKR (computed against a `baseCurrency:'LKR'`
+    clone of the db) and stamps `currency: 'LKR'`, so the LLM prompt no longer mixes a
+    base-currency `summary` with the raw-LKR `monthlySummary` / `categoryBreakdown` /
+    `topVendors`. The prompt now states the currency explicitly.
+    *(was item 10 "Finance Analyst units pass" in the original table — the "lighter mutation
+    responses" idea moves down.)*
+11. ✅ **DONE** (`feat/pf-dashboard-perf`) — `financeSummary` aggregate outputs + `emergencyFund`
+    / `wealthGoal` payload fields `*Lkr` → `*Base`. Storage fields, the `set_wealth_goal`
+    `targetLkr` request param, and the `wealthGoalTargetLkr` settings key kept. Also touched
+    `src/screens/dashboard/`; the digest cron reads both names for the deploy window.
+12. ✅ **first slice done** (`feat/pf-dashboard-perf`) — `transfer` record kind (type, `db.transfers`
+    collection, `FINANCE_COLLECTIONS` entry, add/update/delete, unified-list emission, windowed
+    payload, parity test, `financeSummary` untouched). The full unified ledger (balances derived
+    from the ledger, splits, transfer UI) stays roadmap-sequenced across further PRs.
+
+---
+
+## Appendix — the transaction-payload cluster (items 1 + 6 + 9 are one change)
+
+Items 1, 6 and 9 look independent in the table but must land together. Item 1 as written
+("window `income_records`/`expense_records` to 24 months in the dashboard payload") is **lossy on
+its own**: `payload.transactions` is the *sole* feed for `TransactionsPanel` (the Records-tab
+transaction browser), so a 24-month window makes a 2023 transaction unviewable anywhere in the UI.
+
+### Do it in this order, one PR
+
+**Step A — item 6 (pick one representation).** Drop `payload.transactions`; keep only
+`data.income_records` / `data.expense_records`. `transactions-panel.tsx` is the only consumer of
+`transactions` and already does field-normalisation via `stringField`/`numberField` — give it a
+local `useMemo` that maps + merges the two raw arrays (the exact logic of `getUnifiedTransactions`,
+moved client-side). Net payload change: the larger of the two representations is gone.
+
+Consumers to leave untouched (they already read the raw arrays): `accounts-panel`,
+`categories-panel`, `merchants-panel`, `tags-panel`, `income-sources-panel`, `finance-trends-card`,
+`upcoming-money`, `recurring-bills-insight`.
+
+**Step B — item 9 (paged history endpoint).** New `?scope=transactions&before=<cursor>&limit=200`
+(or a `list_transactions` action) returning a page of unified rows, newest first. `TransactionsPanel`
+switches from "map the whole payload array" to "first page + cursor, load more". This is the
+history surface, so it must exist before Step C removes old rows from the main payload.
+
+**Step C — item 1 (window the dashboard payload).** Now safe: `personalFinancePayload().data`
+returns only the trailing 24 months of `income_records` / `expense_records`. The 8 aggregation/insight
+consumers all operate on recent windows already (`finance-trends-card` = 6 months,
+`recurring-bills-insight` = recent cadence, `upcoming-money` = forward-looking). `financeSummary`'s
+all-time totals are **unaffected** — it reads `db.*` server-side, not the windowed payload.
+`TransactionsPanel` is unaffected — it's on the Step-B endpoint by now.
+
+### Risks to cover in that PR
+
+- `recurring-bills-insight`'s `detectRecurringVendors` needs enough months to see a cadence — verify
+  24 is comfortably more than its longest look-back before shipping Step C.
+- Any entity panel that shows "all records tagged to this account/merchant/…" now shows "records in
+  the last 24 months tagged to …". Decide whether that's acceptable or whether those panels move to
+  the paged endpoint too.
+- `getUnifiedTransactions` stays in `finance-store.ts` for the Step-B endpoint; only its use inside
+  `personalFinancePayload` goes away.
+
+### Not started here
+
+This appendix is the plan; no code for items 1/6/9 is in the `feat/pf-dashboard-perf` branch —
+that branch carries only items 2 and 3 (see the PR).

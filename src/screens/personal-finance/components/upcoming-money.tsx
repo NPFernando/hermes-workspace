@@ -1,91 +1,63 @@
-import { stringField } from '../field-helpers'
-import { neutralTone as NEUTRAL_TONE } from '../shared-styles'
-import { getPaydayStatus } from './payday-status'
-import { contractExpiryLabel, paydayLabel } from './income-sources-panel'
-import { daysUntil, maturityBadge } from './fixed-deposits-panel'
+import { dangerTone, warningTone } from '../shared-styles'
 import type { PersonalFinancePayload } from '../types'
 
-type UpcomingEvent = {
-  key: string
-  name: string
-  kindLabel: string
-  text: string
-  tone: string
-  sortKey: number
-}
+type Row = { key: string; name: string; kindLabel: string; text: string; tone: string; sortKey: number }
 
+/**
+ * PF review item 7: the payday / contract / FD-maturity windows are now
+ * computed server-side (`getUpcomingMoney`) and carried on the payload — they
+ * used to be recomputed here from raw records via a stack of client badge
+ * helpers, and a THIRD time in Python in personal-finance-digest.sh. This
+ * component only maps the structured events to badges.
+ */
 export function UpcomingMoney({
   payload,
 }: {
   payload: PersonalFinancePayload
 }) {
-  const jobs = payload.data.income_sources
-  const incomeRecords = payload.data.income_records
-  const deposits = payload.data.fixed_deposits
+  const { paydays, contracts, fdMaturities } = payload.upcomingMoney
+  const rows: Array<Row> = []
 
-  const events: Array<UpcomingEvent> = []
-
-  for (const job of jobs) {
-    const jobId = stringField(job, 'id')
-    const name = stringField(job, 'employerName') || 'Income source'
-
-    const status = getPaydayStatus(job, incomeRecords)
-    if (status.state === 'due_soon' || status.state === 'overdue') {
-      const badge = paydayLabel(job, incomeRecords)
-      if (badge && badge.tone !== NEUTRAL_TONE) {
-        const sortKey =
-          status.state === 'overdue' ? -status.daysOverdue : status.daysUntil
-        events.push({
-          key: `payday-${jobId}`,
-          name,
-          kindLabel: 'Payday',
-          text: badge.text,
-          tone: badge.tone,
-          sortKey,
-        })
-      }
-    }
-
-    const expiryBadge = contractExpiryLabel(job)
-    if (expiryBadge && expiryBadge.tone !== NEUTRAL_TONE) {
-      const target = Date.parse(stringField(job, 'contractEndDate'))
-      const sortKey = Number.isFinite(target)
-        ? Math.ceil((target - Date.now()) / (24 * 60 * 60 * 1000))
-        : 0
-      events.push({
-        key: `contract-${jobId}`,
-        name,
-        kindLabel: 'Contract',
-        text: expiryBadge.text,
-        tone: expiryBadge.tone,
-        sortKey,
-      })
-    }
+  for (const p of paydays) {
+    rows.push({
+      key: `payday-${p.name}`,
+      name: p.name,
+      kindLabel: 'Payday',
+      text:
+        p.state === 'overdue'
+          ? `Overdue by ${p.days}d`
+          : p.days === 0
+            ? 'Due today'
+            : p.days > 0
+              ? `Due in ${p.days}d`
+              : `${-p.days}d past payday`,
+      tone: p.state === 'overdue' ? dangerTone : warningTone,
+      sortKey: p.state === 'overdue' ? -p.days : p.days,
+    })
   }
-
-  for (const fd of deposits) {
-    const status = stringField(fd, 'status') || 'active'
-    if (status !== 'active') continue
-    const maturity = stringField(fd, 'maturityDate')
-    const remaining = maturity ? daysUntil(maturity) : null
-    if (remaining === null) continue
-    const badge = maturityBadge(remaining)
-    if (badge.tone === NEUTRAL_TONE) continue
-    const fdId = stringField(fd, 'id')
-    const name = stringField(fd, 'bankName') || 'Fixed deposit'
-    events.push({
-      key: `fd-${fdId}`,
-      name,
+  for (const c of contracts) {
+    rows.push({
+      key: `contract-${c.name}`,
+      name: c.name,
+      kindLabel: 'Contract',
+      text: c.days < 0 ? `Contract ended ${-c.days}d ago` : `Contract ends in ${c.days}d`,
+      tone: c.days < 0 ? dangerTone : warningTone,
+      sortKey: c.days,
+    })
+  }
+  for (const f of fdMaturities) {
+    rows.push({
+      key: `fd-${f.name}`,
+      name: f.name,
       kindLabel: 'Fixed deposit',
-      text: badge.text,
-      tone: badge.tone,
-      sortKey: remaining,
+      text: f.days < 0 ? `Matured ${-f.days}d ago` : `Matures in ${f.days}d`,
+      tone: f.days < 0 ? dangerTone : warningTone,
+      sortKey: f.days,
     })
   }
 
-  events.sort((a, b) => a.sortKey - b.sortKey)
-
-  if (events.length === 0) return null
+  rows.sort((a, b) => a.sortKey - b.sortKey)
+  if (rows.length === 0) return null
 
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
@@ -97,7 +69,7 @@ export function UpcomingMoney({
         attention soon.
       </p>
       <div className="mt-3 grid gap-2">
-        {events.map((e) => (
+        {rows.map((e) => (
           <div
             key={e.key}
             className="flex items-center justify-between rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
