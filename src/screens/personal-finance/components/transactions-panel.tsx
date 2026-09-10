@@ -58,6 +58,7 @@ export function unifyTransactions(
       documentRef: r.documentRef,
       recurring: r.recurring,
       subcategory: r.subcategory,
+      splits: r.splits,
       tags: r.tags,
       status: r.status,
       source: r.source,
@@ -107,6 +108,9 @@ function merchantDefaultCategory(
   return defaultCategory || undefined
 }
 
+/** One row of the split editor — strings while typing, parsed on submit. */
+type SplitRow = { category: string; amount: string }
+
 type EditDraft = {
   date: string
   counterparty: string
@@ -123,6 +127,107 @@ type EditDraft = {
   // transfer-only legs
   fromAccountId: string
   toAccountId: string
+  // expense-only: category splits ([] = not split)
+  splits: Array<SplitRow>
+}
+
+/**
+ * PF review item 2: split one expense across several categories. Rows of
+ * {category, amount}; the parts must sum to the expense amount. Returns
+ * `null` (⇒ send no `splits`, or `[]` to clear) when there are fewer than
+ * two rows.
+ */
+function SplitsField({
+  rows,
+  expenseAmount,
+  onChange,
+}: {
+  rows: Array<SplitRow>
+  expenseAmount: number
+  onChange: (rows: Array<SplitRow>) => void
+}) {
+  const assigned = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  const remaining = Math.round((expenseAmount - assigned) * 100) / 100
+  return (
+    <div className="mt-2 w-full rounded-xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_5%,transparent)] p-2">
+      <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--theme-muted)]">
+        <span>Split across categories</span>
+        <span
+          className={
+            Math.abs(remaining) > 0.01
+              ? 'text-[var(--theme-warning)]'
+              : 'text-[var(--theme-success)]'
+          }
+        >
+          {Math.abs(remaining) > 0.01
+            ? `${remaining > 0 ? 'Unassigned' : 'Over by'} ${Math.abs(remaining)}`
+            : '✓ balanced'}
+        </span>
+      </div>
+      {rows.map((row, i) => (
+        <div key={i} className="mb-1 flex flex-wrap gap-2">
+          <input
+            type="text"
+            placeholder="Category"
+            value={row.category}
+            onChange={(e) => {
+              const next = rows.slice()
+              next[i] = { ...next[i], category: e.target.value }
+              onChange(next)
+            }}
+            list="pf-known-categories"
+            className={inputClass}
+          />
+          <input
+            type="number"
+            placeholder="Amount"
+            value={row.amount}
+            onChange={(e) => {
+              const next = rows.slice()
+              next[i] = { ...next[i], amount: e.target.value }
+              onChange(next)
+            }}
+            className={`${inputClass} w-28`}
+          />
+          <button
+            type="button"
+            onClick={() => onChange(rows.filter((_, j) => j !== i))}
+            className="text-xs text-[var(--theme-danger)]"
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() =>
+          onChange([
+            ...rows,
+            {
+              category: '',
+              amount: remaining > 0 ? String(remaining) : '',
+            },
+          ])
+        }
+        className="text-xs font-medium text-[var(--theme-text)] underline"
+      >
+        + Add split
+      </button>
+    </div>
+  )
+}
+
+/** Parse split rows → payload `splits` (or `[]` to clear when <2 valid rows). */
+function toSplitsPayload(
+  rows: Array<SplitRow>,
+): Array<{ category: string; amount: number }> {
+  const valid = rows
+    .map((r) => ({
+      category: r.category.trim() || 'Other',
+      amount: Number(r.amount) || 0,
+    }))
+    .filter((r) => r.amount > 0)
+  return valid.length >= 2 ? valid : []
 }
 
 /**
@@ -162,6 +267,8 @@ export function TransactionsPanel({
   const [notes, setNotes] = useState('')
   const [taxable, setTaxable] = useState(true)
   const [recurring, setRecurring] = useState(false)
+  // Item 2: category splits for the expense being added ([] = not split).
+  const [addSplits, setAddSplits] = useState<Array<SplitRow>>([])
   // Item 12 UI: account-to-account transfer.
   const [transferFrom, setTransferFrom] = useState('')
   const [transferTo, setTransferTo] = useState('')
@@ -297,6 +404,18 @@ export function TransactionsPanel({
       tags: tags.trim() || undefined,
       status,
     }
+    const expenseAmount = Number(amount) || 0
+    const splitsPayload =
+      addKind === 'expense' ? toSplitsPayload(addSplits) : []
+    if (splitsPayload.length) {
+      const splitSum = splitsPayload.reduce((s, p) => s + p.amount, 0)
+      if (Math.abs(splitSum - expenseAmount) > 0.01) {
+        setErr(
+          `Split parts (${splitSum}) must add up to the amount (${expenseAmount})`,
+        )
+        return
+      }
+    }
     const data =
       addKind === 'income'
         ? await mutate(
@@ -325,9 +444,10 @@ export function TransactionsPanel({
                 vendor: counterparty.trim(),
                 category: category.trim() || 'Other',
                 subcategory: subcategory.trim() || undefined,
+                splits: splitsPayload.length ? splitsPayload : undefined,
                 currency,
-                amount: Number(amount) || 0,
-                convertedLkrAmount: Number(amount) || 0,
+                amount: expenseAmount,
+                convertedLkrAmount: expenseAmount,
                 recurring,
                 ...shared,
               },
@@ -343,11 +463,21 @@ export function TransactionsPanel({
       setAmount('')
       setNotes('')
       setDate(todayIso())
+      setAddSplits([])
     }
   }
 
   function startEdit(txn: Record<string, unknown>) {
     const id = stringField(txn, 'id')
+    // Unified rows don't carry `splits` — read them off the raw expense record.
+    const rawExpense = expenseRecords.find((r) => stringField(r, 'id') === id)
+    const rawSplitsValue = rawExpense ? rawExpense.splits : undefined
+    const rawSplits = Array.isArray(rawSplitsValue)
+      ? (rawSplitsValue as Array<Record<string, unknown>>).map((s) => ({
+          category: stringField(s, 'category'),
+          amount: String(numberField(s, 'amount')),
+        }))
+      : []
     setEditDrafts((prev) => ({
       ...prev,
       [id]: {
@@ -365,6 +495,7 @@ export function TransactionsPanel({
         recurring: boolField(txn, 'recurring'),
         fromAccountId: stringField(txn, 'fromAccountId'),
         toAccountId: stringField(txn, 'toAccountId'),
+        splits: rawSplits,
       },
     }))
     setEditOpenId(id)
@@ -424,6 +555,17 @@ export function TransactionsPanel({
       tags: draft.tags.trim() || undefined,
       status: draft.status,
     }
+    const editAmount = Number(draft.amount) || 0
+    const editSplits = kind === 'expense' ? toSplitsPayload(draft.splits) : []
+    if (editSplits.length) {
+      const splitSum = editSplits.reduce((s, p) => s + p.amount, 0)
+      if (Math.abs(splitSum - editAmount) > 0.01) {
+        setErr(
+          `Split parts (${splitSum}) must add up to the amount (${editAmount})`,
+        )
+        return
+      }
+    }
     const data =
       kind === 'income'
         ? await mutate(
@@ -454,9 +596,13 @@ export function TransactionsPanel({
                 vendor: draft.counterparty.trim(),
                 category: draft.category.trim() || 'Other',
                 subcategory: draft.subcategory.trim() || undefined,
+                // Always send `splits` on an expense edit: a non-empty array
+                // replaces, `[]` clears — so an amount change can't silently
+                // leave stale parts behind.
+                splits: editSplits,
                 currency: draft.currency,
-                amount: Number(draft.amount) || 0,
-                convertedLkrAmount: Number(draft.amount) || 0,
+                amount: editAmount,
+                convertedLkrAmount: editAmount,
                 recurring: draft.recurring,
                 ...shared,
               },
@@ -673,6 +819,27 @@ export function TransactionsPanel({
                 className={inputClass}
               />
             )}
+            {addKind === 'expense' && addSplits.length > 0 && (
+              <SplitsField
+                rows={addSplits}
+                expenseAmount={Number(amount) || 0}
+                onChange={setAddSplits}
+              />
+            )}
+            {addKind === 'expense' && addSplits.length === 0 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setAddSplits([
+                    { category: category.trim(), amount: amount || '' },
+                    { category: '', amount: '' },
+                  ])
+                }
+                className="self-center text-xs font-medium text-[var(--theme-text)] underline"
+              >
+                Split
+              </button>
+            )}
             <input
               type="text"
               placeholder="Tags (comma-separated, optional)"
@@ -880,6 +1047,9 @@ export function TransactionsPanel({
           const txnStatus = stringField(txn, 'status') || 'cleared'
           const documentRef = stringField(txn, 'documentRef')
           const txnSource = stringField(txn, 'source') || 'manual'
+          const txnSplits = Array.isArray(txn.splits)
+            ? (txn.splits as Array<Record<string, unknown>>)
+            : []
 
           return (
             <div
@@ -1064,6 +1234,41 @@ export function TransactionsPanel({
                       className={inputClass}
                     />
                   )}
+                  {kind === 'expense' &&
+                    (editDrafts[id].splits.length > 0 ? (
+                      <SplitsField
+                        rows={editDrafts[id].splits}
+                        expenseAmount={Number(editDrafts[id].amount) || 0}
+                        onChange={(next) =>
+                          setEditDrafts((prev) => ({
+                            ...prev,
+                            [id]: { ...prev[id], splits: next },
+                          }))
+                        }
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditDrafts((prev) => ({
+                            ...prev,
+                            [id]: {
+                              ...prev[id],
+                              splits: [
+                                {
+                                  category: prev[id].category,
+                                  amount: prev[id].amount,
+                                },
+                                { category: '', amount: '' },
+                              ],
+                            },
+                          }))
+                        }
+                        className="self-center text-xs font-medium text-[var(--theme-text)] underline"
+                      >
+                        Split
+                      </button>
+                    ))}
                   <input
                     type="text"
                     placeholder="Tags (comma-separated)"
@@ -1233,6 +1438,21 @@ export function TransactionsPanel({
                       · {stringField(txn, 'date')} ·{' '}
                       {formatMoney(amountValue, txnCurrency)}
                     </span>
+                    {txnSplits.length > 0 && (
+                      <span className="ml-1 text-[10px] text-[var(--theme-muted)]">
+                        (split:{' '}
+                        {txnSplits
+                          .map(
+                            (s) =>
+                              `${stringField(s, 'category') || 'Other'} ${formatMoney(
+                                numberField(s, 'amount'),
+                                txnCurrency,
+                              )}`,
+                          )
+                          .join(' · ')}
+                        )
+                      </span>
+                    )}
                     {splitTags(stringField(txn, 'tags')).length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {splitTags(stringField(txn, 'tags')).map((t) => (

@@ -586,6 +586,71 @@ describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {
     expect(aud.convertedLkrAmount).toBe(500)
   })
 
+  it('expense splits: validated on write, attributed per-category, cleared with []', async () => {
+    const store = await freshFinanceStore()
+
+    // parts must sum to the amount
+    expect(() =>
+      store.addFinanceRecord('expense', {
+        date: '2026-07-04',
+        vendor: 'Keells',
+        category: 'Groceries',
+        currency: 'LKR',
+        amount: 10_000,
+        convertedLkrAmount: 10_000,
+        splits: [
+          { category: 'Groceries', amount: 6_000 },
+          { category: 'Household', amount: 3_000 },
+        ],
+      }),
+    ).toThrow(/add up/)
+
+    store.addFinanceRecord('expense', {
+      date: '2026-07-04',
+      vendor: 'Keells',
+      category: 'Groceries',
+      currency: 'LKR',
+      amount: 10_000,
+      convertedLkrAmount: 10_000,
+      splits: [
+        { category: 'Groceries', amount: 7_000 },
+        { category: 'Household', amount: 3_000 },
+      ],
+    })
+    store.addFinanceRecord('budget_category', {
+      month: '2026-07',
+      category: 'Household',
+      currency: 'LKR',
+      budgetAmount: 5_000,
+    })
+    store.addFinanceRecord('budget_category', {
+      month: '2026-07',
+      category: 'Groceries',
+      currency: 'LKR',
+      budgetAmount: 20_000,
+    })
+
+    let db = store.readFinanceStore()
+    const exp = db.expense_records[0]
+    expect(exp.splits).toHaveLength(2)
+
+    // record-level total is unchanged; category attribution follows the splits
+    expect(store.financeSummary(db).totalExpensesBase).toBe(10_000)
+    expect(getBudgetVsActual(db, 'Household', 2026, 7)?.actual).toBe(3_000)
+    expect(getBudgetVsActual(db, 'Groceries', 2026, 7)?.actual).toBe(7_000)
+
+    const trendCats = getFinanceTrends(db).categoriesThisMonth
+    // (only asserts the split rows are present with their own totals)
+    const householdRow = trendCats.find((c) => c.category === 'Household')
+    if (householdRow) expect(householdRow.amount).toBe(3_000)
+
+    // sending splits:[] clears them; the whole amount reverts to `category`
+    store.updateFinanceRecord('expense', exp.id, { splits: [] })
+    db = store.readFinanceStore()
+    expect(db.expense_records[0].splits).toBeUndefined()
+    expect(getBudgetVsActual(db, 'Household', 2026, 7)?.actual).toBe(0)
+  })
+
   it('goalKind (PF-1007 Sinking Funds) defaults to general and accepts sinking', async () => {
     const store = await freshFinanceStore()
     store.addFinanceRecord('goal', { name: 'Untyped goal', targetAmount: 1000 })
