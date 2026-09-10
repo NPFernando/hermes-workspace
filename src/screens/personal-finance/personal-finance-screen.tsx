@@ -161,6 +161,23 @@ export function PersonalFinanceScreen() {
           Track your accounts, spending, budgets, savings goals, investments, and
           tax records — all in one place.
         </p>
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-[var(--theme-muted)]">
+          <span>
+            Updated{' '}
+            {new Date(payload.checkedAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+          <button
+            type="button"
+            onClick={() => void financeQuery.refetch()}
+            disabled={financeQuery.isFetching}
+            className="rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_12%,transparent)] px-2 py-0.5 font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_20%,transparent)] disabled:opacity-50"
+          >
+            {financeQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </p>
       </section>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -266,18 +283,31 @@ export function PersonalFinanceScreen() {
 
       {exposure.length > 0 && (
         <section className="mt-4 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
-          <p className="text-xs font-medium text-[var(--theme-muted)]">
-            Currency exposure (active jobs, holdings, and fixed deposits — not
-            converted)
+          <h2 className="text-sm font-semibold text-[var(--theme-text)]">
+            Money held in other currencies
+          </h2>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            You hold value across {exposure.length}{' '}
+            {exposure.length === 1 ? 'currency' : 'currencies'} outside{' '}
+            {base}. These aren&apos;t converted into your reporting currency —
+            each is shown as-is, from active jobs, investments, and fixed
+            deposits.
           </p>
-          <div className="mt-2 flex flex-wrap gap-3">
-            {exposure.map(({ currency, amount }) => (
-              <span
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {exposure.map(({ currency, amount, breakdown }) => (
+              <div
                 key={currency}
-                className="text-sm font-medium text-[var(--theme-text)]"
+                className="rounded-2xl border border-[var(--theme-border)]/60 bg-[color-mix(in_srgb,var(--theme-text)_6%,transparent)] p-3"
               >
-                {formatMoney(amount, currency)}
-              </span>
+                <p className="text-sm font-semibold text-[var(--theme-text)]">
+                  {formatMoney(amount, currency)}
+                </p>
+                <p className="mt-0.5 text-[11px] text-[var(--theme-muted)]">
+                  {breakdown
+                    .map((b) => `${b.label} · ${formatMoney(b.amount, currency)}`)
+                    .join('  ·  ')}
+                </p>
+              </div>
             ))}
           </div>
         </section>

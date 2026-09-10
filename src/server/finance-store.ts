@@ -3482,35 +3482,79 @@ export function getUpcomingMoney(
 /** Non-LKR exposure across active jobs, holdings and FDs — grouped by
  *  currency, never summed across (no single-figure conversion). Port of the
  *  old screen-level `currencyExposure`. */
-export function getCurrencyExposure(
-  db: FinanceDatabase,
-): Array<{ currency: string; amount: number }> {
-  const totals = new Map<string, number>()
-  const add = (currency: string, amount: number) =>
-    totals.set(currency, (totals.get(currency) ?? 0) + amount)
+export type CurrencyExposureSource = 'jobs' | 'holdings' | 'fixed_deposits'
+
+export interface CurrencyExposure {
+  currency: string
+  amount: number
+  /** What drives this currency's exposure, so the UI can label it. */
+  breakdown: Array<{
+    source: CurrencyExposureSource
+    label: string
+    amount: number
+    count: number
+  }>
+}
+
+export function getCurrencyExposure(db: FinanceDatabase): Array<CurrencyExposure> {
+  // per currency → per source: { amount, count }
+  const byCurrency = new Map<
+    string,
+    Map<CurrencyExposureSource, { amount: number; count: number }>
+  >()
+  const add = (
+    currency: string,
+    source: CurrencyExposureSource,
+    amount: number,
+  ) => {
+    if (!(amount > 0)) return
+    const cur = byCurrency.get(currency) ?? new Map()
+    const entry = cur.get(source) ?? { amount: 0, count: 0 }
+    entry.amount += amount
+    entry.count += 1
+    cur.set(source, entry)
+    byCurrency.set(currency, cur)
+  }
 
   for (const job of db.income_sources as Array<Record<string, unknown>>) {
     if (job.status !== 'active') continue
     const amount = job.monthlyIncomeAmount
     if (typeof amount === 'number')
-      add((job.currency as string) || 'LKR', amount)
+      add((job.currency as string) || 'LKR', 'jobs', amount)
   }
   for (const h of db.stock_holdings) {
     const qty = typeof h.quantity === 'number' ? h.quantity : 0
     const price =
       (typeof h.lastKnownPrice === 'number' ? h.lastKnownPrice : undefined) ??
       (typeof h.buyPrice === 'number' ? h.buyPrice : 0)
-    add(h.currency || 'LKR', qty * price)
+    add(h.currency || 'LKR', 'holdings', qty * price)
   }
   for (const fd of db.fixed_deposits) {
     if (fd.status === 'withdrawn') continue
     if (typeof fd.principal === 'number')
-      add(fd.currency || 'LKR', fd.principal)
+      add(fd.currency || 'LKR', 'fixed_deposits', fd.principal)
   }
 
-  return [...totals.entries()]
-    .filter(([, amount]) => amount > 0)
-    .map(([currency, amount]) => ({ currency, amount }))
+  const sourceLabel: Record<CurrencyExposureSource, string> = {
+    jobs: 'active job',
+    holdings: 'holding',
+    fixed_deposits: 'fixed deposit',
+  }
+
+  return [...byCurrency.entries()]
+    .map(([currency, sources]) => {
+      const breakdown = [...sources.entries()]
+        .map(([source, { amount, count }]) => ({
+          source,
+          label: `${count} ${sourceLabel[source]}${count === 1 ? '' : 's'}`,
+          amount,
+          count,
+        }))
+        .sort((a, b) => b.amount - a.amount)
+      const amount = breakdown.reduce((sum, b) => sum + b.amount, 0)
+      return { currency, amount, breakdown }
+    })
+    .filter((e) => e.amount > 0)
     .sort((a, b) => b.amount - a.amount)
 }
 

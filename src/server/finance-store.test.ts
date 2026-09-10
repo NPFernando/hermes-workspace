@@ -2603,9 +2603,38 @@ describe('PF review item 7: server-side dashboard derivations', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
-    expect(getCurrencyExposure(db)).toEqual([
-      { currency: 'LKR', amount: 500_000 },
-      { currency: 'USD', amount: 3_000 },
+    db.stock_holdings.push({
+      id: 'h',
+      symbol: 'AAPL',
+      quantity: 10,
+      buyPrice: 100,
+      currency: 'USD',
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    const exposure = getCurrencyExposure(db)
+    expect(exposure).toEqual([
+      {
+        currency: 'LKR',
+        amount: 500_000,
+        breakdown: [
+          {
+            source: 'fixed_deposits',
+            label: '1 fixed deposit',
+            amount: 500_000,
+            count: 1,
+          },
+        ],
+      },
+      {
+        currency: 'USD',
+        amount: 4_000,
+        breakdown: [
+          { source: 'jobs', label: '1 active job', amount: 3_000, count: 1 },
+          { source: 'holdings', label: '1 holding', amount: 1_000, count: 1 },
+        ],
+      },
     ])
   })
 })
