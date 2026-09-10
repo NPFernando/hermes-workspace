@@ -226,10 +226,10 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 | 6 · de-dup transaction representation | ✅ done — `transactions` off the payload; panel unifies raw arrays client-side, parity-tested | PR #46 |
 | 7 · server-side derivations | ✅ done — `getFinanceTrends`/`getRecurringBills`/`getUpcomingMoney`/`getCurrencyExposure` on the payload; 4 components + `personal-finance-digest.sh` rewired; ~90 lines of digest Python deleted | PR #46 |
 | 9 · paged transaction-history endpoint | ✅ done — `list_transactions` action (id cursor, 1..500) | PR #46 |
-| 5 · merge target cards / settings screen | **substantially done** — the 3 target cards are grouped under one "Goals & targets" heading (item 4). Folding them into a single component and a cross-screen settings home for the currency picker are polish left for a UX PR against a merged baseline. | PR #46 |
-| 1 · window payload to 24 months | **prerequisites all done** (6, 7, 9). After 6+7 the only remaining raw-array consumers are `TransactionsPanel` + 5 entity panels ("records tagged to X"). Windowing is now a **product decision** — accept a 24-month cut in those 6 places, or rewrite `TransactionsPanel` for server-side filtered paging (it filters client-side today). Not a unilateral commit. |
-| 11 · `*Lkr` → `*Base` rename | **deliberately not done** — ~56 sites of pure rename churn for readability; PF-201 kept the names intentionally; a standalone, easily-reverted PR if the team wants it, not bundled here. |
-| 12 · unified ledger | roadmap Phase 1. `personal-finance-os-roadmap.md`'s own process rule: built "one feature at a time, explicitly requested" — an unrequested slice here would violate that. Multi-PR project. |
+| 5 · merge target cards / settings screen | ✅ done — `GoalsTargetsCard` (one section, `GoalRow` layout, each row keeps its `set_*` action); the 3 old card files deleted; `BaseCurrencySelect` moved into the collapsed settings drawer (U3) | PR #46 |
+| 1 · window payload | ✅ done — `data.{income_records,expense_records}` capped to the trailing **36 months** (`TRANSACTIONS_WINDOW_MONTHS`); `financeSummary`'s all-time figures untouched (reads `db`); `TransactionsPanel` shows a "last 36 months" note; full history via `list_transactions` + JSON export | PR #46 |
+| 11 · `*Lkr` → `*Base` rename | **not done — standalone PR.** Confirmed **109 occurrences across 12 files**, incl. `src/screens/dashboard/` (a different screen) and the digest cron. `targetLkr` is overloaded — a display field, the `set_wealth_goal` request-body param (API contract), a local var, and collides with the `wealthGoalTargetLkr` storage key — so a safe rename is per-occurrence, not find/replace. Zero functional change; PF-201 kept the names on purpose. Belongs in an isolated, trivially-revertible `refactor(finance): *Lkr → *Base` PR. |
+| 12 · unified ledger | **not done — roadmap-governed.** `personal-finance-os-roadmap.md`: *"Do not build ahead of this document … one feature at a time, explicitly requested."* Building a speculative ledger slice on this branch would violate that governance rule. It's Phase 1, a multi-PR project, and the roadmap owns its sequencing. |
 
 **Tier 0 — shipped in this pass**
 
@@ -240,11 +240,11 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 
 **Tier 1 — small, safe, high user impact**
 
-1. Window `income_records` / `expense_records` in the dashboard payload to 24 months (D2/P1).
-   **Prerequisites done** (6 ✅, 9 ✅). The windowing itself is still deferred: it silently
-   truncates the 8 non-panel consumers of the raw arrays, and `TransactionsPanel` would need
-   server-side filtering (not just paging) to keep its date/kind/amount/search filters correct
-   over a windowed set. One careful PR against a merged baseline — see the Appendix.
+1. ✅ **DONE** (`feat/pf-dashboard-perf`) — `data.{income_records,expense_records}` capped to
+   the trailing **36 months** (`TRANSACTIONS_WINDOW_MONTHS`, `withinWindow()`). `financeSummary`
+   reads `db` server-side so its all-time figures are unaffected; `TransactionsPanel` shows a
+   "last 36 months" note; the entity panels' "records tagged to X" lists are likewise bounded.
+   Full history: `list_transactions` (item 9) + the JSON export (D2/P1).
 2. ✅ **DONE** (`feat/pf-dashboard-perf`) — `TransactionsPanel` renders the first 100 filtered
    rows + "Show more"; totals/counts still span the full list; visible count resets on filter
    change (D3/P2).
@@ -259,11 +259,11 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 
 **Tier 2 — medium, structural**
 
-5. **Partial** (`feat/pf-dashboard-perf`): the 3 target cards are now visually grouped under a
-   "Goals & targets" heading in a grid (item 4). Still open — collapsing
-   `EmergencyFundCard` + `SavingsRateTargetCard` + `WealthGoalCard` into **one component**
-   with a shared row layout (U2), and giving `BaseCurrencySelect` a real settings-screen home
-   (U3) rather than a bottom-of-Overview slot.
+5. ✅ **DONE** (`feat/pf-dashboard-perf`) — `EmergencyFundCard` + `SavingsRateTargetCard` +
+   `WealthGoalCard` folded into one **`GoalsTargetsCard`** (one section, a `GoalRow` layout,
+   each row keeps its own set-form and `set_*` action). The 3 old files deleted.
+   `BaseCurrencySelect` moved into the collapsed "Settings, assistant memory & data health"
+   drawer (U3) — the missing-rate warning still surfaces up top via `FinanceAlertsCard`.
 6. ✅ **DONE** (`feat/pf-dashboard-perf`) — `transactions` dropped from the payload;
    `TransactionsPanel` unifies `data.income_records` + `data.expense_records` client-side via
    `unifyTransactions`, parity-tested against the server's `getUnifiedTransactions` (D1).
@@ -290,8 +290,13 @@ across ~15 panels. That work is done and good; the duplication that remains is *
     `topVendors`. The prompt now states the currency explicitly.
     *(was item 10 "Finance Analyst units pass" in the original table — the "lighter mutation
     responses" idea moves down.)*
-11. `*Lkr` → `*Base` rename (M3).
-12. The unified ledger (already `personal-finance-os-roadmap.md` Phase 1).
+11. **Not done — standalone PR.** `*Lkr` → `*Base` rename (M3). 109 occurrences / 12 files,
+    incl. `src/screens/dashboard/` and the digest cron; `targetLkr` is overloaded (display
+    field / `set_wealth_goal` request param / local var / collides with the `wealthGoalTargetLkr`
+    storage key). Per-occurrence work, zero functional change — its own revertible PR.
+12. **Not done — roadmap-governed.** The unified ledger is `personal-finance-os-roadmap.md`
+    Phase 1; that doc's rule is "do not build ahead of this document … one feature at a time,
+    explicitly requested". Multi-PR project, sequenced by the roadmap.
 
 ---
 
