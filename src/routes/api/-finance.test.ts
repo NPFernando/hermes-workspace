@@ -260,6 +260,42 @@ describe('/api/finance?scope=personal_finance windowing (PF review item 1)', () 
     expect(body.data.income_records.map((r) => r.id)).toEqual(['i-new'])
     expect(body.data.expense_records.map((r) => r.id)).toEqual(['e-new'])
   })
+
+  it('data.exchange_rates collapses history to the latest row per base->target pair', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.financeSummary).mockReturnValue({
+      baseCurrency: 'LKR',
+    } as never)
+    const rows = [
+      { base: 'USD', target: 'LKR', rate: 300, date: '2026-09-08' },
+      { base: 'USD', target: 'LKR', rate: 328.4, date: '2026-09-10' },
+      { base: 'USD', target: 'LKR', rate: 320, date: '2026-09-09' },
+      { base: 'LKR', target: 'USD', rate: 1 / 328.4, date: '2026-09-10' },
+      { base: 'AUD', target: 'LKR', rate: 236.8, date: '2026-09-10' },
+    ]
+    vi.mocked(store.readFinanceStore).mockReturnValue(
+      state.mockFinanceDb({ exchange_rates: rows }) as never,
+    )
+    vi.mocked(store.ensureFinanceStore).mockReturnValue(
+      state.mockFinanceDb({ exchange_rates: rows }) as never,
+    )
+
+    const response = await (
+      await handlers()
+    ).GET({
+      request: new Request(
+        'http://localhost/api/finance?scope=personal_finance',
+      ),
+    })
+    const body = (await response.json()) as {
+      data: { exchange_rates: Array<{ base: string; target: string; rate: number; date: string }> }
+    }
+    const er = body.data.exchange_rates
+    expect(er).toHaveLength(3) // USD->LKR, LKR->USD, AUD->LKR — one each
+    const usdLkr = er.find((r) => r.base === 'USD' && r.target === 'LKR')
+    expect(usdLkr).toMatchObject({ rate: 328.4, date: '2026-09-10' })
+  })
 })
 
 describe('/api/finance fetch_news', () => {

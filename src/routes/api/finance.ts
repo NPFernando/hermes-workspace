@@ -416,6 +416,48 @@ function withinWindow<T extends Record<string, unknown>>(
   return rows.filter((r) => String(r[dateKey] ?? '') >= cutoffIso)
 }
 
+type LatestRate = {
+  base: string
+  target: string
+  rate: number
+  date: string
+  updatedAt?: string
+}
+
+/**
+ * The FX cron (`refresh_exchange_rates`) appends one `exchange_rates` row per
+ * pair per day. The dashboard only needs the *current* value for each
+ * `base -> target` pair, so collapse the history to the newest row per pair.
+ */
+function latestExchangeRates(
+  rows: Array<Record<string, unknown>>,
+): Array<LatestRate> {
+  const byPair = new Map<string, LatestRate>()
+  for (const r of rows) {
+    if (
+      typeof r.base !== 'string' ||
+      typeof r.target !== 'string' ||
+      typeof r.rate !== 'number'
+    )
+      continue
+    const key = `${r.base}->${r.target}`
+    const date = String(r.date ?? '')
+    const current = byPair.get(key)
+    if (!current || date >= current.date) {
+      byPair.set(key, {
+        base: r.base,
+        target: r.target,
+        rate: r.rate,
+        date,
+        updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : undefined,
+      })
+    }
+  }
+  return [...byPair.values()].sort((a, b) =>
+    `${a.base}${a.target}`.localeCompare(`${b.base}${b.target}`),
+  )
+}
+
 function personalFinancePayload() {
   const db = ensureFinanceStore()
   const storage = financeStorageStatus()
@@ -531,6 +573,9 @@ function personalFinancePayload() {
       properties: db.properties,
       beneficiaries: db.beneficiaries,
       pending_ingestions: db.pending_ingestions,
+      // Latest rate per pair (from the FX cron / manual entry) so the
+      // reporting-currency picker can show "rates as of …" and flag staleness.
+      exchange_rates: latestExchangeRates(db.exchange_rates),
     }),
   }
 }
