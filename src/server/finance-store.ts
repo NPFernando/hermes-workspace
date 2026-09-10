@@ -138,12 +138,28 @@ export type IncomeRecord = {
   updatedAt: string
 }
 
+/**
+ * PF review item 2: one expense line split across several categories (e.g. a
+ * supermarket receipt that's part Groceries, part Household). Additive and
+ * optional — an expense with no `splits` behaves exactly as before. `amount`
+ * is in the record's `currency`; the parts must sum to the record `amount`
+ * (enforced on write). Category-level aggregations attribute each part its
+ * pro-rata share of `convertedLkrAmount`; record-level totals are untouched.
+ */
+export type ExpenseSplit = {
+  category: string
+  subcategory?: string
+  amount: number
+  notes?: string
+}
+
 export type ExpenseRecord = {
   id: string
   date: string
   vendor: string
   category: string
   subcategory?: string
+  splits?: Array<ExpenseSplit>
   accountId?: string
   currency: CurrencyCode
   amount: number
@@ -203,6 +219,7 @@ export type UnifiedTransaction = {
   taxable?: boolean
   incomeSourceId?: string
   subcategory?: string
+  splits?: Array<ExpenseSplit>
   tags?: string
   status?: 'pending' | 'cleared' | 'reconciled'
   source: string
@@ -1429,19 +1446,23 @@ export function addFinanceRecord(
       status: reconciliationStatus(payload.status),
     })
   } else if (kind === 'expense') {
+    const expenseAmount = numberField(payload, 'amount', 0)
+    const expenseSplits = parseExpenseSplits(payload)
+    assertValidExpenseSplits(expenseSplits, expenseAmount)
     db.expense_records.push({
       ...base,
       date: stringField(payload, 'date', createdAt.slice(0, 10)),
       vendor: stringField(payload, 'vendor', 'Unspecified vendor'),
       category: stringField(payload, 'category', 'Other'),
       subcategory: optionalString(payload, 'subcategory'),
+      ...(expenseSplits ? { splits: expenseSplits } : {}),
       accountId: optionalString(payload, 'accountId'),
       currency: stringField(payload, 'currency', 'LKR'),
-      amount: numberField(payload, 'amount', 0),
+      amount: expenseAmount,
       convertedLkrAmount: numberField(
         payload,
         'convertedLkrAmount',
-        numberField(payload, 'amount', 0),
+        expenseAmount,
       ),
       recurring: booleanField(payload, 'recurring', false),
       workRelated: booleanField(payload, 'workRelated', false),
@@ -1685,11 +1706,20 @@ export function updateFinanceRecord(
   } else if (kind === 'expense') {
     const index = db.expense_records.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.expense_records[index] = {
+      const merged = {
         ...db.expense_records[index],
         ...payload,
         updatedAt: nowIso(),
       }
+      // `splits` needs parse + validation, and an explicit `null`/`[]` clears
+      // it. Only touch it when the caller actually sent the key.
+      if ('splits' in payload) {
+        const parsed = parseExpenseSplits(payload)
+        assertValidExpenseSplits(parsed, merged.amount)
+        if (parsed) merged.splits = parsed
+        else delete merged.splits
+      }
+      db.expense_records[index] = merged
       updated = true
     }
   } else if (kind === 'account') {
@@ -2653,6 +2683,43 @@ function optionalNumber(payload: AddPayload, key: string): number | undefined {
   return Number.isFinite(value) ? value : undefined
 }
 
+/**
+ * Parse `payload.splits` (from add/update_record) into `ExpenseSplit[]`, or
+ * `undefined` when absent/empty. `null` / `[]` are treated as an explicit
+ * "clear the splits" on update.
+ */
+function parseExpenseSplits(payload: AddPayload): Array<ExpenseSplit> | undefined {
+  const raw = payload.splits
+  if (!Array.isArray(raw) || raw.length === 0) return undefined
+  return raw.map((entry) => {
+    const row: AddPayload =
+      entry && typeof entry === 'object' ? (entry as AddPayload) : {}
+    return {
+      category: stringField(row, 'category', 'Other'),
+      subcategory: optionalString(row, 'subcategory'),
+      amount: numberField(row, 'amount', 0),
+      notes: optionalString(row, 'notes'),
+    }
+  })
+}
+
+/** Throws when `splits` don't form a valid split of `amount`. */
+function assertValidExpenseSplits(
+  splits: Array<ExpenseSplit> | undefined,
+  amount: number,
+): void {
+  if (!splits) return
+  if (splits.length < 2) {
+    throw new Error('An expense split needs at least two parts')
+  }
+  const sum = splits.reduce((acc, part) => acc + part.amount, 0)
+  if (Math.abs(sum - amount) > 0.01) {
+    throw new Error(
+      `Split parts add up to ${sum}, which does not match the expense amount ${amount}`,
+    )
+  }
+}
+
 function booleanField(
   payload: AddPayload,
   key: string,
@@ -2826,6 +2893,35 @@ function parseDate(dateString: string): { year: number; month: number } | null {
   }
 }
 
+/**
+ * PF review item 2: the category-level LKR breakdown of one expense. With
+ * `splits`, each part gets its share of `convertedLkrAmount` pro-rata to its
+ * `amount` (so an FX-converted record total is preserved exactly). Without
+ * splits, the whole record lands under its own `category`. Category-level
+ * aggregations (budget-vs-actual, trend category totals, the analyst's
+ * category breakdown) go through this; record-level totals never do.
+ */
+export function expenseCategoryBreakdown(
+  exp: ExpenseRecord,
+): Array<{ category: string; subcategory?: string; lkr: number }> {
+  if (!exp.splits || exp.splits.length === 0) {
+    return [
+      {
+        category: exp.category || 'Other',
+        subcategory: exp.subcategory,
+        lkr: exp.convertedLkrAmount,
+      },
+    ]
+  }
+  const partsTotal =
+    exp.amount || exp.splits.reduce((acc, p) => acc + p.amount, 0) || 1
+  return exp.splits.map((part) => ({
+    category: part.category || 'Other',
+    subcategory: part.subcategory,
+    lkr: exp.convertedLkrAmount * (part.amount / partsTotal),
+  }))
+}
+
 export function getUnifiedTransactions(
   db: FinanceDatabase,
 ): Array<UnifiedTransaction> {
@@ -2867,6 +2963,7 @@ export function getUnifiedTransactions(
       documentRef: exp.documentRef,
       recurring: exp.recurring,
       subcategory: exp.subcategory,
+      splits: exp.splits,
       tags: exp.tags,
       status: exp.status,
       source: exp.source,
@@ -3016,8 +3113,12 @@ export function getFinanceTrends(
   const catTotals = new Map<string, number>()
   for (const row of db.expense_records) {
     if (String(row.date).slice(0, 7) !== currentMonth) continue
-    const cat = row.category || 'Other'
-    catTotals.set(cat, (catTotals.get(cat) ?? 0) + row.convertedLkrAmount)
+    for (const part of expenseCategoryBreakdown(row)) {
+      catTotals.set(
+        part.category,
+        (catTotals.get(part.category) ?? 0) + part.lkr,
+      )
+    }
   }
   const categoriesThisMonth = [...catTotals.entries()]
     .map(([category, amount]) => ({ category, amount }))
@@ -3303,10 +3404,14 @@ export function buildFinanceQueryContext(db: FinanceDatabase): {
   )
   const byCategory = (monthKey: string) => {
     const totals: Record<string, number> = {}
-    for (const t of expenses) {
-      const d = parseDate(t.date)
+    // Iterate raw expense_records (not the unified list) so `splits` are
+    // visible and each part is attributed to its own category.
+    for (const exp of db.expense_records) {
+      const d = parseDate(exp.date)
       if (!d || `${d.year}-${d.month}` !== monthKey) continue
-      totals[t.category] = (totals[t.category] ?? 0) + t.convertedLkrAmount
+      for (const part of expenseCategoryBreakdown(exp)) {
+        totals[part.category] = (totals[part.category] ?? 0) + part.lkr
+      }
     }
     return totals
   }
@@ -3370,12 +3475,10 @@ export function getBudgetVsActual(
     if (!includeInTotals(exp)) continue
     const dateInfo = parseDate(exp.date)
     if (!dateInfo) continue
-    if (
-      dateInfo.year === year &&
-      dateInfo.month === month &&
-      exp.category === category
-    ) {
-      actual += exp.convertedLkrAmount
+    if (dateInfo.year !== year || dateInfo.month !== month) continue
+    // A split expense contributes only the parts tagged to this category.
+    for (const part of expenseCategoryBreakdown(exp)) {
+      if (part.category === category) actual += part.lkr
     }
   }
 
