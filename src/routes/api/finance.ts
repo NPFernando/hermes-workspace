@@ -11,6 +11,7 @@ import {
   appendAuditLog,
   budgetVsActualSummary,
   buildFinanceQueryContext,
+  computeAccountLedgerBalance,
   convertCurrency,
   deleteFinanceRecord,
   ensureFinanceStore,
@@ -28,6 +29,7 @@ import {
   getRecurringBills,
   getUnifiedTransactions,
   getUpcomingMoney,
+  ledgerTransactionsForDb,
   listPendingIngestions,
   maskSensitive,
   readFinanceStore,
@@ -460,6 +462,7 @@ function latestExchangeRates(
 
 function personalFinancePayload() {
   const db = ensureFinanceStore()
+  const accountLedgerLegs = ledgerTransactionsForDb(db)
   const storage = financeStorageStatus()
   const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
   const summary = financeSummary(db)
@@ -555,7 +558,19 @@ function personalFinancePayload() {
     // Full history is on the `list_transactions` endpoint + the JSON export.
     transactionsWindowMonths: TRANSACTIONS_WINDOW_MONTHS,
     data: maskSensitive({
-      finance_accounts: db.finance_accounts,
+      // Item 3: each account row carries its ledger-derived balance
+      // (openingBalance + tagged income − expenses + transfer legs, in the
+      // account's own currency) so the panel can show a reconcile delta
+      // without re-implementing the math client-side. `null` when the
+      // account has no `openingBalance` to reconcile against.
+      finance_accounts: db.finance_accounts.map((account) => ({
+        ...account,
+        ledgerBalance: computeAccountLedgerBalance(
+          db,
+          account,
+          accountLedgerLegs,
+        ),
+      })),
       income_records: withinWindow(db.income_records, 'dateReceived'),
       expense_records: withinWindow(db.expense_records, 'date'),
       transfers: withinWindow(db.transfers, 'date'),

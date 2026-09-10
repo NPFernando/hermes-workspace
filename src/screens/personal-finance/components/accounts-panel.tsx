@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
-import { computeAccountLedgerBalance, formatMoney } from '../utils'
+import { formatMoney } from '../utils'
 import { buttonClass, confirmButtonClass, dangerButtonClass, inputClass } from '../shared-styles'
 import { numberField, optionalNumberField, stringField } from '../field-helpers'
-import type { ReconcileTransaction } from '../utils'
 import type { PersonalFinancePayload } from '../types'
 
 const ACCOUNT_TYPES = [
@@ -29,6 +28,7 @@ type EditDraft = {
   balance: string
   openingBalance: string
   openingBalanceDate: string
+  deriveBalanceFromLedger: boolean
   maskedIdentifier: string
   platform: string
 }
@@ -114,6 +114,7 @@ export function AccountsPanel({
         openingBalance:
           optionalNumberField(account, 'openingBalance')?.toString() ?? '',
         openingBalanceDate: stringField(account, 'openingBalanceDate'),
+        deriveBalanceFromLedger: account.deriveBalanceFromLedger === true,
         maskedIdentifier: stringField(account, 'maskedIdentifier'),
         platform: stringField(account, 'platform'),
       },
@@ -145,6 +146,7 @@ export function AccountsPanel({
             ? Number(draft.openingBalance)
             : undefined,
           openingBalanceDate: draft.openingBalanceDate || undefined,
+          deriveBalanceFromLedger: draft.deriveBalanceFromLedger,
           maskedIdentifier: draft.maskedIdentifier.trim() || undefined,
           platform: draft.platform.trim() || undefined,
         },
@@ -163,52 +165,6 @@ export function AccountsPanel({
   }
 
   const accounts = payload.data.finance_accounts
-
-  const ledgerTransactions: Array<ReconcileTransaction> = useMemo(
-    () => [
-      ...payload.data.income_records.map((r) => ({
-        accountId: stringField(r, 'accountId') || undefined,
-        currency: stringField(r, 'originalCurrency') || 'LKR',
-        amount: numberField(r, 'originalAmount'),
-        kind: 'income' as const,
-      })),
-      ...payload.data.expense_records.map((r) => ({
-        accountId: stringField(r, 'accountId') || undefined,
-        currency: stringField(r, 'currency') || 'LKR',
-        amount: numberField(r, 'amount'),
-        kind: 'expense' as const,
-      })),
-      // A transfer moves money out of `fromAccountId` and into
-      // `toAccountId` — feed it as two legs so both accounts reconcile.
-      ...payload.data.transfers.flatMap((r) => {
-        const txCurrency = stringField(r, 'currency') || 'LKR'
-        const txAmount = numberField(r, 'amount')
-        const legs: Array<ReconcileTransaction> = []
-        const from = stringField(r, 'fromAccountId')
-        const to = stringField(r, 'toAccountId')
-        if (from)
-          legs.push({
-            accountId: from,
-            currency: txCurrency,
-            amount: txAmount,
-            kind: 'expense',
-          })
-        if (to)
-          legs.push({
-            accountId: to,
-            currency: txCurrency,
-            amount: txAmount,
-            kind: 'income',
-          })
-        return legs
-      }),
-    ],
-    [
-      payload.data.income_records,
-      payload.data.expense_records,
-      payload.data.transfers,
-    ],
-  )
 
   const totalsByCurrency = new Map<string, number>()
   for (const account of accounts) {
@@ -334,14 +290,12 @@ export function AccountsPanel({
           )
           const maskedIdentifierValue = stringField(account, 'maskedIdentifier')
           const platformValue = stringField(account, 'platform')
-          const ledgerBalance = computeAccountLedgerBalance(
-            {
-              id,
-              currency: accountCurrency,
-              openingBalance: openingBalanceValue,
-            },
-            ledgerTransactions,
-          )
+          // Ledger-derived balance is computed server-side (cross-currency
+          // aware) and shipped on the row; `null` when no opening balance.
+          const ledgerBalanceRaw = account.ledgerBalance
+          const ledgerBalance =
+            typeof ledgerBalanceRaw === 'number' ? ledgerBalanceRaw : null
+          const deriveFromLedger = account.deriveBalanceFromLedger === true
           const reconciliationDiff =
             ledgerBalance === null ? null : balanceValue - ledgerBalance
 
@@ -432,6 +386,25 @@ export function AccountsPanel({
                     }
                     className={inputClass}
                   />
+                  <label
+                    className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]"
+                    title="Net worth and cash use openingBalance + tagged transactions for this account instead of the number above. Needs an opening balance."
+                  >
+                    <input
+                      type="checkbox"
+                      checked={editDrafts[id].deriveBalanceFromLedger}
+                      onChange={(e) =>
+                        setEditDrafts((prev) => ({
+                          ...prev,
+                          [id]: {
+                            ...prev[id],
+                            deriveBalanceFromLedger: e.target.checked,
+                          },
+                        }))
+                      }
+                    />
+                    Use ledger balance
+                  </label>
                   <input
                     type="text"
                     placeholder="Masked identifier"
@@ -480,7 +453,24 @@ export function AccountsPanel({
                     </span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
                       · {accountTypeLabel(stringField(account, 'type'))} ·{' '}
-                      {formatMoney(balanceValue, accountCurrency)}
+                      {formatMoney(
+                        deriveFromLedger && ledgerBalance !== null
+                          ? ledgerBalance
+                          : balanceValue,
+                        accountCurrency,
+                      )}
+                      {deriveFromLedger && ledgerBalance !== null && (
+                        <span className="text-[var(--theme-success)]">
+                          {' '}
+                          · from ledger
+                        </span>
+                      )}
+                      {deriveFromLedger && ledgerBalance === null && (
+                        <span className="text-[var(--theme-warning)]">
+                          {' '}
+                          · ledger on, but no opening balance — using manual
+                        </span>
+                      )}
                       {maskedIdentifierValue && ` · ${maskedIdentifierValue}`}
                       {platformValue && ` · ${platformValue}`}
                     </span>

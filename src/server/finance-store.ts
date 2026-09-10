@@ -107,6 +107,14 @@ export type FinanceAccount = {
   /** Balance recorded when the user started tracking this account, distinct from the live `balance` above. */
   openingBalance?: number
   openingBalanceDate?: string
+  /**
+   * When true (and an `openingBalance` is set), this account's contribution
+   * to net worth / cash / card-debt uses the ledger-derived balance
+   * (openingBalance + tagged income − expenses + transfer legs) instead of
+   * the manually-entered `balance`. Falls back to `balance` when the ledger
+   * figure can't be computed. Default (absent/false) = manual balance.
+   */
+  deriveBalanceFromLedger?: boolean
   maskedIdentifier?: string
   platform?: string
   source: string
@@ -1492,6 +1500,8 @@ export function addFinanceRecord(
       balance: numberField(payload, 'balance', 0),
       openingBalance: optionalNumber(payload, 'openingBalance'),
       openingBalanceDate: optionalString(payload, 'openingBalanceDate'),
+      deriveBalanceFromLedger:
+        payload.deriveBalanceFromLedger === true ? true : undefined,
       maskedIdentifier: optionalString(payload, 'maskedIdentifier'),
       platform: optionalString(payload, 'platform'),
     })
@@ -2406,6 +2416,129 @@ function amountToLkr(
   return amount
 }
 
+/**
+ * Convert `amount` from `from` currency to `to` currency via this db's
+ * `exchange_rates` (direct rate, else 1/inverse). Returns null when neither
+ * leg is on file — the caller decides whether to skip or fall back.
+ */
+function convertBetweenCurrencies(
+  db: FinanceDatabase,
+  amount: number,
+  from: string,
+  to: string,
+): number | null {
+  if (!from || !to || from === to) return amount
+  const direct = latestRateFromDb(db, from, to)
+  if (direct !== undefined) return amount * direct
+  const inverse = latestRateFromDb(db, to, from)
+  if (inverse) return amount / inverse
+  return null
+}
+
+/**
+ * A signed movement against one account, in that record's own currency.
+ * A transfer is fed in as TWO legs: `{kind: 'expense'}` on the source
+ * account and `{kind: 'income'}` on the destination.
+ */
+export type ReconcileTransaction = {
+  accountId?: string
+  currency: string
+  amount: number
+  kind: 'income' | 'expense'
+}
+
+/**
+ * AI-600: what an account's own tagged transactions say its balance should
+ * be, starting from `openingBalance`. Returns null when there's no
+ * `openingBalance` (nothing to reconcile against). Lives here rather than in
+ * `screens/…/utils.ts` so `financeSummary` can use it and so cross-currency
+ * legs convert through the FX table. A record in a currency other than the
+ * account's is converted via `exchange_rates`; it is skipped only when no
+ * rate is on file.
+ */
+export function computeAccountLedgerBalance(
+  db: FinanceDatabase,
+  account: { id: string; currency: string; openingBalance?: number },
+  records: Array<ReconcileTransaction>,
+): number | null {
+  if (account.openingBalance === undefined) return null
+  let balance = account.openingBalance
+  for (const record of records) {
+    if (record.accountId !== account.id) continue
+    let value = record.amount
+    if (record.currency !== account.currency) {
+      const converted = convertBetweenCurrencies(
+        db,
+        record.amount,
+        record.currency,
+        account.currency,
+      )
+      if (converted === null) continue // no rate on file — exclude, as before
+      value = converted
+    }
+    balance += record.kind === 'income' ? value : -value
+  }
+  return balance
+}
+
+/** Every income, expense and transfer in `db` as reconcile legs. */
+export function ledgerTransactionsForDb(
+  db: FinanceDatabase,
+): Array<ReconcileTransaction> {
+  const legs: Array<ReconcileTransaction> = []
+  for (const inc of db.income_records) {
+    legs.push({
+      accountId: inc.accountId,
+      currency: inc.originalCurrency,
+      amount: inc.originalAmount,
+      kind: 'income',
+    })
+  }
+  for (const exp of db.expense_records) {
+    legs.push({
+      accountId: exp.accountId,
+      currency: exp.currency,
+      amount: exp.amount,
+      kind: 'expense',
+    })
+  }
+  for (const t of db.transfers) {
+    if (t.fromAccountId) {
+      legs.push({
+        accountId: t.fromAccountId,
+        currency: t.currency,
+        amount: t.amount,
+        kind: 'expense',
+      })
+    }
+    if (t.toAccountId) {
+      legs.push({
+        accountId: t.toAccountId,
+        currency: t.currency,
+        amount: t.amount,
+        kind: 'income',
+      })
+    }
+  }
+  return legs
+}
+
+/**
+ * The balance to use for `account` in aggregates: the ledger-derived figure
+ * when the account opted in (`deriveBalanceFromLedger`) AND it's computable,
+ * otherwise the manually-entered `balance`. Fails closed — never 0, never
+ * drops the account.
+ */
+export function effectiveAccountBalance(
+  db: FinanceDatabase,
+  account: FinanceAccount,
+  legs: Array<ReconcileTransaction> = ledgerTransactionsForDb(db),
+): number {
+  if (!account.deriveBalanceFromLedger) return account.balance
+  const derived = computeAccountLedgerBalance(db, account, legs)
+  return derived ?? account.balance
+}
+
 export function financeSummary(db: FinanceDatabase) {
   // PF-201: the reporting currency. Stored amounts stay LKR-denominated
   // (`convertedLkrAmount`, `wealthGoalTargetLkr`, …); this only changes what
@@ -2449,8 +2582,14 @@ export function financeSummary(db: FinanceDatabase) {
   const netSavingsBase = totalIncomeBase - totalExpensesBase
   const savingsRate =
     totalIncomeBase > 0 ? (netSavingsBase / totalIncomeBase) * 100 : 0
+  // Accounts that opted into `deriveBalanceFromLedger` contribute their
+  // ledger-derived balance (openingBalance + tagged movements) instead of the
+  // manual `balance`; the rest are unchanged. `legs` built once.
+  const reconcileLegs = ledgerTransactionsForDb(db)
   const cashBalanceBase = db.finance_accounts.reduce(
-    (sum, row) => sum + toLkr(row.balance, row.currency),
+    (sum, row) =>
+      sum +
+      toLkr(effectiveAccountBalance(db, row, reconcileLegs), row.currency),
     0,
   )
   // PF-201: budget categories may be non-LKR (getBudgetVsActual converts them
@@ -2468,7 +2607,11 @@ export function financeSummary(db: FinanceDatabase) {
   const debtBase =
     db.finance_accounts
       .filter((account) => account.type === 'card')
-      .reduce((sum, row) => sum + Math.abs(row.balance), 0) +
+      .reduce(
+        (sum, row) =>
+          sum + Math.abs(effectiveAccountBalance(db, row, reconcileLegs)),
+        0,
+      ) +
     db.loans
       .filter((loan) => loan.status === 'active')
       .reduce((sum, loan) => sum + loan.currentBalance, 0)

@@ -73,36 +73,7 @@ export function buildFinanceAnswerMarkdown(
   return lines.join('\n')
 }
 
-export type ReconcileTransaction = {
-  accountId?: string
-  currency: string
-  amount: number
-  // A transfer is fed in as TWO legs: `{kind: 'expense'}` on the source
-  // account and `{kind: 'income'}` on the destination — so it moves both
-  // balances without any change to the summing logic below.
-  kind: 'income' | 'expense'
-}
-
-/**
- * AI-600 (Phase 28, first slice): reconciles an account's manually-maintained
- * `balance` against what its own tagged transactions say it should be,
- * starting from `openingBalance`. Returns null when there's no
- * openingBalance to start from — without one, "since some unknown point"
- * transactions can't be meaningfully checked, so no number is shown rather
- * than a misleading one. Only same-currency transactions are summed;
- * cross-currency records tagged to the account are excluded (no conversion
- * attempted this slice). Transfers count as two legs (see ReconcileTransaction).
- */
-export function computeAccountLedgerBalance(
-  account: { id: string; currency: string; openingBalance?: number },
-  records: Array<ReconcileTransaction>,
-): number | null {
-  if (account.openingBalance === undefined) return null
-  let balance = account.openingBalance
-  for (const record of records) {
-    if (record.accountId !== account.id || record.currency !== account.currency)
-      continue
-    balance += record.kind === 'income' ? record.amount : -record.amount
-  }
-  return balance
-}
+// `computeAccountLedgerBalance` + `ReconcileTransaction` moved to
+// `src/server/finance-store.ts` (they now need the FX table for
+// cross-currency legs, and `financeSummary` uses them). The accounts panel
+// reads the server-computed `ledgerBalance` off each payload account row.
