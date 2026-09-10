@@ -228,8 +228,8 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 | 9 · paged transaction-history endpoint | ✅ done — `list_transactions` action (id cursor, 1..500) | PR #46 |
 | 5 · merge target cards / settings screen | ✅ done — `GoalsTargetsCard` (one section, `GoalRow` layout, each row keeps its `set_*` action); the 3 old card files deleted; `BaseCurrencySelect` moved into the collapsed settings drawer (U3) | PR #46 |
 | 1 · window payload | ✅ done — `data.{income_records,expense_records}` capped to the trailing **36 months** (`TRANSACTIONS_WINDOW_MONTHS`); `financeSummary`'s all-time figures untouched (reads `db`); `TransactionsPanel` shows a "last 36 months" note; full history via `list_transactions` + JSON export | PR #46 |
-| 11 · `*Lkr` → `*Base` rename | **not done — standalone PR.** Confirmed **109 occurrences across 12 files**, incl. `src/screens/dashboard/` (a different screen) and the digest cron. `targetLkr` is overloaded — a display field, the `set_wealth_goal` request-body param (API contract), a local var, and collides with the `wealthGoalTargetLkr` storage key — so a safe rename is per-occurrence, not find/replace. Zero functional change; PF-201 kept the names on purpose. Belongs in an isolated, trivially-revertible `refactor(finance): *Lkr → *Base` PR. |
-| 12 · unified ledger | **not done — roadmap-governed.** `personal-finance-os-roadmap.md`: *"Do not build ahead of this document … one feature at a time, explicitly requested."* Building a speculative ledger slice on this branch would violate that governance rule. It's Phase 1, a multi-PR project, and the roadmap owns its sequencing. |
+| 11 · `*Lkr` → `*Base` rename | ✅ done — `financeSummary`'s aggregate outputs + the `emergencyFund` / `wealthGoal` payload fields renamed `*Lkr` → `*Base`; storage fields (`convertedLkrAmount`), the `set_wealth_goal` request param `targetLkr`, and the `wealthGoalTargetLkr` settings key **kept** (contract/storage). Touches `src/screens/dashboard/finance-overview-card.tsx` too. `personal-finance-digest.sh` reads both names for the deploy window. | PR #46 |
+| 12 · unified ledger | **not done — persistence-layer project, roadmap-governed.** A `transfers` collection is a schema change to a **Postgres-primary** store: `FinanceDatabase` type + `createEmptyFinanceDatabase` + `migrateFinanceStore` + `finance-postgres-store.ts` (schema/read/write) + `addFinanceRecord`/`update`/`delete` + `getUnifiedTransactions` + `PERSONAL_FINANCE_RECORD_KINDS` + payload + `TransactionsPanel` + tests. `personal-finance-os-roadmap.md` calls the unified ledger *"the recommended next major undertaking, not a quick win"* and *"do not build ahead of this document."* A rushed migration on a live financial store is a data-integrity risk. First slice (own PR): a `transfer` record kind so account-to-account moves stop being double-counted as fake income+expense. |
 
 **Tier 0 — shipped in this pass**
 
@@ -290,13 +290,15 @@ across ~15 panels. That work is done and good; the duplication that remains is *
     `topVendors`. The prompt now states the currency explicitly.
     *(was item 10 "Finance Analyst units pass" in the original table — the "lighter mutation
     responses" idea moves down.)*
-11. **Not done — standalone PR.** `*Lkr` → `*Base` rename (M3). 109 occurrences / 12 files,
-    incl. `src/screens/dashboard/` and the digest cron; `targetLkr` is overloaded (display
-    field / `set_wealth_goal` request param / local var / collides with the `wealthGoalTargetLkr`
-    storage key). Per-occurrence work, zero functional change — its own revertible PR.
-12. **Not done — roadmap-governed.** The unified ledger is `personal-finance-os-roadmap.md`
-    Phase 1; that doc's rule is "do not build ahead of this document … one feature at a time,
-    explicitly requested". Multi-PR project, sequenced by the roadmap.
+11. ✅ **DONE** (`feat/pf-dashboard-perf`) — `financeSummary` aggregate outputs + `emergencyFund`
+    / `wealthGoal` payload fields `*Lkr` → `*Base`. Storage fields, the `set_wealth_goal`
+    `targetLkr` request param, and the `wealthGoalTargetLkr` settings key kept. Also touched
+    `src/screens/dashboard/`; the digest cron reads both names for the deploy window.
+12. **Not done — persistence-layer project.** A `transfers` collection is a schema migration to
+    the **Postgres-primary** finance store (10+ modules incl. `finance-postgres-store.ts`). The
+    roadmap: *"the recommended next major undertaking, not a quick win … do not build ahead of
+    this document."* First slice for its own PR: a `transfer` record kind so account-to-account
+    moves stop being modelled as fake income+expense.
 
 ---
 
