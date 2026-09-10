@@ -415,14 +415,10 @@ export function PersonalFinanceScreen() {
           <CategoriesPanel payload={payload} onPayload={setPayload} />
           <MerchantsPanel payload={payload} onPayload={setPayload} />
           <TagsPanel payload={payload} onPayload={setPayload} />
-          <DataTable
-            title="Budget categories"
-            rows={payload.data.budget_categories}
-            columns={['month', 'category', 'currency', 'budgetAmount']}
-            kind="budget_category"
-            onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-            searchable
-          />
+          <p className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_6%,transparent)] p-3 text-xs text-[var(--theme-muted)]">
+            Budget categories are managed on the <strong>Income</strong> tab
+            (Budget vs. actual spending) — add, edit and delete them there.
+          </p>
           <DataTable
             title="Savings goals"
             rows={payload.data.savings_goals}
