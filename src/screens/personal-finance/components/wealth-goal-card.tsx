@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatLkr } from '../utils'
 import { toneFor } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
@@ -18,8 +19,11 @@ export function WealthGoalCard({
 }) {
   const [draftTargetLkr, setDraftTargetLkr] = useState('')
   const [draftTargetDate, setDraftTargetDate] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+  const {
+    run,
+    isBusy: saving,
+    error: err,
+  } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const wg = payload.wealthGoal
   // PF-201: payload.wealthGoal figures are already in the reporting currency,
   // and the target is *entered* in it too — the server converts base->LKR for
@@ -29,27 +33,12 @@ export function WealthGoalCard({
   async function saveTarget() {
     const targetLkr = Number(draftTargetLkr)
     if (!Number.isFinite(targetLkr) || targetLkr <= 0) return
-    setSaving(true)
-    setErr(null)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          action: 'set_wealth_goal',
-          targetLkr,
-          currency: c,
-          targetDate: draftTargetDate || undefined,
-        }),
-      })
-      const data = (await res.json()) as PersonalFinancePayload & {
-        error?: string
-      }
-      if (data.ok) onPayload(data)
-      else setErr(data.error ?? 'Could not save the target.')
-    } finally {
-      setSaving(false)
-    }
+    await run({
+      action: 'set_wealth_goal',
+      targetLkr,
+      currency: c,
+      targetDate: draftTargetDate || undefined,
+    })
   }
 
   if (wg.targetLkr === 0) {

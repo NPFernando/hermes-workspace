@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatLkr } from '../utils'
 import { numberField, stringField, toneFor } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
@@ -27,24 +28,16 @@ function LinkedAccountControl({
   const linkedAccount = accounts.find(
     (a) => stringField(a, 'id') === linkedAccountId,
   )
+  const { run } = useFinanceAction<PersonalFinancePayload>(onPayload)
 
   async function setLinkedAccount(nextId: string) {
     setEditingId(null)
-    await fetch('/api/finance', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        action: 'update_record',
-        kind: 'goal',
-        id,
-        payload: { linkedAccountId: nextId || null },
-      }),
+    await run({
+      action: 'update_record',
+      kind: 'goal',
+      id,
+      payload: { linkedAccountId: nextId || null },
     })
-      .then((r) => r.json())
-      .then((data: PersonalFinancePayload) => {
-        if (data.ok) onPayload(data)
-      })
-      .catch(() => {})
   }
 
   if (linkedAccountId && editingId !== id) {

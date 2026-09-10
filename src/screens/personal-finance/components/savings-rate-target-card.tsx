@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { toneFor } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
@@ -16,24 +17,15 @@ export function SavingsRateTargetCard({
   onPayload: (payload: PersonalFinancePayload) => void
 }) {
   const [draftPct, setDraftPct] = useState('20')
-  const [saving, setSaving] = useState(false)
+  const { run, isBusy, error } = useFinanceAction<PersonalFinancePayload>(
+    onPayload,
+  )
   const sr = payload.savingsRateTarget
 
   async function saveTarget() {
     const pct = Number(draftPct)
     if (!Number.isFinite(pct) || pct <= 0) return
-    setSaving(true)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'set_savings_rate_target', pct }),
-      })
-      const data = (await res.json()) as PersonalFinancePayload
-      if (data.ok) onPayload(data)
-    } finally {
-      setSaving(false)
-    }
+    await run({ action: 'set_savings_rate_target', pct })
   }
 
   if (sr.targetPct === 0) {
@@ -58,13 +50,16 @@ export function SavingsRateTargetCard({
           <span className="text-xs text-[var(--theme-muted)]">%</span>
           <button
             type="button"
-            disabled={saving}
+            disabled={isBusy}
             onClick={() => void saveTarget()}
             className="rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-3 py-1 text-xs font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_24%,transparent)] disabled:opacity-50"
           >
             Set target
           </button>
         </div>
+        {error && (
+          <p className="mt-2 text-xs text-[var(--theme-danger)]">{error}</p>
+        )}
       </section>
     )
   }

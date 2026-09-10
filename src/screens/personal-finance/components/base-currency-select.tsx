@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import type { PersonalFinancePayload } from '../types'
 
 /**
@@ -18,7 +18,9 @@ export function BaseCurrencySelect({
   payload: PersonalFinancePayload
   onPayload: (payload: PersonalFinancePayload) => void
 }) {
-  const [saving, setSaving] = useState(false)
+  const { run, isBusy, error } = useFinanceAction<PersonalFinancePayload>(
+    onPayload,
+  )
   const current = payload.baseCurrency
   const options = CURRENCIES.includes(
     current as (typeof CURRENCIES)[number],
@@ -28,18 +30,7 @@ export function BaseCurrencySelect({
 
   async function pick(currency: string) {
     if (currency === current) return
-    setSaving(true)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'set_base_currency', currency }),
-      })
-      const data = (await res.json()) as PersonalFinancePayload
-      if (data.ok) onPayload(data)
-    } finally {
-      setSaving(false)
-    }
+    await run({ action: 'set_base_currency', currency })
   }
 
   const missingRate = payload.summary.fxUnconverted?.includes(current)
@@ -58,7 +49,7 @@ export function BaseCurrencySelect({
         </div>
         <select
           value={current}
-          disabled={saving}
+          disabled={isBusy}
           onChange={(e) => void pick(e.target.value)}
           className="rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-3 py-1.5 text-sm text-[var(--theme-text)] disabled:opacity-50"
         >
@@ -74,6 +65,9 @@ export function BaseCurrencySelect({
           No LKR↔{current} exchange rate on file — figures are showing their raw
           LKR value. Add a rate under Accounts &amp; Records.
         </p>
+      )}
+      {error && (
+        <p className="mt-2 text-xs text-[var(--theme-danger)]">{error}</p>
       )}
     </section>
   )

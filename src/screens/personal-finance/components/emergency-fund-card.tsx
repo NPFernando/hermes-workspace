@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatLkr } from '../utils'
 import { toneFor } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
@@ -17,24 +18,15 @@ export function EmergencyFundCard({
   onPayload: (payload: PersonalFinancePayload) => void
 }) {
   const [draftMonths, setDraftMonths] = useState('6')
-  const [saving, setSaving] = useState(false)
+  const { run, isBusy, error } = useFinanceAction<PersonalFinancePayload>(
+    onPayload,
+  )
   const ef = payload.emergencyFund
 
   async function saveTarget() {
     const months = Number(draftMonths)
     if (!Number.isFinite(months) || months <= 0) return
-    setSaving(true)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'set_emergency_fund_target', months }),
-      })
-      const data = (await res.json()) as PersonalFinancePayload
-      if (data.ok) onPayload(data)
-    } finally {
-      setSaving(false)
-    }
+    await run({ action: 'set_emergency_fund_target', months })
   }
 
   if (ef.targetMonths === 0) {
@@ -59,13 +51,16 @@ export function EmergencyFundCard({
           <span className="text-xs text-[var(--theme-muted)]">months</span>
           <button
             type="button"
-            disabled={saving}
+            disabled={isBusy}
             onClick={() => void saveTarget()}
             className="rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-3 py-1 text-xs font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_24%,transparent)] disabled:opacity-50"
           >
             Set target
           </button>
         </div>
+        {error && (
+          <p className="mt-2 text-xs text-[var(--theme-danger)]">{error}</p>
+        )}
       </section>
     )
   }
