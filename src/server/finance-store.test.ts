@@ -2536,10 +2536,39 @@ describe('PF review item 7: server-side dashboard derivations', () => {
     expect(bills).toHaveLength(1)
     expect(bills[0]).toMatchObject({
       vendor: 'netflix',
+      displayVendor: 'Netflix',
       category: 'Subscriptions',
       monthsSeen: 2,
       averageAmount: 1_990,
+      // the loop logged an expense for the current month too
+      loggedThisMonth: true,
     })
+  })
+
+  it('getRecurringBills.loggedThisMonth is false when the vendor has no current-month expense', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    // two consecutive PAST months only (i = 1, 2), nothing this month
+    for (let i = 1; i <= 2; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 15)
+      db.expense_records.push({
+        id: `p-${i}`,
+        date: d.toISOString().slice(0, 10),
+        vendor: 'Spotify',
+        category: 'Subscriptions',
+        currency: 'LKR',
+        amount: 990,
+        convertedLkrAmount: 990,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    }
+    const [bill] = getRecurringBills(db)
+    expect(bill).toMatchObject({ vendor: 'spotify', loggedThisMonth: false })
   })
 
   it('getUpcomingMoney surfaces an FD maturing within 30 days and a due-soon payday', () => {

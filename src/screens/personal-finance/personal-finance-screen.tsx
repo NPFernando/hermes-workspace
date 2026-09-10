@@ -374,7 +374,7 @@ export function PersonalFinanceScreen() {
             </h2>
             <div className="mt-1 grid items-start gap-4 lg:grid-cols-2 [&>*]:mt-0">
               <UpcomingMoney payload={payload} />
-              <RecurringBillsInsight payload={payload} />
+              <RecurringBillsInsight payload={payload} onPayload={setPayload} />
             </div>
           </section>
 
