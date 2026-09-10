@@ -1,14 +1,28 @@
 import { useState } from 'react'
+import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { StatCard } from '../../finance/components/stat-card'
 import { formatLkr } from '../utils'
-import { buttonClass, inputClass } from '../shared-styles'
+import {
+  buttonClass,
+  confirmButtonClass,
+  dangerButtonClass,
+  inputClass,
+} from '../shared-styles'
+import { numberField, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
 function budgetTone(percentUsed: number): 'good' | 'warn' | 'danger' {
   if (percentUsed > 100) return 'danger'
   if (percentUsed >= 80) return 'warn'
   return 'good'
+}
+
+type BudgetDraft = {
+  month: string
+  category: string
+  budgetAmount: string
+  currency: string
 }
 
 export function BudgetPanel({
@@ -42,6 +56,59 @@ export function BudgetPanel({
   const [expenseCategory, setExpenseCategory] = useState('')
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCurrency, setExpenseCurrency] = useState('LKR')
+
+  const [editOpenId, setEditOpenId] = useState<string | null>(null)
+  const [editDrafts, setEditDrafts] = useState<Record<string, BudgetDraft>>({})
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  const allBudgets = [...payload.data.budget_categories].sort((a, b) =>
+    stringField(a, 'month') < stringField(b, 'month') ? 1 : -1,
+  )
+
+  function startEdit(row: Record<string, unknown>) {
+    const id = stringField(row, 'id')
+    setEditDrafts((prev) => ({
+      ...prev,
+      [id]: {
+        month: stringField(row, 'month'),
+        category: stringField(row, 'category'),
+        budgetAmount: String(numberField(row, 'budgetAmount')),
+        currency: stringField(row, 'currency') || 'LKR',
+      },
+    }))
+    setEditOpenId(id)
+  }
+
+  async function saveEdit(id: string) {
+    const draft = editDrafts[id]
+    if (!draft.category.trim()) {
+      setErr('Category is required')
+      return
+    }
+    const data = await post(
+      {
+        action: 'update_record',
+        kind: 'budget_category',
+        id,
+        payload: {
+          month: draft.month,
+          category: draft.category.trim(),
+          currency: draft.currency,
+          budgetAmount: Number(draft.budgetAmount) || 0,
+        },
+      },
+      `edit-${id}`,
+    )
+    if (data) setEditOpenId(null)
+  }
+
+  async function deleteBudget(id: string) {
+    const data = await post(
+      { action: 'delete_record', kind: 'budget_category', id },
+      `delete-${id}`,
+    )
+    if (data) setConfirmDeleteId(null)
+  }
 
   async function submitBudget() {
     if (!budgetCategory.trim()) {
@@ -228,6 +295,137 @@ export function BudgetPanel({
           </div>
         )}
       </div>
+
+      {allBudgets.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-sm font-semibold">All budgets</h3>
+          <div className="mt-2 grid gap-2">
+            {allBudgets.map((row, index) => {
+              const id = stringField(row, 'id') || String(index)
+              const isEditing = editOpenId === id
+              return (
+                <div
+                  key={id}
+                  className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
+                >
+                  {isEditing ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="month"
+                        value={editDrafts[id].month}
+                        onChange={(e) =>
+                          setEditDrafts((prev) => ({
+                            ...prev,
+                            [id]: { ...prev[id], month: e.target.value },
+                          }))
+                        }
+                        className={inputClass}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Category"
+                        value={editDrafts[id].category}
+                        onChange={(e) =>
+                          setEditDrafts((prev) => ({
+                            ...prev,
+                            [id]: { ...prev[id], category: e.target.value },
+                          }))
+                        }
+                        list="pf-known-categories"
+                        className={inputClass}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Budget amount"
+                        value={editDrafts[id].budgetAmount}
+                        onChange={(e) =>
+                          setEditDrafts((prev) => ({
+                            ...prev,
+                            [id]: { ...prev[id], budgetAmount: e.target.value },
+                          }))
+                        }
+                        className={`${inputClass} w-32`}
+                      />
+                      <select
+                        value={editDrafts[id].currency}
+                        onChange={(e) =>
+                          setEditDrafts((prev) => ({
+                            ...prev,
+                            [id]: { ...prev[id], currency: e.target.value },
+                          }))
+                        }
+                        className={inputClass}
+                      >
+                        {budgetCurrencyOptions.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={busy === `edit-${id}`}
+                        onClick={() => void saveEdit(id)}
+                        className={confirmButtonClass}
+                      >
+                        {busy === `edit-${id}` ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditOpenId(null)}
+                        className={buttonClass}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm text-[var(--theme-text)]">
+                        <span className="text-[var(--theme-muted)]">
+                          {stringField(row, 'month')}
+                        </span>{' '}
+                        · {stringField(row, 'category')} ·{' '}
+                        {formatLkr(
+                          numberField(row, 'budgetAmount'),
+                          stringField(row, 'currency') || 'LKR',
+                        )}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(row)}
+                          className={buttonClass}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy === `delete-${id}`}
+                          onClick={() => setConfirmDeleteId(id)}
+                          className={dangerButtonClass}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteId && (
+        <ConfirmDialog
+          title="Delete this budget?"
+          body="This can't be undone."
+          confirmLabel="Delete"
+          busy={busy === `delete-${confirmDeleteId}`}
+          onConfirm={() => void deleteBudget(confirmDeleteId)}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
     </section>
   )
 }
