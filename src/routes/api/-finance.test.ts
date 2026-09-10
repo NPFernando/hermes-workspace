@@ -493,6 +493,74 @@ describe('/api/finance fetch_news', () => {
     expect(vi.mocked(store.updateExchangeRate)).not.toHaveBeenCalled()
   })
 
+  it('list_transactions pages the unified history by id cursor (PF review item 9)', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const rows = Array.from({ length: 5 }, (_, i) => ({
+      id: `t-${i}`,
+      kind: i % 2 ? 'income' : 'expense',
+      date: `2026-06-${10 - i}`,
+      amount: 100 + i,
+    }))
+    vi.mocked(store.getUnifiedTransactions).mockReturnValue(rows as never)
+
+    const call = (bodyObj: Record<string, unknown>) =>
+      handlers().then((h) =>
+        h.POST({
+          request: new Request('http://localhost/api/finance', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'list_transactions', ...bodyObj }),
+          }),
+        }),
+      )
+
+    const first = (await (await call({ limit: 2 })).json()) as {
+      ok: boolean
+      transactions: Array<{ id: string }>
+      nextCursor: string | null
+      total: number
+    }
+    expect(first.ok).toBe(true)
+    expect(first.transactions.map((t) => t.id)).toEqual(['t-0', 't-1'])
+    expect(first.nextCursor).toBe('t-1')
+    expect(first.total).toBe(5)
+
+    const second = (await (
+      await call({ limit: 2, cursor: first.nextCursor })
+    ).json()) as { transactions: Array<{ id: string }>; nextCursor: string | null }
+    expect(second.transactions.map((t) => t.id)).toEqual(['t-2', 't-3'])
+    expect(second.nextCursor).toBe('t-3')
+
+    const third = (await (
+      await call({ limit: 2, cursor: second.nextCursor })
+    ).json()) as { transactions: Array<{ id: string }>; nextCursor: string | null }
+    expect(third.transactions.map((t) => t.id)).toEqual(['t-4'])
+    expect(third.nextCursor).toBeNull()
+  })
+
+  it('list_transactions clamps limit and restarts on an unknown cursor', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const rows = Array.from({ length: 3 }, (_, i) => ({ id: `x-${i}`, date: '2026-06-01' }))
+    vi.mocked(store.getUnifiedTransactions).mockReturnValue(rows as never)
+
+    const res = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'list_transactions',
+          limit: 9999,
+          cursor: 'nope',
+        }),
+      }),
+    })
+    const data = (await res.json()) as { transactions: Array<{ id: string }> }
+    // limit clamped to 500 (> 3 rows) and unknown cursor -> from the top
+    expect(data.transactions.map((t) => t.id)).toEqual(['x-0', 'x-1', 'x-2'])
+  })
+
   it('derives and stores research-only intelligence from existing data', async () => {
     state.authenticated = true
     const store = await import('../../server/finance-store')

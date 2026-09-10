@@ -1860,6 +1860,37 @@ export const Route = createFileRoute('/api/finance')({
             appendAuditLog('llm_config_updated', { enabled: lc.enabled })
             return json(financePayload())
           }
+          if (action === 'list_transactions') {
+            // PF review item 9: paged unified transaction history. Lets the
+            // dashboard payload window `income_records`/`expense_records` to a
+            // recent slice (item 1) while the Records tab can still page back
+            // through everything. Cursor = the `id` of the last row seen (rows
+            // are date-desc then createdAt-desc, a stable order); the next page
+            // is the rows after it. An unknown cursor restarts from the top.
+            const rawLimit =
+              typeof body.limit === 'number' ? Math.floor(body.limit) : 200
+            const limit = Math.max(1, Math.min(500, rawLimit))
+            const cursor =
+              typeof body.cursor === 'string' && body.cursor.trim()
+                ? body.cursor.trim()
+                : null
+            const db = readFinanceStore()
+            const all = getUnifiedTransactions(db)
+            const startIdx = cursor
+              ? all.findIndex((t) => t.id === cursor) + 1
+              : 0
+            const page = all.slice(startIdx, startIdx + limit)
+            const nextCursor =
+              startIdx + limit < all.length && page.length > 0
+                ? page[page.length - 1].id
+                : null
+            return json({
+              ok: true,
+              transactions: maskSensitive(page),
+              nextCursor,
+              total: all.length,
+            })
+          }
           if (action === 'list_pending_ingestions') {
             // Unmasked on purpose — financePayload()'s `data` blob runs
             // through maskSensitive(), which would redact passwordHint
