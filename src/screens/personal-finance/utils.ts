@@ -77,6 +77,9 @@ export type ReconcileTransaction = {
   accountId?: string
   currency: string
   amount: number
+  // A transfer is fed in as TWO legs: `{kind: 'expense'}` on the source
+  // account and `{kind: 'income'}` on the destination — so it moves both
+  // balances without any change to the summing logic below.
   kind: 'income' | 'expense'
 }
 
@@ -88,7 +91,7 @@ export type ReconcileTransaction = {
  * transactions can't be meaningfully checked, so no number is shown rather
  * than a misleading one. Only same-currency transactions are summed;
  * cross-currency records tagged to the account are excluded (no conversion
- * attempted this slice).
+ * attempted this slice). Transfers count as two legs (see ReconcileTransaction).
  */
 export function computeAccountLedgerBalance(
   account: { id: string; currency: string; openingBalance?: number },

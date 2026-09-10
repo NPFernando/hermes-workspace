@@ -94,4 +94,15 @@ describe('computeAccountLedgerBalance', () => {
     ]
     expect(computeAccountLedgerBalance(account, records)).toBe(10000)
   })
+
+  it('handles a transfer fed as two legs: out of the source, into the destination', () => {
+    // accounts-panel maps one transfer → {source: expense} + {dest: income}
+    const legs: Array<ReconcileTransaction> = [
+      { accountId: 'acc-1', currency: 'LKR', amount: 3000, kind: 'expense' },
+      { accountId: 'acc-2', currency: 'LKR', amount: 3000, kind: 'income' },
+    ]
+    expect(computeAccountLedgerBalance(account, legs)).toBe(7000)
+    const dest = { id: 'acc-2', currency: 'LKR', openingBalance: 0 }
+    expect(computeAccountLedgerBalance(dest, legs)).toBe(3000)
+  })
 })
