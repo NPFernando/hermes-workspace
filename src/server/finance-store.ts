@@ -208,6 +208,28 @@ export type Transfer = {
 }
 
 /**
+ * A planned future income or expense. LKR-denominated (v1). It is NOT part
+ * of any total until it is posted — "Post now" (or a future auto-post)
+ * turns it into a real income/expense record and flips `status` to
+ * 'posted'. Shown in "Coming up" while pending.
+ */
+export type ScheduledTransaction = {
+  id: string
+  dueDate: string
+  kind: 'income' | 'expense'
+  counterparty: string
+  category: string
+  amount: number
+  accountId?: string
+  notes?: string
+  status: 'pending' | 'posted' | 'cancelled'
+  postedRecordId?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
  * A daily point-in-time snapshot of net worth (and its main components), all
  * LKR-denominated like every other stored figure. Written by the
  * `snapshot_net_worth` action / the nightly cron; upserted by `date` so at
@@ -847,6 +869,7 @@ export type FinanceDatabase = {
   expense_records: Array<ExpenseRecord>
   transfers: Array<Transfer>
   net_worth_snapshots: Array<NetWorthSnapshot>
+  scheduled_transactions: Array<ScheduledTransaction>
   budget_categories: Array<BudgetCategory>
   categories: Array<Category>
   subcategories: Array<Subcategory>
@@ -947,6 +970,7 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     expense_records: [],
     transfers: [],
     net_worth_snapshots: [],
+    scheduled_transactions: [],
     budget_categories: [],
     categories: [],
     subcategories: [],
@@ -1706,6 +1730,18 @@ export function addFinanceRecord(
       convertedLkrAmount: amountToLkr(db, amount, currency),
       notes: optionalString(payload, 'notes'),
     })
+  } else if (kind === 'scheduled_transaction') {
+    db.scheduled_transactions.push({
+      ...base,
+      dueDate: stringField(payload, 'dueDate', createdAt.slice(0, 10)),
+      kind: payload.kind === 'income' ? 'income' : 'expense',
+      counterparty: stringField(payload, 'counterparty', 'Unspecified'),
+      category: stringField(payload, 'category', 'Other'),
+      amount: numberField(payload, 'amount', 0),
+      accountId: optionalString(payload, 'accountId'),
+      notes: optionalString(payload, 'notes'),
+      status: 'pending',
+    })
   } else if (kind === 'trading_plan') {
     db.trading_plans.push(createTradingPlan(payload, base))
   } else if (kind === 'virtual_account') {
@@ -1912,6 +1948,16 @@ export function updateFinanceRecord(
       }
       updated = true
     }
+  } else if (kind === 'scheduled_transaction') {
+    const index = db.scheduled_transactions.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.scheduled_transactions[index] = {
+        ...db.scheduled_transactions[index],
+        ...payload,
+        updatedAt: nowIso(),
+      }
+      updated = true
+    }
   } else {
     throw new Error(`Unsupported finance record kind for update: ${kind}`)
   }
@@ -2005,6 +2051,12 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.transfers.length
     db.transfers = db.transfers.filter((r) => r.id !== id)
     removed = db.transfers.length !== before
+  } else if (kind === 'scheduled_transaction') {
+    const before = db.scheduled_transactions.length
+    db.scheduled_transactions = db.scheduled_transactions.filter(
+      (r) => r.id !== id,
+    )
+    removed = db.scheduled_transactions.length !== before
   } else {
     throw new Error(`Unsupported finance record kind for delete: ${kind}`)
   }
@@ -3538,6 +3590,14 @@ export function getUpcomingMoney(
   }>
   contracts: Array<{ name: string; days: number }>
   fdMaturities: Array<{ name: string; days: number }>
+  scheduled: Array<{
+    id: string
+    dueDate: string
+    kind: 'income' | 'expense'
+    counterparty: string
+    amount: number
+    days: number
+  }>
 } {
   const dayMs = 24 * 60 * 60 * 1000
   const paydays: Array<{
@@ -3574,7 +3634,26 @@ export function getUpcomingMoney(
     }
   }
 
-  return { paydays, contracts, fdMaturities }
+  // Pending scheduled transactions from ~2 weeks overdue to ~45 days out.
+  const startOfToday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  ).getTime()
+  const scheduled = db.scheduled_transactions
+    .filter((s) => s.status === 'pending')
+    .map((s) => ({
+      id: s.id,
+      dueDate: s.dueDate,
+      kind: s.kind,
+      counterparty: s.counterparty,
+      amount: s.amount,
+      days: Math.round((Date.parse(s.dueDate) - startOfToday) / dayMs),
+    }))
+    .filter((s) => Number.isFinite(s.days) && s.days >= -14 && s.days <= 45)
+    .sort((a, b) => a.days - b.days)
+
+  return { paydays, contracts, fdMaturities, scheduled }
 }
 
 /** Non-LKR exposure across active jobs, holdings and FDs — grouped by

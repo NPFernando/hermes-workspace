@@ -33,6 +33,7 @@ import { BeneficiariesPanel } from './components/beneficiaries-panel'
 import { PropertiesPanel } from './components/properties-panel'
 import { AccountsPanel } from './components/accounts-panel'
 import { TransactionsPanel } from './components/transactions-panel'
+import { ScheduledTransactionsPanel } from './components/scheduled-transactions-panel'
 import { CategoriesPanel } from './components/categories-panel'
 import { MerchantsPanel } from './components/merchants-panel'
 import { TagsPanel } from './components/tags-panel'
@@ -373,7 +374,7 @@ export function PersonalFinanceScreen() {
               Coming up
             </h2>
             <div className="mt-1 grid items-start gap-4 lg:grid-cols-2 [&>*]:mt-0">
-              <UpcomingMoney payload={payload} />
+              <UpcomingMoney payload={payload} onPayload={setPayload} />
               <RecurringBillsInsight payload={payload} onPayload={setPayload} />
             </div>
           </section>
@@ -412,6 +413,7 @@ export function PersonalFinanceScreen() {
         <section className="mt-6 grid gap-4">
           <AccountsPanel payload={payload} onPayload={setPayload} />
           <TransactionsPanel payload={payload} onPayload={setPayload} />
+          <ScheduledTransactionsPanel payload={payload} onPayload={setPayload} />
           <CategoriesPanel payload={payload} onPayload={setPayload} />
           <MerchantsPanel payload={payload} onPayload={setPayload} />
           <TagsPanel payload={payload} onPayload={setPayload} />

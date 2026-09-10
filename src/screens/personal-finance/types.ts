@@ -65,6 +65,14 @@ export type PersonalFinancePayload = {
     paydays: Array<{ name: string; state: 'due_soon' | 'overdue'; days: number }>
     contracts: Array<{ name: string; days: number }>
     fdMaturities: Array<{ name: string; days: number }>
+    scheduled: Array<{
+      id: string
+      dueDate: string
+      kind: 'income' | 'expense'
+      counterparty: string
+      amount: number
+      days: number
+    }>
   }
   currencyExposure: Array<{
     currency: string
@@ -126,6 +134,7 @@ export type PersonalFinancePayload = {
     income_records: Array<Record<string, unknown>>
     expense_records: Array<Record<string, unknown>>
     transfers: Array<Record<string, unknown>>
+    scheduled_transactions: Array<Record<string, unknown>>
     budget_categories: Array<Record<string, unknown>>
     categories: Array<Record<string, unknown>>
     subcategories: Array<Record<string, unknown>>

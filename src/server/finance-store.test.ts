@@ -2953,3 +2953,78 @@ describe('financeAlerts — category budget thresholds', () => {
     ).toBe(false)
   })
 })
+
+describe('scheduled_transaction (planned future income/expense)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('round-trips through add / update / delete and defaults status to pending', async () => {
+    const store = await freshFinanceStore()
+    store.addFinanceRecord('scheduled_transaction', {
+      dueDate: '2026-10-01',
+      kind: 'expense',
+      counterparty: 'Landlord',
+      category: 'Rent',
+      amount: 85_000,
+    })
+    let db = store.readFinanceStore()
+    expect(db.scheduled_transactions).toHaveLength(1)
+    expect(db.scheduled_transactions[0]).toMatchObject({
+      kind: 'expense',
+      counterparty: 'Landlord',
+      amount: 85_000,
+      status: 'pending',
+    })
+    const id = db.scheduled_transactions[0].id
+
+    store.updateFinanceRecord('scheduled_transaction', id, { amount: 90_000 })
+    db = store.readFinanceStore()
+    expect(db.scheduled_transactions[0].amount).toBe(90_000)
+
+    store.updateFinanceRecord('scheduled_transaction', id, { status: 'cancelled' })
+    expect(store.readFinanceStore().scheduled_transactions[0].status).toBe(
+      'cancelled',
+    )
+
+    store.deleteFinanceRecord('scheduled_transaction', id)
+    expect(store.readFinanceStore().scheduled_transactions).toHaveLength(0)
+  })
+
+  it('getUpcomingMoney.scheduled lists pending items in a -14..+45 day window, sorted by days', async () => {
+    const store = await freshFinanceStore()
+    const today = new Date('2026-09-10T00:00:00Z')
+    const plus = (n: number) =>
+      new Date(Date.UTC(2026, 8, 10 + n)).toISOString().slice(0, 10)
+    store.addFinanceRecord('scheduled_transaction', {
+      dueDate: plus(5),
+      kind: 'expense',
+      counterparty: 'Soon',
+      category: 'X',
+      amount: 100,
+    })
+    store.addFinanceRecord('scheduled_transaction', {
+      dueDate: plus(-3),
+      kind: 'expense',
+      counterparty: 'Overdue',
+      category: 'X',
+      amount: 100,
+    })
+    store.addFinanceRecord('scheduled_transaction', {
+      dueDate: plus(120),
+      kind: 'expense',
+      counterparty: 'FarOut',
+      category: 'X',
+      amount: 100,
+    })
+    const cancelledId = store.readFinanceStore().scheduled_transactions[0].id
+    store.updateFinanceRecord('scheduled_transaction', cancelledId, {
+      status: 'cancelled',
+    })
+
+    const { scheduled } = store.getUpcomingMoney(store.readFinanceStore(), today)
+    expect(scheduled.map((s) => s.counterparty)).toEqual(['Overdue'])
+    // 'Soon' was the one we cancelled; 'FarOut' is outside the +45d window
+    expect(scheduled[0].days).toBe(-3)
+  })
+})
