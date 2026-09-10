@@ -60,6 +60,8 @@ export type PersonalFinancePayload = {
     monthsSeen: number
     averageAmount: number
     loggedThisMonth: boolean
+    thisMonthAmount: number | null
+    drift: number | null
   }>
   upcomingMoney: {
     paydays: Array<{ name: string; state: 'due_soon' | 'overdue'; days: number }>

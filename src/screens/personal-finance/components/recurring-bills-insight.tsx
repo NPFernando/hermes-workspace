@@ -87,7 +87,7 @@ export function RecurringBillsInsight({
   const { run, busy } = useFinanceAction<PersonalFinancePayload>(onPayload)
   if (recurring.length === 0) return null
 
-  const logThisMonth = (bill: (typeof recurring)[number]) =>
+  const logThisMonth = (bill: (typeof recurring)[number], key = `log-${bill.vendor}`) =>
     run(
       {
         action: 'add_record',
@@ -104,21 +104,48 @@ export function RecurringBillsInsight({
           notes: 'Logged from recurring-bills suggestion',
         },
       },
-      `log-${bill.vendor}`,
+      key,
     )
+
+  const unlogged = recurring.filter((r) => !r.loggedThisMonth)
+
+  async function logAll() {
+    // Sequential so each write sees the previous — the last payload wins.
+    for (const bill of recurring.filter((r) => !r.loggedThisMonth)) {
+      await logThisMonth(bill, 'log-all')
+    }
+  }
 
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <h2 className="text-lg font-semibold text-[var(--theme-text)]">
         Likely recurring bills
       </h2>
-      <p className="text-xs text-[var(--theme-muted)]">
-        Detected from repeated vendors with a similar amount over the last 3
-        months. Nothing is logged automatically — use “Log this month” to add
-        one at its usual amount.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-[var(--theme-muted)]">
+          Detected from repeated vendors with a similar amount over the last 3
+          months. Nothing is logged automatically.
+        </p>
+        {unlogged.length > 1 && (
+          <button
+            type="button"
+            onClick={() => void logAll()}
+            disabled={busy === 'log-all'}
+            className="rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_12%,transparent)] px-2 py-0.5 text-xs font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_20%,transparent)] disabled:opacity-50"
+          >
+            {busy === 'log-all'
+              ? 'Adding…'
+              : `Log all ${unlogged.length} for this month`}
+          </button>
+        )}
+      </div>
       <div className="mt-3 flex flex-col gap-2">
-        {recurring.map((r) => (
+        {recurring.map((r) => {
+          const driftPct =
+            r.drift !== null && Math.abs(r.drift) >= 0.15
+              ? Math.round(r.drift * 100)
+              : null
+          return (
           <div
             key={r.vendor}
             className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs text-[var(--theme-text)]"
@@ -129,6 +156,18 @@ export function RecurringBillsInsight({
               {formatLkr(r.averageAmount * fx, payload.baseCurrency)} ·{' '}
               {r.monthsSeen} months
             </span>
+            {driftPct !== null && (
+              <span
+                className={
+                  driftPct > 0
+                    ? 'text-[var(--theme-warning)]'
+                    : 'text-[var(--theme-success)]'
+                }
+              >
+                {driftPct > 0 ? '▲' : '▼'} {Math.abs(driftPct)}% vs usual this
+                month
+              </span>
+            )}
             {r.loggedThisMonth ? (
               <span className="text-[var(--theme-success)]">
                 ✓ logged this month
@@ -144,7 +183,8 @@ export function RecurringBillsInsight({
               </button>
             )}
           </div>
-        ))}
+          )
+        })}
       </div>
     </section>
   )

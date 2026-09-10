@@ -3465,6 +3465,12 @@ export interface RecurringBill {
   /** True when an expense for this vendor already exists in the current
    *  calendar month — the "Log this month" action hides itself then. */
   loggedThisMonth: boolean
+  /** Total logged for this vendor in the current calendar month (LKR), or
+   *  null when nothing is logged yet. */
+  thisMonthAmount: number | null
+  /** Fractional change of `thisMonthAmount` vs `averageAmount` (e.g. 0.25 =
+   *  25% higher than usual), or null when this month isn't logged. */
+  drift: number | null
 }
 
 export function getRecurringBills(
@@ -3484,6 +3490,7 @@ export function getRecurringBills(
       category: string
       entries: Array<{ month: string; amount: number }>
       loggedThisMonth: boolean
+      thisMonthAmount: number
     }
   >()
   for (const row of db.expense_records) {
@@ -3495,8 +3502,12 @@ export function getRecurringBills(
       category: row.category || 'Other',
       entries: [],
       loggedThisMonth: false,
+      thisMonthAmount: 0,
     }
-    if (month === thisMonth) bucket.loggedThisMonth = true
+    if (month === thisMonth) {
+      bucket.loggedThisMonth = true
+      bucket.thisMonthAmount += row.convertedLkrAmount || row.amount || 0
+    }
     if (month >= cutoffMonth) {
       const amount = row.convertedLkrAmount || row.amount || 0
       bucket.entries.push({ month, amount })
@@ -3511,6 +3522,9 @@ export function getRecurringBills(
     const amounts = bucket.entries.map((e) => e.amount)
     const avg = amounts.reduce((s, a) => s + a, 0) / amounts.length
     if (!amounts.every((a) => avg > 0 && Math.abs(a - avg) / avg <= 0.2)) continue
+    const thisMonthAmount = bucket.loggedThisMonth
+      ? bucket.thisMonthAmount
+      : null
     results.push({
       vendor,
       displayVendor: bucket.displayVendor,
@@ -3518,6 +3532,11 @@ export function getRecurringBills(
       monthsSeen: distinctMonths.size,
       averageAmount: avg,
       loggedThisMonth: bucket.loggedThisMonth,
+      thisMonthAmount,
+      drift:
+        thisMonthAmount !== null && avg > 0
+          ? (thisMonthAmount - avg) / avg
+          : null,
     })
   }
   return results.sort((a, b) => b.monthsSeen - a.monthsSeen)

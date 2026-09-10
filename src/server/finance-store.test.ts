@@ -2542,7 +2542,39 @@ describe('PF review item 7: server-side dashboard derivations', () => {
       averageAmount: 1_990,
       // the loop logged an expense for the current month too
       loggedThisMonth: true,
+      thisMonthAmount: 1_990,
+      drift: 0,
     })
+  })
+
+  it('getRecurringBills.drift reflects how far this month is above the usual amount', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    const push = (monthOffset: number, amount: number) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - monthOffset, 12)
+      db.expense_records.push({
+        id: `d-${monthOffset}`,
+        date: d.toISOString().slice(0, 10),
+        vendor: 'PowerCo',
+        category: 'Utilities',
+        currency: 'LKR',
+        amount,
+        convertedLkrAmount: amount,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    }
+    push(2, 10_000)
+    push(1, 10_000)
+    push(0, 12_000) // this month, 20% over the ~10.7k average
+
+    const [bill] = getRecurringBills(db)
+    expect(bill.thisMonthAmount).toBe(12_000)
+    expect(bill.drift).toBeGreaterThan(0.1)
   })
 
   it('getRecurringBills.loggedThisMonth is false when the vendor has no current-month expense', () => {
