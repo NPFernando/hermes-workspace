@@ -1,3 +1,5 @@
+import { useFinanceAction } from '../../finance/hooks/use-finance-action'
+import { formatLkr } from '../utils'
 import { dangerTone, warningTone } from '../shared-styles'
 import type { PersonalFinancePayload } from '../types'
 
@@ -12,10 +14,13 @@ type Row = { key: string; name: string; kindLabel: string; text: string; tone: s
  */
 export function UpcomingMoney({
   payload,
+  onPayload,
 }: {
   payload: PersonalFinancePayload
+  onPayload: (p: PersonalFinancePayload) => void
 }) {
-  const { paydays, contracts, fdMaturities } = payload.upcomingMoney
+  const { paydays, contracts, fdMaturities, scheduled } = payload.upcomingMoney
+  const { run, busy } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const rows: Array<Row> = []
 
   for (const p of paydays) {
@@ -57,7 +62,7 @@ export function UpcomingMoney({
   }
 
   rows.sort((a, b) => a.sortKey - b.sortKey)
-  if (rows.length === 0) return null
+  if (rows.length === 0 && scheduled.length === 0) return null
 
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
@@ -65,9 +70,51 @@ export function UpcomingMoney({
         Upcoming money
       </h2>
       <p className="text-xs text-[var(--theme-muted)]">
-        Paydays, fixed deposit maturities, and contract expirations needing
-        attention soon.
+        Paydays, fixed deposit maturities, contract expirations, and planned
+        transactions needing attention soon.
       </p>
+
+      {scheduled.length > 0 && (
+        <div className="mt-3 grid gap-2">
+          {scheduled.map((s) => (
+            <div
+              key={`sched-${s.id}`}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-accent)_10%,transparent)] p-3"
+            >
+              <div>
+                <p className="text-sm font-medium text-[var(--theme-text)]">
+                  {s.counterparty}{' '}
+                  <span className="text-xs font-normal text-[var(--theme-muted)]">
+                    · {s.kind === 'income' ? 'Planned income' : 'Planned expense'}{' '}
+                    · {formatLkr(s.amount, 'LKR')}
+                  </span>
+                </p>
+                <p className="text-xs text-[var(--theme-muted)]">
+                  {s.days < 0
+                    ? `Was due ${-s.days}d ago (${s.dueDate})`
+                    : s.days === 0
+                      ? `Due today (${s.dueDate})`
+                      : `Due in ${s.days}d (${s.dueDate})`}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={busy === `post-${s.id}`}
+                onClick={() =>
+                  void run(
+                    { action: 'post_scheduled', id: s.id },
+                    `post-${s.id}`,
+                  )
+                }
+                className="rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_12%,transparent)] px-2 py-1 text-xs font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_20%,transparent)] disabled:opacity-50"
+              >
+                {busy === `post-${s.id}` ? 'Posting…' : 'Post now'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="mt-3 grid gap-2">
         {rows.map((e) => (
           <div

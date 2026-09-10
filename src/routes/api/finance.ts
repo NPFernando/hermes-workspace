@@ -172,6 +172,7 @@ const PERSONAL_FINANCE_RECORD_KINDS = new Set([
   'income',
   'expense',
   'transfer',
+  'scheduled_transaction',
   'account',
   'goal',
   'tax',
@@ -583,6 +584,7 @@ function personalFinancePayload() {
       income_records: withinWindow(db.income_records, 'dateReceived'),
       expense_records: withinWindow(db.expense_records, 'date'),
       transfers: withinWindow(db.transfers, 'date'),
+      scheduled_transactions: db.scheduled_transactions,
       budget_categories: db.budget_categories,
       categories: db.categories,
       subcategories: db.subcategories,
@@ -1996,6 +1998,62 @@ export const Route = createFileRoute('/api/finance')({
               nextCursor,
               total: all.length,
             })
+          }
+          if (action === 'post_scheduled') {
+            // Turn a pending scheduled transaction into a real income/expense
+            // record and mark it posted. LKR-only (see ScheduledTransaction).
+            const id = typeof body.id === 'string' ? body.id : ''
+            const db = readFinanceStore()
+            const sched = db.scheduled_transactions.find((s) => s.id === id)
+            if (!sched || sched.status !== 'pending') {
+              return json(
+                { ok: false, error: 'No pending scheduled transaction with that id.' },
+                { status: 400 },
+              )
+            }
+            const postDate =
+              typeof body.date === 'string' && body.date
+                ? body.date
+                : new Date().toISOString().slice(0, 10)
+            addFinanceRecord(
+              sched.kind,
+              sched.kind === 'income'
+                ? {
+                    dateReceived: postDate,
+                    sourceName: sched.counterparty,
+                    incomeType: sched.category,
+                    originalCurrency: 'LKR',
+                    originalAmount: sched.amount,
+                    convertedLkrAmount: sched.amount,
+                    accountId: sched.accountId,
+                    notes: sched.notes,
+                  }
+                : {
+                    date: postDate,
+                    vendor: sched.counterparty,
+                    category: sched.category,
+                    currency: 'LKR',
+                    amount: sched.amount,
+                    convertedLkrAmount: sched.amount,
+                    accountId: sched.accountId,
+                    notes: sched.notes,
+                  },
+            )
+            const fresh = readFinanceStore()
+            const newRecord =
+              sched.kind === 'income'
+                ? fresh.income_records[fresh.income_records.length - 1]
+                : fresh.expense_records[fresh.expense_records.length - 1]
+            updateFinanceRecord('scheduled_transaction', id, {
+              status: 'posted',
+              postedRecordId: newRecord.id,
+            })
+            appendAuditLog('scheduled_transaction_posted', {
+              id,
+              kind: sched.kind,
+              recordId: newRecord.id,
+            })
+            return json(personalFinancePayload())
           }
           if (action === 'snapshot_net_worth') {
             // Idempotent per calendar day — the nightly cron and a manual

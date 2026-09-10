@@ -113,6 +113,7 @@ vi.mock('../../server/finance-store', () => ({
     paydays: [],
     contracts: [],
     fdMaturities: [],
+    scheduled: [],
   })),
   getCurrencyExposure: vi.fn(() => []),
   getAverageMonthlyExpensesLkr: vi.fn(() => 0),

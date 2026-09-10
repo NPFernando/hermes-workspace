@@ -44,6 +44,7 @@ const FINANCE_COLLECTIONS = [
   'expense_records',
   'transfers',
   'net_worth_snapshots',
+  'scheduled_transactions',
   'budget_categories',
   'categories',
   'subcategories',
