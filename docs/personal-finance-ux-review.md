@@ -229,7 +229,7 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 | 5 · merge target cards / settings screen | ✅ done — `GoalsTargetsCard` (one section, `GoalRow` layout, each row keeps its `set_*` action); the 3 old card files deleted; `BaseCurrencySelect` moved into the collapsed settings drawer (U3) | PR #46 |
 | 1 · window payload | ✅ done — `data.{income_records,expense_records}` capped to the trailing **36 months** (`TRANSACTIONS_WINDOW_MONTHS`); `financeSummary`'s all-time figures untouched (reads `db`); `TransactionsPanel` shows a "last 36 months" note; full history via `list_transactions` + JSON export | PR #46 |
 | 11 · `*Lkr` → `*Base` rename | ✅ done — `financeSummary`'s aggregate outputs + the `emergencyFund` / `wealthGoal` payload fields renamed `*Lkr` → `*Base`; storage fields (`convertedLkrAmount`), the `set_wealth_goal` request param `targetLkr`, and the `wealthGoalTargetLkr` settings key **kept** (contract/storage). Touches `src/screens/dashboard/finance-overview-card.tsx` too. `personal-finance-digest.sh` reads both names for the deploy window. | PR #46 |
-| 12 · unified ledger | **not done — persistence-layer project, roadmap-governed.** A `transfers` collection is a schema change to a **Postgres-primary** store: `FinanceDatabase` type + `createEmptyFinanceDatabase` + `migrateFinanceStore` + `finance-postgres-store.ts` (schema/read/write) + `addFinanceRecord`/`update`/`delete` + `getUnifiedTransactions` + `PERSONAL_FINANCE_RECORD_KINDS` + payload + `TransactionsPanel` + tests. `personal-finance-os-roadmap.md` calls the unified ledger *"the recommended next major undertaking, not a quick win"* and *"do not build ahead of this document."* A rushed migration on a live financial store is a data-integrity risk. First slice (own PR): a `transfer` record kind so account-to-account moves stop being double-counted as fake income+expense. |
+| 12 · unified ledger | ✅ **first slice done** — `transfer` record kind: `Transfer` type + `db.transfers` collection (auto-migrated via `migrateFinanceStore`'s spread; `'transfers'` added to `FINANCE_COLLECTIONS` → persists through the generic `finance_engine_collections` table, no DDL); `add`/`update`/`delete` branches; `getUnifiedTransactions` + client `unifyTransactions` emit it (parity-tested); windowed on the payload. **`financeSummary` untouched** — transfers never enter income/expense/savings totals (asserted). Remaining ledger work (own PRs, roadmap-sequenced): ledger-derived account balances (ADR-001), splits, a transfer entry form, transfer-aware filters. | PR #46 |
 
 **Tier 0 — shipped in this pass**
 
@@ -294,11 +294,10 @@ across ~15 panels. That work is done and good; the duplication that remains is *
     / `wealthGoal` payload fields `*Lkr` → `*Base`. Storage fields, the `set_wealth_goal`
     `targetLkr` request param, and the `wealthGoalTargetLkr` settings key kept. Also touched
     `src/screens/dashboard/`; the digest cron reads both names for the deploy window.
-12. **Not done — persistence-layer project.** A `transfers` collection is a schema migration to
-    the **Postgres-primary** finance store (10+ modules incl. `finance-postgres-store.ts`). The
-    roadmap: *"the recommended next major undertaking, not a quick win … do not build ahead of
-    this document."* First slice for its own PR: a `transfer` record kind so account-to-account
-    moves stop being modelled as fake income+expense.
+12. ✅ **first slice done** (`feat/pf-dashboard-perf`) — `transfer` record kind (type, `db.transfers`
+    collection, `FINANCE_COLLECTIONS` entry, add/update/delete, unified-list emission, windowed
+    payload, parity test, `financeSummary` untouched). The full unified ledger (balances derived
+    from the ledger, splits, transfer UI) stays roadmap-sequenced across further PRs.
 
 ---
 
