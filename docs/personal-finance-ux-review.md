@@ -223,10 +223,12 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 | 4 · Overview hierarchy | ✅ done | PR #46 |
 | 8 · one mutation pattern | ✅ done | PR #46 |
 | 10 · analyst units | ✅ done | PR #46 |
+| 6 · de-dup transaction representation | ✅ done — `transactions` off the payload; panel unifies raw arrays client-side, parity-tested | PR #46 |
+| 9 · paged transaction-history endpoint | ✅ done — `list_transactions` action (id cursor, 1..500) | PR #46 |
 | 5 · merge target cards / settings screen | partial — visual grouping done, component-merge open | PR #46 |
-| 1 + 6 + 9 · transaction-payload cluster | plan only (Appendix) — needs #45 merged, one PR |
-| 7 · server-side derivations | not started — reshapes the payload, do after/with 6 |
-| 11 · `*Lkr` → `*Base` rename | **deliberately not done** — ~56 call sites + the digest cron's Python reads `s['netWorthLkr']`; PF-201 kept the names on purpose; wants its own PR against a merged baseline |
+| 1 · window payload to 24 months | prerequisites (6, 9) done; **windowing itself deferred** — it silently truncates 9 payload consumers and `TransactionsPanel` needs server-side filtering to page correctly. One careful PR against a merged baseline. |
+| 7 · server-side derivations | not started — moves trends/recurring/upcoming/exposure server-side, reshapes the payload, and rewrites the digest cron's Python. ~6 files + a live cron. Own PR. |
+| 11 · `*Lkr` → `*Base` rename | **deliberately not done** — ~56 call sites + the digest cron's Python reads `s['netWorthLkr']`; PF-201 kept the names on purpose; own PR against a merged baseline |
 | 12 · unified ledger | roadmap Phase 1 — multi-PR project, not a session task |
 
 **Tier 0 — shipped in this pass**
@@ -239,7 +241,10 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 **Tier 1 — small, safe, high user impact**
 
 1. Window `income_records` / `expense_records` in the dashboard payload to 24 months (D2/P1).
-   **Not standalone — see the Appendix; do it with items 6 + 9.**
+   **Prerequisites done** (6 ✅, 9 ✅). The windowing itself is still deferred: it silently
+   truncates the 8 non-panel consumers of the raw arrays, and `TransactionsPanel` would need
+   server-side filtering (not just paging) to keep its date/kind/amount/search filters correct
+   over a windowed set. One careful PR against a merged baseline — see the Appendix.
 2. ✅ **DONE** (`feat/pf-dashboard-perf`) — `TransactionsPanel` renders the first 100 filtered
    rows + "Show more"; totals/counts still span the full list; visible count resets on filter
    change (D3/P2).
@@ -259,9 +264,12 @@ across ~15 panels. That work is done and good; the duplication that remains is *
    `EmergencyFundCard` + `SavingsRateTargetCard` + `WealthGoalCard` into **one component**
    with a shared row layout (U2), and giving `BaseCurrencySelect` a real settings-screen home
    (U3) rather than a bottom-of-Overview slot.
-6. De-duplicate the transaction representation — one of `transactions` vs raw arrays (D1).
+6. ✅ **DONE** (`feat/pf-dashboard-perf`) — `transactions` dropped from the payload;
+   `TransactionsPanel` unifies `data.income_records` + `data.expense_records` client-side via
+   `unifyTransactions`, parity-tested against the server's `getUnifiedTransactions` (D1).
 7. Server-side `trends` / `recurringBills` / `upcomingMoney` / `currencyExposure` in the
-   payload; delete the Python port in the digest cron (D4).
+   payload; delete the Python port in the digest cron (D4). **Not started** — ~6 components +
+   a live cron script; own PR against a merged baseline.
 8. ✅ **DONE** (`feat/pf-dashboard-perf`) — 6 Overview cards (`savings-rate-target-card`,
    `emergency-fund-card`, `base-currency-select`, `wealth-goal-card`, and the
    `LinkedAccountControl` in `savings-goals-progress` / `sinking-funds-panel`) now use
@@ -270,7 +278,9 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 
 **Tier 3 — larger / roadmap-level**
 
-9. Paged transaction-history endpoint (D2).
+9. ✅ **DONE** (`feat/pf-dashboard-perf`) — `list_transactions` action: paged unified history,
+   id cursor, `limit` 1..500. Prerequisite for item 1; not yet wired into `TransactionsPanel`
+   (that's part of item 1).
 10. ✅ **DONE** (`feat/pf-dashboard-perf`) — Finance Analyst units pass:
     `buildFinanceQueryContext` pins its `summary` to LKR (computed against a `baseCurrency:'LKR'`
     clone of the db) and stamps `currency: 'LKR'`, so the LLM prompt no longer mixes a
