@@ -124,6 +124,14 @@ export type PersonalFinancePayload = {
     loans: Array<Record<string, unknown>>
     properties: Array<Record<string, unknown>>
     beneficiaries: Array<Record<string, unknown>>
+    /** Latest rate per `base -> target` pair (FX cron / manual). */
+    exchange_rates: Array<{
+      base: string
+      target: string
+      rate: number
+      date: string
+      updatedAt?: string
+    }>
   }
 }
 
