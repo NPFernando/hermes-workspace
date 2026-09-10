@@ -325,6 +325,101 @@ describe('finance-store', () => {
   })
 })
 
+describe('budget-vs-actual normalises a non-LKR budget to LKR (PF-201)', () => {
+  const usdBudget = {
+    id: 'b-usd',
+    category: 'Software',
+    month: '2026-07',
+    currency: 'USD' as const,
+    budgetAmount: 100,
+    source: 'test',
+    createdAt: '2026-07-01T00:00:00.000Z',
+    updatedAt: '2026-07-01T00:00:00.000Z',
+  }
+  const usdSpend = {
+    id: 'e-usd',
+    date: '2026-07-10',
+    vendor: 'SaaS',
+    category: 'Software',
+    currency: 'USD',
+    amount: 40,
+    convertedLkrAmount: 12_000, // already LKR-converted at ingest
+    recurring: false,
+    workRelated: false,
+    taxDeductiblePossible: false,
+    source: 'test',
+    createdAt: '2026-07-10T00:00:00.000Z',
+    updatedAt: '2026-07-10T00:00:00.000Z',
+  }
+
+  it('converts the budget via a stored USD->LKR rate before comparing', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push({
+      base: 'USD',
+      target: 'LKR',
+      rate: 300,
+      date: '2026-07-01',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    })
+    db.budget_categories.push({ ...usdBudget })
+    db.expense_records.push({ ...usdSpend })
+
+    const r = getBudgetVsActual(db, 'Software', 2026, 7)
+    expect(r).toEqual({ budget: 30_000, actual: 12_000, variance: 18_000 })
+
+    const [row] = budgetVsActualSummary(db, '2026-07')
+    expect(row).toMatchObject({
+      currency: 'LKR',
+      budget: 30_000,
+      actual: 12_000,
+      variance: 18_000,
+      percentUsed: 40,
+      overBudget: false,
+    })
+  })
+
+  it('falls back to the inverse LKR->USD rate when no direct rate is on file', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push({
+      base: 'LKR',
+      target: 'USD',
+      rate: 1 / 300,
+      date: '2026-07-01',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    })
+    db.budget_categories.push({ ...usdBudget })
+
+    const r = getBudgetVsActual(db, 'Software', 2026, 7)
+    expect(r?.budget).toBeCloseTo(30_000)
+  })
+
+  it('falls back to the raw amount when no rate exists, and flags the currency', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push({ ...usdBudget })
+
+    // getBudgetVsActual still returns a number (better than dropping the row)…
+    const r = getBudgetVsActual(db, 'Software', 2026, 7)
+    expect(r).toEqual({ budget: 100, actual: 0, variance: 100 })
+
+    // …but the missing rate surfaces via financeSummary.fxUnconverted ->
+    // the "Missing exchange rate" alert, so it isn't a silent wrong number.
+    expect(financeSummary(db).fxUnconverted).toContain('USD')
+    expect(
+      financeAlerts(db).some((a) => a.title === 'Missing exchange rate'),
+    ).toBe(true)
+  })
+
+  it('leaves an all-LKR budget untouched', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push({ ...usdBudget, currency: 'LKR', budgetAmount: 50_000 })
+    expect(getBudgetVsActual(db, 'Software', 2026, 7)).toEqual({
+      budget: 50_000,
+      actual: 0,
+      variance: 50_000,
+    })
+  })
+})
+
 // Same isolation pattern as trading-summary.test.ts / rebalance-engine.test.ts —
 // point HOME at a temp dir so these never touch the real ~/.hermes/finance store.
 describe('addFinanceRecord / updateFinanceRecord / deleteFinanceRecord', () => {

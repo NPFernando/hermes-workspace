@@ -94,8 +94,9 @@ export function BudgetPanel({
           <h2 className="text-lg font-semibold">Budget vs. actual spending</h2>
           <p className="text-xs text-[var(--theme-muted)]">
             Set a monthly budget per category, log expenses, and see how actual
-            spending compares — updates instantly below. Enter budgets in LKR;
-            actual spend is always compared in LKR-converted terms.
+            spending compares — updates instantly below. A non-LKR budget is
+            converted at the exchange rate on file; the comparison is always in
+            LKR-converted terms.
           </p>
         </div>
       </div>

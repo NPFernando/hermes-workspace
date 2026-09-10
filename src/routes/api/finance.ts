@@ -438,21 +438,16 @@ function personalFinancePayload() {
     baseCurrency: base,
     fxToBase,
     summary,
-    // PF-201: budgetVsActualSummary rows carry `budget` in the category's own
-    // currency but `actual` already summed in LKR (getBudgetVsActual). Only the
-    // all-LKR row (the normal case) is coherent to convert; a non-LKR category
-    // is left exactly as today and keeps its own currency label.
-    budgetVsActual: budgetVsActualSummary(db).map((b) =>
-      b.currency === 'LKR'
-        ? {
-            ...b,
-            currency: base,
-            budget: inBase(b.budget),
-            actual: inBase(b.actual),
-            variance: inBase(b.variance),
-          }
-        : b,
-    ),
+    // PF-201: budgetVsActualSummary now returns budget/actual/variance already
+    // LKR-normalised (a non-LKR budget category is converted at the join), so
+    // every row goes through `inBase` and carries the reporting currency.
+    budgetVsActual: budgetVsActualSummary(db).map((b) => ({
+      ...b,
+      currency: base,
+      budget: inBase(b.budget),
+      actual: inBase(b.actual),
+      variance: inBase(b.variance),
+    })),
     transactions: maskSensitive(getUnifiedTransactions(db)),
     alerts,
     emergencyFund: {
