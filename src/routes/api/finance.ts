@@ -1615,21 +1615,33 @@ export const Route = createFileRoute('/api/finance')({
               !Array.isArray(cfg.learningPolicy)
             ) {
               const lp = cfg.learningPolicy as JsonRecord
+              const existingPolicy = (
+                dt.learningPolicy && typeof dt.learningPolicy === 'object'
+                  ? { ...(dt.learningPolicy as Record<string, unknown>) }
+                  : {}
+              ) as Record<string, unknown>
+              let policyChanged = false
               if (Array.isArray(lp.autoApplyModes)) {
                 const modes = lp.autoApplyModes.filter(
                   (m): m is 'paper_trade' | 'testnet_execute' =>
                     m === 'paper_trade' || m === 'testnet_execute',
                 )
                 if (modes.length > 0) {
-                  const existingPolicy = (
-                    dt.learningPolicy && typeof dt.learningPolicy === 'object'
-                      ? { ...(dt.learningPolicy as Record<string, unknown>) }
-                      : {}
-                  ) as Record<string, unknown>
                   existingPolicy.autoApplyModes = Array.from(new Set(modes))
-                  dt.learningPolicy = existingPolicy
+                  policyChanged = true
                 }
               }
+              // autoRestore: enables the symmetric strategy *upgrade* path in
+              // applyStrategyOverrideRecommendations (docs/trading-strategy-
+              // lifecycle.md). Structurally safe to toggle from the UI — it
+              // only ever *lifts* automatic-source overrides one rung at a
+              // time behind a hysteresis band + 2-run streak, never touches
+              // tradingMode or the global quote base.
+              if (typeof lp.autoRestore === 'boolean') {
+                existingPolicy.autoRestore = lp.autoRestore
+                policyChanged = true
+              }
+              if (policyChanged) dt.learningPolicy = existingPolicy
             }
             settings.demoTrading = dt
             // autoRefinement.enabled: a top-level settings key (not nested

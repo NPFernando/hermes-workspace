@@ -1803,12 +1803,22 @@ async function runTradingCycleInner(
     return bail('testnet mode refuses a live Binance client')
   }
 
-  const warmupRun = await runMarketDataWarmup({
-    config,
-    client,
-    executionMode,
-    targetCandles: MARKET_WARMUP_TARGET_CANDLES,
-  })
+  let warmupRun: Awaited<ReturnType<typeof runMarketDataWarmup>>
+  try {
+    warmupRun = await runMarketDataWarmup({
+      config,
+      client,
+      executionMode,
+      targetCandles: MARKET_WARMUP_TARGET_CANDLES,
+    })
+  } catch (err) {
+    // Match the bail() pattern used by every other external call in this
+    // function: a market-data fetch/parse failure must degrade the cycle to
+    // "ran: false" with a diagnostic reason, never bubble out as an uncaught
+    // 500 that leaves the engine silently dead (as it was for ~5 days after
+    // 2026-09-05 with only "Internal server error" reaching the cron log).
+    return bail(`market data warmup failed: ${(err as Error).message}`)
+  }
   cycleContext.marketWarmup = warmupRun.report
 
   // One account read per cycle: quote balance feeds the guardian floor check.
@@ -1824,10 +1834,19 @@ async function runTradingCycleInner(
 
   const activePositions = () => activePositionsForMode(positions, executionMode)
   const activeTradeLog = () => realizedTradesForMode(trades, executionMode)
-  const openUnrealizedPnlQuote = await openUnrealizedQuote(
-    activePositions(),
-    client,
-  )
+  let openUnrealizedPnlQuote: number
+  try {
+    openUnrealizedPnlQuote = await openUnrealizedQuote(
+      activePositions(),
+      client,
+    )
+  } catch (err) {
+    // Same rationale as the market-data warmup guard above: a per-position
+    // mark-price lookup failure degrades the cycle, it does not crash it.
+    return bail(
+      `open-position mark-price lookup failed: ${(err as Error).message}`,
+    )
+  }
   const livePerOrderCap =
     typeof settings.livePerOrderCapUsdt === 'number' &&
     Number.isFinite(settings.livePerOrderCapUsdt)
@@ -3207,10 +3226,23 @@ export interface StrategyOverrideRecommendationSkip {
   reason: string
 }
 
+export interface StrategyOverrideRestoreStep {
+  strategyId: string
+  fromMode: StrategyOverrideMode
+  fromMultiplier: number
+  action: StrategyOverrideAction
+  toMultiplier: number | null
+  healthyRuns: number
+  winRate: number
+}
+
 export interface StrategyOverrideRecommendationResult {
   checkedAt: string
   applied: Array<StrategyOverrideRecommendationApplication>
   skipped: Array<StrategyOverrideRecommendationSkip>
+  /** Automatic overrides stepped *down* the ladder this run because the
+   * strategy recovered. Always empty unless learningPolicy.autoRestore. */
+  restored: Array<StrategyOverrideRestoreStep>
   activeOverrides: Array<StrategyOverride>
   history: Array<StrategyOverrideHistoryEntry>
 }
@@ -3232,6 +3264,15 @@ export interface LearningPolicy {
   candidateMinBacktestFolds: number
   stabilityGate: LearningStabilityGate
   livePromotionRequiresApproval: boolean
+  /**
+   * When true, `applyStrategyOverrideRecommendations()` also *lifts*
+   * automatic-source overrides one step at a time as a throttled strategy's
+   * win rate recovers past the hysteresis band (see
+   * docs/trading-strategy-lifecycle.md). Default **false** — the degrade
+   * direction is unaffected either way; this only enables the symmetric
+   * upgrade path. Ships inert.
+   */
+  autoRestore: boolean
 }
 
 export interface LearningConfigPatch {
@@ -3312,6 +3353,112 @@ const DEFAULT_LEARNING_POLICY: LearningPolicy = {
   candidateMinBacktestFolds: 4,
   stabilityGate: 'conservative',
   livePromotionRequiresApproval: true,
+  autoRestore: false,
+}
+
+// ── Auto-restore (symmetric strategy upgrade) ───────────────────────────────
+// docs/trading-strategy-lifecycle.md. All inert unless
+// learningPolicy.autoRestore === true.
+
+/** Win rate a recovered strategy must clear to be eligible for a restore step.
+ * 7 points above the 0.45 `reduce_size` line → strategies in [0.45, 0.53) are
+ * neither demoted nor restored (hysteresis band, no flap). */
+const STRATEGY_RESTORE_WINRATE = 0.53
+/** Asymmetric sample gate — slower to trust a recovery (5) than to react to a
+ * slump (3, in `strategyRecommendation`). */
+const STRATEGY_RESTORE_MIN_TRADES = 5
+/** Consecutive daily applier runs a strategy must stay recovery-eligible
+ * before each single step down the ladder. */
+const STRATEGY_RESTORE_HEALTHY_RUNS = 2
+
+interface StrategyRestoreProgress {
+  healthyRuns: number
+  lastEvaluatedAt: string
+}
+
+/** Pure: is this strategy's current score a clean, profitable recovery? */
+function strategyRecoveryEligible(score: {
+  trades: number
+  winRate: number
+  avgPnlQuote: number
+  score: number
+}): boolean {
+  return (
+    score.trades >= STRATEGY_RESTORE_MIN_TRADES &&
+    score.winRate >= STRATEGY_RESTORE_WINRATE &&
+    score.avgPnlQuote > 0 &&
+    score.score > -0.2
+  )
+}
+
+/** Pure: the next single step *down* the override ladder, or null if there is
+ * nothing left to lift. `disabled → reduce_size(0.5) → reduce_size(0.75) →
+ * clear`. */
+function restoreStepForOverride(existing: StrategyOverride): {
+  overrideAction: StrategyOverrideAction
+  multiplier: number | null
+} | null {
+  if (existing.mode === 'disabled')
+    return { overrideAction: 'reduce_size', multiplier: 0.5 }
+  if (existing.mode === 'reduce_size') {
+    if (existing.multiplier < 0.75)
+      return { overrideAction: 'reduce_size', multiplier: 0.75 }
+    return { overrideAction: 'clear', multiplier: null }
+  }
+  return null
+}
+
+function readStrategyRestoreProgress(
+  settingsDemoTrading: unknown,
+): Record<string, StrategyRestoreProgress> {
+  const dt =
+    settingsDemoTrading &&
+    typeof settingsDemoTrading === 'object' &&
+    !Array.isArray(settingsDemoTrading)
+      ? (settingsDemoTrading as Record<string, unknown>)
+      : {}
+  const raw =
+    dt.strategyRestoreProgress &&
+    typeof dt.strategyRestoreProgress === 'object' &&
+    !Array.isArray(dt.strategyRestoreProgress)
+      ? (dt.strategyRestoreProgress as Record<string, unknown>)
+      : {}
+  const out: Record<string, StrategyRestoreProgress> = {}
+  for (const [strategyId, value] of Object.entries(raw)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+    const v = value as Record<string, unknown>
+    const healthyRuns =
+      typeof v.healthyRuns === 'number' && Number.isFinite(v.healthyRuns)
+        ? Math.max(0, Math.floor(v.healthyRuns))
+        : 0
+    out[strategyId] = {
+      healthyRuns,
+      lastEvaluatedAt:
+        typeof v.lastEvaluatedAt === 'string' ? v.lastEvaluatedAt : '',
+    }
+  }
+  return out
+}
+
+/** Persist the restore-progress map back onto settings.demoTrading. Separate
+ * read-modify-write so it survives the `setStrategyOverride()` writes the
+ * restore loop makes just before it. */
+function writeStrategyRestoreProgress(
+  progress: Record<string, StrategyRestoreProgress>,
+): void {
+  const db = readFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const dt = (
+    settings.demoTrading &&
+    typeof settings.demoTrading === 'object' &&
+    !Array.isArray(settings.demoTrading)
+      ? { ...(settings.demoTrading as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>
+  if (Object.keys(progress).length === 0) delete dt.strategyRestoreProgress
+  else dt.strategyRestoreProgress = progress
+  settings.demoTrading = dt
+  writeFinanceStore(db)
 }
 
 function chronological<T extends { closedAt: string }>(
@@ -3724,6 +3871,10 @@ function learningPolicyFromSettings(
       typeof raw.livePromotionRequiresApproval === 'boolean'
         ? raw.livePromotionRequiresApproval
         : DEFAULT_LEARNING_POLICY.livePromotionRequiresApproval,
+    autoRestore:
+      typeof raw.autoRestore === 'boolean'
+        ? raw.autoRestore
+        : DEFAULT_LEARNING_POLICY.autoRestore,
   }
 }
 
@@ -5754,17 +5905,94 @@ export function applyStrategyOverrideRecommendations(): {
     })
   }
 
+  // ── Recovery ladder (symmetric upgrade) ──────────────────────────────────
+  // Only when learningPolicy.autoRestore. Steps automatic-source overrides
+  // one level *down* when a throttled strategy's win rate recovers past the
+  // hysteresis band and stays there for STRATEGY_RESTORE_HEALTHY_RUNS
+  // consecutive daily runs. Escalation above always wins — a strategy demoted
+  // this same run can't also be restored (its override was just made stricter
+  // and its recommendation is not `keep`).
+  const restored: Array<StrategyOverrideRestoreStep> = []
+  const policy = learningPolicyFromSettings(
+    (readFinanceStore().settings as Record<string, unknown>).demoTrading,
+  )
+  if (policy.autoRestore) {
+    const progress = readStrategyRestoreProgress(
+      (readFinanceStore().settings as Record<string, unknown>).demoTrading,
+    )
+    const nextProgress: Record<string, StrategyRestoreProgress> = { ...progress }
+    const nowIso = new Date().toISOString()
+
+    for (const strategy of report.byStrategy) {
+      const existing = activeByStrategy.get(strategy.strategyId)
+      if (!existing || existing.source !== 'automatic') {
+        delete nextProgress[strategy.strategyId]
+        continue
+      }
+      const eligible =
+        strategy.recommendation === 'keep' &&
+        strategyRecoveryEligible(strategy)
+      if (!eligible) {
+        // In the hysteresis band or still flagged — reset the streak, hold.
+        if (nextProgress[strategy.strategyId])
+          delete nextProgress[strategy.strategyId]
+        continue
+      }
+      const healthyRuns =
+        (progress[strategy.strategyId]?.healthyRuns ?? 0) + 1
+      if (healthyRuns < STRATEGY_RESTORE_HEALTHY_RUNS) {
+        nextProgress[strategy.strategyId] = {
+          healthyRuns,
+          lastEvaluatedAt: nowIso,
+        }
+        continue
+      }
+      const step = restoreStepForOverride(existing)
+      if (!step) {
+        delete nextProgress[strategy.strategyId]
+        continue
+      }
+      const update = setStrategyOverride({
+        strategyId: strategy.strategyId,
+        overrideAction: step.overrideAction,
+        multiplier: step.multiplier ?? undefined,
+        reason:
+          step.overrideAction === 'clear'
+            ? `Auto-restore: win rate recovered to ${(strategy.winRate * 100).toFixed(0)}% over ${strategy.trades} trades — override lifted.`
+            : `Auto-restore: sustained recovery (${(strategy.winRate * 100).toFixed(0)}% win rate) — easing throttle to ${step.multiplier}x.`,
+        source: 'automatic',
+      })
+      activeByStrategy = new Map(
+        update.activeOverrides.map((o) => [o.strategyId, o]),
+      )
+      restored.push({
+        strategyId: strategy.strategyId,
+        fromMode: existing.mode,
+        fromMultiplier: existing.multiplier,
+        action: step.overrideAction,
+        toMultiplier: step.multiplier,
+        healthyRuns,
+        winRate: strategy.winRate,
+      })
+      // Each further step needs its own fresh streak.
+      delete nextProgress[strategy.strategyId]
+    }
+    writeStrategyRestoreProgress(nextProgress)
+  }
+
   const finalState = strategyOverrideState()
   const result: StrategyOverrideRecommendationResult = {
     checkedAt: new Date().toISOString(),
     applied,
     skipped,
+    restored,
     activeOverrides: finalState.active,
     history: [...finalState.history].reverse(),
   }
   appendAuditLog('strategy_override_recommendations_applied', {
     appliedCount: applied.filter((item) => item.changed).length,
     skippedCount: skipped.length,
+    restoredCount: restored.length,
     checkedStrategies: report.byStrategy.length,
   })
   return { report, result }

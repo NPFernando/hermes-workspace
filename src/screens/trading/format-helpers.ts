@@ -20,3 +20,10 @@ export function formatSignedAmount(value: number): string {
 export function formatFractionPct(value: number): string {
   return `${(value * 100).toFixed(1)}%`
 }
+
+/** Locale date-time string; echoes the raw value on an unparseable date. */
+export function formatDateTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
