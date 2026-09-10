@@ -178,8 +178,36 @@ export function AccountsPanel({
         amount: numberField(r, 'amount'),
         kind: 'expense' as const,
       })),
+      // A transfer moves money out of `fromAccountId` and into
+      // `toAccountId` — feed it as two legs so both accounts reconcile.
+      ...payload.data.transfers.flatMap((r) => {
+        const txCurrency = stringField(r, 'currency') || 'LKR'
+        const txAmount = numberField(r, 'amount')
+        const legs: Array<ReconcileTransaction> = []
+        const from = stringField(r, 'fromAccountId')
+        const to = stringField(r, 'toAccountId')
+        if (from)
+          legs.push({
+            accountId: from,
+            currency: txCurrency,
+            amount: txAmount,
+            kind: 'expense',
+          })
+        if (to)
+          legs.push({
+            accountId: to,
+            currency: txCurrency,
+            amount: txAmount,
+            kind: 'income',
+          })
+        return legs
+      }),
     ],
-    [payload.data.income_records, payload.data.expense_records],
+    [
+      payload.data.income_records,
+      payload.data.expense_records,
+      payload.data.transfers,
+    ],
   )
 
   const totalsByCurrency = new Map<string, number>()
@@ -479,7 +507,8 @@ export function AccountsPanel({
                           Math.abs(reconciliationDiff),
                           accountCurrency,
                         )}{' '}
-                        from recorded transactions
+                        — recorded income, expenses and transfers imply{' '}
+                        {formatMoney(ledgerBalance ?? 0, accountCurrency)}
                       </p>
                     )}
                   </div>
