@@ -538,6 +538,9 @@ function personalFinancePayload() {
       .map((snap) => ({
         date: snap.date,
         netWorthBase: inBase(snap.netWorthLkr),
+        cashBase: inBase(snap.cashLkr),
+        investmentsBase: inBase(snap.investmentsLkr),
+        debtBase: inBase(snap.debtLkr),
       })),
     alerts,
     emergencyFund: {
