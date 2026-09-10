@@ -52,6 +52,10 @@ describe('transfers collection is wired for Postgres persistence', () => {
     )
   })
 
+  it('net_worth_snapshots is wired for Postgres persistence too', () => {
+    expect(FINANCE_POSTGRES_COLLECTIONS).toContain('net_worth_snapshots')
+  })
+
   it('every PG-persisted PF collection exists as an array on a fresh db, so the normalizer round-trips it', () => {
     const db = createEmptyFinanceDatabase() as unknown as Record<string, unknown>
     for (const collection of [
@@ -59,6 +63,7 @@ describe('transfers collection is wired for Postgres persistence', () => {
       'income_records',
       'expense_records',
       'transfers',
+      'net_worth_snapshots',
       'exchange_rates',
     ]) {
       expect(Array.isArray(db[collection]), collection).toBe(true)

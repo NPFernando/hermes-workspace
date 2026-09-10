@@ -2606,8 +2606,11 @@ describe('PF review item 7: server-side dashboard derivations', () => {
     db.stock_holdings.push({
       id: 'h',
       symbol: 'AAPL',
+      platform: 'ibkr',
       quantity: 10,
       buyPrice: 100,
+      buyDate: '2026-01-01',
+      priceSource: 'manual',
       currency: 'USD',
       source: 't',
       createdAt: '2026-01-01T00:00:00.000Z',
@@ -2802,5 +2805,54 @@ describe('ledger-derived account balances (item 3 + 4)', () => {
     })
     // led: 1000 - 250 = 750 (not 999) · man: 2000 · noOpen: 3000 (fallback)
     expect(financeSummary(db).cashBalanceBase).toBe(750 + 2_000 + 3_000)
+  })
+})
+
+describe('recordNetWorthSnapshot', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('computes an LKR snapshot and upserts by date (idempotent per day)', async () => {
+    const store = await freshFinanceStore()
+    store.addFinanceRecord('account', {
+      name: 'Checking',
+      type: 'bank',
+      currency: 'LKR',
+      balance: 120_000,
+    })
+
+    let db = store.readFinanceStore()
+    const first = store.recordNetWorthSnapshot(db, '2026-09-10')
+    expect(first.snapshot).toMatchObject({
+      date: '2026-09-10',
+      netWorthLkr: 120_000,
+      cashLkr: 120_000,
+      source: 'snapshot',
+    })
+    store.writeFinanceStore(first.db)
+
+    // same day again, after the balance changed → replaces, not appends
+    store.updateFinanceRecord(
+      'account',
+      store.readFinanceStore().finance_accounts[0].id,
+      { balance: 150_000 },
+    )
+    db = store.readFinanceStore()
+    const second = store.recordNetWorthSnapshot(db, '2026-09-10')
+    store.writeFinanceStore(second.db)
+    const snaps = store.readFinanceStore().net_worth_snapshots
+    expect(snaps).toHaveLength(1)
+    expect(snaps[0].netWorthLkr).toBe(150_000)
+    expect(snaps[0].id).toBe(first.snapshot.id) // stable id, kept createdAt
+
+    // a different day appends, sorted ascending
+    const third = store.recordNetWorthSnapshot(
+      store.readFinanceStore(),
+      '2026-09-11',
+    )
+    store.writeFinanceStore(third.db)
+    const all = store.readFinanceStore().net_worth_snapshots
+    expect(all.map((s) => s.date)).toEqual(['2026-09-10', '2026-09-11'])
   })
 })

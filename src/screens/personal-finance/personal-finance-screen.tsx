@@ -17,6 +17,7 @@ import { PendingIngestionPanel } from './components/pending-ingestion-panel'
 import { FinanceAlertsCard } from './components/finance-alerts-card'
 import { FinanceAnalystCard } from './components/finance-analyst-card'
 import { FinanceTrendsCard } from './components/finance-trends-card'
+import { NetWorthHistoryCard } from './components/net-worth-history-card'
 import { SavingsGoalsProgress } from './components/savings-goals-progress'
 import { SinkingFundsPanel } from './components/sinking-funds-panel'
 import { GoalsTargetsCard } from './components/goals-targets-card'
@@ -280,6 +281,8 @@ export function PersonalFinanceScreen() {
           </div>
         </section>
       )}
+
+      <NetWorthHistoryCard payload={payload} />
 
       {exposure.length > 0 && (
         <section className="mt-4 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">

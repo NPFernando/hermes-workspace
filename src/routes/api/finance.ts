@@ -34,6 +34,7 @@ import {
   maskSensitive,
   readFinanceStore,
   recordCategoryCorrection,
+  recordNetWorthSnapshot,
   setNonLiveExecutionMode,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
@@ -529,6 +530,14 @@ function personalFinancePayload() {
     recurringBills: getRecurringBills(db),
     upcomingMoney: getUpcomingMoney(db),
     currencyExposure: getCurrencyExposure(db),
+    // Daily net-worth history (written by the snapshot cron / action), most
+    // recent 180 points, converted to the reporting currency for the chart.
+    netWorthHistory: db.net_worth_snapshots
+      .slice(-180)
+      .map((snap) => ({
+        date: snap.date,
+        netWorthBase: inBase(snap.netWorthLkr),
+      })),
     alerts,
     emergencyFund: {
       targetMonths: efTargetMonths,
@@ -1987,6 +1996,18 @@ export const Route = createFileRoute('/api/finance')({
               nextCursor,
               total: all.length,
             })
+          }
+          if (action === 'snapshot_net_worth') {
+            // Idempotent per calendar day — the nightly cron and a manual
+            // trigger both land on the same upserted-by-date row.
+            const db = readFinanceStore()
+            const { db: next, snapshot } = recordNetWorthSnapshot(db)
+            writeFinanceStore(next)
+            appendAuditLog('net_worth_snapshot', {
+              date: snapshot.date,
+              netWorthLkr: snapshot.netWorthLkr,
+            })
+            return json({ ok: true, snapshot })
           }
           if (action === 'list_pending_ingestions') {
             // Unmasked on purpose — financePayload()'s `data` blob runs

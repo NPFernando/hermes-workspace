@@ -89,6 +89,10 @@ vi.mock('../../server/finance-store', () => ({
   budgetVsActualSummary: vi.fn(() => []),
   computeAccountLedgerBalance: vi.fn(() => null),
   ledgerTransactionsForDb: vi.fn(() => []),
+  recordNetWorthSnapshot: vi.fn((db) => ({
+    db,
+    snapshot: { date: '2026-09-10', netWorthLkr: 0 },
+  })),
   ensureFinanceStore: vi.fn(() => state.mockFinanceDb()),
   financeAlerts: vi.fn(() => []),
   financeStorageAlerts: vi.fn(() => []),

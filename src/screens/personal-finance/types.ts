@@ -74,6 +74,8 @@ export type PersonalFinancePayload = {
       count: number
     }>
   }>
+  /** Daily net-worth history for the trend chart, in the reporting currency. */
+  netWorthHistory: Array<{ date: string; netWorthBase: number }>
   /** PF review item 1: `data.income_records` / `data.expense_records` carry
    * only the trailing N months. Older rows: `list_transactions` + JSON export. */
   transactionsWindowMonths: number
