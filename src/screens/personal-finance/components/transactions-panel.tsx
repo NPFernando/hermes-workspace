@@ -6,7 +6,7 @@ import { buttonClass, confirmButtonClass, dangerButtonClass, inputClass } from '
 import { numberField, splitTags, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
-type TxnKind = 'income' | 'expense'
+type TxnKind = 'income' | 'expense' | 'transfer'
 
 /** Rows rendered before the "show more" cut — keeps the DOM bounded on a
  *  many-year history. Filters/search still run over the whole list. */
@@ -157,6 +157,9 @@ export function TransactionsPanel({
   const [notes, setNotes] = useState('')
   const [taxable, setTaxable] = useState(true)
   const [recurring, setRecurring] = useState(false)
+  // Item 12 UI: account-to-account transfer.
+  const [transferFrom, setTransferFrom] = useState('')
+  const [transferTo, setTransferTo] = useState('')
 
   const [search, setSearch] = useState('')
   const [filterKind, setFilterKind] = useState<'all' | TxnKind>('all')
@@ -178,13 +181,50 @@ export function TransactionsPanel({
   )
 
   async function submitTransaction() {
+    const busyKey = 'add-transaction'
+
+    if (addKind === 'transfer') {
+      const amt = Number(amount) || 0
+      if (amt <= 0) {
+        setErr('Transfer amount must be greater than 0')
+        return
+      }
+      if (transferFrom && transferTo && transferFrom === transferTo) {
+        setErr('“From” and “To” accounts must differ')
+        return
+      }
+      const data = await post(
+        {
+          action: 'add_record',
+          kind: 'transfer',
+          payload: {
+            date,
+            fromAccountId: transferFrom || undefined,
+            toAccountId: transferTo || undefined,
+            amount: amt,
+            currency,
+            convertedLkrAmount: amt,
+            notes: notes.trim() || undefined,
+          },
+        },
+        busyKey,
+      )
+      if (data) {
+        setAmount('')
+        setNotes('')
+        setTransferFrom('')
+        setTransferTo('')
+        setDate(todayIso())
+      }
+      return
+    }
+
     if (!counterparty.trim()) {
       setErr(
         addKind === 'income' ? 'Source name is required' : 'Vendor is required',
       )
       return
     }
-    const busyKey = 'add-transaction'
     const shared = {
       accountId: accountId || undefined,
       notes: notes.trim() || undefined,
@@ -426,6 +466,13 @@ export function TransactionsPanel({
           >
             Expense
           </button>
+          <button
+            type="button"
+            onClick={() => setAddKind('transfer')}
+            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'transfer' ? 'bg-[color-mix(in_srgb,var(--theme-accent)_25%,transparent)] text-[var(--theme-accent)]' : 'bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'}`}
+          >
+            Transfer
+          </button>
         </div>
         <input
           type="date"
@@ -433,57 +480,97 @@ export function TransactionsPanel({
           onChange={(e) => setDate(e.target.value)}
           className={inputClass}
         />
-        <input
-          type="text"
-          placeholder={addKind === 'income' ? 'Source name' : 'Vendor'}
-          value={counterparty}
-          onChange={(e) => setCounterparty(e.target.value)}
-          onBlur={() => {
-            if (addKind !== 'expense' || category.trim()) return
-            const guess = merchantDefaultCategory(
-              payload.data.merchants,
-              counterparty.trim(),
-            )
-            if (guess) setCategory(guess)
-          }}
-          list={addKind === 'expense' ? 'pf-known-merchants' : undefined}
-          className={inputClass}
-        />
-        <input
-          type="text"
-          placeholder={addKind === 'income' ? 'Income type' : 'Category'}
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          list="pf-known-categories"
-          className={inputClass}
-        />
-        {addKind === 'expense' && (
-          <input
-            type="text"
-            placeholder="Subcategory (optional)"
-            value={subcategory}
-            onChange={(e) => setSubcategory(e.target.value)}
-            list="pf-known-subcategories"
-            className={inputClass}
-          />
+        {addKind === 'transfer' && (
+          <>
+            <select
+              value={transferFrom}
+              onChange={(e) => setTransferFrom(e.target.value)}
+              className={inputClass}
+              aria-label="From account"
+            >
+              <option value="">From account…</option>
+              {accounts.map((account, index) => {
+                const id = stringField(account, 'id') || String(index)
+                return (
+                  <option key={id} value={id}>
+                    {stringField(account, 'name')}
+                  </option>
+                )
+              })}
+            </select>
+            <select
+              value={transferTo}
+              onChange={(e) => setTransferTo(e.target.value)}
+              className={inputClass}
+              aria-label="To account"
+            >
+              <option value="">To account…</option>
+              {accounts.map((account, index) => {
+                const id = stringField(account, 'id') || String(index)
+                return (
+                  <option key={id} value={id}>
+                    {stringField(account, 'name')}
+                  </option>
+                )
+              })}
+            </select>
+          </>
         )}
-        <input
-          type="text"
-          placeholder="Tags (comma-separated, optional)"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-          list="pf-known-tags"
-          className={inputClass}
-        />
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className={inputClass}
-        >
-          <option value="pending">Pending</option>
-          <option value="cleared">Cleared</option>
-          <option value="reconciled">Reconciled</option>
-        </select>
+        {addKind !== 'transfer' && (
+          <>
+            <input
+              type="text"
+              placeholder={addKind === 'income' ? 'Source name' : 'Vendor'}
+              value={counterparty}
+              onChange={(e) => setCounterparty(e.target.value)}
+              onBlur={() => {
+                if (addKind !== 'expense' || category.trim()) return
+                const guess = merchantDefaultCategory(
+                  payload.data.merchants,
+                  counterparty.trim(),
+                )
+                if (guess) setCategory(guess)
+              }}
+              list={addKind === 'expense' ? 'pf-known-merchants' : undefined}
+              className={inputClass}
+            />
+            <input
+              type="text"
+              placeholder={addKind === 'income' ? 'Income type' : 'Category'}
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              list="pf-known-categories"
+              className={inputClass}
+            />
+            {addKind === 'expense' && (
+              <input
+                type="text"
+                placeholder="Subcategory (optional)"
+                value={subcategory}
+                onChange={(e) => setSubcategory(e.target.value)}
+                list="pf-known-subcategories"
+                className={inputClass}
+              />
+            )}
+            <input
+              type="text"
+              placeholder="Tags (comma-separated, optional)"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              list="pf-known-tags"
+              className={inputClass}
+            />
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className={inputClass}
+            >
+              <option value="pending">Pending</option>
+              <option value="cleared">Cleared</option>
+              <option value="reconciled">Reconciled</option>
+            </select>
+          </>
+        )}
         <select
           value={currency}
           onChange={(e) => setCurrency(e.target.value)}
@@ -500,21 +587,23 @@ export function TransactionsPanel({
           onChange={(e) => setAmount(e.target.value)}
           className={`${inputClass} w-32`}
         />
-        <select
-          value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-          className={inputClass}
-        >
-          <option value="">No account</option>
-          {accounts.map((account, index) => {
-            const id = stringField(account, 'id') || String(index)
-            return (
-              <option key={id} value={id}>
-                {stringField(account, 'name')}
-              </option>
-            )
-          })}
-        </select>
+        {addKind !== 'transfer' && (
+          <select
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">No account</option>
+            {accounts.map((account, index) => {
+              const id = stringField(account, 'id') || String(index)
+              return (
+                <option key={id} value={id}>
+                  {stringField(account, 'name')}
+                </option>
+              )
+            })}
+          </select>
+        )}
         <input
           type="text"
           placeholder="Notes (optional)"
@@ -522,7 +611,7 @@ export function TransactionsPanel({
           onChange={(e) => setNotes(e.target.value)}
           className={inputClass}
         />
-        {addKind === 'income' ? (
+        {addKind === 'income' && (
           <label className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
             <input
               type="checkbox"
@@ -531,7 +620,8 @@ export function TransactionsPanel({
             />
             Taxable
           </label>
-        ) : (
+        )}
+        {addKind === 'expense' && (
           <label className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
             <input
               type="checkbox"
@@ -547,7 +637,11 @@ export function TransactionsPanel({
           onClick={() => void submitTransaction()}
           className={buttonClass}
         >
-          {busy === 'add-transaction' ? 'Saving…' : 'Add transaction'}
+          {busy === 'add-transaction'
+            ? 'Saving…'
+            : addKind === 'transfer'
+              ? 'Add transfer'
+              : 'Add transaction'}
         </button>
       </div>
 
@@ -569,6 +663,7 @@ export function TransactionsPanel({
           <option value="all">All</option>
           <option value="income">Income</option>
           <option value="expense">Expense</option>
+          <option value="transfer">Transfer</option>
         </select>
         <select
           value={filterStatus}
@@ -898,13 +993,15 @@ export function TransactionsPanel({
                         View document
                       </a>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => startEdit(txn)}
-                      className={buttonClass}
-                    >
-                      Edit
-                    </button>
+                    {kind !== 'transfer' && (
+                      <button
+                        type="button"
+                        onClick={() => startEdit(txn)}
+                        className={buttonClass}
+                      >
+                        Edit
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={busy === `delete-${id}`}
