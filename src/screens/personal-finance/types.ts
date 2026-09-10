@@ -55,9 +55,11 @@ export type PersonalFinancePayload = {
   }
   recurringBills: Array<{
     vendor: string
+    displayVendor: string
     category: string
     monthsSeen: number
     averageAmount: number
+    loggedThisMonth: boolean
   }>
   upcomingMoney: {
     paydays: Array<{ name: string; state: 'due_soon' | 'overdue'; days: number }>

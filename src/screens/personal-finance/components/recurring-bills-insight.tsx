@@ -1,6 +1,11 @@
+import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { formatLkr } from '../utils'
 import { numberField, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
 
 export type RecurringVendor = {
   vendor: string
@@ -69,15 +74,38 @@ export function detectRecurringVendors(
 
 export function RecurringBillsInsight({
   payload,
+  onPayload,
 }: {
   payload: PersonalFinancePayload
+  onPayload: (p: PersonalFinancePayload) => void
 }) {
   // PF review item 7: computed server-side now (was `detectRecurringVendors`
   // here + a Python port in the digest cron). `detectRecurringVendors` stays
   // exported for its unit test.
   const recurring = payload.recurringBills
   const fx = payload.fxToBase
+  const { run, busy } = useFinanceAction<PersonalFinancePayload>(onPayload)
   if (recurring.length === 0) return null
+
+  const logThisMonth = (bill: (typeof recurring)[number]) =>
+    run(
+      {
+        action: 'add_record',
+        kind: 'expense',
+        payload: {
+          date: todayIso(),
+          vendor: bill.displayVendor,
+          category: bill.category,
+          // averageAmount is already LKR (convertedLkrAmount) — post it as LKR.
+          currency: 'LKR',
+          amount: Math.round(bill.averageAmount),
+          convertedLkrAmount: Math.round(bill.averageAmount),
+          recurring: true,
+          notes: 'Logged from recurring-bills suggestion',
+        },
+      },
+      `log-${bill.vendor}`,
+    )
 
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
@@ -86,18 +114,36 @@ export function RecurringBillsInsight({
       </h2>
       <p className="text-xs text-[var(--theme-muted)]">
         Detected from repeated vendors with a similar amount over the last 3
-        months — informational only, nothing is changed automatically.
+        months. Nothing is logged automatically — use “Log this month” to add
+        one at its usual amount.
       </p>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-col gap-2">
         {recurring.map((r) => (
-          <span
+          <div
             key={r.vendor}
-            className="rounded-xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs text-[var(--theme-text)]"
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs text-[var(--theme-text)]"
           >
-            <span className="capitalize">{r.vendor}</span> · {r.category} · ~
-            {formatLkr(r.averageAmount * fx, payload.baseCurrency)} ·{' '}
-            {r.monthsSeen} months
-          </span>
+            <span className="capitalize font-medium">{r.displayVendor}</span>
+            <span className="text-[var(--theme-muted)]">
+              {r.category} · ~
+              {formatLkr(r.averageAmount * fx, payload.baseCurrency)} ·{' '}
+              {r.monthsSeen} months
+            </span>
+            {r.loggedThisMonth ? (
+              <span className="text-[var(--theme-success)]">
+                ✓ logged this month
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void logThisMonth(r)}
+                disabled={busy === `log-${r.vendor}`}
+                className="rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_12%,transparent)] px-2 py-0.5 font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_20%,transparent)] disabled:opacity-50"
+              >
+                {busy === `log-${r.vendor}` ? 'Adding…' : 'Log this month'}
+              </button>
+            )}
+          </div>
         ))}
       </div>
     </section>

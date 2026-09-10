@@ -3374,43 +3374,57 @@ export function getFinanceTrends(
 /** Vendors seen with a similar amount (±20%) in 2+ of the last `monthsBack`
  *  distinct months — the shape of a recurring bill. Port of the old client
  *  `detectRecurringVendors`. */
-export function getRecurringBills(
-  db: FinanceDatabase,
-  monthsBack = 3,
-): Array<{
+export interface RecurringBill {
+  /** Lower-cased match key (stable identity for the UI list). */
   vendor: string
+  /** Original casing of the vendor as first entered — for display + write-back. */
+  displayVendor: string
   category: string
   monthsSeen: number
   averageAmount: number
-}> {
+  /** True when an expense for this vendor already exists in the current
+   *  calendar month — the "Log this month" action hides itself then. */
+  loggedThisMonth: boolean
+}
+
+export function getRecurringBills(
+  db: FinanceDatabase,
+  monthsBack = 3,
+): Array<RecurringBill> {
+  const now = new Date()
   const cutoff = new Date()
   cutoff.setMonth(cutoff.getMonth() - monthsBack)
   const cutoffMonth = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}`
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
   const byVendor = new Map<
     string,
-    { category: string; entries: Array<{ month: string; amount: number }> }
+    {
+      displayVendor: string
+      category: string
+      entries: Array<{ month: string; amount: number }>
+      loggedThisMonth: boolean
+    }
   >()
   for (const row of db.expense_records) {
     const month = row.date.slice(0, 7)
-    if (!month || month < cutoffMonth) continue
     const vendorKey = row.vendor.trim().toLowerCase()
-    if (!vendorKey) continue
-    const amount = row.convertedLkrAmount || row.amount || 0
+    if (!vendorKey || !month) continue
     const bucket = byVendor.get(vendorKey) ?? {
+      displayVendor: row.vendor.trim(),
       category: row.category || 'Other',
       entries: [],
+      loggedThisMonth: false,
     }
-    bucket.entries.push({ month, amount })
+    if (month === thisMonth) bucket.loggedThisMonth = true
+    if (month >= cutoffMonth) {
+      const amount = row.convertedLkrAmount || row.amount || 0
+      bucket.entries.push({ month, amount })
+    }
     byVendor.set(vendorKey, bucket)
   }
 
-  const results: Array<{
-    vendor: string
-    category: string
-    monthsSeen: number
-    averageAmount: number
-  }> = []
+  const results: Array<RecurringBill> = []
   for (const [vendor, bucket] of byVendor) {
     const distinctMonths = new Set(bucket.entries.map((e) => e.month))
     if (distinctMonths.size < 2) continue
@@ -3419,9 +3433,11 @@ export function getRecurringBills(
     if (!amounts.every((a) => avg > 0 && Math.abs(a - avg) / avg <= 0.2)) continue
     results.push({
       vendor,
+      displayVendor: bucket.displayVendor,
       category: bucket.category,
       monthsSeen: distinctMonths.size,
       averageAmount: avg,
+      loggedThisMonth: bucket.loggedThisMonth,
     })
   }
   return results.sort((a, b) => b.monthsSeen - a.monthsSeen)
