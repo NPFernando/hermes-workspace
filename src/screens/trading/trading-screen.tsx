@@ -931,13 +931,47 @@ function SafeguardHistoryPanel({
   )
 }
 
+/** Consecutive recovery-eligible daily runs a throttled strategy needs before
+ * each auto-restore step. Mirrors STRATEGY_RESTORE_HEALTHY_RUNS in
+ * demo-trading-engine.ts. */
+const AUTO_RESTORE_HEALTHY_RUNS = 2
+
+function demoTradingSettings(payload: FinancePayload): Record<string, unknown> {
+  const dt = payload.settings.demoTrading
+  return dt && typeof dt === 'object' && !Array.isArray(dt)
+    ? (dt as Record<string, unknown>)
+    : {}
+}
+
+function demoTradingLearningPolicy(
+  payload: FinancePayload,
+): Record<string, unknown> {
+  const lp = demoTradingSettings(payload).learningPolicy
+  return lp && typeof lp === 'object' && !Array.isArray(lp)
+    ? (lp as Record<string, unknown>)
+    : {}
+}
+
+function demoTradingRestoreProgress(
+  payload: FinancePayload,
+): Record<string, { healthyRuns: number } | undefined> {
+  const rp = demoTradingSettings(payload).strategyRestoreProgress
+  return rp && typeof rp === 'object' && !Array.isArray(rp)
+    ? (rp as Record<string, { healthyRuns: number } | undefined>)
+    : {}
+}
+
 function StrategyOverridePanel({
   catalog,
   state,
+  autoRestore,
+  restoreProgress,
   onPayload,
 }: {
   catalog: Array<StrategyCatalogEntry>
   state: FinancePayload['strategyOverrides']
+  autoRestore: boolean
+  restoreProgress: Record<string, { healthyRuns: number } | undefined>
   onPayload: (payload: FinancePayload) => void
 }) {
   const { run, busy, error } = useFinanceAction<
@@ -945,6 +979,23 @@ function StrategyOverridePanel({
   >(onPayload)
   const [message, setMessage] = useState<string | null>(null)
   const [expiresAfterDays, setExpiresAfterDays] = useState(7)
+
+  async function toggleAutoRestore(next: boolean) {
+    setMessage(null)
+    const data = await run(
+      {
+        action: 'set_demo_config',
+        config: { learningPolicy: { autoRestore: next } },
+      },
+      `auto_restore:${next}`,
+    )
+    if (data)
+      setMessage(
+        next
+          ? 'Auto-restore on — throttled strategies ease back up as their win rate recovers.'
+          : 'Auto-restore off — throttles now clear only manually or at expiry.',
+      )
+  }
   const activeByStrategy = useMemo(
     () =>
       new Map(state.active.map((override) => [override.strategyId, override])),
@@ -1045,6 +1096,20 @@ function StrategyOverridePanel({
           <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
             {state.active.length} active
           </span>
+          <label
+            className="flex items-center gap-2 rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-3 py-1.5 text-xs text-[var(--theme-muted)]"
+            title="When on, automatic throttles ease back up one step per day as a strategy's win rate recovers past the hysteresis band."
+          >
+            <input
+              type="checkbox"
+              checked={autoRestore}
+              disabled={busy !== null}
+              onChange={(event) =>
+                void toggleAutoRestore(event.target.checked)
+              }
+            />
+            Auto-restore
+          </label>
           <button
             type="button"
             disabled={state.history.length === 0}
@@ -1106,6 +1171,18 @@ function StrategyOverridePanel({
                   {overrideLifecycleLabel(override)
                     ? ` · ${overrideLifecycleLabel(override)}`
                     : ''}
+                </p>
+              ) : null}
+              {override?.source === 'automatic' &&
+              autoRestore &&
+              (restoreProgress[strategy.id]?.healthyRuns ?? 0) > 0 ? (
+                <p className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--theme-success)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-success)_10%,transparent)] px-2 py-0.5 text-[11px] text-[var(--theme-success)]">
+                  ↑ recovering —{' '}
+                  {Math.min(
+                    restoreProgress[strategy.id]?.healthyRuns ?? 0,
+                    AUTO_RESTORE_HEALTHY_RUNS,
+                  )}
+                  /{AUTO_RESTORE_HEALTHY_RUNS} healthy runs
                 </p>
               ) : null}
               <div className="mt-4 flex flex-wrap gap-2">
@@ -4722,6 +4799,8 @@ export function TradingScreen() {
         <StrategyOverridePanel
           catalog={payload.strategyCatalog}
           state={payload.strategyOverrides}
+          autoRestore={demoTradingLearningPolicy(payload).autoRestore === true}
+          restoreProgress={demoTradingRestoreProgress(payload)}
           onPayload={setPayload}
         />
         <GuardEvidencePanel evidence={payload.guardEvidence} />
