@@ -934,12 +934,27 @@ async function runGridPaperCycleInner(
   const allNewTrades: Array<GridPaperTrade> = []
   const allNewBuys: Array<GridBuyEvent> = []
 
+  const symbolFetchErrors: Array<{ symbol: string; error: string }> = []
   for (const symbol of config.symbols) {
-    const candles = await fetchKlines(
-      symbol,
-      config.interval,
-      config.fetchCandleLimit,
-    )
+    let candles: Awaited<ReturnType<typeof fetchKlines>>
+    try {
+      candles = await fetchKlines(
+        symbol,
+        config.interval,
+        config.fetchCandleLimit,
+      )
+    } catch (err) {
+      // A single symbol's kline fetch failing (delisting, transient 5xx, a
+      // rate-limit HTML body that won't parse) must not 500 the whole grid
+      // cycle — carry its previously-persisted state forward untouched and
+      // press on. Was an uncaught throw here that took the grid engine silently
+      // dead alongside the main engine after 2026-09-05 (only "Internal server
+      // error" ever reached the cron log).
+      symbolFetchErrors.push({ symbol, error: (err as Error).message })
+      const persistedState = existingBySymbol.get(symbol)
+      if (persistedState) newStates.push(persistedState)
+      continue
+    }
     const persisted = existingBySymbol.get(symbol)
     const { state, trades, buys } = advanceSymbolState(
       symbol,
@@ -950,6 +965,23 @@ async function runGridPaperCycleInner(
     newStates.push(state)
     allNewTrades.push(...trades)
     allNewBuys.push(...buys)
+  }
+  if (symbolFetchErrors.length > 0) {
+    appendAuditLog('grid_symbol_fetch_failed', { failures: symbolFetchErrors })
+  }
+  if (symbolFetchErrors.length === config.symbols.length) {
+    // Every symbol failed — nothing to advance. Return a diagnostic "not ran"
+    // result (the route relays `reason` to the cron log) rather than throwing,
+    // which safeErrorMessage() would flatten back to "Internal server error".
+    return {
+      ran: false,
+      reason: `grid cycle aborted: every symbol kline fetch failed (${symbolFetchErrors
+        .map((f) => `${f.symbol}: ${f.error}`)
+        .join('; ')})`,
+      trades: [],
+      symbolsProcessed: 0,
+      realFills: [],
+    }
   }
 
   // Testnet execution mirror — strictly after the paper accounting, which
@@ -994,7 +1026,9 @@ async function runGridPaperCycleInner(
   return {
     ran: true,
     trades: allNewTrades,
-    symbolsProcessed: config.symbols.length,
+    // symbols whose klines actually fetched this cycle — excludes any skipped
+    // by a per-symbol fetch failure above.
+    symbolsProcessed: config.symbols.length - symbolFetchErrors.length,
     realFills: newRealFills,
   }
 }

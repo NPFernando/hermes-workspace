@@ -1803,12 +1803,22 @@ async function runTradingCycleInner(
     return bail('testnet mode refuses a live Binance client')
   }
 
-  const warmupRun = await runMarketDataWarmup({
-    config,
-    client,
-    executionMode,
-    targetCandles: MARKET_WARMUP_TARGET_CANDLES,
-  })
+  let warmupRun: Awaited<ReturnType<typeof runMarketDataWarmup>>
+  try {
+    warmupRun = await runMarketDataWarmup({
+      config,
+      client,
+      executionMode,
+      targetCandles: MARKET_WARMUP_TARGET_CANDLES,
+    })
+  } catch (err) {
+    // Match the bail() pattern used by every other external call in this
+    // function: a market-data fetch/parse failure must degrade the cycle to
+    // "ran: false" with a diagnostic reason, never bubble out as an uncaught
+    // 500 that leaves the engine silently dead (as it was for ~5 days after
+    // 2026-09-05 with only "Internal server error" reaching the cron log).
+    return bail(`market data warmup failed: ${(err as Error).message}`)
+  }
   cycleContext.marketWarmup = warmupRun.report
 
   // One account read per cycle: quote balance feeds the guardian floor check.
@@ -1824,10 +1834,19 @@ async function runTradingCycleInner(
 
   const activePositions = () => activePositionsForMode(positions, executionMode)
   const activeTradeLog = () => realizedTradesForMode(trades, executionMode)
-  const openUnrealizedPnlQuote = await openUnrealizedQuote(
-    activePositions(),
-    client,
-  )
+  let openUnrealizedPnlQuote: number
+  try {
+    openUnrealizedPnlQuote = await openUnrealizedQuote(
+      activePositions(),
+      client,
+    )
+  } catch (err) {
+    // Same rationale as the market-data warmup guard above: a per-position
+    // mark-price lookup failure degrades the cycle, it does not crash it.
+    return bail(
+      `open-position mark-price lookup failed: ${(err as Error).message}`,
+    )
+  }
   const livePerOrderCap =
     typeof settings.livePerOrderCapUsdt === 'number' &&
     Number.isFinite(settings.livePerOrderCapUsdt)

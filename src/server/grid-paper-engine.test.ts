@@ -535,6 +535,44 @@ describe('runGridPaperCycle — I/O + lock', () => {
       candles[candles.length - 1]?.openTime,
     )
   })
+
+  it('one symbol kline fetch failing does not abort the whole cycle', async () => {
+    const { runGridPaperCycle, getGridEngineState } =
+      await import('./grid-paper-engine')
+    const candles: Array<Candle> = []
+    for (let i = 0; i < 6; i++)
+      candles.push(candle(i, { open: 100, high: 110, low: 90, close: 100 }))
+    const fetchKlines = vi
+      .fn()
+      .mockImplementation((symbol: string) =>
+        symbol === 'ETHUSDT'
+          ? Promise.reject(new Error('HTTP 418 rate limited'))
+          : Promise.resolve(candles),
+      )
+
+    const result = await runGridPaperCycle({ fetchKlines })
+    expect(result.ran).toBe(true)
+    // the four healthy symbols still advanced; ETH was skipped
+    expect(result.symbolsProcessed).toBe(
+      DEFAULT_GRID_ENGINE_CONFIG.symbols.length - 1,
+    )
+    const state = getGridEngineState()
+    expect(
+      state.states.some((s: GridSymbolState) => s.symbol === 'BTCUSDT'),
+    ).toBe(true)
+  })
+
+  it('every symbol failing returns a diagnostic "not ran" result, not a throw', async () => {
+    const { runGridPaperCycle } = await import('./grid-paper-engine')
+    const fetchKlines = vi
+      .fn()
+      .mockRejectedValue(new Error('getaddrinfo ENOTFOUND data-api.binance.vision'))
+
+    const result = await runGridPaperCycle({ fetchKlines })
+    expect(result.ran).toBe(false)
+    expect(result.reason).toContain('every symbol kline fetch failed')
+    expect(result.reason).toContain('ENOTFOUND')
+  })
 })
 
 describe('runGridPaperCycle — testnet execution mirror', () => {
