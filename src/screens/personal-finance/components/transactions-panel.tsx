@@ -108,8 +108,39 @@ function merchantDefaultCategory(
   return defaultCategory || undefined
 }
 
+/** The remembered `{category, percent}` split for an exact-name vendor match. */
+function merchantDefaultSplits(
+  merchants: Array<Record<string, unknown>>,
+  vendorName: string,
+): Array<{ category: string; percent: number }> | undefined {
+  const match = merchants.find((m) => stringField(m, 'name') === vendorName)
+  const raw = match ? match.defaultSplits : undefined
+  if (!Array.isArray(raw) || raw.length < 2) return undefined
+  return raw.map((p) => {
+    const row = (p ?? {}) as Record<string, unknown>
+    return {
+      category: stringField(row, 'category'),
+      percent: Number(row.percent) || 0,
+    }
+  })
+}
+
 /** One row of the split editor — strings while typing, parsed on submit. */
 type SplitRow = { category: string; amount: string }
+
+/** `{category, percent}[]` + a total → split rows, remainder on the last row. */
+export function splitRowsFromPercents(
+  parts: Array<{ category: string; percent: number }>,
+  total: number,
+): Array<SplitRow> {
+  const amounts = parts.map((p) => Math.round(((total * p.percent) / 100) * 100) / 100)
+  const drift = Math.round((total - amounts.reduce((s, a) => s + a, 0)) * 100) / 100
+  if (amounts.length) amounts[amounts.length - 1] += drift
+  return parts.map((p, i) => ({
+    category: p.category,
+    amount: String(amounts[i]),
+  }))
+}
 
 type EditDraft = {
   date: string
@@ -131,23 +162,35 @@ type EditDraft = {
   splits: Array<SplitRow>
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
 /**
  * PF review item 2: split one expense across several categories. Rows of
- * {category, amount}; the parts must sum to the expense amount. Returns
- * `null` (⇒ send no `splits`, or `[]` to clear) when there are fewer than
- * two rows.
+ * {category, amount}; the parts must sum to the expense amount. A per-row
+ * "%" input is a write-through convenience — typing a percentage sets that
+ * row's amount to `expenseAmount * pct / 100`; the shown % is always
+ * derived from the amount. "Balance" puts the leftover on the last row so
+ * percentages that don't divide evenly (33/33/34) still reconcile.
  */
 function SplitsField({
   rows,
   expenseAmount,
   onChange,
+  onSaveAsDefault,
 }: {
   rows: Array<SplitRow>
   expenseAmount: number
   onChange: (rows: Array<SplitRow>) => void
+  onSaveAsDefault?: () => void
 }) {
   const assigned = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
-  const remaining = Math.round((expenseAmount - assigned) * 100) / 100
+  const remaining = round2(expenseAmount - assigned)
+  const pctOf = (amount: string) =>
+    expenseAmount > 0 && Number(amount)
+      ? String(round2((Number(amount) / expenseAmount) * 100))
+      : ''
   return (
     <div className="mt-2 w-full rounded-xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_5%,transparent)] p-2">
       <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--theme-muted)]">
@@ -165,7 +208,7 @@ function SplitsField({
         </span>
       </div>
       {rows.map((row, i) => (
-        <div key={i} className="mb-1 flex flex-wrap gap-2">
+        <div key={i} className="mb-1 flex flex-wrap items-center gap-2">
           <input
             type="text"
             placeholder="Category"
@@ -177,6 +220,21 @@ function SplitsField({
             }}
             list="pf-known-categories"
             className={inputClass}
+          />
+          <input
+            type="number"
+            placeholder="%"
+            value={pctOf(row.amount)}
+            onChange={(e) => {
+              const pct = Number(e.target.value) || 0
+              const next = rows.slice()
+              next[i] = {
+                ...next[i],
+                amount: pct ? String(round2((expenseAmount * pct) / 100)) : '',
+              }
+              onChange(next)
+            }}
+            className={`${inputClass} w-16`}
           />
           <input
             type="number"
@@ -198,21 +256,48 @@ function SplitsField({
           </button>
         </div>
       ))}
-      <button
-        type="button"
-        onClick={() =>
-          onChange([
-            ...rows,
-            {
-              category: '',
-              amount: remaining > 0 ? String(remaining) : '',
-            },
-          ])
-        }
-        className="text-xs font-medium text-[var(--theme-text)] underline"
-      >
-        + Add split
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() =>
+            onChange([
+              ...rows,
+              { category: '', amount: remaining > 0 ? String(remaining) : '' },
+            ])
+          }
+          className="text-xs font-medium text-[var(--theme-text)] underline"
+        >
+          + Add split
+        </button>
+        {rows.length >= 2 && Math.abs(remaining) > 0.01 && (
+          <button
+            type="button"
+            onClick={() => {
+              const next = rows.slice()
+              const last = next.length - 1
+              next[last] = {
+                ...next[last],
+                amount: String(
+                  round2((Number(next[last].amount) || 0) + remaining),
+                ),
+              }
+              onChange(next)
+            }}
+            className="text-xs font-medium text-[var(--theme-text)] underline"
+          >
+            Balance last row
+          </button>
+        )}
+        {onSaveAsDefault && rows.length >= 2 && Math.abs(remaining) <= 0.01 && (
+          <button
+            type="button"
+            onClick={onSaveAsDefault}
+            className="text-xs font-medium text-[var(--theme-text)] underline"
+          >
+            Save as vendor default
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -465,6 +550,48 @@ export function TransactionsPanel({
       setDate(todayIso())
       setAddSplits([])
     }
+  }
+
+  /**
+   * Persist the current add-form split as this vendor's remembered
+   * `defaultSplits` (as percentages) — updates the merchant if it exists,
+   * otherwise creates it.
+   */
+  async function saveMerchantDefaultSplit() {
+    const vendorName = counterparty.trim()
+    const total = Number(amount) || 0
+    if (!vendorName || total <= 0) {
+      setErr('Enter a vendor and amount before saving a default split')
+      return
+    }
+    const percents = addSplits
+      .map((r) => ({
+        category: r.category.trim() || 'Other',
+        percent: round2(((Number(r.amount) || 0) / total) * 100),
+      }))
+      .filter((p) => p.percent > 0)
+    if (percents.length < 2) {
+      setErr('Need at least two non-zero split parts to save a default')
+      return
+    }
+    const existing = payload.data.merchants.find(
+      (m) => stringField(m, 'name') === vendorName,
+    )
+    await mutate(
+      existing
+        ? {
+            action: 'update_record',
+            kind: 'merchant',
+            id: stringField(existing, 'id'),
+            payload: { defaultSplits: percents },
+          }
+        : {
+            action: 'add_record',
+            kind: 'merchant',
+            payload: { name: vendorName, defaultSplits: percents },
+          },
+      'save-merchant-split',
+    )
   }
 
   function startEdit(txn: Record<string, unknown>) {
@@ -791,12 +918,24 @@ export function TransactionsPanel({
               value={counterparty}
               onChange={(e) => setCounterparty(e.target.value)}
               onBlur={() => {
-                if (addKind !== 'expense' || category.trim()) return
-                const guess = merchantDefaultCategory(
-                  payload.data.merchants,
-                  counterparty.trim(),
-                )
-                if (guess) setCategory(guess)
+                if (addKind !== 'expense') return
+                const vendorName = counterparty.trim()
+                if (!category.trim()) {
+                  const guess = merchantDefaultCategory(
+                    payload.data.merchants,
+                    vendorName,
+                  )
+                  if (guess) setCategory(guess)
+                }
+                // Pre-fill a remembered split, scaled to the entered amount.
+                if (addSplits.length === 0 && Number(amount) > 0) {
+                  const ds = merchantDefaultSplits(
+                    payload.data.merchants,
+                    vendorName,
+                  )
+                  if (ds)
+                    setAddSplits(splitRowsFromPercents(ds, Number(amount)))
+                }
               }}
               list={addKind === 'expense' ? 'pf-known-merchants' : undefined}
               className={inputClass}
@@ -824,6 +963,7 @@ export function TransactionsPanel({
                 rows={addSplits}
                 expenseAmount={Number(amount) || 0}
                 onChange={setAddSplits}
+                onSaveAsDefault={() => void saveMerchantDefaultSplit()}
               />
             )}
             {addKind === 'expense' && addSplits.length === 0 && (

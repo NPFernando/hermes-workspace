@@ -1394,6 +1394,39 @@ describe('merchant (PF-111 Merchant Registry)', () => {
     expect(db.merchants[0].defaultCategory).toBeUndefined()
     expect(db.merchants[0].notes).toBeUndefined()
   })
+
+  it('remembers a defaultSplits percentage split: validated on write, cleared with []', async () => {
+    const store = await freshFinanceStore()
+
+    // percentages must be positive and sum to ~100
+    expect(() =>
+      store.addFinanceRecord('merchant', {
+        name: 'Keells',
+        defaultSplits: [
+          { category: 'Groceries', percent: 60 },
+          { category: 'Household', percent: 30 },
+        ],
+      }),
+    ).toThrow(/sum to ~100/)
+
+    store.addFinanceRecord('merchant', {
+      name: 'Keells',
+      defaultSplits: [
+        { category: 'Groceries', percent: 60 },
+        { category: 'Household', percent: 40 },
+      ],
+    })
+    let db = store.readFinanceStore()
+    expect(db.merchants[0].defaultSplits).toEqual([
+      { category: 'Groceries', percent: 60 },
+      { category: 'Household', percent: 40 },
+    ])
+    const id = db.merchants[0].id
+
+    store.updateFinanceRecord('merchant', id, { defaultSplits: [] })
+    db = store.readFinanceStore()
+    expect(db.merchants[0].defaultSplits).toBeUndefined()
+  })
 })
 
 describe('tag (PF-112 Tags)', () => {
