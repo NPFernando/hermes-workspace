@@ -10,7 +10,6 @@ import {
   YAxis,
 } from 'recharts'
 import { StatCard } from '../finance/components/stat-card'
-import { DataTable } from '../finance/components/data-table'
 import { BaseCurrencySelect } from './components/base-currency-select'
 import { BudgetPanel } from './components/budget-panel'
 import { PendingIngestionPanel } from './components/pending-ingestion-panel'
@@ -34,6 +33,8 @@ import { PropertiesPanel } from './components/properties-panel'
 import { AccountsPanel } from './components/accounts-panel'
 import { TransactionsPanel } from './components/transactions-panel'
 import { ScheduledTransactionsPanel } from './components/scheduled-transactions-panel'
+import { SavingsGoalsPanel } from './components/savings-goals-panel'
+import { TaxRecordsPanel } from './components/tax-records-panel'
 import { CategoriesPanel } from './components/categories-panel'
 import { MerchantsPanel } from './components/merchants-panel'
 import { TagsPanel } from './components/tags-panel'
@@ -421,47 +422,8 @@ export function PersonalFinanceScreen() {
             Budget categories are managed on the <strong>Income</strong> tab
             (Budget vs. actual spending) — add, edit and delete them there.
           </p>
-          <DataTable
-            title="Savings goals"
-            rows={payload.data.savings_goals}
-            columns={[
-              'name',
-              'targetAmount',
-              'currentAmount',
-              'currency',
-              'targetDate',
-              'status',
-              'goalKind',
-              'monthlyContribution',
-              'priority',
-            ]}
-            kind="goal"
-            onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-            searchable
-          />
-          <DataTable
-            title="Tax records"
-            rows={payload.data.tax_records}
-            columns={[
-              'taxYear',
-              'incomeType',
-              'currency',
-              'convertedLkrAmount',
-              'exchangeRateSource',
-              'taxPaid',
-              'taxDue',
-              'deductionCategory',
-              'supportingDocument',
-              'requiresConfirmation',
-            ]}
-            kind="tax"
-            onChanged={(p) => setPayload(p as PersonalFinancePayload)}
-            searchable
-          />
-          <p className="rounded-2xl border border-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] p-4 text-sm text-[var(--theme-warning)]">
-            Tax figures are estimates; confirm them against official sources
-            before filing.
-          </p>
+          <SavingsGoalsPanel payload={payload} onPayload={setPayload} />
+          <TaxRecordsPanel payload={payload} onPayload={setPayload} />
         </section>
       )}
 
