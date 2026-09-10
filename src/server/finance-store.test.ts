@@ -14,8 +14,12 @@ import {
   getAverageMonthlyExpensesLkr,
   getAverageMonthlySavingsRatePct,
   buildFinanceQueryContext,
+  getCurrencyExposure,
+  getFinanceTrends,
   getMonthlySummary,
+  getRecurringBills,
   getUnifiedTransactions,
+  getUpcomingMoney,
   maskSensitive,
   tradingPerformanceSummary,
 } from './finance-store'
@@ -2257,5 +2261,173 @@ describe('financeSummary net worth with stock holdings and fixed deposits', () =
     const db = createEmptyFinanceDatabase()
     const summary = financeSummary(db)
     expect(summary.unrealizedStockPnlPct).toBe(0)
+  })
+})
+
+describe('PF review item 7: server-side dashboard derivations', () => {
+  const isoDaysFromNow = (n: number) =>
+    new Date(Date.now() + n * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const thisMonth = () => new Date().toISOString().slice(0, 7)
+
+  it('getFinanceTrends returns a 6-month series and this-month top categories', () => {
+    const db = createEmptyFinanceDatabase()
+    const m = thisMonth()
+    db.income_records.push({
+      id: 'i',
+      dateReceived: `${m}-05`,
+      sourceName: 'x',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: 200_000,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 200_000,
+      taxable: true,
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.expense_records.push(
+      {
+        id: 'e1',
+        date: `${m}-06`,
+        vendor: 'A',
+        category: 'Food',
+        currency: 'LKR',
+        amount: 30_000,
+        convertedLkrAmount: 30_000,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'e2',
+        date: `${m}-07`,
+        vendor: 'B',
+        category: 'Transport',
+        currency: 'LKR',
+        amount: 5_000,
+        convertedLkrAmount: 5_000,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    )
+    const t = getFinanceTrends(db)
+    expect(t.series).toHaveLength(6)
+    const current = t.series[t.series.length - 1]
+    expect(current).toMatchObject({
+      month: m,
+      income: 200_000,
+      expense: 35_000,
+      net: 165_000,
+    })
+    expect(t.categoriesThisMonth).toEqual([
+      { category: 'Food', amount: 30_000 },
+      { category: 'Transport', amount: 5_000 },
+    ])
+  })
+
+  it('getRecurringBills flags a vendor seen with a stable amount in 2+ recent months', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    for (let i = 0; i < 2; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 15)
+      db.expense_records.push({
+        id: `r-${i}`,
+        date: d.toISOString().slice(0, 10),
+        vendor: 'Netflix',
+        category: 'Subscriptions',
+        currency: 'LKR',
+        amount: 1_990,
+        convertedLkrAmount: 1_990,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    }
+    const bills = getRecurringBills(db)
+    expect(bills).toHaveLength(1)
+    expect(bills[0]).toMatchObject({
+      vendor: 'netflix',
+      category: 'Subscriptions',
+      monthsSeen: 2,
+      averageAmount: 1_990,
+    })
+  })
+
+  it('getUpcomingMoney surfaces an FD maturing within 30 days and a due-soon payday', () => {
+    const db = createEmptyFinanceDatabase()
+    db.fixed_deposits.push({
+      id: 'fd',
+      bankName: 'BOC',
+      principal: 100_000,
+      currency: 'LKR',
+      interestRatePct: 10,
+      interestPayout: 'at_maturity',
+      startDate: '2026-01-01',
+      maturityDate: isoDaysFromNow(10),
+      status: 'active',
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.income_sources.push({
+      id: 'job',
+      employerName: 'Acme',
+      employmentType: 'full_time',
+      status: 'active',
+      monthlyIncomeAmount: 200_000,
+      currency: 'LKR',
+      expectedPaydayDayOfMonth: new Date().getDate(),
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    const u = getUpcomingMoney(db)
+    expect(u.fdMaturities).toEqual([{ name: 'BOC', days: 10 }])
+    expect(u.paydays).toHaveLength(1)
+    expect(u.paydays[0]).toMatchObject({ name: 'Acme', state: 'due_soon' })
+  })
+
+  it('getCurrencyExposure groups active jobs / holdings / FDs by currency, never summed across', () => {
+    const db = createEmptyFinanceDatabase()
+    db.income_sources.push({
+      id: 'j',
+      employerName: 'Remote Co',
+      employmentType: 'contract',
+      status: 'active',
+      monthlyIncomeAmount: 3_000,
+      currency: 'USD',
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.fixed_deposits.push({
+      id: 'fd',
+      bankName: 'X',
+      principal: 500_000,
+      currency: 'LKR',
+      interestRatePct: 10,
+      interestPayout: 'at_maturity',
+      startDate: '2026-01-01',
+      maturityDate: '2027-01-01',
+      status: 'active',
+      source: 't',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    expect(getCurrencyExposure(db)).toEqual([
+      { currency: 'LKR', amount: 500_000 },
+      { currency: 'USD', amount: 3_000 },
+    ])
   })
 })

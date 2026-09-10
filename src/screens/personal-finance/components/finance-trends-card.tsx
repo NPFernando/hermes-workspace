@@ -103,39 +103,33 @@ export function FinanceTrendsCard({
 }: {
   payload: PersonalFinancePayload
 }) {
-  const months = useMemo(() => lastNMonths(MONTHS_BACK), [])
-  // PF-201: buildTrendData/buildCategoryData sum raw LKR-denominated records.
-  // Scale to the reporting currency (fxToBase is 1 for 'LKR' or no rate).
+  // PF review item 7: trend + category data is now computed server-side and
+  // carried on the payload (was recomputed here on every render, and again in
+  // Python in the digest cron). PF-201: server amounts are raw LKR; scale by
+  // `fxToBase` for the reporting currency (1 for 'LKR' or no rate).
   const base = payload.baseCurrency
   const fx = payload.fxToBase
-
-  // Depend on the specific record arrays, not the whole `payload`. Every
-  // mutation response replaces `payload` wholesale, but React Query's default
-  // structuralSharing keeps `data.income_records` / `data.expense_records`
-  // referentially stable when a mutation didn't touch them (a tag edit, an
-  // account rename, …) — so an unrelated edit no longer forces both charts to
-  // recompute.
-  const incomeRecords = payload.data.income_records
-  const expenseRecords = payload.data.expense_records
+  const { series, categoriesThisMonth } = payload.trends
 
   const trendData = useMemo(
     () =>
-      buildTrendData(months, incomeRecords, expenseRecords).map((d) => ({
-        ...d,
+      series.map((d) => ({
+        month: d.month,
+        label: monthLabel(d.month),
         income: d.income * fx,
         expense: d.expense * fx,
         net: d.net * fx,
       })),
-    [incomeRecords, expenseRecords, months, fx],
+    [series, fx],
   )
 
   const categoryData = useMemo(
     () =>
-      buildCategoryData(months[months.length - 1], expenseRecords).map((d) => ({
-        ...d,
+      categoriesThisMonth.map((d) => ({
+        category: d.category,
         amount: d.amount * fx,
       })),
-    [expenseRecords, months, fx],
+    [categoriesThisMonth, fx],
   )
 
   const hasTrendData = trendData.some((d) => d.income > 0 || d.expense > 0)

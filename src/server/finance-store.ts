@@ -2887,6 +2887,265 @@ export function getMonthlySummary(
   return result
 }
 
+// ---------------------------------------------------------------------------
+// PF review item 7: dashboard derivations that used to be recomputed in the
+// browser (finance-trends-card, recurring-bills-insight, upcoming-money) and
+// re-implemented a THIRD time in Python in personal-finance-digest.sh. Now
+// computed once here and carried on the payload. All amounts are raw LKR; the
+// payload applies the PF-201 `fxToBase` scaling for display.
+// ---------------------------------------------------------------------------
+
+/** Last `monthsBack` calendar months of income/expense/net plus this month's
+ *  top expense categories. Mirrors the old client `buildTrendData` /
+ *  `buildCategoryData` (no pending-status filter — matches prior UI). */
+export function getFinanceTrends(
+  db: FinanceDatabase,
+  monthsBack = 6,
+): {
+  series: Array<{
+    month: string
+    income: number
+    expense: number
+    net: number
+  }>
+  categoriesThisMonth: Array<{ category: string; amount: number }>
+} {
+  const now = new Date()
+  const months: Array<string> = []
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+    )
+  }
+  const incomeByMonth = new Map<string, number>()
+  const expenseByMonth = new Map<string, number>()
+  for (const row of db.income_records) {
+    const m = String(row.dateReceived).slice(0, 7)
+    incomeByMonth.set(m, (incomeByMonth.get(m) ?? 0) + row.convertedLkrAmount)
+  }
+  for (const row of db.expense_records) {
+    const m = String(row.date).slice(0, 7)
+    expenseByMonth.set(m, (expenseByMonth.get(m) ?? 0) + row.convertedLkrAmount)
+  }
+  const series = months.map((month) => {
+    const income = incomeByMonth.get(month) ?? 0
+    const expense = expenseByMonth.get(month) ?? 0
+    return { month, income, expense, net: income - expense }
+  })
+
+  const currentMonth = months[months.length - 1]
+  const catTotals = new Map<string, number>()
+  for (const row of db.expense_records) {
+    if (String(row.date).slice(0, 7) !== currentMonth) continue
+    const cat = row.category || 'Other'
+    catTotals.set(cat, (catTotals.get(cat) ?? 0) + row.convertedLkrAmount)
+  }
+  const categoriesThisMonth = [...catTotals.entries()]
+    .map(([category, amount]) => ({ category, amount }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 8)
+
+  return { series, categoriesThisMonth }
+}
+
+/** Vendors seen with a similar amount (±20%) in 2+ of the last `monthsBack`
+ *  distinct months — the shape of a recurring bill. Port of the old client
+ *  `detectRecurringVendors`. */
+export function getRecurringBills(
+  db: FinanceDatabase,
+  monthsBack = 3,
+): Array<{
+  vendor: string
+  category: string
+  monthsSeen: number
+  averageAmount: number
+}> {
+  const cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - monthsBack)
+  const cutoffMonth = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}`
+
+  const byVendor = new Map<
+    string,
+    { category: string; entries: Array<{ month: string; amount: number }> }
+  >()
+  for (const row of db.expense_records) {
+    const month = row.date.slice(0, 7)
+    if (!month || month < cutoffMonth) continue
+    const vendorKey = row.vendor.trim().toLowerCase()
+    if (!vendorKey) continue
+    const amount = row.convertedLkrAmount || row.amount || 0
+    const bucket = byVendor.get(vendorKey) ?? {
+      category: row.category || 'Other',
+      entries: [],
+    }
+    bucket.entries.push({ month, amount })
+    byVendor.set(vendorKey, bucket)
+  }
+
+  const results: Array<{
+    vendor: string
+    category: string
+    monthsSeen: number
+    averageAmount: number
+  }> = []
+  for (const [vendor, bucket] of byVendor) {
+    const distinctMonths = new Set(bucket.entries.map((e) => e.month))
+    if (distinctMonths.size < 2) continue
+    const amounts = bucket.entries.map((e) => e.amount)
+    const avg = amounts.reduce((s, a) => s + a, 0) / amounts.length
+    if (!amounts.every((a) => avg > 0 && Math.abs(a - avg) / avg <= 0.2)) continue
+    results.push({
+      vendor,
+      category: bucket.category,
+      monthsSeen: distinctMonths.size,
+      averageAmount: avg,
+    })
+  }
+  return results.sort((a, b) => b.monthsSeen - a.monthsSeen)
+}
+
+/** This-month payday state for a job. Pure. The client keeps an identical copy
+ *  in `payday-status.ts` (with its own test) for the per-row badge; this one
+ *  feeds `getUpcomingMoney` + the payload so the digest cron stops
+ *  re-implementing it in Python. */
+function paydayStatusFor(
+  job: Record<string, unknown>,
+  incomeRecords: Array<Record<string, unknown>>,
+  today: Date,
+):
+  | { state: 'not_tracked' }
+  | { state: 'paid'; lastPaidDate: string }
+  | { state: 'due_soon'; daysUntil: number }
+  | { state: 'overdue'; daysOverdue: number } {
+  const status = (job.status as string) || 'active'
+  const monthly = job.monthlyIncomeAmount
+  const paydayDay = job.expectedPaydayDayOfMonth
+  if (
+    status !== 'active' ||
+    typeof monthly !== 'number' ||
+    typeof paydayDay !== 'number'
+  ) {
+    return { state: 'not_tracked' }
+  }
+  const jobId = (job.id as string) || ''
+  const employer = String(job.employerName ?? '').trim().toLowerCase()
+  const now = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const matches = incomeRecords.filter((r) => {
+    if (String(r.dateReceived ?? '').slice(0, 7) !== monthKey) return false
+    const linked = String(r.incomeSourceId ?? '')
+    if (linked) return linked === jobId
+    return String(r.sourceName ?? '').trim().toLowerCase() === employer
+  })
+  if (matches.length > 0) {
+    const lastPaidDate = matches
+      .map((r) => String(r.dateReceived ?? ''))
+      .sort()
+      .at(-1) as string
+    return { state: 'paid', lastPaidDate }
+  }
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const payday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    Math.min(paydayDay, lastDay),
+  )
+  const daysDiff = Math.round(
+    (payday.getTime() - now.getTime()) / (24 * 60 * 60 * 1000),
+  )
+  if (daysDiff < -3) return { state: 'overdue', daysOverdue: -daysDiff }
+  return { state: 'due_soon', daysUntil: daysDiff }
+}
+
+/** Forward-looking money events (paydays due/overdue, contract expiries, FD
+ *  maturities) as structured data — the UI and the digest each render their
+ *  own labels. Port of the data half of the old client `upcoming-money`. */
+export function getUpcomingMoney(
+  db: FinanceDatabase,
+  today: Date = new Date(),
+): {
+  paydays: Array<{
+    name: string
+    state: 'due_soon' | 'overdue'
+    days: number
+  }>
+  contracts: Array<{ name: string; days: number }>
+  fdMaturities: Array<{ name: string; days: number }>
+} {
+  const dayMs = 24 * 60 * 60 * 1000
+  const paydays: Array<{
+    name: string
+    state: 'due_soon' | 'overdue'
+    days: number
+  }> = []
+  const contracts: Array<{ name: string; days: number }> = []
+  for (const job of db.income_sources as Array<Record<string, unknown>>) {
+    const name = String(job.employerName ?? '') || 'Income source'
+    const s = paydayStatusFor(job, db.income_records, today)
+    if (s.state === 'overdue')
+      paydays.push({ name, state: 'overdue', days: s.daysOverdue })
+    else if (s.state === 'due_soon' && s.daysUntil <= 3)
+      paydays.push({ name, state: 'due_soon', days: s.daysUntil })
+
+    if (job.employmentType === 'contract' && job.status === 'active') {
+      const end = Date.parse(String(job.contractEndDate ?? ''))
+      if (Number.isFinite(end)) {
+        const days = Math.ceil((end - today.getTime()) / dayMs)
+        if (days <= 30) contracts.push({ name, days })
+      }
+    }
+  }
+
+  const fdMaturities: Array<{ name: string; days: number }> = []
+  for (const fd of db.fixed_deposits) {
+    if (fd.status !== 'active') continue
+    const maturity = Date.parse(fd.maturityDate)
+    if (!Number.isFinite(maturity)) continue
+    const days = Math.ceil((maturity - today.getTime()) / dayMs)
+    if (days >= -7 && days <= 30) {
+      fdMaturities.push({ name: fd.bankName || 'Fixed deposit', days })
+    }
+  }
+
+  return { paydays, contracts, fdMaturities }
+}
+
+/** Non-LKR exposure across active jobs, holdings and FDs — grouped by
+ *  currency, never summed across (no single-figure conversion). Port of the
+ *  old screen-level `currencyExposure`. */
+export function getCurrencyExposure(
+  db: FinanceDatabase,
+): Array<{ currency: string; amount: number }> {
+  const totals = new Map<string, number>()
+  const add = (currency: string, amount: number) =>
+    totals.set(currency, (totals.get(currency) ?? 0) + amount)
+
+  for (const job of db.income_sources as Array<Record<string, unknown>>) {
+    if (job.status !== 'active') continue
+    const amount = job.monthlyIncomeAmount
+    if (typeof amount === 'number')
+      add((job.currency as string) || 'LKR', amount)
+  }
+  for (const h of db.stock_holdings) {
+    const qty = typeof h.quantity === 'number' ? h.quantity : 0
+    const price =
+      (typeof h.lastKnownPrice === 'number' ? h.lastKnownPrice : undefined) ??
+      (typeof h.buyPrice === 'number' ? h.buyPrice : 0)
+    add(h.currency || 'LKR', qty * price)
+  }
+  for (const fd of db.fixed_deposits) {
+    if (fd.status === 'withdrawn') continue
+    if (typeof fd.principal === 'number')
+      add(fd.currency || 'LKR', fd.principal)
+  }
+
+  return [...totals.entries()]
+    .filter(([, amount]) => amount > 0)
+    .map(([currency, amount]) => ({ currency, amount }))
+    .sort((a, b) => b.amount - a.amount)
+}
+
 /**
  * Trailing average of monthly expenses, excluding the current in-progress
  * calendar month (which is always partial). Used to convert an "N months of

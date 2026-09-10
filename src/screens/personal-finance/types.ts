@@ -40,6 +40,29 @@ export type PersonalFinancePayload = {
     title: string
     detail: string
   }>
+  /** PF review item 7: server-computed dashboard derivations. Amounts are raw
+   * LKR — scale by `fxToBase` for display. */
+  trends: {
+    series: Array<{
+      month: string
+      income: number
+      expense: number
+      net: number
+    }>
+    categoriesThisMonth: Array<{ category: string; amount: number }>
+  }
+  recurringBills: Array<{
+    vendor: string
+    category: string
+    monthsSeen: number
+    averageAmount: number
+  }>
+  upcomingMoney: {
+    paydays: Array<{ name: string; state: 'due_soon' | 'overdue'; days: number }>
+    contracts: Array<{ name: string; days: number }>
+    fdMaturities: Array<{ name: string; days: number }>
+  }
+  currencyExposure: Array<{ currency: string; amount: number }>
   emergencyFund: {
     targetMonths: number
     avgMonthlyExpensesLkr: number

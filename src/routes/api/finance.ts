@@ -22,8 +22,12 @@ import {
   getAverageMonthlyExpensesLkr,
   getAverageMonthlySavingsRatePct,
   getCategoryCorrections,
+  getCurrencyExposure,
   getExchangeRate,
+  getFinanceTrends,
+  getRecurringBills,
   getUnifiedTransactions,
+  getUpcomingMoney,
   listPendingIngestions,
   maskSensitive,
   readFinanceStore,
@@ -454,6 +458,15 @@ function personalFinancePayload() {
     // — the same rows twice. TransactionsPanel now unifies the two raw arrays
     // client-side. `getUnifiedTransactions` stays for buildFinanceQueryContext
     // and the future paged history endpoint.
+    //
+    // PF review item 7: trends / recurring bills / upcoming money / currency
+    // exposure are computed here once (were recomputed in 4 components + a
+    // Python port in personal-finance-digest.sh). Amounts are raw LKR — the
+    // client scales by `fxToBase` for display.
+    trends: getFinanceTrends(db),
+    recurringBills: getRecurringBills(db),
+    upcomingMoney: getUpcomingMoney(db),
+    currencyExposure: getCurrencyExposure(db),
     alerts,
     emergencyFund: {
       targetMonths: efTargetMonths,
