@@ -213,6 +213,22 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 
 ## Part 5 — Recommended order of work
 
+### Status (2026-09-10)
+
+| Item | State | Where |
+|---|---|---|
+| Budget currency default | ✅ done | PR #45 |
+| 2 · cap TransactionsPanel render | ✅ done | PR #46 |
+| 3 · trends memo deps | ✅ done | PR #46 |
+| 4 · Overview hierarchy | ✅ done | PR #46 |
+| 8 · one mutation pattern | ✅ done | PR #46 |
+| 10 · analyst units | ✅ done | PR #46 |
+| 5 · merge target cards / settings screen | partial — visual grouping done, component-merge open | PR #46 |
+| 1 + 6 + 9 · transaction-payload cluster | plan only (Appendix) — needs #45 merged, one PR |
+| 7 · server-side derivations | not started — reshapes the payload, do after/with 6 |
+| 11 · `*Lkr` → `*Base` rename | **deliberately not done** — ~56 call sites + the digest cron's Python reads `s['netWorthLkr']`; PF-201 kept the names on purpose; wants its own PR against a merged baseline |
+| 12 · unified ledger | roadmap Phase 1 — multi-PR project, not a session task |
+
 **Tier 0 — shipped in this pass**
 
 - **Budget-panel currency default + convert-on-write.** The `getBudgetVsActual` LKR-normalisation
