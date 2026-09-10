@@ -370,6 +370,11 @@ export function TransactionsPanel({
 
   const [search, setSearch] = useState('')
   const [filterKind, setFilterKind] = useState<'all' | TxnKind>('all')
+  // Item 5: account-to-account transfers are noise in a spend/earn list for
+  // some users — this hides them from the rendered list without touching the
+  // kind dropdown (which is single-select). The `net` total already excludes
+  // transfers; trends and budget-vs-actual never include them by design.
+  const [hideTransfers, setHideTransfers] = useState(false)
   const [filterStatus, setFilterStatus] = useState<
     'all' | 'pending' | 'cleared' | 'reconciled'
   >('all')
@@ -751,6 +756,7 @@ export function TransactionsPanel({
     const term = search.trim().toLowerCase()
     return transactions.filter((txn) => {
       const kind = stringField(txn, 'kind')
+      if (hideTransfers && kind === 'transfer') return false
       if (filterKind !== 'all' && kind !== filterKind) return false
       if (
         filterStatus !== 'all' &&
@@ -772,6 +778,7 @@ export function TransactionsPanel({
     transactions,
     search,
     filterKind,
+    hideTransfers,
     filterStatus,
     dateFrom,
     dateTo,
@@ -787,6 +794,7 @@ export function TransactionsPanel({
   }, [
     search,
     filterKind,
+    hideTransfers,
     filterStatus,
     dateFrom,
     dateTo,
@@ -1093,6 +1101,14 @@ export function TransactionsPanel({
           <option value="expense">Expense</option>
           <option value="transfer">Transfer</option>
         </select>
+        <label className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
+          <input
+            type="checkbox"
+            checked={hideTransfers}
+            onChange={(e) => setHideTransfers(e.target.checked)}
+          />
+          Hide transfers
+        </label>
         <select
           value={filterStatus}
           onChange={(e) =>

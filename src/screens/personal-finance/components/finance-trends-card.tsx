@@ -142,7 +142,8 @@ export function FinanceTrendsCard({
           Income vs. expense
         </h2>
         <p className="text-xs text-[var(--theme-muted)]">
-          Last {MONTHS_BACK} months, in {base}.
+          Last {MONTHS_BACK} months, in {base}. Account transfers aren&apos;t
+          counted.
         </p>
         {hasTrendData && (
           <p className="text-xs text-[var(--theme-muted)]">
