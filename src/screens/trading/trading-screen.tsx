@@ -4641,15 +4641,23 @@ function IntelligenceSummaryPanel({
   )
 }
 
+/** Background refresh cadence for the whole trading payload. This is a live
+ * automated-trading dashboard (5/15-min engine cycles, guardian blocks,
+ * position P&L) — mount-only load left it showing frozen state until the user
+ * happened to click something. Kept conservative because /api/finance is a
+ * heavy response, and paused entirely while the tab is hidden. */
+const TRADING_PAYLOAD_POLL_MS = 60_000
+
 export function TradingScreen() {
   const [payload, setPayload] = useState<FinancePayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshedAt, setRefreshedAt] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    async function load() {
-      setLoading(true)
+    async function load(isInitial: boolean) {
+      if (isInitial) setLoading(true)
       try {
         const response = await fetch('/api/finance', { cache: 'no-store' })
         if (!response.ok)
@@ -4658,21 +4666,49 @@ export function TradingScreen() {
         if (!cancelled) {
           setPayload(data)
           setError(null)
+          setRefreshedAt(Date.now())
         }
       } catch (nextError) {
-        if (!cancelled)
+        // A failed *background* refresh keeps the last good payload on screen
+        // rather than blanking the dashboard; only the initial load surfaces
+        // the hard error state.
+        if (!cancelled && isInitial)
           setError(
             nextError instanceof Error
               ? nextError.message
               : 'Finance API failed',
           )
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled && isInitial) setLoading(false)
       }
     }
-    void load()
+
+    void load(true)
+    let timer: ReturnType<typeof setInterval> | null = null
+    const start = () => {
+      if (timer === null && document.visibilityState === 'visible')
+        timer = setInterval(() => void load(false), TRADING_PAYLOAD_POLL_MS)
+    }
+    const stop = () => {
+      if (timer !== null) {
+        clearInterval(timer)
+        timer = null
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void load(false)
+        start()
+      } else {
+        stop()
+      }
+    }
+    start()
+    document.addEventListener('visibilitychange', onVisibility)
     return () => {
       cancelled = true
+      stop()
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [])
 
@@ -4724,6 +4760,15 @@ export function TradingScreen() {
             <strong>
               {summary.emergencyKillSwitch ? 'active' : 'inactive'}
             </strong>
+            {refreshedAt !== null ? (
+              <>
+                <br />
+                <span className="text-xs text-[var(--theme-muted)]">
+                  Auto-refresh 60s · updated{' '}
+                  {new Date(refreshedAt).toLocaleTimeString()}
+                </span>
+              </>
+            ) : null}
           </div>
         </div>
       </section>
