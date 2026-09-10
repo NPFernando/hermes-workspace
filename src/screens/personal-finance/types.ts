@@ -63,6 +63,9 @@ export type PersonalFinancePayload = {
     fdMaturities: Array<{ name: string; days: number }>
   }
   currencyExposure: Array<{ currency: string; amount: number }>
+  /** PF review item 1: `data.income_records` / `data.expense_records` carry
+   * only the trailing N months. Older rows: `list_transactions` + JSON export. */
+  transactionsWindowMonths: number
   emergencyFund: {
     targetMonths: number
     avgMonthlyExpensesLkr: number

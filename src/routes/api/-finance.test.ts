@@ -207,6 +207,61 @@ async function handlers() {
   return (module.Route as any).server.handlers
 }
 
+describe('/api/finance?scope=personal_finance windowing (PF review item 1)', () => {
+  it('drops income/expense rows older than the window and stamps transactionsWindowMonths', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const old = new Date()
+    old.setFullYear(old.getFullYear() - 5)
+    const recent = new Date().toISOString().slice(0, 10)
+    vi.mocked(store.financeSummary).mockReturnValue({
+      baseCurrency: 'LKR',
+    } as never)
+    vi.mocked(store.readFinanceStore).mockReturnValue(
+      state.mockFinanceDb({
+        income_records: [
+          { id: 'i-old', dateReceived: old.toISOString().slice(0, 10) },
+          { id: 'i-new', dateReceived: recent },
+        ],
+        expense_records: [
+          { id: 'e-old', date: old.toISOString().slice(0, 10) },
+          { id: 'e-new', date: recent },
+        ],
+      }) as never,
+    )
+    vi.mocked(store.ensureFinanceStore).mockReturnValue(
+      state.mockFinanceDb({
+        income_records: [
+          { id: 'i-old', dateReceived: old.toISOString().slice(0, 10) },
+          { id: 'i-new', dateReceived: recent },
+        ],
+        expense_records: [
+          { id: 'e-old', date: old.toISOString().slice(0, 10) },
+          { id: 'e-new', date: recent },
+        ],
+      }) as never,
+    )
+
+    const response = await (
+      await handlers()
+    ).GET({
+      request: new Request(
+        'http://localhost/api/finance?scope=personal_finance',
+      ),
+    })
+    const body = (await response.json()) as {
+      transactionsWindowMonths: number
+      data: {
+        income_records: Array<{ id: string }>
+        expense_records: Array<{ id: string }>
+      }
+    }
+    expect(body.transactionsWindowMonths).toBe(36)
+    expect(body.data.income_records.map((r) => r.id)).toEqual(['i-new'])
+    expect(body.data.expense_records.map((r) => r.id)).toEqual(['e-new'])
+  })
+})
+
 describe('/api/finance fetch_news', () => {
   it('exposes read-only paper-decision quality only through the authenticated finance payload', async () => {
     state.authenticated = true

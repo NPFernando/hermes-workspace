@@ -399,6 +399,22 @@ function financePayload() {
  * underlying read/write/migration path. The Trading screen keeps using the
  * unscoped GET (financePayload()) unchanged.
  */
+/** PF review item 1: how many trailing months of income/expense rows the
+ *  dashboard payload carries. Older rows are reachable via `list_transactions`
+ *  and the JSON export. `financeSummary`'s all-time figures are computed from
+ *  `db` server-side and are NOT windowed. */
+const TRANSACTIONS_WINDOW_MONTHS = 36
+
+function withinWindow<T extends Record<string, unknown>>(
+  rows: Array<T>,
+  dateKey: keyof T & string,
+): Array<T> {
+  const cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - TRANSACTIONS_WINDOW_MONTHS)
+  const cutoffIso = cutoff.toISOString().slice(0, 10)
+  return rows.filter((r) => String(r[dateKey] ?? '') >= cutoffIso)
+}
+
 function personalFinancePayload() {
   const db = ensureFinanceStore()
   const storage = financeStorageStatus()
@@ -489,10 +505,16 @@ function personalFinancePayload() {
       progressPct: wgProgressPct,
     },
     financeQaHistory: db.settings.financeQaHistory ?? [],
+    // PF review item 1: bound the two fastest-growing collections. The
+    // dashboard's own consumers all look at recent windows (trends 6mo,
+    // recurring-bills 3mo, upcoming-money forward-looking) and `financeSummary`
+    // reads `db` directly server-side, so its all-time totals are unaffected.
+    // Full history is on the `list_transactions` endpoint + the JSON export.
+    transactionsWindowMonths: TRANSACTIONS_WINDOW_MONTHS,
     data: maskSensitive({
       finance_accounts: db.finance_accounts,
-      income_records: db.income_records,
-      expense_records: db.expense_records,
+      income_records: withinWindow(db.income_records, 'dateReceived'),
+      expense_records: withinWindow(db.expense_records, 'date'),
       budget_categories: db.budget_categories,
       categories: db.categories,
       subcategories: db.subcategories,

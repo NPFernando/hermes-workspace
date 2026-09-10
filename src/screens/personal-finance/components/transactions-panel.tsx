@@ -597,6 +597,13 @@ export function TransactionsPanel({
         />
       </div>
 
+      {payload.transactionsWindowMonths > 0 && (
+        <p className="mt-2 text-xs text-[var(--theme-muted)]">
+          Showing the last {payload.transactionsWindowMonths} months. Older
+          transactions are in the JSON export.
+        </p>
+      )}
+
       <div className="mt-3 grid gap-2">
         {filtered.length === 0 && (
           <p className="text-sm text-[var(--theme-muted)]">
