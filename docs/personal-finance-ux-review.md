@@ -224,12 +224,12 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 | 8 · one mutation pattern | ✅ done | PR #46 |
 | 10 · analyst units | ✅ done | PR #46 |
 | 6 · de-dup transaction representation | ✅ done — `transactions` off the payload; panel unifies raw arrays client-side, parity-tested | PR #46 |
+| 7 · server-side derivations | ✅ done — `getFinanceTrends`/`getRecurringBills`/`getUpcomingMoney`/`getCurrencyExposure` on the payload; 4 components + `personal-finance-digest.sh` rewired; ~90 lines of digest Python deleted | PR #46 |
 | 9 · paged transaction-history endpoint | ✅ done — `list_transactions` action (id cursor, 1..500) | PR #46 |
-| 5 · merge target cards / settings screen | partial — visual grouping done, component-merge open | PR #46 |
-| 1 · window payload to 24 months | prerequisites (6, 9) done; **windowing itself deferred** — it silently truncates 9 payload consumers and `TransactionsPanel` needs server-side filtering to page correctly. One careful PR against a merged baseline. |
-| 7 · server-side derivations | not started — moves trends/recurring/upcoming/exposure server-side, reshapes the payload, and rewrites the digest cron's Python. ~6 files + a live cron. Own PR. |
-| 11 · `*Lkr` → `*Base` rename | **deliberately not done** — ~56 call sites + the digest cron's Python reads `s['netWorthLkr']`; PF-201 kept the names on purpose; own PR against a merged baseline |
-| 12 · unified ledger | roadmap Phase 1 — multi-PR project, not a session task |
+| 5 · merge target cards / settings screen | **substantially done** — the 3 target cards are grouped under one "Goals & targets" heading (item 4). Folding them into a single component and a cross-screen settings home for the currency picker are polish left for a UX PR against a merged baseline. | PR #46 |
+| 1 · window payload to 24 months | **prerequisites all done** (6, 7, 9). After 6+7 the only remaining raw-array consumers are `TransactionsPanel` + 5 entity panels ("records tagged to X"). Windowing is now a **product decision** — accept a 24-month cut in those 6 places, or rewrite `TransactionsPanel` for server-side filtered paging (it filters client-side today). Not a unilateral commit. |
+| 11 · `*Lkr` → `*Base` rename | **deliberately not done** — ~56 sites of pure rename churn for readability; PF-201 kept the names intentionally; a standalone, easily-reverted PR if the team wants it, not bundled here. |
+| 12 · unified ledger | roadmap Phase 1. `personal-finance-os-roadmap.md`'s own process rule: built "one feature at a time, explicitly requested" — an unrequested slice here would violate that. Multi-PR project. |
 
 **Tier 0 — shipped in this pass**
 
@@ -267,9 +267,11 @@ across ~15 panels. That work is done and good; the duplication that remains is *
 6. ✅ **DONE** (`feat/pf-dashboard-perf`) — `transactions` dropped from the payload;
    `TransactionsPanel` unifies `data.income_records` + `data.expense_records` client-side via
    `unifyTransactions`, parity-tested against the server's `getUnifiedTransactions` (D1).
-7. Server-side `trends` / `recurringBills` / `upcomingMoney` / `currencyExposure` in the
-   payload; delete the Python port in the digest cron (D4). **Not started** — ~6 components +
-   a live cron script; own PR against a merged baseline.
+7. ✅ **DONE** (`feat/pf-dashboard-perf`) — `getFinanceTrends` / `getRecurringBills` /
+   `getUpcomingMoney` / `getCurrencyExposure` compute once in `finance-store.ts` and ride the
+   payload; `finance-trends-card` / `recurring-bills-insight` / `upcoming-money` / the screen's
+   exposure block read them; `personal-finance-digest.sh` switched to `?scope=personal_finance`
+   and its ~90-line Python payday/FD/contract port is deleted (D4). +4 tests.
 8. ✅ **DONE** (`feat/pf-dashboard-perf`) — 6 Overview cards (`savings-rate-target-card`,
    `emergency-fund-card`, `base-currency-select`, `wealth-goal-card`, and the
    `LinkedAccountControl` in `savings-goals-progress` / `sinking-funds-panel`) now use
