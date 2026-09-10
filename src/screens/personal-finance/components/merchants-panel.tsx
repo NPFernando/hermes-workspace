@@ -203,6 +203,15 @@ export function MerchantsPanel({
             merchant,
             'defaultCategory',
           )
+          const rawDefaultSplits = merchant.defaultSplits
+          const defaultSplitText = Array.isArray(rawDefaultSplits)
+            ? rawDefaultSplits
+                .map((p) => {
+                  const row = (p ?? {}) as Record<string, unknown>
+                  return `${stringField(row, 'category') || 'Other'} ${Number(row.percent) || 0}%`
+                })
+                .join(' · ')
+            : ''
           const count = usageCounts.get(merchantName) ?? 0
 
           return (
@@ -276,6 +285,7 @@ export function MerchantsPanel({
                         `· default: ${merchantDefaultCategory} `}
                       · used {count} time
                       {count === 1 ? '' : 's'}
+                      {defaultSplitText && ` · split: ${defaultSplitText}`}
                     </span>
                   </div>
                   <div className="flex gap-2">

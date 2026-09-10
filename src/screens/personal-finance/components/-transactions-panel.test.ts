@@ -3,7 +3,10 @@ import {
   createEmptyFinanceDatabase,
   getUnifiedTransactions,
 } from '../../../server/finance-store'
-import { unifyTransactions } from './transactions-panel'
+import {
+  splitRowsFromPercents,
+  unifyTransactions,
+} from './transactions-panel'
 
 /**
  * PF review D1: the payload dropped its pre-unified `transactions` array;
@@ -92,5 +95,46 @@ describe('unifyTransactions (client) matches getUnifiedTransactions (server)', (
 
   it('returns [] for empty inputs', () => {
     expect(unifyTransactions([], [])).toEqual([])
+  })
+})
+
+describe('splitRowsFromPercents (percentage splits, item 1)', () => {
+  it('scales percentages to amounts that sum exactly to the total', () => {
+    const rows = splitRowsFromPercents(
+      [
+        { category: 'Groceries', percent: 60 },
+        { category: 'Household', percent: 40 },
+      ],
+      10_000,
+    )
+    expect(rows.map((r) => r.amount)).toEqual(['6000', '4000'])
+  })
+
+  it('puts the rounding remainder on the last row (33/33/34 of 100)', () => {
+    const rows = splitRowsFromPercents(
+      [
+        { category: 'A', percent: 33 },
+        { category: 'B', percent: 33 },
+        { category: 'C', percent: 34 },
+      ],
+      100,
+    )
+    const sum = rows.reduce((s, r) => s + Number(r.amount), 0)
+    expect(sum).toBe(100)
+  })
+
+  it('absorbs a non-even split (three thirds of 100) into the last row', () => {
+    const rows = splitRowsFromPercents(
+      [
+        { category: 'A', percent: 33.333 },
+        { category: 'B', percent: 33.333 },
+        { category: 'C', percent: 33.334 },
+      ],
+      100,
+    )
+    const sum = Math.round(
+      rows.reduce((s, r) => s + Number(r.amount), 0) * 100,
+    ) / 100
+    expect(sum).toBe(100)
   })
 })

@@ -280,6 +280,13 @@ export type Merchant = {
   id: string
   name: string
   defaultCategory?: string
+  /**
+   * PF splits: a remembered percentage split for this vendor (e.g. a
+   * supermarket that's usually 60% Groceries / 40% Household). When the
+   * vendor is typed on an expense, the split editor pre-fills these parts
+   * scaled to the entered amount. Percentages should sum to ~100.
+   */
+  defaultSplits?: Array<{ category: string; percent: number }>
   notes?: string
   source: string
   createdAt: string
@@ -1550,10 +1557,12 @@ export function addFinanceRecord(
       parentCategory: stringField(payload, 'parentCategory', 'Other'),
     })
   } else if (kind === 'merchant') {
+    const merchantSplits = parseMerchantDefaultSplits(payload)
     db.merchants.push({
       ...base,
       name: stringField(payload, 'name', 'Untitled'),
       defaultCategory: optionalString(payload, 'defaultCategory'),
+      ...(merchantSplits ? { defaultSplits: merchantSplits } : {}),
       notes: optionalString(payload, 'notes'),
     })
   } else if (kind === 'tag') {
@@ -1785,11 +1794,17 @@ export function updateFinanceRecord(
   } else if (kind === 'merchant') {
     const index = db.merchants.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.merchants[index] = {
+      const merged = {
         ...db.merchants[index],
         ...payload,
         updatedAt: nowIso(),
       }
+      if ('defaultSplits' in payload) {
+        const parsed = parseMerchantDefaultSplits(payload)
+        if (parsed) merged.defaultSplits = parsed
+        else delete merged.defaultSplits
+      }
+      db.merchants[index] = merged
       updated = true
     }
   } else if (kind === 'tag') {
@@ -2718,6 +2733,37 @@ function assertValidExpenseSplits(
       `Split parts add up to ${sum}, which does not match the expense amount ${amount}`,
     )
   }
+}
+
+/**
+ * Parse `payload.defaultSplits` (Merchant remembered split) into
+ * `{category, percent}[]`, or `undefined` when absent/empty (`[]`/`null`
+ * clears on update). Percentages must be positive and sum to ~100.
+ */
+function parseMerchantDefaultSplits(
+  payload: AddPayload,
+): Array<{ category: string; percent: number }> | undefined {
+  const raw = payload.defaultSplits
+  if (!Array.isArray(raw) || raw.length === 0) return undefined
+  const parts = raw.map((entry) => {
+    const row: AddPayload =
+      entry && typeof entry === 'object' ? (entry as AddPayload) : {}
+    return {
+      category: stringField(row, 'category', 'Other'),
+      percent: numberField(row, 'percent', 0),
+    }
+  })
+  const sum = parts.reduce((acc, p) => acc + p.percent, 0)
+  if (
+    parts.length < 2 ||
+    parts.some((p) => p.percent <= 0) ||
+    Math.abs(sum - 100) > 0.5
+  ) {
+    throw new Error(
+      `Merchant default split percentages must be positive and sum to ~100 (got ${sum})`,
+    )
+  }
+  return parts
 }
 
 function booleanField(
