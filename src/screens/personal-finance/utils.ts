@@ -1,5 +1,18 @@
+// M2: digit grouping is locale-specific (e.g. LKR/AUD/USD group in thousands,
+// INR in lakhs). Key the grouping locale off the currency instead of hardcoding
+// 'en-LK' for everything; fall back to 'en-LK' for currencies not listed.
+const CURRENCY_LOCALE: Record<string, string> = {
+  LKR: 'en-LK',
+  AUD: 'en-AU',
+  USD: 'en-US',
+  INR: 'en-IN',
+  EUR: 'de-DE',
+  GBP: 'en-GB',
+}
+
 export function formatMoney(amount: number, currency: string): string {
-  return `${currency} ${Math.round(amount).toLocaleString('en-LK')}`
+  const locale = CURRENCY_LOCALE[currency] ?? 'en-LK'
+  return `${currency} ${Math.round(amount).toLocaleString(locale)}`
 }
 
 /**

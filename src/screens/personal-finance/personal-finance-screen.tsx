@@ -130,10 +130,10 @@ export function PersonalFinanceScreen() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color-mix(in_srgb,var(--theme-success)_80%,transparent)]">
-              DollarWise-style personal finance
+              Personal finance
             </p>
             <h1 className="mt-2 text-3xl font-semibold md:text-4xl">
-              Money clarity, without trading controls
+              Your money at a glance
             </h1>
           </div>
           <a href="/api/finance-export" download className={buttonClass}>
@@ -141,8 +141,8 @@ export function PersonalFinanceScreen() {
           </a>
         </div>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--theme-muted)]">
-          Track accounts, spending, budgets, savings goals, investments, and tax
-          records — separate from the automated trading workspace.
+          Track your accounts, spending, budgets, savings goals, investments, and
+          tax records — all in one place.
         </p>
       </section>
 

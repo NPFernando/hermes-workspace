@@ -71,6 +71,8 @@ export function unifyTransactions(
       counterparty: [r.fromAccountId, r.toAccountId].filter(Boolean).join(' → '),
       category: 'Transfer',
       accountId: r.fromAccountId,
+      fromAccountId: r.fromAccountId,
+      toAccountId: r.toAccountId,
       currency: r.currency,
       amount: r.amount,
       convertedLkrAmount: r.convertedLkrAmount,
@@ -118,6 +120,9 @@ type EditDraft = {
   notes: string
   taxable: boolean
   recurring: boolean
+  // transfer-only legs
+  fromAccountId: string
+  toAccountId: string
 }
 
 /**
@@ -297,6 +302,8 @@ export function TransactionsPanel({
         notes: stringField(txn, 'notes'),
         taxable: boolField(txn, 'taxable'),
         recurring: boolField(txn, 'recurring'),
+        fromAccountId: stringField(txn, 'fromAccountId'),
+        toAccountId: stringField(txn, 'toAccountId'),
       },
     }))
     setEditOpenId(id)
@@ -308,6 +315,42 @@ export function TransactionsPanel({
 
   async function saveEdit(id: string, kind: TxnKind) {
     const draft = editDrafts[id]
+
+    if (kind === 'transfer') {
+      const amt = Number(draft.amount) || 0
+      if (amt <= 0) {
+        setErr('Transfer amount must be greater than 0')
+        return
+      }
+      if (
+        draft.fromAccountId &&
+        draft.toAccountId &&
+        draft.fromAccountId === draft.toAccountId
+      ) {
+        setErr('“From” and “To” accounts must differ')
+        return
+      }
+      const data = await post(
+        {
+          action: 'update_record',
+          kind: 'transfer',
+          id,
+          payload: {
+            date: draft.date,
+            fromAccountId: draft.fromAccountId || undefined,
+            toAccountId: draft.toAccountId || undefined,
+            amount: amt,
+            currency: draft.currency,
+            convertedLkrAmount: amt,
+            notes: draft.notes.trim() || undefined,
+          },
+        },
+        `edit-${id}`,
+      )
+      if (data) setEditOpenId(null)
+      return
+    }
+
     if (!draft.counterparty.trim()) {
       setErr(
         kind === 'income' ? 'Source name is required' : 'Vendor is required',
@@ -413,10 +456,17 @@ export function TransactionsPanel({
   const totalsByCurrency = new Map<string, number>()
   let incomeCount = 0
   let expenseCount = 0
+  let transferCount = 0
   for (const txn of transactions) {
     const kind = stringField(txn, 'kind')
     if (kind === 'income') incomeCount += 1
     if (kind === 'expense') expenseCount += 1
+    if (kind === 'transfer') {
+      transferCount += 1
+      // transfers move money between the user's own accounts — they net to
+      // zero and must not shift the income/expense total.
+      continue
+    }
     const txnCurrency = stringField(txn, 'currency') || 'LKR'
     const signed =
       kind === 'income'
@@ -437,11 +487,12 @@ export function TransactionsPanel({
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <h2 className="text-lg font-semibold">Transactions</h2>
       <p className="text-xs text-[var(--theme-muted)]">
-        A unified view of income and expenses — added here writes to the same
-        underlying records shown elsewhere.
+        A unified view of income, expenses and transfers — added here writes to
+        the same underlying records shown elsewhere.
       </p>
       <p className="mt-2 text-sm font-medium text-[var(--theme-text)]">
         {incomeCount} income · {expenseCount} expense
+        {transferCount > 0 && <> · {transferCount} transfer</>}
         {totalsText && (
           <>
             {' '}
@@ -737,7 +788,118 @@ export function TransactionsPanel({
               key={id}
               className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
-              {isEditing ? (
+              {isEditing && kind === 'transfer' ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="date"
+                    value={editDrafts[id].date}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], date: e.target.value },
+                      }))
+                    }
+                    className={inputClass}
+                  />
+                  <select
+                    value={editDrafts[id].fromAccountId}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], fromAccountId: e.target.value },
+                      }))
+                    }
+                    className={inputClass}
+                    aria-label="From account"
+                  >
+                    <option value="">From account…</option>
+                    {accounts.map((account, accountIndex) => {
+                      const accountRowId =
+                        stringField(account, 'id') || String(accountIndex)
+                      return (
+                        <option key={accountRowId} value={accountRowId}>
+                          {stringField(account, 'name')}
+                        </option>
+                      )
+                    })}
+                  </select>
+                  <select
+                    value={editDrafts[id].toAccountId}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], toAccountId: e.target.value },
+                      }))
+                    }
+                    className={inputClass}
+                    aria-label="To account"
+                  >
+                    <option value="">To account…</option>
+                    {accounts.map((account, accountIndex) => {
+                      const accountRowId =
+                        stringField(account, 'id') || String(accountIndex)
+                      return (
+                        <option key={accountRowId} value={accountRowId}>
+                          {stringField(account, 'name')}
+                        </option>
+                      )
+                    })}
+                  </select>
+                  <select
+                    value={editDrafts[id].currency}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], currency: e.target.value },
+                      }))
+                    }
+                    className={inputClass}
+                  >
+                    <option value="LKR">LKR</option>
+                    <option value="USD">USD</option>
+                    <option value="AUD">AUD</option>
+                  </select>
+                  <input
+                    type="number"
+                    placeholder="Amount"
+                    value={editDrafts[id].amount}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], amount: e.target.value },
+                      }))
+                    }
+                    className={`${inputClass} w-32`}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Notes"
+                    value={editDrafts[id].notes}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], notes: e.target.value },
+                      }))
+                    }
+                    className={inputClass}
+                  />
+                  <button
+                    type="button"
+                    disabled={busy === `edit-${id}`}
+                    onClick={() => void saveEdit(id, kind)}
+                    className={confirmButtonClass}
+                  >
+                    {busy === `edit-${id}` ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className={buttonClass}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="date"
@@ -939,9 +1101,13 @@ export function TransactionsPanel({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <span
-                      className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${kind === 'income' ? 'bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] text-[var(--theme-success)]' : 'bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] text-[var(--theme-muted)]'}`}
+                      className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${kind === 'income' ? 'bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] text-[var(--theme-success)]' : kind === 'transfer' ? 'bg-[color-mix(in_srgb,var(--theme-accent)_25%,transparent)] text-[var(--theme-accent)]' : 'bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] text-[var(--theme-muted)]'}`}
                     >
-                      {kind === 'income' ? 'Income' : 'Expense'}
+                      {kind === 'income'
+                        ? 'Income'
+                        : kind === 'transfer'
+                          ? 'Transfer'
+                          : 'Expense'}
                     </span>
                     {txnStatus !== 'cleared' && (
                       <span
@@ -993,15 +1159,13 @@ export function TransactionsPanel({
                         View document
                       </a>
                     )}
-                    {kind !== 'transfer' && (
-                      <button
-                        type="button"
-                        onClick={() => startEdit(txn)}
-                        className={buttonClass}
-                      >
-                        Edit
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => startEdit(txn)}
+                      className={buttonClass}
+                    >
+                      Edit
+                    </button>
                     <button
                       type="button"
                       disabled={busy === `delete-${id}`}
