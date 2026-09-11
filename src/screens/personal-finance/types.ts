@@ -62,6 +62,8 @@ export type PersonalFinancePayload = {
     loggedThisMonth: boolean
     thisMonthAmount: number | null
     drift: number | null
+    priceHikeStreak: number
+    sustainedPriceHike: boolean
   }>
   upcomingMoney: {
     paydays: Array<{ name: string; state: 'due_soon' | 'overdue'; days: number }>

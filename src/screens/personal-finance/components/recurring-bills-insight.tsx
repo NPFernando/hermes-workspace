@@ -168,6 +168,14 @@ export function RecurringBillsInsight({
                 month
               </span>
             )}
+            {r.sustainedPriceHike && (
+              <span
+                className="text-[var(--theme-warning)]"
+                title="Risen every month for the last few months — a drift-vs-average check alone wouldn't catch a bill creeping up gradually."
+              >
+                📈 up {r.priceHikeStreak} months running
+              </span>
+            )}
             {r.loggedThisMonth ? (
               <span className="text-[var(--theme-success)]">
                 ✓ logged this month

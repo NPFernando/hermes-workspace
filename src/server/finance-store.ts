@@ -3646,6 +3646,16 @@ export interface RecurringBill {
   /** Fractional change of `thisMonthAmount` vs `averageAmount` (e.g. 0.25 =
    *  25% higher than usual), or null when this month isn't logged. */
   drift: number | null
+  /** Consecutive months (most recent backward) where this vendor's bill
+   *  rose vs the month before — distinct from `drift`, which only compares
+   *  this month to the historical average and can't see a *trend*: a bill
+   *  climbing 5% every month for 3 months running never trips `drift`'s
+   *  ±20% band, but is exactly the "quietly getting more expensive" pattern
+   *  a single-month comparison misses. 0 when the most recent month isn't
+   *  higher than the one before it. */
+  priceHikeStreak: number
+  /** priceHikeStreak >= 3 — three or more consecutive rises. */
+  sustainedPriceHike: boolean
 }
 
 export function getRecurringBills(
@@ -3700,6 +3710,24 @@ export function getRecurringBills(
     const thisMonthAmount = bucket.loggedThisMonth
       ? bucket.thisMonthAmount
       : null
+
+    // Independent of `avg`/`amounts` above (which don't dedupe a vendor
+    // billed twice in one month — a preexisting quirk left as-is): sum per
+    // calendar month first, so a streak can't be thrown off by a vendor
+    // that happened to get two expense rows in the same month.
+    const sumByMonth = new Map<string, number>()
+    for (const e of bucket.entries) {
+      sumByMonth.set(e.month, (sumByMonth.get(e.month) ?? 0) + e.amount)
+    }
+    const monthsAsc = [...sumByMonth.keys()].sort()
+    let priceHikeStreak = 0
+    for (let i = monthsAsc.length - 1; i > 0; i--) {
+      const cur = sumByMonth.get(monthsAsc[i])!
+      const prev = sumByMonth.get(monthsAsc[i - 1])!
+      if (cur > prev) priceHikeStreak += 1
+      else break
+    }
+
     results.push({
       vendor,
       displayVendor: bucket.displayVendor,
@@ -3712,6 +3740,8 @@ export function getRecurringBills(
         thisMonthAmount !== null && avg > 0
           ? (thisMonthAmount - avg) / avg
           : null,
+      priceHikeStreak,
+      sustainedPriceHike: priceHikeStreak >= 3,
     })
   }
   return results.sort((a, b) => b.monthsSeen - a.monthsSeen)
