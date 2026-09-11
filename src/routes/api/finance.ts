@@ -51,6 +51,7 @@ import {
   upsertKnownSender,
   writeFinanceStore,
 } from '../../server/finance-store'
+import { getCashFlowForecast } from '../../server/finance-forecast'
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
 import {
   answerFinanceQuestion,
@@ -537,6 +538,7 @@ function personalFinancePayload() {
     // client scales by `fxToBase` for display.
     trends: getFinanceTrends(db),
     recurringBills: getRecurringBills(db),
+    cashFlowForecast: getCashFlowForecast(db),
     upcomingMoney: getUpcomingMoney(db),
     currencyExposure: getCurrencyExposure(db),
     fxGainLoss: getFxGainLoss(db),
