@@ -11,9 +11,11 @@ import {
   appendAuditLog,
   budgetVsActualSummary,
   buildFinanceQueryContext,
+  clearKnownSenderPassword,
   computeAccountLedgerBalance,
   convertCurrency,
   deleteFinanceRecord,
+  deleteKnownSender,
   ensureFinanceStore,
   financeAlerts,
   financeStorageAlerts,
@@ -30,17 +32,20 @@ import {
   getUnifiedTransactions,
   getUpcomingMoney,
   ledgerTransactionsForDb,
+  listKnownSenders,
   listPendingIngestions,
   maskSensitive,
   readFinanceStore,
   recordCategoryCorrection,
   recordNetWorthSnapshot,
+  setKnownSenderPassword,
   setNonLiveExecutionMode,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
   updateExchangeRate,
   updateFinanceRecord,
   updatePendingIngestion,
+  upsertKnownSender,
   writeFinanceStore,
 } from '../../server/finance-store'
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
@@ -2427,6 +2432,87 @@ export const Route = createFileRoute('/api/finance')({
                 { status: 502 },
               )
             }
+          }
+          if (action === 'list_known_senders') {
+            // Never returns encryptedPassword — hasPassword is the only
+            // signal the client gets that a secret is stored for this sender.
+            return json({
+              ok: true,
+              knownSenders: listKnownSenders().map(
+                ({ encryptedPassword, ...rest }) => ({
+                  ...rest,
+                  hasPassword: Boolean(encryptedPassword),
+                }),
+              ),
+            })
+          }
+          if (action === 'upsert_known_sender') {
+            const label = typeof body.label === 'string' ? body.label : ''
+            if (!label.trim()) {
+              return json(
+                { ok: false, error: 'label is required.' },
+                { status: 400 },
+              )
+            }
+            const sender = upsertKnownSender({
+              id: typeof body.id === 'string' ? body.id : undefined,
+              label,
+              matchDomain:
+                typeof body.matchDomain === 'string'
+                  ? body.matchDomain
+                  : undefined,
+              matchAddress:
+                typeof body.matchAddress === 'string'
+                  ? body.matchAddress
+                  : undefined,
+              passwordScheme:
+                typeof body.passwordScheme === 'string'
+                  ? body.passwordScheme
+                  : undefined,
+              accountId:
+                typeof body.accountId === 'string'
+                  ? body.accountId
+                  : undefined,
+            })
+            const { encryptedPassword, ...rest } = sender
+            return json({
+              ok: true,
+              knownSender: { ...rest, hasPassword: Boolean(encryptedPassword) },
+            })
+          }
+          if (action === 'delete_known_sender') {
+            const id = typeof body.id === 'string' ? body.id : ''
+            if (!id)
+              return json({ ok: false, error: 'id is required.' }, { status: 400 })
+            deleteKnownSender(id)
+            return json({ ok: true })
+          }
+          if (action === 'set_known_sender_password') {
+            const id = typeof body.id === 'string' ? body.id : ''
+            const password =
+              typeof body.password === 'string' ? body.password : ''
+            if (!id || !password) {
+              return json(
+                { ok: false, error: 'id and password are required.' },
+                { status: 400 },
+              )
+            }
+            try {
+              setKnownSenderPassword(id, password)
+              return json({ ok: true })
+            } catch (error) {
+              return json(
+                { ok: false, error: safeErrorMessage(error) },
+                { status: 400 },
+              )
+            }
+          }
+          if (action === 'clear_known_sender_password') {
+            const id = typeof body.id === 'string' ? body.id : ''
+            if (!id)
+              return json({ ok: false, error: 'id is required.' }, { status: 400 })
+            clearKnownSenderPassword(id)
+            return json({ ok: true })
           }
           if (action === 'apply_recommended_safeguards') {
             const applied = applyRecommendedSafeguards()
