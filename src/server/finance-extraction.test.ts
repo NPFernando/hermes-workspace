@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }))
+vi.mock('node:child_process', () => ({ spawnSync: spawnSyncMock }))
+
 import {
   buildFinanceAnswerPrompt,
+  callClaudeCliVision,
   mimeTypeForImageExtension,
   parseContractExtractionJson,
   parseExtractionJson,
@@ -405,5 +410,52 @@ describe('parseContractExtractionJson', () => {
       ok: false,
       reason: 'malformed_response',
     })
+  })
+})
+
+describe('callClaudeCliVision', () => {
+  beforeEach(() => {
+    spawnSyncMock.mockReset()
+  })
+  afterEach(() => {
+    spawnSyncMock.mockReset()
+  })
+
+  it('returns stdout on a successful run, with --restricted + Read-only tools + the image path in the prompt', () => {
+    spawnSyncMock.mockReturnValue({
+      status: 0,
+      stdout: '{"kind":"expense","amount":100,"currency":"LKR","vendorOrSource":"Test","date":"2026-01-01","confidence":"high"}',
+      stderr: '',
+    })
+
+    const result = callClaudeCliVision('/tmp/bill.png', 'Extract the transaction.')
+
+    expect(result).toContain('"kind":"expense"')
+    const [bin, args] = spawnSyncMock.mock.calls[0]
+    expect(bin).toContain('claude')
+    expect(args).toContain('--restricted')
+    expect(args).toContain('--allowedTools')
+    expect(args).toContain('Read')
+    expect(args).toContain('--dangerously-skip-permissions')
+    expect(args).toContain('-p')
+    const promptArg = args[args.indexOf('-p') + 1]
+    expect(promptArg).toContain('/tmp/bill.png')
+  })
+
+  it('returns null when the CLI exits non-zero', () => {
+    spawnSyncMock.mockReturnValue({ status: 1, stdout: '', stderr: 'error' })
+    expect(callClaudeCliVision('/tmp/bill.png', 'Extract.')).toBeNull()
+  })
+
+  it('returns null when stdout is empty even on exit 0', () => {
+    spawnSyncMock.mockReturnValue({ status: 0, stdout: '', stderr: '' })
+    expect(callClaudeCliVision('/tmp/bill.png', 'Extract.')).toBeNull()
+  })
+
+  it('returns null instead of throwing when spawnSync itself throws (e.g. binary not found)', () => {
+    spawnSyncMock.mockImplementation(() => {
+      throw new Error('ENOENT')
+    })
+    expect(callClaudeCliVision('/tmp/bill.png', 'Extract.')).toBeNull()
   })
 })
