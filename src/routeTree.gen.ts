@@ -138,6 +138,7 @@ import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-repr
 import { Route as ApiFinanceUploadRouteImport } from './routes/api/finance-upload'
 import { Route as ApiFinanceExportRouteImport } from './routes/api/finance-export'
 import { Route as ApiFinanceDocumentRouteImport } from './routes/api/finance-document'
+import { Route as ApiFinanceBackupRouteImport } from './routes/api/finance-backup'
 import { Route as ApiFinanceRouteImport } from './routes/api/finance'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
@@ -899,6 +900,11 @@ const ApiFinanceDocumentRoute = ApiFinanceDocumentRouteImport.update({
   path: '/api/finance-document',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFinanceBackupRoute = ApiFinanceBackupRouteImport.update({
+  id: '/api/finance-backup',
+  path: '/api/finance-backup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFinanceRoute = ApiFinanceRouteImport.update({
   id: '/api/finance',
   path: '/api/finance',
@@ -1539,6 +1545,7 @@ export interface FileRoutesByFullPath {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
+  '/api/finance-backup': typeof ApiFinanceBackupRoute
   '/api/finance-document': typeof ApiFinanceDocumentRoute
   '/api/finance-export': typeof ApiFinanceExportRoute
   '/api/finance-upload': typeof ApiFinanceUploadRoute
@@ -1783,6 +1790,7 @@ export interface FileRoutesByTo {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
+  '/api/finance-backup': typeof ApiFinanceBackupRoute
   '/api/finance-document': typeof ApiFinanceDocumentRoute
   '/api/finance-export': typeof ApiFinanceExportRoute
   '/api/finance-upload': typeof ApiFinanceUploadRoute
@@ -2029,6 +2037,7 @@ export interface FileRoutesById {
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
+  '/api/finance-backup': typeof ApiFinanceBackupRoute
   '/api/finance-document': typeof ApiFinanceDocumentRoute
   '/api/finance-export': typeof ApiFinanceExportRoute
   '/api/finance-upload': typeof ApiFinanceUploadRoute
@@ -2276,6 +2285,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/finance'
+    | '/api/finance-backup'
     | '/api/finance-document'
     | '/api/finance-export'
     | '/api/finance-upload'
@@ -2520,6 +2530,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/finance'
+    | '/api/finance-backup'
     | '/api/finance-document'
     | '/api/finance-export'
     | '/api/finance-upload'
@@ -2765,6 +2776,7 @@ export interface FileRouteTypes {
     | '/api/events'
     | '/api/files'
     | '/api/finance'
+    | '/api/finance-backup'
     | '/api/finance-document'
     | '/api/finance-export'
     | '/api/finance-upload'
@@ -3011,6 +3023,7 @@ export interface RootRouteChildren {
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiFinanceRoute: typeof ApiFinanceRouteWithChildren
+  ApiFinanceBackupRoute: typeof ApiFinanceBackupRoute
   ApiFinanceDocumentRoute: typeof ApiFinanceDocumentRoute
   ApiFinanceExportRoute: typeof ApiFinanceExportRoute
   ApiFinanceUploadRoute: typeof ApiFinanceUploadRoute
@@ -4059,6 +4072,13 @@ declare module '@tanstack/react-router' {
       path: '/api/finance-document'
       fullPath: '/api/finance-document'
       preLoaderRoute: typeof ApiFinanceDocumentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/finance-backup': {
+      id: '/api/finance-backup'
+      path: '/api/finance-backup'
+      fullPath: '/api/finance-backup'
+      preLoaderRoute: typeof ApiFinanceBackupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/finance': {
@@ -5179,6 +5199,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiFinanceRoute: ApiFinanceRouteWithChildren,
+  ApiFinanceBackupRoute: ApiFinanceBackupRoute,
   ApiFinanceDocumentRoute: ApiFinanceDocumentRoute,
   ApiFinanceExportRoute: ApiFinanceExportRoute,
   ApiFinanceUploadRoute: ApiFinanceUploadRoute,
