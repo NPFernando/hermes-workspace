@@ -356,6 +356,8 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
 
   const now = Math.floor(Date.now() / 1000)
   gmailIngest.lastSyncedAtSeconds = now
+  // A run that got this far succeeded — clear any stale "reconnect needed" flag.
+  delete gmailIngest.lastError
   // AI-506: capped recent-activity list, not a full audit trail — the
   // unbounded gmail_sync_run audit-log entries already cover that.
   const priorHistory = Array.isArray(gmailIngest.syncHistory)

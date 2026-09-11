@@ -6,6 +6,7 @@ import {
   buildGmailConnectAuthUrl,
   isGmailConnected,
   isGoogleOAuthEnabled,
+  readGmailConnectedAccount,
   storeOAuthState,
 } from '../../server/google-oauth'
 
@@ -30,13 +31,18 @@ export const Route = createFileRoute('/api/auth/gmail-connect')({
                   queued: number
                   skippedAlreadyQueued: number
                 }>
+                lastError?: { at: number; message: string }
               }
             | undefined
+          const account = readGmailConnectedAccount()
           return Response.json({
             enabled: isGoogleOAuthEnabled(),
             connected: isGmailConnected(),
+            email: account?.email ?? null,
+            connectedAt: account?.connectedAt ?? null,
             lastSyncedAtSeconds: gmailIngest?.lastSyncedAtSeconds ?? null,
             syncHistory: gmailIngest?.syncHistory ?? [],
+            lastError: gmailIngest?.lastError ?? null,
           })
         }
 
