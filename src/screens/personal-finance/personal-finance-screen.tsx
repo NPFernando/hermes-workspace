@@ -14,6 +14,7 @@ import { BaseCurrencySelect } from './components/base-currency-select'
 import { GmailConnectionCard } from './components/gmail-connection-card'
 import { KnownSendersCard } from './components/known-senders-card'
 import { CsvImportPanel } from './components/csv-import-panel'
+import { FxGainLossCard } from './components/fx-gain-loss-card'
 import { BudgetPanel } from './components/budget-panel'
 import { PendingIngestionPanel } from './components/pending-ingestion-panel'
 import { FinanceAlertsCard } from './components/finance-alerts-card'
@@ -408,6 +409,7 @@ export function PersonalFinanceScreen() {
       {tab === 'investments' && (
         <>
           <StockHoldingsPanel payload={payload} onPayload={setPayload} />
+          <FxGainLossCard payload={payload} />
           <FixedDepositsPanel payload={payload} onPayload={setPayload} />
           <LoansPanel payload={payload} onPayload={setPayload} />
           <PropertiesPanel payload={payload} onPayload={setPayload} />

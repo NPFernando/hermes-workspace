@@ -116,6 +116,13 @@ vi.mock('../../server/finance-store', () => ({
     scheduled: [],
   })),
   getCurrencyExposure: vi.fn(() => []),
+  getFxGainLoss: vi.fn(() => ({
+    entries: [],
+    totalAssetGainLkr: 0,
+    totalFxGainLkr: 0,
+    totalReturnLkr: 0,
+    excludedCount: 0,
+  })),
   getAverageMonthlyExpensesLkr: vi.fn(() => 0),
   getAverageMonthlySavingsRatePct: vi.fn(() => ({ actualPct: 0, hasData: false })),
   storeIntelligenceRecords: state.storeIntelligenceRecords,
