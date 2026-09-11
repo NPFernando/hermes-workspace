@@ -84,7 +84,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@tanstack/eslint-config": "0.3.4",
+    "@tanstack/eslint-config": "0.4.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.2.0",
     "@types/node": "^22.10.2",
