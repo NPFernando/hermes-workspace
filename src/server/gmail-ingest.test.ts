@@ -53,30 +53,65 @@ describe('buildSearchQuery / matchKnownSender (pure helpers)', () => {
   })
 })
 
+/**
+ * Models the real finance-store.ts contract faithfully enough to catch a
+ * real bug found via a live sync test (2026-09-11): syncGmailNow captured
+ * `db` once at the top of the function, then wrote that same (by-then
+ * stale) object back at the end to persist gmailIngest.lastSyncedAtSeconds
+ * — clobbering every pending_ingestion the loop had queued in between,
+ * each of which did its own independent read/write round-trip. A mock
+ * where readFinanceStore/writeFinanceStore don't share state with
+ * addPendingIngestion (the naive version) can't see this bug at all, since
+ * writeFinanceStore(staleDb) would be a no-op instead of an overwrite.
+ */
+function makeFinanceStoreState() {
+  return { settings: {} as Record<string, unknown>, pending_ingestions: [] as Array<Record<string, unknown>> }
+}
+
 describe('syncGmailNow', () => {
   const accessToken = 'test-access-token'
+  let storeState: ReturnType<typeof makeFinanceStoreState>
   let pendingIngestions: Array<Record<string, unknown>>
+
+  function financeStoreMock(overrides: {
+    listKnownSenders?: Array<KnownSender>
+    decryptKnownSenderPassword?: () => string | undefined
+  } = {}) {
+    return {
+      FINANCE_INGESTION_UPLOAD_DIR: '/tmp/gmail-ingest-test-uploads',
+      // Each call returns a fresh snapshot — never a shared reference —
+      // exactly like the real ensureFinanceStore()/readFinanceStore(),
+      // which re-reads from disk/PG every time.
+      readFinanceStore: vi.fn(() => structuredClone(storeState)),
+      writeFinanceStore: vi.fn((db: typeof storeState) => {
+        storeState = structuredClone(db)
+      }),
+      getCategoryCorrections: vi.fn(() => ({})),
+      listPendingIngestions: vi.fn(() => storeState.pending_ingestions),
+      // Mirrors the real addPendingIngestion: its own independent
+      // read-modify-write, not routed through whatever `db` the caller
+      // happens to be holding.
+      addPendingIngestion: vi.fn((input: Record<string, unknown>) => {
+        const fresh = structuredClone(storeState)
+        const record = { id: `pending-${fresh.pending_ingestions.length}`, ...input }
+        fresh.pending_ingestions.push(record)
+        storeState = fresh
+        pendingIngestions = storeState.pending_ingestions
+        return record
+      }),
+      listKnownSenders: vi.fn(() => overrides.listKnownSenders ?? ([] as Array<KnownSender>)),
+      decryptKnownSenderPassword: vi.fn(overrides.decryptKnownSenderPassword ?? (() => undefined)),
+    }
+  }
 
   beforeEach(() => {
     vi.resetModules()
-    pendingIngestions = []
+    storeState = makeFinanceStoreState()
+    pendingIngestions = storeState.pending_ingestions
     vi.doMock('./google-oauth', () => ({
       getGmailAccessToken: vi.fn(async () => accessToken),
     }))
-    vi.doMock('./finance-store', () => ({
-      FINANCE_INGESTION_UPLOAD_DIR: '/tmp/gmail-ingest-test-uploads',
-      readFinanceStore: vi.fn(() => ({ settings: {} })),
-      writeFinanceStore: vi.fn(),
-      getCategoryCorrections: vi.fn(() => ({})),
-      listPendingIngestions: vi.fn(() => pendingIngestions),
-      addPendingIngestion: vi.fn((input: Record<string, unknown>) => {
-        const record = { id: `pending-${pendingIngestions.length}`, ...input }
-        pendingIngestions.push(record)
-        return record
-      }),
-      listKnownSenders: vi.fn(() => [] as Array<KnownSender>),
-      decryptKnownSenderPassword: vi.fn(() => undefined),
-    }))
+    vi.doMock('./finance-store', () => financeStoreMock())
     vi.doMock('./document-normalizer', () => ({
       isPdfEncrypted: vi.fn(() => false),
       pdfToImages: vi.fn(() => ({ ok: true, imagePaths: ['/tmp/preview.png'] })),
@@ -150,20 +185,12 @@ describe('syncGmailNow', () => {
       matchAddress: 'e-statement@example-bank.test',
       passwordScheme: 'date of birth, DDMMYYYY',
     })
-    vi.doMock('./finance-store', () => ({
-      FINANCE_INGESTION_UPLOAD_DIR: '/tmp/gmail-ingest-test-uploads',
-      readFinanceStore: vi.fn(() => ({ settings: {} })),
-      writeFinanceStore: vi.fn(),
-      getCategoryCorrections: vi.fn(() => ({})),
-      listPendingIngestions: vi.fn(() => pendingIngestions),
-      addPendingIngestion: vi.fn((input: Record<string, unknown>) => {
-        const record = { id: `pending-${pendingIngestions.length}`, ...input }
-        pendingIngestions.push(record)
-        return record
+    vi.doMock('./finance-store', () =>
+      financeStoreMock({
+        listKnownSenders: [known],
+        decryptKnownSenderPassword: () => 'the-real-password',
       }),
-      listKnownSenders: vi.fn(() => [known]),
-      decryptKnownSenderPassword: vi.fn(() => 'the-real-password'),
-    }))
+    )
     vi.doMock('./document-normalizer', () => ({
       isPdfEncrypted: vi.fn(() => true),
       pdfToImages: vi.fn((_path: string, password?: string) =>
@@ -221,29 +248,22 @@ describe('syncGmailNow', () => {
     const path = await import('node:path')
     const fs = await import('node:fs')
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gmail-ingest-'))
-    vi.doMock('./finance-store', async (importOriginal) => {
-      const actual = await importOriginal<typeof import('./finance-store')>()
-      return {
-        ...actual,
-        FINANCE_INGESTION_UPLOAD_DIR: tmp,
-        readFinanceStore: vi.fn(() => ({ settings: {} })),
-        writeFinanceStore: vi.fn(),
-        getCategoryCorrections: vi.fn(() => ({})),
-        listPendingIngestions: vi.fn(() => pendingIngestions),
-        addPendingIngestion: vi.fn((input: Record<string, unknown>) => {
-          const record = { id: `pending-${pendingIngestions.length}`, ...input }
-          pendingIngestions.push(record)
-          return record
-        }),
-        listKnownSenders: vi.fn(() => [known]),
-        decryptKnownSenderPassword: vi.fn(() => 'the-real-password'),
-      }
-    })
+    vi.doMock('./finance-store', () => ({
+      ...financeStoreMock({
+        listKnownSenders: [known],
+        decryptKnownSenderPassword: () => 'the-real-password',
+      }),
+      FINANCE_INGESTION_UPLOAD_DIR: tmp,
+    }))
 
     const { syncGmailNow } = await import('./gmail-ingest')
     const result = await syncGmailNow()
 
     expect(result.queued).toBe(1)
+    // Regression guard for the 2026-09-11 stale-`db` bug: the queued item
+    // must still be in the store after syncGmailNow's own final settings
+    // write, not just in the function's return value.
+    expect(storeState.pending_ingestions).toHaveLength(1)
     expect(pendingIngestions).toHaveLength(1)
     expect(pendingIngestions[0].status).toBe('awaiting_review')
     expect(pendingIngestions[0].matchedSenderId).toBe(known.id)

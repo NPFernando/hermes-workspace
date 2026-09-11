@@ -367,8 +367,16 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
     ...priorHistory,
     { at: now, found: messageIds.length, queued, skippedAlreadyQueued },
   ].slice(-10)
-  settings.gmailIngest = gmailIngest
-  writeFinanceStore(db)
+  // Re-read rather than reusing the `db` captured at the top of this
+  // function: every addPendingIngestion() call above did its own
+  // independent read/write round-trip via ensureFinanceStore(), so `db`
+  // here is stale — writing it back would silently clobber every
+  // pending_ingestion this run just queued. Confirmed as a real bug via a
+  // live sync test (2026-09-11): syncGmailNow reported queued: 4 but zero
+  // of those 4 rows existed in either store afterward.
+  const freshDb = readFinanceStore()
+  ;(freshDb.settings as Record<string, unknown>).gmailIngest = gmailIngest
+  writeFinanceStore(freshDb)
 
   return { found: messageIds.length, queued, skippedAlreadyQueued }
 }
