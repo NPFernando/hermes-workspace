@@ -23,6 +23,21 @@ import {
   shouldClearWaitingForAssistantMessage,
 } from './chat-screen-utils'
 import {
+  MAX_CHAT_QUEUE_ITEMS,
+  MAX_CHAT_QUEUE_TEXT_LENGTH,
+  createQueuedChatPrompt,
+  getChatQueuePausedStorageKey,
+  getChatQueueStorageKey,
+  parseQueueCommand,
+  readChatQueue,
+  readChatQueuePaused,
+  refreshChatQueueLock,
+  releaseChatQueueLock,
+  tryAcquireChatQueueLock,
+  writeChatQueue,
+  writeChatQueuePaused,
+} from './chat-queue'
+import {
   appendHistoryMessage,
   chatQueryKeys,
   clearHistoryMessages,
@@ -85,6 +100,7 @@ import type { ChatAttachment, ChatMessage, SessionMeta } from './types'
 import type { AgentActivity } from '@/stores/chat-activity-store'
 import type { ArtifactPanelState } from './contexts/artifact-panel-context'
 import type { InlineArtifact } from './components/message-item'
+import type { QueuedChatPrompt } from './chat-queue'
 import { createTask } from '@/lib/tasks-api'
 import { classifyMultiple, classifyOne } from '@/lib/sister-routing'
 import KeyboardShortcuts from '@/components/KeyboardShortcuts'
@@ -479,6 +495,12 @@ export function ChatScreen({
   const setChatFocusMode = useWorkspaceStore((s) => s.setChatFocusMode)
   const queryClient = useQueryClient()
   const [sending, setSending] = useState(false)
+  const [queuedPrompts, setQueuedPrompts] = useState<Array<QueuedChatPrompt>>(
+    [],
+  )
+  const [queuePaused, setQueuePaused] = useState(false)
+  const [activeQueuedPromptState, setActiveQueuedPrompt] =
+    useState<QueuedChatPrompt | null>(null)
   const [_creatingSession, setCreatingSession] = useState(false)
   const [sessionsOpen, setSessionsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -525,7 +547,7 @@ export function ChatScreen({
         ok: boolean
         sisters: Array<SisterOption>
       }
-      return { sisters: data.sisters ?? [] }
+      return { sisters: data.sisters }
     },
     staleTime: 5 * 60 * 1000,
   })
@@ -578,6 +600,18 @@ export function ChatScreen({
     friendlyId: string
     clientId: string
   } | null>(null)
+  const queuedPromptsRef = useRef(queuedPrompts)
+  const drainQueuedPromptRef = useRef<() => void>(() => {})
+  const restoreQueuedPromptRef = useRef<(prompt: QueuedChatPrompt) => void>(
+    () => {},
+  )
+  const activeQueuedPromptRef = useRef<QueuedChatPrompt | null>(null)
+  const queueLockOwnerRef = useRef<string | null>(null)
+  const queuePausedRef = useRef(false)
+  const sendingRef = useRef(sending)
+  useEffect(() => {
+    sendingRef.current = sending
+  }, [sending])
   const [fileExplorerCollapsed, setFileExplorerCollapsed] = useState(() => {
     if (typeof window === 'undefined') return true
     const stored = localStorage.getItem('claude-file-explorer-collapsed')
@@ -631,6 +665,46 @@ export function ChatScreen({
     historyRefetchInterval: sseConnectionState === 'connected' ? 30_000 : 5_000,
     portableMode: isPortableMode,
   })
+
+  const queueSessionKey = isPortableMode
+    ? 'main'
+    : forcedSessionKey ||
+      resolvedSessionKey ||
+      activeSessionKey ||
+      activeFriendlyId ||
+      'main'
+
+  useEffect(() => {
+    const queue = readChatQueue(queueSessionKey)
+    const paused = readChatQueuePaused(queueSessionKey)
+    activeQueuedPromptRef.current = null
+    setActiveQueuedPrompt(null)
+    queuePausedRef.current = paused
+    setQueuePaused(paused)
+    queuedPromptsRef.current = queue
+    setQueuedPrompts(queue)
+  }, [queueSessionKey])
+
+  // Durable queue state can be changed from another workspace tab. Keep the
+  // visible queue/count and paused state synchronized without touching the
+  // active stream in this tab.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const queueKey = getChatQueueStorageKey(queueSessionKey)
+    const pausedKey = getChatQueuePausedStorageKey(queueSessionKey)
+    const syncFromAnotherTab = (event: StorageEvent) => {
+      if (event.storageArea && event.storageArea !== window.localStorage) return
+      if (event.key !== queueKey && event.key !== pausedKey) return
+      const queue = readChatQueue(queueSessionKey)
+      const paused = readChatQueuePaused(queueSessionKey)
+      queuedPromptsRef.current = queue
+      setQueuedPrompts(queue)
+      queuePausedRef.current = paused
+      setQueuePaused(paused)
+    }
+    window.addEventListener('storage', syncFromAnotherTab)
+    return () => window.removeEventListener('storage', syncFromAnotherTab)
+  }, [queueSessionKey])
 
   // --- Waiting state management (Issue #43 + #449) ---
   // resolvedSessionKey is now available (defined above from useChatHistory).
@@ -687,6 +761,95 @@ export function ChatScreen({
       store.clearSessionWaiting(key)
     }
   }, [])
+
+  const enqueueQueuedPrompt = useCallback(
+    (text: string) => {
+      const normalizedText = text.trim()
+      if (!normalizedText) {
+        toast('Queued message cannot be empty', { type: 'error' })
+        return
+      }
+      if (normalizedText.length > MAX_CHAT_QUEUE_TEXT_LENGTH) {
+        toast(
+          `Queued messages are limited to ${MAX_CHAT_QUEUE_TEXT_LENGTH.toLocaleString()} characters`,
+          { type: 'error' },
+        )
+        return
+      }
+      if (queuedPromptsRef.current.length >= MAX_CHAT_QUEUE_ITEMS) {
+        toast(`You can queue up to ${MAX_CHAT_QUEUE_ITEMS} messages per chat`, {
+          type: 'error',
+        })
+        return
+      }
+      const prompt = createQueuedChatPrompt(normalizedText)
+      queuePausedRef.current = false
+      setQueuePaused(false)
+      const nextQueue = [...queuedPromptsRef.current, prompt]
+      queuedPromptsRef.current = nextQueue
+      setQueuedPrompts(nextQueue)
+      writeChatQueue(queueSessionKey, nextQueue)
+      writeChatQueuePaused(queueSessionKey, false)
+      toast(
+        waitingForResponse || sending
+          ? `Queued message ${nextQueue.length} — it will run after this answer`
+          : 'Queued message — starting now',
+        { type: 'success' },
+      )
+      window.setTimeout(() => drainQueuedPromptRef.current(), 0)
+    },
+    [queueSessionKey, sending, waitingForResponse],
+  )
+
+  const clearQueuedPrompts = useCallback(() => {
+    if (
+      queuedPromptsRef.current.length > 0 &&
+      typeof window !== 'undefined' &&
+      !window.confirm('Clear all queued messages for this chat?')
+    ) {
+      return
+    }
+    queuePausedRef.current = false
+    setQueuePaused(false)
+    activeQueuedPromptRef.current = null
+    setActiveQueuedPrompt(null)
+    queuedPromptsRef.current = []
+    setQueuedPrompts([])
+    writeChatQueue(queueSessionKey, [])
+    toast('Queued messages cleared', { type: 'success' })
+  }, [queueSessionKey])
+
+  const resumeQueuedPrompts = useCallback(() => {
+    queuePausedRef.current = false
+    setQueuePaused(false)
+    writeChatQueuePaused(queueSessionKey, false)
+    toast('Queued messages resumed', { type: 'success' })
+    window.setTimeout(() => drainQueuedPromptRef.current(), 0)
+  }, [queueSessionKey])
+
+  const removeQueuedPrompt = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= queuedPromptsRef.current.length) {
+        toast('That queued message number does not exist', { type: 'error' })
+        return
+      }
+      const removed = queuedPromptsRef.current[index]
+      const nextQueue = queuedPromptsRef.current.filter(
+        (_prompt, promptIndex) => promptIndex !== index,
+      )
+      queuedPromptsRef.current = nextQueue
+      setQueuedPrompts(nextQueue)
+      writeChatQueue(queueSessionKey, nextQueue)
+      if (nextQueue.length === 0) {
+        queuePausedRef.current = false
+        setQueuePaused(false)
+      }
+      toast(`Removed queued message: ${removed.text.slice(0, 60)}`, {
+        type: 'success',
+      })
+    },
+    [queueSessionKey],
+  )
   // verification before showing thinking (Issue #449).
   useEffect(() => {
     const currentSessionKey = resolvedSessionKey
@@ -705,7 +868,7 @@ export function ChatScreen({
   // On remount, check if the server still has an active run for this session.
   // If so, re-set waitingForResponse in the store so the UI shows the spinner.
   useActiveRunCheck({
-    sessionKey: resolvedSessionKey ?? '',
+    sessionKey: resolvedSessionKey,
     enabled:
       !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
     onCheckComplete: useCallback(() => {
@@ -1083,7 +1246,7 @@ export function ChatScreen({
         const res = await fetch('/api/hermes-config')
         if (!res.ok) return 'low'
         const data = (await res.json()) as { config?: Record<string, unknown> }
-        const agentSection = data?.config?.agent
+        const agentSection = data.config?.agent
         if (
           agentSection &&
           typeof agentSection === 'object' &&
@@ -1203,14 +1366,7 @@ export function ChatScreen({
     if (thinkingInitializedByUserRef.current) return
     const configEffort = reasoningEffortQuery.data
     if (!configEffort) return
-    if (
-      configEffort === 'off' ||
-      configEffort === 'low' ||
-      configEffort === 'medium' ||
-      configEffort === 'high'
-    ) {
-      setThinkingLevel(configEffort)
-    }
+    setThinkingLevel(configEffort)
   }, [reasoningEffortQuery.data])
 
   // Persist thinking level changes to sessionStorage
@@ -1229,7 +1385,7 @@ export function ChatScreen({
     currentModel, // Real model from session-status (fail closed if empty)
     sessionKey: resolvedSessionKey || 'main',
     messages: historyMessages.map((m) => ({
-      role: m.role as 'user' | 'assistant',
+      role: m.role,
       content: textFromMessage(m),
     })) as any,
     availableModels: availableModelIds,
@@ -1242,9 +1398,7 @@ export function ChatScreen({
     startStreaming,
     cancelStreaming,
   } = useStreamingMessage({
-    pinMainSession:
-      activeFriendlyId === 'main' &&
-      (resolvedSessionKey || activeFriendlyId || 'main') === 'main',
+    pinMainSession: activeFriendlyId === 'main',
     onSessionResolved: useCallback(
       ({
         sessionKey,
@@ -1299,8 +1453,8 @@ export function ChatScreen({
           updateHistoryMessageByClientIdEverywhere(
             queryClient,
             activeSend.clientId,
-            (message) => ({
-              ...message,
+            (currentMessage) => ({
+              ...currentMessage,
               status: 'done',
             }),
           )
@@ -1313,21 +1467,32 @@ export function ChatScreen({
           )
         }
         activeSendRef.current = null
+        releaseChatQueueLock(queueSessionKey, queueLockOwnerRef.current)
+        queueLockOwnerRef.current = null
+        activeQueuedPromptRef.current = null
+        setActiveQueuedPrompt(null)
+        queuePausedRef.current = false
+        setQueuePaused(false)
+        writeChatQueuePaused(queueSessionKey, false)
         refreshHistoryRef.current()
         setSending(false)
+        sendingRef.current = false
         // Clear waitingForResponse so ThinkingBubble hides and message renders
         streamFinish()
+        waitingForResponseRef.current = false
+        window.setTimeout(() => drainQueuedPromptRef.current(), 0)
         // Play notification sound if the user opted in (Settings → Chat).
         // Read directly from the store to avoid re-creating this callback on every settings change.
         if (useChatSettingsStore.getState().settings.soundOnChatComplete) {
           playChatComplete()
         }
       },
-      [queryClient, streamFinish],
+      [queryClient, queueSessionKey, streamFinish],
     ),
     onError: useCallback(
       (messageText: string) => {
         const activeSend = activeSendRef.current
+        const activeQueuedPrompt = activeQueuedPromptRef.current
         if (activeSend?.clientId && !isMissingAuth(messageText)) {
           updateHistoryMessageByClientIdEverywhere(
             queryClient,
@@ -1339,6 +1504,13 @@ export function ChatScreen({
           )
         }
         activeSendRef.current = null
+        releaseChatQueueLock(queueSessionKey, queueLockOwnerRef.current)
+        queueLockOwnerRef.current = null
+        activeQueuedPromptRef.current = null
+        setActiveQueuedPrompt(null)
+        if (activeQueuedPrompt) {
+          restoreQueuedPromptRef.current(activeQueuedPrompt)
+        }
         setSending(false)
         if (isMissingAuth(messageText)) {
           if (!embedded) {
@@ -1357,7 +1529,7 @@ export function ChatScreen({
         setPendingGeneration(false)
         setWaitingForResponse(false)
       },
-      [navigate, queryClient],
+      [embedded, navigate, queryClient, queueSessionKey],
     ),
     onMessageAccepted: useCallback(
       (_sessionKey: string, friendlyId: string, clientId: string) => {
@@ -1387,7 +1559,12 @@ export function ChatScreen({
       [queryClient],
     ),
     onAbort: useCallback(() => {
+      const activeQueuedPrompt = activeQueuedPromptRef.current
       activeSendRef.current = null
+      activeQueuedPromptRef.current = null
+      if (activeQueuedPrompt) {
+        restoreQueuedPromptRef.current(activeQueuedPrompt)
+      }
       setSending(false)
       setPendingGeneration(false)
       setWaitingForResponse(false)
@@ -1407,7 +1584,7 @@ export function ChatScreen({
   // wanted in either session).
   const navCancelKeyRef = useRef<string | null>(null)
   useEffect(() => {
-    const navKey = `${activeCanonicalKey ?? ''}::${isNewChat ? 'new' : activeFriendlyId}`
+    const navKey = `${activeCanonicalKey}::${isNewChat ? 'new' : activeFriendlyId}`
     if (navCancelKeyRef.current === null) {
       navCancelKeyRef.current = navKey
       return
@@ -1644,14 +1821,14 @@ export function ChatScreen({
       const last = finalDisplayMessages[finalDisplayMessages.length - 1]
       const id = isPortableMode
         ? localStreamingMessageId
-        : last?.role === 'assistant'
+        : last.role === 'assistant'
           ? (last as any).__optimisticId || (last as any).id || null
           : null
       return { isStreaming: true, streamingMessageId: id }
     }
     if (waitingForResponse && finalDisplayMessages.length > 0) {
       const last = finalDisplayMessages[finalDisplayMessages.length - 1]
-      if (last && last.role === 'assistant') {
+      if (last.role === 'assistant') {
         const isStreamingPlaceholder =
           (last as any).__streamingStatus === 'streaming'
         if (!isStreamingPlaceholder) {
@@ -1745,9 +1922,7 @@ export function ChatScreen({
   }, [suggestion, resolvedSessionKey, dismiss])
 
   // Sync chat activity to global store for sidebar orchestrator avatar
-  const setLocalActivity = useChatActivityStore((s) => s.setLocalActivity) as (
-    next: AgentActivity,
-  ) => void
+  const setLocalActivity = useChatActivityStore((s) => s.setLocalActivity)
   useEffect(() => {
     if (liveToolActivity.length > 0) {
       setLocalActivity('tool-use')
@@ -1777,20 +1952,19 @@ export function ChatScreen({
     refetchInterval: 60_000, // Re-check every 60s to clear stale errors
   })
   // Don't show errors for new chats or when SSE is connected
-  const statusError =
-    !isNewChat && connectionState !== 'connected'
-      ? statusQuery.error instanceof Error
+  const statusError = !isNewChat
+    ? statusQuery.error instanceof Error
+      ? {
+          message: statusQuery.error.message,
+          status: (statusQuery.error as Error & { status?: number }).status,
+        }
+      : statusQuery.data && !statusQuery.data.ok
         ? {
-            message: statusQuery.error.message,
-            status: (statusQuery.error as Error & { status?: number }).status,
+            message: statusQuery.data.error || 'Hermes Agent unavailable',
+            status: statusQuery.data.status,
           }
-        : statusQuery.data && !statusQuery.data.ok
-          ? {
-              message: statusQuery.data.error || 'Hermes Agent unavailable',
-              status: statusQuery.data.status,
-            }
-          : null
-      : null
+        : null
+    : null
   const serverError = statusError?.message ?? sessionsError ?? historyError
   const serverErrorStatus = statusError?.status
   const showErrorNotice = Boolean(serverError) && !isNewChat
@@ -1835,7 +2009,7 @@ export function ChatScreen({
       void historyQuery.refetch()
     }, 2000)
     return () => window.clearTimeout(timer)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only
+  }, [])
 
   useEffect(() => {
     function handleSSEDrop() {
@@ -2035,7 +2209,7 @@ export function ChatScreen({
    * Response arrives via SSE stream, not via this function.
    */
   const sendMessage = useCallback(
-    function sendMessage(
+    function sendMessageImpl(
       sessionKey: string,
       friendlyId: string,
       body: string,
@@ -2097,9 +2271,11 @@ export function ChatScreen({
 
       setPendingGeneration(true)
       setSending(true)
+      sendingRef.current = true
       setError(null)
       clearCompletedStreaming()
       setWaitingForResponse(true)
+      waitingForResponseRef.current = true
       activeSendRef.current = {
         sessionKey,
         friendlyId,
@@ -2220,8 +2396,16 @@ export function ChatScreen({
                 )
                 setIsOrchestrating(false)
                 setOrchestratingSisterIds([])
+                activeQueuedPromptRef.current = null
+                setActiveQueuedPrompt(null)
+                queuePausedRef.current = false
+                setQueuePaused(false)
+                writeChatQueuePaused(queueSessionKey, false)
                 streamFinish()
                 setSending(false)
+                sendingRef.current = false
+                waitingForResponseRef.current = false
+                window.setTimeout(() => drainQueuedPromptRef.current(), 0)
                 return
               }
               // Single-sister: use sister_id returned directly from the same call
@@ -2237,10 +2421,8 @@ export function ChatScreen({
           } catch {
             // Orchestration timed out or failed — Astra handles it
           } finally {
-            if (orchTimer) {
-              clearTimeout(orchTimer)
-              orchTimer = null
-            }
+            clearTimeout(orchTimer)
+            orchTimer = null
             setIsOrchestrating(false)
             setOrchestratingSisterIds([])
           }
@@ -2275,6 +2457,7 @@ export function ChatScreen({
       streamFinish,
       streamStart,
       currentModel,
+      queueSessionKey,
     ],
   )
 
@@ -2340,7 +2523,10 @@ export function ChatScreen({
   ])
 
   const retryQueuedMessage = useCallback(
-    function retryQueuedMessage(message: ChatMessage, mode: 'manual' | 'auto') {
+    function retryQueuedMessageImpl(
+      message: ChatMessage,
+      mode: 'manual' | 'auto',
+    ) {
       if (!isRetryableQueuedMessage(message)) return false
 
       const body = textFromMessage(message).trim()
@@ -2408,7 +2594,7 @@ export function ChatScreen({
   )
 
   const flushRetryableMessages = useCallback(
-    function flushRetryableMessages() {
+    function flushRetryableMessagesImpl() {
       for (const message of finalDisplayMessages) {
         retryQueuedMessage(message, 'auto')
       }
@@ -2417,7 +2603,7 @@ export function ChatScreen({
   )
 
   const handleRetryMessage = useCallback(
-    function handleRetryMessage(message: ChatMessage) {
+    function handleRetryMessageImpl(message: ChatMessage) {
       const retryKey = getRetryMessageKey(message)
       retriedQueuedMessageKeysRef.current.delete(retryKey)
       retryQueuedMessage(message, 'manual')
@@ -2426,11 +2612,11 @@ export function ChatScreen({
   )
 
   useEffect(() => {
-    if (connectionState === 'connected' && hasSeenDisconnectRef.current) {
+    if (hasSeenDisconnectRef.current) {
       hasSeenDisconnectRef.current = false
       flushRetryableMessages()
     }
-  }, [connectionState, flushRetryableMessages])
+  }, [flushRetryableMessages])
 
   useEffect(() => {
     if (statusError) {
@@ -2508,11 +2694,11 @@ export function ChatScreen({
       queryClient.setQueryData(
         chatQueryKeys.sessions,
         function upsert(existing: unknown) {
-          const sessions = Array.isArray(existing)
+          const cachedSessions = Array.isArray(existing)
             ? (existing as Array<SessionMeta>)
             : []
           const now = Date.now()
-          const existingIndex = sessions.findIndex((session) => {
+          const existingIndex = cachedSessions.findIndex((session) => {
             return (
               session.friendlyId === friendlyId || session.key === friendlyId
             )
@@ -2527,11 +2713,11 @@ export function ChatScreen({
                 lastMessage,
                 titleStatus: 'idle',
               },
-              ...sessions,
+              ...cachedSessions,
             ]
           }
 
-          return sessions.map((session, index) => {
+          return cachedSessions.map((session, index) => {
             if (index !== existingIndex) return session
             return {
               ...session,
@@ -2559,6 +2745,27 @@ export function ChatScreen({
     (command: string) => {
       const trimmedCommand = command.trim()
       if (!trimmedCommand.startsWith('/')) return false
+
+      const queueCommand = parseQueueCommand(trimmedCommand)
+      if (queueCommand) {
+        if (queueCommand.kind === 'enqueue') {
+          enqueueQueuedPrompt(queueCommand.text)
+        } else if (queueCommand.kind === 'clear') {
+          clearQueuedPrompts()
+        } else if (queueCommand.kind === 'resume') {
+          resumeQueuedPrompts()
+        } else if (queueCommand.kind === 'remove') {
+          removeQueuedPrompt(queueCommand.index)
+        } else if (queuedPromptsRef.current.length === 0) {
+          toast('No messages are queued', { type: 'info' })
+        } else {
+          toast(
+            `${queuedPromptsRef.current.length} message${queuedPromptsRef.current.length === 1 ? '' : 's'} queued`,
+            { type: 'info' },
+          )
+        }
+        return true
+      }
 
       if (trimmedCommand === '/new') {
         // Use the explicit 'new' session sentinel rather than '/chat' alone.
@@ -2660,11 +2867,15 @@ export function ChatScreen({
     [
       activeFriendlyId,
       activeSessionKey,
+      clearQueuedPrompts,
+      enqueueQueuedPrompt,
       finalDisplayMessages,
       forcedSessionKey,
       navigate,
       queryClient,
+      removeQueuedPrompt,
       resolvedSessionKey,
+      resumeQueuedPrompts,
     ],
   )
 
@@ -2782,7 +2993,79 @@ export function ChatScreen({
     ],
   )
 
+  const drainQueuedPrompt = useCallback(() => {
+    if (
+      waitingForResponseRef.current ||
+      sendingRef.current ||
+      queuePausedRef.current
+    )
+      return
+    if (queuedPromptsRef.current.length === 0) return
+    const lockOwner = tryAcquireChatQueueLock(queueSessionKey)
+    if (!lockOwner) return
+    const [nextPrompt, ...remaining] = queuedPromptsRef.current
+
+    queueLockOwnerRef.current = lockOwner
+    queuedPromptsRef.current = remaining
+    setQueuedPrompts(remaining)
+    writeChatQueue(queueSessionKey, remaining)
+    activeQueuedPromptRef.current = nextPrompt
+    setActiveQueuedPrompt(nextPrompt)
+    send(nextPrompt.text, [], false, commandHelpers)
+  }, [queueSessionKey, send])
+
+  const restoreQueuedPrompt = useCallback(
+    (prompt: QueuedChatPrompt) => {
+      const nextQueue = [prompt, ...queuedPromptsRef.current]
+      queuePausedRef.current = true
+      setQueuePaused(true)
+      queuedPromptsRef.current = nextQueue
+      setQueuedPrompts(nextQueue)
+      writeChatQueue(queueSessionKey, nextQueue)
+      writeChatQueuePaused(queueSessionKey, true)
+      toast('Queued message kept after send stopped — use /queue resume', {
+        type: 'error',
+      })
+    },
+    [queueSessionKey],
+  )
+
+  useEffect(() => {
+    drainQueuedPromptRef.current = drainQueuedPrompt
+    restoreQueuedPromptRef.current = restoreQueuedPrompt
+  }, [drainQueuedPrompt, restoreQueuedPrompt])
+
+  // Keep the cross-tab lease alive while a queued prompt is running. Without
+  // renewal, a response longer than the 15-minute lease could be claimed by
+  // another tab and submitted twice.
+  useEffect(() => {
+    if (!activeQueuedPromptState || !queueLockOwnerRef.current) return
+    const renew = () => {
+      refreshChatQueueLock(queueSessionKey, queueLockOwnerRef.current)
+    }
+    const timer = window.setInterval(renew, 5 * 60 * 1000)
+    return () => window.clearInterval(timer)
+  }, [activeQueuedPromptState, queueSessionKey])
+
+  // Resume persisted queue items after a reload/remount, but only once the
+  // active-run check confirms this session is actually idle.
+  useEffect(() => {
+    if (
+      queuedPrompts.length === 0 ||
+      waitingForResponse ||
+      sending ||
+      queuePausedRef.current ||
+      !activeRunCheckDone
+    ) {
+      return
+    }
+    const timer = window.setTimeout(() => drainQueuedPromptRef.current(), 0)
+    return () => window.clearTimeout(timer)
+  }, [activeRunCheckDone, queuedPrompts.length, sending, waitingForResponse])
+
   const handleAbortStreaming = useCallback(() => {
+    const activeQueuedPrompt = activeQueuedPromptRef.current
+    activeQueuedPromptRef.current = null
     const activeSend = activeSendRef.current
     if (activeSend?.clientId) {
       updateHistoryMessageByClientIdEverywhere(
@@ -2795,11 +3078,16 @@ export function ChatScreen({
       )
     }
     activeSendRef.current = null
+    releaseChatQueueLock(queueSessionKey, queueLockOwnerRef.current)
+    queueLockOwnerRef.current = null
+    if (activeQueuedPrompt) {
+      restoreQueuedPromptRef.current(activeQueuedPrompt)
+    }
     cancelStreaming()
     setSending(false)
     setPendingGeneration(false)
     setWaitingForResponse(false)
-  }, [cancelStreaming, queryClient])
+  }, [cancelStreaming, queryClient, queueSessionKey])
 
   const handleRegenerate = useCallback(() => {
     send('/retry', [], false, commandHelpers)
@@ -2828,7 +3116,7 @@ export function ChatScreen({
   useEffect(() => {
     function handleRunCommand(event: Event) {
       const detail = (event as CustomEvent<ChatRunCommandDetail>).detail
-      if (!detail?.command) return
+      if (!detail.command) return
       runPaletteSlashCommand(detail.command)
     }
 
@@ -2841,7 +3129,7 @@ export function ChatScreen({
   useEffect(() => {
     function handleSubmitSelection(event: Event) {
       const detail = (event as CustomEvent<ChatSubmitSelectionDetail>).detail
-      const text = detail?.text?.trim()
+      const text = detail.text.trim()
       if (!text) return
       send(text, [], false, commandHelpers)
     }
@@ -2908,7 +3196,6 @@ export function ChatScreen({
   }, [])
 
   const historyLoading =
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
     (historyQuery.isLoading && !historyQuery.data) || isRedirecting
   const historyEmpty = !historyLoading && finalDisplayMessages.length === 0
   const errorNotice = useMemo(() => {
@@ -2996,7 +3283,9 @@ export function ChatScreen({
           compact ? 'h-full flex-1 min-h-0' : 'h-full',
         )}
       >
-        <KeyboardShortcuts />
+        <KeyboardShortcuts
+          onFocusComposer={() => composerHandleRef.current?.focus()}
+        />
         <div
           className={cn(
             'flex-1 min-h-0 overflow-hidden',
@@ -3036,7 +3325,7 @@ export function ChatScreen({
                 renamingTitle={renamingSessionTitle}
                 wrapperRef={headerRef}
                 onOpenSessions={() => setSessionsOpen(true)}
-                sessions={sessions ?? []}
+                sessions={sessions}
                 activeFriendlyId={activeFriendlyId}
                 onSelectSession={(key) =>
                   void navigate({
@@ -3193,10 +3482,83 @@ export function ChatScreen({
                 }}
               />
             )}
+            {showComposer &&
+              (queuedPrompts.length > 0 || activeQueuedPromptState) && (
+                <div
+                  className="mx-3 mb-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-xs text-[var(--theme-muted)] sm:mx-5"
+                  role="status"
+                  aria-live="polite"
+                  aria-label={`${activeQueuedPromptState ? 'sending one queued message, ' : ''}${queuedPrompts.length} ${queuePaused ? 'paused' : 'queued'} chat messages`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'font-medium',
+                        queuePaused
+                          ? 'text-[var(--theme-warning)]'
+                          : 'text-[var(--theme-text)]',
+                      )}
+                    >
+                      {activeQueuedPromptState
+                        ? 'Sending queued message'
+                        : `${queuedPrompts.length} ${queuePaused ? 'paused' : 'queued'}`}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {activeQueuedPromptState
+                        ? activeQueuedPromptState.text
+                        : `Next: ${queuedPrompts[0]?.text}`}
+                    </span>
+                    {queuePaused && (
+                      <button
+                        type="button"
+                        className="shrink-0 text-[var(--theme-accent)] hover:underline"
+                        onClick={resumeQueuedPrompts}
+                      >
+                        Resume
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="shrink-0 text-[var(--theme-accent)] hover:underline"
+                      onClick={clearQueuedPrompts}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="mt-2 max-h-24 space-y-1 overflow-y-auto border-t border-[var(--theme-border)] pt-2">
+                    {queuedPrompts.map((prompt, index) => (
+                      <div
+                        key={prompt.id}
+                        className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-[var(--theme-hover)]"
+                      >
+                        <span className="w-4 shrink-0 text-right text-[10px] text-[var(--theme-muted)]">
+                          {index + 1}.
+                        </span>
+                        <span
+                          className="min-w-0 flex-1 truncate"
+                          title={prompt.text}
+                        >
+                          {prompt.text}
+                        </span>
+                        <button
+                          type="button"
+                          className="shrink-0 px-1 text-[var(--theme-muted)] hover:text-[var(--theme-danger)]"
+                          aria-label={`Remove queued message ${index + 1}`}
+                          title={`Remove queued message ${index + 1}`}
+                          onClick={() => removeQueuedPrompt(index)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             {showComposer ? (
               <ChatComposer
                 onSubmit={send}
                 onAbort={handleAbortStreaming}
+                allowQueueWhileLoading
                 onResearch={handleResearch}
                 isLoading={sending || waitingForResponse}
                 disabled={sending || hideUi}

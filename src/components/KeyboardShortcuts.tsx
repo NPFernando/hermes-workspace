@@ -1,13 +1,23 @@
 import { useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 
-const KeyboardShortcuts = () => {
+type KeyboardShortcutsProps = {
+  onFocusComposer?: () => void
+}
+
+const KeyboardShortcuts = ({ onFocusComposer }: KeyboardShortcutsProps) => {
   const navigate = useNavigate()
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const ctrl = event.ctrlKey || event.metaKey
       if (!ctrl) return
+
+      if (event.shiftKey && event.key.toLowerCase() === 'q' && onFocusComposer) {
+        event.preventDefault()
+        onFocusComposer()
+        return
+      }
 
       switch (event.key) {
         case 'n': {
@@ -35,7 +45,7 @@ const KeyboardShortcuts = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [navigate])
+  }, [navigate, onFocusComposer])
 
   return null
 }

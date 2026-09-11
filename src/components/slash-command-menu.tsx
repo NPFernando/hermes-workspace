@@ -38,6 +38,17 @@ export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
   { command: '/undo', description: 'Remove the last exchange' },
   { command: '/title', description: 'Name the current session' },
   { command: '/compress', description: 'Manually compress context' },
+  {
+    command: '/queue <message>',
+    description: 'Run a message after the current answer finishes',
+  },
+  { command: '/queue', description: 'Show queued messages' },
+  { command: '/queue clear', description: 'Clear queued messages' },
+  { command: '/queue resume', description: 'Resume a paused message queue' },
+  {
+    command: '/queue remove <number>',
+    description: 'Remove one queued message',
+  },
 
   // Persistent goals (Ralph loop)
   { command: '/goal <text>', description: 'Set standing goal across turns' },
