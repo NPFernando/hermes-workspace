@@ -306,6 +306,8 @@ export interface LlmCycleResult {
 
 export interface LlmCycleOptions {
   client?: BinanceExecutionClient
+  /** Override HARP discovery for deterministic callers and unit tests. */
+  routes?: Array<HarpRoute>
   fetchKlines?: (
     symbol: string,
     interval: string,
@@ -349,7 +351,8 @@ async function runLlmCycleInner(
     }
   }
 
-  const routes = selectHarpRoutes(config.harpTask, config.harpRisk)
+  const routes =
+    options.routes ?? selectHarpRoutes(config.harpTask, config.harpRisk)
   if (routes.length === 0)
     return { ran: false, reason: 'no HARP OpenRouter route available' }
 

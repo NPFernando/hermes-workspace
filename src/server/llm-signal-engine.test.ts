@@ -270,6 +270,7 @@ describe('runLlmSignalCycle gating', () => {
     })
     const result = await runLlmSignalCycle({
       client: fakeClient as never,
+      routes: [{ model: 'test-model', provider: 'openrouter', tier: 'free' }],
       callModel,
     })
     expect(result.ran).toBe(true)
@@ -305,6 +306,7 @@ describe('runLlmSignalCycle gating', () => {
     })
     const result = await runLlmSignalCycle({
       client: fakeClient as never,
+      routes: [{ model: 'test-model', provider: 'openrouter', tier: 'free' }],
       callModel,
     })
     expect(result.ran).toBe(true)

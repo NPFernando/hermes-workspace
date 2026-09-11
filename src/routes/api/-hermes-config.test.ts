@@ -40,6 +40,12 @@ beforeEach(() => {
   setEnv('HERMES_HOME', tmpHome)
   setEnv('CLAUDE_HOME', undefined)
   authState.authenticated = true
+  // Re-register the default after vi.resetModules(). The capability-negative
+  // test temporarily overrides this module, and CI may reuse its worker.
+  vi.doMock('../../server/gateway-capabilities', () => ({
+    ensureGatewayProbed: vi.fn(),
+    getCapabilities: () => ({ config: true }),
+  }))
   vi.resetModules()
 })
 

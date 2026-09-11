@@ -10,14 +10,11 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
 import { getRootSurfaceState } from './-root-layout-state'
 import type { AuthStatus } from '@/lib/claude-auth'
-import { SearchModal } from '@/components/search/search-modal'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import KeyboardShortcuts from '@/components/KeyboardShortcuts'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { Toaster } from '@/components/ui/toast'
-import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
-import { NotificationHub } from '@/components/notification-hub'
 import {
   applyInterfacePreferences,
   initializeSettingsAppearance,
@@ -39,6 +36,21 @@ import { safeErrorMessage } from '@/lib/error-utils'
 
 const UsageMeter = lazy(() =>
   import('@/components/usage-meter').then((m) => ({ default: m.UsageMeter })),
+)
+const SearchModal = lazy(() =>
+  import('@/components/search/search-modal').then((m) => ({
+    default: m.SearchModal,
+  })),
+)
+const KeyboardShortcutsModal = lazy(() =>
+  import('@/components/keyboard-shortcuts-modal').then((m) => ({
+    default: m.KeyboardShortcutsModal,
+  })),
+)
+const NotificationHub = lazy(() =>
+  import('@/components/notification-hub').then((m) => ({
+    default: m.NotificationHub,
+  })),
 )
 const OnboardingTour = lazy(() =>
   import('@/components/onboarding/onboarding-tour').then((m) => ({
@@ -68,7 +80,7 @@ const APP_CSP = [
 ].join('; ')
 
 const THEME_STORAGE_KEY = 'claude-theme'
-const DEFAULT_THEME = 'odysseus'
+const DEFAULT_THEME = 'claude-nous'
 const VALID_THEMES = [
   'claude-nous',
   'claude-nous-light',
@@ -143,13 +155,6 @@ const themeColorScript = `
     root.style.setProperty('color-scheme', isDark ? 'dark' : 'light')
   } catch {}
 })()
-`
-
-const DEFAULT_SPLASH_HTML = `
-<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px rgba(224,108,117,0.45))" />
-<img src="/claude-banner.png" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.5))" />
-<div style="font:400 14px/1 'JetBrains Mono Variable',ui-monospace,monospace;letter-spacing:0.06em;color:rgba(156,222,242,0.65)">Workspace</div>
-<div style="margin-top:28px;width:140px;height:3px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;position:relative"><div id="splash-bar" style="width:0%;height:100%;background:#f08090;border-radius:3px;transition:width 0.4s ease"></div></div>
 `
 
 export const Route = createRootRoute({
@@ -265,25 +270,14 @@ type ServiceWorkerLike = {
   ) => Promise<unknown>
 }
 
-type CachesLike = {
-  keys: () => Promise<Array<string>>
-  delete: (name: string) => Promise<boolean> | boolean
-}
-
 export async function registerAppServiceWorker({
   serviceWorker,
-  cachesApi,
 }: {
   serviceWorker?: ServiceWorkerLike
-  cachesApi?: CachesLike
 }): Promise<void> {
-  try {
-    const cacheNames = (await cachesApi?.keys()) ?? []
-    await Promise.all(cacheNames.map((name) => cachesApi?.delete(name)))
-  } catch (error) {
-    console.warn('PWA cache cleanup failed', error)
-  }
-
+  // Do not clear browser caches on every mount. The service worker owns
+  // versioned cache cleanup during activation; purging here made every
+  // reload a cold launch and amplified the duplicate-loading perception.
   await serviceWorker
     ?.register('/sw.js', { scope: '/' })
     .catch((error: unknown) => {
@@ -315,6 +309,13 @@ function RootLayout() {
   useEffect(() => {
     setMounted(true)
     initializeSettingsAppearance()
+
+    // The inline SSR splash belongs only to the pre-hydration bootstrap. Once
+    // React owns the document, dismiss it from the root layout rather than
+    // waiting for a particular child surface (such as the connection checker)
+    // to mount. This prevents the themed bootstrap and a runtime startup
+    // surface from ever being visible as duplicate loading screens.
+    window.__dismissSplash?.()
 
     const syncOnboardingCompletion = () => {
       try {
@@ -348,7 +349,6 @@ function RootLayout() {
     void registerAppServiceWorker({
       serviceWorker:
         'serviceWorker' in navigator ? navigator.serviceWorker : undefined,
-      cachesApi: 'caches' in window ? caches : undefined,
     })
 
     return () => {
@@ -440,7 +440,7 @@ function RootLayout() {
               <GlobalShortcutListener />
               <TerminalShortcutListener />
               <KeyboardShortcuts />
-              <WorkspaceShell>
+              <WorkspaceShell initialAuthStatus={authStatus}>
                 <ErrorBoundary
                   className="h-full min-h-0 flex-1"
                   title="Something went wrong"
@@ -449,13 +449,19 @@ function RootLayout() {
                   <Outlet />
                 </ErrorBoundary>
               </WorkspaceShell>
-              <SearchModal />
+              <Suspense fallback={null}>
+                <SearchModal />
+              </Suspense>
               {/* Keep UsageMeter mounted so search-modal OPEN_USAGE still works even when the pill is hidden by default. */}
               <Suspense fallback={null}>
                 <UsageMeter visible={settings.showUsageMeter} />
               </Suspense>
-              <KeyboardShortcutsModal />
-              <NotificationHub />
+              <Suspense fallback={null}>
+                <KeyboardShortcutsModal />
+              </Suspense>
+              <Suspense fallback={null}>
+                <NotificationHub />
+              </Suspense>
               {rootSurfaceState.showPostOnboardingOverlays ? (
                 <Suspense fallback={null}>
                   <OnboardingTour />
@@ -499,15 +505,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         />
       </head>
       <body>
-        {/* The inline splash bootstrap mutates this node before React hydrates.
-            Keep default splash markup in the server/client tree, then suppress
-            parent-level style/theme mutations for this intentionally browser-owned DOM. */}
+        {/* Stable marker retained so older cached scripts can safely no-op. The
+            mounted app owns login, onboarding, and connection states. */}
         <div
           id="splash-screen"
           aria-hidden="true"
           suppressHydrationWarning
           style={{ display: 'none' }}
-          dangerouslySetInnerHTML={{ __html: DEFAULT_SPLASH_HTML }}
         />
         <script
           dangerouslySetInnerHTML={{
@@ -515,50 +519,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           (function(){
             var d = document.getElementById('splash-screen');
             if (!d) return;
-            var bg = '#282c34', txt = '#9cdef2', muted = 'rgba(156,222,242,0.65)', accent = '#f08090';
-            var isDark = true;
-            var fontStack = "'JetBrains Mono Variable',ui-monospace,monospace";
-            var letterSpacing = '0.06em';
-            var gridStyle = ';background-image:radial-gradient(rgba(53,90,102,0.45) 1px,transparent 1px);background-size:20px 20px';
-            var terminalQuips = ['> initializing agent runtime...','> loading ancient knowledge...','> calibrating tool chain...','> summoning your agent...','> bridging realms...','> connecting to Hermes...'];
-            var quip = terminalQuips[Math.floor(Math.random() * terminalQuips.length)];
-
-            d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:'+bg+';transition:opacity 0.5s ease'+gridStyle+';';
-            d.innerHTML = '<img src="/claude-avatar.webp" alt="Hermes Agent" style="width:80px;height:80px;margin-bottom:20px;border-radius:16px;filter:drop-shadow(0 8px 32px color-mix(in srgb,'+accent+' 45%, transparent))" />'
-              + '<img src="'+(isDark ? '/claude-banner.png' : '/claude-banner-light.png')+'" alt="Hermes Workspace" style="width:280px;height:auto;margin-bottom:8px;filter:drop-shadow(0 4px 16px '+(isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)')+')" />'
-              + '<div style="font:400 14px/1 '+fontStack+';letter-spacing:'+letterSpacing+';color:'+muted+'">Workspace</div>'
-              + (quip ? '<div style="margin-top:10px;font:400 11px/1 '+fontStack+';letter-spacing:0.08em;color:'+accent+';opacity:0.6">'+quip+'</div>' : '')
-              + '<div style="margin-top:28px;width:140px;height:3px;background:'+(isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')+';border-radius:3px;overflow:hidden;position:relative"><div id=splash-bar style="width:0%;height:100%;background:'+accent+';border-radius:3px;transition:width 0.4s ease"></div></div>';
-
-            var bar = document.getElementById('splash-bar');
-            if (bar) {
-              setTimeout(function(){ bar.style.width='15%' }, 300);
-              setTimeout(function(){ bar.style.width='40%' }, 800);
-              setTimeout(function(){ bar.style.width='65%' }, 1500);
-              setTimeout(function(){ bar.style.width='85%' }, 2500);
-              setTimeout(function(){ bar.style.width='92%' }, 3200);
-            }
-
             window.__dismissSplash = function() {
               var el = document.getElementById('splash-screen');
               if (!el) return;
-              if (bar) bar.style.width = '100%';
-              setTimeout(function(){
-                el.style.opacity = '0';
-                setTimeout(function(){
-                  el.innerHTML = '';
-                  el.style.cssText = 'display:none';
-                }, 500);
-              }, 300);
+              el.replaceChildren();
+              el.style.cssText = 'display:none';
             };
-            // Fallback: always dismiss after 5s
-            setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 5000);
-            // Fast dismiss: returning users skip quickly
-            try {
-              if (localStorage.getItem('claude-claude-url') || localStorage.getItem('claude-url')) {
-                setTimeout(function(){ window.__dismissSplash && window.__dismissSplash(); }, 600);
-              }
-            } catch(e) {}
+            window.__dismissSplash();
           })()
         `),
           }}
@@ -568,22 +535,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <script
           dangerouslySetInnerHTML={{
             __html: wrapInlineScript(`
-          (function(){
-            var fired = false;
-            function dismiss() {
-              if (fired) return;
-              fired = true;
-              if (obs) obs.disconnect();
-              window.__dismissSplash && window.__dismissSplash();
-            }
-            var obs = new MutationObserver(function() {
-              var el = document.querySelector('nav, aside, .workspace-shell, .lp-card, [data-testid]');
-              if (el) dismiss();
-            });
-            obs.observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
-            // Fallback: dismiss after 6s if MutationObserver never fires
-            setTimeout(dismiss, 6000);
-          })()
+          // Kept as a no-op compatibility hook for older cached bundles. The
+          // current bootstrap script dismisses the hidden marker immediately,
+          // and the mounted root calls the same idempotent function once more.
+          if (window.__dismissSplash) window.__dismissSplash();
         `),
           }}
         />
