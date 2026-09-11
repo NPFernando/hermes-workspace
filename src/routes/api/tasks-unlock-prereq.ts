@@ -4,6 +4,12 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { listTasks, updateTask } from '../../server/tasks-store'
 import { runAgentDeployBackground } from '../../server/astra-tasks'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 // ---------------------------------------------------------------------------
 // POST /api/tasks-unlock-prereq
@@ -21,6 +27,13 @@ export const Route = createFileRoute('/api/tasks-unlock-prereq')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (
+          !rateLimit(`tasks-unlock-prereq:${getClientIp(request)}`, 10, 60_000)
+        ) {
+          return rateLimitResponse()
         }
 
         let body: { prereq_id?: string } = {}
@@ -108,7 +121,7 @@ export const Route = createFileRoute('/api/tasks-unlock-prereq')({
       },
 
       // GET: return info about which tasks are gated on which prereqs
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

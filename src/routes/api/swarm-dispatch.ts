@@ -6,6 +6,13 @@ import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
+import {
   newestCheckpointFromMessages,
   parseSwarmCheckpoint,
 } from '../../server/swarm-checkpoints'
@@ -24,7 +31,6 @@ import {
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
-import { safeErrorMessage } from '../../server/rate-limit'
 import type { SwarmRosterWorker } from '../../server/swarm-roster'
 import type { ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 
@@ -216,6 +222,7 @@ function execFileAsync(
   args: Array<string>,
   timeout = 8_000,
   input?: string,
+  options?: { env?: NodeJS.ProcessEnv },
 ): Promise<
   { ok: true; stdout: string; stderr: string } | { ok: false; error: string }
 > {
@@ -223,7 +230,11 @@ function execFileAsync(
     const child = execFile(
       cmd,
       args,
-      { timeout, maxBuffer: MAX_OUTPUT_CHARS },
+      {
+        timeout,
+        maxBuffer: MAX_OUTPUT_CHARS,
+        ...(options?.env ? { env: options.env } : {}),
+      },
       (error, stdout, stderr) => {
         if (error) {
           resolve({
@@ -266,13 +277,10 @@ function shellEscapeSingle(value: string): string {
 export function buildHermesTmuxLaunchCommand(input: {
   profilePath: string
   hermesBin: string
-  ghToken?: string | null
 }): string {
   const launchPrefix = [
     `HERMES_HOME='${shellEscapeSingle(input.profilePath)}'`,
     `HERMES_CLI_BIN='${shellEscapeSingle(input.hermesBin)}'`,
-    input.ghToken ? `GH_TOKEN='${shellEscapeSingle(input.ghToken)}'` : '',
-    input.ghToken ? `GITHUB_TOKEN='${shellEscapeSingle(input.ghToken)}'` : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -1061,11 +1069,15 @@ async function ensureLiveTmuxSession(
   ensureSwarmProfileConfig(profilePath)
   const cwd = resolveWorkerCwd(workerId)
   const hermesBin = resolveHermesBin()
+  const ghToken = resolveGithubToken()
   const launchCommand = buildHermesTmuxLaunchCommand({
     profilePath,
     hermesBin,
-    ghToken: resolveGithubToken(),
   })
+
+  const tmuxEnv = ghToken
+    ? { ...process.env, GH_TOKEN: ghToken, GITHUB_TOKEN: ghToken }
+    : process.env
 
   const started = await execFileAsync(tmuxBin, [
     'new-session',
@@ -1074,7 +1086,7 @@ async function ensureLiveTmuxSession(
     sessionName,
     '-c',
     cwd,
-  ])
+  ], 8_000, undefined, { env: tmuxEnv })
   if (!started.ok) {
     return { ok: false, error: started.error }
   }
@@ -1740,6 +1752,11 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`swarm-dispatch:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
         }
 
         let body: DispatchRequest

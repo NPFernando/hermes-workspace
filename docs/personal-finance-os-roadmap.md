@@ -33,15 +33,15 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | C     | **existing** | The actual read-cutover — `overlaySplitStores()` reads personal-finance collections and settings from Postgres first, with an automatic JSON fallback and a manual kill switch (`HERMES_PERSONAL_FINANCE_READ_SOURCE=json`). Writes still go to both JSON and Postgres. See Shipped note.                                                                                |
 | D     | **existing** | Cleanup — the JSON split store is retired (frozen read-only), `overlaySplitStores()` collapsed to a clean two-tier Postgres → base-file fallback, dead code removed. Naveen asked to proceed immediately rather than wait out an observation period. See Shipped note.                                                                                                   |
 
-**Project status: complete.** Personal finance is now genuinely Postgres-primary end to end — all 27 tables, real reads, real writes, the JSON split-store mirror retired. As of the 2026-09 Postgres-only cutover, **no JSON file is a system of record**: the `finance` Postgres DB is the sole store, and `~/.hermes/finance/audit.jsonl` is a best-effort outage-only recovery buffer (the old `finance.json` write path is gone). The frozen `personal-finance.json.frozen-phaseD-20260902` snapshot remains as a point-in-time rollback reference until the legacy `personal_finance` DB is dropped (~2026-09-21).
+**Project status: complete.** Personal finance is now genuinely Postgres-primary end to end — all 27 tables, real reads, real writes, the JSON split-store mirror retired. The base `finance.json` file remains as an always-fresh, real-time-updated safety net (not a separate mirror to maintain), plus the frozen `personal-finance.json.frozen-phaseD-20260902` snapshot as a point-in-time rollback reference.
 
-**Deliberately out of scope for this whole project**: the trading-shared remainder of `FinanceSettings` (`tradingMode`, `liveTradingEnabled`, `demoTrading*` config, `strategyBaselines`, etc.) stays exactly where it is today, persisted through `finance-postgres-store.ts`. **Those keys and their persistence must never be touched.** Transport/plumbing edits to `finance-postgres-store.ts` itself (the Postgres-only cutover made several) are fine; the trading-owned settings subset is not.
+**Deliberately out of scope for this whole project**: the trading-shared remainder of `FinanceSettings` (`tradingMode`, `liveTradingEnabled`, `demoTrading*` config, `strategyBaselines`, etc.) stays exactly where it is today, mirrored through `finance-postgres-store.ts` — the file this session is permanently forbidden from editing. Only the personal-finance-owned subset of settings is part of this migration.
 
 ## Current State Summary
 
 **What's genuinely working today** (built across PRs #53-#72 this session): jobs/employment tracking with AI contract extraction + risk review + re-analysis + payday tracking + contract-expiry alerts; CSE stock holdings with live price refresh, manual fallback, edit, and P/L; fixed deposits with maturity tracking; budget vs. actual with an overspend badge; savings goals with progress tracking; a full AI document-ingestion pipeline (receipts, bills, contracts) with confidence scoring and mandatory human review before anything is committed; manual Gmail sync into that same review queue; a weekly Telegram digest covering net worth, income/expenses, budget overspend, payday, FD maturity, and contract expiry; JSON data export; and a strict architectural separation between Personal Finance and the Trading engine (separate Postgres databases, separate screens, a dedicated lightweight API path).
 
-**The single biggest structural gap**: there is no unified transaction ledger. `income_records` and `expense_records` are separate flat collections with no transfers, splits, merchant registry, tags, or reconciliation status. Nearly every phase from 6 onward (credit cards, bills/subscriptions, forecasting, goals v2, all of CSE ledger/research/signals, analytics, scenarios, loans) depends on this existing first. This is why **Phase 1 (Core Financial Ledger)** is the recommended next major undertaking, not a quick win.
+**The single biggest structural gap**: the ledger is still additive rather than fully normalized. `income_records` and `expense_records` remain separate flat collections, while the unified read model supports ordinary income/expense rows, linked same-currency transfers, and grouped expense splits without rewriting storage. Merchant registry, tags, and reconciliation status are also available. Nearly every phase from 6 onward (credit cards, bills/subscriptions, forecasting, goals v2, all of CSE ledger/research/signals, analytics, scenarios, loans) still depends on completing the normalized ledger foundation.
 
 **Two previously-flagged UI bugs are already fixed** (confirmed 2026-09-03, stale text below left for history): fixed deposits now show the `p.a.` qualifier and stock holdings gain/loss now shows the percentage alongside it.
 
@@ -49,7 +49,7 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 
 ## Phase 0 — Current Build Audit and Corrections
 
-**Goal:** Understand and stabilize what already exists. **Depends on:** none. **Status:** partial (this document is the audit; two corrections confirmed, not yet fixed).
+**Goal:** Understand and stabilize what already exists. **Depends on:** none. **Status:** complete for the audited scope; the two display corrections are shipped, while the remaining workspace-wide UI-language cleanup stays tracked under PF-008.
 
 | ID     | Feature                                     | Status       | Note                                                                                                                                                                                                       |
 | ------ | ------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -57,18 +57,18 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | PF-001 | Current Database Schema Audit               | existing     | See Current State Summary + `FinanceDatabase` type in `src/server/finance-store.ts`                                                                                                                        |
 | PF-002 | Current API Audit                           | existing     | Single `/api/finance` action-dispatch family, `?scope=personal_finance` lightweight variant added this session                                                                                             |
 | PF-003 | Current UI/Page Inventory                   | existing     | 5-tab `personal-finance-screen.tsx` (Overview/Income & Jobs/Investments/Accounts & Records/Ingestion)                                                                                                      |
-| PF-004 | Current Calculation Validation              | partial      | 1288 unit tests cover most computed values; no standalone "calculation validation" doc                                                                                                                     |
-| PF-005 | Fix Currency Display Inconsistencies        | planned      | `formatLkr()` only handles LKR; other currencies use raw string interpolation in a few places                                                                                                              |
+| PF-004 | Current Calculation Validation              | complete     | Named calculation validation map plus cross-calculator regression coverage; full-suite validation remains part of release checks                                                                                 |
+| PF-005 | Fix Currency Display Inconsistencies        | **existing** | Shared `formatMoney(amount, currency)` is used across multi-currency summaries and transaction/audit displays; LKR-converted values intentionally use `formatLkr()` |
 | PF-006 | Fix Fixed Deposit Rate Labelling            | **existing** | Add-form placeholder and row display now show "% p.a.", helper text says "annual interest rate" explicitly — display-text only, `interestRatePct` was already stored unambiguously                         |
 | PF-007 | Improve Investment P/L Display              | **existing** | `financeSummary()` returns `unrealizedStockPnlPct` alongside the existing LKR figure; shown on the Overview StatCard and per-holding row, e.g. "+LKR 200 (+20.0%)"                                         |
-| PF-008 | Remove Developer/API Language From User UI  | planned      | Not yet audited line-by-line                                                                                                                                                                               |
+| PF-008 | Remove Developer/API Language From User UI  | partial      | Personal Finance surfaces now use user-facing data/storage wording; onboarding, provider setup, connection, and settings-dialog copy were refined, while a complete workspace-wide audit remains |
 | PF-009 | Standardize Money Formatting                | **existing** | Shared `formatMoney(amount, currency)` in `utils.ts`; 4 duplicated reimplementations deduplicated, and 2 real mislabeling bugs (stock holdings, fixed deposits showing "LKR" for non-LKR currencies) fixed |
-| PF-010 | Standardize Date Handling                   | planned      | Not yet audited line-by-line                                                                                                                                                                               |
-| PF-011 | Add Current Feature Regression Tests        | partial      | 1288 tests exist covering this session's work; not organized as a named regression suite                                                                                                                   |
+| PF-010 | Standardize Date Handling                   | **existing** | Personal Finance user-facing timestamps now use shared `formatDateTime()`/`formatDateOnly()` helpers with stable `en-LK` formatting and invalid-date fallbacks |
+| PF-011 | Add Current Feature Regression Tests        | complete     | Dedicated `personal-finance-regression.test.ts` covers calculator identities, budget rollups, bounds, and the finance-agent contract                                                               |
 
 ## Phase 1 — Core Financial Ledger
 
-**Goal:** Unified accounts + transactions as the foundation everything else depends on. **Depends on:** Phase 0. **Status:** partial — Account Model shipped, Unified Transaction Model is next.
+**Goal:** Unified accounts + transactions as the foundation everything else depends on. **Depends on:** Phase 0. **Status:** partial — additive unified reads and grouped transfer/split writes are shipped; normalized storage and a formal double-entry ledger remain future work.
 
 | ID     | Feature                                | Status                 | Note                                                                                                                                                                                                                                                                                                |
 | ------ | -------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -77,18 +77,18 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | PF-102 | Account UI                             | **existing**           | Dedicated `AccountsPanel` (add/edit/delete, per-currency total, opening-balance display) replaces the generic DataTable                                                                                                                                                                             |
 | PF-103 | Opening Balances                       | **existing**           | Optional `openingBalance` + `openingBalanceDate`, shown as a secondary line per account                                                                                                                                                                                                             |
 | PF-104 | Unified Transaction Model              | **existing**           | Additive read view — `getUnifiedTransactions()` (`finance-store.ts`) maps `income_records`/`expense_records` into one shared shape/sort order; storage itself stays split (deliberate, see Shipped note below)                                                                                      |
-| PF-105 | Transaction CRUD                       | **partial (stronger)** | One `TransactionsPanel` now does add/edit/delete for both kinds from a single UI, but there's still no formal transaction-type enum and each kind keeps its own field set under the hood                                                                                                            |
-| PF-106 | Transaction Types                      | planned                | Deferred by the PF-104 slice — no enum, `kind: 'income' \| 'expense'` only                                                                                                                                                                                                                          |
-| PF-107 | Transfers                              | planned                | Deferred by the PF-104 slice — no transfer/double-entry concept exists                                                                                                                                                                                                                              |
-| PF-108 | Transaction Splits                     | planned                | Deferred by the PF-104 slice                                                                                                                                                                                                                                                                        |
+| PF-105 | Transaction CRUD                       | **partial (stronger)** | One `TransactionsPanel` now does add/edit/delete for both ordinary kinds and paired transfers from a single UI, but each underlying side still keeps its own field set                                                                                                                                                                                  |
+| PF-106 | Transaction Types                      | **existing (read model)** | `UnifiedTransaction.transactionType` is a stable `income`/`expense`/`transfer` enum; legacy rows are inferred from their collection while linked transfers retain their paired metadata, without a risky storage rewrite |
+| PF-107 | Transfers                              | **existing (same-currency)** | `add_transfer` validates two existing same-currency accounts and writes a balanced income/expense pair; unified view shows both sides, summaries exclude them, and deleting either side removes the pair                                                                                  |
+| PF-108 | Transaction Splits                     | **existing (expense allocations)** | `add_split` writes two or more grouped expense rows, preserves category-level budget actuals, updates the selected account once, and deleting one member removes the full group and reverses the balance                                                                                     |
 | PF-109 | Categories                             | **existing**           | `Category` entity + `CategoriesPanel` (add/edit/delete, usage counts, "in use, not yet a category" formalize flow) + shared datalist wired into Transactions/Budget category inputs; free-text `category`/`incomeType` remain the join key for budget-vs-actual, unchanged — no `categoryId` FK yet |
 | PF-110 | Subcategories                          | **existing**           | `Subcategory` entity (name + parentCategory, additive, no FK) managed inline in `CategoriesPanel` — chips per category, usage counts, "in use, not yet a subcategory" formalize flow; also fixed a real bug where `ExpenseRecord.subcategory` was silently blanked on every edit                    |
 | PF-111 | Merchant Registry                      | **existing**           | `Merchant` entity (name + optional defaultCategory, additive, no FK) via `MerchantsPanel`; vendor input in `TransactionsPanel` now autocompletes against known merchants and auto-fills category on blur when the category field is empty                                                           |
 | PF-112 | Tags                                   | **existing**           | `Tag` entity (name + optional notes, additive, no FK) via `TagsPanel`; comma-separated `tags` field on both `ExpenseRecord`/`IncomeRecord`, symmetric input in `TransactionsPanel`, chip display, usage counts/formalize tokenize the delimited field across both record types                      |
 | PF-113 | Pending/Cleared/Reconciled Status      | **existing**           | `status: 'pending' \| 'cleared' \| 'reconciled'` added to `ExpenseRecord`/`IncomeRecord` (default `'cleared'`), plumbed through `getUnifiedTransactions()` and a status select/badge/filter in `TransactionsPanel`                                                                                  |
 | PF-114 | Transaction Search and Filters         | **existing**           | `TransactionsPanel` now also has date-range (From/To) and amount-range (Min/Max) filters, composing with the existing search/kind/status filters — all client-side against the already-present `date`/`amount` fields on `UnifiedTransaction`                                                       |
-| PF-115 | Transaction Audit History              | partial                | `appendAuditLog` covers all mutations generically                                                                                                                                                                                                                                                   |
-| PF-116 | Soft Delete                            | planned                | Deferred by the PF-104 slice — deletes are hard deletes today                                                                                                                                                                                                                                       |
+| PF-115 | Transaction Audit History              | **partial (bounded paginated recent view)** | Transaction add/update/delete/transfer/split events include redacted snapshots and are exposed as a bounded `transactionAudit` payload with search and client pagination; malformed audit lines are skipped for resilient reads, while an unbounded archival audit-log screen remains future work |
+| PF-116 | Soft Delete                            | **partial (transactions)** | Income/expense records now use `deletedAt` tombstones, paired transfers/splits are archived together, summaries and exports exclude them, and the UI exposes a restore action; other finance entities still use hard delete |
 | PF-117 | Finance Calculation Service Foundation | existing               | `finance-store.ts`'s `financeSummary()` etc. already fill this role                                                                                                                                                                                                                                 |
 
 ## Phase 2 — Multi-Currency and FX
@@ -97,17 +97,17 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 
 | ID     | Feature                        | Status       | Note                                                                                                                                                                                               |
 | ------ | ------------------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PF-200 | Currency Model                 | partial      | `CurrencyCode` string type exists                                                                                                                                                                  |
-| PF-201 | Base Currency Configuration    | planned      | LKR assumed hardcoded, not configurable                                                                                                                                                            |
+| PF-200 | Currency Model                 | **existing (normalized extensible codes)** | `CurrencyCode` accepts future codes and finance-record ingestion paths canonicalize user/imported values by trimming and uppercasing before FX and display joins |
+| PF-201 | Base Currency Configuration    | **partial (stronger)** | Validated LKR/AUD/USD reporting-currency setting is persisted through JSON/Postgres and drives the overview/base summary; detailed rule, forecast, and goal surfaces remain LKR-denominated until their schemas are generalized |
 | PF-202 | Original Currency Preservation | **existing** | Deliberate design decision this session — never overwrite AUD with LKR                                                                                                                             |
-| PF-203 | FX Provider Interface          | planned      |                                                                                                                                                                                                    |
-| PF-204 | Historical FX Storage          | planned      |                                                                                                                                                                                                    |
-| PF-205 | Transaction FX                 | partial      | `exchangeRateUsed` field exists on `IncomeRecord`, manual entry only                                                                                                                               |
-| PF-206 | Current Valuation FX           | planned      | No live conversion for non-LKR holdings/FDs                                                                                                                                                        |
-| PF-207 | Manual FX Override             | partial      | `exchangeRateUsed` is manual-entry today, loosely satisfies this                                                                                                                                   |
-| PF-208 | FX Source/Freshness Metadata   | **existing** | `currency`/`exchangeRateSource` now shown/editable in the Tax records table (same fields still not surfaced on `IncomeRecord`, but `IncomeRecord` has no dedicated table today — see Shipped note) |
-| PF-209 | Multi-Currency UI              | partial      | Currency exposure card + per-currency grouped totals exist (PR #69)                                                                                                                                |
-| PF-210 | Multi-Currency Testing         | partial      | Some unit tests touch currency fields, not comprehensive                                                                                                                                           |
+| PF-203 | FX Provider Interface          | **existing** | Explicit user-triggered Frankfurter v2 reference-rate refresh is isolated behind a provider adapter; failures never overwrite stored history |
+| PF-204 | Historical FX Storage          | **existing** | Dated manual exchange rates are persisted, deduplicated per currency pair/date, mirrored to Postgres, and shown in the Records tab                                                                 |
+| PF-205 | Transaction FX                 | **existing** | New and edited income/expense/split transactions resolve the dated stored rate into LKR and retain the applied rate; legacy converted values remain a safe fallback when no rate exists |
+| PF-206 | Current Valuation FX           | **existing** | Current summaries convert foreign cash, stock holdings, fixed deposits, property, goals, and debt into LKR using the latest dated stored rate; missing rates remain excluded rather than guessed |
+| PF-207 | Manual FX Override             | **existing** | Transactions expose an optional per-record FX override; it takes precedence over dated stored rates and is retained on income and expense records |
+| PF-208 | FX Source/Freshness Metadata   | **existing** | Dated exchange rates retain and display source plus observed timestamp; tax-record provenance remains available |
+| PF-209 | Multi-Currency UI              | **partial (stronger)** | Currency exposure card + per-currency grouped totals exist; rows show a read-only approximate amount when a dated stored rate is available and explicitly show when conversion is unavailable |
+| PF-210 | Multi-Currency Testing         | **partial (stronger)** | Dated transaction conversion and override behavior plus direct, inverse, cross-currency, future-rate, missing-rate, same-currency, non-LKR formatting, and currency-code normalization now have regression coverage; broader rendered valuation coverage remains |
 
 ## Phase 3 — Personal Financial Rules
 
@@ -115,17 +115,17 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 
 | ID     | Feature                          | Status                                                                                                                                                                    |
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PF-300 | Financial Rules Model            | planned                                                                                                                                                                   |
-| PF-301 | Financial Rules Settings Page    | planned                                                                                                                                                                   |
-| PF-302 | Minimum Cash Reserve             | planned                                                                                                                                                                   |
+| PF-300 | Financial Rules Model            | **existing** (typed, validated user-authored threshold model persisted through JSON/Postgres)                                                                             |
+| PF-301 | Financial Rules Settings Page    | **existing** (Overview panel for investment, large-transaction, discretionary-spend, and allocation thresholds)                                                            |
+| PF-302 | Minimum Cash Reserve             | **existing** (user-set LKR reserve persisted through JSON/Postgres)                                                                                                       |
 | PF-303 | Emergency Fund Target            | **existing** (settings-driven target, in months of average expenses; see PF-1005/PF-1006 and Shipped note)                                                                |
 | PF-304 | Savings Rate Target              | **existing** (settings-driven target compared against a trailing-3-month ratio-of-sums rate, separate from the existing lifetime `summary.savingsRate`; see Shipped note) |
 | PF-305 | Credit Utilization Threshold     | blocked (no credit cards yet)                                                                                                                                             |
-| PF-306 | Monthly Investment Target        | planned                                                                                                                                                                   |
-| PF-307 | Large Transaction Threshold      | planned                                                                                                                                                                   |
-| PF-308 | Discretionary Spending Threshold | planned                                                                                                                                                                   |
-| PF-309 | Investment Allocation Rules      | planned                                                                                                                                                                   |
-| PF-310 | Rule Validation Engine           | planned                                                                                                                                                                   |
+| PF-306 | Monthly Investment Target        | **existing** (tracks current-month LKR stock/FD additions against the user target and emits a transparent alert)                                                          |
+| PF-307 | Large Transaction Threshold      | **existing** (flags current-month tracked transactions at or above the configured LKR threshold)                                                                         |
+| PF-308 | Discretionary Spending Threshold | **existing** (read-only alert over explicit Dining/Entertainment/Shopping/Discretionary/Hobbies/Leisure categories)                                                       |
+| PF-309 | Investment Allocation Rules      | **existing** (read-only LKR allocation comparison with a mixed-currency/valuation caveat)                                                                                  |
+| PF-310 | Rule Validation Engine           | **existing** (`validateFinancialRules()` rejects invalid ranges and normalizes values before persistence)                                                                   |
 
 ## Phase 4 — Overview V2
 
@@ -134,10 +134,10 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | ID     | Feature                     | Status                   | Note                                                                                                                                                                                                                                                                              |
 | ------ | --------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | PF-400 | Net Worth Engine            | existing                 | `financeSummary().netWorthLkr`                                                                                                                                                                                                                                                    |
-| PF-401 | Liquid Net Worth            | planned                  | Not distinguished from total net worth                                                                                                                                                                                                                                            |
+| PF-401 | Liquid Net Worth            | **existing**             | Overview distinguishes cash, savings-goal balances, stock holdings, and debt as liquid net worth                                                                                                                                            |
 | PF-402 | Available Cash              | existing                 | `cashBalanceLkr`                                                                                                                                                                                                                                                                  |
-| PF-403 | Locked/Illiquid Wealth      | planned                  | FDs contribute to net worth but aren't separately labeled illiquid                                                                                                                                                                                                                |
-| PF-404 | Safe-To-Spend               | planned                  | Depends on Phase 3 rules                                                                                                                                                                                                                                                          |
+| PF-403 | Locked/Illiquid Wealth      | **existing**             | Overview labels fixed deposits and properties as locked wealth alongside liquid net worth                                                                                                                                                |
+| PF-404 | Safe-To-Spend               | **existing** | Overview estimate subtracts configured reserve plus average recorded recurring expenses from the last three months; it explicitly excludes unrecorded commitments |
 | PF-405 | Monthly Income              | existing                 | `totalIncomeLkr` + per-currency active-monthly-income total                                                                                                                                                                                                                       |
 | PF-406 | Monthly Expenses            | existing                 | `totalExpensesLkr`                                                                                                                                                                                                                                                                |
 | PF-407 | Monthly Savings             | existing                 | `netSavingsLkr`                                                                                                                                                                                                                                                                   |
@@ -145,10 +145,10 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | PF-409 | Assets vs Liabilities       | **existing**             | Overview's "Net worth breakdown" chart (renamed "Assets vs. liabilities") now includes a red `Debt` bar alongside the existing asset bars, using the already-computed `debtLkr`                                                                                                   |
 | PF-410 | Monthly Cash Flow           | **existing**             | `FinanceTrendsCard` now plots a derived net (income − expense) line alongside income/expense, plus a legend and "this month's net" subtitle                                                                                                                                       |
 | PF-411 | Upcoming Money              | **existing**             | New `UpcomingMoney` card on the Overview tab merges the existing payday/FD-maturity/contract-expiry badge computations into one sorted, urgency-filtered list                                                                                                                     |
-| PF-412 | Financial Health            | planned                  | No composite score                                                                                                                                                                                                                                                                |
+| PF-412 | Financial Health            | **existing**             | Transparent 100-point score covering savings, emergency fund, budget adherence, debt load, and data confidence, with component explanations on Overview                                                                                                                          |
 | PF-413 | Data Health                 | **existing**             | `financeStorageStatus()` health object now surfaced as a `DataHealthCard` on the Overview tab, tone-coded good/warn/danger; immediately surfaced a real, pre-existing mirror-lag issue on the trading-side Postgres mirror                                                        |
 | PF-414 | Investment Summary          | existing                 | Stock value, unrealized P/L, FD value all on Overview                                                                                                                                                                                                                             |
-| PF-415 | AI Insight Summary          | planned                  |                                                                                                                                                                                                                                                                                   |
+| PF-415 | AI Insight Summary          | **existing**             | Deterministic evidence-linked priority summary from alerts, financial health, budget variance, and safe-to-spend data; no autonomous action or ungrounded AI advice |
 | PF-416 | Responsive Dashboard Layout | **existing** (corrected) | Verified via a real Playwright multi-viewport audit rather than the prior unverified claim — see Shipped note. Actual mechanism is a `flex-wrap` fallback (only 5 of 25 component files use explicit Tailwind breakpoints), not "responsive grid throughout" as previously stated |
 
 ## Phase 5 — Income and Employment V2
@@ -161,15 +161,15 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | PF-501 | Employment Income                   | existing |                                                                   |
 | PF-502 | Contract Income                     | existing | `employmentType:'contract'` + dates                               |
 | PF-503 | Freelance Income                    | existing | Optional `monthlyIncomeAmount`                                    |
-| PF-504 | Dividend/Interest Income Types      | planned  | Free-text `incomeType` field only, not structured to holdings/FDs |
-| PF-505 | Salary History                      | planned  | Only current amount stored, no history over time                  |
+| PF-504 | Dividend/Interest Income Types      | **existing**  | Optional structured `incomeSubtype` (`salary`, `dividend`, `interest`, `freelance`, `other`) alongside the preserved free-text `incomeType` |
+| PF-505 | Salary History                      | **partial (stronger)** | Income history still visualizes recorded monthly income events, and an additive effective-dated salary-rate ledger now persists employer, amount, currency, reason, and source through the Postgres-primary settings path; historical import/automatic extraction remains future work |
 | PF-506 | Expected Payday                     | existing | `expectedPaydayDayOfMonth` + payday badge (PR #67)                |
-| PF-507 | Income Reliability                  | planned  |                                                                   |
+| PF-507 | Income Reliability                  | **existing** | Transparent recorded-income evidence score based on 12-month coverage, consistency, and recency; not a future-income guarantee |
 | PF-508 | Employment Contract Structured Data | existing | Job title, dates, payday, pay schedule all AI-extracted           |
-| PF-509 | Contract Lifecycle                  | partial  | Only active/ended states                                          |
+| PF-509 | Contract Lifecycle                  | **existing** | Income sources support active, paused, notice-period, ended, and terminated states; lifecycle state controls payday and forecast inclusion |
 | PF-510 | Contract Expiry Alerts              | existing | Contract-expiry badge (PR #68)                                    |
 | PF-511 | Contract AI Extraction              | existing | `extractEmploymentContract()` (PR #64)                            |
-| PF-512 | Contract Change Detection           | planned  | Re-analyze exists (PR #70) but doesn't diff old vs. new terms     |
+| PF-512 | Contract Change Detection           | **existing** | Re-analysis compares structured terms against the confirmed job and shows field-level changes before confirmation |
 
 ## Phase 6 — Credit Card Management
 
@@ -185,22 +185,36 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 
 | ID     | Feature               | Status                                                                                            |
 | ------ | --------------------- | ------------------------------------------------------------------------------------------------- |
-| PF-800 | Budget Engine         | partial (`budgetVsActualSummary()`)                                                               |
+| PF-800 | Budget Engine         | **partial (stronger)** (`budgetVsActualSummary()` plus warning thresholds, templates, projected month-end spend, committed recurring spend, rollover, annual rollups, and currency-aware comparisons when dated FX exists; missing-rate states remain explicit) |
 | PF-801 | Category Budgets      | existing                                                                                          |
 | PF-802 | Monthly Budgets       | existing                                                                                          |
-| PF-803 | Annual Budgets        | planned                                                                                           |
+| PF-803 | Annual Budgets        | **existing** (year-to-date category rollup aggregates monthly budgets, actuals, variance, warning state, and tracked months) |
 | PF-804 | Budget vs Actual      | existing                                                                                          |
-| PF-805 | Committed Spend       | planned                                                                                           |
+| PF-805 | Committed Spend       | **existing** (recorded recurring LKR expenses surfaced separately with an explicit unrecorded-commitments caveat) |
 | PF-806 | Remaining Budget      | **existing** (`row.variance` displayed as "Remaining"/"Over by" suffix on each budget `StatCard`) |
-| PF-807 | Projected Spend       | planned                                                                                           |
-| PF-808 | Budget Thresholds     | partial (boolean overBudget only, no configurable %)                                              |
-| PF-809 | Budget Rollover       | planned                                                                                           |
-| PF-810 | Budget Templates      | planned                                                                                           |
-| PF-811 | AI Budget Explanation | planned                                                                                           |
+| PF-807 | Projected Spend       | **existing** (LKR run-rate plus explicitly future-dated recurring entries, with no invented bills) |
+| PF-808 | Budget Thresholds     | **existing** (configurable 50–100% warning threshold, persisted through JSON/Postgres, shown in budget UI) |
+| PF-809 | Budget Rollover       | **existing** (read-only unused prior-month LKR carry-forward; saved budgets are not mutated)       |
+| PF-810 | Budget Templates      | **existing** (save a month’s budget rows as a reusable template; apply to a target month without overwriting existing categories) |
+| PF-811 | AI Budget Explanation | **existing** (authenticated Finance Analyst action uses bounded budget-vs-actual context and explains the current month without mutating data) |
 
 ## Phase 9 — Forecasting
 
-**Depends on:** Phase 1, 3, 7. **Status:** blocked — nothing exists (PF-900 through PF-910).
+**Depends on:** Phase 1, 3, 7. **Status:** partial — PF-900 now has a transparent trailing-complete-month baseline forecast; category forecasts, scenario inputs, and confidence calibration remain planned.
+
+| ID     | Feature                    | Status |
+|--------|----------------------------|--------|
+| PF-900 | Baseline Cash-Flow Forecast | **existing** (three-month trailing run-rate, three-month forward view, explicit coverage and data-count disclosure) |
+| PF-901 | Category Forecast           | **existing** (trailing expense run-rate by category with three-month projection and evidence disclosure) |
+| PF-902 | Income Forecast             | **existing** (active income sources use documented LKR monthly amounts where available, otherwise recorded run-rate; next expected payday is shown when configured) |
+| PF-903 | Expense Forecast            | **existing** (category run-rate plus explicit latest recorded recurring commitments; unrecorded bills are excluded) |
+| PF-904 | Forecast Confidence         | **existing** (transparent low/moderate/high data-quality score based on month coverage, record sample size, and repeated activity; not presented as a guarantee) |
+| PF-905 | Scenario Inputs              | **existing** (session-only income and expense adjustment controls over the verified baseline; no stored data mutation) |
+| PF-906 | Scenario Comparison          | **existing** (baseline, cautious, stress, and optimistic three-month comparisons use the same session-only scenario engine) |
+| PF-907 | Cash-Flow Alerts             | **existing** (read-only negative-flow, sparse-evidence, and high-recurring-commitment alerts with severity and rationale) |
+| PF-908 | Forecast Accuracy Tracking   | **existing** (rolling out-of-sample back-test with per-month error, mean absolute error, and mean absolute percentage error) |
+| PF-909 | Forecast Export              | **existing** (user-triggered, client-side formula-safe CSV containing summary, forecast, categories, income sources, scenarios, and accuracy) |
+| PF-910 | Forecast Explanation         | **existing** (deterministic narrative cites coverage, confidence, leading category, recurring commitments, and measured back-test error) |
 
 ## Phase 10 — Goals, Emergency Funds and Sinking Funds
 
@@ -217,7 +231,7 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | PF-1006 | Emergency Coverage Months          | **existing** (`coverageMonths` — current cash ÷ trailing 3-month average expenses)                                                                                  |
 | PF-1007 | Sinking Funds                      | **existing** (`SavingsGoal.goalKind: 'sinking'`, rendered in `SinkingFundsPanel`; see Shipped note)                                                                 |
 | PF-1008 | Sinking Fund Contribution Schedule | **existing** (computed on-track/behind-schedule comparison, not a persisted installment ledger; see Shipped note)                                                   |
-| PF-1009 | Goal Completion Events             | planned                                                                                                                                                             |
+| PF-1009 | Goal Completion Events             | **existing** (bounded last-20 history records actual incomplete-to-complete transitions and surfaces recent completions)                                               |
 
 ## Phase 11 — CSE Ledger Foundation
 
@@ -229,18 +243,18 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 
 | ID      | Feature                   | Status                                                    |
 | ------- | ------------------------- | --------------------------------------------------------- |
-| CSE-100 | Price Provider Interface  | planned (single hardcoded implementation, no abstraction) |
+| CSE-100 | Price Provider Interface  | **existing** (`CsePriceProvider` seam with the unofficial endpoint as the default provider) |
 | CSE-101 | Current Price             | existing                                                  |
 | CSE-102 | Price Source Metadata     | existing (`priceSource: cse_api\|manual`)                 |
 | CSE-103 | Price Freshness           | existing (staleness display, PR #65)                      |
 | CSE-104 | Manual Price Fallback     | existing                                                  |
-| CSE-105 | Historical Price Store    | planned                                                   |
-| CSE-106 | OHLC Data                 | planned                                                   |
-| CSE-107 | Volume                    | planned                                                   |
-| CSE-108 | Turnover                  | planned                                                   |
-| CSE-109 | Market Index Data         | planned                                                   |
-| CSE-110 | Daily Market Snapshot     | planned                                                   |
-| CSE-111 | Portfolio Snapshots       | planned                                                   |
+| CSE-105 | Historical Price Store    | **existing** (bounded last-365 price observations per holding, persisted in JSON/Postgres and shown in the holdings panel) |
+| CSE-106 | OHLC Data                 | **partial** (daily high, low, and close are stored; the public response does not provide a reliable open) |
+| CSE-107 | Volume                    | **existing** (daily share volume captured with the latest quote) |
+| CSE-108 | Turnover                  | **existing** (daily turnover captured with the latest quote) |
+| CSE-109 | Market Index Data         | **existing** (authenticated CSE market endpoint and portfolio card expose ASPI, S&P SL20, turnover, volume/trades, market cap, and source/date metadata with explicit refresh) |
+| CSE-110 | Daily Market Snapshot     | **partial (stronger)** (manual authenticated refresh and an opt-in systemd capture template persist a private, deduplicated, capped 365-day local history; timer installation/activation remains operator-controlled) |
+| CSE-111 | Portfolio Snapshots       | **existing** (manual net-worth snapshots persist per-holding valuation, cost basis, currency, and quote provenance) |
 | CSE-112 | Provider Failure Handling | existing (`priceFetchFailed` → manual entry)              |
 
 ## Phase 13 — CSE Portfolio V2
@@ -251,17 +265,18 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | ------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | CSE-200 | My Holdings Dashboard        | existing (`StockHoldingsPanel`)                                                                                                           |
 | CSE-201 | Portfolio Summary            | existing                                                                                                                                  |
-| CSE-202 | Allocation                   | planned                                                                                                                                   |
-| CSE-203 | Holding Detail               | **existing** (notes field added on stock holdings, incl. edit; add-only on fixed deposits, which has no edit mode yet — see Shipped note) |
+| CSE-202 | Allocation                   | **existing** (currency-separated symbol allocation uses current quotes and labels buy-price fallback when a quote is unavailable)         |
+| CSE-203 | Holding Detail               | **existing** (notes and full edit modes are available for stock holdings and fixed deposits)                                      |
 | CSE-204 | Price vs Cost                | existing                                                                                                                                  |
 | CSE-205 | P/L %                        | existing (shipped as part of PF-007)                                                                                                      |
-| CSE-206 | Dividend Income              | planned                                                                                                                                   |
-| CSE-207 | Portfolio History            | planned                                                                                                                                   |
-| CSE-208 | Investment Journal           | planned                                                                                                                                   |
-| CSE-209 | Investment Thesis            | planned                                                                                                                                   |
-| CSE-210 | Thesis Health                | planned                                                                                                                                   |
-| CSE-211 | Why I Bought                 | planned                                                                                                                                   |
-| CSE-212 | Sell/Invalidation Conditions | planned                                                                                                                                   |
+| CSE-206 | Dividend Income              | **existing** (linked dividend income records with explicit currency/rate capture and per-holding totals)                                |
+| CSE-207 | Portfolio History            | **existing** (stock holdings show dated captured valuation points and first-to-latest change)                                           |
+| CSE-208 | Investment Journal           | **existing** (linked thesis/review/buy/sell/note entries with optional review dates and guarded CRUD)                                     |
+| CSE-209 | Investment Thesis            | **existing** (structured thesis and explicit invalidation-condition fields are stored with journal entries)                             |
+| CSE-210 | Thesis Health                | **existing** (deterministic per-holding summary marks explicit theses as reviewed, needs review, or overdue from journal evidence; it never infers market health) |
+| CSE-211 | Why I Bought                 | **existing** (journal summary surfaces the latest explicit buy rationale, falling back to the recorded thesis text) |
+| CSE-212 | Sell/Invalidation Conditions | **existing** (journal captures explicit invalidation evidence without initiating trades)                                                |
+| CSE-213 | Concentration Alerts          | **existing** (currency-separated advisory warnings at 50% and critical alerts at 75% concentration)                                    |
 
 ## Phase 14 — CSE Research Foundation
 
@@ -305,18 +320,23 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 
 | ID     | Feature                       | Status   | Note                                                            |
 | ------ | ----------------------------- | -------- | --------------------------------------------------------------- |
-| AI-100 | Finance Manager Agent         | planned  | No named agent; the Finance API is the controlled layer         |
+| AI-100 | Finance Manager Agent         | **existing** | Versioned non-autonomous `finance-manager` profile defines the finance-agent-v1 context, scopes, allowed actions, prohibited actions, and approval-required actions |
 | AI-101 | Finance API Tool Layer        | existing | `/api/finance` action-dispatch                                  |
-| AI-102 | Agent Read Permissions        | partial  | Implicit, no formal scoped-permission model                     |
-| AI-103 | Agent Action Contract         | partial  | `PendingIngestion` confirm/reject is an informal version        |
-| AI-104 | Finance Guard                 | planned  |                                                                 |
+| AI-102 | Agent Read Permissions        | **existing** | Explicit opt-in `agentContext` with `finance.read`; browser UI remains compatible |
+| AI-103 | Agent Action Contract         | **existing** | `finance.write`, `finance.delete`, and `finance.approve` are enforced and denials are audit-logged |
+| AI-104 | Finance Guard                 | **existing** | `financeMutationGuard()` validates mutation kinds, identifiers, structured transfer/split payloads, and explicit delete confirmation before storage dispatch |
 | AI-105 | Agent Audit Log               | existing | `appendAuditLog`                                                |
-| AI-106 | AI Task Records               | planned  |                                                                 |
-| AI-107 | Risk Classification           | planned  |                                                                 |
+| AI-106 | AI Task Records               | **existing** | Finance-scoped `ai_task` records persist in the personal-finance store/Postgres with risk, approval, summaries, and guarded lifecycle transitions |
+| AI-107 | Risk Classification           | **existing** | Finance mutations are classified low/medium/high; rejected requests are audit-logged before storage dispatch |
 | AI-108 | Approval Integration          | existing | Review-before-commit is the approval gate today                 |
-| AI-109 | Context Builder               | planned  |                                                                 |
+| AI-109 | Context Builder               | **existing** | Versioned `finance-agent-v1` read context exposes bounded aggregates and task status counts while excluding raw rows, documents, credentials, and task contents |
 | AI-110 | HARP Routing Integration      | existing | `finance-extraction.ts` uses HARP-routed calls + fallback chain |
-| AI-111 | Sensitive Data Classification | partial  | `maskSensitive()` exists, not a full classification scheme      |
+| AI-111 | Sensitive Data Classification | **existing** | Reusable finance sensitivity map distinguishes aggregated personal data, internal task status, highly sensitive raw records/documents, and secrets; agent context publishes the policy and excludes restricted fields |
+| AI-112 | AI Task History and Review    | **existing** | Paginated, summary-free `list_ai_tasks` endpoint with status/risk/agent/date filters, actor-aware lifecycle history, and dashboard review/audit-detail controls |
+| AI-113 | AI Review Export and Correlation | **existing** | Immutable task correlation IDs, actor-aware transition records, and review-safe CSV export from the Finance Manager panel |
+| AI-114 | Tamper-Evident Audit Retention | **existing** | SHA-256 append-only audit chaining, verification status, configurable retention target, and read-only dashboard diagnostics; no automatic destructive pruning |
+| AI-115 | Operator Audit Pruning       | **existing** | Separate preview and confirmed archive/prune actions; encrypted archive is created first, at least one entry is retained, and the retained chain is re-anchored safely |
+| AI-116 | Audit Archive Inventory      | **existing** | Safe archive metadata inventory and configured-passphrase verification; no automatic restore or merge into live audit history |
 
 ## Phase 24 — Hermes Finance Analyst
 
@@ -329,10 +349,10 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | AI-202 | Saved Q&A History                    | **existing** (`FinanceSettings.financeQaHistory`, capped last-10; see Shipped note)                                                                      |
 | AI-203 | Chart/Visualization Answers          | **existing** (`parseFinanceAnswerJson()`, optional chart in the LLM's strict-JSON response; see Shipped note)                                            |
 | AI-204 | Multi-Turn Conversation              | **existing** (`buildFinanceAnswerPrompt()`, in-session-only `turns` state; see Shipped note)                                                             |
-| AI-205 | Proactive Insights (agent-initiated) | planned — blocked on AI-102/103 (agent read permissions/action contract), since this would need an autonomous agent, not a live user session             |
+| AI-205 | Proactive Insights (agent-initiated) | **partial (stronger)** — explicit opt-in policy, duplicate-safe review-task queue, host-scheduler entrypoint, and an explicit systemd installer/check now exist; timers remain operator-enabled and tasks are review-only/approval-gated |
 | AI-206 | Cross-Reference Trading Data         | **existing** (`tradingSummary` in `buildFinanceQueryContext()`, via `tradingPerformanceSummary(db)`; see Shipped note)                                   |
 | AI-207 | Export Answer as Report              | **existing** (`buildFinanceAnswerMarkdown()`, Copy/Download buttons; see Shipped note)                                                                   |
-| AI-208 | Voice/Chat Widget Integration        | planned                                                                                                                                                  |
+| AI-208 | Voice/Chat Widget Integration        | **existing** (inline Finance Analyst widget supports browser dictation with review-before-submit and optional read-aloud responses; no audio is sent to the finance API) |
 
 ## Phase 25 — Financial Inbox
 
@@ -340,16 +360,16 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 
 | ID     | Feature                 | Status                                                                                                        |
 | ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------- |
-| AI-300 | Financial Inbox         | partial (Ingestion tab is a proto-inbox)                                                                      |
-| AI-301 | Inbox Item Types        | partial (`documentType: transaction\|contract` only)                                                          |
+| AI-300 | Financial Inbox         | **partial (stronger)** — active review queue and history now share safe metadata search; priority ordering, missing-category filtering, duplicate review, and batch approval are also available; a richer persisted inbox taxonomy remains future work |
+| AI-301 | Inbox Item Types        | **existing** (`documentType: transaction\|statement\|contract`)                                               |
 | AI-302 | Receipt Review          | existing                                                                                                      |
-| AI-303 | Statement Review        | planned                                                                                                       |
+| AI-303 | Statement Review        | **existing** (multi-page statement upload extracts posted lines into separate review items before confirmation) |
 | AI-304 | Duplicate Review        | existing (`findPossibleDuplicate` + duplicate-job guard)                                                      |
-| AI-305 | Missing Category Review | planned                                                                                                       |
-| AI-306 | Reconciliation Issues   | planned                                                                                                       |
+| AI-305 | Missing Category Review | **existing** (inbox highlights and filters expense items without a category before confirmation)              |
+| AI-306 | Reconciliation Issues   | **existing** (Records tab flags pending transactions older than 7 days and supports marking them cleared)     |
 | AI-307 | Low Confidence Review   | **existing** (pending-ingestion list now defaults to sorting low/no-confidence items first; see Shipped note) |
-| AI-308 | Batch Approval          | planned                                                                                                       |
-| AI-309 | Inbox Priority          | planned                                                                                                       |
+| AI-308 | Batch Approval          | **existing** (select multiple reviewed transaction extractions and confirm sequentially through the duplicate-aware API) |
+| AI-309 | Inbox Priority          | **existing** (sorts extraction failures, missing categories, and low-confidence items first with priority cues) |
 
 **Fixed (bug, not a new feature slice, 2026-09-01):** camera/photo uploads (AI-302 Receipt Review) failed extraction every time for HEIC/HEIF images — the default photo format on iPhone cameras and many recent Android phones. `readImageAsBase64()` only recognized `.jpg`/`.jpeg` and silently mislabeled everything else, including HEIC, as `image/png`, so both vision extraction routes failed to decode it. Fixed by correctly detecting the real mime type (`mimeTypeForImageExtension()`, `finance-extraction.ts`) — Gemini's API accepts `image/heic`/`image/heif` natively, so no file conversion was needed, just the correct label. The preview thumbnail still can't render HEIC in a browser `<img>` tag (no mainstream browser decodes it), so a "Preview not available for this format" placeholder now shows instead of a broken-image icon. See `git log` on `fix-heic-upload-extraction` for the full change.
 
@@ -359,14 +379,14 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 
 | ID     | Feature                          | Status                                                                                                                                |
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| AI-400 | Document Agent                   | partial (`finance-extraction.ts` functions collectively)                                                                              |
+| AI-400 | Document Agent                   | **partial (stronger)** — specialized extraction, deterministic classification metadata, and a secure document-vault inventory are now wired; autonomous planning/orchestration remains future |
 | AI-401 | Receipt Extraction               | existing                                                                                                                              |
 | AI-402 | Bill Extraction                  | existing                                                                                                                              |
-| AI-403 | Bank Statement Extraction        | planned                                                                                                                               |
+| AI-403 | Bank Statement Extraction        | **existing** (multi-page statement images/PDFs produce separate posted-transaction review items)                                      |
 | AI-404 | Credit Card Statement Extraction | blocked (no credit cards)                                                                                                             |
-| AI-405 | Salary Slip Extraction           | planned                                                                                                                               |
-| AI-406 | Contract Note Extraction         | planned                                                                                                                               |
-| AI-407 | FD Certificate Extraction        | planned                                                                                                                               |
+| AI-405 | Salary Slip Extraction           | **partial (stronger)** (payroll-specific extraction preserves employer, pay period, payment date, gross pay, deductions, net pay, and confidence through review; confirmed net pay becomes an income record) |
+| AI-406 | Contract Note Extraction         | **partial (stronger)** (trade confirmations preserve symbol, side, quantity, execution price, fees, broker, and trade/settlement dates through review; confirmation creates a journal entry only, not a holding or trade execution) |
+| AI-407 | FD Certificate Extraction        | **partial (stronger)** (certificate extraction preserves bank, principal, rate, payout schedule, dates, renewal preference, and confidence through review; confirmation creates a fixed-deposit record without moving funds) |
 | AI-408 | Employment Contract Extraction   | existing                                                                                                                              |
 | AI-409 | Confidence Scoring               | existing                                                                                                                              |
 | AI-410 | Document Linking                 | existing (`documentRef`)                                                                                                              |
@@ -381,7 +401,7 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | AI-500 | Gmail Finance Intake            | existing (`syncGmailNow()`)                                                                                    |
 | AI-501 | Candidate Email Detection       | existing (keyword pre-filter)                                                                                  |
 | AI-502 | Attachment Detection            | existing                                                                                                       |
-| AI-503 | Finance Document Classification | partial                                                                                                        |
+| AI-503 | Finance Document Classification | **partial (stronger)** (deterministic, explainable classification metadata is now attached to Gmail/upload pending items and shown in the review queue; specialized extraction flows remain) |
 | AI-504 | Duplicate Prevention            | existing (`alreadyQueued()`)                                                                                   |
 | AI-505 | Review Queue Integration        | existing                                                                                                       |
 | AI-506 | Sync History                    | **existing** (capped `gmailIngest.syncHistory`, last 10 runs, rendered in the Ingestion tab; see Shipped note) |
@@ -417,7 +437,7 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 
 | ID       | Feature                   | Status                                                                              |
 | -------- | ------------------------- | ----------------------------------------------------------------------------------- |
-| AUTO-100 | Notification Engine       | planned (badges + digest are informal equivalents)                                  |
+| AUTO-100 | Notification Engine       | **partial (stronger)** (audited Telegram delivery with in-app alert visibility, opt-in non-critical delivery, and critical bypass) |
 | AUTO-101 | Important Finance Alerts  | **existing** (`FinanceAlertsCard` on the Overview tab now renders `payload.alerts`) |
 | AUTO-102 | Credit Card Alerts        | blocked                                                                             |
 | AUTO-103 | Budget Alerts             | existing (overspend tab badge, PR #68)                                              |
@@ -426,8 +446,8 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | AUTO-106 | CSE Material Event Alerts | blocked                                                                             |
 | AUTO-107 | Thesis Change Alerts      | blocked                                                                             |
 | AUTO-108 | Prediction Horizon Alerts | blocked                                                                             |
-| AUTO-109 | Data Health Alerts        | planned                                                                             |
-| AUTO-110 | Quiet Mode                | planned                                                                             |
+| AUTO-109 | Data Health Alerts        | **existing** (`financeStorageAlerts()` folds storage and mirror health warnings into the authenticated finance payload) |
+| AUTO-110 | Quiet Mode                | **existing** (persisted quiet-mode toggle suppresses only non-critical Telegram delivery; in-app alerts and critical delivery remain available) |
 
 ## Phase 34 — Scheduled Hermes Reviews
 
@@ -435,10 +455,10 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 
 | ID       | Feature                    | Status                                                       |
 | -------- | -------------------------- | ------------------------------------------------------------ |
-| AUTO-200 | Daily Finance Check        | planned                                                      |
+| AUTO-200 | Daily Finance Check        | **partial (stronger)** (explicit entrypoint plus non-mutating/opt-in systemd installer; timer activation remains an operator decision) |
 | AUTO-201 | Weekly Finance Review      | existing (`personal-finance-digest.sh`, cron `a1d0b1b42455`) |
-| AUTO-202 | Monthly Financial Report   | planned                                                      |
-| AUTO-203 | Monthly Net Worth Snapshot | planned (needs Phase 38)                                     |
+| AUTO-202 | Monthly Financial Report   | **partial (stronger)** (authenticated client-side/API Markdown export plus host-scheduler delivery and explicit opt-in systemd installation; timer activation remains an operator decision) |
+| AUTO-203 | Monthly Net Worth Snapshot | **partial (stronger)** (idempotent authenticated entrypoint plus explicit opt-in systemd installation; timer activation remains an operator decision) |
 | AUTO-204 | CSE Daily Brief            | blocked                                                      |
 | AUTO-205 | CSE Market Close Review    | blocked                                                      |
 | AUTO-206 | Subscription Review        | blocked (no subscriptions model)                             |
@@ -467,15 +487,15 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | ------- | --------------------- | ----------------------------------------------------- |
 | PF-1100 | Annual Interest Rate  | existing                                              |
 | PF-1101 | Payout Frequency      | existing                                              |
-| PF-1102 | Interest Schedule     | planned                                               |
-| PF-1103 | Accrued Interest      | planned                                               |
-| PF-1104 | Interest Received     | planned                                               |
-| PF-1105 | Tax Deducted          | planned                                               |
-| PF-1106 | Linked Payout Account | planned                                               |
-| PF-1107 | Maturity Value        | planned (principal + rate stored, value not computed) |
+| PF-1102 | Interest Schedule     | **existing** (next monthly, quarterly, annual, or maturity payout date is shown within the deposit term) |
+| PF-1103 | Accrued Interest      | **existing** (read-only simple-interest accrual estimate capped at maturity) |
+| PF-1104 | Interest Received     | **existing** (optional manually recorded gross interest with persisted display) |
+| PF-1105 | Tax Deducted          | **existing** (optional manually recorded withholding with persisted net display) |
+| PF-1106 | Linked Payout Account | **existing** (optional finance-account link with unavailable-account fallback) |
+| PF-1107 | Maturity Value        | **existing** (read-only simple-interest estimate shown per deposit; compounding, tax, and paid periodic interest are not inferred) |
 | PF-1108 | Maturity Alerts       | existing (badge, PR #68)                              |
-| PF-1109 | Auto Renewal          | planned                                               |
-| PF-1110 | FD Ladder View        | planned                                               |
+| PF-1109 | Auto Renewal          | **existing** (persisted renewal preference; no automatic money movement) |
+| PF-1110 | FD Ladder View        | **existing** (chronological maturity view with principal, status, and renewal preference) |
 
 ## Phase 37 — Documents Vault
 
@@ -483,25 +503,33 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 
 | ID      | Feature                        | Status                                                                                          |
 | ------- | ------------------------------ | ----------------------------------------------------------------------------------------------- |
-| DOC-100 | Document Vault                 | planned                                                                                         |
+| DOC-100 | Document Vault                 | **existing** (safe metadata inventory over linked records and pending intake documents, with authorized view links) |
 | DOC-101 | Employment Documents           | existing (`finance-document.ts` route, view/re-analyze)                                         |
-| DOC-102 | Bank Documents                 | planned                                                                                         |
+| DOC-102 | Bank Documents                 | **partial (stronger)** (bank-account documents can be securely uploaded, linked to the account, persisted through Postgres, and viewed from the document vault) |
 | DOC-103 | Credit Card Documents          | blocked                                                                                         |
-| DOC-104 | Investment Documents           | planned                                                                                         |
-| DOC-105 | Fixed Deposit Documents        | planned                                                                                         |
+| DOC-104 | Investment Documents           | **partial (stronger)** (broker/trade documents can be securely attached to stock holdings, persisted through Postgres, and viewed from the document vault) |
+| DOC-105 | Fixed Deposit Documents        | **partial (stronger)** (confirmed FD certificates retain `documentRef`, persist through Postgres, and appear in the secure document vault viewer) |
 | DOC-106 | Receipts                       | **existing** (viewable via "View document" link on transactions once `documentRef` is set)      |
 | DOC-107 | Bills                          | **existing** (same viewer, shared with receipts)                                                |
-| DOC-108 | Tax                            | planned                                                                                         |
-| DOC-109 | Insurance                      | planned                                                                                         |
+| DOC-108 | Tax                            | **partial (stronger)** (tax documents can be securely attached to tax records, persisted through Postgres, and viewed from the document vault) |
+| DOC-109 | Insurance                      | **partial (stronger)** (insurance policies can be recorded, securely linked to policy documents, persisted through Postgres, and viewed from the document vault; coverage and premiums remain informational) |
 | DOC-110 | Loans                          | blocked                                                                                         |
 | DOC-111 | Property                       | blocked                                                                                         |
-| DOC-112 | Search                         | planned                                                                                         |
+| DOC-112 | Search                         | **existing** (privacy-safe document intake search across type, source, vendor, employer, and status) |
 | DOC-113 | Record Linking                 | **existing** (`documentRef` viewer extended from income_source to income_record/expense_record) |
-| DOC-114 | Checksum / Duplicate Detection | planned                                                                                         |
+| DOC-114 | Checksum / Duplicate Detection | **existing** (SHA-256 upload provenance and duplicate review-history guard)                      |
 
 ## Phase 38 — Analytics and Historical State
 
-**Depends on:** Phase 1. **Status:** blocked — everything is live-computed present-moment only, no snapshots exist (AN-100 through AN-110).
+**Depends on:** Phase 1. **Status:** partial — manual snapshots, point comparisons, trend chart, CSV export, and an explicit opt-in scheduled capture entrypoint now exist; deployment-specific registration and the remaining period analytics are still planned.
+
+| ID     | Feature                         | Status                                                                                              |
+|--------|---------------------------------|-----------------------------------------------------------------------------------------------------|
+| AN-100 | Manual Net-Worth Snapshots      | **existing** (explicit user-triggered, persisted locally and in PostgreSQL)                       |
+| AN-101 | Snapshot Comparison / Trend     | **existing** (first-to-latest summary and chart when at least two points exist)                     |
+| AN-102 | Snapshot Export                 | **existing** (privacy-safe client-side CSV export)                                                  |
+| AN-103 | Automated Period Snapshots      | **partial (stronger)** (explicit opt-in entrypoint and non-mutating/opt-in systemd installer capture one idempotent snapshot per date; activation remains an operator decision) |
+| AN-104 | Monthly Analytics Summary       | **existing** (latest captured point per month with explicit month-over-month change)                |
 
 ## Phase 39 — Scenario Engine
 
@@ -536,8 +564,8 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | TAX-102 | Tax Withheld                | existing (`taxPaid`)                                                            |
 | TAX-103 | Potential Deduction Records | **existing** (`deductionCategory` now shown/editable in the Tax records table)  |
 | TAX-104 | Supporting Documents        | **existing** (`supportingDocument` now shown/editable in the Tax records table) |
-| TAX-105 | Tax Export                  | partial (covered generically by JSON export)                                    |
-| TAX-106 | Tax Review Queue            | planned (`requiresConfirmation` field exists, no queue UI)                      |
+| TAX-105 | Tax Export                  | **existing (CSV + JSON)** — authenticated formula-safe tax CSV download now complements the general JSON export |
+| TAX-106 | Tax Review Queue            | **partial (review queue)** — pending records are searchable and can be explicitly marked reviewed; filing/export workflow remains future work |
 
 ## Phase 42 — Backup, Import and Restore
 
@@ -546,15 +574,15 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | ID       | Feature                 | Status                                                                                                                                        |
 | -------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | DATA-100 | Versioned JSON Export   | **existing** (export now includes `schemaVersion: db.schemaVersion`)                                                                          |
-| DATA-101 | CSV Transaction Export  | planned                                                                                                                                       |
+| DATA-101 | CSV Transaction Export  | **existing** (authenticated `/api/finance?scope=personal_finance&format=csv` export plus Personal Finance download button; formula-safe escaping and transfer/split metadata included) |
 | DATA-102 | Investment Export       | **existing** (`stock_holdings`/`fixed_deposits` were already both included in the general JSON export — roadmap-accuracy fix, no code change) |
-| DATA-103 | Import                  | planned                                                                                                                                       |
+| DATA-103 | Import                  | **partial (stronger CSV)** — authenticated preview-first CSV import supports ordinary income/expense rows, transfer pairs, and split groups with strict calendar/column validation, duplicate warnings, hash-bound confirmation, and explicit commit |
 | DATA-104 | Backup                  | existing (nightly Postgres dumps, infra-level)                                                                                                |
-| DATA-105 | Encrypted Backup        | planned                                                                                                                                       |
-| DATA-106 | Restore                 | existing (restore-verified nightly, infra-level)                                                                                              |
+| DATA-105 | Encrypted Backup        | **partial (stronger)** — authenticated passphrase-protected AES-256-GCM download, bounded rotation, and decrypt-only restore preview using an explicit 0600 passphrase file; full restore orchestration remains future work |
+| DATA-106 | Restore                 | **partial (stronger)** — --dry-run decrypt/validation summary is non-mutating; --confirm validates schema, creates a pre-restore encrypted safety backup, writes through the Postgres-primary store, and preserves audit history; unattended restore remains out of scope |
 | DATA-107 | Restore Validation      | existing                                                                                                                                      |
-| DATA-108 | Schema Version          | planned                                                                                                                                       |
-| DATA-109 | Migration Compatibility | planned                                                                                                                                       |
+| DATA-108 | Schema Version          | **partial (stronger)** — reads normalize legacy/missing collections, reject malformed versions, and reject unsupported future versions rather than silently downgrading |
+| DATA-109 | Migration Compatibility | **partial (stronger)** — legacy snapshot compatibility is covered for additive collections and malformed collection/settings repair; formal multi-version migration steps remain future work |
 
 ## Phase 43 — Security
 
@@ -564,15 +592,15 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | ------- | -------------------------------- | ---------------------------------------------------------------------- |
 | SEC-100 | Authentication Review            | existing (password-gated)                                              |
 | SEC-101 | MFA/Passkey Future Support       | planned                                                                |
-| SEC-102 | Session Management               | partial                                                                |
+| SEC-102 | Session Management               | **partial (stronger)** (secure cookie attributes, absolute expiry plus a configurable 12-hour idle timeout, revocation, atomic private persistence, proxy-aware authorization, and a 1,000-session cap with oldest-token eviction; multi-instance storage remains) |
 | SEC-103 | Sensitive Value Masking          | existing (`maskSensitive()`)                                           |
 | SEC-104 | Secret Management                | existing (`.env`, never in finance DB)                                 |
-| SEC-105 | Scoped Agent API Tokens          | planned                                                                |
-| SEC-106 | Financial API Authorization      | partial (`isAuthenticated` gate, not finance-scoped)                   |
-| SEC-107 | Document Access Security         | existing (`finance-document.ts` auth + path validation)                |
+| SEC-105 | Scoped Agent API Tokens          | **partial (stronger)** (optional singular token remains backward-compatible; bounded `FINANCE_AGENT_API_TOKENS` overlap supports safe rotation for non-browser `agentContext` callers; issuance, token IDs, and multi-token identity management remain) |
+| SEC-106 | Financial API Authorization      | **partial (stronger)** (authenticated route gate plus fail-closed finance-agent scopes; explicit read-only allowlist, write default for new actions, and dedicated delete/approval scopes; browser sessions remain workspace-wide) |
+| SEC-107 | Document Access Security         | **existing (stronger)** (finance document and upload preview routes use auth plus realpath/regular-file guards that reject traversal and escaping symlinks) |
 | SEC-108 | Audit Logging                    | existing (`appendAuditLog`)                                            |
-| SEC-109 | Sensitive AI Data Classification | planned                                                                |
-| SEC-110 | Cloud/Local AI Routing Policy    | partial (HARP routing tiers exist platform-wide, not finance-specific) |
+| SEC-109 | Sensitive AI Data Classification | **partial** (finance-agent-v1 has a bounded sensitivity map and excludes raw records, documents, task contents, and secrets; a platform-wide classification policy remains) |
+| SEC-110 | Cloud/Local AI Routing Policy    | **partial (stronger)** (versioned finance-ai-routing-v1 policy is published with the agent context; `FINANCE_AI_LOCAL_ONLY=1` now routes finance prompts and document extraction through discovered local providers and fails closed when unavailable; provider-enforced local routing remains opt-in) |
 
 ## Phase 44 — Reliability and Observability
 
@@ -582,15 +610,15 @@ Naveen requested personal finance move fully off JSON onto Postgres as the real 
 | ------- | ------------------------- | ------------------------------------------------------------------------------- |
 | OPS-100 | System Health             | **existing** (fully shipped via PF-413's `DataHealthCard` — row was stale)      |
 | OPS-101 | Database Health           | existing (self-heal logic)                                                      |
-| OPS-102 | Hermes Health             | planned (not finance-specific)                                                  |
-| OPS-103 | CSE Provider Health       | partial (`priceFetchFailed` handling)                                           |
-| OPS-104 | FX Provider Health        | planned                                                                         |
+| OPS-102 | Hermes Health             | **existing** (authenticated `/api/dashboard/overview` aggregates gateway health/active agents; Dashboard OpsStrip renders state and heartbeat) |
+| OPS-103 | CSE Provider Health       | **existing** (read-only stored CSE quote freshness, provenance, and manual-fallback summary; no automatic refresh) |
+| OPS-104 | FX Provider Health        | **existing** (read-only healthy/stale/unknown assessment from the latest stored Frankfurter observation, surfaced in the Exchange Rates panel; no automatic refresh) |
 | OPS-105 | Gmail Health              | **existing** (connect-check now also returns/shows `lastSyncedAtSeconds`)       |
-| OPS-106 | AI Provider Health        | planned                                                                         |
-| OPS-107 | Backup Health             | planned (backups exist, no in-app health surface)                               |
-| OPS-108 | Background Job Monitoring | planned                                                                         |
-| OPS-109 | Error Reporting           | partial (`safeErrorMessage` pattern)                                            |
-| OPS-110 | Integration Retry         | partial (HARP fallback chains for AI; CSE fetch has no retry, just fail→manual) |
+| OPS-106 | AI Provider Health        | **partial (stronger)** (authenticated Ops screen surfaces provider-usage health for Claude, Codex, OpenAI, OpenRouter, and Gemini; a capped privacy-safe status history is now persisted and exposed, while provider-specific alerting remains) |
+| OPS-107 | Backup Health             | **partial (in-app status)** — personal finance now shows safe encrypted-backup configuration, retained-count, latest-snapshot, and stale/missing status without exposing paths or secrets; the adjacent storage-monitor state file now uses collision-resistant atomic writes and enforced private permissions |
+| OPS-108 | Background Job Monitoring | **existing** (dashboard cron totals, paused/running/failed, next-run, recent failure incidents, and `/jobs` drilldown) |
+| OPS-109 | Error Reporting           | **partial (stronger)** (shared `safeErrorMessage` now redacts common API keys, bearer tokens, credentials, secret-valued fields, and caps development diagnostics at 500 characters; centralized event collection remains future work) |
+| OPS-110 | Integration Retry         | **partial (stronger)** (HARP fallback chains for AI plus one bounded retry for transient CSE and Google News network/provider failures; malformed, non-retryable, and unusable responses still fail fast to manual fallback) |
 
 ---
 
@@ -614,7 +642,7 @@ There is no separate "master registry" file distinct from this document — this
 
 A follow-up scoping pass over Phase 3 (Personal Financial Rules), Phase 10 (Goals/Emergency Funds), and Phase 42 (Backup/Import) found **PF-1003 (Required Monthly Contribution)** the clear next pick — fully additive, reusing `SavingsGoal`'s already-stored `targetAmount`/`currentAmount`/`targetDate`. It's now shipped. The same pass also caught that **DATA-102 (Investment Export)** was already fully satisfied by the existing export and just needed its status corrected — done in the same PR, no code required.
 
-**DATA-100** is also now shipped — the one-line `schemaVersion` stamp closes out the Phase 42 quick wins found in that pass. The phase's remaining actionable items (DATA-101 CSV export, DATA-103 Import, DATA-108 Schema Version enforcement/migrations, DATA-109 Migration Compatibility) are all genuinely `planned` — real design/build efforts, not further quick wins — so the next step is another fresh registry pass rather than continuing Phase 42.
+**DATA-100** is also now shipped — the one-line `schemaVersion` stamp closes out the Phase 42 quick wins found in that pass. **DATA-101** is now shipped as an authenticated unified-ledger CSV export. **DATA-103** now has a safe CSV import slice with preview-first validation and explicit commit. **DATA-105** now has an authenticated, passphrase-protected AES-256-GCM download path plus bounded encrypted rotation. **DATA-106** now has an explicit-confirm operator restore CLI with a pre-restore safety backup, and **DATA-108/109** normalize additive legacy snapshots and reject future unsupported versions. Unattended restore and formal multi-version migrations remain future work.
 
 Not ready without design work first: **PF-115** (needs new audit-log query/diff plumbing), **PF-808** (needs a new configurable-threshold schema field and a per-category-vs-global design decision), **PF-800** (not independently scoped — it's the umbrella row for Phase 8's other large `planned` items), **PF-300** (Financial Rules Model — needs a wholly new entity with no existing analog), **PF-304** (Savings Rate Target — technically small, but would pre-empt where Phase 3's other threshold rules end up living; an ordering problem, not a size problem), **PF-1004** (Account-Linked Goals — blocked on whether linking should derive `currentAmount` from the account, plus `DataTable` having no select/dropdown input type).
 
@@ -646,13 +674,15 @@ Naveen picked **Phase 40 (Loans, Property and Long-Term Wealth)** as the next su
 
 A follow-up pass over Phase 36 (Fixed Deposits V2), Phase 37 (Documents Vault), and Phase 43 (Security) found that pattern genuinely exhausted in Phase 36 (no `partial` rows at all) and Phase 43 (all three `partial` items need new data capture or a real authz/policy design decision). Phase 37's **DOC-106, DOC-107, and DOC-113** were the one structural candidate — extending the already-shipped `finance-document.ts` employment-contract viewer to also serve receipts/bills via the already-existing `documentRef` field on income/expense records. Explicitly flagged before building: this environment has zero live receipt/bill data with `documentRef` populated, so the feature ships correct and ready but not immediately visible — Naveen confirmed shipping it anyway as correct, low-risk infrastructure. Now shipped.
 
+**Roadmap correction (2026-09-10):** the historical Phase 24 narrative above predates the AI-205 slice. AI-205 is no longer blocked on the permission contract: its explicit opt-in policy, approval-gated review queue, and host-scheduler entrypoint are now implemented. Only deployment-specific cron registration and delivery policy remain.
+
 A follow-up pass over Phase 2 (Multi-Currency), Phase 5's remainder, and Phase 33/34 (Smart Alerts/Scheduled Reviews) found **AUTO-101 (Important Finance Alerts)** a clean instance of this pattern — `financeAlerts()`/`financeStorageAlerts()` were already computed and merged into both payload builders' `alerts` field, with a proven render precedent already shipped in `trading-screen.tsx`. Now shipped. The pass also confirmed Phase 34 has no `partial` rows left at all, and Phase 5's remaining rows are all `existing`/`planned` besides the already-ruled-out PF-509.
 
 **PF-208** is also now shipped — `currency`/`exchangeRateSource` added to the Tax records `DataTable` columns, the same shape as TAX-103/104.
 
 With this shipped, the "surface an already-computed value" pattern this session has been mining is genuinely exhausted across every phase audited (Phase 0/1/2/4/5/8/10/33/34/36/37/41/42/43/44). The next scoping pass should either audit further phases not yet touched this session (e.g. Phase 3 beyond PF-300/304, Phase 12/13 CSE, Phase 23-27 Hermes AI, Phase 35 Trading Integration), or accept that further personal-finance work needs real design/build effort — a new entity, new computation logic, or an explicit product decision — rather than another pure-surfacing pass.
 
-Not ready in the phases audited this session: **PF-509** (Contract Lifecycle — the stored `status` union is genuinely just `'active' | 'ended'`, nothing hiding; would need new lifecycle states and a design decision), **OPS-103** (needs a new aggregate health computation across holdings, not a surfacing fix), **OPS-109** (a platform-wide utility used well beyond finance, not finance-scoped), **OPS-110** (needs new retry/backoff logic, a real feature build), **PF-1107** (Maturity Value — needs a new maturity-value computation, not a surfacing fix), **SEC-102/106/110** (all need new data capture or a real authz/policy design decision), **PF-200** (Currency Model — needs real currency metadata design), **PF-205/PF-207** (Transaction FX / Manual FX Override — conversion logic was never actually built, not a hidden field), **PF-209** (Multi-Currency UI — subjective scope, not a specific gap), **PF-210** (test-writing, not this pattern).
+Not ready in the phases audited this session: **OPS-109** (a platform-wide utility used well beyond finance, not finance-scoped), **SEC-102/106/110** (all need new data capture or a real authz/policy design decision), **PF-200** (Currency Model — needs real currency metadata design), **PF-210** (test-writing, not this pattern). PF-205/PF-207 are shipped; PF-209 now has a concrete read-only conversion refinement but remains partial until broader currency metadata and history rules are designed. **PF-1107, PF-509, OPS-103, and OPS-110 were subsequently completed or strengthened as incremental follow-up slices.**
 
 ### Shipped: PF-100/101/102/103 — Account Model
 
@@ -663,8 +693,8 @@ Not ready in the phases audited this session: **PF-509** (Contract Lifecycle —
 ### Shipped: PF-104 — Unified Transaction Model (+ partial PF-105, PF-114)
 
 - **What was built**: an additive read layer, not a storage migration — `getUnifiedTransactions()` (`src/server/finance-store.ts`) maps `income_records`/`expense_records` into one shared `UnifiedTransaction` shape (renaming `dateReceived`→`date`, `sourceName`→`vendor`-equivalent `counterparty`, `incomeType`→`category`, etc.) and sorts them together by date. `TransactionsPanel` (`src/screens/personal-finance/components/transactions-panel.tsx`) replaces the two separate, no-create `DataTable`s (income records in the Income & Jobs tab, expense records in Accounts & Records) with one panel: an income/expense toggle add-form, inline edit, delete, a counterparty/category search box, and a kind filter — all routed through the existing `add_record`/`update_record`/`delete_record` dispatch under the hood. `transactions` is now included in both `personalFinancePayload()` (GET) and `financePayload()` (the shape every mutation's POST response returns via `useFinanceAction`), matching how `budgetVsActual` is already present in both.
-- **Known limitation / deliberate scope**: `income_records` and `expense_records` remain two separate collections in storage (JSON + both Postgres mirrors) — `financeSummary`, `budgetVsActual`, `getMonthlySummary`, and duplicate-detection are all untouched and still read the original collections directly. A real storage migration to one `transactions` table (PF-106 types, PF-107 transfers, PF-108 splits, PF-113 reconciliation status, PF-116 soft delete) was deliberately deferred as a separate, larger, higher-risk future feature rather than bundled into this slice.
-- **Not built** (deliberately deferred, not dropped): transfers between the user's own accounts (no transfer concept exists anywhere in the codebase today — confirmed via full-file grep), a formal transaction-type enum, merchant/tag entities, and date-range/amount filters (only counterparty/category text search + kind filter shipped).
+- **Known limitation / deliberate scope**: `income_records` and `expense_records` remain two separate collections in storage (JSON + both Postgres mirrors) — a real migration to one `transactions` table remains deferred. Same-currency transfers use a migration-safe paired-record representation, while expense splits use grouped expense rows; summary/budget/monthly calculations preserve the correct net/category totals.
+- **Not built** (deliberately deferred, not dropped): a fully normalized transaction-type table and split editing UI. Merchant/tag entities, reconciliation status, date-range/amount filters, same-currency transfer creation/filtering, and split creation/group deletion are now shipped.
 
 ### Shipped: PF-109 — Categories
 
@@ -904,7 +934,7 @@ This closes out every real-design candidate identified across this session's sco
 - **What was built**: `FinanceSettings.financeQaHistory?: Array<{at, question, answer}>` — a typed, capped (`.slice(-10)`) array, same bounded-log convention as AI-506's `gmailIngest.syncHistory`, appended inside `ask_finance_question` right after a successful `answerFinanceQuestion()` call. `personalFinancePayload()` now returns `financeQaHistory`; `FinanceAnalystCard` was updated from taking no props to taking `payload`/`onPayload` (matching the convention already used by every other mutating panel this session) and renders the last 5 exchanges, most-recent-first, with a truncated answer preview.
 - **Key design decision**: the `ask_finance_question` action's success response changed from `{ok, answer}` to the full `{...personalFinancePayload(), answer}`, so the client updates its history list immediately via `onPayload()` with no reload — the same pattern used everywhere else a mutating action needs to refresh derived UI state.
 - **Key design decision (typed field, not an untyped blob)**: unlike `gmailIngest` (which predates a typed-settings convention), `financeQaHistory` is a properly typed optional field, consistent with `FinanceSettings`'s other typed optionals (`emergencyFundTargetMonths`, `savingsRateTargetPct`, `wealthGoalTargetLkr`). No Postgres/mirror changes — settings aren't mirrored to Postgres (confirmed during AI-506).
-- **Known limitation / deliberate scope**: no multi-turn conversation (AI-204) and no proactive agent-initiated insights (AI-205, still blocked on AI-102/103) — this slice only persists and surfaces prior single-turn Q&A.
+- **Known limitation / deliberate scope**: no multi-turn conversation (AI-204) and no autonomous scheduler for proactive insights (AI-205 now has an explicit opt-in, approval-gated review-task foundation) — this slice only persists and surfaces prior single-turn Q&A.
 - **Verified live**: asked two questions in sequence through the UI; both appeared in the "previous questions" list most-recent-first immediately after the second ask, with no page reload; reloaded the page and confirmed the history persisted; reset `financeQaHistory` back to `[]` for a clean state afterward.
 
 ### Shipped: AI-204 — Multi-Turn Conversation (Phase 24, third slice)
@@ -912,7 +942,7 @@ This closes out every real-design candidate identified across this session's sco
 - **What was built**: `buildFinanceAnswerPrompt(question, context, priorTurns)` (new, exported, unit-tested) folds up to the last 3 prior `{question, answer}` turns into a "Conversation so far" block ahead of the existing Data/Question sections of the same flat prompt string `answerFinanceQuestion()` already built — output is byte-identical to before when no prior turns are given. `ask_finance_question` re-validates and caps client-sent `priorTurns` to the last 3 server-side, regardless of what the client sends. `FinanceAnalystCard` tracks conversation turns in local, in-session-only React state (`turns`) — separate from AI-202's persisted `financeQaHistory` audit log — sending the last 3 with each question and appending the new one on success; a "New conversation" button clears `turns` explicitly.
 - **Key design decision (no shared-plumbing changes)**: `callWithFallback`/`callOpenRouter` (llm-signal-engine.ts) and `callGemini` (finance-extraction.ts) are all locked to a single flat prompt string and used by other features (ingestion extraction) — rather than widening those shared signatures to accept a structured multi-turn messages/roles array, prior turns are folded into the same string-prompt shape, following the exact precedent already used by `promptWithCategoryHints` (cap injected extra context before templating it in).
 - **Key design decision (conversation state is client-side and in-session only)**: reusing `financeQaHistory` as "the conversation" would mean a follow-up on page reload accidentally inherits an unrelated question from days ago. Keeping `turns` in local React state means a reload is a genuinely fresh conversation by default, with an explicit "New conversation" button for mid-session resets — the persisted history list is untouched by either.
-- **Known limitation / deliberate scope**: capped to the last 3 turns (no long-running conversation memory); no chart/visualization answers (AI-203), cross-reference with trading data (AI-206), export (AI-207), or proactive insights (AI-205, still blocked on AI-102/103).
+- **Known limitation / deliberate scope**: capped to the last 3 turns (no long-running conversation memory); no chart/visualization answers (AI-203), cross-reference with trading data (AI-206), export (AI-207), or autonomous proactive scheduling (AI-205's approval-gated review queue is now available).
 - **Verified live**: asked "How much did I spend this month?" then a genuine follow-up "and what about last month?" with no restated context — the second answer correctly continued the spending topic (demonstrating real context carry-over, not independent re-answering). Clicked "New conversation" — the live conversation area reset while the persisted "Previous questions" list stayed untouched. Test history reset to `financeQaHistory: []` afterward.
 
 ### Shipped: AI-203 — Chart/Visualization Answers (Phase 24, fourth slice)
@@ -920,7 +950,7 @@ This closes out every real-design candidate identified across this session's sco
 - **What was built**: `answerFinanceQuestion()`'s prompt now asks the LLM to respond with strict JSON — `{"text": "...", "chart": null | {"title": "...", "data": [{"label", "value"}, ...]}}` — instead of plain prose. New `parseFinanceAnswerJson()` (unit-tested) parses this, reusing the exact fence-strip/`JSON.parse`/type-guard pattern already proven by `parseExtractionJson` for transaction extraction. `ask_finance_question`'s response now includes `chart` alongside `answer`. `FinanceAnalystCard` renders the chart with the exact recharts bar-chart JSX `FinanceTrendsCard` already uses for its "Spending by category" chart (same `--theme-*` styling, `#38bdf8` fill, `h-[220px]` container).
 - **Key design decision (reuse the strict-JSON convention, degrade gracefully)**: rather than inventing a new structured-output mechanism, this reuses the extraction features' proven pattern. Unlike extraction (which fails the whole item on malformed JSON), a malformed or non-JSON response here degrades to plain text with no chart — weaker fallback-tier models don't always obey format instructions, and losing the chart is a much smaller failure than losing the answer.
 - **Key design decision (chart is not persisted)**: `financeQaHistory` (AI-202) and `turns` (AI-204) both keep storing text-only `{question, answer}` — no chart data added to either, so a follow-up question's prompt never gets bloated with a prior chart's JSON, and the persisted "Previous questions" list stays exactly as before. Only the live, most-recent answer can show a chart.
-- **Known limitation / deliberate scope**: one chart type (horizontal bar), chosen by the model per-question with no way for the user to explicitly request "as a pie chart" or similar — cross-reference with trading data (AI-206), export (AI-207), and proactive insights (AI-205, still blocked on AI-102/103) remain separate future items.
+- **Known limitation / deliberate scope**: one chart type (horizontal bar), chosen by the model per-question with no way for the user to explicitly request "as a pie chart" or similar — cross-reference with trading data (AI-206), export (AI-207), and autonomous proactive scheduling remain separate future items.
 - **Verified live** (with 3 injected test expense records across categories, since this environment normally has none): asked "Break down my spending by category this month as a chart" → got a correct text answer plus a rendered bar chart with the right labels/values (Groceries 22,000 / Utilities 8,000 / Subscriptions 1,500 LKR); asked "What is my net worth?" → correct text answer, no chart, exactly as before AI-203. Test expense records and `financeQaHistory` reset afterward.
 
 ### Shipped: AI-207 — Export Answer as Report (Phase 24, fifth slice)
@@ -1051,3 +1081,22 @@ This closes out every real-design candidate identified across this session's sco
 - **Real bug caught by review, not by the mechanical script**: an independent fork review of the diff (standard practice for these large generated diffs this session) found that one delete-icon's `text-red-300 hover:text-red-100` two-shade hover-brighten effect had collapsed into an identical color for both states, since both bare shades mapped to the same `--theme-danger` token with no differentiation — a real, if minor, regression the blind regex swap couldn't have caught on its own. Fixed by giving the base state a dimmer `color-mix()` variant so hover still visibly brightens.
 - **Two stale doc claims corrected along the way**: this doc's "Current State Summary" intro previously listed two "confirmed UI bugs" (fixed deposits missing a "p.a." qualifier, stock holdings gain/loss missing a percentage) — both were checked and found already fixed in the live code, just never marked resolved here. No code change needed for those two; noted only so the next scoping pass doesn't re-investigate them.
 - **Verified**: `npx tsc --noEmit`/`npx eslint` clean, all 118 tests passing, production build succeeded in an isolated worktree, deployed and verified 200 on both `localhost:3000` and `agent.fernandofamily.com`.
+
+### Shipped: PF-008 follow-up — Onboarding and settings language refinement
+
+- **What was refined**: onboarding, provider setup, connection settings, model settings, and the settings dialog now describe compatible AI services and workspace access in user-facing language rather than presenting HTTP/API/gateway terminology as the primary guidance. The underlying environment keys, commands, configuration paths, and compatibility endpoints remain unchanged for operators who need them.
+- **Scope boundary**: this closes the remaining onboarding copy slice, but PF-008 stays partial because other workspace surfaces still need a complete language audit.
+- **Verified**: targeted onboarding/root-layout tests (11/11), ESLint, and the existing full-suite baseline pass.
+
+### Shipped: AI-400 follow-up — Document classification and vault inventory
+
+- **What was built**: the finance intake path now attaches deterministic, explainable document classification metadata to uploads and Gmail candidates; the authenticated Finance API and Personal Finance screen expose a privacy-safe document-vault inventory with authorized view links. Specialized extraction remains review-first and does not commit financial records without user confirmation.
+- **Scope boundary**: this strengthens the existing Document Agent foundation but does not claim autonomous document planning, unrestricted agent actions, or credit-card extraction; those remain separate roadmap items and dependencies.
+- **Verified**: focused extraction/classifier/vault tests (44/44), the repository suite (237 files, 1,784 tests), TypeScript, ESLint, and production client/SSR build checks pass.
+
+### Shipped: SEC-102 — Session Idle Timeout
+
+- **What was built**: browser session tokens now track `lastSeen` activity in an additive field alongside their existing absolute expiry. Authenticated requests refresh activity in memory, with persistence throttled to five minutes so normal polling does not rewrite the credentials file on every request.
+- **Security behavior**: sessions expire after 12 hours without an authenticated request by default; `HERMES_SESSION_IDLE_TIMEOUT_MS=0` disables only idle expiry while retaining absolute TTLs. The existing 24-hour, 30-day, and one-year absolute lifetimes, revocation, 1,000-token cap, atomic private persistence, and local automation behavior remain unchanged.
+- **Compatibility**: old `workspace-sessions.json` files without `lastSeen` remain valid; the first request after upgrade establishes their activity baseline rather than logging users out.
+- **Verified**: focused auth tests (16/16), TypeScript, focused ESLint, shell/Node syntax checks, and `git diff --check` pass. No live deployment or restart was performed.

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -18,7 +18,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { CreateJobDialog } from './create-job-dialog'
 import { EditJobDialog } from './edit-job-dialog'
-import type { ClaudeJob } from '@/lib/jobs-api'
+import type { ClaudeJob, JobProfileOption } from '@/lib/jobs-api'
 import { toast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import {
@@ -88,6 +88,37 @@ export function formatJobFreshnessCopy(
 
 export type JobHealthFilter = 'all' | 'stale' | 'failed' | 'paused' | 'neverRun'
 
+export const ALL_JOB_PROFILES = 'all'
+
+export function getJobProfileName(
+  job: Pick<ClaudeJob, 'profile' | 'profile_name'>,
+): string {
+  return job.profile?.trim() || job.profile_name?.trim() || 'default'
+}
+
+export function getJobProfileOptions(
+  jobs: Array<ClaudeJob>,
+  profiles: Array<JobProfileOption>,
+): Array<string> {
+  const names = new Set<string>()
+  for (const profile of profiles) {
+    const name = profile.name.trim()
+    if (name) names.add(name)
+  }
+  for (const job of jobs) names.add(getJobProfileName(job))
+  return [...names].sort((a, b) => a.localeCompare(b))
+}
+
+export function doesJobMatchProfileFilter(
+  job: ClaudeJob,
+  profileFilter: string,
+): boolean {
+  return (
+    profileFilter === ALL_JOB_PROFILES ||
+    getJobProfileName(job) === profileFilter
+  )
+}
+
 export const JOB_HEALTH_FILTERS: Array<JobHealthFilter> = [
   'all',
   'stale',
@@ -95,6 +126,14 @@ export const JOB_HEALTH_FILTERS: Array<JobHealthFilter> = [
   'paused',
   'neverRun',
 ]
+
+export const JOB_HEALTH_FILTER_STORAGE_KEY = 'hermes.jobs.health-filter'
+
+export function parseJobHealthFilter(value: string | null): JobHealthFilter {
+  return value && JOB_HEALTH_FILTERS.includes(value as JobHealthFilter)
+    ? (value as JobHealthFilter)
+    : 'all'
+}
 
 function isPausedJob(job: Pick<ClaudeJob, 'enabled' | 'state'>): boolean {
   return job.state === 'paused' || !job.enabled
@@ -499,6 +538,31 @@ export function JobsScreen() {
   const [showCreate, setShowCreate] = useState(false)
   const [editingJob, setEditingJob] = useState<ClaudeJob | null>(null)
   const [healthFilter, setHealthFilter] = useState<JobHealthFilter>('all')
+  const [profileFilter, setProfileFilter] = useState(ALL_JOB_PROFILES)
+  const [healthFilterHydrated, setHealthFilterHydrated] = useState(false)
+
+  useEffect(() => {
+    try {
+      setHealthFilter(
+        parseJobHealthFilter(
+          window.localStorage.getItem(JOB_HEALTH_FILTER_STORAGE_KEY),
+        ),
+      )
+    } catch {
+      // Storage can be unavailable in private/restricted browser contexts.
+    } finally {
+      setHealthFilterHydrated(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!healthFilterHydrated) return
+    try {
+      window.localStorage.setItem(JOB_HEALTH_FILTER_STORAGE_KEY, healthFilter)
+    } catch {
+      // Filtering remains fully usable when persistence is unavailable.
+    }
+  }, [healthFilter, healthFilterHydrated])
 
   const jobsQuery = useQuery({
     queryKey: QUERY_KEY,
@@ -598,17 +662,39 @@ export function JobsScreen() {
     )
   }, [jobsQuery.data, search])
 
+  const profileOptions = useMemo(
+    () => getJobProfileOptions(searchedJobs, profiles),
+    [profiles, searchedJobs],
+  )
+
+  useEffect(() => {
+    if (
+      profileFilter !== ALL_JOB_PROFILES &&
+      !profileOptions.includes(profileFilter)
+    ) {
+      setProfileFilter(ALL_JOB_PROFILES)
+    }
+  }, [profileFilter, profileOptions])
+
+  const profileFilteredJobs = useMemo(
+    () =>
+      searchedJobs.filter((job) =>
+        doesJobMatchProfileFilter(job, profileFilter),
+      ),
+    [profileFilter, searchedJobs],
+  )
+
   const healthFilterCounts = useMemo(
-    () => getJobHealthFilterCounts(searchedJobs, jobHealthNowMs),
-    [jobHealthNowMs, searchedJobs],
+    () => getJobHealthFilterCounts(profileFilteredJobs, jobHealthNowMs),
+    [jobHealthNowMs, profileFilteredJobs],
   )
 
   const filteredJobs = useMemo(
     () =>
-      searchedJobs.filter((job) =>
+      profileFilteredJobs.filter((job) =>
         doesJobMatchHealthFilter(job, healthFilter, jobHealthNowMs),
       ),
-    [healthFilter, jobHealthNowMs, searchedJobs],
+    [healthFilter, jobHealthNowMs, profileFilteredJobs],
   )
 
   const emptyStateCopy = getJobsEmptyStateCopy(search, healthFilter)
@@ -722,6 +808,43 @@ export function JobsScreen() {
               )
             })}
           </div>
+          {profileOptions.length > 1 && (
+            <div
+              className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none"
+              aria-label="Scheduled job profile filters"
+            >
+              <span className="shrink-0 px-1 text-[10px] uppercase tracking-wide text-[var(--theme-muted)]">
+                Profile
+              </span>
+              {[ALL_JOB_PROFILES, ...profileOptions].map((profile) => {
+                const isActive = profileFilter === profile
+                const label = profile === ALL_JOB_PROFILES ? 'All' : profile
+                const count = searchedJobs.filter((job) =>
+                  doesJobMatchProfileFilter(job, profile),
+                ).length
+                return (
+                  <button
+                    key={profile}
+                    type="button"
+                    onClick={() => setProfileFilter(profile)}
+                    aria-pressed={isActive}
+                    aria-label={`${isActive ? 'Showing' : 'Show'} ${label} profile jobs (${count} ${count === 1 ? 'job' : 'jobs'})`}
+                    className={cn(
+                      'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                      isActive
+                        ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)] text-white'
+                        : 'border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-muted)] hover:text-[var(--theme-text)]',
+                    )}
+                  >
+                    {label}
+                    <span className="ml-1 tabular-nums opacity-80">
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">

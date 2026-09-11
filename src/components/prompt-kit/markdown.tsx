@@ -1,5 +1,14 @@
 import { marked } from 'marked'
-import { createContext, memo, useContext, useId, useMemo, useRef } from 'react'
+import {
+  Suspense,
+  createContext,
+  lazy,
+  memo,
+  useContext,
+  useId,
+  useMemo,
+  useRef,
+} from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
@@ -7,9 +16,28 @@ import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import { CodeBlock } from './code-block'
 import { DiffBlock } from './diff-block'
-import { MermaidBlock } from './mermaid-block'
 import type { Components } from 'react-markdown'
 import { cn } from '@/lib/utils'
+
+const DeferredMermaidBlock = lazy(() =>
+  import('./mermaid-block').then((module) => ({
+    default: module.MermaidBlock,
+  })),
+)
+
+function MermaidCodeBlock({ code }: { code: string }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="my-2 animate-pulse rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-8 text-center text-xs text-[var(--theme-muted)]">
+          Loading diagram renderer…
+        </div>
+      }
+    >
+      <DeferredMermaidBlock code={code} />
+    </Suspense>
+  )
+}
 
 /**
  * Rewrite Workspace-local `MEDIA:<path>` tokens emitted by Hermes Agent to the
@@ -117,7 +145,7 @@ const INITIAL_COMPONENTS: Partial<Components> = {
     const language = extractLanguage(className)
 
     if (language === 'mermaid') {
-      return <MermaidBlock code={String(children ?? '').trim()} />
+      return <MermaidCodeBlock code={String(children ?? '').trim()} />
     }
 
     if (language === 'diff' || language === 'patch' || language === 'udiff') {
@@ -491,7 +519,7 @@ const MemoizedMarkdownBlock = memo(
           }
           const language = extractLanguage(className)
           if (language === 'mermaid') {
-            return <MermaidBlock code={String(children ?? '').trim()} />
+            return <MermaidCodeBlock code={String(children ?? '').trim()} />
           }
           if (
             language === 'diff' ||

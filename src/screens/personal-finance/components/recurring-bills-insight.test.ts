@@ -117,4 +117,13 @@ describe('detectRecurringVendors', () => {
     expect(result).toHaveLength(1)
     expect(result[0].monthsSeen).toBe(2)
   })
+
+  it('ignores deleted and transfer expenses', () => {
+    const expenses = [
+      { date: '2026-01-05', vendor: 'Rent', category: 'Housing', amount: 1000, convertedLkrAmount: 1000, deletedAt: '2026-01-06T00:00:00Z' },
+      { date: '2026-02-05', vendor: 'Rent', category: 'Housing', amount: 1000, convertedLkrAmount: 1000, transactionType: 'transfer' },
+      { date: '2026-03-05', vendor: 'Rent', category: 'Housing', amount: 1000, convertedLkrAmount: 1000 },
+    ]
+    expect(detectRecurringVendors(expenses)).toHaveLength(0)
+  })
 })

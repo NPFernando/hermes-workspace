@@ -1,5 +1,18 @@
 import { useMemo } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
+import {
+  AiGameIcon,
+  Airplane01Icon,
+  AlarmClockIcon,
+  ArrowRight01Icon,
+  Chat01Icon,
+  ClipboardIcon,
+  Compass01Icon,
+  ComputerTerminal01Icon,
+  Plug01Icon,
+  Wifi01Icon,
+} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { formatModelName } from '@/screens/dashboard/lib/formatters'
 
 export type SessionRowData = {
@@ -16,21 +29,23 @@ export type SessionRowData = {
   updatedAt: number | null
 }
 
-const KIND_ICONS: Record<string, string> = {
-  chat: '💬',
-  cron: '⏰',
-  cli: '⌨️',
-  api: '🔌',
-  api_server: '🔌',
-  telegram: '✈️',
-  discord: '🎮',
-  whatsapp: '🟢',
-  signal: '🔵',
-  imessage: '💬',
-  matrix: '#',
-  workspace: '🧭',
-  local: '🧭',
-  job: '📋',
+type SessionIcon = typeof Chat01Icon
+
+const KIND_ICONS: Record<string, SessionIcon> = {
+  chat: Chat01Icon,
+  cron: AlarmClockIcon,
+  cli: ComputerTerminal01Icon,
+  api: Plug01Icon,
+  api_server: Plug01Icon,
+  telegram: Airplane01Icon,
+  discord: AiGameIcon,
+  whatsapp: Chat01Icon,
+  signal: Wifi01Icon,
+  imessage: Chat01Icon,
+  matrix: Chat01Icon,
+  workspace: Compass01Icon,
+  local: Compass01Icon,
+  job: ClipboardIcon,
 }
 
 /**
@@ -38,16 +53,18 @@ const KIND_ICONS: Record<string, string> = {
  * and a heuristic on the session key (cron sessions use the canonical
  * `cron_<jobId>_<ts>` key format the agent confirmed).
  */
-function sessionGlyph(
-  s: { kind: string; source: string | null; key: string },
-): string {
+function sessionGlyph(s: {
+  kind: string
+  source: string | null
+  key: string
+}): SessionIcon {
   if (typeof s.key === 'string' && s.key.startsWith('cron_')) {
     return KIND_ICONS.cron
   }
   const sourceKey = s.source?.toLowerCase()
-  if (sourceKey && KIND_ICONS[sourceKey]) return KIND_ICONS[sourceKey]
-  const kindKey = s.kind?.toLowerCase()
-  if (kindKey && KIND_ICONS[kindKey]) return KIND_ICONS[kindKey]
+  if (sourceKey && sourceKey in KIND_ICONS) return KIND_ICONS[sourceKey]
+  const kindKey = s.kind.toLowerCase()
+  if (kindKey in KIND_ICONS) return KIND_ICONS[kindKey]
   return KIND_ICONS.chat
 }
 
@@ -69,7 +86,7 @@ function formatTokens(n: number): string {
 }
 
 function shortTitle(s: SessionRowData): string {
-  const t = s.title?.trim()
+  const t = s.title.trim()
   if (t && t.length > 0 && t !== s.key) return t
   // Fall back to friendly slug from the key
   return `Session ${s.key.slice(0, 8)}`
@@ -85,11 +102,7 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
   const badges: Array<SessionBadge> = []
   const now = Date.now()
   // Hot: started or updated within 5 minutes and still idle/active
-  if (
-    s.updatedAt &&
-    now - s.updatedAt < 5 * 60_000 &&
-    s.status !== 'ended'
-  ) {
+  if (s.updatedAt && now - s.updatedAt < 5 * 60_000 && s.status !== 'ended') {
     badges.push({
       label: 'hot',
       tone: 'var(--theme-success)',
@@ -110,7 +123,10 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
       title: `${formatTokens(s.tokenCount)} tokens`,
     })
   }
-  if (s.status?.toLowerCase() === 'error' || s.status?.toLowerCase() === 'failed') {
+  if (
+    s.status.toLowerCase() === 'error' ||
+    s.status.toLowerCase() === 'failed'
+  ) {
     badges.push({
       label: 'error',
       tone: 'var(--theme-danger)',
@@ -150,10 +166,11 @@ function buildBadges(s: SessionRowData): Array<SessionBadge> {
  */
 export function SessionsIntelligenceCard({
   sessions,
+  loading = false,
 }: {
   sessions: Array<SessionRowData>
+  loading?: boolean
 }) {
-  const navigate = useNavigate()
   const enriched = useMemo(() => {
     return sessions.map((s) => ({
       session: s,
@@ -163,9 +180,7 @@ export function SessionsIntelligenceCard({
 
   // Highlight: top hot session, otherwise top tool-heavy, otherwise top recent.
   const highlightId = useMemo(() => {
-    const hot = enriched.find((e) =>
-      e.badges.some((b) => b.label === 'hot'),
-    )
+    const hot = enriched.find((e) => e.badges.some((b) => b.label === 'hot'))
     if (hot) return hot.session.key
     const heavy = enriched.find((e) =>
       e.badges.some((b) => b.label === 'tool-heavy'),
@@ -186,38 +201,64 @@ export function SessionsIntelligenceCard({
           'linear-gradient(150deg, color-mix(in srgb, var(--theme-card) 96%, transparent), color-mix(in srgb, var(--theme-card) 90%, transparent))',
       }}
     >
-      <div className="flex items-center justify-between gap-2">
-        <h3
-          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-        >
-          Sessions intelligence
-        </h3>
-        <div className="flex items-center gap-2">
-          <span
-            className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-          >
-            {sessions.length} recent
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <h2 className="min-w-0 truncate whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--theme-text)] md:text-[11px] md:tracking-[0.18em]">
+          <span className="sm:hidden">Sessions</span>
+          <span className="hidden sm:inline">Sessions intelligence</span>
+        </h2>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
+            {loading ? 'Loading…' : `${sessions.length} recent`}
           </span>
-          <button
-            type="button"
-            onClick={() =>
-              navigate({
-                to: '/chat/$sessionKey',
-                params: { sessionKey: 'main' },
-              })
-            }
-            className="rounded border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
+          <Link
+            to="/chat/$sessionKey"
+            params={{ sessionKey: 'main' }}
+            className="inline-flex min-h-11 items-center gap-1 rounded border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--theme-muted)] motion-safe:transition-colors hover:bg-[var(--theme-card)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] lg:min-h-0"
+            aria-label="Open main chat"
           >
-            Open chat →
-          </button>
+            <span>Open chat</span>
+            <HugeiconsIcon
+              icon={ArrowRight01Icon}
+              size={12}
+              strokeWidth={1.8}
+            />
+          </Link>
         </div>
       </div>
 
-      {sessions.length === 0 ? (
+      {loading ? (
         <div
-          className="flex h-[120px] items-center justify-center rounded-md border border-dashed border-[var(--theme-border)] text-[11px] text-[var(--theme-muted)]"
+          className="flex min-h-[120px] flex-col justify-center gap-2 rounded-md border border-dashed border-[var(--theme-border)] px-4"
+          aria-busy="true"
+          aria-label="Loading recent sessions"
         >
-          No sessions yet — start a chat.
+          <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+            <span className="size-1.5 rounded-full bg-[var(--theme-accent)] motion-safe:animate-pulse" />
+            Syncing session activity
+          </div>
+          <div className="h-2 w-3/4 rounded bg-[var(--theme-border)]/70 motion-safe:animate-pulse" />
+          <div className="h-2 w-1/2 rounded bg-[var(--theme-border)]/50 motion-safe:animate-pulse" />
+        </div>
+      ) : sessions.length === 0 ? (
+        <div className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-md border border-dashed border-[var(--theme-border)] px-4 text-center">
+          <p className="text-[11px] text-[var(--theme-muted)]">
+            No sessions yet
+          </p>
+          <p className="text-[10px] text-[var(--theme-muted)]/75">
+            Start a chat to populate your activity timeline.
+          </p>
+          <Link
+            to="/chat/$sessionKey"
+            params={{ sessionKey: 'new' }}
+            className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[var(--theme-accent)]/40 bg-[var(--theme-accent)]/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-accent)] motion-safe:transition-colors hover:bg-[var(--theme-accent)]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] lg:min-h-0"
+          >
+            <span>Start a chat</span>
+            <HugeiconsIcon
+              icon={ArrowRight01Icon}
+              size={12}
+              strokeWidth={1.8}
+            />
+          </Link>
         </div>
       ) : (
         // Iter 013: bumped from 8 → 14 rows. The card is now the
@@ -230,15 +271,11 @@ export function SessionsIntelligenceCard({
             const icon = sessionGlyph(s)
             return (
               <li key={s.key}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate({
-                      to: '/chat/$sessionKey',
-                      params: { sessionKey: s.key },
-                    })
-                  }
-                  className="group flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors hover:bg-[var(--theme-card)]/80"
+                <Link
+                  to="/chat/$sessionKey"
+                  params={{ sessionKey: s.key }}
+                  aria-label={`Open session ${shortTitle(s)}`}
+                  className="group flex min-h-11 w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left motion-safe:transition-colors hover:bg-[var(--theme-card)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)]"
                   style={{
                     borderColor: isHighlight
                       ? 'color-mix(in srgb, var(--theme-accent) 50%, transparent)'
@@ -250,10 +287,10 @@ export function SessionsIntelligenceCard({
                 >
                   <span
                     aria-hidden
-                    className="text-sm"
+                    className="inline-flex shrink-0 text-[var(--theme-muted)]"
                     style={{ filter: isHighlight ? 'none' : 'grayscale(0.2)' }}
                   >
-                    {icon}
+                    <HugeiconsIcon icon={icon} size={15} strokeWidth={1.6} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -278,12 +315,10 @@ export function SessionsIntelligenceCard({
                         </span>
                       ))}
                     </div>
-                    <div
-                      className="mt-0.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.05em] text-[var(--theme-muted)]"
-                    >
+                    <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.05em] text-[var(--theme-muted)]">
                       {s.model ? (
                         <span
-                          className="rounded px-1 py-0.5"
+                          className="min-w-0 max-w-[9rem] truncate rounded px-1 py-0.5"
                           style={{
                             background:
                               'color-mix(in srgb, var(--theme-accent) 10%, transparent)',
@@ -300,12 +335,12 @@ export function SessionsIntelligenceCard({
                       {s.tokenCount > 0 ? (
                         <span>{formatTokens(s.tokenCount)} tok</span>
                       ) : null}
-                      <span className="ml-auto">
+                      <span className="ml-auto shrink-0">
                         {relativeTime(s.updatedAt ?? s.startedAt)}
                       </span>
                     </div>
                   </div>
-                </button>
+                </Link>
               </li>
             )
           })}

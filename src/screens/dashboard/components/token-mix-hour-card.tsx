@@ -1,5 +1,10 @@
 import { useMemo } from 'react'
+import {
+  DashboardLoadingState,
+  DashboardUnavailableState,
+} from './dashboard-empty-state'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { safeNumber } from '@/screens/dashboard/lib/analytics-normalizers'
 
 function formatTokens(n: number): string {
   if (!n || n <= 0) return '0'
@@ -34,39 +39,45 @@ type Slice = {
  * "rhythm" insight instead of two unrelated widgets.
  *
  * Both halves are still independent: if analytics is unavailable the
- * top half hides; if there are no sessions the bottom half hides.
+ * top half hides; if there are no sessions the bottom half hides. The
+ * card itself remains visible with an intentional empty state so the
+ * default rail never leaves an unexplained blank gap.
  */
 export function TokenMixHourCard({
   analytics,
   sessions,
+  loading = false,
+  unavailable = false,
 }: {
   analytics: DashboardOverview['analytics']
   sessions: Array<{ startedAt: number | null; updatedAt: number | null }>
+  loading?: boolean
+  unavailable?: boolean
 }) {
   const slices: Array<Slice> = useMemo(() => {
     if (!analytics || analytics.source !== 'analytics') return []
     return [
       {
         label: 'cache',
-        value: analytics.cacheReadTokens,
+        value: safeNumber(analytics.cacheReadTokens),
         tone: 'var(--theme-accent-secondary)',
         hint: 'Cache read tokens.',
       },
       {
         label: 'input',
-        value: analytics.inputTokens,
+        value: safeNumber(analytics.inputTokens),
         tone: 'var(--theme-accent)',
         hint: 'Prompt tokens sent to the model.',
       },
       {
         label: 'output',
-        value: analytics.outputTokens,
+        value: safeNumber(analytics.outputTokens),
         tone: 'var(--theme-success)',
         hint: 'Completion tokens emitted.',
       },
       {
         label: 'reasoning',
-        value: analytics.reasoningTokens,
+        value: safeNumber(analytics.reasoningTokens),
         tone: 'var(--theme-warning)',
         hint: 'Thinking tokens (when supported).',
       },
@@ -74,9 +85,10 @@ export function TokenMixHourCard({
   }, [analytics])
 
   const totalTokens = slices.reduce((a, s) => a + s.value, 0)
+  const inputTokens = safeNumber(analytics?.inputTokens)
   const ratio =
-    analytics && analytics.inputTokens > 0
-      ? (analytics.outputTokens / analytics.inputTokens) * 100
+    inputTokens > 0
+      ? (safeNumber(analytics?.outputTokens) / inputTokens) * 100
       : 0
 
   const buckets = useMemo(() => {
@@ -95,9 +107,8 @@ export function TokenMixHourCard({
   const maxBucket = Math.max(...buckets, 1)
   const peakHour = buckets.indexOf(maxBucket)
 
-  // If there's nothing to show in either half, render nothing so the
-  // side rail stays tidy on fresh installs.
-  if (totalTokens === 0 && totalSessions === 0) return null
+  if (loading) return <DashboardLoadingState title="Mix & rhythm" />
+  if (unavailable) return <DashboardUnavailableState title="Mix & rhythm" />
 
   return (
     <div
@@ -108,23 +119,39 @@ export function TokenMixHourCard({
         borderColor: 'var(--theme-border)',
       }}
     >
-      <div className="flex items-center justify-between gap-2">
-        <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-        >
+      <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+        <h2 className="shrink-0 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
           Mix &amp; rhythm
           {analytics ? ` · ${analytics.windowDays}d` : ''}
-        </h3>
-        <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-        >
-          {totalTokens > 0 ? `out/in ${ratio.toFixed(1)}%` : ''}
-          {totalTokens > 0 && totalSessions > 0 ? ' · ' : ''}
-          {totalSessions > 0
-            ? `peak ${formatHour(peakHour)} · ${totalSessions} sess`
-            : ''}
+        </h2>
+        <span className="ml-auto flex min-w-0 flex-wrap justify-end gap-x-2 gap-y-0.5 text-right font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
+          {totalTokens > 0 ? (
+            <span className="whitespace-nowrap">
+              out/in {ratio.toFixed(1)}%
+            </span>
+          ) : null}
+          {totalSessions > 0 ? (
+            <span className="whitespace-nowrap">
+              peak {formatHour(peakHour)} · {totalSessions} sess
+            </span>
+          ) : null}
         </span>
       </div>
+
+      {totalTokens === 0 && totalSessions === 0 ? (
+        <div
+          role="group"
+          aria-label="Mix and rhythm: no activity in this window yet. Start a chat to populate token mix and activity rhythm."
+          className="flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-md border border-dashed border-[var(--theme-border)] px-3 text-center"
+        >
+          <p className="text-[11px] font-medium text-[var(--theme-text)]">
+            No activity in this window yet
+          </p>
+          <p className="text-[10px] text-[var(--theme-muted)]">
+            Start a chat to populate token mix and activity rhythm.
+          </p>
+        </div>
+      ) : null}
 
       {/* Token split */}
       {totalTokens > 0 ? (
@@ -167,13 +194,9 @@ export function TokenMixHourCard({
                       {s.label}
                     </span>
                   </span>
-                  <span
-                    className="shrink-0 font-mono tabular-nums text-[var(--theme-text)]"
-                  >
+                  <span className="shrink-0 font-mono tabular-nums text-[var(--theme-text)]">
                     {formatTokens(s.value)}
-                    <span
-                      className="ml-1 text-[var(--theme-muted)]"
-                    >
+                    <span className="ml-1 text-[var(--theme-muted)]">
                       · {widthPct.toFixed(0)}%
                     </span>
                   </span>
@@ -202,8 +225,7 @@ export function TokenMixHourCard({
                         : isPeak
                           ? 'var(--theme-accent)'
                           : `color-mix(in srgb, var(--theme-accent) ${Math.max(20, heightPct)}%, transparent)`,
-                    height:
-                      count === 0 ? 4 : `${Math.max(8, heightPct)}%`,
+                    height: count === 0 ? 4 : `${Math.max(8, heightPct)}%`,
                     minHeight: 4,
                   }}
                   title={`${formatHour(hour)} · ${count} session${count === 1 ? '' : 's'}`}
@@ -211,9 +233,7 @@ export function TokenMixHourCard({
               )
             })}
           </div>
-          <div
-            className="flex justify-between font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-          >
+          <div className="flex justify-between font-mono text-[8px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
             <span>12a</span>
             <span>6a</span>
             <span>12p</span>

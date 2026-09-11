@@ -1,6 +1,16 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Award01Icon, CancelIcon } from '@hugeicons/core-free-icons'
+import {
+  ArrowRight01Icon,
+  Award01Icon,
+  CancelIcon,
+} from '@hugeicons/core-free-icons'
+import { DashboardDialog } from './dashboard-dialog'
+import {
+  DashboardEmptyState,
+  DashboardLoadingState,
+  DashboardUnavailableState,
+} from './dashboard-empty-state'
 import type {
   DashboardAchievementUnlock,
   DashboardOverview,
@@ -36,30 +46,24 @@ function AchievementRow({
   compact?: boolean
 }) {
   return (
-    <div
-      className="flex items-center gap-2 rounded border px-2 py-1.5 border-[var(--theme-border)]"
-    >
+    <div className="flex items-center gap-2 rounded border px-2 py-1.5 border-[var(--theme-border)]">
       <span
         aria-hidden
-        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-base"
+        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded"
         style={{
           background:
             'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
           color: tierColor(unlock.tier),
         }}
       >
-        🏆
+        <HugeiconsIcon icon={Award01Icon} size={15} strokeWidth={1.6} />
       </span>
       <div className="min-w-0 flex-1">
-        <div
-          className="truncate text-[11px] font-semibold text-[var(--theme-text)]"
-        >
+        <div className="truncate text-[11px] font-semibold text-[var(--theme-text)]">
           {unlock.name}
         </div>
         {!compact ? (
-          <div
-            className="truncate text-[10px] text-[var(--theme-muted)]"
-          >
+          <div className="truncate text-[10px] text-[var(--theme-muted)]">
             {unlock.description || unlock.category}
           </div>
         ) : null}
@@ -73,9 +77,7 @@ function AchievementRow({
             {unlock.tier}
           </span>
         ) : null}
-        <span
-          className="block text-[9px] font-mono text-[var(--theme-muted)]"
-        >
+        <span className="block text-[9px] font-mono text-[var(--theme-muted)]">
           {relativeTime(unlock.unlockedAt)}
         </span>
       </div>
@@ -91,33 +93,63 @@ function AchievementRow({
  */
 export function AchievementsCard({
   achievements,
+  loading = false,
+  unavailable = false,
 }: {
   achievements: DashboardOverview['achievements']
+  loading?: boolean
+  unavailable?: boolean
 }) {
+  const titleId = useId()
   const [showAll, setShowAll] = useState(false)
-  const [allUnlocks, setAllUnlocks] = useState<
-    Array<DashboardAchievementUnlock> | null
-  >(null)
+  const [allUnlocks, setAllUnlocks] =
+    useState<Array<DashboardAchievementUnlock> | null>(null)
   const [loadingAll, setLoadingAll] = useState(false)
   const [allError, setAllError] = useState<string | null>(null)
 
-  if (!achievements) return null
+  if (loading) return <DashboardLoadingState title="Achievements" />
 
-  const openModal = async () => {
-    setShowAll(true)
+  if (!achievements) {
+    if (!unavailable) {
+      return (
+        <DashboardEmptyState
+          title="Achievements"
+          description="Achievements are not enabled for this workspace."
+          statusLabel="not enabled"
+        />
+      )
+    }
+    return <DashboardUnavailableState title="Achievements" />
+  }
+
+  const loadAllAchievements = async () => {
     if (allUnlocks !== null) return
     setLoadingAll(true)
     setAllError(null)
+    const controller = new AbortController()
+    const timeout = globalThis.setTimeout(() => controller.abort(), 5_000)
     try {
-      const res = await fetch('/api/dashboard/overview?achievements=12')
-      if (!res.ok) throw new Error(`overview ${res.status}`)
+      const res = await fetch('/api/dashboard/overview?achievements=12', {
+        signal: controller.signal,
+      })
+      if (!res.ok) throw new Error('The achievement list could not be loaded.')
       const data = (await res.json()) as DashboardOverview
       setAllUnlocks(data.achievements?.recentUnlocks ?? [])
     } catch (err) {
-      setAllError(err instanceof Error ? err.message : 'failed to load')
+      setAllError(
+        err instanceof DOMException && err.name === 'AbortError'
+          ? 'Loading achievements timed out. Check the connection and retry.'
+          : 'The achievement list is temporarily unavailable. Retry to load it.',
+      )
     } finally {
+      globalThis.clearTimeout(timeout)
       setLoadingAll(false)
     }
+  }
+
+  const openModal = () => {
+    setShowAll(true)
+    if (allUnlocks === null) void loadAllAchievements()
   }
 
   return (
@@ -146,26 +178,38 @@ export function AchievementsCard({
               strokeWidth={1.5}
               className="text-[var(--theme-muted)]"
             />
-            <h3
-              className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-            >
+            <h2 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
               Achievements
-            </h3>
+            </h2>
           </div>
-          <button
-            type="button"
-            onClick={openModal}
-            className="font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:text-[var(--theme-accent)] text-[var(--theme-muted)]"
-          >
-            {achievements.totalUnlocked} unlocked · view all →
-          </button>
+          {achievements.totalUnlocked > 0 ? (
+            <button
+              type="button"
+              onClick={openModal}
+              className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded px-1 font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)] motion-safe:transition-colors hover:text-[var(--theme-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] lg:min-h-0"
+            >
+              <span>{achievements.totalUnlocked} unlocked · view all</span>
+              <HugeiconsIcon
+                icon={ArrowRight01Icon}
+                size={12}
+                strokeWidth={1.8}
+              />
+            </button>
+          ) : (
+            <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
+              0 unlocked
+            </span>
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
           {achievements.recentUnlocks.length === 0 ? (
-            <div
-              className="py-3 text-center text-[11px] text-[var(--theme-muted)]"
-            >
-              No unlocks yet — keep working.
+            <div className="flex flex-col items-center gap-1 py-3 text-center">
+              <p className="text-[11px] font-medium text-[var(--theme-text)]">
+                No unlocks yet
+              </p>
+              <p className="max-w-[24ch] text-[10px] leading-relaxed text-[var(--theme-muted)]">
+                Complete sessions and use skills to earn milestones.
+              </p>
             </div>
           ) : (
             // Render every unlock the aggregator returns so the card
@@ -179,61 +223,66 @@ export function AchievementsCard({
       </div>
 
       {showAll ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-8"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setShowAll(false)}
+        <DashboardDialog
+          titleId={titleId}
+          onClose={() => setShowAll(false)}
+          className="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-lg border bg-[var(--theme-card)] border-[var(--theme-border)]"
         >
-          <div
-            className="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-lg border bg-[var(--theme-card)] border-[var(--theme-border)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className="flex items-center justify-between border-b px-4 py-3 border-[var(--theme-border)]"
+          <div className="flex items-center justify-between border-b px-4 py-3 border-[var(--theme-border)]">
+            <h2
+              id={titleId}
+              className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--theme-text)]"
             >
-              <h2
-                className="text-sm font-semibold uppercase tracking-[0.15em] text-[var(--theme-text)]"
+              Achievement Ribbon
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowAll(false)}
+              aria-label="Close"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded p-1 hover:bg-[var(--theme-card)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] lg:min-h-0 lg:min-w-0"
+            >
+              <HugeiconsIcon
+                icon={CancelIcon}
+                size={16}
+                strokeWidth={1.5}
+                className="text-[var(--theme-muted)]"
+              />
+            </button>
+          </div>
+          <div className="max-h-[64vh] overflow-y-auto p-4">
+            {loadingAll ? (
+              <div
+                role="status"
+                aria-busy="true"
+                className="py-8 text-center text-[11px] text-[var(--theme-muted)]"
               >
-                Achievement Ribbon
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowAll(false)}
-                aria-label="Close"
-                className="rounded p-1 hover:bg-[var(--theme-card)]/80"
-              >
-                <HugeiconsIcon
-                  icon={CancelIcon}
-                  size={16}
-                  strokeWidth={1.5}
-                  className="text-[var(--theme-muted)]"
-                />
-              </button>
-            </div>
-            <div className="max-h-[64vh] overflow-y-auto p-4">
-              {loadingAll ? (
-                <div
-                  className="py-8 text-center text-[11px] text-[var(--theme-muted)]"
-                >
-                  Loading…
-                </div>
-              ) : allError ? (
-                <div
-                  className="py-8 text-center text-[11px] text-[var(--theme-danger,#ef4444)]"
+                Loading achievements…
+              </div>
+            ) : allError ? (
+              <div className="flex flex-col items-center gap-3 py-8 text-center">
+                <p
+                  role="alert"
+                  className="text-[11px] text-[var(--theme-danger,#ef4444)]"
                 >
                   {allError}
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {(allUnlocks ?? achievements.recentUnlocks).map((unlock) => (
-                    <AchievementRow key={unlock.id} unlock={unlock} />
-                  ))}
-                </div>
-              )}
-            </div>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void loadAllAchievements()}
+                  className="rounded-md border border-[var(--theme-border)] px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-accent)] motion-safe:transition-colors hover:bg-[var(--theme-card)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)]"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {(allUnlocks ?? achievements.recentUnlocks).map((unlock) => (
+                  <AchievementRow key={unlock.id} unlock={unlock} />
+                ))}
+              </div>
+            )}
           </div>
-        </div>
+        </DashboardDialog>
       ) : null}
     </>
   )

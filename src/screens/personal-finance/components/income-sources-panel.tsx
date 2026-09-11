@@ -54,7 +54,7 @@ const expiryTone = {
 export function contractExpiryLabel(
   job: Record<string, unknown>,
 ): { text: string; tone: string } | null {
-  if (job.employmentType !== 'contract' || job.status !== 'active') return null
+  if (job.employmentType !== 'contract' || !['active', 'notice_period'].includes(String(job.status || 'active'))) return null
   const contractEndDate =
     typeof job.contractEndDate === 'string' ? job.contractEndDate : ''
   if (!contractEndDate) return null
@@ -84,7 +84,7 @@ function findPossibleDuplicateJob(
   const target = employerName.trim().toLowerCase()
   if (!target) return null
   for (const job of jobs) {
-    if (stringField(job, 'status') !== 'active') continue
+    if (!['active', 'notice_period'].includes(stringField(job, 'status') || 'active')) continue
     const existing = stringField(job, 'employerName').trim().toLowerCase()
     if (
       existing &&
@@ -207,15 +207,10 @@ export function IncomeSourcesPanel({
     if (data) setPayLogOpenId(null)
   }
 
-  async function endJob(id: string) {
+  async function setJobStatus(id: string, status: string) {
     await post(
-      {
-        action: 'update_record',
-        kind: 'income_source',
-        id,
-        payload: { status: 'ended' },
-      },
-      `end-${id}`,
+      { action: 'update_record', kind: 'income_source', id, payload: { status } },
+      `status-${id}`,
     )
   }
 
@@ -262,7 +257,7 @@ export function IncomeSourcesPanel({
   // would silently invent a conversion this app doesn't otherwise do.
   const activeMonthlyTotals = new Map<string, number>()
   for (const job of jobs) {
-    if (stringField(job, 'status') !== 'active') continue
+    if (!['active', 'notice_period'].includes(stringField(job, 'status') || 'active')) continue
     const amount = numberField(job, 'monthlyIncomeAmount')
     if (amount === undefined) continue
     const jobCurrency = stringField(job, 'currency') || 'LKR'
@@ -471,7 +466,7 @@ export function IncomeSourcesPanel({
                       </button>
                     </>
                   )}
-                  {status === 'active' &&
+                  {['active', 'notice_period'].includes(status) &&
                     monthly !== undefined &&
                     paydayStatus.state !== 'not_tracked' &&
                     paydayStatus.state !== 'paid' && (
@@ -493,16 +488,19 @@ export function IncomeSourcesPanel({
                         Log this month's payment
                       </button>
                     )}
-                  {status === 'active' && (
-                    <button
-                      type="button"
-                      disabled={busy === `end-${id}`}
-                      onClick={() => void endJob(id)}
-                      className={buttonClass}
-                    >
-                      Mark ended
-                    </button>
-                  )}
+                  <select
+                    value={status}
+                    aria-label={`Lifecycle status for ${stringField(job, 'employerName')}`}
+                    disabled={busy === `status-${id}`}
+                    onChange={(event) => void setJobStatus(id, event.target.value)}
+                    className={`${inputClass} max-w-[150px]`}
+                  >
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="notice_period">Notice period</option>
+                    <option value="ended">Ended</option>
+                    <option value="terminated">Terminated</option>
+                  </select>
                   <button
                     type="button"
                     disabled={busy === `delete-${id}`}

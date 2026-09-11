@@ -8,6 +8,26 @@ function textValue(row: Record<string, unknown>, key: string): string {
   return String(value)
 }
 
+/** Convert storage-oriented field names into readable table headings. */
+export function humanizeColumnLabel(column: string): string {
+  const labels: Record<string, string> = {
+    budgetAmount: 'Budget amount',
+    convertedLkrAmount: 'Converted LKR amount',
+    documentRef: 'Document',
+    exchangeRateSource: 'Exchange-rate source',
+    goalKind: 'Goal type',
+    monthlyContribution: 'Monthly contribution',
+    supportingDocument: 'Supporting document',
+    taxPaid: 'Tax paid',
+    taxDue: 'Tax due',
+  }
+  if (labels[column]) return labels[column]
+  return column
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .replace(/^./, (character) => character.toUpperCase())
+}
+
 function inputTypeFor(value: unknown): 'number' | 'checkbox' | 'text' {
   if (typeof value === 'number') return 'number'
   if (typeof value === 'boolean') return 'checkbox'
@@ -187,8 +207,7 @@ export function DataTable({
       {error && <p className="mb-2 text-xs text-red-300">{error}</p>}
       {rows.length === 0 ? (
         <p className="text-sm text-[var(--theme-muted)]">
-          No records yet. Add records through /api/finance or future forms; the
-          database is initialized and ready.
+          No records yet. Add a record using the form above when you are ready.
         </p>
       ) : visibleRows.length === 0 ? (
         <p className="text-sm text-[var(--theme-muted)]">
@@ -205,7 +224,7 @@ export function DataTable({
                     className={`border-b border-[var(--theme-border)] py-2 pr-4 ${searchable ? 'cursor-pointer select-none hover:text-[var(--theme-text)]' : ''}`}
                     onClick={searchable ? () => toggleSort(column) : undefined}
                   >
-                    {column}
+                    {humanizeColumnLabel(column)}
                     {sortColumn === column &&
                       (sortDirection === 'asc' ? ' ▲' : ' ▼')}
                   </th>

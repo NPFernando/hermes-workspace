@@ -59,7 +59,7 @@ export function ScheduledTransactionsPanel({
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
 
   const accounts = payload.data.finance_accounts
-  const rows = [...payload.data.scheduled_transactions].sort((a, b) =>
+  const rows = [...(payload.data.scheduled_transactions ?? [])].sort((a, b) =>
     stringField(a, 'dueDate') < stringField(b, 'dueDate') ? -1 : 1,
   )
 

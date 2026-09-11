@@ -59,6 +59,21 @@ Start here: [docs/swarm/](./docs/swarm/)
 - 📱 **PWA + Tailscale** — Install as a native-feeling app; access from any device on your tailnet
 - ⚙️ **Capability gates** — Features that need upstream endpoints (Conductor) show a clean placeholder instead of failing mid-action
 
+### Queue follow-up messages
+
+While Codex, Claude, or another provider is answering, enter `/queue <message>` in Chat to save a follow-up for automatic FIFO execution after the current answer completes. Queue entries are scoped to the current chat session, stored locally in the browser, and survive page reloads and browser restarts. They are never sent until the active answer finishes and the queue drains.
+
+Useful controls:
+
+- `/queue` — show the queue count
+- `/queue remove <number>` — remove one queued entry
+- `/queue clear` — clear all queued entries
+- `/queue resume` — retry a queue paused after an error or abort
+
+Queues are capped at 50 messages per chat and 4,000 characters per message. Clearing from the queue panel asks for confirmation; queued data remains local to the browser and is not uploaded as queue metadata.
+
+Press `Ctrl/Cmd+Shift+Q` to focus the chat composer from anywhere in the workspace.
+
 ---
 
 ## 📸 Screenshots
@@ -143,6 +158,24 @@ Verify both services before opening the workspace:
 - `curl http://127.0.0.1:3000/api/sessions` (after the workspace boots) should return a sessions payload or an empty list.
 
 If `/api/sessions` is already returning data, **do not start another gateway just because the UI still says Offline** — refresh or reprobe the Workspace UI first.
+
+### Release and operational checks
+
+Before merging, run `pnpm install --frozen-lockfile`, `pnpm run typecheck`,
+`pnpm run lint`, `pnpm test`, and `pnpm build`. CI also runs Gitleaks, CodeQL,
+and a production dependency audit. After deployment, run:
+
+```bash
+node scripts/release-smoke.mjs http://127.0.0.1:3000
+RELEASE_SMOKE_FINANCE=1 node scripts/release-smoke.mjs http://127.0.0.1:3000
+```
+
+The finance check confirms the authentication gate by default; set
+`RELEASE_SMOKE_REQUIRE_AUTH=1` when authenticated credentials are available.
+See [docs/release-checklist.md](docs/release-checklist.md) and
+[docs/operational-readiness.md](docs/operational-readiness.md) for the full
+finance, security, observability, accessibility, responsive, and rollback
+checklist.
 
 If your default model is `gpt-5.4` / `openai-codex`, make sure Codex CLI auth is live before testing chat:
 
@@ -239,6 +272,16 @@ HERMES_API_URL=http://127.0.0.1:8642
 # OPENROUTER_API_KEY=sk-or-v1-...      # OpenRouter (incl. free models)
 # GOOGLE_API_KEY=AIza...               # Gemini
 # (Ollama / LM Studio / local servers don't need a key)
+
+# Optional Personal Finance privacy mode: use only a discovered local
+# Ollama/Atomic Chat model for finance prompts and document extraction.
+# FINANCE_AI_LOCAL_ONLY=1
+
+# Optional: require a separate token for callers using the finance-agent API
+# contract (`X-Finance-Agent-Token`). Browser requests do not need this.
+# FINANCE_AGENT_API_TOKEN=replace-with-a-random-secret
+# Optional overlap window for rotation (up to 16 comma-separated tokens):
+# FINANCE_AGENT_API_TOKENS=old-secret,new-secret
 
 # Optional: password-protect the web UI
 # HERMES_PASSWORD=your_password

@@ -234,7 +234,7 @@ export function SkillsScreen() {
     const explicit = profilesQuery.data?.activeProfile
     if (explicit) return explicit
     const defaultProfile = profiles.find((p) => p.is_default)
-    return defaultProfile?.name ?? profiles[0]?.name ?? ''
+    return defaultProfile?.name || profiles.at(0)?.name || ''
   }, [profiles, profilesQuery.data?.activeProfile])
 
   // Pick a sensible default once profiles arrive — match the dashboard's
@@ -294,7 +294,7 @@ export function SkillsScreen() {
         if (!response.ok) {
           throw new Error(payload.error || 'Failed to fetch profile skills')
         }
-        const normalized = (payload.items || []).map(normalizeProfileSkill)
+        const normalized = payload.items.map(normalizeProfileSkill)
         const lowered = searchInput.trim().toLowerCase()
         const filtered = normalized.filter((skill) => {
           if (category !== 'All' && skill.category !== category) return false
@@ -411,18 +411,13 @@ export function SkillsScreen() {
         const author =
           skill.author ||
           (skill.repo ? skill.repo.split('/')[0] : null) ||
-          (skill.extra as Record<string, unknown>)?.author ||
+          skill.extra?.author ||
           skill.source ||
           'Community'
         const homepage =
-          skill.homepage ||
-          skill.repo ||
-          (skill.extra as Record<string, unknown>)?.homepage ||
-          null
-        const category =
-          skill.category ||
-          (skill.extra as Record<string, unknown>)?.category ||
-          'Productivity'
+          skill.homepage || skill.repo || skill.extra?.homepage || null
+        const skillCategory =
+          skill.category || skill.extra?.category || 'Productivity'
 
         return {
           id: skillId,
@@ -433,7 +428,7 @@ export function SkillsScreen() {
           triggers: skill.tags,
           tags: skill.tags,
           homepage: typeof homepage === 'string' ? homepage : null,
-          category: String(category),
+          category: String(skillCategory),
           icon:
             skill.source === 'github'
               ? '🐙'
@@ -644,7 +639,10 @@ export function SkillsScreen() {
   }
 
   return (
-    <div data-route-page className="min-h-full overflow-y-auto bg-surface text-ink">
+    <div
+      data-route-page
+      className="min-h-full overflow-y-auto bg-surface text-ink"
+    >
       <div className="flex w-full flex-col gap-5 px-4 py-6 pb-[calc(var(--tabbar-h,80px)+1.5rem)] sm:px-6 lg:px-8">
         <header className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4 backdrop-blur-xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -705,9 +703,7 @@ export function SkillsScreen() {
               {tab === 'installed' ? (
                 <select
                   value={category}
-                  onChange={(event) =>
-                    handleCategoryChange(event.target.value)
-                  }
+                  onChange={(event) => handleCategoryChange(event.target.value)}
                   className="h-9 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-3 text-sm text-ink outline-none"
                 >
                   {categories.map((item) => (
@@ -754,7 +750,10 @@ export function SkillsScreen() {
                   Installed
                 </TabsTab>
                 {isOnActiveProfile ? (
-                  <TabsTab value="marketplace" className="min-w-0 sm:min-w-[120px]">
+                  <TabsTab
+                    value="marketplace"
+                    className="min-w-0 sm:min-w-[120px]"
+                  >
                     Marketplace
                   </TabsTab>
                 ) : null}
@@ -846,7 +845,13 @@ export function SkillsScreen() {
             </TabsPanel>
 
             <TabsPanel value="workspace" className="pt-2">
-              <Suspense fallback={<div className="py-8 text-center text-sm text-[var(--theme-muted)]">Loading…</div>}>
+              <Suspense
+                fallback={
+                  <div className="py-8 text-center text-sm text-[var(--theme-muted)]">
+                    Loading…
+                  </div>
+                }
+              >
                 <WorkspaceSkillsScreen />
               </Suspense>
             </TabsPanel>
@@ -1081,8 +1086,6 @@ function SecurityBadge({
 }) {
   if (!security) return null
   const config = SECURITY_BADGE[security.level]
-  if (!config) return null
-
   const [expanded, setExpanded] = useState(false)
 
   // Compact badge for card grid
@@ -1105,9 +1108,7 @@ function SecurityBadge({
           {config.label}
         </button>
         {expanded && (
-          <div
-            className="absolute left-0 bottom-[calc(100%+6px)] z-50 w-72 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-0 shadow-xl"
-          >
+          <div className="absolute left-0 bottom-[calc(100%+6px)] z-50 w-72 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-0 shadow-xl">
             <SecurityScanCard security={security} />
           </div>
         )}
@@ -1122,8 +1123,6 @@ function SecurityBadge({
 function SecurityScanCard({ security }: { security: SecurityRisk }) {
   const [showDetails, setShowDetails] = useState(false)
   const config = SECURITY_BADGE[security.level]
-  if (!config) return null
-
   const summaryText =
     security.flags.length === 0
       ? 'No risky patterns detected. This skill appears safe to install.'
@@ -1181,7 +1180,9 @@ function SecurityScanCard({ security }: { security: SecurityRisk }) {
                   key={flag}
                   className="flex items-start gap-2 text-[var(--theme-muted)]"
                 >
-                  <span className="mt-0.5 text-[9px] text-[var(--theme-muted)]">●</span>
+                  <span className="mt-0.5 text-[9px] text-[var(--theme-muted)]">
+                    ●
+                  </span>
                   <span>{flag}</span>
                 </div>
               ))}
@@ -1254,7 +1255,10 @@ function SkillsGrid({
                     </h3>
                   </div>
                   {skill.author ? (
-                    <p title={`by ${skill.author}`} className="line-clamp-1 text-xs text-[var(--theme-muted)]">
+                    <p
+                      title={`by ${skill.author}`}
+                      className="line-clamp-1 text-xs text-[var(--theme-muted)]"
+                    >
                       by {skill.author}
                     </p>
                   ) : null}
@@ -1292,7 +1296,10 @@ function SkillsGrid({
                 </div>
               </div>
 
-              <p title={skill.description} className="line-clamp-3 min-h-[58px] text-sm text-[var(--theme-muted)] text-pretty">
+              <p
+                title={skill.description}
+                className="line-clamp-3 min-h-[58px] text-sm text-[var(--theme-muted)] text-pretty"
+              >
                 {skill.description}
               </p>
 
@@ -1415,7 +1422,9 @@ function FeaturedGrid({
                 <h3 className="text-lg font-medium text-ink text-balance">
                   {skill.icon} {skill.name}
                 </h3>
-                <p className="text-sm text-[var(--theme-muted)]">by {skill.author}</p>
+                <p className="text-sm text-[var(--theme-muted)]">
+                  by {skill.author}
+                </p>
               </div>
 
               <span
@@ -1430,7 +1439,10 @@ function FeaturedGrid({
               </span>
             </div>
 
-            <p title={skill.description} className="line-clamp-3 mb-3 text-sm text-[var(--theme-muted)] text-pretty">
+            <p
+              title={skill.description}
+              className="line-clamp-3 mb-3 text-sm text-[var(--theme-muted)] text-pretty"
+            >
               {skill.description}
             </p>
 

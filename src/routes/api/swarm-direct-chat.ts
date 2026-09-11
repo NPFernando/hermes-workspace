@@ -5,6 +5,12 @@ import { join } from 'node:path'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import type { SwarmChatMessage } from '../../server/swarm-chat-reader'
@@ -307,6 +313,13 @@ export const Route = createFileRoute('/api/swarm-direct-chat')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (
+          !rateLimit(`swarm-direct-chat:${getClientIp(request)}`, 5, 60_000)
+        ) {
+          return rateLimitResponse()
         }
 
         let body: DirectChatRequest

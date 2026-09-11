@@ -90,6 +90,7 @@ describe('canonical /api/hermes-config route', () => {
     const res = await handlers.PATCH({
       request: new Request('http://localhost/api/hermes-config', {
         method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           action: 'set-default-model',
           providerId: 'openrouter',
@@ -116,6 +117,7 @@ describe('canonical /api/hermes-config route', () => {
     await handlers.PATCH({
       request: new Request('http://localhost/api/hermes-config', {
         method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ config: { memory: { memory_enabled: true } } }),
       }),
     })
@@ -130,6 +132,7 @@ describe('canonical /api/hermes-config route', () => {
     const res = await handlers.PATCH({
       request: new Request('http://localhost/api/hermes-config', {
         method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'set-default-model' }),
       }),
     })
@@ -145,6 +148,7 @@ describe('canonical /api/hermes-config route', () => {
     const res = await handlers.PATCH({
       request: new Request('http://localhost/api/hermes-config', {
         method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           action: 'set-api-key',
           envKey: 'X',

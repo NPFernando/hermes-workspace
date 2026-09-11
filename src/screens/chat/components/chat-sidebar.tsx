@@ -21,8 +21,10 @@ import {
   Settings01Icon,
   Sun02Icon,
   Telescope02Icon,
+  UserCircle02Icon,
   UserGroupIcon,
   UserMultipleIcon,
+  Wallet01Icon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
 import {
@@ -64,6 +66,7 @@ import {
 } from '@/hooks/use-chat-settings'
 import { StatusDot } from '@/components/status-indicator'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import { logoutWorkspace } from '@/lib/auth-session'
 
 const SettingsDialog = lazy(() =>
   import('@/components/settings-dialog').then((m) => ({
@@ -115,8 +118,9 @@ function ThemeToggleMini() {
         applyTheme(nextMode)
         updateSettings({ theme: nextMode })
       }}
-      className="shrink-0 rounded-lg p-1.5 transition-colors hover:opacity-80 text-[var(--theme-muted)]"
+      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg transition-colors hover:opacity-80 text-[var(--theme-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-sidebar)]"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       <HugeiconsIcon
         icon={isDark ? Sun02Icon : Moon02Icon}
@@ -168,7 +172,7 @@ export async function fetchWorkspaceStats(): Promise<WorkspaceStats | null> {
   }
 }
 
-export async function fetchWorkspaceProjectShortcuts(): Promise<Array<never>> {
+export function fetchWorkspaceProjectShortcuts(): Array<never> {
   return []
 }
 
@@ -267,6 +271,8 @@ function NavItem({
                   hash={item.hash}
                   onClick={handleSelect}
                   className={cls}
+                  aria-current={item.active ? 'page' : undefined}
+                  aria-label={item.label}
                   data-tour={item.dataTour}
                 >
                   {iconEl}
@@ -285,6 +291,7 @@ function NavItem({
         hash={item.hash}
         onClick={handleSelect}
         className={cls}
+        aria-current={item.active ? 'page' : undefined}
         data-tour={item.dataTour}
       >
         {iconEl}
@@ -308,6 +315,7 @@ function NavItem({
                   handleSelect()
                 }}
                 className={cls}
+                aria-label={item.label}
                 data-tour={item.dataTour}
               >
                 {iconEl}
@@ -539,6 +547,7 @@ function ChatSidebarComponent({
   sessionsError,
   onRetrySessions,
 }: ChatSidebarProps) {
+  const [loggingOut, setLoggingOut] = useState(false)
   const { settingsOpen, settingsSection, setSettingsOpen, handleOpenSettings } =
     useSidebarSettings()
   // Mount the (lazy) settings dialog only once it has been opened, then keep
@@ -551,6 +560,16 @@ function ChatSidebarComponent({
   const profileAvatarDataUrl = useChatSettingsStore(
     selectChatProfileAvatarDataUrl,
   )
+
+  async function handleLogout() {
+    if (loggingOut) return
+    setLoggingOut(true)
+    try {
+      await logoutWorkspace()
+    } catch {
+      setLoggingOut(false)
+    }
+  }
   const { deleteSession } = useDeleteSession()
   const { renameSession } = useRenameSession()
   const openSearchModal = useSearchModal((state) => state.openModal)
@@ -861,7 +880,7 @@ function ChatSidebarComponent({
     {
       kind: 'link',
       to: '/personal-finance',
-      icon: ChartCandleIcon,
+      icon: Wallet01Icon,
       label: 'Personal Finance',
       active: isPersonalFinanceActive,
     },
@@ -932,7 +951,7 @@ function ChatSidebarComponent({
     {
       kind: 'link',
       to: '/profiles',
-      icon: UserMultipleIcon,
+      icon: UserCircle02Icon,
       label: t('nav.profiles'),
       active: pathname === '/profiles',
     },
@@ -953,7 +972,7 @@ function ChatSidebarComponent({
             : 48
           : isMobile
             ? '85vw'
-            : 300,
+            : 'var(--desktop-sidebar-width)',
       }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className={cn(
@@ -996,7 +1015,7 @@ function ChatSidebarComponent({
               >
                 <img
                   src="/claude-avatar.webp"
-                  alt="Hermes Agent"
+                  alt="Hermes Workspace logo"
                   className="size-6 rounded-lg"
                 />
                 <span className="text-sm font-semibold tracking-tight text-[var(--theme-text)]">
@@ -1088,87 +1107,94 @@ function ChatSidebarComponent({
       )}
 
       {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
-        {/* Navigation sections */}
-        <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
-          <SectionLabel
-            label="Main"
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            collapsible
-            expanded={mainExpanded}
-            onToggle={toggleMain}
-            navigateTo={mainNav}
-          />
-          <CollapsibleSection
-            expanded={mainExpanded || isCollapsed}
-            items={mainItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
+      <div className="relative h-0 flex-1 min-h-0">
+        <div className="h-full overflow-y-auto scrollbar-thin scroll-pb-24 flex flex-col pb-24">
+          {/* Navigation sections */}
+          <div
+            className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}
+          >
+            <SectionLabel
+              label="Main"
+              isCollapsed={isVisuallyCollapsed}
+              transition={transition}
+              collapsible
+              expanded={mainExpanded}
+              onToggle={toggleMain}
+              navigateTo={mainNav}
+            />
+            <CollapsibleSection
+              expanded={mainExpanded || isCollapsed}
+              items={mainItems}
+              isCollapsed={isVisuallyCollapsed}
+              transition={transition}
+              onSelectSession={onSelectSession}
+            />
 
-          <SectionLabel
-            label="Knowledge"
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            collapsible
-            expanded={knowledgeExpanded}
-            onToggle={toggleKnowledge}
-            navigateTo={knowledgeNav}
-          />
-          <CollapsibleSection
-            expanded={knowledgeExpanded || isCollapsed}
-            items={knowledgeItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
+            <SectionLabel
+              label="Knowledge"
+              isCollapsed={isVisuallyCollapsed}
+              transition={transition}
+              collapsible
+              expanded={knowledgeExpanded}
+              onToggle={toggleKnowledge}
+              navigateTo={knowledgeNav}
+            />
+            <CollapsibleSection
+              expanded={knowledgeExpanded || isCollapsed}
+              items={knowledgeItems}
+              isCollapsed={isVisuallyCollapsed}
+              transition={transition}
+              onSelectSession={onSelectSession}
+            />
 
-          {/* System */}
-          <CollapsibleSection
-            expanded={true}
-            items={systemItems}
-            isCollapsed={isVisuallyCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
-        </div>
+            {/* System */}
+            <CollapsibleSection
+              expanded={true}
+              items={systemItems}
+              isCollapsed={isVisuallyCollapsed}
+              transition={transition}
+              onSelectSession={onSelectSession}
+            />
+          </div>
 
-        {/* Sessions list */}
-        <div className={cn('shrink-0 mt-1', isMobile && 'order-1')}>
-          <AnimatePresence initial={false}>
-            {!isVisuallyCollapsed && (
-              <motion.div
-                key="content"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={transition}
-                className="flex flex-col w-full min-h-0 h-full"
-              >
-                <div className="flex-1 min-h-0">
-                  <SidebarSessions
-                    sessions={sessions}
-                    activeFriendlyId={activeFriendlyId}
-                    onSelect={onSelectSession}
-                    onRename={handleOpenRename}
-                    onDelete={handleOpenDelete}
-                    loading={sessionsLoading}
-                    fetching={sessionsFetching}
-                    error={sessionsError}
-                    onRetry={onRetrySessions}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Sessions list */}
+          <div className={cn('flex-1 min-h-0 mt-1', isMobile && 'order-1')}>
+            <AnimatePresence initial={false}>
+              {!isVisuallyCollapsed && (
+                <motion.div
+                  key="content"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={transition}
+                  className="flex flex-col w-full min-h-0 h-full"
+                >
+                  <div className="flex-1 min-h-0">
+                    <SidebarSessions
+                      sessions={sessions}
+                      activeFriendlyId={activeFriendlyId}
+                      onSelect={onSelectSession}
+                      onRename={handleOpenRename}
+                      onDelete={handleOpenDelete}
+                      loading={sessionsLoading}
+                      fetching={sessionsFetching}
+                      error={sessionsError}
+                      onRetry={onRetrySessions}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
       {/* end scrollable body */}
 
       {/* ── Footer with User Menu ─────────────────────────────────── */}
-      <div className="px-2 py-2.5 border-t shrink-0 theme-border theme-panel">
+      <div
+        className="relative z-20 px-2 py-2.5 border-t shrink-0 theme-border theme-panel"
+        data-testid="sidebar-user-footer"
+      >
         {/* User card + actions */}
         <div
           className={cn(
@@ -1187,8 +1213,9 @@ function ChatSidebarComponent({
               type="button"
               data-tour="settings"
               onClick={() => handleOpenSettings('claude')}
-              className="flex flex-1 min-w-0 items-center justify-center rounded-lg px-0 py-1 transition-colors hover:bg-[var(--theme-hover)]"
+              className="flex min-h-11 min-w-11 flex-1 items-center justify-center rounded-lg px-0 py-1 transition-colors hover:bg-[var(--theme-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-sidebar)]"
               aria-label="Settings"
+              title="Settings"
             >
               <UserAvatar
                 size={28}
@@ -1227,8 +1254,9 @@ function ChatSidebarComponent({
                 type="button"
                 data-tour="settings"
                 onClick={() => handleOpenSettings('claude')}
-                className="shrink-0 rounded-lg p-1.5 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-muted)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-sidebar)]"
                 aria-label="Settings"
+                title="Settings"
               >
                 <HugeiconsIcon
                   icon={Settings01Icon}
@@ -1237,6 +1265,16 @@ function ChatSidebarComponent({
                 />
               </button>
               <ThemeToggleMini />
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                disabled={loggingOut}
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg px-1 text-[10px] font-medium text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)] transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-sidebar)]"
+                aria-label={loggingOut ? 'Signing out' : 'Sign out'}
+                title={loggingOut ? 'Signing out' : 'Sign out'}
+              >
+                {loggingOut ? '…' : 'Exit'}
+              </button>
             </div>
           )}
         </div>

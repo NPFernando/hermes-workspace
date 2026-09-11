@@ -47,6 +47,7 @@ export function publishChatEvent(
   broadcast(event, data)
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await -- callers use one Promise-shaped startup contract across bus implementations
 export async function ensureBusStarted(): Promise<void> {
   const bus = getBus()
   if (bus.started) return

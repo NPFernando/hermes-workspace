@@ -238,10 +238,8 @@ function evidenceGate(
 }
 
 function ledgerIntegrityGate(): ReadinessGate {
-  const storage = financeStorageStatus()
-  // Postgres is the sole store now — only a genuinely unreachable store blocks
-  // ledger trust. A transient last-write-error stays a warning, not a halt.
-  const storageOk = storage.health.status !== 'postgres_unavailable'
+  const storage = financeStorageStatus({ selfHeal: false })
+  const storageOk = storage.health.status !== 'mirror_mismatch' && storage.health.status !== 'postgres_behind'
   const records = Array.isArray(buildLedgerRecords()) ? buildLedgerRecords() : []
   const anomalies = records.filter((r) => {
     if (r.status === 'open') {
@@ -261,7 +259,7 @@ function ledgerIntegrityGate(): ReadinessGate {
   })
   const pass = storageOk && anomalies.length === 0
   const detail = !storageOk
-    ? `finance storage health is "${storage.health.status}" — Postgres is unreachable, ledger cannot be trusted`
+    ? `finance storage health is "${storage.health.status}" — resolve the mirror mismatch before trusting the ledger`
     : anomalies.length > 0
       ? `${anomalies.length} ledger record(s) have missing/invalid price or quantity data`
       : `storage healthy (${storage.health.status}), ${records.length} ledger record(s), no anomalies`
@@ -391,14 +389,7 @@ function exposureCapsGate(db: FinanceDatabase): ReadinessGate {
 }
 
 function patientHoldIsolationGate(): ReadinessGate {
-  // Defensive fallback kept despite the non-nullable return type — this gate
-  // must never throw during readiness evaluation if the engine history is
-  // unavailable.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  const history = getFullEngineHistory() ?? {
-    positions: [],
-    archivedPositions: [],
-  }
+  const history = getFullEngineHistory()
   const positions = Array.isArray(history.positions) ? history.positions : []
   const archived = Array.isArray(history.archivedPositions)
     ? history.archivedPositions

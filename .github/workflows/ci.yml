@@ -1,5 +1,4 @@
-# Phase 2.5-002: Build + lint workflow
-# Runs on all PRs and pushes to main
+# Build, type, test, and release-artifact validation.
 
 name: CI
 
@@ -8,6 +7,13 @@ on:
     branches: [main, production]
   pull_request:
     branches: [main, production]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -21,7 +27,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 11.24.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -30,15 +36,19 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Run linter
-        run: pnpm run lint || echo "⚠️ Lint not configured, skipping"
-        continue-on-error: true
+        run: pnpm run lint
+
+      - name: Lint critical finance and auth paths
+        run: pnpm run lint:critical
+
+      - name: Lint critical UI and mission paths
+        run: pnpm run lint:ui-critical
 
       - name: Type check
-        run: pnpm run typecheck || pnpm exec tsc --noEmit || echo "⚠️ Typecheck not configured"
-        continue-on-error: true
+        run: pnpm run typecheck
 
       - name: Build
         run: pnpm build
@@ -65,7 +75,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 11.24.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -74,8 +84,116 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm test || echo "⚠️ No tests configured"
-        continue-on-error: true
+        run: pnpm test
+
+      - name: Verify Vitest collection boundaries
+        run: pnpm test:collection
+
+      - name: Verify task API security guards
+        run: pnpm check:task-api-guards
+      - name: Verify JSON API security guards
+        run: pnpm check:json-api-guards
+      - name: Verify mutation API authorization markers
+        run: pnpm check:mutation-api-auth
+
+      - name: Verify Dify integration boundary
+        run: pnpm run test:dify
+
+      - name: Optional live Dify smoke test
+        if: ${{ secrets.DIFY_BASE_URL != '' && secrets.DIFY_APPS_JSON != '' }}
+        env:
+          DIFY_BASE_URL: ${{ secrets.DIFY_BASE_URL }}
+          DIFY_APPS_JSON: ${{ secrets.DIFY_APPS_JSON }}
+          DIFY_RESEARCH_KEY: ${{ secrets.DIFY_RESEARCH_KEY }}
+        run: pnpm smoke:dify
+
+      - name: Optional Dify browser smoke
+        if: ${{ vars.DIFY_BROWSER_SMOKE == '1' }}
+        env:
+          DIFY_BROWSER_SMOKE: '1'
+          BASE_URL: ${{ vars.DIFY_BROWSER_BASE_URL || 'http://localhost:3000' }}
+        run: pnpm smoke:dify:browser
+
+      - name: Optional authenticated browser smoke
+        if: ${{ secrets.AUTH_E2E_PASSWORD != '' && vars.AUTH_E2E_BASE_URL != '' }}
+        env:
+          AUTH_E2E_PASSWORD: ${{ secrets.AUTH_E2E_PASSWORD }}
+          AUTH_E2E_BASE_URL: ${{ vars.AUTH_E2E_BASE_URL }}
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm smoke:auth:browser
+          pnpm smoke:queue:browser
+
+  artifact:
+    name: Validate release artifact
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build release artifact
+        run: pnpm build
+
+      - name: Verify required artifact paths
+        run: |
+          test -s dist/client/index.html
+          test -s dist/server/server.js
+          ! grep -R "hermesworld-world.png" dist electron/server-bundle.cjs
+
+      - name: Start release artifact and run smoke test
+        env:
+          HERMES_BUILD_ID: ci-${{ github.sha }}
+        run: |
+          set -euo pipefail
+          PORT=3300 HOST=127.0.0.1 NODE_ENV=production \
+            HERMES_BUILD_ID="$HERMES_BUILD_ID" \
+            node server-entry.js > /tmp/hermes-workspace-ci.log 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3300/api/health >/dev/null; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/hermes-workspace-ci.log
+              exit 1
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              cat /tmp/hermes-workspace-ci.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          RELEASE_SMOKE_EXPECTED_BUILD="$HERMES_BUILD_ID" \
+            node scripts/release-smoke.mjs http://127.0.0.1:3300
+
+          pnpm exec playwright install --with-deps chromium
+          pnpm smoke:browser http://127.0.0.1:3300
+          DASHBOARD_BROWSER_SMOKE=1 \
+            BASE_URL=http://127.0.0.1:3300 \
+            node scripts/dashboard-browser-smoke.mjs

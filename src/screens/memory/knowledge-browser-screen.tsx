@@ -615,7 +615,7 @@ export function KnowledgeBrowserScreen() {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (!settingsSource || settingsSource.type !== 'github') return
+                        const source = settingsSource
                         setSyncing(true)
                         setSyncError(null)
                         try {
@@ -623,7 +623,7 @@ export function KnowledgeBrowserScreen() {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                              source: settingsSource,
+                              source,
                             }),
                           })
                           const data = (await res.json()) as { error?: string }

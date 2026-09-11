@@ -1,5 +1,6 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import {
   FINANCE_DATA_DIR,
@@ -19,6 +20,7 @@ const DEFAULT_INTERVAL_MS = 10 * 60_000
 const DEFAULT_INITIAL_DELAY_MS = 60_000
 const DEFAULT_ALERT_REPEAT_MS = 6 * 60 * 60_000
 const DEFAULT_FAILURE_THRESHOLD = 3
+const DEFAULT_SELF_HEAL_RETRIES = 2
 const DEFAULT_ALERT_TARGET = 'telegram:2130622225'
 
 export type FinanceStorageMonitorState = {
@@ -28,6 +30,8 @@ export type FinanceStorageMonitorState = {
   consecutiveFailures: number
   lastStatus: FinanceStorageHealthStatus | null
   lastWarnings: Array<string>
+  lastSelfHealAttempts: number
+  lastSelfHealSucceeded: boolean | null
 }
 
 export type FinanceStorageHeartbeatResult = {
@@ -51,6 +55,7 @@ type FinanceStorageHeartbeatOptions = {
   auditLogger?: (action: string, details: Record<string, unknown>) => void
   failureAlertThreshold?: number
   alertRepeatMs?: number
+  selfHealRetries?: number
 }
 
 type FinanceStorageMonitorStartOptions = FinanceStorageHeartbeatOptions & {
@@ -65,6 +70,8 @@ const EMPTY_STATE: FinanceStorageMonitorState = {
   consecutiveFailures: 0,
   lastStatus: null,
   lastWarnings: [],
+  lastSelfHealAttempts: 0,
+  lastSelfHealSucceeded: null,
 }
 
 let monitorTimer: ReturnType<typeof setInterval> | null = null
@@ -129,6 +136,15 @@ export function readFinanceStorageMonitorState(
             (warning): warning is string => typeof warning === 'string',
           )
         : [],
+      lastSelfHealAttempts:
+        typeof parsed.lastSelfHealAttempts === 'number' &&
+        Number.isFinite(parsed.lastSelfHealAttempts)
+          ? Math.max(0, Math.floor(parsed.lastSelfHealAttempts))
+          : 0,
+      lastSelfHealSucceeded:
+        typeof parsed.lastSelfHealSucceeded === 'boolean'
+          ? parsed.lastSelfHealSucceeded
+          : null,
     }
   } catch {
     return { ...EMPTY_STATE }
@@ -140,11 +156,25 @@ function writeFinanceStorageMonitorState(
   statePath: string,
 ): void {
   fs.mkdirSync(path.dirname(statePath), { recursive: true, mode: 0o700 })
-  const tmp = `${statePath}.tmp`
-  fs.writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`, {
-    mode: 0o600,
-  })
-  fs.renameSync(tmp, statePath)
+  // A unique temporary path prevents overlapping monitor instances from
+  // clobbering each other's partial state before the atomic replacement.
+  const tmp = `${statePath}.${process.pid}.${randomUUID()}.tmp`
+  try {
+    fs.writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`, {
+      mode: 0o600,
+      flag: 'wx',
+    })
+    fs.chmodSync(tmp, 0o600)
+    fs.renameSync(tmp, statePath)
+    fs.chmodSync(statePath, 0o600)
+  } finally {
+    try {
+      fs.unlinkSync(tmp)
+    } catch {
+      // The temporary file was already renamed, or the write failed before
+      // it was created.
+    }
+  }
 }
 
 function defaultAuditLogger(
@@ -161,11 +191,17 @@ export function formatFinanceStorageOpsAlert(input: {
 }): string {
   const { health } = input.storage
   const lines = [
-    'Finance storage alert',
+    'Finance storage mirror alert',
     `Status: ${health.status}`,
     `Consecutive failed heartbeats: ${input.consecutiveFailures}`,
     `Active storage: ${input.storage.active}`,
+    `JSON updated: ${health.jsonUpdatedAt ?? 'unknown'}`,
     `Postgres updated: ${health.postgresUpdatedAt ?? 'unknown'}`,
+    `Self-heal: ${
+      health.selfHeal.attempted
+        ? `${health.selfHeal.succeeded ? 'resolved' : 'unresolved'} after ${health.selfHeal.attempts} attempt(s)`
+        : 'not attempted'
+    }`,
     `Checked at: ${input.checkedAt}`,
   ]
   if (health.warnings.length > 0) {
@@ -210,7 +246,18 @@ export function runFinanceStorageHeartbeat(
   const nowMs = parseTimeMs(checkedAt)
   const statePath = options.statePath ?? defaultStatePath()
   const previous = readFinanceStorageMonitorState(statePath)
-  const storage = options.storageStatus?.() ?? financeStorageStatus()
+  const selfHealRetries =
+    positiveNumber(options.selfHealRetries) ??
+    envCount(
+      'HERMES_FINANCE_STORAGE_SELF_HEAL_RETRIES',
+      DEFAULT_SELF_HEAL_RETRIES,
+    )
+  const storage =
+    options.storageStatus?.() ??
+    financeStorageStatus({
+      selfHeal: true,
+      selfHealRetries,
+    })
   const storageAlerts = financeStorageAlerts(storage.health)
   const unhealthy = storageAlerts.length > 0
   const consecutiveFailures = unhealthy ? previous.consecutiveFailures + 1 : 0
@@ -258,6 +305,10 @@ export function runFinanceStorageHeartbeat(
     consecutiveFailures,
     lastStatus: storage.health.status,
     lastWarnings: storage.health.warnings,
+    lastSelfHealAttempts: storage.health.selfHeal.attempts,
+    lastSelfHealSucceeded: storage.health.selfHeal.attempted
+      ? storage.health.selfHeal.succeeded
+      : null,
   }
 
   writeFinanceStorageMonitorState(nextState, statePath)
@@ -271,6 +322,7 @@ export function runFinanceStorageHeartbeat(
       warnings: storage.health.warnings,
       notificationSent,
       notificationReason,
+      selfHeal: storage.health.selfHeal,
     })
   } else if (!unhealthy && previous.consecutiveFailures > 0) {
     audit('finance_storage_monitor_recovered', {

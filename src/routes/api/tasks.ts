@@ -10,6 +10,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
@@ -71,6 +74,9 @@ export const Route = createFileRoute('/api/tasks')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`tasks:post:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
 
         try {
           const body = (await request.json()) as {

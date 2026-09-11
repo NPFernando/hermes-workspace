@@ -6,7 +6,12 @@ import {
   invalidateOdysseusCookie,
 } from '../../server/odysseus-session'
 
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/odysseus/$')({
   server: {
@@ -26,6 +31,11 @@ async function handler({ request }: { request: Request }): Promise<Response> {
       status: 401,
       headers: { 'content-type': 'application/json' },
     })
+  }
+  const method = request.method.toUpperCase()
+  const limit = method === 'GET' || method === 'HEAD' ? 120 : 30
+  if (!rateLimit(`odysseus-proxy:${method}:${getClientIp(request)}`, limit, 60_000)) {
+    return rateLimitResponse()
   }
 
   const url = new URL(request.url)

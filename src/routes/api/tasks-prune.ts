@@ -3,7 +3,12 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { deleteTask, listTasks } from '../../server/tasks-store'
 
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 // POST /api/tasks-prune — delete todo/backlog tasks that:
 //   - have no agent history (never processed)
 //   - are older than 2 hours
@@ -11,9 +16,12 @@ import { safeErrorMessage } from '../../server/rate-limit'
 export const Route = createFileRoute('/api/tasks-prune')({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        if (!rateLimit(`tasks-prune:${getClientIp(request)}`, 5, 60_000)) {
+          return rateLimitResponse()
         }
 
         try {

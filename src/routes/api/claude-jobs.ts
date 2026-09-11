@@ -14,7 +14,13 @@ import {
   createProfileCronJob,
   listProfileCronJobs,
 } from '../../server/hermes-cron-profiles'
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 function authHeaders(): Record<string, string> {
@@ -92,6 +98,11 @@ export const Route = createFileRoute('/api/claude-jobs')({
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
           })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`claude-jobs-create:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
         }
         const body = await request.text()
         let parsedBody: Record<string, unknown> = {}

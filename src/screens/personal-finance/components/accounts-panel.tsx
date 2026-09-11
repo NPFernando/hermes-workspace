@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
-import { formatMoney } from '../utils'
+import { computeAccountLedgerBalance, formatMoney } from '../utils'
 import { buttonClass, confirmButtonClass, dangerButtonClass, inputClass } from '../shared-styles'
 import { numberField, optionalNumberField, stringField } from '../field-helpers'
+import type { ReconcileTransaction } from '../utils'
 import type { PersonalFinancePayload } from '../types'
 
 const ACCOUNT_TYPES = [
@@ -28,7 +29,6 @@ type EditDraft = {
   balance: string
   openingBalance: string
   openingBalanceDate: string
-  deriveBalanceFromLedger: boolean
   maskedIdentifier: string
   platform: string
 }
@@ -58,6 +58,7 @@ export function AccountsPanel({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<Record<string, EditDraft>>({})
+  const [attachingAccountId, setAttachingAccountId] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [type, setType] = useState<string>('bank')
@@ -114,7 +115,6 @@ export function AccountsPanel({
         openingBalance:
           optionalNumberField(account, 'openingBalance')?.toString() ?? '',
         openingBalanceDate: stringField(account, 'openingBalanceDate'),
-        deriveBalanceFromLedger: account.deriveBalanceFromLedger === true,
         maskedIdentifier: stringField(account, 'maskedIdentifier'),
         platform: stringField(account, 'platform'),
       },
@@ -146,7 +146,6 @@ export function AccountsPanel({
             ? Number(draft.openingBalance)
             : undefined,
           openingBalanceDate: draft.openingBalanceDate || undefined,
-          deriveBalanceFromLedger: draft.deriveBalanceFromLedger,
           maskedIdentifier: draft.maskedIdentifier.trim() || undefined,
           platform: draft.platform.trim() || undefined,
         },
@@ -164,7 +163,51 @@ export function AccountsPanel({
     if (data) setConfirmDeleteId(null)
   }
 
+  async function attachBankDocument(id: string, file: File | undefined) {
+    if (!file) return
+    setAttachingAccountId(id)
+    setErr(null)
+    try {
+      const form = new FormData()
+      form.set('file', file)
+      form.set('documentType', 'bank_document')
+      form.set('accountId', id)
+      const response = await fetch('/api/finance-upload', {
+        method: 'POST',
+        body: form,
+      })
+      const data = (await response.json()) as { ok?: boolean; error?: string }
+      if (!response.ok || !data.ok) {
+        setErr(data.error || 'Could not attach bank document')
+        return
+      }
+      setErr('Bank document linked securely.')
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Could not attach bank document')
+    } finally {
+      setAttachingAccountId(null)
+    }
+  }
+
   const accounts = payload.data.finance_accounts
+
+  const ledgerTransactions: Array<ReconcileTransaction> = useMemo(
+    () => [
+      ...payload.data.income_records.map((r) => ({
+        accountId: stringField(r, 'accountId') || undefined,
+        currency: stringField(r, 'originalCurrency') || 'LKR',
+        amount: numberField(r, 'originalAmount'),
+        kind: 'income' as const,
+      })),
+      ...payload.data.expense_records.map((r) => ({
+        accountId: stringField(r, 'accountId') || undefined,
+        currency: stringField(r, 'currency') || 'LKR',
+        amount: numberField(r, 'amount'),
+        kind: 'expense' as const,
+      })),
+    ],
+    [payload.data.income_records, payload.data.expense_records],
+  )
 
   const totalsByCurrency = new Map<string, number>()
   for (const account of accounts) {
@@ -290,12 +333,14 @@ export function AccountsPanel({
           )
           const maskedIdentifierValue = stringField(account, 'maskedIdentifier')
           const platformValue = stringField(account, 'platform')
-          // Ledger-derived balance is computed server-side (cross-currency
-          // aware) and shipped on the row; `null` when no opening balance.
-          const ledgerBalanceRaw = account.ledgerBalance
-          const ledgerBalance =
-            typeof ledgerBalanceRaw === 'number' ? ledgerBalanceRaw : null
-          const deriveFromLedger = account.deriveBalanceFromLedger === true
+          const ledgerBalance = computeAccountLedgerBalance(
+            {
+              id,
+              currency: accountCurrency,
+              openingBalance: openingBalanceValue,
+            },
+            ledgerTransactions,
+          )
           const reconciliationDiff =
             ledgerBalance === null ? null : balanceValue - ledgerBalance
 
@@ -386,25 +431,6 @@ export function AccountsPanel({
                     }
                     className={inputClass}
                   />
-                  <label
-                    className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]"
-                    title="Net worth and cash use openingBalance + tagged transactions for this account instead of the number above. Needs an opening balance."
-                  >
-                    <input
-                      type="checkbox"
-                      checked={editDrafts[id].deriveBalanceFromLedger}
-                      onChange={(e) =>
-                        setEditDrafts((prev) => ({
-                          ...prev,
-                          [id]: {
-                            ...prev[id],
-                            deriveBalanceFromLedger: e.target.checked,
-                          },
-                        }))
-                      }
-                    />
-                    Use ledger balance
-                  </label>
                   <input
                     type="text"
                     placeholder="Masked identifier"
@@ -453,24 +479,7 @@ export function AccountsPanel({
                     </span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
                       · {accountTypeLabel(stringField(account, 'type'))} ·{' '}
-                      {formatMoney(
-                        deriveFromLedger && ledgerBalance !== null
-                          ? ledgerBalance
-                          : balanceValue,
-                        accountCurrency,
-                      )}
-                      {deriveFromLedger && ledgerBalance !== null && (
-                        <span className="text-[var(--theme-success)]">
-                          {' '}
-                          · from ledger
-                        </span>
-                      )}
-                      {deriveFromLedger && ledgerBalance === null && (
-                        <span className="text-[var(--theme-warning)]">
-                          {' '}
-                          · ledger on, but no opening balance — using manual
-                        </span>
-                      )}
+                      {formatMoney(balanceValue, accountCurrency)}
                       {maskedIdentifierValue && ` · ${maskedIdentifierValue}`}
                       {platformValue && ` · ${platformValue}`}
                     </span>
@@ -497,12 +506,24 @@ export function AccountsPanel({
                           Math.abs(reconciliationDiff),
                           accountCurrency,
                         )}{' '}
-                        — recorded income, expenses and transfers imply{' '}
-                        {formatMoney(ledgerBalance ?? 0, accountCurrency)}
+                        from recorded transactions
                       </p>
                     )}
                   </div>
                   <div className="flex gap-2">
+                    <label className={`${buttonClass} cursor-pointer`}>
+                      {attachingAccountId === id ? 'Linking…' : 'Attach bank document'}
+                      <input
+                        type="file"
+                        accept="application/pdf,image/*"
+                        className="sr-only"
+                        disabled={attachingAccountId !== null}
+                        onChange={(event) => {
+                          void attachBankDocument(id, event.target.files?.[0])
+                          event.currentTarget.value = ''
+                        }}
+                      />
+                    </label>
                     <button
                       type="button"
                       onClick={() => startEdit(account)}

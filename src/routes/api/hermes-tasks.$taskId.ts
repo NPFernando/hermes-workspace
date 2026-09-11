@@ -5,6 +5,12 @@ import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
+import {
   deleteTask,
   getTask,
   moveTask,
@@ -55,7 +61,7 @@ function isTaskPriority(value: unknown): value is TaskPriority {
 export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }
@@ -106,6 +112,13 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
       PATCH: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (
+          !rateLimit(`hermes-task-update:${getClientIp(request)}`, 40, 60_000)
+        ) {
+          return rateLimitResponse()
         }
 
         try {
@@ -163,9 +176,14 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
         }
       },
 
-      DELETE: async ({ request, params }) => {
+      DELETE: ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
+        }
+        if (
+          !rateLimit(`hermes-task-delete:${getClientIp(request)}`, 20, 60_000)
+        ) {
+          return rateLimitResponse()
         }
 
         const deleted = deleteTask(params.taskId)
@@ -177,9 +195,21 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         const url = new URL(request.url)
         const action = url.searchParams.get('action') || 'move'
+        const limit = action === 'launch' ? 5 : 40
+        if (
+          !rateLimit(
+            `hermes-task-${action}:${getClientIp(request)}`,
+            limit,
+            60_000,
+          )
+        ) {
+          return rateLimitResponse()
+        }
 
         if (action === 'launch') {
           const task = getTask(params.taskId)
@@ -332,7 +362,10 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
         if (action === 'clarify') {
           try {
             const body = (await request.json()) as Record<string, unknown>
-            const answers = (body.answers ?? {}) as Record<string, string>
+            const answers =
+              body.answers && typeof body.answers === 'object'
+                ? (body.answers as Record<string, unknown>)
+                : {}
             const task = getTask(params.taskId)
             if (!task) return jsonResponse({ error: 'Task not found' }, 404)
 
@@ -343,16 +376,23 @@ export const Route = createFileRoute('/api/hermes-tasks/$taskId')({
             // Save answers back into the questions array
             const updatedQuestions = questions.map((q) => ({
               ...q,
-              answer: answers[q.id] != null ? String(answers[q.id]) : q.answer,
-              answered_at: answers[q.id] != null ? now : q.answered_at,
+              answer:
+                typeof answers[q.id] === 'string'
+                  ? String(answers[q.id])
+                  : q.answer,
+              answered_at:
+                typeof answers[q.id] === 'string' ? now : q.answered_at,
             }))
 
             // Build one combined Q&A history entry so the resumed agent sees context
             const qaNote = updatedQuestions
-              .map(
-                (q, i) =>
-                  `Q${i + 1}: ${q.question}\nA${i + 1}: ${answers[q.id] ?? q.answer ?? '(no answer)'}`,
-              )
+              .map((q, i) => {
+                const answer =
+                  typeof answers[q.id] === 'string'
+                    ? answers[q.id]
+                    : (q.answer ?? '(no answer)')
+                return `Q${i + 1}: ${q.question}\nA${i + 1}: ${answer}`
+              })
               .join('\n\n')
 
             const replyEntry: ActivityEntry = {

@@ -5,6 +5,12 @@ import { join } from 'node:path'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 import { getProfilesDir } from '../../server/claude-paths'
 import {
   buildSwarmDispatchMetadata,
@@ -283,6 +289,11 @@ export const Route = createFileRoute('/api/swarm-runtime')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`swarm-runtime-mode:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
         }
         let body: { mode?: unknown }
         try {

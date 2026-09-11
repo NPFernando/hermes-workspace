@@ -8,10 +8,18 @@
  * - Anthropic API: API key from env → header-based usage tracking
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { safeErrorMessage } from './rate-limit'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -47,7 +55,17 @@ export type ProviderUsageResponse = {
   ok: boolean
   updatedAt: number
   providers: Array<ProviderUsageResult>
+  /** Bounded status-only history; never contains credentials or error text. */
+  providerHealthHistory?: Array<ProviderHealthSnapshot>
   error?: string
+}
+
+export type ProviderHealthSnapshot = {
+  capturedAt: number
+  providers: Array<{
+    provider: string
+    status: ProviderStatus
+  }>
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1062,6 +1080,119 @@ export async function fetchGeminiUsage(): Promise<ProviderUsageResult> {
 // ── Aggregate ────────────────────────────────────────────────────────────────
 
 const CACHE_TTL_MS = 30_000
+const HEALTH_HISTORY_MAX = 48
+const HEALTH_HISTORY_PERSIST_INTERVAL_MS = 5 * 60 * 1000
+const HEALTH_HISTORY_PATH = join(
+  process.env.HERMES_HOME ?? join(homedir(), '.hermes'),
+  'provider-health-history.json',
+)
+
+function loadProviderHealthHistory(): Array<ProviderHealthSnapshot> {
+  try {
+    if (!existsSync(HEALTH_HISTORY_PATH)) return []
+    const parsed = JSON.parse(
+      readFileSync(HEALTH_HISTORY_PATH, 'utf8'),
+    ) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter(
+        (entry): entry is ProviderHealthSnapshot =>
+          Boolean(entry) &&
+          typeof entry === 'object' &&
+          typeof (entry as ProviderHealthSnapshot).capturedAt === 'number' &&
+          Array.isArray((entry as ProviderHealthSnapshot).providers),
+      )
+      .map((entry) => ({
+        capturedAt: entry.capturedAt,
+        providers: entry.providers
+          .filter(
+            (provider) =>
+              typeof provider.provider === 'string' &&
+              ['ok', 'missing_credentials', 'auth_expired', 'error'].includes(
+                provider.status,
+              ),
+          )
+          .map((provider) => ({
+            provider: provider.provider,
+            status: provider.status,
+          })),
+      }))
+      .slice(-HEALTH_HISTORY_MAX)
+  } catch {
+    return []
+  }
+}
+
+function persistProviderHealthHistory(
+  history: Array<ProviderHealthSnapshot>,
+): void {
+  const serialized = JSON.stringify(history)
+  const tempPath = `${HEALTH_HISTORY_PATH}.${process.pid}.tmp`
+  try {
+    const directory = dirname(HEALTH_HISTORY_PATH)
+    if (!existsSync(directory)) mkdirSync(directory, { recursive: true, mode: 0o700 })
+    writeFileSync(tempPath, serialized, { encoding: 'utf8', mode: 0o600 })
+    chmodSync(tempPath, 0o600)
+    renameSync(tempPath, HEALTH_HISTORY_PATH)
+    chmodSync(HEALTH_HISTORY_PATH, 0o600)
+  } catch {
+    try {
+      writeFileSync(HEALTH_HISTORY_PATH, serialized, {
+        encoding: 'utf8',
+        mode: 0o600,
+      })
+      chmodSync(HEALTH_HISTORY_PATH, 0o600)
+    } catch {
+      // Health history is diagnostic; provider availability must still work.
+    }
+    try {
+      unlinkSync(tempPath)
+    } catch {
+      // The temporary file may already have been renamed.
+    }
+  }
+}
+
+let providerHealthHistory = loadProviderHealthHistory()
+let lastHealthHistoryPersistAt =
+  providerHealthHistory.at(-1)?.capturedAt ?? 0
+
+function healthSnapshotSignature(snapshot: ProviderHealthSnapshot): string {
+  return snapshot.providers
+    .map((provider) => `${provider.provider}:${provider.status}`)
+    .sort()
+    .join('|')
+}
+
+export function recordProviderHealthSnapshot(
+  providers: Array<Pick<ProviderUsageResult, 'provider' | 'status'>>,
+  capturedAt = Date.now(),
+): Array<ProviderHealthSnapshot> {
+  const snapshot: ProviderHealthSnapshot = {
+    capturedAt,
+    providers: providers.map(({ provider, status }) => ({ provider, status })),
+  }
+  const previous = providerHealthHistory.at(-1)
+  if (
+    previous &&
+    healthSnapshotSignature(previous) === healthSnapshotSignature(snapshot) &&
+    capturedAt - previous.capturedAt < HEALTH_HISTORY_PERSIST_INTERVAL_MS
+  ) {
+    return providerHealthHistory
+  }
+  providerHealthHistory = [...providerHealthHistory, snapshot].slice(
+    -HEALTH_HISTORY_MAX,
+  )
+  if (
+    !previous ||
+    capturedAt - lastHealthHistoryPersistAt >= HEALTH_HISTORY_PERSIST_INTERVAL_MS
+  ) {
+    persistProviderHealthHistory(providerHealthHistory)
+    lastHealthHistoryPersistAt = capturedAt
+  }
+  return providerHealthHistory
+}
+
 let cache: { timestamp: number; payload: ProviderUsageResponse } | undefined
 
 export async function getProviderUsage(
@@ -1101,6 +1232,7 @@ export async function getProviderUsage(
     ok: true,
     updatedAt: now,
     providers: activeProviders,
+    providerHealthHistory: recordProviderHealthSnapshot(activeProviders, now),
   }
 
   cache = { timestamp: now, payload }

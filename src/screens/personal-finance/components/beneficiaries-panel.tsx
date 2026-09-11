@@ -9,7 +9,7 @@ import type { PersonalFinancePayload } from '../types'
  * WEALTH-108: purely informational estate/beneficiary notes — name,
  * relationship, and a free-text note. No legal/binding weight, no
  * percentage-split math, and zero involvement in financeSummary() (unlike
- * Loan/Property, which feed debtBase/propertyValueBase/netWorthBase).
+ * Loan/Property, which feed debtLkr/propertyValueLkr/netWorthLkr).
  */
 export function BeneficiariesPanel({
   payload,

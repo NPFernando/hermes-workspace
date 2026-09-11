@@ -10,6 +10,9 @@ import {
   getCapabilities,
 } from '../../../server/gateway-capabilities'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../../server/rate-limit'
@@ -42,6 +45,9 @@ export const Route = createFileRoute('/api/mcp/test')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`mcp-test:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
+        }
         const capabilities = await ensureGatewayProbed()
         if (capabilities.mcpFallback && !capabilities.mcp) {
           // Phase 1.5 fallback: shell out to `hermes mcp test <name>` and

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import {
   ArrowDown01Icon,
   ArrowUp01Icon,
@@ -141,6 +142,7 @@ function FilterPill({
 }
 
 function OutputCard({ output }: { output: AgentOutput }) {
+  const navigate = useNavigate()
   const [expanded, setExpanded] = useState(false)
   const [isRetrying, setIsRetrying] = useState(false)
   const status = getStatusPill(output)
@@ -347,9 +349,9 @@ function OutputCard({ output }: { output: AgentOutput }) {
           <Button
             variant="secondary"
             className="border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] hover:bg-[var(--theme-card2)]"
-            onClick={() => toast('Signals view coming soon', { type: 'info' })}
+            onClick={() => void navigate({ to: '/trading' })}
           >
-            View Signals
+            Open Trading Signals
           </Button>
         ) : null}
 

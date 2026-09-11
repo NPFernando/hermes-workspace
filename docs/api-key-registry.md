@@ -66,6 +66,7 @@ This registry groups supported environment keys so deployments can audit what is
 - `MCP_VAPI_API_KEY`
 - `API_SERVER_KEY`
 - `HERMES_PASSWORD`
+- `FINANCE_AGENT_API_TOKEN` — scoped credential for non-browser finance-agent API callers
 
 ## Trading and market data
 

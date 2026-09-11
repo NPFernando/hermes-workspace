@@ -1,5 +1,13 @@
+import { ArrowRight01Icon, Refresh01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Link } from '@tanstack/react-router'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { formatModelName } from '@/screens/dashboard/lib/formatters'
+import { useDashboardRefresh } from '@/screens/dashboard/lib/dashboard-refresh-context'
+import {
+  safeAnalyticsModels,
+  safeNumber,
+} from '@/screens/dashboard/lib/analytics-normalizers'
 
 function formatCount(n: number): string {
   if (!n || n <= 0) return '0'
@@ -21,32 +29,63 @@ function formatCount(n: number): string {
 export function ActiveModelKpi({
   modelInfo,
   analytics,
+  loading = false,
+  unavailable = false,
 }: {
   modelInfo: DashboardOverview['modelInfo']
   analytics: DashboardOverview['analytics']
+  loading?: boolean
+  unavailable?: boolean
 }) {
-  const connected = !!modelInfo
-  const display = modelInfo ? formatModelName(modelInfo.model) : '—'
-  const provider = modelInfo?.provider ?? '—'
+  const refreshState = useDashboardRefresh()
+  const connected = !!modelInfo && !loading && !unavailable
+  const display = loading
+    ? 'Syncing…'
+    : modelInfo
+      ? formatModelName(modelInfo.model)
+      : unavailable
+        ? 'Unavailable'
+        : 'Not connected'
+  const provider = loading
+    ? 'Loading routing data'
+    : (modelInfo?.provider ?? 'Connect a gateway to see routing')
 
   // Routing share (proxy): % of calls in the analytics window that hit
   // the active model. Hermes Agent confirmed this is the closest
   // available metric without a dedicated routing-decisions endpoint.
   const share = ((): number | null => {
     if (!modelInfo || !analytics) return null
-    if (analytics.totalApiCalls <= 0) return null
-    const match = analytics.topModels.find((m) => m.id === modelInfo.model)
+    const totalApiCalls = safeNumber(analytics.totalApiCalls)
+    if (totalApiCalls <= 0) return null
+    const match = safeAnalyticsModels(analytics).find(
+      (m) => m.id === modelInfo.model,
+    )
     if (!match) return null
-    return Math.round((match.calls / analytics.totalApiCalls) * 100)
+    return Math.round((safeNumber(match.calls) / totalApiCalls) * 100)
   })()
 
   const sessionsForModel = ((): number | null => {
     if (!modelInfo || !analytics) return null
-    const match = analytics.topModels.find((m) => m.id === modelInfo.model)
-    return match?.sessions ?? null
+    const match = safeAnalyticsModels(analytics).find(
+      (m) => m.id === modelInfo.model,
+    )
+    return match ? safeNumber(match.sessions) : null
   })()
 
-  const tone = connected ? 'var(--theme-success)' : 'var(--theme-danger)'
+  const tone = loading
+    ? 'var(--theme-accent)'
+    : connected
+      ? 'var(--theme-success)'
+      : unavailable
+        ? 'var(--theme-warning)'
+        : 'var(--theme-danger)'
+  const statusLabel = loading
+    ? 'Syncing'
+    : unavailable
+      ? 'Unavailable'
+      : connected
+        ? 'Online'
+        : 'Offline'
 
   return (
     <div
@@ -70,38 +109,40 @@ export function ActiveModelKpi({
         style={{ background: tone }}
       />
 
-      <div className="flex items-center justify-between">
-        <span
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]"
-        >
+      <div className="flex flex-wrap items-center justify-between gap-1.5 sm:flex-nowrap sm:gap-0">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
           Active Model
         </span>
         <span
-          className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+          className="ml-auto inline-flex max-w-full shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold sm:ml-0"
           style={{
             background: connected
               ? 'color-mix(in srgb, var(--theme-success) 14%, transparent)'
-              : 'color-mix(in srgb, var(--theme-danger) 14%, transparent)',
+              : `color-mix(in srgb, ${tone} 14%, transparent)`,
             color: tone,
           }}
         >
-          <span className="size-1.5 rounded-full" style={{ background: tone }} />
-          {connected ? 'Online' : 'Offline'}
+          <span
+            className="size-1.5 rounded-full"
+            style={{ background: tone }}
+          />
+          {statusLabel}
         </span>
       </div>
 
-      <div className="flex items-end justify-between gap-2">
+      <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-2">
         <span
-          className="font-mono text-2xl font-bold leading-none tracking-tight text-[var(--theme-text)]"
+          className={`${connected ? 'text-xl sm:text-2xl' : 'text-base sm:text-xl'} min-w-0 max-w-full truncate whitespace-nowrap font-mono font-bold leading-none tracking-tight text-[var(--theme-text)]`}
           title={modelInfo?.model}
         >
           {display}
         </span>
         {share !== null ? (
           <span
-            className="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em]"
+            className="shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em]"
             style={{
-              background: 'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
+              background:
+                'color-mix(in srgb, var(--theme-accent) 12%, transparent)',
               color: 'var(--theme-accent)',
             }}
             title="Share of API calls in the analytics window."
@@ -111,19 +152,66 @@ export function ActiveModelKpi({
         ) : null}
       </div>
 
-      <div className="flex items-center justify-between gap-2 text-[10px]">
-        <span
-          className="truncate font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]"
-        >
-          {provider}
-          {sessionsForModel !== null
-            ? ` · ${formatCount(sessionsForModel)} sessions`
-            : ''}
-        </span>
-        {modelInfo?.effectiveContextLength ? (
-          <span
-            className="font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]"
+      <div className="flex min-w-0 flex-col items-start gap-1 text-[10px] sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+        {loading ? (
+          <span className="min-w-0 flex-1 truncate font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+            Waiting for telemetry
+          </span>
+        ) : unavailable && refreshState && !refreshState.globalUnavailable ? (
+          <button
+            type="button"
+            onClick={refreshState.refresh}
+            disabled={refreshState.isRefreshing}
+            aria-busy={refreshState.isRefreshing ? 'true' : undefined}
+            aria-label={
+              refreshState.isRefreshing
+                ? 'Retrying active model telemetry'
+                : 'Retry active model telemetry'
+            }
+            className="inline-flex min-h-11 items-center gap-1 rounded-md border px-2 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-accent)] motion-safe:transition-colors hover:bg-[var(--theme-accent-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] disabled:cursor-wait disabled:opacity-60 lg:min-h-0"
+            style={{ borderColor: 'var(--theme-accent-border)' }}
           >
+            <HugeiconsIcon
+              icon={Refresh01Icon}
+              size={12}
+              strokeWidth={1.8}
+              className={
+                refreshState.isRefreshing
+                  ? 'motion-safe:animate-spin'
+                  : undefined
+              }
+            />
+            {refreshState.isRefreshing ? 'Retrying…' : 'Retry sync'}
+          </button>
+        ) : unavailable ? (
+          <span className="min-w-0 max-w-full whitespace-normal break-words font-mono text-[9px] uppercase tracking-[0.08em] text-[var(--theme-muted)]">
+            {refreshState?.globalUnavailable
+              ? 'Use Retry sync above'
+              : 'Telemetry unavailable'}
+          </span>
+        ) : connected ? (
+          <span className="min-w-0 max-w-full whitespace-normal break-words font-mono text-[9px] uppercase tracking-[0.08em] text-[var(--theme-muted)]">
+            {provider}
+            {sessionsForModel !== null
+              ? ` · ${formatCount(sessionsForModel)} sessions`
+              : ''}
+          </span>
+        ) : (
+          <Link
+            to="/conductor"
+            className="inline-flex min-h-11 items-center gap-1 rounded-md border px-2 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-accent)] motion-safe:transition-colors hover:bg-[var(--theme-accent-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] lg:min-h-0"
+            style={{ borderColor: 'var(--theme-accent-border)' }}
+          >
+            <span>Connect gateway</span>
+            <HugeiconsIcon
+              icon={ArrowRight01Icon}
+              size={12}
+              strokeWidth={1.8}
+            />
+          </Link>
+        )}
+        {modelInfo?.effectiveContextLength ? (
+          <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.08em] text-[var(--theme-muted)]">
             ctx {formatCount(modelInfo.effectiveContextLength)}
           </span>
         ) : null}

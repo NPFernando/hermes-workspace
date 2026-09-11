@@ -1,7 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import { safeErrorMessage } from '../../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 import {
   BEARER_TOKEN,
   CLAUDE_API,
@@ -18,6 +24,11 @@ export const Route = createFileRoute('/api/skills/uninstall')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`skills-uninstall:${getClientIp(request)}`, 5, 60_000)) {
+          return rateLimitResponse()
         }
         try {
           const body = (await request.json()) as {

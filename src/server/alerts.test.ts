@@ -145,6 +145,10 @@ describe('sendAlert delivery gating', () => {
     const db = readFinanceStore()
     db.settings.alertsEnabled = true
     writeFinanceStore(db)
+    // Prime the test store while Vitest mode is still active. The delivery
+    // branch below temporarily switches NODE_ENV to production so spawn is
+    // exercised, but it must observe the setting written above.
+    readFinanceStore()
 
     const prevVitest = process.env.VITEST
     const prevNodeEnv = process.env.NODE_ENV
@@ -157,6 +161,35 @@ describe('sendAlert delivery gating', () => {
         detail: 'd',
         source: 'unit-test',
       })
+    } finally {
+      process.env.VITEST = prevVitest
+      process.env.NODE_ENV = prevNodeEnv
+    }
+    expect(spawn).toHaveBeenCalledTimes(1)
+  })
+
+  it('suppresses non-critical delivery in quiet mode while preserving critical delivery', async () => {
+    vi.doMock('node:child_process', () => ({
+      spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })),
+    }))
+    const { spawn } = await import('node:child_process')
+    const { readFinanceStore, writeFinanceStore } =
+      await import('./finance-store')
+    const { sendAlert } = await import('./alerts')
+    const db = readFinanceStore()
+    db.settings.alertsEnabled = true
+    db.settings.quietModeEnabled = true
+    writeFinanceStore(db)
+    readFinanceStore()
+
+    const prevVitest = process.env.VITEST
+    const prevNodeEnv = process.env.NODE_ENV
+    delete process.env.VITEST
+    process.env.NODE_ENV = 'production'
+    try {
+      sendAlert({ severity: 'warning', title: 'quiet', detail: 'd', source: 'unit-test' })
+      expect(spawn).not.toHaveBeenCalled()
+      sendAlert({ severity: 'critical', title: 'critical', detail: 'd', source: 'unit-test' })
     } finally {
       process.env.VITEST = prevVitest
       process.env.NODE_ENV = prevNodeEnv

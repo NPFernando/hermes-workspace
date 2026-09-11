@@ -9,7 +9,13 @@ import { rosterByWorkerId } from '../../server/swarm-roster'
 import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
 import { syncSwarmProfileModel } from '../../server/swarm-profile-config'
 
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 // Inlined to avoid SSR module-resolution races against freshly-written
 // helpers; mirrors `src/server/claude-paths.ts` getProfilesDir().
 function getProfilesDir(): string {
@@ -157,6 +163,11 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`swarm-tmux-start:${getClientIp(request)}`, 5, 60_000)) {
+          return rateLimitResponse()
         }
 
         let body: StartRequest

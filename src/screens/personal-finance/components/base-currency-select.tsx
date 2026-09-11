@@ -27,7 +27,7 @@ export function BaseCurrencySelect({
   const { run, isBusy, error } = useFinanceAction<PersonalFinancePayload>(
     onPayload,
   )
-  const current = payload.baseCurrency
+  const current = payload.baseCurrency ?? 'LKR'
   const options = CURRENCIES.includes(current as (typeof CURRENCIES)[number])
     ? CURRENCIES
     : [current, ...CURRENCIES]
@@ -43,7 +43,7 @@ export function BaseCurrencySelect({
   // maintenance JSON (not a PersonalFinancePayload), so it can't go through
   // useFinanceAction — do a bespoke call and re-pull the payload for the fresh
   // `data.exchange_rates`.
-  const rates = payload.data.exchange_rates
+  const rates = payload.data.exchange_rates ?? []
   const newestDate = rates.reduce((m, r) => (r.date > m ? r.date : m), '')
   const daysOld = newestDate
     ? Math.floor((Date.now() - Date.parse(newestDate)) / DAY_MS)

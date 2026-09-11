@@ -4,6 +4,8 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { homedir } from 'node:os'
@@ -21,6 +23,8 @@ import { dirname, join } from 'node:path'
  */
 interface SessionStore {
   tokens: Record<string, number> // token -> expiry unix-ms
+  /** Last authenticated request for each token; optional for legacy stores. */
+  lastSeen?: Record<string, number>
 }
 
 const STORE_FILE = join(
@@ -32,6 +36,31 @@ const STORE_FILE = join(
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days (legacy default)
 const TOKEN_TTL_LONG = 365 * 24 * 60 * 60 * 1000 // 1 year (remember me)
 const TOKEN_TTL_SHORT = 24 * 60 * 60 * 1000 // 24 hours (session-only)
+const DEFAULT_IDLE_TTL_MS = 12 * 60 * 60 * 1000 // 12 hours
+const IDLE_PERSIST_INTERVAL_MS = 5 * 60 * 1000
+/** Bound the persisted session set so repeated logins cannot grow it forever. */
+export const MAX_SESSION_TOKENS = 1000
+
+function configuredIdleTtl(): number {
+  const configured = Number(process.env.HERMES_SESSION_IDLE_TIMEOUT_MS)
+  if (Number.isFinite(configured) && configured >= 0) return configured
+  return DEFAULT_IDLE_TTL_MS
+}
+
+function limitSessionTokens(
+  tokens: Record<string, number>,
+): Record<string, number> {
+  const limited = { ...tokens }
+  // Object insertion order is the token's insertion order because session
+  // stores are written atomically after each login/revocation. Evict the
+  // oldest active token first when the bounded set is exceeded.
+  while (Object.keys(limited).length > MAX_SESSION_TOKENS) {
+    const oldest = Object.keys(limited)[0]
+    if (!oldest) break
+    delete limited[oldest]
+  }
+  return limited
+}
 
 function loadStore(): SessionStore {
   try {
@@ -41,10 +70,23 @@ function loadStore(): SessionStore {
       // Expire any stale tokens on load
       const now = Date.now()
       const valid: Record<string, number> = {}
+      const lastSeen: Record<string, number> = {}
       for (const [token, expiry] of Object.entries(parsed.tokens)) {
-        if (expiry > now) valid[token] = expiry
+        if (expiry <= now) continue
+        const seen = parsed.lastSeen?.[token]
+        // Legacy stores have no activity timestamp. Treat the first request
+        // after upgrade as the baseline rather than logging every user out.
+        valid[token] = expiry
+        lastSeen[token] =
+          typeof seen === 'number' && Number.isFinite(seen) ? seen : now
       }
-      return { tokens: valid }
+      const limited = limitSessionTokens(valid)
+      return {
+        tokens: limited,
+        lastSeen: Object.fromEntries(
+          Object.keys(limited).map((token) => [token, lastSeen[token] ?? now]),
+        ),
+      }
     }
   } catch {
     // Corrupt store — start fresh
@@ -53,35 +95,59 @@ function loadStore(): SessionStore {
 }
 
 function saveStore(store: SessionStore): void {
+  const serialized = JSON.stringify(store)
+  const tempFile = `${STORE_FILE}.${process.pid}.tmp`
   try {
     const dir = dirname(STORE_FILE)
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true, mode: 0o700 })
     }
-    // Write with restrictive permissions — tokens are sensitive.
-    writeFileSync(STORE_FILE, JSON.stringify(store), {
+    // Write with restrictive permissions — tokens are sensitive. Replace the
+    // live file atomically so an interrupted write cannot leave malformed JSON
+    // and invalidate every persisted session.
+    writeFileSync(tempFile, serialized, {
       encoding: 'utf8',
       mode: 0o600,
     })
-    // Enforce 0600 even if the file already existed with looser perms.
+    chmodSync(tempFile, 0o600)
+    renameSync(tempFile, STORE_FILE)
+    // Enforce 0600 even if the platform preserves the destination mode.
     try {
       chmodSync(STORE_FILE, 0o600)
     } catch {
       // chmod is best-effort (e.g. Windows) — ignore failures.
     }
   } catch {
-    // Non-fatal — tokens are still in memory.
-    console.warn(`[auth] Failed to persist session store to ${STORE_FILE}`)
+    // Some Windows filesystems refuse to replace an existing file with
+    // renameSync. Preserve persistence as a fallback, while cleaning up the
+    // temporary file whenever possible.
+    try {
+      writeFileSync(STORE_FILE, serialized, { encoding: 'utf8', mode: 0o600 })
+      chmodSync(STORE_FILE, 0o600)
+    } catch {
+      // Non-fatal — tokens are still in memory.
+      console.warn(`[auth] Failed to persist session store to ${STORE_FILE}`)
+    }
+    try {
+      unlinkSync(tempFile)
+    } catch {
+      // The temporary file may already have been renamed or never created.
+    }
   }
 }
 
 // In-memory working copy
 const _tokens: Map<string, number> = new Map()
+const _lastSeen: Map<string, number> = new Map()
+const _lastSeenPersisted: Map<string, number> = new Map()
 
 // Hydrate from disk on module load
 const initial = loadStore()
 for (const [token, expiry] of Object.entries(initial.tokens)) {
   _tokens.set(token, expiry)
+  const seen = initial.lastSeen?.[token] ?? Date.now()
+  _lastSeen.set(token, seen)
+  _lastSeenPersisted.set(token, seen)
 }
 
 /**
@@ -93,6 +159,16 @@ function _prune(): void {
   for (const [token, expiry] of _tokens) {
     if (expiry <= now) {
       _tokens.delete(token)
+      _lastSeen.delete(token)
+      _lastSeenPersisted.delete(token)
+      changed = true
+      continue
+    }
+    const seen = _lastSeen.get(token) ?? now
+    if (configuredIdleTtl() > 0 && seen + configuredIdleTtl() <= now) {
+      _tokens.delete(token)
+      _lastSeen.delete(token)
+      _lastSeenPersisted.delete(token)
       changed = true
     }
   }
@@ -100,8 +176,12 @@ function _prune(): void {
 }
 
 function _persist(): void {
-  const store: SessionStore = { tokens: Object.fromEntries(_tokens) }
+  const store: SessionStore = {
+    tokens: Object.fromEntries(_tokens),
+    lastSeen: Object.fromEntries(_lastSeen),
+  }
   saveStore(store)
+  for (const [token, seen] of _lastSeen) _lastSeenPersisted.set(token, seen)
 }
 
 // Sweep expired tokens every 10 minutes
@@ -125,7 +205,17 @@ export function storeSessionToken(token: string, rememberMe?: boolean): void {
       : rememberMe === false
         ? TOKEN_TTL_SHORT
         : TOKEN_TTL_MS
-  _tokens.set(token, Date.now() + ttl)
+  const now = Date.now()
+  _tokens.set(token, now + ttl)
+  _lastSeen.set(token, now)
+  _lastSeenPersisted.set(token, now)
+  while (_tokens.size > MAX_SESSION_TOKENS) {
+    const oldest = _tokens.keys().next().value
+    if (!oldest) break
+    _tokens.delete(oldest)
+    _lastSeen.delete(oldest)
+    _lastSeenPersisted.delete(oldest)
+  }
   _persist()
 }
 
@@ -135,11 +225,19 @@ export function storeSessionToken(token: string, rememberMe?: boolean): void {
 export function isValidSessionToken(token: string): boolean {
   const expiry = _tokens.get(token)
   if (expiry === undefined) return false
-  if (expiry <= Date.now()) {
+  const now = Date.now()
+  const lastSeen = _lastSeen.get(token) ?? now
+  const idleTtl = configuredIdleTtl()
+  if (expiry <= now || (idleTtl > 0 && lastSeen + idleTtl <= now)) {
     _tokens.delete(token)
+    _lastSeen.delete(token)
+    _lastSeenPersisted.delete(token)
     _persist()
     return false
   }
+  _lastSeen.set(token, now)
+  const persistedAt = _lastSeenPersisted.get(token) ?? 0
+  if (now - persistedAt >= IDLE_PERSIST_INTERVAL_MS) _persist()
   return true
 }
 
@@ -148,6 +246,8 @@ export function isValidSessionToken(token: string): boolean {
  */
 export function revokeSessionToken(token: string): void {
   _tokens.delete(token)
+  _lastSeen.delete(token)
+  _lastSeenPersisted.delete(token)
   _persist()
 }
 
@@ -239,13 +339,12 @@ export function getRequestIp(request: Request): string {
     const real = request.headers.get('x-real-ip')?.trim()
     if (real) return real
   }
-  // Node's Request does not expose the socket; the adapter that constructs it
-  // (TanStack Start / undici) may attach `remoteAddress` under a well-known
-  // symbol. Fall back to loopback when nothing is available so we fail *safe*
-  // (no LAN/Tailscale bypass for unknown peers).
+  // Node's Request does not expose the socket by default; server-entry attaches
+  // the peer address before dispatch. An unknown peer must remain non-local —
+  // falling back to loopback would turn missing metadata into an auth bypass.
   const maybeAddress = (request as unknown as { remoteAddress?: string })
     .remoteAddress
-  return (maybeAddress && maybeAddress.trim()) || '127.0.0.1'
+  return (maybeAddress && maybeAddress.trim()) || 'unknown'
 }
 
 function isLocalRequest(request: Request): boolean {
@@ -282,12 +381,18 @@ export function isAuthenticated(request: Request): boolean {
   return isValidSessionToken(token)
 }
 
+/**
+ * Authorize trusted automation and interactive users.
+ *
+ * Loopback/private-network callers are used by the host's scheduled Hermes
+ * jobs, which do not have a browser session cookie. Password protection must
+ * still apply to public callers, so a non-local request needs a valid session.
+ */
 export function requireLocalOrAuth(request: Request): boolean {
   if (!isPasswordProtectionEnabled()) {
     return isLocalRequest(request)
   }
-
-  return isAuthenticated(request)
+  return isLocalRequest(request) || isAuthenticated(request)
 }
 
 /**
@@ -327,4 +432,12 @@ export function createSessionCookie(
   }
   // rememberMe=false → session cookie, no Max-Age
   return `claude-auth=${token}; ${attrs.join('; ')}`
+}
+
+/** Clear the workspace session cookie after an explicit logout. */
+export function clearSessionCookie(): string {
+  const attrs = ['HttpOnly']
+  if (shouldSetSecureCookie()) attrs.push('Secure')
+  attrs.push('SameSite=Strict', 'Path=/', 'Max-Age=0')
+  return `claude-auth=; ${attrs.join('; ')}`
 }

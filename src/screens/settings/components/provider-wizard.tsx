@@ -56,8 +56,8 @@ type AuthTypeMeta = {
 
 const WIZARD_STEPS: Array<StepItem> = [
   { id: 'provider', label: 'Choose Provider' },
-  { id: 'auth', label: 'Choose Auth' },
-  { id: 'instructions', label: 'Config Instructions' },
+  { id: 'auth', label: 'Sign-in Method' },
+  { id: 'instructions', label: 'Setup Instructions' },
   { id: 'verify', label: 'Verify' },
 ]
 
@@ -72,7 +72,7 @@ function getAuthTypeMeta(authType: ProviderAuthType): AuthTypeMeta {
   if (authType === 'api-key') {
     return {
       title: 'API Key',
-      description: 'Paste your API key — saved directly to local config',
+      description: 'Paste your provider key — saved securely on this device',
     }
   }
 
@@ -553,7 +553,7 @@ export function ProviderWizard({
             {step === 'instructions' && selectedProvider && selectedAuthType ? (
               <section className="mt-5">
                 <h3 className="text-base font-medium text-[var(--theme-text)] text-balance">
-                  Step 3: Add API Key
+                  Step 3: Complete Setup
                 </h3>
 
                 {selectedAuthType === 'oauth' ? (
@@ -574,7 +574,7 @@ export function ProviderWizard({
                           window.open('/terminal', '_blank')
                           setVerificationMessage(
                             'Run "hermes setup" in the terminal and select Google OAuth when prompted. ' +
-                              'A browser window will open for sign-in. Once complete, Hermes Agent will restart automatically.',
+                              'A browser window will open for sign-in. Once complete, Hermes will restart automatically.',
                           )
                           setVerifyState('warning')
                           setStep('verify')
@@ -680,8 +680,8 @@ export function ProviderWizard({
                 ) : selectedAuthType === 'api-key' ? (
                   <>
                     <p className="mt-1 text-sm text-[var(--theme-muted)] text-pretty">
-                      Paste your {selectedProvider.name} API key below. It will
-                      be saved directly to your local config file.
+                      Paste your {selectedProvider.name} provider key below. It
+                      will be saved securely on this device.
                     </p>
 
                     <div className="mt-4 flex flex-col gap-3">
@@ -725,7 +725,7 @@ export function ProviderWizard({
                             strokeWidth={1.5}
                             className="inline mr-1"
                           />
-                          Key saved! Hermes Agent is restarting to apply
+                          Key saved! Hermes is restarting to apply
                           changes.
                         </p>
                       ) : null}

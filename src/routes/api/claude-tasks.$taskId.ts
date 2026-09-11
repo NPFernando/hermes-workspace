@@ -5,6 +5,12 @@ import {
   moveClaudeTask,
   updateClaudeTask,
 } from '../../server/claude-tasks-backend'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 import type {
   TaskColumn,
   TaskPriority,
@@ -49,6 +55,11 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`claude-task-update:${getClientIp(request)}`, 40, 60_000)) {
+          return rateLimitResponse()
+        }
 
         try {
           const body = (await request.json()) as Record<string, unknown>
@@ -82,9 +93,12 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
         }
       },
 
-      DELETE: async ({ request }) => {
+      DELETE: ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
+        }
+        if (!rateLimit(`claude-task-delete:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
         }
 
         return jsonResponse(
@@ -98,6 +112,11 @@ export const Route = createFileRoute('/api/claude-tasks/$taskId')({
       POST: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`claude-task-move:${getClientIp(request)}`, 40, 60_000)) {
+          return rateLimitResponse()
         }
 
         const url = new URL(request.url)

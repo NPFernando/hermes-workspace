@@ -345,6 +345,7 @@ function mergeWithBuiltins(
 // ---------------------------------------------------------------------------
 
 /** Read hub sources, bootstrapping the file if missing. */
+// eslint-disable-next-line @typescript-eslint/require-await -- the public store API remains Promise-shaped for async backends
 export async function readHubSources(): Promise<ReadHubSourcesResult> {
   const path = hubSourcesFilePath()
 
@@ -442,6 +443,7 @@ export async function readHubSources(): Promise<ReadHubSourcesResult> {
 // Internal: read only user-defined sources from the file
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line @typescript-eslint/require-await -- internal callers share the async store pipeline
 async function readUserSources(): Promise<{
   sources: Array<HubSourceEntry>
   error?: string
