@@ -37,6 +37,7 @@ import {
   maskSensitive,
   readFinanceStore,
   recordCategoryCorrection,
+  recordGmailSyncError,
   recordNetWorthSnapshot,
   setKnownSenderPassword,
   setNonLiveExecutionMode,
@@ -2427,10 +2428,9 @@ export const Route = createFileRoute('/api/finance')({
               appendAuditLog('gmail_sync_run', { ...result })
               return json({ ok: true, result })
             } catch (error) {
-              return json(
-                { ok: false, error: safeErrorMessage(error) },
-                { status: 502 },
-              )
+              const message = safeErrorMessage(error)
+              recordGmailSyncError(message)
+              return json({ ok: false, error: message }, { status: 502 })
             }
           }
           if (action === 'list_known_senders') {

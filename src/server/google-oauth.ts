@@ -234,19 +234,27 @@ export function storeGmailRefreshToken(
   })
 }
 
-export function readGmailRefreshToken(): string | null {
+function readGmailOAuthRecord(): GmailOAuthRecord | null {
   try {
-    const record = JSON.parse(
-      readFileSync(GMAIL_TOKEN_FILE, 'utf8'),
-    ) as GmailOAuthRecord
-    return record.refreshToken || null
+    return JSON.parse(readFileSync(GMAIL_TOKEN_FILE, 'utf8')) as GmailOAuthRecord
   } catch {
     return null
   }
 }
 
+export function readGmailRefreshToken(): string | null {
+  return readGmailOAuthRecord()?.refreshToken || null
+}
+
 export function isGmailConnected(): boolean {
   return Boolean(readGmailRefreshToken())
+}
+
+/** For the settings UI — which mailbox is connected and since when. Never returns the refresh token itself. */
+export function readGmailConnectedAccount(): { email: string; connectedAt: string } | null {
+  const record = readGmailOAuthRecord()
+  if (!record?.refreshToken) return null
+  return { email: record.email, connectedAt: record.connectedAt }
 }
 
 export async function getGmailAccessToken(): Promise<string> {

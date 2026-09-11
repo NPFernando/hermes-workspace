@@ -1012,6 +1012,38 @@ describe('knownSenders (upsert/list/delete + password encryption)', () => {
   })
 })
 
+describe('recordGmailSyncError', () => {
+  it('stores the failure onto settings.gmailIngest.lastError', async () => {
+    const store = await freshFinanceStore()
+    store.recordGmailSyncError('invalid_grant: Token has been expired or revoked.')
+    const db = store.readFinanceStore()
+    const gmailIngest = (db.settings as Record<string, unknown>).gmailIngest as {
+      lastError?: { at: number; message: string }
+    }
+    expect(gmailIngest.lastError?.message).toBe(
+      'invalid_grant: Token has been expired or revoked.',
+    )
+    expect(typeof gmailIngest.lastError?.at).toBe('number')
+  })
+
+  it('preserves prior gmailIngest fields (e.g. syncHistory) when recording an error', async () => {
+    const store = await freshFinanceStore()
+    const db = store.readFinanceStore()
+    ;(db.settings as Record<string, unknown>).gmailIngest = {
+      syncHistory: [{ at: 1, found: 2, queued: 1, skippedAlreadyQueued: 0 }],
+    }
+    store.writeFinanceStore(db)
+    store.recordGmailSyncError('boom')
+    const after = store.readFinanceStore()
+    const gmailIngest = (after.settings as Record<string, unknown>).gmailIngest as {
+      syncHistory?: Array<unknown>
+      lastError?: { message: string }
+    }
+    expect(gmailIngest.syncHistory).toHaveLength(1)
+    expect(gmailIngest.lastError?.message).toBe('boom')
+  })
+})
+
 describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)', () => {
   let tmp: string
   let realHome: string | undefined

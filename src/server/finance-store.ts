@@ -2204,6 +2204,27 @@ export function getCategoryCorrections(): Record<string, string> {
   return Object.keys(harp).length > 0 ? { ...flat, ...harp } : flat
 }
 
+/**
+ * Persists a Gmail sync failure onto settings.gmailIngest so the settings UI
+ * can show "last sync failed: <reason>" even after the transient toast in
+ * the ingestion panel is gone — `isGmailConnected()` only checks whether a
+ * refresh token *file* exists, not whether Google still honours it, so this
+ * is the only durable signal that a "connected" account actually needs
+ * reconnecting (e.g. invalid_grant: token expired or revoked).
+ */
+export function recordGmailSyncError(message: string): void {
+  const db = ensureFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const gmailIngest = (
+    settings.gmailIngest && typeof settings.gmailIngest === 'object'
+      ? { ...(settings.gmailIngest as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>
+  gmailIngest.lastError = { at: Math.floor(Date.now() / 1000), message }
+  settings.gmailIngest = gmailIngest
+  writeFinanceStore(db)
+}
+
 function readKnownSenders(settings: Record<string, unknown>): Array<KnownSender> {
   const gmailIngest =
     settings.gmailIngest && typeof settings.gmailIngest === 'object'
