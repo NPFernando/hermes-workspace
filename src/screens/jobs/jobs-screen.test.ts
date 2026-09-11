@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  doesJobMatchProfileFilter,
   doesJobMatchHealthFilter,
   formatJobActionLabel,
   formatJobFreshnessCopy,
   getJobHealthFilterButtonLabel,
   getJobHealthFilterCounts,
+  getJobProfileName,
+  getJobProfileOptions,
   getJobsEmptyStateCopy,
+  parseJobHealthFilter,
 } from './jobs-screen'
 import type { ClaudeJob } from '@/lib/jobs-api'
 
@@ -191,5 +195,52 @@ describe('job health filters', () => {
       description:
         'No scheduled jobs match both the search text and selected health filter.',
     })
+  })
+
+  it('accepts only known persisted filters and falls back to all', () => {
+    expect(parseJobHealthFilter('failed')).toBe('failed')
+    expect(parseJobHealthFilter('neverRun')).toBe('neverRun')
+    expect(parseJobHealthFilter('unknown')).toBe('all')
+    expect(parseJobHealthFilter(null)).toBe('all')
+  })
+})
+
+describe('job profile filters', () => {
+  const makeJob = (overrides: Partial<ClaudeJob> = {}): ClaudeJob => ({
+    id: overrides.id ?? 'job-1',
+    name: overrides.name ?? 'Daily monitor',
+    prompt: overrides.prompt ?? 'Run the monitor',
+    schedule: overrides.schedule ?? {},
+    enabled: overrides.enabled ?? true,
+    state: overrides.state ?? 'active',
+    ...overrides,
+  })
+
+  it('uses the explicit profile and falls back to profile_name/default', () => {
+    expect(
+      getJobProfileName({ profile: ' finance ', profile_name: 'other' }),
+    ).toBe('finance')
+    expect(getJobProfileName({ profile: '', profile_name: 'other' })).toBe(
+      'other',
+    )
+    expect(
+      getJobProfileName({ profile: undefined, profile_name: undefined }),
+    ).toBe('default')
+  })
+
+  it('builds a sorted union of configured and observed profiles', () => {
+    const options = getJobProfileOptions(
+      [makeJob({ profile: 'zeta' }), makeJob({ id: '2', profile: 'alpha' })],
+      [{ name: 'finance' }, { name: 'alpha' }, { name: '  ' }],
+    )
+
+    expect(options).toEqual(['alpha', 'finance', 'zeta'])
+  })
+
+  it('matches all profiles or one normalized job profile', () => {
+    const job = makeJob({ profile_name: 'finance' })
+    expect(doesJobMatchProfileFilter(job, 'all')).toBe(true)
+    expect(doesJobMatchProfileFilter(job, 'finance')).toBe(true)
+    expect(doesJobMatchProfileFilter(job, 'default')).toBe(false)
   })
 })

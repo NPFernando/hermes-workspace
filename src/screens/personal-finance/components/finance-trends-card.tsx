@@ -43,6 +43,10 @@ export type TrendPoint = {
   net: number
 }
 
+function isChartableRecord(row: Record<string, unknown>): boolean {
+  return !row.deletedAt && stringField(row, 'transactionType') !== 'transfer'
+}
+
 export function buildTrendData(
   months: Array<string>,
   incomeRecords: Array<Record<string, unknown>>,
@@ -51,6 +55,7 @@ export function buildTrendData(
   const incomeByMonth = new Map<string, number>()
   const expenseByMonth = new Map<string, number>()
   for (const row of incomeRecords) {
+    if (!isChartableRecord(row)) continue
     const month = stringField(row, 'dateReceived').slice(0, 7)
     incomeByMonth.set(
       month,
@@ -58,6 +63,7 @@ export function buildTrendData(
     )
   }
   for (const row of expenseRecords) {
+    if (!isChartableRecord(row)) continue
     const month = stringField(row, 'date').slice(0, 7)
     expenseByMonth.set(
       month,
@@ -85,7 +91,10 @@ export function buildCategoryData(
 ): Array<CategoryTotal> {
   const totals = new Map<string, number>()
   for (const row of expenseRecords) {
-    if (stringField(row, 'date').slice(0, 7) !== currentMonth) continue
+    if (
+      !isChartableRecord(row) ||
+      stringField(row, 'date').slice(0, 7) !== currentMonth
+    ) continue
     const category = stringField(row, 'category') || 'Other'
     totals.set(
       category,
@@ -134,7 +143,7 @@ export function FinanceTrendsCard({
           Income vs. expense
         </h2>
         <p className="text-xs text-[var(--theme-muted)]">
-          Last {MONTHS_BACK} months, LKR-converted totals.
+          Last {MONTHS_BACK} months, totals shown in LKR.
         </p>
         {hasTrendData && (
           <p className="text-xs text-[var(--theme-muted)]">
@@ -235,7 +244,7 @@ export function FinanceTrendsCard({
           Spending by category
         </h2>
         <p className="text-xs text-[var(--theme-muted)]">
-          This month, LKR-converted totals.
+          This month, totals shown in LKR.
         </p>
         {hasCategoryData ? (
           <div className="mt-3 h-[220px] w-full">

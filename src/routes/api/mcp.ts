@@ -10,6 +10,9 @@ import {
   getCapabilities,
 } from '../../server/gateway-capabilities'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
@@ -207,6 +210,9 @@ export const Route = createFileRoute('/api/mcp')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`mcp-write:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
+        }
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.mcp && !capabilities.mcpFallback) {
           return json(

@@ -1,46 +1,116 @@
+import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
+import { buildMonthlyFinanceReport } from '../../screens/personal-finance/components/financial-report'
 import {
   FINANCE_AUDIT_PATH,
   FINANCE_DATA_PATH,
+  SUPPORTED_CURRENCIES,
   TRADING_MODES,
   addFinanceRecord,
+  addFinanceSplit,
+  addFinanceTransfer,
   addPendingIngestion,
+  annualBudgetVsActualSummary,
   appendAuditLog,
+  applyBudgetTemplate,
   budgetVsActualSummary,
+  buildAiTaskReviewCsv,
+  buildFinanceAgentContext,
   buildFinanceQueryContext,
+  buildTaxRecordsCsv,
+  buildTransactionsCsv,
+  captureNetWorthSnapshot,
+  cseProviderHealth,
+  deleteBudgetTemplate,
   deleteFinanceRecord,
   ensureFinanceStore,
   financeAlerts,
   financeStorageAlerts,
   financeStorageStatus,
   financeSummary,
+  financialHealthSummary,
   findPossibleDuplicate,
   getAverageMonthlyExpensesLkr,
   getAverageMonthlySavingsRatePct,
   getCategoryCorrections,
   getUnifiedTransactions,
+  listFinanceAiTasks,
   listPendingIngestions,
   maskSensitive,
+  previewFinanceAuditPrune,
+  pruneFinanceAudit,
+  readFinanceAuditLog,
   readFinanceStore,
+  readTransactionAudit,
   recordCategoryCorrection,
+  restoreFinanceRecord,
+  safeToSpendSummary,
+  saveBudgetTemplate,
   setNonLiveExecutionMode,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
+  updateExchangeRate,
   updateFinanceRecord,
   updatePendingIngestion,
+  verifyFinanceAuditChain,
   writeFinanceStore,
 } from '../../server/finance-store'
+import type { FinanceDatabase } from '../../server/finance-store'
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
+import { listFinanceDocuments } from '../../server/finance-document-vault'
+import {
+  assessFxProviderHealth,
+  fetchFrankfurterRate,
+} from '../../server/finance-fx-provider'
+import { detectContractChanges } from '../../server/contract-change-detection'
+import { getFinanceManagerAgentProfile } from '../../server/finance-agent-profile'
 import {
   answerFinanceQuestion,
   extractEmploymentContract,
   extractTransactionFromImage,
+  extractTransactionsFromImages,
 } from '../../server/finance-extraction'
+import {
+  approveMemory,
+  flagFinanceMemory,
+  getUserFinanceMemoriesForPrompt,
+  isHarpMemoryEnabled,
+  listActiveFinanceMemories,
+  listPendingFinanceCandidates,
+  proposeCategoryPreference,
+  proposeFinancialRule,
+  rejectMemory,
+} from '../../server/harp-memory-client'
 import { syncGmailNow } from '../../server/gmail-ingest'
+import { validateFinancialRules } from '../../server/financial-rules'
+import {
+  financeAgentAuthenticationError,
+  financeAgentScopeGuard,
+  financeMutationGuard,
+  financeMutationRisk,
+} from '../../server/finance-action-guard'
 import { fetchCsePrice } from '../../server/cse-market.service'
+import { prepareTransactionImport } from '../../server/transaction-import'
+import {
+  decryptFinanceBackup,
+  encryptFinanceBackup,
+} from '../../server/encrypted-finance-backup'
+import {
+  defaultEncryptedBackupConfig,
+  encryptedFinanceBackupHealth,
+  listEncryptedFinanceAuditArchives,
+  verifyEncryptedFinanceAuditArchive,
+  writeEncryptedFinanceAuditArchive,
+} from '../../server/encrypted-finance-retention'
 import {
   addBinanceCandles,
   addMarketPrice,
@@ -79,6 +149,14 @@ import {
   assessResearchRisk,
   buildCompositeSentiment,
 } from '../../server/finance-intelligence'
+
+export function detectDurableFinancePreference(text: string): string | null {
+  if (!['1', 'true', 'yes'].includes((process.env.FINANCE_LEARNED_FACTS_ENABLED ?? '').toLowerCase())) return null
+  const value = text.trim()
+  if (value.length < 20 || /\?\s*$/.test(value)) return null
+  if (!/^(i\s+(always|never|prefer|avoid|only|usually)|my\s+rule\s+is\b)/i.test(value)) return null
+  return value
+}
 import {
   appendPaperDecisionSnapshot,
   readPaperDecisionJournal,
@@ -160,7 +238,13 @@ const PERSONAL_FINANCE_RECORD_KINDS = new Set([
   'income_source',
   'stock_holding',
   'fixed_deposit',
+  'investment_journal',
+  'ai_task',
   'beneficiary',
+  'insurance_policy',
+  'transfer',
+  'split',
+  'scheduled_transaction',
 ])
 
 function recordActionResponse(kind: string) {
@@ -209,11 +293,14 @@ function financePayload() {
   recoverValidationRunAutomationIfStale()
   const db = ensureFinanceStore()
   const storage = financeStorageStatus({ selfHeal: true })
+  const backupConfig = defaultEncryptedBackupConfig()
   const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
   return {
     ok: true,
     checkedAt: Date.now(),
+    baseCurrency: db.settings.baseCurrency,
     storage,
+    backupHealth: encryptedFinanceBackupHealth(backupConfig),
     paths: {
       database: FINANCE_DATA_PATH,
       postgresDatabase: storage.postgres.database,
@@ -249,8 +336,11 @@ function financePayload() {
       },
     },
     summary: financeSummary(db),
+    cseProviderHealth: cseProviderHealth(db),
+    netWorthSnapshots: db.net_worth_snapshots,
+    safeToSpend: safeToSpendSummary(db),
     nextRecommendation: (() => {
-      const mode = String(db.settings.tradingMode ?? 'paper_trade')
+      const mode = db.settings.tradingMode
       if (mode === 'live_manual_approval' || mode === 'live_auto_trade') {
         return {
           decision: 'live_requires_manual_review',
@@ -305,7 +395,26 @@ function financePayload() {
       }
     })(),
     budgetVsActual: budgetVsActualSummary(db),
+    annualBudgetVsActual: annualBudgetVsActualSummary(db),
+    exchangeRates: (Array.isArray(db.exchange_rates) ? db.exchange_rates : [])
+      .filter(
+        (rate) =>
+          typeof rate.base === 'string' &&
+          typeof rate.target === 'string' &&
+          typeof rate.rate === 'number',
+      )
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      .slice(0, 100),
+    fxProviderHealth: assessFxProviderHealth(
+      Array.isArray(db.exchange_rates) ? db.exchange_rates : [],
+    ),
     transactions: maskSensitive(getUnifiedTransactions(db)),
+    deletedTransactions: maskSensitive(
+      getUnifiedTransactions(db, { includeDeleted: true }).filter(
+        (transaction) => transaction.deletedAt,
+      ),
+    ),
+    transactionAudit: readTransactionAudit(100),
     tradingPerformance: tradingPerformanceSummary(db),
     demoPerformance: demoTradingPerformance(),
     decisionQuality: decisionQualityReport(),
@@ -339,7 +448,17 @@ function financePayload() {
     // market_prices/risk_scores are fetched but never rendered anywhere in
     // the UI (confirmed via grep) — dropped here to shrink this response,
     // which finance-screen.tsx's polling/refetch cycle re-fetches in full.
-    data: maskSensitive({ ...db, market_prices: [], risk_scores: [] }),
+    data: maskSensitive({
+      ...db,
+      income_records: Array.isArray(db.income_records)
+        ? db.income_records.filter((record) => !record.deletedAt)
+        : [],
+      expense_records: Array.isArray(db.expense_records)
+        ? db.expense_records.filter((record) => !record.deletedAt)
+        : [],
+      market_prices: [],
+      risk_scores: [],
+    }),
   }
 }
 
@@ -357,11 +476,53 @@ function financePayload() {
  */
 function personalFinancePayload() {
   const db = ensureFinanceStore()
+  const summary = financeSummary(db)
+  const exchangeRateRows = Array.isArray(db.exchange_rates)
+    ? db.exchange_rates
+    : []
+  const fxUnconverted = (() => {
+    const base = String(summary.baseCurrency ?? 'LKR').toUpperCase()
+    const currencies = new Set<string>()
+    const add = (value: unknown) => {
+      if (typeof value !== 'string') return
+      const currency = value.trim().toUpperCase()
+      if (currency && currency !== base) currencies.add(currency)
+    }
+    const storedRows: Array<unknown> = [
+      db.finance_accounts as Array<unknown>,
+      db.income_records as Array<unknown>,
+      db.expense_records as Array<unknown>,
+      db.savings_goals as Array<unknown>,
+      db.stock_holdings as Array<unknown>,
+      db.fixed_deposits as Array<unknown>,
+      db.loans as Array<unknown>,
+    ].flatMap((rows: unknown) => (Array.isArray(rows) ? rows : []))
+    for (const row of storedRows) {
+      const record = row as Record<string, unknown>
+      add(record.currency ?? record.originalCurrency)
+    }
+    return [...currencies].filter(
+      (currency) =>
+        !exchangeRateRows.some((rate) => {
+          const record = rate as Record<string, unknown>
+          const value = Number(record.rate)
+          const from = String(record.base ?? '').toUpperCase()
+          const to = String(record.target ?? '').toUpperCase()
+          return value > 0 &&
+            ((from === base && to === currency) ||
+              (from === currency && to === base))
+        }),
+    ).sort()
+  })()
+  const snapshots = Array.isArray(db.net_worth_snapshots)
+    ? db.net_worth_snapshots
+    : []
   const storage = financeStorageStatus({ selfHeal: true })
+  const backupConfig = defaultEncryptedBackupConfig()
   const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
   const efTargetMonths = db.settings.emergencyFundTargetMonths ?? 0
   const efAvgMonthlyExpensesLkr = getAverageMonthlyExpensesLkr(db, 3)
-  const efCurrentLkr = financeSummary(db).cashBalanceLkr
+  const efCurrentLkr = summary.cashBalanceLkr
   const efTargetLkr = efTargetMonths * efAvgMonthlyExpensesLkr
   const efCoverageMonths =
     efAvgMonthlyExpensesLkr > 0 ? efCurrentLkr / efAvgMonthlyExpensesLkr : 0
@@ -376,7 +537,7 @@ function personalFinancePayload() {
       : 0
   const wgTargetLkr = db.settings.wealthGoalTargetLkr ?? 0
   const wgTargetDate = db.settings.wealthGoalTargetDate ?? null
-  const wgCurrentLkr = financeSummary(db).netWorthLkr
+  const wgCurrentLkr = summary.netWorthLkr
   const wgProgressPct =
     wgTargetLkr > 0
       ? Math.min(100, Math.max(0, (wgCurrentLkr / wgTargetLkr) * 100))
@@ -385,9 +546,51 @@ function personalFinancePayload() {
     ok: true,
     checkedAt: Date.now(),
     storage,
-    summary: financeSummary(db),
+    backupHealth: encryptedFinanceBackupHealth(backupConfig),
+    summary: {
+      ...summary,
+      fxUnconverted,
+    },
+    cseProviderHealth: cseProviderHealth(db),
+    netWorthSnapshots: snapshots,
+    netWorthHistory: snapshots.slice(-180).map((snapshot) => ({
+      date: snapshot.snapshotDate,
+      netWorthBase: snapshot.netWorthLkr,
+      cashBase: snapshot.cashLkr,
+      investmentsBase: snapshot.investmentsLkr,
+      debtBase: snapshot.debtLkr,
+    })),
+    safeToSpend: safeToSpendSummary(db),
+    financialHealth: financialHealthSummary(db, storage.health.status),
     budgetVsActual: budgetVsActualSummary(db),
+    annualBudgetVsActual: annualBudgetVsActualSummary(db),
+    exchangeRates: (Array.isArray(db.exchange_rates) ? db.exchange_rates : [])
+      .filter(
+        (rate) =>
+          typeof rate.base === 'string' &&
+          typeof rate.target === 'string' &&
+          typeof rate.rate === 'number',
+      )
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      .slice(0, 100),
+    budgetAlertThresholdPct: Math.max(
+      50,
+      Math.min(100, db.settings.budgetAlertThresholdPct ?? 80),
+    ),
+    budgetTemplates: db.settings.budgetTemplates ?? [],
+    goalCompletionEvents: db.settings.goalCompletionEvents ?? [],
+    proactiveInsightsEnabled: db.settings.proactiveInsightsEnabled === true,
+    salaryHistory: db.settings.salaryHistory ?? [],
+    alertsEnabled: db.settings.alertsEnabled === true,
+    quietModeEnabled: db.settings.quietModeEnabled === true,
+    financialRules: db.settings.financialRules ?? {},
     transactions: maskSensitive(getUnifiedTransactions(db)),
+    deletedTransactions: maskSensitive(
+      getUnifiedTransactions(db, { includeDeleted: true }).filter(
+        (transaction) => transaction.deletedAt,
+      ),
+    ),
+    transactionAudit: readTransactionAudit(100),
     alerts,
     emergencyFund: {
       targetMonths: efTargetMonths,
@@ -412,8 +615,12 @@ function personalFinancePayload() {
     financeQaHistory: db.settings.financeQaHistory ?? [],
     data: maskSensitive({
       finance_accounts: db.finance_accounts,
-      income_records: db.income_records,
-      expense_records: db.expense_records,
+      income_records: Array.isArray(db.income_records)
+        ? db.income_records.filter((record) => !record.deletedAt)
+        : [],
+      expense_records: Array.isArray(db.expense_records)
+        ? db.expense_records.filter((record) => !record.deletedAt)
+        : [],
       budget_categories: db.budget_categories,
       categories: db.categories,
       subcategories: db.subcategories,
@@ -424,10 +631,25 @@ function personalFinancePayload() {
       income_sources: db.income_sources,
       stock_holdings: db.stock_holdings,
       fixed_deposits: db.fixed_deposits,
+      investment_journal: db.investment_journal,
+      ai_tasks: db.ai_tasks,
       loans: db.loans,
       properties: db.properties,
       beneficiaries: db.beneficiaries,
+      insurance_policies: db.insurance_policies,
       pending_ingestions: db.pending_ingestions,
+      scheduled_transactions:
+        (db as FinanceDatabase & {
+          scheduled_transactions?: Array<Record<string, unknown>>
+        }).scheduled_transactions ?? [],
+      exchange_rates: (Array.isArray(db.exchange_rates) ? db.exchange_rates : [])
+        .filter(
+          (rate) =>
+            typeof rate.base === 'string' &&
+            typeof rate.target === 'string' &&
+            typeof rate.rate === 'number',
+        )
+        .slice(0, 100),
     }),
   }
 }
@@ -484,17 +706,111 @@ export const Route = createFileRoute('/api/finance')({
     handlers: {
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) return unauthorized()
-        const scope = new URL(request.url).searchParams.get('scope')
+        const searchParams = new URL(request.url).searchParams
+        const scope = searchParams.get('scope')
+        if (
+          scope === 'personal_finance' &&
+          searchParams.get('format') === 'monthly-report'
+        ) {
+          const requestedMonth = searchParams.get('month') ?? ''
+          const month = /^\d{4}-\d{2}$/.test(requestedMonth)
+            ? requestedMonth
+            : new Date().toISOString().slice(0, 7)
+          const report = buildMonthlyFinanceReport(
+            personalFinancePayload() as unknown as Parameters<
+              typeof buildMonthlyFinanceReport
+            >[0],
+            month,
+          )
+          return new Response(report, {
+            headers: {
+              'Content-Type': 'text/markdown; charset=utf-8',
+              'Content-Disposition': `attachment; filename="hermes-finance-report-${month}.md"`,
+              'Cache-Control': 'no-store',
+            },
+          })
+        }
+        if (
+          scope === 'personal_finance' &&
+          (searchParams.get('format') === 'csv' ||
+            searchParams.get('format') === 'tax-csv')
+        ) {
+          const taxExport = searchParams.get('format') === 'tax-csv'
+          const csv = taxExport
+            ? buildTaxRecordsCsv(ensureFinanceStore())
+            : buildTransactionsCsv(ensureFinanceStore())
+          return new Response(csv, {
+            headers: {
+              'Content-Type': 'text/csv; charset=utf-8',
+              'Content-Disposition': `attachment; filename="hermes-${taxExport ? 'tax-records' : 'transactions'}-${new Date().toISOString().slice(0, 10)}.csv"`,
+              'Cache-Control': 'no-store',
+            },
+          })
+        }
         if (scope === 'personal_finance') return json(personalFinancePayload())
         await getLiveMonitor()
         return json(financePayload())
       },
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) return unauthorized()
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`finance-write:${getClientIp(request)}`, 120, 60_000)) {
+          return rateLimitResponse()
+        }
         const body = await parseJsonBody(request)
         const action =
           typeof body.action === 'string' ? body.action : 'add_record'
         try {
+          const agentAuthenticationError = financeAgentAuthenticationError(
+            request,
+            body,
+          )
+          if (agentAuthenticationError) {
+            appendAuditLog('finance_agent_auth_rejected', {
+              action,
+              reason: agentAuthenticationError.error,
+              source: 'finance_agent_token_guard',
+            })
+            return json(
+              { ok: false, error: agentAuthenticationError.error },
+              { status: agentAuthenticationError.status },
+            )
+          }
+          const guardError = financeMutationGuard(action, body)
+          if (guardError) {
+            appendAuditLog('finance_action_rejected', {
+              action,
+              risk: financeMutationRisk(action),
+              reason: guardError,
+              source: 'finance_mutation_guard',
+            })
+            return json(
+              {
+                ok: false,
+                error: guardError,
+                risk: financeMutationRisk(action),
+              },
+              { status: 400 },
+            )
+          }
+          const agentScopeError = financeAgentScopeGuard(action, body)
+          if (agentScopeError) {
+            appendAuditLog('finance_agent_scope_rejected', {
+              action,
+              risk: financeMutationRisk(action),
+              reason: agentScopeError,
+              source: 'finance_agent_scope_guard',
+            })
+            return json(
+              {
+                ok: false,
+                error: agentScopeError,
+                risk: financeMutationRisk(action),
+              },
+              { status: 403 },
+            )
+          }
           if (action === 'add_record') {
             const kind = typeof body.kind === 'string' ? body.kind : ''
             const payload =
@@ -503,6 +819,170 @@ export const Route = createFileRoute('/api/finance')({
                 : {}
             addFinanceRecord(kind, payload)
             return recordActionResponse(kind)
+          }
+          if (action === 'add_transfer') {
+            const payload =
+              body.payload && typeof body.payload === 'object'
+                ? (body.payload as JsonRecord)
+                : {}
+            addFinanceTransfer(payload)
+            return recordActionResponse('transfer')
+          }
+          if (action === 'add_split') {
+            const payload =
+              body.payload && typeof body.payload === 'object'
+                ? (body.payload as JsonRecord)
+                : {}
+            addFinanceSplit(payload)
+            return recordActionResponse('split')
+          }
+          if (action === 'post_scheduled') {
+            const id = typeof body.id === 'string' ? body.id.trim() : ''
+            const db = readFinanceStore()
+            const scheduled = db.scheduled_transactions.find(
+              (record) => record.id === id,
+            )
+            if (!scheduled || scheduled.status !== 'pending') {
+              return json(
+                { ok: false, error: 'No pending scheduled transaction with that id.' },
+                { status: 404 },
+              )
+            }
+            const recordPayload =
+              scheduled.kind === 'income'
+                ? {
+                    dateReceived: scheduled.dueDate,
+                    sourceName: scheduled.counterparty,
+                    incomeType: scheduled.category,
+                    originalAmount: scheduled.amount,
+                    originalCurrency: 'LKR',
+                    accountId: scheduled.accountId,
+                    notes: scheduled.notes,
+                  }
+                : {
+                    date: scheduled.dueDate,
+                    vendor: scheduled.counterparty,
+                    category: scheduled.category,
+                    amount: scheduled.amount,
+                    currency: 'LKR',
+                    accountId: scheduled.accountId,
+                    notes: scheduled.notes,
+                  }
+            const fresh = addFinanceRecord(scheduled.kind, recordPayload)
+            const records =
+              scheduled.kind === 'income'
+                ? fresh.income_records
+                : fresh.expense_records
+            const posted = records.at(-1)
+            updateFinanceRecord('scheduled_transaction', id, {
+              status: 'posted',
+              postedRecordId: posted?.id,
+            })
+            appendAuditLog('scheduled_transaction_posted', {
+              id,
+              recordId: posted?.id,
+            })
+            return recordActionResponse('scheduled_transaction')
+          }
+          if (action === 'preview_transaction_import') {
+            const csv = typeof body.csv === 'string' ? body.csv : ''
+            const preview = prepareTransactionImport(csv, ensureFinanceStore())
+            return json({ ok: true, transactionImportPreview: preview })
+          }
+          if (action === 'commit_transaction_import') {
+            const csv = typeof body.csv === 'string' ? body.csv : ''
+            const preview = prepareTransactionImport(csv, ensureFinanceStore())
+            if (body.confirm !== true) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Explicit import confirmation is required.',
+                },
+                { status: 400 },
+              )
+            }
+            if (body.previewHash !== preview.fingerprint) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Import preview is stale; preview the file again.',
+                },
+                { status: 409 },
+              )
+            }
+            if (preview.errors.length > 0) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Import contains invalid rows.',
+                  transactionImportPreview: preview,
+                },
+                { status: 400 },
+              )
+            }
+            if (
+              preview.duplicates.length > 0 &&
+              body.allowDuplicates !== true
+            ) {
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Import contains possible duplicates; review and explicitly allow them.',
+                  transactionImportPreview: preview,
+                },
+                { status: 409 },
+              )
+            }
+            for (const item of preview.items) {
+              if (item.type === 'transfer') addFinanceTransfer(item.payload)
+              else if (item.type === 'split') addFinanceSplit(item.payload)
+              else addFinanceRecord(item.type, item.payload)
+            }
+            return json({
+              ...personalFinancePayload(),
+              transactionImportResult: {
+                importedItems: preview.items.length,
+                importedRows: preview.rowCount,
+                duplicatesAllowed: preview.duplicates.length > 0,
+              },
+            })
+          }
+          if (action === 'download_encrypted_backup') {
+            const passphrase =
+              typeof body.passphrase === 'string' ? body.passphrase : ''
+            const backup = encryptFinanceBackup(
+              readFinanceStore(),
+              readFinanceAuditLog(),
+              passphrase,
+            )
+            return new Response(backup, {
+              headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Content-Disposition': `attachment; filename="hermes-finance-backup-${new Date().toISOString().slice(0, 10)}.enc.json"`,
+                'Cache-Control': 'no-store',
+              },
+            })
+          }
+          if (action === 'verify_encrypted_backup') {
+            const serialized =
+              typeof body.backup === 'string' ? body.backup : ''
+            const passphrase =
+              typeof body.passphrase === 'string' ? body.passphrase : ''
+            const payload = decryptFinanceBackup(serialized, passphrase)
+            const schemaVersion =
+              payload.finance && typeof payload.finance === 'object'
+                ? (payload.finance as { schemaVersion?: unknown }).schemaVersion
+                : undefined
+            return json({
+              ok: true,
+              encryptedBackup: {
+                verified: true,
+                schemaVersion,
+                auditEntries: payload.auditLog.split('\n').filter(Boolean)
+                  .length,
+              },
+            })
           }
           if (action === 'update_record') {
             const kind = typeof body.kind === 'string' ? body.kind : ''
@@ -516,6 +996,15 @@ export const Route = createFileRoute('/api/finance')({
                 { ok: false, error: 'id is required.' },
                 { status: 400 },
               )
+            if (
+              kind === 'ai_task' &&
+              body.agentContext &&
+              typeof body.agentContext === 'object' &&
+              !Array.isArray(body.agentContext) &&
+              (body.agentContext as JsonRecord).actor === 'finance_agent'
+            ) {
+              payload.statusChangedBy = 'finance_agent'
+            }
             updateFinanceRecord(kind, id, payload)
             return recordActionResponse(kind)
           }
@@ -528,6 +1017,17 @@ export const Route = createFileRoute('/api/finance')({
                 { status: 400 },
               )
             deleteFinanceRecord(kind, id)
+            return recordActionResponse(kind)
+          }
+          if (action === 'restore_record') {
+            const kind = typeof body.kind === 'string' ? body.kind : ''
+            const id = typeof body.id === 'string' ? body.id : ''
+            if (!id)
+              return json(
+                { ok: false, error: 'id is required.' },
+                { status: 400 },
+              )
+            restoreFinanceRecord(kind, id)
             return recordActionResponse(kind)
           }
           if (action === 'fetch_market_price') {
@@ -555,9 +1055,9 @@ export const Route = createFileRoute('/api/finance')({
           if (action === 'refresh_intelligence') {
             // Derives and stores research-only records from already stored
             // inputs. It never creates plans, orders, positions, or execution.
-            const symbol = binanceSymbolFromBody(body)
+            const symbol = researchSymbolFromBody(body)
             const intelligence = refreshIntelligence(symbol)
-            return json({ ...financePayload(), intelligence })
+            return json({ ok: true, intelligence })
           }
           if (action === 'record_paper_decision') {
             // Authenticated research journal only. It derives a composite from
@@ -590,7 +1090,7 @@ export const Route = createFileRoute('/api/finance')({
               idempotencyKey,
             })
             return json({
-              ...financePayload(),
+              ok: true,
               paperDecisionJournal: { ...journal, researchOnly: true },
             })
           }
@@ -844,7 +1344,9 @@ export const Route = createFileRoute('/api/finance')({
           }
           if (action === 'deactivate_live_readiness') {
             const result = deactivateLiveReadiness(
-              typeof body.reason === 'string' ? body.reason : 'manual deactivation',
+              typeof body.reason === 'string'
+                ? body.reason
+                : 'manual deactivation',
             )
             return json({ ...financePayload(), liveReadinessResult: result })
           }
@@ -873,6 +1375,93 @@ export const Route = createFileRoute('/api/finance')({
             })
             return json(financePayload())
           }
+          if (action === 'set_quiet_mode') {
+            const enabled = body.enabled === true
+            const db = readFinanceStore()
+            db.settings.quietModeEnabled = enabled
+            writeFinanceStore(db)
+            appendAuditLog('quiet_mode_updated', {
+              enabled,
+              source: 'finance_api',
+            })
+            return json(financePayload())
+          }
+          if (action === 'add_salary_history') {
+            const employerName =
+              typeof body.employerName === 'string'
+                ? body.employerName.trim()
+                : ''
+            const effectiveDate =
+              typeof body.effectiveDate === 'string' ? body.effectiveDate : ''
+            const amount =
+              typeof body.amount === 'number'
+                ? body.amount
+                : Number(body.amount)
+            const currency =
+              typeof body.currency === 'string'
+                ? body.currency.trim().toUpperCase()
+                : ''
+            if (!employerName || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Employer and a valid effective date are required.',
+                },
+                { status: 400 },
+              )
+            }
+            if (
+              !Number.isFinite(amount) ||
+              amount <= 0 ||
+              !SUPPORTED_CURRENCIES.includes(
+                currency as (typeof SUPPORTED_CURRENCIES)[number],
+              )
+            ) {
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Amount must be positive and currency must be supported.',
+                },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            const now = new Date().toISOString()
+            const settings = db.settings
+            const history = Array.isArray(settings.salaryHistory)
+              ? [...settings.salaryHistory]
+              : []
+            history.push({
+              id: randomUUID(),
+              incomeSourceId:
+                typeof body.incomeSourceId === 'string'
+                  ? body.incomeSourceId
+                  : undefined,
+              employerName,
+              effectiveDate,
+              amount,
+              currency: currency as (typeof SUPPORTED_CURRENCIES)[number],
+              reason:
+                typeof body.reason === 'string' && body.reason.trim()
+                  ? body.reason.trim().slice(0, 240)
+                  : undefined,
+              source: 'manual',
+              createdAt: now,
+              updatedAt: now,
+            })
+            settings.salaryHistory = history
+              .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))
+              .slice(0, 100)
+            writeFinanceStore(db)
+            appendAuditLog('salary_history_added', {
+              employerName,
+              effectiveDate,
+              currency,
+              source: 'finance_api',
+            })
+            return json(personalFinancePayload())
+          }
           if (action === 'set_emergency_fund_target') {
             // PF-303: user-set target, in months of average expenses. Clamped
             // to a sane range; 0 clears the target back to "not configured".
@@ -895,6 +1484,306 @@ export const Route = createFileRoute('/api/finance')({
             appendAuditLog('savings_rate_target_updated', { pct })
             return json(personalFinancePayload())
           }
+          if (action === 'set_budget_alert_threshold') {
+            const rawPct = typeof body.pct === 'number' ? body.pct : 80
+            const pct = Math.max(50, Math.min(100, Math.round(rawPct)))
+            const db = readFinanceStore()
+            db.settings.budgetAlertThresholdPct = pct
+            writeFinanceStore(db)
+            appendAuditLog('budget_alert_threshold_updated', { pct })
+            return json(personalFinancePayload())
+          }
+          if (action === 'save_budget_template') {
+            const payload =
+              body.template &&
+              typeof body.template === 'object' &&
+              !Array.isArray(body.template)
+                ? (body.template as JsonRecord)
+                : {}
+            try {
+              const db = readFinanceStore()
+              const template = saveBudgetTemplate(db, payload)
+              writeFinanceStore(db)
+              appendAuditLog('budget_template_saved', {
+                templateId: template.id,
+                name: template.name,
+              })
+              return json({
+                ...personalFinancePayload(),
+                budgetTemplateResult: { action: 'saved', template },
+              })
+            } catch (error) {
+              return json(
+                { ok: false, error: safeErrorMessage(error) },
+                { status: 400 },
+              )
+            }
+          }
+          if (action === 'delete_budget_template') {
+            const id = typeof body.id === 'string' ? body.id.trim() : ''
+            if (!id)
+              return json(
+                { ok: false, error: 'Template id is required.' },
+                { status: 400 },
+              )
+            const db = readFinanceStore()
+            const deleted = deleteBudgetTemplate(db, id)
+            if (!deleted)
+              return json(
+                { ok: false, error: 'Budget template was not found.' },
+                { status: 404 },
+              )
+            writeFinanceStore(db)
+            appendAuditLog('budget_template_deleted', { templateId: id })
+            return json({
+              ...personalFinancePayload(),
+              budgetTemplateResult: { action: 'deleted', templateId: id },
+            })
+          }
+          if (action === 'apply_budget_template') {
+            const templateId =
+              typeof body.templateId === 'string' ? body.templateId.trim() : ''
+            const month = typeof body.month === 'string' ? body.month : ''
+            if (!templateId || !month)
+              return json(
+                {
+                  ok: false,
+                  error: 'Template id and target month are required.',
+                },
+                { status: 400 },
+              )
+            try {
+              const db = readFinanceStore()
+              const result = applyBudgetTemplate(db, templateId, month)
+              writeFinanceStore(db)
+              appendAuditLog('budget_template_applied', {
+                templateId,
+                month,
+                appliedCount: result.appliedCount,
+                skippedCount: result.skippedCount,
+              })
+              return json({
+                ...personalFinancePayload(),
+                budgetTemplateResult: { action: 'applied', ...result },
+              })
+            } catch (error) {
+              return json(
+                { ok: false, error: safeErrorMessage(error) },
+                { status: 400 },
+              )
+            }
+          }
+          if (action === 'set_financial_rules') {
+            const validation = validateFinancialRules(body.rules)
+            if (!validation.ok) {
+              return json(
+                { ok: false, error: validation.errors.join(' ') },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            db.settings.financialRules = validation.rules
+            writeFinanceStore(db)
+            appendAuditLog('financial_rules_updated', {
+              rules: validation.rules,
+              source: 'finance_api',
+            })
+            return json(personalFinancePayload())
+          }
+          if (action === 'set_base_currency') {
+            const baseCurrency =
+              typeof body.baseCurrency === 'string'
+                ? body.baseCurrency.trim().toUpperCase()
+                : ''
+            if (
+              !SUPPORTED_CURRENCIES.includes(
+                baseCurrency as (typeof SUPPORTED_CURRENCIES)[number],
+              )
+            ) {
+              return json(
+                {
+                  ok: false,
+                  error: `Base currency must be one of ${SUPPORTED_CURRENCIES.join(', ')}.`,
+                },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            db.settings.baseCurrency = baseCurrency
+            writeFinanceStore(db)
+            appendAuditLog('base_currency_updated', { baseCurrency })
+            return json(personalFinancePayload())
+          }
+          if (action === 'set_proactive_insights') {
+            const enabled = body.enabled === true
+            const db = readFinanceStore()
+            db.settings.proactiveInsightsEnabled = enabled
+            writeFinanceStore(db)
+            appendAuditLog('proactive_insights_policy_updated', {
+              enabled,
+              source: 'finance_api',
+            })
+            return json(personalFinancePayload())
+          }
+          if (action === 'queue_proactive_finance_review') {
+            const schedulerAck = body.responseMode === 'scheduler_ack'
+            const db = readFinanceStore()
+            if (db.settings.proactiveInsightsEnabled !== true) {
+              return json(
+                { ok: false, error: 'Proactive finance reviews are disabled.' },
+                { status: 403 },
+              )
+            }
+            const today = new Date().toISOString().slice(0, 10)
+            const summary = financeSummary(db)
+            const storage = financeStorageStatus()
+            const duplicate = db.ai_tasks.some(
+              (task) =>
+                task.taskType === 'proactive_finance_review' &&
+                typeof task.createdAt === 'string' &&
+                task.createdAt.startsWith(today) &&
+                task.status !== 'cancelled',
+            )
+            if (duplicate) {
+              return json(
+                {
+                  ok: false,
+                  error: 'A proactive finance review is already queued today.',
+                },
+                { status: 409 },
+              )
+            }
+            addFinanceRecord('ai_task', {
+              taskType: 'proactive_finance_review',
+              title: 'Review current finance insights',
+              status: 'awaiting_approval',
+              risk: 'low',
+              requestedAction: 'review_finance_insights',
+              inputSummary: JSON.stringify({
+                asOf: today,
+                netWorthLkr: summary.netWorthLkr,
+                cashBalanceLkr: summary.cashBalanceLkr,
+                netSavingsLkr: summary.netSavingsLkr,
+                alertCount: financeStorageAlerts(storage.health).length,
+              }),
+              resultSummary:
+                'Review-only task. No financial record or trade will be changed automatically.',
+              approvalRequired: true,
+              source: 'proactive_finance_review',
+              agentName: 'finance-agent',
+            })
+            appendAuditLog('proactive_finance_review_queued', {
+              asOf: today,
+              source: 'finance_api',
+            })
+            return schedulerAck
+              ? json({
+                  ok: true,
+                  queued: true,
+                  taskType: 'proactive_finance_review',
+                  status: 'awaiting_approval',
+                  asOf: today,
+                })
+              : json(personalFinancePayload())
+          }
+          if (action === 'set_exchange_rate') {
+            const base =
+              typeof body.base === 'string'
+                ? body.base.trim().toUpperCase()
+                : ''
+            const target =
+              typeof body.target === 'string'
+                ? body.target.trim().toUpperCase()
+                : ''
+            const rate =
+              typeof body.rate === 'number' ? body.rate : Number(body.rate)
+            const date = typeof body.date === 'string' ? body.date : undefined
+            if (
+              !base ||
+              !target ||
+              base === target ||
+              !Number.isFinite(rate) ||
+              rate <= 0
+            ) {
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Base, target, and a positive exchange rate are required.',
+                },
+                { status: 400 },
+              )
+            }
+            if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+              return json(
+                { ok: false, error: 'Exchange-rate date must be YYYY-MM-DD.' },
+                { status: 400 },
+              )
+            }
+            updateExchangeRate(base, target, rate, date)
+            return json(personalFinancePayload())
+          }
+          if (action === 'refresh_exchange_rate') {
+            const base =
+              typeof body.base === 'string'
+                ? body.base.trim().toUpperCase()
+                : ''
+            const target =
+              typeof body.target === 'string'
+                ? body.target.trim().toUpperCase()
+                : ''
+            if (!base || !target || base === target) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Choose different base and target currencies.',
+                },
+                { status: 400 },
+              )
+            }
+            try {
+              const quote = await fetchFrankfurterRate(base, target)
+              updateExchangeRate(
+                quote.base,
+                quote.target,
+                quote.rate,
+                quote.date,
+                quote.source,
+                quote.observedAt,
+              )
+              return json({
+                ...personalFinancePayload(),
+                exchangeRateRefresh: quote,
+              })
+            } catch (error) {
+              return json(
+                { ok: false, error: safeErrorMessage(error) },
+                { status: 502 },
+              )
+            }
+          }
+          if (action === 'set_minimum_cash_reserve') {
+            const rawReserve =
+              typeof body.amountLkr === 'number'
+                ? body.amountLkr
+                : Number(body.amountLkr)
+            if (!Number.isFinite(rawReserve) || rawReserve < 0) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Cash reserve must be a non-negative LKR amount.',
+                },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            db.settings.minimumCashReserveLkr = Math.round(rawReserve)
+            writeFinanceStore(db)
+            appendAuditLog('minimum_cash_reserve_updated', {
+              amountLkr: db.settings.minimumCashReserveLkr,
+            })
+            return json(personalFinancePayload())
+          }
           if (action === 'set_wealth_goal') {
             // WEALTH-107: user-set long-term net worth target, with an
             // optional target date. 0 clears the target back to "not
@@ -911,6 +1800,27 @@ export const Route = createFileRoute('/api/finance')({
             db.settings.wealthGoalTargetDate = targetDate
             writeFinanceStore(db)
             appendAuditLog('wealth_goal_updated', { targetLkr, targetDate })
+            return json(personalFinancePayload())
+          }
+          if (action === 'capture_net_worth_snapshot') {
+            const snapshotDate =
+              typeof body.snapshotDate === 'string' && body.snapshotDate
+                ? body.snapshotDate
+                : new Date().toISOString().slice(0, 10)
+            const db = readFinanceStore()
+            const snapshotSource =
+              body.source === 'scheduled' ? 'scheduled' : 'manual'
+            const snapshot = captureNetWorthSnapshot(
+              db,
+              snapshotDate,
+              snapshotSource,
+            )
+            writeFinanceStore(db)
+            appendAuditLog('net_worth_snapshot_captured', {
+              id: snapshot.id,
+              snapshotDate: snapshot.snapshotDate,
+              source: snapshot.source,
+            })
             return json(personalFinancePayload())
           }
           if (action === 'ask_finance_question') {
@@ -943,7 +1853,11 @@ export const Route = createFileRoute('/api/finance')({
               )
               .slice(-3)
             const db = readFinanceStore()
-            const context = buildFinanceQueryContext(db)
+            const userMemories = await getUserFinanceMemoriesForPrompt(question)
+            const context = {
+              ...(buildFinanceQueryContext(db) as Record<string, unknown>),
+              assistantMemories: userMemories,
+            }
             const result = await answerFinanceQuestion(
               question,
               context,
@@ -963,10 +1877,238 @@ export const Route = createFileRoute('/api/finance')({
               },
             ].slice(-10)
             writeFinanceStore(db)
+            const learned = detectDurableFinancePreference(question)
+            if (learned) void proposeFinancialRule(learned)
             return json({
               ...personalFinancePayload(),
               answer: result.answer,
               chart: result.chart,
+            })
+          }
+          if (action === 'list_finance_memories') {
+            const [memories, pending] = await Promise.all([
+              listActiveFinanceMemories(),
+              listPendingFinanceCandidates(),
+            ])
+            return json({
+              ok: true,
+              harpEnabled: isHarpMemoryEnabled(),
+              memories,
+              pending,
+            })
+          }
+          if (
+            action === 'approve_finance_memory' ||
+            action === 'reject_finance_memory'
+          ) {
+            const memoryId =
+              typeof body.memoryId === 'string' ? body.memoryId.trim() : ''
+            if (!memoryId)
+              return json(
+                { ok: false, error: 'memoryId is required.' },
+                { status: 400 },
+              )
+            const result =
+              action === 'approve_finance_memory'
+                ? await approveMemory(memoryId)
+                : await rejectMemory(memoryId)
+            return json(result)
+          }
+          if (action === 'add_financial_rule') {
+            const rule = typeof body.rule === 'string' ? body.rule.trim() : ''
+            if (!rule)
+              return json(
+                { ok: false, error: 'rule is required.' },
+                { status: 400 },
+              )
+            const { submitted } = await proposeFinancialRule(rule)
+            return json({ ok: true, submitted })
+          }
+          if (action === 'set_category_rule') {
+            const vendor =
+              typeof body.vendor === 'string' ? body.vendor.trim() : ''
+            const category =
+              typeof body.category === 'string' ? body.category.trim() : ''
+            const replacesId =
+              typeof body.replacesId === 'string' ? body.replacesId.trim() : ''
+            if (!vendor || !category)
+              return json(
+                { ok: false, error: 'vendor and category are required.' },
+                { status: 400 },
+              )
+            await proposeCategoryPreference({ vendor, category })
+            if (replacesId) await flagFinanceMemory(replacesId)
+            return json({ ok: true, submitted: true })
+          }
+          if (action === 'flag_finance_memory') {
+            const memoryId =
+              typeof body.memoryId === 'string' ? body.memoryId.trim() : ''
+            if (!memoryId)
+              return json(
+                { ok: false, error: 'memoryId is required.' },
+                { status: 400 },
+              )
+            await flagFinanceMemory(memoryId)
+            return json({ ok: true })
+          }
+          if (action === 'build_finance_context') {
+            const db = readFinanceStore()
+            const context = buildFinanceAgentContext(db)
+            appendAuditLog('finance_agent_context_read', {
+              contextVersion: context.contextVersion,
+              sensitivity: context.sensitivity,
+              source: 'finance_agent_context_builder',
+            })
+            return json({ ok: true, financeAgentContext: context })
+          }
+          if (action === 'get_finance_agent_profile') {
+            return json({
+              ok: true,
+              financeAgentProfile: getFinanceManagerAgentProfile(),
+            })
+          }
+          if (action === 'list_ai_tasks') {
+            const status =
+              typeof body.status === 'string' ? body.status : undefined
+            const risk = typeof body.risk === 'string' ? body.risk : undefined
+            const agentName =
+              typeof body.agentName === 'string'
+                ? body.agentName.trim()
+                : undefined
+            const from = typeof body.from === 'string' ? body.from : undefined
+            const to = typeof body.to === 'string' ? body.to : undefined
+            const terminalOnly = body.terminalOnly === true
+            const limit =
+              typeof body.limit === 'number' && Number.isFinite(body.limit)
+                ? body.limit
+                : undefined
+            const offset =
+              typeof body.offset === 'number' && Number.isFinite(body.offset)
+                ? body.offset
+                : undefined
+            return json({
+              ok: true,
+              aiTaskPage: listFinanceAiTasks({
+                status: status as NonNullable<
+                  Parameters<typeof listFinanceAiTasks>[0]
+                >['status'],
+                risk: risk as NonNullable<
+                  Parameters<typeof listFinanceAiTasks>[0]
+                >['risk'],
+                agentName,
+                from,
+                to,
+                terminalOnly,
+                limit,
+                offset,
+              }),
+            })
+          }
+          if (action === 'export_ai_task_review') {
+            const csv = buildAiTaskReviewCsv(readFinanceStore())
+            return new Response(csv, {
+              headers: {
+                'Content-Type': 'text/csv; charset=utf-8',
+                'Content-Disposition': `attachment; filename="finance-ai-task-review-${new Date().toISOString().slice(0, 10)}.csv"`,
+                'Cache-Control': 'no-store',
+              },
+            })
+          }
+          if (action === 'finance_audit_status') {
+            return json({ ok: true, financeAudit: verifyFinanceAuditChain() })
+          }
+          if (action === 'list_finance_audit_archives') {
+            const config = defaultEncryptedBackupConfig()
+            return json({
+              ok: true,
+              financeAuditArchives: listEncryptedFinanceAuditArchives(
+                config.auditArchiveDir,
+              ),
+            })
+          }
+          if (action === 'verify_finance_audit_archive') {
+            const name = typeof body.name === 'string' ? body.name : ''
+            if (!name) {
+              return json(
+                { ok: false, error: 'Archive name is required.' },
+                { status: 400 },
+              )
+            }
+            const config = defaultEncryptedBackupConfig()
+            const verification = verifyEncryptedFinanceAuditArchive({
+              archiveDir: config.auditArchiveDir,
+              passphraseFile: config.passphraseFile,
+              name,
+            })
+            return json(
+              { ok: verification.valid, financeAuditArchive: verification },
+              { status: verification.valid ? 200 : 422 },
+            )
+          }
+          if (action === 'preview_finance_audit_prune') {
+            const retentionDays =
+              typeof body.retentionDays === 'number' &&
+              Number.isFinite(body.retentionDays)
+                ? body.retentionDays
+                : undefined
+            return json({
+              ok: true,
+              financeAuditPrune: previewFinanceAuditPrune(retentionDays),
+            })
+          }
+          if (action === 'archive_and_prune_finance_audit') {
+            if (body.confirm !== true) {
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Explicit confirmation is required before pruning audit history.',
+                },
+                { status: 400 },
+              )
+            }
+            const retentionDays =
+              typeof body.retentionDays === 'number' &&
+              Number.isFinite(body.retentionDays)
+                ? body.retentionDays
+                : undefined
+            const preview = previewFinanceAuditPrune(retentionDays)
+            if (preview.eligibleEntries === 0) {
+              return json({
+                ok: true,
+                financeAuditPrune: {
+                  ...preview,
+                  archiveCreated: false,
+                  prunedEntries: 0,
+                },
+                financeAudit: verifyFinanceAuditChain(),
+              })
+            }
+            const config = defaultEncryptedBackupConfig()
+            appendAuditLog('finance_audit_archive_requested', {
+              retentionDays: preview.retentionDays,
+              eligibleEntries: preview.eligibleEntries,
+            })
+            writeEncryptedFinanceAuditArchive({
+              archiveDir: config.auditArchiveDir,
+              passphraseFile: config.passphraseFile,
+              auditLog: readFinanceAuditLog(),
+              metadata: {
+                retentionDays: preview.retentionDays,
+                cutoff: preview.cutoff,
+                eligibleEntries: preview.eligibleEntries,
+              },
+            })
+            const result = pruneFinanceAudit(preview, true)
+            appendAuditLog('finance_audit_pruned', result)
+            return json({
+              ok: true,
+              financeAuditPrune: {
+                ...preview,
+                ...result,
+                archiveCreated: true,
+              },
+              financeAudit: verifyFinanceAuditChain(),
             })
           }
           if (action === 'set_demo_config' || action === 'set_engine_config') {
@@ -1262,8 +2404,7 @@ export const Route = createFileRoute('/api/finance')({
               maxHoldMinutes: dt.maxHoldMinutes,
               strategyGuardEnabled: dt.strategyGuardEnabled,
               strategyGuardMinClosedTrades: dt.strategyGuardMinClosedTrades,
-              strategyGuardLossRateThreshold:
-                dt.strategyGuardLossRateThreshold,
+              strategyGuardLossRateThreshold: dt.strategyGuardLossRateThreshold,
               strategyGuardMaxPnlQuote: dt.strategyGuardMaxPnlQuote,
               strategyGuardAction: dt.strategyGuardAction,
               learningPolicyAutoApplyModes: (
@@ -1564,6 +2705,12 @@ export const Route = createFileRoute('/api/finance')({
               pendingIngestions: listPendingIngestions(),
             })
           }
+          if (action === 'list_finance_documents') {
+            return json({
+              ok: true,
+              financeDocuments: listFinanceDocuments(readFinanceStore()),
+            })
+          }
           if (action === 'submit_ingestion_password') {
             const id = typeof body.id === 'string' ? body.id : ''
             const password =
@@ -1605,6 +2752,48 @@ export const Route = createFileRoute('/api/finance')({
               })
               return json({ ok: true, pendingIngestion: updated })
             }
+            if (pending.documentType === 'statement') {
+              const extraction = await extractTransactionsFromImages(
+                normalized.imagePaths,
+                getCategoryCorrections(),
+              )
+              if (!extraction.ok || extraction.data.length === 0) {
+                const updated = updatePendingIngestion(id, {
+                  status: 'awaiting_review',
+                  rawPreviewImagePath: previewImagePath,
+                  extracted: undefined,
+                  error: extraction.ok
+                    ? 'No posted transactions found.'
+                    : extraction.reason,
+                })
+                return json({ ok: true, pendingIngestion: updated })
+              }
+              const [first, ...rest] = extraction.data
+              const updated = updatePendingIngestion(id, {
+                status: 'awaiting_review',
+                rawPreviewImagePath: previewImagePath,
+                extracted: first,
+                error: undefined,
+              })
+              const additional = rest.map((extracted) =>
+                addPendingIngestion({
+                  source: pending.source,
+                  documentType: 'statement',
+                  sourceRef: pending.sourceRef,
+                  checksumSha256: pending.checksumSha256,
+                  status: 'awaiting_review',
+                  rawPreviewImagePath: previewImagePath,
+                  extracted,
+                }),
+              )
+              return json({
+                ok: true,
+                pendingIngestion: updated,
+                additionalPendingIngestionIds: additional.map(
+                  (item) => item.id,
+                ),
+              })
+            }
             const extraction = await extractTransactionFromImage(
               previewImagePath,
               getCategoryCorrections(),
@@ -1630,6 +2819,247 @@ export const Route = createFileRoute('/api/finance')({
                 { ok: false, error: 'Pending ingestion not found.' },
                 { status: 404 },
               )
+
+            if (pending.documentClass === 'salary_slip') {
+              const employerName =
+                typeof payload.employerName === 'string'
+                  ? payload.employerName.trim()
+                  : (pending.extractedSalarySlip?.employerName.trim() ?? '')
+              const paymentDate =
+                typeof payload.paymentDate === 'string'
+                  ? payload.paymentDate.trim()
+                  : (pending.extractedSalarySlip?.paymentDate?.trim() ?? '')
+              const netAmount =
+                typeof payload.netAmount === 'number'
+                  ? payload.netAmount
+                  : Number(payload.netAmount)
+              const currency =
+                typeof payload.currency === 'string' && payload.currency.trim()
+                  ? payload.currency.trim().toUpperCase()
+                  : (pending.extractedSalarySlip?.currency ?? 'LKR')
+              if (
+                !employerName ||
+                !paymentDate ||
+                !Number.isFinite(netAmount) ||
+                netAmount <= 0
+              ) {
+                return json(
+                  {
+                    ok: false,
+                    error:
+                      'Employer, payment date, and positive net pay are required.',
+                  },
+                  { status: 400 },
+                )
+              }
+              const grossAmount =
+                typeof payload.grossAmount === 'number'
+                  ? payload.grossAmount
+                  : pending.extractedSalarySlip?.grossAmount
+              const deductions =
+                typeof payload.deductions === 'number'
+                  ? payload.deductions
+                  : pending.extractedSalarySlip?.deductions
+              const payPeriod =
+                typeof payload.payPeriod === 'string'
+                  ? payload.payPeriod.trim()
+                  : pending.extractedSalarySlip?.payPeriod
+              const payrollNote = [
+                payPeriod ? `Pay period: ${payPeriod}` : '',
+                typeof grossAmount === 'number'
+                  ? `Gross: ${grossAmount} ${currency}`
+                  : '',
+                typeof deductions === 'number'
+                  ? `Deductions: ${deductions} ${currency}`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join('; ')
+              addFinanceRecord('income', {
+                sourceName: employerName,
+                incomeType: 'Salary',
+                incomeSubtype: 'salary',
+                originalCurrency: currency,
+                originalAmount: netAmount,
+                dateReceived: paymentDate,
+                notes: payrollNote || undefined,
+                documentRef: pending.sourceRef,
+                source: pending.source,
+              })
+              const updated = updatePendingIngestion(id, {
+                status: 'confirmed',
+              })
+              return json({ pendingIngestion: updated, ...financePayload() })
+            }
+
+            if (pending.documentClass === 'contract_note') {
+              const note = pending.extractedContractNote
+              const symbol =
+                typeof payload.symbol === 'string'
+                  ? payload.symbol.trim().toUpperCase()
+                  : (note?.symbol ?? '')
+              const side =
+                payload.side === 'sell' || note?.side === 'sell'
+                  ? 'sell'
+                  : 'buy'
+              const quantity =
+                typeof payload.quantity === 'number'
+                  ? payload.quantity
+                  : Number(payload.quantity ?? note?.quantity)
+              const price =
+                typeof payload.price === 'number'
+                  ? payload.price
+                  : Number(payload.price ?? note?.price)
+              if (
+                !symbol ||
+                !Number.isFinite(quantity) ||
+                quantity <= 0 ||
+                !Number.isFinite(price) ||
+                price <= 0
+              ) {
+                return json(
+                  {
+                    ok: false,
+                    error:
+                      'Symbol, positive quantity, and positive execution price are required.',
+                  },
+                  { status: 400 },
+                )
+              }
+              const currency =
+                typeof payload.currency === 'string' && payload.currency.trim()
+                  ? payload.currency.trim().toUpperCase()
+                  : (note?.currency ?? 'LKR')
+              const companyName =
+                typeof payload.companyName === 'string'
+                  ? payload.companyName.trim()
+                  : note?.companyName
+              const broker =
+                typeof payload.broker === 'string'
+                  ? payload.broker.trim()
+                  : note?.broker
+              const tradeDate =
+                typeof payload.tradeDate === 'string' &&
+                payload.tradeDate.trim()
+                  ? payload.tradeDate.trim()
+                  : (note?.tradeDate ?? new Date().toISOString().slice(0, 10))
+              const settlementDate =
+                typeof payload.settlementDate === 'string'
+                  ? payload.settlementDate.trim()
+                  : note?.settlementDate
+              const grossAmount =
+                typeof payload.grossAmount === 'number'
+                  ? payload.grossAmount
+                  : note?.grossAmount
+              const fees =
+                typeof payload.fees === 'number' ? payload.fees : note?.fees
+              const details = [
+                `${side.toUpperCase()} ${quantity} ${symbol} @ ${price} ${currency}`,
+                companyName ? `Company: ${companyName}` : '',
+                broker ? `Broker: ${broker}` : '',
+                typeof grossAmount === 'number'
+                  ? `Gross: ${grossAmount} ${currency}`
+                  : '',
+                typeof fees === 'number' ? `Fees: ${fees} ${currency}` : '',
+                settlementDate ? `Settlement: ${settlementDate}` : '',
+              ]
+                .filter(Boolean)
+                .join('; ')
+              addFinanceRecord('investment_journal', {
+                symbol,
+                entryDate: tradeDate,
+                entryType: side,
+                content: `Contract note confirmed: ${details}`,
+                source: pending.source,
+              })
+              const updated = updatePendingIngestion(id, {
+                status: 'confirmed',
+              })
+              return json({ pendingIngestion: updated, ...financePayload() })
+            }
+
+            if (pending.documentClass === 'fd_certificate') {
+              const certificate = pending.extractedFdCertificate
+              const bankName =
+                typeof payload.bankName === 'string'
+                  ? payload.bankName.trim()
+                  : (certificate?.bankName.trim() ?? '')
+              const principal =
+                typeof payload.principal === 'number'
+                  ? payload.principal
+                  : Number(payload.principal ?? certificate?.principal)
+              const interestRatePct =
+                typeof payload.interestRatePct === 'number'
+                  ? payload.interestRatePct
+                  : Number(
+                      payload.interestRatePct ?? certificate?.interestRatePct,
+                    )
+              if (
+                !bankName ||
+                !Number.isFinite(principal) ||
+                principal <= 0 ||
+                !Number.isFinite(interestRatePct) ||
+                interestRatePct < 0
+              ) {
+                return json(
+                  {
+                    ok: false,
+                    error:
+                      'Bank, positive principal, and valid interest rate are required.',
+                  },
+                  { status: 400 },
+                )
+              }
+              const currency =
+                typeof payload.currency === 'string' && payload.currency.trim()
+                  ? payload.currency.trim().toUpperCase()
+                  : (certificate?.currency ?? 'LKR')
+              const interestPayout =
+                payload.interestPayout === 'monthly' ||
+                payload.interestPayout === 'quarterly' ||
+                payload.interestPayout === 'annually' ||
+                payload.interestPayout === 'at_maturity'
+                  ? payload.interestPayout
+                  : (certificate?.interestPayout ?? 'at_maturity')
+              const startDate =
+                typeof payload.startDate === 'string' &&
+                payload.startDate.trim()
+                  ? payload.startDate.trim()
+                  : (certificate?.startDate ??
+                    new Date().toISOString().slice(0, 10))
+              const maturityDate =
+                typeof payload.maturityDate === 'string' &&
+                payload.maturityDate.trim()
+                  ? payload.maturityDate.trim()
+                  : (certificate?.maturityDate ?? startDate)
+              const autoRenew =
+                typeof payload.autoRenew === 'boolean'
+                  ? payload.autoRenew
+                  : (certificate?.autoRenew ?? false)
+              const certificateNumber =
+                typeof payload.certificateNumber === 'string'
+                  ? payload.certificateNumber.trim()
+                  : certificate?.certificateNumber
+              addFinanceRecord('fixed_deposit', {
+                bankName,
+                principal,
+                currency,
+                interestRatePct,
+                interestPayout,
+                startDate,
+                maturityDate,
+                autoRenew,
+                documentRef: pending.sourceRef,
+                notes: certificateNumber
+                  ? `Certificate: ${certificateNumber}`
+                  : undefined,
+                source: pending.source,
+              })
+              const updated = updatePendingIngestion(id, {
+                status: 'confirmed',
+              })
+              return json({ pendingIngestion: updated, ...financePayload() })
+            }
 
             if (pending.documentType === 'contract') {
               const employerName =
@@ -1856,6 +3286,9 @@ export const Route = createFileRoute('/api/finance')({
               status: 'awaiting_review',
               rawPreviewImagePath: imagePaths[0],
               extractedContract: extraction.ok ? extraction.data : undefined,
+              contractChanges: extraction.ok
+                ? detectContractChanges(job, extraction.data)
+                : undefined,
               error: extraction.ok ? undefined : extraction.reason,
             })
             return json({ ok: true, pendingIngestionId: pending.id })
@@ -1885,6 +3318,11 @@ export const Route = createFileRoute('/api/finance')({
               lastKnownPrice: priceResult.price,
               lastPriceUpdatedAt: priceResult.asOf,
               priceSource: 'cse_api',
+              lastPriceHigh: priceResult.high,
+              lastPriceLow: priceResult.low,
+              lastPriceClose: priceResult.close,
+              lastPriceVolume: priceResult.volume,
+              lastPriceTurnover: priceResult.turnover,
             })
             return json({ priceFetchFailed: false, ...financePayload() })
           }

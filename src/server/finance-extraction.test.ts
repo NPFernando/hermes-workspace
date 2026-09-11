@@ -3,8 +3,12 @@ import {
   buildFinanceAnswerPrompt,
   mimeTypeForImageExtension,
   parseContractExtractionJson,
+  parseContractNoteExtractionJson,
   parseExtractionJson,
+  parseFdCertificateExtractionJson,
   parseFinanceAnswerJson,
+  parseSalarySlipExtractionJson,
+  parseStatementExtractionJson,
   promptWithCategoryHints,
 } from './finance-extraction'
 
@@ -97,6 +101,162 @@ describe('parseExtractionJson', () => {
       expect(result.data.category).toBeUndefined()
       expect(result.data.confidence).toBe('low')
     }
+  })
+})
+
+describe('parseStatementExtractionJson', () => {
+  it('parses valid statement lines and ignores malformed rows', () => {
+    const result = parseStatementExtractionJson(
+      JSON.stringify({
+        transactions: [
+          {
+            kind: 'expense',
+            amount: 1250,
+            currency: 'LKR',
+            vendorOrSource: 'Market',
+            date: '2026-09-01',
+            category: 'Groceries',
+            confidence: 'high',
+          },
+          { kind: 'not-a-kind', amount: 2 },
+        ],
+      }),
+    )
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      ok: true,
+      data: { vendorOrSource: 'Market', amount: 1250 },
+    })
+  })
+
+  it('returns no rows for a non-statement response', () => {
+    expect(parseStatementExtractionJson('{"error":"no_transactions_found"}')).toEqual([])
+  })
+})
+
+describe('parseSalarySlipExtractionJson', () => {
+  it('preserves payroll-specific fields and normalizes currency', () => {
+    expect(
+      parseSalarySlipExtractionJson(
+        JSON.stringify({
+          employerName: 'Acme',
+          employeeName: 'Alex',
+          payPeriod: 'August 2026',
+          paymentDate: '2026-08-31',
+          grossAmount: 250000,
+          deductions: 35000,
+          netAmount: 215000,
+          currency: 'lkr',
+          confidence: 'high',
+        }),
+      ),
+    ).toEqual({
+      ok: true,
+      data: {
+        employerName: 'Acme',
+        employeeName: 'Alex',
+        payPeriod: 'August 2026',
+        paymentDate: '2026-08-31',
+        grossAmount: 250000,
+        deductions: 35000,
+        netAmount: 215000,
+        currency: 'LKR',
+        confidence: 'high',
+      },
+    })
+  })
+
+  it('rejects a missing or non-positive net amount', () => {
+    expect(
+      parseSalarySlipExtractionJson(
+        '{"employerName":"Acme","netAmount":0}',
+      ),
+    ).toEqual({ ok: false, reason: 'missing_net_amount' })
+  })
+})
+
+describe('parseContractNoteExtractionJson', () => {
+  it('parses an executed buy and normalizes symbol/currency', () => {
+    const result = parseContractNoteExtractionJson(
+      JSON.stringify({
+        symbol: ' abcd ',
+        companyName: 'Acme PLC',
+        side: 'buy',
+        quantity: 100,
+        price: 42.5,
+        grossAmount: 4250,
+        fees: 20,
+        currency: 'lkr',
+        broker: 'Broker One',
+        tradeDate: '2026-09-01',
+        settlementDate: '2026-09-03',
+        confidence: 'high',
+      }),
+    )
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        symbol: 'ABCD',
+        companyName: 'Acme PLC',
+        side: 'buy',
+        quantity: 100,
+        price: 42.5,
+        grossAmount: 4250,
+        fees: 20,
+        currency: 'LKR',
+        broker: 'Broker One',
+        tradeDate: '2026-09-01',
+        settlementDate: '2026-09-03',
+        confidence: 'high',
+      },
+    })
+  })
+
+  it('rejects a note without an executable symbol or price', () => {
+    expect(
+      parseContractNoteExtractionJson(
+        '{"symbol":"","side":"buy","quantity":1,"price":0}',
+      ),
+    ).toEqual({ ok: false, reason: 'missing_trade_quantity_or_price' })
+  })
+})
+
+describe('parseFdCertificateExtractionJson', () => {
+  it('preserves the principal and deposit terms', () => {
+    expect(
+      parseFdCertificateExtractionJson(
+        JSON.stringify({
+          bankName: 'Acme Bank',
+          certificateNumber: 'FD-42',
+          principal: 500000,
+          currency: 'lkr',
+          interestRatePct: 8.5,
+          interestPayout: 'quarterly',
+          startDate: '2026-01-01',
+          maturityDate: '2027-01-01',
+          autoRenew: false,
+          confidence: 'high',
+        }),
+      ),
+    ).toMatchObject({
+      ok: true,
+      data: {
+        bankName: 'Acme Bank',
+        principal: 500000,
+        currency: 'LKR',
+        interestRatePct: 8.5,
+        interestPayout: 'quarterly',
+        maturityDate: '2027-01-01',
+      },
+    })
+  })
+
+  it('rejects a missing principal', () => {
+    expect(
+      parseFdCertificateExtractionJson(
+        '{"bankName":"Acme Bank","principal":0,"interestRatePct":8}',
+      ),
+    ).toEqual({ ok: false, reason: 'missing_principal' })
   })
 })
 

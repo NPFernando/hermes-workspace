@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -12,6 +12,7 @@ import { buildFinanceAnswerMarkdown } from '../utils'
 import { buttonClass, wideInputClass } from '../shared-styles'
 import type { FinanceAnswerChartExport } from '../utils'
 import type { PersonalFinancePayload } from '../types'
+import { useVoiceInput } from '@/hooks/use-voice-input'
 
 function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}…` : text
@@ -24,7 +25,7 @@ function formatNumber(v: number): string {
 type AnalystChart = FinanceAnswerChartExport
 
 /**
- * Phase 24 (AI-200/201/202/203/204/207): a same-origin, authenticated-user-
+ * Phase 24 (AI-200/201/202/203/204/207/208): a same-origin, authenticated-user-
  * only question/answer exchange over the user's own finance data. AI-202
  * adds a capped (last 10, showing the last 5) recent-questions list stored
  * in FinanceSettings.financeQaHistory. AI-204 adds in-session-only
@@ -53,12 +54,31 @@ export function FinanceAnalystCard({
   const [error, setError] = useState<string | null>(null)
   const [asking, setAsking] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [speaking, setSpeaking] = useState(false)
   // AI-204: in-session-only conversation turns, separate from the persisted
   // payload.financeQaHistory audit log — resets on reload, explicitly
   // clearable via "New conversation" below.
   const [turns, setTurns] = useState<
     Array<{ question: string; answer: string }>
   >([])
+
+  // AI-208: use the browser's explicit speech-recognition permission for
+  // dictation; audio never enters the finance API, only the resulting text.
+  const voiceInput = useVoiceInput({
+    lang: 'en-US',
+    interim: true,
+    onResult: (text) => setQuestion(text),
+    onInterim: (text) => setQuestion(text),
+    onError: (message) => setError(message),
+  })
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel()
+      }
+    }
+  }, [])
 
   async function ask() {
     const asked = question.trim()
@@ -109,6 +129,22 @@ export function FinanceAnalystCard({
     setChart(null)
     setLastQuestion('')
     setError(null)
+  }
+
+  function readAnswerAloud() {
+    if (!answer || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      setError('Read aloud is not supported in this browser')
+      return
+    }
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(answer)
+    utterance.onstart = () => setSpeaking(true)
+    utterance.onend = () => setSpeaking(false)
+    utterance.onerror = () => {
+      setSpeaking(false)
+      setError('Read aloud failed')
+    }
+    window.speechSynthesis.speak(utterance)
   }
 
   const handleDownload = useCallback(() => {
@@ -164,6 +200,17 @@ export function FinanceAnalystCard({
           }}
           className={wideInputClass}
         />
+        {voiceInput.isSupported && (
+          <button
+            type="button"
+            onClick={voiceInput.toggle}
+            className={buttonClass}
+            aria-label={voiceInput.isListening ? 'Stop voice input' : 'Start voice input'}
+            title="Dictate with browser voice recognition"
+          >
+            {voiceInput.isListening ? '■ Stop' : '🎙 Dictate'}
+          </button>
+        )}
         <button
           type="button"
           disabled={asking}
@@ -183,6 +230,11 @@ export function FinanceAnalystCard({
         )}
       </div>
       {error && <p className="mt-2 text-xs text-[var(--theme-danger)]">{error}</p>}
+      {voiceInput.isListening && (
+        <p className="mt-2 text-xs text-[var(--theme-accent-secondary)]" role="status">
+          Listening… review the text, then press Ask.
+        </p>
+      )}
       {answer && (
         <p className="mt-2 text-sm text-[var(--theme-text)]">{answer}</p>
       )}
@@ -250,8 +302,19 @@ export function FinanceAnalystCard({
           >
             📄 Download .md
           </button>
+          <button
+            type="button"
+            onClick={readAnswerAloud}
+            className={buttonClass}
+            disabled={speaking}
+          >
+            {speaking ? '🔊 Reading…' : '🔊 Read aloud'}
+          </button>
         </div>
       )}
+      <p className="mt-3 text-[10px] text-[var(--theme-muted)]">
+        Voice controls use your browser’s speech features. Dictated text is shown for review before it is submitted.
+      </p>
 
       {recentHistory.length > 0 && (
         <div className="mt-4 border-t border-[var(--theme-border)]/60 pt-3">

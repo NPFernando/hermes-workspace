@@ -1,5 +1,6 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import {
   FINANCE_DATA_DIR,
@@ -155,11 +156,25 @@ function writeFinanceStorageMonitorState(
   statePath: string,
 ): void {
   fs.mkdirSync(path.dirname(statePath), { recursive: true, mode: 0o700 })
-  const tmp = `${statePath}.tmp`
-  fs.writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`, {
-    mode: 0o600,
-  })
-  fs.renameSync(tmp, statePath)
+  // A unique temporary path prevents overlapping monitor instances from
+  // clobbering each other's partial state before the atomic replacement.
+  const tmp = `${statePath}.${process.pid}.${randomUUID()}.tmp`
+  try {
+    fs.writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`, {
+      mode: 0o600,
+      flag: 'wx',
+    })
+    fs.chmodSync(tmp, 0o600)
+    fs.renameSync(tmp, statePath)
+    fs.chmodSync(statePath, 0o600)
+  } finally {
+    try {
+      fs.unlinkSync(tmp)
+    } catch {
+      // The temporary file was already renamed, or the write failed before
+      // it was created.
+    }
+  }
 }
 
 function defaultAuditLogger(

@@ -1,6 +1,9 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { ApiIcon, Chat01Icon, FlashIcon } from '@hugeicons/core-free-icons'
 import type { ReactNode } from 'react'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { safeAnalyticsDaily } from '@/screens/dashboard/lib/analytics-normalizers'
 
 function formatTokens(n: number): string {
   if (!n || n <= 0) return '0'
@@ -15,6 +18,10 @@ function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return n.toLocaleString()
+}
+
+function safeNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
 function deltaPct(current: number, previous: number): number | null {
@@ -40,6 +47,7 @@ function Spark({
   height?: number
   width?: number
 }) {
+  const gradientId = `spark-grad-${useId().replace(/:/g, '')}`
   if (values.length === 0) {
     return <div style={{ width, height }} />
   }
@@ -64,15 +72,12 @@ function Spark({
       aria-hidden
     >
       <defs>
-        <linearGradient id={`spark-grad-${tone.replace('#', '')}`} x1="0" x2="0" y1="0" y2="1">
+        <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor={tone} stopOpacity={0.35} />
           <stop offset="100%" stopColor={tone} stopOpacity={0} />
         </linearGradient>
       </defs>
-      <polygon
-        points={areaPoints}
-        fill={`url(#spark-grad-${tone.replace('#', '')})`}
-      />
+      <polygon points={areaPoints} fill={`url(#${gradientId})`} />
       <polyline
         points={points}
         stroke={tone}
@@ -92,23 +97,42 @@ type HeroTileProps = {
   delta?: number | null
   spark?: Array<number>
   tone: string
-  icon: string
+  icon: typeof Chat01Icon
 }
 
-function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps) {
+function HeroTile({
+  label,
+  value,
+  sub,
+  delta,
+  spark,
+  tone,
+  icon,
+  state,
+}: HeroTileProps & { state?: 'loading' | 'unavailable' }) {
   const deltaText = (() => {
     if (delta === null || delta === undefined) return null
     const sign = delta > 0 ? '+' : ''
-    const tone =
+    const deltaTone =
       Math.abs(delta) < 1
         ? 'var(--theme-muted)'
         : delta > 0
           ? 'var(--theme-success)'
           : 'var(--theme-warning)'
-    return { text: `${sign}${delta.toFixed(0)}%`, tone }
+    return { text: `${sign}${delta.toFixed(0)}%`, tone: deltaTone }
   })()
+  const accessibleValue = state
+    ? state === 'loading'
+      ? 'loading'
+      : 'unavailable'
+    : value
+  const accessibleDescription = [accessibleValue, sub, deltaText?.text]
+    .filter(Boolean)
+    .join(', ')
   return (
     <div
+      role="group"
+      aria-label={`${label}: ${accessibleDescription}`}
       className="relative flex flex-col gap-2 overflow-hidden rounded-xl border px-4 pb-3 pt-4"
       style={{
         background:
@@ -129,9 +153,7 @@ function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps
         style={{ background: tone }}
       />
       <div className="flex items-center justify-between">
-        <span
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]"
-        >
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-muted)]">
           {label}
         </span>
         <span
@@ -142,23 +164,34 @@ function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps
           }}
           aria-hidden
         >
-          {icon}
+          <HugeiconsIcon icon={icon} size={16} strokeWidth={1.7} />
         </span>
       </div>
       <div className="flex items-end justify-between gap-2">
         <span
-          className="font-mono text-3xl font-bold tabular-nums leading-none tracking-tight text-[var(--theme-text)]"
+          className="font-mono text-2xl font-bold tabular-nums leading-none tracking-tight text-[var(--theme-text)] sm:text-3xl"
+          aria-label={state ? `${label} ${state}` : undefined}
         >
-          {value}
+          {state === 'loading' ? '…' : state === 'unavailable' ? '—' : value}
         </span>
-        {spark ? <Spark values={spark} tone={tone} /> : null}
+        {state ? (
+          <span
+            className="size-2 rounded-full motion-safe:animate-pulse"
+            style={{ background: tone }}
+            aria-hidden
+          />
+        ) : spark ? (
+          <Spark values={spark} tone={tone} />
+        ) : null}
       </div>
       <div className="flex items-center justify-between gap-2 text-[10px]">
         {sub ? (
-          <span
-            className="truncate font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]"
-          >
-            {sub}
+          <span className="truncate font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+            {state === 'loading'
+              ? 'syncing'
+              : state === 'unavailable'
+                ? 'unavailable'
+                : sub}
           </span>
         ) : (
           <span />
@@ -166,6 +199,8 @@ function HeroTile({ label, value, sub, delta, spark, tone, icon }: HeroTileProps
         {deltaText ? (
           <span
             className="rounded px-1.5 py-0.5 font-mono uppercase tracking-[0.1em]"
+            aria-label={`${deltaText.text} versus previous period`}
+            title="Change versus the previous half of the selected window"
             style={{
               background: `color-mix(in srgb, ${deltaText.tone} 12%, transparent)`,
               color: deltaText.tone,
@@ -191,6 +226,8 @@ export function HeroMetrics({
   analytics,
   fallback,
   extraTile,
+  loading = false,
+  unavailable = false,
 }: {
   analytics: DashboardOverview['analytics']
   fallback: {
@@ -205,19 +242,20 @@ export function HeroMetrics({
    * hero row composable without coupling HeroMetrics to model data.
    */
   extraTile?: ReactNode
+  loading?: boolean
+  unavailable?: boolean
 }) {
   // Decide source: analytics is canonical when it has any usage; otherwise fall back.
   const useAnalytics = !!analytics && analytics.source === 'analytics'
 
-  const dailyTokens = useAnalytics
-    ? analytics.daily.map((d) => d.inputTokens + d.outputTokens)
-    : []
-  const dailySessions = useAnalytics
-    ? analytics.daily.map((d) => d.sessions)
-    : []
-  const dailyCalls = useAnalytics
-    ? analytics.daily.map((d) => d.apiCalls)
-    : []
+  // Analytics is an external gateway payload. Keep the KPI strip useful when
+  // a provider omits one daily series or returns a partial numeric row.
+  const daily = useAnalytics ? safeAnalyticsDaily(analytics) : []
+  const dailyTokens = daily.map(
+    (d) => safeNumber(d.inputTokens) + safeNumber(d.outputTokens),
+  )
+  const dailySessions = daily.map((d) => safeNumber(d.sessions))
+  const dailyCalls = daily.map((d) => safeNumber(d.apiCalls))
 
   // Period-over-period deltas: split daily into the latter half vs the prior half.
   const splitSum = (arr: Array<number>): [number, number] => {
@@ -232,13 +270,13 @@ export function HeroMetrics({
   const [tokCurr, tokPrev] = splitSum(dailyTokens)
 
   const tokensTotal = useAnalytics
-    ? analytics.totalTokens
+    ? safeNumber(analytics.totalTokens)
     : fallback.tokens
   const sessionsTotal = useAnalytics
-    ? analytics.totalSessions
+    ? safeNumber(analytics.totalSessions)
     : fallback.sessions
   const apiCalls = useAnalytics
-    ? analytics.totalApiCalls
+    ? safeNumber(analytics.totalApiCalls)
     : fallback.toolCalls
 
   const window = useAnalytics ? `${analytics.windowDays}d` : 'all time'
@@ -252,18 +290,18 @@ export function HeroMetrics({
         delta: useAnalytics ? deltaPct(sessCurr, sessPrev) : null,
         spark: useAnalytics ? dailySessions : undefined,
         tone: 'var(--theme-accent)',
-        icon: '💬',
+        icon: Chat01Icon,
       },
       {
         label: 'Tokens',
         value: formatTokens(tokensTotal),
         sub: useAnalytics
-          ? `${formatTokens(analytics.cacheReadTokens)} cached`
+          ? `${formatTokens(safeNumber(analytics.cacheReadTokens))} cached`
           : 'Hermes ledger',
         delta: useAnalytics ? deltaPct(tokCurr, tokPrev) : null,
         spark: useAnalytics ? dailyTokens : undefined,
         tone: 'var(--theme-accent-secondary)',
-        icon: '⚡',
+        icon: FlashIcon,
       },
       {
         label: 'API Calls',
@@ -272,9 +310,8 @@ export function HeroMetrics({
         delta: null,
         spark: useAnalytics ? dailyCalls : undefined,
         tone: 'var(--theme-success)',
-        icon: '🔧',
+        icon: ApiIcon,
       },
-
     ],
     [
       analytics,
@@ -294,9 +331,13 @@ export function HeroMetrics({
   )
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 items-start gap-2 sm:gap-3 lg:grid-cols-4">
       {tiles.map((t) => (
-        <HeroTile key={t.label} {...t} />
+        <HeroTile
+          key={t.label}
+          {...t}
+          state={loading ? 'loading' : unavailable ? 'unavailable' : undefined}
+        />
       ))}
       {extraTile}
     </div>

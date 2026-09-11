@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { formatLkr } from '../utils'
 import { numberField, stringField, toneFor } from '../field-helpers'
+import { formatGoalAmount } from './goal-amount'
 import type { PersonalFinancePayload } from '../types'
 
 /**
@@ -140,10 +140,10 @@ export function SinkingFundsPanel({
                 }
               } else {
                 const monthsUntil = Math.max(1, Math.ceil(daysUntil / 30))
-                const requiredMonthlyLkr = remaining / monthsUntil
-                const onTrack = monthlyContribution >= requiredMonthlyLkr
+                const requiredMonthly = remaining / monthsUntil
+                const onTrack = monthlyContribution >= requiredMonthly
                 scheduleLine = {
-                  text: `Needs ${formatLkr(requiredMonthlyLkr)}/mo by ${targetDate} — contributing ${formatLkr(monthlyContribution)}/mo`,
+                  text: `Needs ${formatGoalAmount(fund, requiredMonthly)}/mo by ${targetDate} — contributing ${formatGoalAmount(fund, monthlyContribution)}/mo`,
                   tone: onTrack ? 'text-[var(--theme-success)]' : 'text-[var(--theme-warning)]',
                 }
               }
@@ -173,7 +173,7 @@ export function SinkingFundsPanel({
                 />
               </div>
               <p className="mt-1 text-xs text-[var(--theme-muted)]">
-                {formatLkr(current)} / {formatLkr(target)}
+                {formatGoalAmount(fund, current)} / {formatGoalAmount(fund, target)}
               </p>
               {scheduleLine && (
                 <p className={`mt-1 text-xs ${scheduleLine.tone}`}>

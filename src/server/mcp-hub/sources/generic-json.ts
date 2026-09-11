@@ -172,18 +172,17 @@ async function readBodyWithLimit(
   let truncated = false
 
   try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (value) {
-        totalBytes += value.byteLength
-        if (totalBytes > MAX_RESPONSE_BYTES) {
-          truncated = true
-          reader.cancel().catch(() => undefined)
-          break
-        }
-        chunks.push(value)
+    let result = await reader.read()
+    while (!result.done) {
+      const value = result.value
+      totalBytes += value.byteLength
+      if (totalBytes > MAX_RESPONSE_BYTES) {
+        truncated = true
+        reader.cancel().catch(() => undefined)
+        break
       }
+      chunks.push(value)
+      result = await reader.read()
     }
   } finally {
     reader.releaseLock()

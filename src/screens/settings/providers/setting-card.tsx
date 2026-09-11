@@ -103,9 +103,6 @@ export function SettingCard(props: {
           <p className="text-sm text-[var(--theme-muted)]">
             {setting.description}
           </p>
-          {setting.path ? (
-            <p className="text-xs text-[var(--theme-muted)]">{setting.path}</p>
-          ) : null}
         </div>
 
         <div className="w-full md:max-w-[420px]">

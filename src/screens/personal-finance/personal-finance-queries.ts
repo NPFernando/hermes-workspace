@@ -1,4 +1,10 @@
-import type { PersonalFinancePayload } from './types'
+import type {
+  AssistantMemoriesResponse,
+  AssistantMemory,
+  PersonalFinancePayload,
+} from './types'
+
+export type { AssistantMemory, AssistantMemoriesResponse } from './types'
 
 /**
  * React Query keys + fetchers for the Personal Finance screen.
@@ -19,13 +25,26 @@ export const pendingIngestionCountKey = [
   'finance',
   'personal-pending-count',
 ] as const
+export const assistantMemoryKey = ['finance', 'assistant-memory'] as const
+
+export async function fetchAssistantMemories(): Promise<AssistantMemoriesResponse> {
+  const response = await fetch('/api/finance', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'list_finance_memories' }),
+  })
+  if (!response.ok) {
+    throw new Error(`Assistant memory request failed (HTTP ${response.status})`)
+  }
+  return (await response.json()) as AssistantMemoriesResponse
+}
 
 export async function fetchPersonalFinancePayload(): Promise<PersonalFinancePayload> {
   const response = await fetch('/api/finance?scope=personal_finance', {
     cache: 'no-store',
   })
   if (!response.ok) {
-    throw new Error(`Finance API returned HTTP ${response.status}`)
+    throw new Error(`Finance data request failed (HTTP ${response.status})`)
   }
   return (await response.json()) as PersonalFinancePayload
 }

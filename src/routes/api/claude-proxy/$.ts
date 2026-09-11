@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { BEARER_TOKEN, CLAUDE_API } from '../../../server/gateway-capabilities'
 import { isAuthenticated } from '../../../server/auth-middleware'
+import { getClientIp, rateLimit, rateLimitResponse } from '../../../server/rate-limit'
 
 /**
  * Vanilla hermes-agent (any version through 2026-05) does not expose
@@ -50,6 +51,11 @@ async function fallbackAvailableModels(
 }
 
 async function proxyRequest(request: Request, splat: string) {
+  const method = request.method.toUpperCase()
+  const limit = method === 'GET' || method === 'HEAD' ? 120 : 30
+  if (!rateLimit(`claude-proxy:${method}:${getClientIp(request)}`, limit, 60_000)) {
+    return rateLimitResponse()
+  }
   const incomingUrl = new URL(request.url)
   const targetPath = splat.startsWith('/') ? splat : `/${splat}`
   const targetUrl = new URL(`${CLAUDE_API}${targetPath}`)

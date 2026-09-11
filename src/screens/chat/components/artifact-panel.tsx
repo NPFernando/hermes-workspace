@@ -101,7 +101,7 @@ export function ArtifactPanel({
   onTabChange,
   onClose,
 }: ArtifactPanelProps) {
-  const artifact = artifacts[activeIndex]
+  const artifact = artifacts.at(activeIndex)
   const [showSource, setShowSource] = useState(false)
   const [copied, setCopied] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -113,6 +113,7 @@ export function ArtifactPanel({
   }, [artifact])
 
   if (!artifact) return null
+  const activeArtifact = artifact
 
   const canToggleSource =
     artifact.type === 'html' ||
@@ -132,7 +133,7 @@ export function ArtifactPanel({
   }
 
   function handleDownload() {
-    const filename = inferDownloadFilename(artifact.title, artifact.type)
+    const filename = inferDownloadFilename(activeArtifact.title, activeArtifact.type)
     const blob = new Blob([activeContent], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

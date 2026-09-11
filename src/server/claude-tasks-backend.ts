@@ -4,7 +4,10 @@ import {
   listKanbanCards,
   updateKanbanCard,
 } from './kanban-backend'
+import { normalizeTaskTitle } from './task-title'
 import type { KanbanBackendMeta } from './kanban-backend'
+
+export { normalizeTaskTitle } from './task-title'
 
 export type TaskColumn =
   | 'backlog'
@@ -154,6 +157,14 @@ export async function getClaudeTask(
 export async function createClaudeTask(
   input: CreateTaskInput,
 ): Promise<ClaudeTaskRecord> {
+  const normalizedTitle = normalizeTaskTitle(input.title)
+  if (normalizedTitle) {
+    const existing = (await listClaudeTasks()).find(
+      (task) => normalizeTaskTitle(task.title) === normalizedTitle,
+    )
+    if (existing) return existing
+  }
+
   const card = await createKanbanCard({
     title: input.title,
     spec: input.description ?? '',

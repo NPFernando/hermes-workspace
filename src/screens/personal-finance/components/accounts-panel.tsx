@@ -58,6 +58,7 @@ export function AccountsPanel({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<Record<string, EditDraft>>({})
+  const [attachingAccountId, setAttachingAccountId] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [type, setType] = useState<string>('bank')
@@ -160,6 +161,32 @@ export function AccountsPanel({
       `delete-${id}`,
     )
     if (data) setConfirmDeleteId(null)
+  }
+
+  async function attachBankDocument(id: string, file: File | undefined) {
+    if (!file) return
+    setAttachingAccountId(id)
+    setErr(null)
+    try {
+      const form = new FormData()
+      form.set('file', file)
+      form.set('documentType', 'bank_document')
+      form.set('accountId', id)
+      const response = await fetch('/api/finance-upload', {
+        method: 'POST',
+        body: form,
+      })
+      const data = (await response.json()) as { ok?: boolean; error?: string }
+      if (!response.ok || !data.ok) {
+        setErr(data.error || 'Could not attach bank document')
+        return
+      }
+      setErr('Bank document linked securely.')
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Could not attach bank document')
+    } finally {
+      setAttachingAccountId(null)
+    }
   }
 
   const accounts = payload.data.finance_accounts
@@ -484,6 +511,19 @@ export function AccountsPanel({
                     )}
                   </div>
                   <div className="flex gap-2">
+                    <label className={`${buttonClass} cursor-pointer`}>
+                      {attachingAccountId === id ? 'Linking…' : 'Attach bank document'}
+                      <input
+                        type="file"
+                        accept="application/pdf,image/*"
+                        className="sr-only"
+                        disabled={attachingAccountId !== null}
+                        onChange={(event) => {
+                          void attachBankDocument(id, event.target.files?.[0])
+                          event.currentTarget.value = ''
+                        }}
+                      />
+                    </label>
                     <button
                       type="button"
                       onClick={() => startEdit(account)}

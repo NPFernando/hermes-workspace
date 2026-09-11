@@ -28,6 +28,7 @@ import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as EchoStudioRouteImport } from './routes/echo-studio'
 import { Route as DownloadApkRouteImport } from './routes/download-apk'
+import { Route as DifyRouteImport } from './routes/dify'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as CommandRouteImport } from './routes/command'
@@ -143,11 +144,13 @@ import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
 import { Route as ApiDownloadApkRouteImport } from './routes/api/download-apk'
+import { Route as ApiDifyRouteImport } from './routes/api/dify'
 import { Route as ApiDemoTradingRebalanceRouteImport } from './routes/api/demo-trading-rebalance'
 import { Route as ApiDemoTradingLlmRouteImport } from './routes/api/demo-trading-llm'
 import { Route as ApiDemoTradingGridRouteImport } from './routes/api/demo-trading-grid'
 import { Route as ApiDemoTradingRouteImport } from './routes/api/demo-trading'
 import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
+import { Route as ApiCseMarketRouteImport } from './routes/api/cse-market'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
 import { Route as ApiConnectionStatusRouteImport } from './routes/api/connection-status'
@@ -236,6 +239,9 @@ import { Route as ApiFinanceSummaryRouteImport } from './routes/api/finance/summ
 import { Route as ApiExternalMemorySearchRouteImport } from './routes/api/external-memory/search'
 import { Route as ApiExternalMemoryProvidersRouteImport } from './routes/api/external-memory/providers'
 import { Route as ApiExternalMemoryCandidatesRouteImport } from './routes/api/external-memory/candidates'
+import { Route as ApiDifyMetricsRouteImport } from './routes/api/dify/metrics'
+import { Route as ApiDifyHistoryRouteImport } from './routes/api/dify/history'
+import { Route as ApiDifyAppsRouteImport } from './routes/api/dify/apps'
 import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
 import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
@@ -252,6 +258,12 @@ import { Route as ApiFinanceReportExpenseRouteImport } from './routes/api/financ
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth.google.callback'
 import { Route as ApiWorkspaceSkillsSkillIdContentRouteImport } from './routes/api/workspace/skills.$skillId.content'
 import { Route as ApiRunsSessionKeyRunIdAbandonRouteImport } from './routes/api/runs/$sessionKey.$runId.abandon'
+import { Route as ApiDifyAppsAppIdStopRouteImport } from './routes/api/dify/apps.$appId.stop'
+import { Route as ApiDifyAppsAppIdRunRouteImport } from './routes/api/dify/apps.$appId.run'
+import { Route as ApiDifyAppsAppIdParametersRouteImport } from './routes/api/dify/apps.$appId.parameters'
+import { Route as ApiDifyAppsAppIdInfoRouteImport } from './routes/api/dify/apps.$appId.info'
+import { Route as ApiDifyAppsAppIdFilesRouteImport } from './routes/api/dify/apps.$appId.files'
+import { Route as ApiDifyRunsAppIdRunIdEventsRouteImport } from './routes/api/dify/runs.$appId.$runId.events'
 
 const TradingRoute = TradingRouteImport.update({
   id: '/trading',
@@ -346,6 +358,11 @@ const EchoStudioRoute = EchoStudioRouteImport.update({
 const DownloadApkRoute = DownloadApkRouteImport.update({
   id: '/download-apk',
   path: '/download-apk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DifyRoute = DifyRouteImport.update({
+  id: '/dify',
+  path: '/dify',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -924,6 +941,11 @@ const ApiDownloadApkRoute = ApiDownloadApkRouteImport.update({
   path: '/api/download-apk',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDifyRoute = ApiDifyRouteImport.update({
+  id: '/api/dify',
+  path: '/api/dify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDemoTradingRebalanceRoute = ApiDemoTradingRebalanceRouteImport.update({
   id: '/api/demo-trading-rebalance',
   path: '/api/demo-trading-rebalance',
@@ -947,6 +969,11 @@ const ApiDemoTradingRoute = ApiDemoTradingRouteImport.update({
 const ApiDebugAnalyzeRoute = ApiDebugAnalyzeRouteImport.update({
   id: '/api/debug-analyze',
   path: '/api/debug-analyze',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCseMarketRoute = ApiCseMarketRouteImport.update({
+  id: '/api/cse-market',
+  path: '/api/cse-market',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCrewStatusRoute = ApiCrewStatusRouteImport.update({
@@ -1393,6 +1420,21 @@ const ApiExternalMemoryCandidatesRoute =
     path: '/api/external-memory/candidates',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiDifyMetricsRoute = ApiDifyMetricsRouteImport.update({
+  id: '/metrics',
+  path: '/metrics',
+  getParentRoute: () => ApiDifyRoute,
+} as any)
+const ApiDifyHistoryRoute = ApiDifyHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => ApiDifyRoute,
+} as any)
+const ApiDifyAppsRoute = ApiDifyAppsRouteImport.update({
+  id: '/apps',
+  path: '/apps',
+  getParentRoute: () => ApiDifyRoute,
+} as any)
 const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
   id: '/api/dashboard/overview',
   path: '/api/dashboard/overview',
@@ -1477,6 +1519,38 @@ const ApiRunsSessionKeyRunIdAbandonRoute =
     path: '/api/runs/$sessionKey/$runId/abandon',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiDifyAppsAppIdStopRoute = ApiDifyAppsAppIdStopRouteImport.update({
+  id: '/$appId/stop',
+  path: '/$appId/stop',
+  getParentRoute: () => ApiDifyAppsRoute,
+} as any)
+const ApiDifyAppsAppIdRunRoute = ApiDifyAppsAppIdRunRouteImport.update({
+  id: '/$appId/run',
+  path: '/$appId/run',
+  getParentRoute: () => ApiDifyAppsRoute,
+} as any)
+const ApiDifyAppsAppIdParametersRoute =
+  ApiDifyAppsAppIdParametersRouteImport.update({
+    id: '/$appId/parameters',
+    path: '/$appId/parameters',
+    getParentRoute: () => ApiDifyAppsRoute,
+  } as any)
+const ApiDifyAppsAppIdInfoRoute = ApiDifyAppsAppIdInfoRouteImport.update({
+  id: '/$appId/info',
+  path: '/$appId/info',
+  getParentRoute: () => ApiDifyAppsRoute,
+} as any)
+const ApiDifyAppsAppIdFilesRoute = ApiDifyAppsAppIdFilesRouteImport.update({
+  id: '/$appId/files',
+  path: '/$appId/files',
+  getParentRoute: () => ApiDifyAppsRoute,
+} as any)
+const ApiDifyRunsAppIdRunIdEventsRoute =
+  ApiDifyRunsAppIdRunIdEventsRouteImport.update({
+    id: '/runs/$appId/$runId/events',
+    path: '/runs/$appId/$runId/events',
+    getParentRoute: () => ApiDifyRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1486,6 +1560,7 @@ export interface FileRoutesByFullPath {
   '/command': typeof CommandRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/dify': typeof DifyRoute
   '/download-apk': typeof DownloadApkRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
@@ -1529,11 +1604,13 @@ export interface FileRoutesByFullPath {
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/cse-market': typeof ApiCseMarketRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/demo-trading': typeof ApiDemoTradingRoute
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
   '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
   '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
+  '/api/dify': typeof ApiDifyRouteWithChildren
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
@@ -1649,6 +1726,9 @@ export interface FileRoutesByFullPath {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/dify/apps': typeof ApiDifyAppsRouteWithChildren
+  '/api/dify/history': typeof ApiDifyHistoryRoute
+  '/api/dify/metrics': typeof ApiDifyMetricsRoute
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -1720,8 +1800,14 @@ export interface FileRoutesByFullPath {
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/dify/apps/$appId/files': typeof ApiDifyAppsAppIdFilesRoute
+  '/api/dify/apps/$appId/info': typeof ApiDifyAppsAppIdInfoRoute
+  '/api/dify/apps/$appId/parameters': typeof ApiDifyAppsAppIdParametersRoute
+  '/api/dify/apps/$appId/run': typeof ApiDifyAppsAppIdRunRoute
+  '/api/dify/apps/$appId/stop': typeof ApiDifyAppsAppIdStopRoute
   '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
   '/api/workspace/skills/$skillId/content': typeof ApiWorkspaceSkillsSkillIdContentRoute
+  '/api/dify/runs/$appId/$runId/events': typeof ApiDifyRunsAppIdRunIdEventsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1731,6 +1817,7 @@ export interface FileRoutesByTo {
   '/command': typeof CommandRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/dify': typeof DifyRoute
   '/download-apk': typeof DownloadApkRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
@@ -1773,11 +1860,13 @@ export interface FileRoutesByTo {
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/cse-market': typeof ApiCseMarketRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/demo-trading': typeof ApiDemoTradingRoute
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
   '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
   '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
+  '/api/dify': typeof ApiDifyRouteWithChildren
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
@@ -1893,6 +1982,9 @@ export interface FileRoutesByTo {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/dify/apps': typeof ApiDifyAppsRouteWithChildren
+  '/api/dify/history': typeof ApiDifyHistoryRoute
+  '/api/dify/metrics': typeof ApiDifyMetricsRoute
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -1964,8 +2056,14 @@ export interface FileRoutesByTo {
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/dify/apps/$appId/files': typeof ApiDifyAppsAppIdFilesRoute
+  '/api/dify/apps/$appId/info': typeof ApiDifyAppsAppIdInfoRoute
+  '/api/dify/apps/$appId/parameters': typeof ApiDifyAppsAppIdParametersRoute
+  '/api/dify/apps/$appId/run': typeof ApiDifyAppsAppIdRunRoute
+  '/api/dify/apps/$appId/stop': typeof ApiDifyAppsAppIdStopRoute
   '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
   '/api/workspace/skills/$skillId/content': typeof ApiWorkspaceSkillsSkillIdContentRoute
+  '/api/dify/runs/$appId/$runId/events': typeof ApiDifyRunsAppIdRunIdEventsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1976,6 +2074,7 @@ export interface FileRoutesById {
   '/command': typeof CommandRoute
   '/conductor': typeof ConductorRoute
   '/dashboard': typeof DashboardRoute
+  '/dify': typeof DifyRoute
   '/download-apk': typeof DownloadApkRoute
   '/echo-studio': typeof EchoStudioRoute
   '/files': typeof FilesRoute
@@ -2019,11 +2118,13 @@ export interface FileRoutesById {
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/cse-market': typeof ApiCseMarketRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/demo-trading': typeof ApiDemoTradingRoute
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
   '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
   '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
+  '/api/dify': typeof ApiDifyRouteWithChildren
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
@@ -2139,6 +2240,9 @@ export interface FileRoutesById {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/dify/apps': typeof ApiDifyAppsRouteWithChildren
+  '/api/dify/history': typeof ApiDifyHistoryRoute
+  '/api/dify/metrics': typeof ApiDifyMetricsRoute
   '/api/external-memory/candidates': typeof ApiExternalMemoryCandidatesRoute
   '/api/external-memory/providers': typeof ApiExternalMemoryProvidersRoute
   '/api/external-memory/search': typeof ApiExternalMemorySearchRoute
@@ -2210,8 +2314,14 @@ export interface FileRoutesById {
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/dify/apps/$appId/files': typeof ApiDifyAppsAppIdFilesRoute
+  '/api/dify/apps/$appId/info': typeof ApiDifyAppsAppIdInfoRoute
+  '/api/dify/apps/$appId/parameters': typeof ApiDifyAppsAppIdParametersRoute
+  '/api/dify/apps/$appId/run': typeof ApiDifyAppsAppIdRunRoute
+  '/api/dify/apps/$appId/stop': typeof ApiDifyAppsAppIdStopRoute
   '/api/runs/$sessionKey/$runId/abandon': typeof ApiRunsSessionKeyRunIdAbandonRoute
   '/api/workspace/skills/$skillId/content': typeof ApiWorkspaceSkillsSkillIdContentRoute
+  '/api/dify/runs/$appId/$runId/events': typeof ApiDifyRunsAppIdRunIdEventsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -2223,6 +2333,7 @@ export interface FileRouteTypes {
     | '/command'
     | '/conductor'
     | '/dashboard'
+    | '/dify'
     | '/download-apk'
     | '/echo-studio'
     | '/files'
@@ -2266,11 +2377,13 @@ export interface FileRouteTypes {
     | '/api/connection-status'
     | '/api/context-usage'
     | '/api/crew-status'
+    | '/api/cse-market'
     | '/api/debug-analyze'
     | '/api/demo-trading'
     | '/api/demo-trading-grid'
     | '/api/demo-trading-llm'
     | '/api/demo-trading-rebalance'
+    | '/api/dify'
     | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
@@ -2386,6 +2499,9 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/dify/apps'
+    | '/api/dify/history'
+    | '/api/dify/metrics'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -2457,8 +2573,14 @@ export interface FileRouteTypes {
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/dify/apps/$appId/files'
+    | '/api/dify/apps/$appId/info'
+    | '/api/dify/apps/$appId/parameters'
+    | '/api/dify/apps/$appId/run'
+    | '/api/dify/apps/$appId/stop'
     | '/api/runs/$sessionKey/$runId/abandon'
     | '/api/workspace/skills/$skillId/content'
+    | '/api/dify/runs/$appId/$runId/events'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -2468,6 +2590,7 @@ export interface FileRouteTypes {
     | '/command'
     | '/conductor'
     | '/dashboard'
+    | '/dify'
     | '/download-apk'
     | '/echo-studio'
     | '/files'
@@ -2510,11 +2633,13 @@ export interface FileRouteTypes {
     | '/api/connection-status'
     | '/api/context-usage'
     | '/api/crew-status'
+    | '/api/cse-market'
     | '/api/debug-analyze'
     | '/api/demo-trading'
     | '/api/demo-trading-grid'
     | '/api/demo-trading-llm'
     | '/api/demo-trading-rebalance'
+    | '/api/dify'
     | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
@@ -2630,6 +2755,9 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/dify/apps'
+    | '/api/dify/history'
+    | '/api/dify/metrics'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -2701,8 +2829,14 @@ export interface FileRouteTypes {
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/dify/apps/$appId/files'
+    | '/api/dify/apps/$appId/info'
+    | '/api/dify/apps/$appId/parameters'
+    | '/api/dify/apps/$appId/run'
+    | '/api/dify/apps/$appId/stop'
     | '/api/runs/$sessionKey/$runId/abandon'
     | '/api/workspace/skills/$skillId/content'
+    | '/api/dify/runs/$appId/$runId/events'
   id:
     | '__root__'
     | '/'
@@ -2712,6 +2846,7 @@ export interface FileRouteTypes {
     | '/command'
     | '/conductor'
     | '/dashboard'
+    | '/dify'
     | '/download-apk'
     | '/echo-studio'
     | '/files'
@@ -2755,11 +2890,13 @@ export interface FileRouteTypes {
     | '/api/connection-status'
     | '/api/context-usage'
     | '/api/crew-status'
+    | '/api/cse-market'
     | '/api/debug-analyze'
     | '/api/demo-trading'
     | '/api/demo-trading-grid'
     | '/api/demo-trading-llm'
     | '/api/demo-trading-rebalance'
+    | '/api/dify'
     | '/api/download-apk'
     | '/api/env-reset'
     | '/api/events'
@@ -2875,6 +3012,9 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/dify/apps'
+    | '/api/dify/history'
+    | '/api/dify/metrics'
     | '/api/external-memory/candidates'
     | '/api/external-memory/providers'
     | '/api/external-memory/search'
@@ -2946,8 +3086,14 @@ export interface FileRouteTypes {
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/dify/apps/$appId/files'
+    | '/api/dify/apps/$appId/info'
+    | '/api/dify/apps/$appId/parameters'
+    | '/api/dify/apps/$appId/run'
+    | '/api/dify/apps/$appId/stop'
     | '/api/runs/$sessionKey/$runId/abandon'
     | '/api/workspace/skills/$skillId/content'
+    | '/api/dify/runs/$appId/$runId/events'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2958,6 +3104,7 @@ export interface RootRouteChildren {
   CommandRoute: typeof CommandRoute
   ConductorRoute: typeof ConductorRoute
   DashboardRoute: typeof DashboardRoute
+  DifyRoute: typeof DifyRoute
   DownloadApkRoute: typeof DownloadApkRoute
   EchoStudioRoute: typeof EchoStudioRoute
   FilesRoute: typeof FilesRoute
@@ -3001,11 +3148,13 @@ export interface RootRouteChildren {
   ApiConnectionStatusRoute: typeof ApiConnectionStatusRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
+  ApiCseMarketRoute: typeof ApiCseMarketRoute
   ApiDebugAnalyzeRoute: typeof ApiDebugAnalyzeRoute
   ApiDemoTradingRoute: typeof ApiDemoTradingRoute
   ApiDemoTradingGridRoute: typeof ApiDemoTradingGridRoute
   ApiDemoTradingLlmRoute: typeof ApiDemoTradingLlmRoute
   ApiDemoTradingRebalanceRoute: typeof ApiDemoTradingRebalanceRoute
+  ApiDifyRoute: typeof ApiDifyRouteWithChildren
   ApiDownloadApkRoute: typeof ApiDownloadApkRoute
   ApiEnvResetRoute: typeof ApiEnvResetRoute
   ApiEventsRoute: typeof ApiEventsRoute
@@ -3289,6 +3438,13 @@ declare module '@tanstack/react-router' {
       path: '/download-apk'
       fullPath: '/download-apk'
       preLoaderRoute: typeof DownloadApkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dify': {
+      id: '/dify'
+      path: '/dify'
+      fullPath: '/dify'
+      preLoaderRoute: typeof DifyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -4096,6 +4252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDownloadApkRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dify': {
+      id: '/api/dify'
+      path: '/api/dify'
+      fullPath: '/api/dify'
+      preLoaderRoute: typeof ApiDifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/demo-trading-rebalance': {
       id: '/api/demo-trading-rebalance'
       path: '/api/demo-trading-rebalance'
@@ -4129,6 +4292,13 @@ declare module '@tanstack/react-router' {
       path: '/api/debug-analyze'
       fullPath: '/api/debug-analyze'
       preLoaderRoute: typeof ApiDebugAnalyzeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cse-market': {
+      id: '/api/cse-market'
+      path: '/api/cse-market'
+      fullPath: '/api/cse-market'
+      preLoaderRoute: typeof ApiCseMarketRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/crew-status': {
@@ -4747,6 +4917,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiExternalMemoryCandidatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dify/metrics': {
+      id: '/api/dify/metrics'
+      path: '/metrics'
+      fullPath: '/api/dify/metrics'
+      preLoaderRoute: typeof ApiDifyMetricsRouteImport
+      parentRoute: typeof ApiDifyRoute
+    }
+    '/api/dify/history': {
+      id: '/api/dify/history'
+      path: '/history'
+      fullPath: '/api/dify/history'
+      preLoaderRoute: typeof ApiDifyHistoryRouteImport
+      parentRoute: typeof ApiDifyRoute
+    }
+    '/api/dify/apps': {
+      id: '/api/dify/apps'
+      path: '/apps'
+      fullPath: '/api/dify/apps'
+      preLoaderRoute: typeof ApiDifyAppsRouteImport
+      parentRoute: typeof ApiDifyRoute
+    }
     '/api/dashboard/overview': {
       id: '/api/dashboard/overview'
       path: '/api/dashboard/overview'
@@ -4859,6 +5050,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiRunsSessionKeyRunIdAbandonRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dify/apps/$appId/stop': {
+      id: '/api/dify/apps/$appId/stop'
+      path: '/$appId/stop'
+      fullPath: '/api/dify/apps/$appId/stop'
+      preLoaderRoute: typeof ApiDifyAppsAppIdStopRouteImport
+      parentRoute: typeof ApiDifyAppsRoute
+    }
+    '/api/dify/apps/$appId/run': {
+      id: '/api/dify/apps/$appId/run'
+      path: '/$appId/run'
+      fullPath: '/api/dify/apps/$appId/run'
+      preLoaderRoute: typeof ApiDifyAppsAppIdRunRouteImport
+      parentRoute: typeof ApiDifyAppsRoute
+    }
+    '/api/dify/apps/$appId/parameters': {
+      id: '/api/dify/apps/$appId/parameters'
+      path: '/$appId/parameters'
+      fullPath: '/api/dify/apps/$appId/parameters'
+      preLoaderRoute: typeof ApiDifyAppsAppIdParametersRouteImport
+      parentRoute: typeof ApiDifyAppsRoute
+    }
+    '/api/dify/apps/$appId/info': {
+      id: '/api/dify/apps/$appId/info'
+      path: '/$appId/info'
+      fullPath: '/api/dify/apps/$appId/info'
+      preLoaderRoute: typeof ApiDifyAppsAppIdInfoRouteImport
+      parentRoute: typeof ApiDifyAppsRoute
+    }
+    '/api/dify/apps/$appId/files': {
+      id: '/api/dify/apps/$appId/files'
+      path: '/$appId/files'
+      fullPath: '/api/dify/apps/$appId/files'
+      preLoaderRoute: typeof ApiDifyAppsAppIdFilesRouteImport
+      parentRoute: typeof ApiDifyAppsRoute
+    }
+    '/api/dify/runs/$appId/$runId/events': {
+      id: '/api/dify/runs/$appId/$runId/events'
+      path: '/runs/$appId/$runId/events'
+      fullPath: '/api/dify/runs/$appId/$runId/events'
+      preLoaderRoute: typeof ApiDifyRunsAppIdRunIdEventsRouteImport
+      parentRoute: typeof ApiDifyRoute
+    }
   }
 }
 
@@ -4936,6 +5169,43 @@ const ApiClaudeTasksRouteChildren: ApiClaudeTasksRouteChildren = {
 const ApiClaudeTasksRouteWithChildren = ApiClaudeTasksRoute._addFileChildren(
   ApiClaudeTasksRouteChildren,
 )
+
+interface ApiDifyAppsRouteChildren {
+  ApiDifyAppsAppIdFilesRoute: typeof ApiDifyAppsAppIdFilesRoute
+  ApiDifyAppsAppIdInfoRoute: typeof ApiDifyAppsAppIdInfoRoute
+  ApiDifyAppsAppIdParametersRoute: typeof ApiDifyAppsAppIdParametersRoute
+  ApiDifyAppsAppIdRunRoute: typeof ApiDifyAppsAppIdRunRoute
+  ApiDifyAppsAppIdStopRoute: typeof ApiDifyAppsAppIdStopRoute
+}
+
+const ApiDifyAppsRouteChildren: ApiDifyAppsRouteChildren = {
+  ApiDifyAppsAppIdFilesRoute: ApiDifyAppsAppIdFilesRoute,
+  ApiDifyAppsAppIdInfoRoute: ApiDifyAppsAppIdInfoRoute,
+  ApiDifyAppsAppIdParametersRoute: ApiDifyAppsAppIdParametersRoute,
+  ApiDifyAppsAppIdRunRoute: ApiDifyAppsAppIdRunRoute,
+  ApiDifyAppsAppIdStopRoute: ApiDifyAppsAppIdStopRoute,
+}
+
+const ApiDifyAppsRouteWithChildren = ApiDifyAppsRoute._addFileChildren(
+  ApiDifyAppsRouteChildren,
+)
+
+interface ApiDifyRouteChildren {
+  ApiDifyAppsRoute: typeof ApiDifyAppsRouteWithChildren
+  ApiDifyHistoryRoute: typeof ApiDifyHistoryRoute
+  ApiDifyMetricsRoute: typeof ApiDifyMetricsRoute
+  ApiDifyRunsAppIdRunIdEventsRoute: typeof ApiDifyRunsAppIdRunIdEventsRoute
+}
+
+const ApiDifyRouteChildren: ApiDifyRouteChildren = {
+  ApiDifyAppsRoute: ApiDifyAppsRouteWithChildren,
+  ApiDifyHistoryRoute: ApiDifyHistoryRoute,
+  ApiDifyMetricsRoute: ApiDifyMetricsRoute,
+  ApiDifyRunsAppIdRunIdEventsRoute: ApiDifyRunsAppIdRunIdEventsRoute,
+}
+
+const ApiDifyRouteWithChildren =
+  ApiDifyRoute._addFileChildren(ApiDifyRouteChildren)
 
 interface ApiFinanceRouteChildren {
   ApiFinanceSummaryRoute: typeof ApiFinanceSummaryRoute
@@ -5126,6 +5396,7 @@ const rootRouteChildren: RootRouteChildren = {
   CommandRoute: CommandRoute,
   ConductorRoute: ConductorRoute,
   DashboardRoute: DashboardRoute,
+  DifyRoute: DifyRoute,
   DownloadApkRoute: DownloadApkRoute,
   EchoStudioRoute: EchoStudioRoute,
   FilesRoute: FilesRoute,
@@ -5169,11 +5440,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiConnectionStatusRoute: ApiConnectionStatusRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiCrewStatusRoute: ApiCrewStatusRoute,
+  ApiCseMarketRoute: ApiCseMarketRoute,
   ApiDebugAnalyzeRoute: ApiDebugAnalyzeRoute,
   ApiDemoTradingRoute: ApiDemoTradingRoute,
   ApiDemoTradingGridRoute: ApiDemoTradingGridRoute,
   ApiDemoTradingLlmRoute: ApiDemoTradingLlmRoute,
   ApiDemoTradingRebalanceRoute: ApiDemoTradingRebalanceRoute,
+  ApiDifyRoute: ApiDifyRouteWithChildren,
   ApiDownloadApkRoute: ApiDownloadApkRoute,
   ApiEnvResetRoute: ApiEnvResetRoute,
   ApiEventsRoute: ApiEventsRoute,

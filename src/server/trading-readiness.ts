@@ -389,10 +389,7 @@ function exposureCapsGate(db: FinanceDatabase): ReadinessGate {
 }
 
 function patientHoldIsolationGate(): ReadinessGate {
-  const history = getFullEngineHistory() ?? {
-    positions: [],
-    archivedPositions: [],
-  }
+  const history = getFullEngineHistory()
   const positions = Array.isArray(history.positions) ? history.positions : []
   const archived = Array.isArray(history.archivedPositions)
     ? history.archivedPositions

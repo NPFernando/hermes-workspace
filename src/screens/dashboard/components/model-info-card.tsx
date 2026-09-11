@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { CancelIcon } from '@hugeicons/core-free-icons'
+import { ArrowRight01Icon, CancelIcon } from '@hugeicons/core-free-icons'
+import { DashboardDialog } from './dashboard-dialog'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import {
+  safeAnalyticsModels,
+  safeNumber,
+} from '@/screens/dashboard/lib/analytics-normalizers'
 import { formatModelName } from '@/screens/dashboard/lib/formatters'
 
 function formatContext(n: number): string {
@@ -58,19 +63,21 @@ export function ModelInfoCard({
   const supportsReasoning = readBoolCap(caps, 'supports_reasoning')
   const family =
     caps && typeof caps['model_family'] === 'string'
-      ? (caps['model_family'])
+      ? caps['model_family']
       : null
 
   // Operational line: share of API calls served by this model in the
   // active analytics window. If no analytics, fall back to capability
   // summary so the card never looks half-empty.
   const opsLine = useMemo(() => {
-    if (modelInfo && analytics && analytics.totalApiCalls > 0) {
-      const match = analytics.topModels.find(
+    if (modelInfo && analytics && safeNumber(analytics.totalApiCalls) > 0) {
+      const match = safeAnalyticsModels(analytics).find(
         (m) => m.id === modelInfo.model,
       )
       if (match) {
-        const pct = Math.round((match.calls / analytics.totalApiCalls) * 100)
+        const pct = Math.round(
+          (safeNumber(match.calls) / safeNumber(analytics.totalApiCalls)) * 100,
+        )
         return `${pct}% of calls · ${match.sessions.toLocaleString()} sessions · ${analytics.windowDays}d`
       }
     }
@@ -85,9 +92,7 @@ export function ModelInfoCard({
 
   return (
     <>
-      <div
-        className="relative flex h-full flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
-      >
+      <div className="relative flex h-full flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
@@ -98,12 +103,12 @@ export function ModelInfoCard({
           }}
         />
         <div className="flex items-center justify-between px-4 pt-3">
-          <h3
+          <h2
             className="text-[10px] font-semibold uppercase tracking-[0.18em]"
             style={{ color: palette.muted }}
           >
             Active Model
-          </h3>
+          </h2>
           <span
             className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold"
             style={{
@@ -164,28 +169,25 @@ export function ModelInfoCard({
               <CapabilityChip label="tools" value="✓" tone={palette.success} />
             ) : null}
             {supportsVision ? (
-              <CapabilityChip
-                label="vision"
-                value="✓"
-                tone={palette.success}
-              />
+              <CapabilityChip label="vision" value="✓" tone={palette.success} />
             ) : null}
             {supportsReasoning ? (
-              <CapabilityChip
-                label="reason"
-                value="✓"
-                tone={palette.success}
-              />
+              <CapabilityChip label="reason" value="✓" tone={palette.success} />
             ) : null}
           </div>
 
           <button
             type="button"
             onClick={() => setShowInventory(true)}
-            className="mt-1 self-start rounded border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
+            className="mt-1 inline-flex items-center gap-1 self-start rounded border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] motion-safe:transition-colors hover:bg-[var(--theme-card)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)]"
             style={{ color: palette.muted }}
           >
-            Inventory →
+            <span>Inventory</span>
+            <HugeiconsIcon
+              icon={ArrowRight01Icon}
+              size={12}
+              strokeWidth={1.8}
+            />
           </button>
         </div>
       </div>
@@ -210,9 +212,7 @@ function CapabilityChip({
   tone: string
 }) {
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-    >
+    <span className="inline-flex items-center gap-1 rounded border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
       <span>{label}</span>
       <span style={{ color: tone }}>{value}</span>
     </span>
@@ -236,18 +236,24 @@ function ModelInventoryModal({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
+  const [reloadToken, setReloadToken] = useState(0)
+  const titleId = useId()
 
   useEffect(() => {
+    const controller = new AbortController()
     let cancelled = false
+    const isCancelled = () => cancelled
+    const timeout = globalThis.setTimeout(() => controller.abort(), 5_000)
+    setLoading(true)
+    setError(null)
     ;(async () => {
       try {
-        const res = await fetch('/api/models')
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const res = await fetch('/api/models', { signal: controller.signal })
+        if (!res.ok) throw new Error('The model inventory could not be loaded.')
         const data = await res.json()
         const list = (data?.data ?? data?.models ?? []) as Array<
           Record<string, unknown>
         >
-        if (cancelled) return
         setModels(
           list
             .map((m) => ({
@@ -258,17 +264,24 @@ function ModelInventoryModal({
             .filter((m) => m.id),
         )
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'failed to load')
-        }
+        if (isCancelled()) return
+        setError(
+          err instanceof DOMException && err.name === 'AbortError'
+            ? 'Loading models timed out. Check the connection and retry.'
+            : err instanceof Error && err.message.startsWith('The model')
+              ? err.message
+              : 'The model inventory is temporarily unavailable. Retry to load it.',
+        )
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!isCancelled()) setLoading(false)
       }
     })()
     return () => {
       cancelled = true
+      globalThis.clearTimeout(timeout)
+      controller.abort()
     }
-  }, [])
+  }, [reloadToken])
 
   const grouped = useMemo(() => {
     const map = new Map<string, Array<InventoryModel>>()
@@ -289,133 +302,133 @@ function ModelInventoryModal({
   }, [filter, models])
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
+    <DashboardDialog
+      titleId={titleId}
+      onClose={onClose}
+      className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
     >
-      <div
-        className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border bg-[var(--theme-card)] border-[var(--theme-border)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          className="flex items-center justify-between gap-3 border-b px-4 py-3 border-[var(--theme-border)]"
-        >
-          <div>
-            <h2
-              className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-            >
-              Model inventory
-            </h2>
-            <p
-              className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-            >
-              {models.length} models from {grouped.length || '—'} providers
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="search"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="filter…"
-              className="rounded border border-[var(--theme-border)] bg-transparent px-2 py-1 font-mono text-[11px] text-[var(--theme-text)]"
-            />
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="rounded p-1 hover:bg-[var(--theme-card)]/80"
-            >
-              <HugeiconsIcon
-                icon={CancelIcon}
-                size={16}
-                strokeWidth={1.5}
-                className="text-[var(--theme-muted)]"
-              />
-            </button>
-          </div>
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-3 border-[var(--theme-border)]">
+        <div>
+          <h2
+            id={titleId}
+            className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
+          >
+            Model inventory
+          </h2>
+          <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
+            {models.length} models from {grouped.length || '—'} providers
+          </p>
         </div>
-
-        <div className="flex-1 overflow-y-auto p-4">
-          {loading ? (
-            <div
-              className="py-8 text-center text-[11px] text-[var(--theme-muted)]"
-            >
-              Loading models…
-            </div>
-          ) : error ? (
-            <div
-              className="py-8 text-center text-[11px] text-[var(--theme-danger,#ef4444)]"
-            >
-              {error}
-            </div>
-          ) : grouped.length === 0 ? (
-            <div
-              className="py-8 text-center text-[11px] text-[var(--theme-muted)]"
-            >
-              No matching models.
-            </div>
-          ) : (
-            grouped.map(([provider, list]) => (
-              <div key={provider} className="mb-4">
-                <h3
-                  className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]"
-                >
-                  {provider} · {list.length}
-                </h3>
-                <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                  {list.map((m) => {
-                    const active = m.id === activeModel
-                    return (
-                      <li
-                        key={m.id}
-                        className="rounded border px-2 py-1.5"
-                        style={{
-                          borderColor: active
-                            ? 'color-mix(in srgb, var(--theme-success) 50%, transparent)'
-                            : 'var(--theme-border)',
-                          background: active
-                            ? 'color-mix(in srgb, var(--theme-success) 8%, transparent)'
-                            : 'transparent',
-                        }}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span
-                            className="truncate font-mono text-[11px] font-semibold text-[var(--theme-text)]"
-                            title={m.id}
-                          >
-                            {m.name}
-                          </span>
-                          {active ? (
-                            <span
-                              className="rounded px-1 py-0.5 font-mono text-[8px] uppercase tracking-[0.15em]"
-                              style={{
-                                background:
-                                  'color-mix(in srgb, var(--theme-success) 18%, transparent)',
-                                color: 'var(--theme-success)',
-                              }}
-                            >
-                              active
-                            </span>
-                          ) : null}
-                        </div>
-                        <div
-                          className="mt-0.5 truncate font-mono text-[9px] text-[var(--theme-muted)]"
-                          title={m.id}
-                        >
-                          {m.id}
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-            ))
-          )}
+        <div className="flex items-center gap-2">
+          <input
+            type="search"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="filter…"
+            aria-label="Filter model inventory"
+            className="rounded border border-[var(--theme-border)] bg-transparent px-2 py-1 font-mono text-[11px] text-[var(--theme-text)] outline-none placeholder:text-[var(--theme-muted)] focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)]"
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded p-1 hover:bg-[var(--theme-card)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] lg:min-h-0 lg:min-w-0"
+          >
+            <HugeiconsIcon
+              icon={CancelIcon}
+              size={16}
+              strokeWidth={1.5}
+              className="text-[var(--theme-muted)]"
+            />
+          </button>
         </div>
       </div>
-    </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {loading ? (
+          <div
+            role="status"
+            aria-busy="true"
+            className="py-8 text-center text-[11px] text-[var(--theme-muted)]"
+          >
+            Loading models…
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <p
+              role="alert"
+              className="text-[11px] text-[var(--theme-danger,#ef4444)]"
+            >
+              {error}
+            </p>
+            <button
+              type="button"
+              onClick={() => setReloadToken((value) => value + 1)}
+              className="rounded-md border border-[var(--theme-border)] px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-accent)] motion-safe:transition-colors hover:bg-[var(--theme-card)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)]"
+            >
+              Retry
+            </button>
+          </div>
+        ) : grouped.length === 0 ? (
+          <div className="py-8 text-center text-[11px] text-[var(--theme-muted)]">
+            No matching models.
+          </div>
+        ) : (
+          grouped.map(([provider, list]) => (
+            <div key={provider} className="mb-4">
+              <h3 className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--theme-muted)]">
+                {provider} · {list.length}
+              </h3>
+              <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                {list.map((m) => {
+                  const active = m.id === activeModel
+                  return (
+                    <li
+                      key={m.id}
+                      className="rounded border px-2 py-1.5"
+                      style={{
+                        borderColor: active
+                          ? 'color-mix(in srgb, var(--theme-success) 50%, transparent)'
+                          : 'var(--theme-border)',
+                        background: active
+                          ? 'color-mix(in srgb, var(--theme-success) 8%, transparent)'
+                          : 'transparent',
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className="truncate font-mono text-[11px] font-semibold text-[var(--theme-text)]"
+                          title={m.id}
+                        >
+                          {m.name}
+                        </span>
+                        {active ? (
+                          <span
+                            className="rounded px-1 py-0.5 font-mono text-[8px] uppercase tracking-[0.15em]"
+                            style={{
+                              background:
+                                'color-mix(in srgb, var(--theme-success) 18%, transparent)',
+                              color: 'var(--theme-success)',
+                            }}
+                          >
+                            active
+                          </span>
+                        ) : null}
+                      </div>
+                      <div
+                        className="mt-0.5 truncate font-mono text-[9px] text-[var(--theme-muted)]"
+                        title={m.id}
+                      >
+                        {m.id}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          ))
+        )}
+      </div>
+    </DashboardDialog>
   )
 }

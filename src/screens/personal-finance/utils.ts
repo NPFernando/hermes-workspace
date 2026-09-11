@@ -1,13 +1,82 @@
 export function formatMoney(amount: number, currency: string): string {
-  return `${currency} ${Math.round(amount).toLocaleString('en-LK')}`
+  return `${normalizeDisplayCurrency(currency)} ${Math.round(amount).toLocaleString('en-LK')}`
 }
 
-export function formatLkr(value: number): string {
-  return formatMoney(value, 'LKR')
+/** Canonicalize legacy/display currency values before grouping or rate joins. */
+export function normalizeDisplayCurrency(
+  value: unknown,
+  fallback = 'LKR',
+): string {
+  const normalized = typeof value === 'string' ? value.trim().toUpperCase() : ''
+  return normalized || fallback
+}
+
+export function formatLkr(value: number, currency = 'LKR'): string {
+  return formatMoney(value, currency)
 }
 
 export function formatPct(value: number): string {
   return `${value.toFixed(1)}%`
+}
+
+export type ExchangeRateLike = {
+  base: string
+  target: string
+  rate: number
+  date?: string
+}
+
+/** PF-209: read-only client conversion for exposure displays. */
+export function convertWithExchangeRates(
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string,
+  rates: Array<ExchangeRateLike>,
+  asOf = new Date().toISOString().slice(0, 10),
+): number | undefined {
+  if (fromCurrency === toCurrency) return amount
+  const eligible = rates.filter(
+    (rate) =>
+      Number.isFinite(rate.rate) &&
+      rate.rate > 0 &&
+      (!rate.date || rate.date <= asOf),
+  )
+  const latest = (base: string, target: string) => {
+    const matches = eligible
+      .filter((rate) => rate.base === base && rate.target === target)
+      .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')))
+    return matches.length === 0 ? undefined : matches[0]
+  }
+  const direct = latest(fromCurrency, toCurrency)
+  if (direct) return amount * direct.rate
+  const inverse = latest(toCurrency, fromCurrency)
+  if (inverse) return amount / inverse.rate
+  if (fromCurrency !== 'LKR' && toCurrency !== 'LKR') {
+    const fromLkr = latest(fromCurrency, 'LKR')
+    const toLkr = latest('LKR', toCurrency)
+    if (fromLkr && toLkr) return amount * fromLkr.rate * toLkr.rate
+  }
+  return undefined
+}
+
+export function formatDateTime(value: string | number | Date): string {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Unknown time'
+  return new Intl.DateTimeFormat('en-LK', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+}
+
+export function formatDateOnly(value: string | number | Date): string {
+  const date =
+    typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00`)
+      : value instanceof Date
+        ? value
+        : new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Unknown date'
+  return new Intl.DateTimeFormat('en-LK', { dateStyle: 'medium' }).format(date)
 }
 
 export type FinanceAnswerChartExport = {

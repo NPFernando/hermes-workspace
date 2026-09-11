@@ -1,4 +1,12 @@
+import {
+  DashboardEmptyState,
+  DashboardUnavailableState,
+} from './dashboard-empty-state'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import {
+  safeAnalyticsDaily,
+  safeNumber,
+} from '@/screens/dashboard/lib/analytics-normalizers'
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -47,19 +55,36 @@ function deltaText(
  */
 export function VelocityCard({
   analytics,
+  unavailable = false,
 }: {
   analytics: DashboardOverview['analytics']
+  unavailable?: boolean
 }) {
-  if (!analytics || analytics.source !== 'analytics') return null
-  if (analytics.daily.length === 0) return null
+  if (unavailable) return <DashboardUnavailableState title="Velocity" />
+  if (!analytics || analytics.source !== 'analytics') {
+    return (
+      <DashboardEmptyState
+        title="Velocity"
+        description="Session velocity will appear after workspace telemetry records activity."
+      />
+    )
+  }
+  const daily = safeAnalyticsDaily(analytics)
+  if (daily.length === 0) {
+    return (
+      <DashboardEmptyState
+        title="Velocity"
+        description="No session activity has been recorded in this window yet."
+      />
+    )
+  }
 
-  const sessionsPerDay =
-    analytics.totalSessions / Math.max(1, analytics.windowDays)
-  const callsPerDay =
-    analytics.totalApiCalls / Math.max(1, analytics.windowDays)
+  const windowDays = Math.max(1, safeNumber(analytics.windowDays))
+  const sessionsPerDay = safeNumber(analytics.totalSessions) / windowDays
+  const callsPerDay = safeNumber(analytics.totalApiCalls) / windowDays
 
   // Period-over-period split for the delta chip.
-  const dailySessions = analytics.daily.map((d) => d.sessions)
+  const dailySessions = daily.map((d) => d.sessions)
   const mid = Math.floor(dailySessions.length / 2)
   const recent = dailySessions.slice(mid).reduce((a, b) => a + b, 0)
   const prior = dailySessions.slice(0, mid).reduce((a, b) => a + b, 0)
@@ -86,9 +111,9 @@ export function VelocityCard({
       />
 
       <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
+        <h2 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
           Velocity
-        </h3>
+        </h2>
         <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
           {analytics.windowDays}d avg
         </span>

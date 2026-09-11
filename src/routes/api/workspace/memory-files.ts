@@ -121,7 +121,7 @@ function collectFiles(): Array<MemoryFileItem> {
 export const Route = createFileRoute('/api/workspace/memory-files')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }

@@ -6,13 +6,19 @@ import {
   applyPersonalityToSwarm,
   getSwarmPersonalityRecommendations,
 } from '../../server/personality-swarm-store'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 import type { ApplyPersonalitySwarmOptions } from '../../server/personality-swarm-store'
 
 export const Route = createFileRoute('/api/personality-swarm')({
   server: {
     handlers: {
       /** GET — return preset catalogue + swarm recommendations */
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -34,6 +40,11 @@ export const Route = createFileRoute('/api/personality-swarm')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        if (!rateLimit(`personality-swarm:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         let body: ApplyPersonalitySwarmOptions
         try {
           body = (await request.json()) as ApplyPersonalitySwarmOptions

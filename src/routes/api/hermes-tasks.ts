@@ -2,6 +2,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { runAgentDeployBackground } from '../../server/astra-tasks'
 import { createTask, listTasks } from '../../server/tasks-store'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 import type { TaskColumn, TaskPriority } from '../../server/tasks-store'
 
 function jsonResponse(data: unknown, status = 200) {
@@ -30,7 +36,7 @@ function isTaskPriority(value: unknown): value is TaskPriority {
 export const Route = createFileRoute('/api/hermes-tasks')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
         }
@@ -49,6 +55,11 @@ export const Route = createFileRoute('/api/hermes-tasks')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`hermes-task-create:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
         }
 
         try {

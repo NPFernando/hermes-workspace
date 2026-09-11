@@ -103,10 +103,16 @@ export const chatQueryKeys = {
 } as const
 
 export async function fetchSessions(): Promise<Array<SessionMeta>> {
-  const res = await fetch('/api/sessions')
-  if (!res.ok) throw new Error(await readError(res))
-  const data = (await res.json()) as SessionListResponse
-  return normalizeSessions(data.sessions)
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 5_000)
+  try {
+    const res = await fetch('/api/sessions', { signal: controller.signal })
+    if (!res.ok) throw new Error(await readError(res))
+    const data = (await res.json()) as SessionListResponse
+    return normalizeSessions(data.sessions)
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
 }
 
 export async function fetchHistory(payload: {
@@ -461,15 +467,16 @@ export function updateHistoryMessageByClientIdEverywhere(
   for (const [queryKey, data] of historyQueries) {
     const current = data
     const messages = Array.isArray(current?.messages) ? current.messages : []
-    let changed = false
+    const hasMatch = messages.some((message) =>
+      isMatchingClientMessage(message, normalizedClientId, optimisticId),
+    )
+    if (!hasMatch) continue
     const nextMessages = messages.map((message) => {
       if (!isMatchingClientMessage(message, normalizedClientId, optimisticId)) {
         return message
       }
-      changed = true
       return updater(message)
     })
-    if (!changed) continue
     queryClient.setQueryData(queryKey, {
       sessionKey: current?.sessionKey ?? '',
       sessionId: current?.sessionId,

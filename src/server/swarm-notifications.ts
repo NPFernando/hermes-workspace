@@ -208,7 +208,7 @@ export function publishSwarmCheckpointNotification(input: {
     typeof current.lastNotifiedCheckpointSignature === 'string'
       ? current.lastNotifiedCheckpointSignature
       : null
-  const checkpointRaw = input.checkpoint.raw?.trim() || ''
+  const checkpointRaw = input.checkpoint.raw.trim()
   const sessionKey =
     input.notifySessionKey?.trim() ||
     (typeof current.notifySessionKey === 'string' &&
@@ -220,7 +220,7 @@ export function publishSwarmCheckpointNotification(input: {
   // state actually changed (e.g. worker went executing -> done with same scraped raw).
   const checkpointSignature = [
     input.checkpoint.stateLabel,
-    input.checkpoint.checkpointStatus ?? '',
+    input.checkpoint.checkpointStatus,
     input.checkpoint.result ?? '',
     input.checkpoint.blocker ?? '',
     input.checkpoint.nextAction ?? '',
@@ -237,8 +237,7 @@ export function publishSwarmCheckpointNotification(input: {
     !currentSig &&
     checkpointRaw &&
     currentRaw === checkpointRaw &&
-    (input.checkpoint.stateLabel === 'IN_PROGRESS' ||
-      !input.checkpoint.stateLabel)
+    input.checkpoint.stateLabel === 'IN_PROGRESS'
   ) {
     return { published: false, sessionKey, route: 'noop' }
   }

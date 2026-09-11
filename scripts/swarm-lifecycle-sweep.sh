@@ -14,6 +14,7 @@
 
 set -euo pipefail
 
+umask 077
 BASE_URL="${SWARM_BASE_URL:-http://localhost:3002}"
 LOG_DIR="${SWARM_LIFECYCLE_LOG_DIR:-$HOME/.ocplatform/workspace/memory/swarm/lifecycle-logs}"
 mkdir -p "$LOG_DIR"
@@ -21,7 +22,7 @@ LOG_FILE="$LOG_DIR/$(date -u +%Y-%m-%d).jsonl"
 
 response=$(curl -sS -X POST \
   -H 'Content-Type: application/json' \
-  -d '{"action":"auto-sweep"}' \
+  -d '{"action":"auto-sweep","responseMode":"scheduler_ack"}' \
   "$BASE_URL/api/swarm-lifecycle")
 
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)

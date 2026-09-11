@@ -663,8 +663,8 @@ export function HermesContent() {
                 (m) => m.provider === provider.id,
               ) || []
             const setup = LOCAL_PROVIDER_SETUP[provider.id] || {
-              baseUrl: 'local OpenAI-compatible endpoint',
-              unavailableMessage: 'No local endpoint detected.',
+              baseUrl: 'local compatible AI service',
+              unavailableMessage: 'No local AI service detected.',
             }
 
             return (
@@ -690,8 +690,8 @@ export function HermesContent() {
                   )}
                   {disc?.needsRestart ? (
                     <div className="mt-2 text-[var(--theme-warning)]">
-                      Gateway restart may be needed after adding this provider
-                      to config.
+                      A service restart may be needed after adding this provider
+                      to your settings.
                     </div>
                   ) : null}
                 </div>
@@ -829,7 +829,7 @@ export function HermesContent() {
             className="mb-1 text-xs font-semibold uppercase tracking-wider"
             style={mutedStyle}
           >
-            Custom Endpoint
+            Custom Service Address
           </p>
           <div className="space-y-1.5">
             {(() => {
@@ -1013,7 +1013,7 @@ export function HermesContent() {
         if (!disc || !disc.needsRestart) return null
         return (
           <div className="rounded-lg border border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] px-3 py-2 text-xs text-[var(--theme-warning)]">
-            ⚠️ Gateway restart needed to use {disc.name}. Run{' '}
+            ⚠️ Service restart needed to use {disc.name}. Run{' '}
             <code className="rounded bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] px-1">
               hermes gateway restart
             </code>{' '}
@@ -1022,13 +1022,13 @@ export function HermesContent() {
         )
       })()}
 
-      {/* API Keys */}
+      {/* Provider keys */}
       <div>
         <p
           className="mb-1 text-xs font-semibold uppercase tracking-wider"
           style={mutedStyle}
         >
-          API Keys
+          Provider Keys
         </p>
         <div className="space-y-1.5">
           {PROVIDER_CARDS.filter((p) => p.envKey).map((p) => {

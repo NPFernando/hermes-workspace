@@ -79,6 +79,21 @@ describe('isStaleAssetError', () => {
       false,
     )
   })
+
+  it('recognizes stale TanStack route component lookup failures', () => {
+    expect(
+      isStaleAssetError(
+        new TypeError(`can't access property "component", d is undefined`),
+      ),
+    ).toBe(true)
+    expect(
+      isStaleAssetError(
+        new TypeError(
+          "Cannot read properties of undefined (reading 'component')",
+        ),
+      ),
+    ).toBe(true)
+  })
 })
 
 describe('ErrorBoundary auto-recovery', () => {
@@ -115,7 +130,9 @@ describe('ErrorBoundary auto-recovery', () => {
 
   it('auto-reloads once for a stale-asset (chunk load) error', async () => {
     renderBoundary(
-      new Error('Failed to fetch dynamically imported module: /assets/main-abc123.js'),
+      new Error(
+        'Failed to fetch dynamically imported module: /assets/main-abc123.js',
+      ),
     )
     await vi.waitFor(() => {
       expect(window.location.reload).toHaveBeenCalledTimes(1)
@@ -137,6 +154,10 @@ describe('ErrorBoundary auto-recovery', () => {
   it('shows the manual reload button for errors it does not recognize', () => {
     const { container } = renderBoundary(new Error('Some unrelated crash'))
     expect(container.textContent).toContain('Reload')
+    expect(container.querySelector('details summary')?.textContent).toBe(
+      'Technical details',
+    )
+    expect(container.querySelector('details')?.hasAttribute('open')).toBe(false)
     expect(window.location.reload).not.toHaveBeenCalled()
   })
 })

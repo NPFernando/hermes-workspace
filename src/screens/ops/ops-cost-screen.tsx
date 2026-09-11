@@ -97,6 +97,19 @@ interface OpsPayload {
   financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
 }
 
+interface ProviderHealth {
+  provider: string
+  displayName: string
+  status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
+  message?: string
+  plan?: string
+  updatedAt: number
+}
+interface ProviderHealthSnapshot {
+  capturedAt: number
+  providers: Array<Pick<ProviderHealth, 'provider' | 'status'>>
+}
+
 function money(v: number | null | undefined): string {
   return v == null
     ? '—'
@@ -166,6 +179,21 @@ export function OpsCostScreen() {
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return (await res.json()) as OpsPayload
+    },
+    refetchInterval: 60_000,
+  })
+  const providerQuery = useQuery({
+    queryKey: ['provider-usage', 'ops-health'],
+    queryFn: async () => {
+      const res = await fetch('/api/provider-usage', {
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return (await res.json()) as {
+        ok: boolean
+        providers: Array<ProviderHealth>
+        providerHealthHistory?: Array<ProviderHealthSnapshot>
+      }
     },
     refetchInterval: 60_000,
   })
@@ -271,6 +299,97 @@ export function OpsCostScreen() {
           }
         />
       </div>
+
+      <Panel title="AI provider health">
+        {providerQuery.isPending ? (
+          <p className="text-sm text-[var(--theme-muted)]">
+            Checking providers…
+          </p>
+        ) : providerQuery.isError || !providerQuery.data.ok ? (
+          <p className="text-sm text-[var(--theme-muted)]">
+            Provider health unavailable. Retry from the usage meter if needed.
+          </p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            {providerQuery.data.providers.map((provider) => {
+              const healthy = provider.status === 'ok'
+              const label =
+                provider.status === 'missing_credentials'
+                  ? 'not configured'
+                  : provider.status === 'auth_expired'
+                    ? 'auth expired'
+                    : provider.status
+              return (
+                <div
+                  key={provider.provider}
+                  className="rounded-lg border border-[var(--theme-border,rgba(128,128,128,0.2))] px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-[var(--theme-text)]">
+                      {provider.displayName}
+                    </span>
+                    <span
+                      className={
+                        healthy
+                          ? 'text-xs text-emerald-400'
+                          : 'text-xs text-amber-400'
+                      }
+                    >
+                      {healthy ? 'healthy' : label}
+                    </span>
+                  </div>
+                  {provider.plan ? (
+                    <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                      {provider.plan}
+                    </p>
+                  ) : null}
+                  {!healthy && provider.message ? (
+                    <p className="mt-1 truncate text-xs text-[var(--theme-muted)]">
+                      {provider.message}
+                    </p>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {providerQuery.data?.providerHealthHistory?.length ? (
+          <div className="mt-3 border-t border-[var(--theme-border,rgba(128,128,128,0.15))] pt-2">
+            <p className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
+              Recent provider status
+            </p>
+            <div className="mt-1 space-y-1 text-xs">
+              {providerQuery.data.providerHealthHistory
+                .slice(-6)
+                .reverse()
+                .map((snapshot) => {
+                  const degraded = snapshot.providers.filter(
+                    (provider) => provider.status !== 'ok',
+                  ).length
+                  return (
+                    <div
+                      key={snapshot.capturedAt}
+                      className="flex flex-wrap items-center justify-between gap-2 text-[var(--theme-muted)]"
+                    >
+                      <span>{new Date(snapshot.capturedAt).toLocaleString()}</span>
+                      <span
+                        className={
+                          degraded === 0
+                            ? 'text-emerald-400'
+                            : 'text-amber-400'
+                        }
+                      >
+                        {degraded === 0
+                          ? 'all healthy'
+                          : `${degraded} degraded`}
+                      </span>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        ) : null}
+      </Panel>
 
       {/* Per-model costs (single-series magnitude → table with inline accent bars) */}
       <Panel title="Per-model cost — last 7 days (billed; subscription/free estimates are phantom)">

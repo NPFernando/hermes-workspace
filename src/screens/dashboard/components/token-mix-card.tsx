@@ -82,11 +82,9 @@ export function TokenMixCard({
       }}
     >
       <div className="flex items-center justify-between gap-2">
-        <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-        >
+        <h2 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
           Token mix · {analytics.windowDays}d
-        </h3>
+        </h2>
         <span
           className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
           title="Output as % of input — proxy for how chatty the model is."
@@ -138,13 +136,9 @@ export function TokenMixCard({
                   {s.label}
                 </span>
               </span>
-              <span
-                className="shrink-0 font-mono tabular-nums text-[var(--theme-text)]"
-              >
+              <span className="shrink-0 font-mono tabular-nums text-[var(--theme-text)]">
                 {formatTokens(s.value)}
-                <span
-                  className="ml-1 text-[var(--theme-muted)]"
-                >
+                <span className="ml-1 text-[var(--theme-muted)]">
                   · {widthPct.toFixed(0)}%
                 </span>
               </span>

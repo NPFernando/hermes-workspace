@@ -22,7 +22,7 @@ import { Switch } from '@/components/ui/switch'
 export function AppearanceContent() {
   const { settings, updateSettings } = useSettings()
   const [activeTheme, setActiveTheme] = useState<ThemeId>(() =>
-    typeof window === 'undefined' ? 'odysseus' : getTheme(),
+    typeof window === 'undefined' ? 'claude-nous' : getTheme(),
   )
 
   function handleThemeChange(value: string) {

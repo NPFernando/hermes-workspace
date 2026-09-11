@@ -173,7 +173,7 @@ export function useAutoSessionTitle({
     onError: (error, payload) => {
       updateSessionTitleState(payload.friendlyId, {
         status: 'error',
-        error: error instanceof Error ? error.message : String(error ?? ''),
+        error: error instanceof Error ? error.message : String(error),
       })
     },
   })
@@ -193,7 +193,7 @@ export function useAutoSessionTitle({
       .then((aiTitle) => {
         mutate({
           friendlyId,
-          sessionKey: sessionKey ?? friendlyId,
+          sessionKey: sessionKey || friendlyId,
           title: aiTitle,
         })
       })
@@ -203,7 +203,7 @@ export function useAutoSessionTitle({
         if (fallback) {
           mutate({
             friendlyId,
-            sessionKey: sessionKey ?? friendlyId,
+            sessionKey: sessionKey || friendlyId,
             title: fallback,
           })
         } else {

@@ -23,7 +23,7 @@ function getHindsightPort(): number {
     const metadata = JSON.parse(fs.readFileSync(METADATA_PATH, 'utf-8')) as {
       profiles?: Record<string, { port?: number }>
     }
-    return metadata?.profiles?.[HERMES_PROFILE]?.port ?? 9177
+    return metadata.profiles?.[HERMES_PROFILE]?.port ?? 9177
   } catch {
     return 9177
   }

@@ -51,11 +51,10 @@ export function ProviderManagementSection(props: {
       <header className="flex flex-col gap-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
         <div className="space-y-1.5">
           <h2 className="text-base font-semibold text-[var(--theme-text)]">
-            Provider Setup
+            AI Provider Setup
           </h2>
           <p className="text-sm text-[var(--theme-muted)]">
-            View configured providers and walk through safe setup instructions
-            for new providers.
+            View connected AI services and follow guided setup for new ones.
           </p>
         </div>
         <Button size="sm" onClick={onAddProvider}>
@@ -68,11 +67,11 @@ export function ProviderManagementSection(props: {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-base font-medium text-[var(--theme-text)]">
-              Configured Providers
+              Connected AI Services
             </h3>
             <p className="mt-1 text-xs text-[var(--theme-muted)]">
-              API keys stay in your local Hermes config and are never sent to
-              Studio.
+              Provider keys stay on this device and are never sent to the
+              workspace interface.
             </p>
           </div>
           <p className="text-xs text-[var(--theme-muted)] tabular-nums">
@@ -83,14 +82,14 @@ export function ProviderManagementSection(props: {
 
         {modelsQuery.isPending ? (
           <p className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-2 text-sm text-[var(--theme-muted)]">
-            Loading providers from Hermes Agent...
+            Loading connected AI services...
           </p>
         ) : null}
 
         {modelsQuery.error ? (
           <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] px-4 py-3">
             <p className="mb-2 text-sm text-[var(--theme-muted)]">
-              Unable to load providers right now. Check your Hermes Agent
+              Unable to load connected services right now. Check your workspace
               connection.
             </p>
             <Button

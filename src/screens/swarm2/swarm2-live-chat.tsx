@@ -57,7 +57,7 @@ function parseTodoSummary(content: string): {
         cancelled?: number
       }
     }
-    if (!parsed || typeof parsed !== 'object' || !parsed.summary) return null
+    if (typeof parsed !== 'object' || !parsed.summary) return null
     return {
       total: parsed.summary.total ?? 0,
       pending: parsed.summary.pending ?? 0,

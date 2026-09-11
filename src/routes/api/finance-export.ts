@@ -9,7 +9,35 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { readFinanceStore } from '../../server/finance-store'
+import { getUnifiedTransactions, readFinanceStore, type FinanceDatabase } from '../../server/finance-store'
+
+const exportColumns = ['date', 'kind', 'counterparty', 'category', 'subcategory', 'account', 'to_account', 'currency', 'amount', 'amount_lkr', 'status', 'tags', 'notes', 'source'] as const
+function csvCell(value: unknown): string {
+  const text = value == null ? '' : String(value)
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+export function transactionsCsv(db: FinanceDatabase): string {
+  const names = new Map(db.finance_accounts.map((account) => [account.id, account.name]))
+  const rows = getUnifiedTransactions(db).map((row) => [
+    row.date, row.kind, row.counterparty, row.category, row.subcategory,
+    row.accountId ? names.get(row.accountId) ?? row.accountId : '',
+    row.kind === 'transfer' ? names.get((db.transfers.find((item) => item.id === row.id)?.toAccountId as string) ?? '') ?? '' : '',
+    row.currency, row.amount, row.convertedLkrAmount, row.status, row.tags, row.notes, row.source,
+  ].map(csvCell).join(','))
+  return [exportColumns.join(','), ...rows].join('\r\n') + '\r\n'
+}
+
+function htmlCell(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] ?? char))
+}
+
+export function reportHtml(db: FinanceDatabase): string {
+  const rows = getUnifiedTransactions(db).map((row) => `<tr><td>${htmlCell(row.date)}</td><td>${htmlCell(row.kind)}</td><td>${htmlCell(row.counterparty)}</td><td>${htmlCell(row.category)}</td><td>${htmlCell(row.currency)} ${htmlCell(row.amount.toLocaleString('en-US'))}</td></tr>`).join('')
+  const income = db.income_records.reduce((sum, row) => sum + row.convertedLkrAmount, 0)
+  const expenses = db.expense_records.reduce((sum, row) => sum + row.convertedLkrAmount, 0)
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Personal finance summary</title></head><body><button onclick="print()">Print → Save as PDF</button><h1>Personal finance summary</h1><p>Net worth: LKR ${(income - expenses).toLocaleString('en-US')}</p><table><tbody>${rows}</tbody></table></body></html>`
+}
 
 export const Route = createFileRoute('/api/finance-export')({
   server: {

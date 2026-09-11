@@ -34,12 +34,20 @@ export interface PersonalFinanceSlice {
   income_sources: Array<Record<string, unknown>>
   stock_holdings: Array<Record<string, unknown>>
   fixed_deposits: Array<Record<string, unknown>>
+  /** Optional: absent before the investment journal was introduced. */
+  investment_journal?: Array<Record<string, unknown>>
+  /** Optional: absent before AI-106 finance task records shipped. */
+  ai_tasks?: Array<Record<string, unknown>>
+  /** Optional: absent before manual net-worth snapshots were introduced. */
+  net_worth_snapshots?: Array<Record<string, unknown>>
   /** Optional: absent on a mirror file written before Phase 40 (Loan Tracking) shipped. */
   loans?: Array<Record<string, unknown>>
   /** Optional: absent on a mirror file written before Phase 40 (Property Tracking) shipped. */
   properties?: Array<Record<string, unknown>>
   /** Optional: absent on a mirror file written before WEALTH-108 (Estate/Beneficiary Notes) shipped. */
   beneficiaries?: Array<Record<string, unknown>>
+  /** Optional: absent on a mirror file written before DOC-109 shipped. */
+  insurance_policies?: Array<Record<string, unknown>>
   /**
    * Postgres-migration Phase A: the personal-finance-owned subset of the
    * shared FinanceSettings bag, split out so it can get real Postgres
@@ -50,11 +58,21 @@ export interface PersonalFinanceSlice {
    * Optional: absent on a mirror file written before this shipped.
    */
   personalFinanceSettings?: {
+    baseCurrency?: string
+    alertsEnabled?: boolean
+    quietModeEnabled?: boolean
     emergencyFundTargetMonths?: number
     savingsRateTargetPct?: number
+    budgetAlertThresholdPct?: number
+    budgetTemplates?: Array<Record<string, unknown>>
+    goalCompletionEvents?: Array<Record<string, unknown>>
+    minimumCashReserveLkr?: number
+    financialRules?: Record<string, unknown>
     wealthGoalTargetLkr?: number
     wealthGoalTargetDate?: string
     financeQaHistory?: Array<{ at: number; question: string; answer: string }>
+    proactiveInsightsEnabled?: boolean
+    salaryHistory?: Array<Record<string, unknown>>
     gmailIngestState?: {
       lastSyncedAtSeconds?: number
       syncHistory?: Array<{

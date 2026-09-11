@@ -135,7 +135,6 @@ function FlatVirtualTaskList({
                 ? vItem.index - 1
                 : vItem.index
             const task = tasks[taskIdx]
-            if (!task) return null
             return (
               <div
                 key={task.id}
@@ -167,7 +166,6 @@ function VirtualRowList({
     getScrollElement: () => parentRef.current,
     estimateSize: (i) => {
       const row = rows[i]
-      if (!row) return CARD_ESTIMATE_PX
       if (row.kind === 'group-header') return 32
       if (row.kind === 'divider') return 24
       return CARD_ESTIMATE_PX
@@ -194,7 +192,6 @@ function VirtualRowList({
         >
           {items.map((vItem) => {
             const row = rows[vItem.index]
-            if (!row) return null
             if (row.kind === 'group-header') {
               return (
                 <div

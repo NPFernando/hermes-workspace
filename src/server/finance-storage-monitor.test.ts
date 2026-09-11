@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -184,5 +184,17 @@ describe('finance-storage-monitor', () => {
         previousStatus: 'postgres_behind',
       }),
     )
+  })
+
+  it('writes monitor state with private permissions', () => {
+    const statePath = tempStatePath()
+    runFinanceStorageHeartbeat({
+      statePath,
+      now: () => new Date('2026-07-08T00:01:00.000Z'),
+      storageStatus: () => storageStatusFor(healthyStorageHealth()),
+      auditLogger: vi.fn(),
+    })
+
+    expect(statSync(statePath).mode & 0o777).toBe(0o600)
   })
 })

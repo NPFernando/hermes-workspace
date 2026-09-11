@@ -4484,7 +4484,9 @@ function IntelligenceSummaryPanel({
       }
       if (!response.ok || data.ok === false)
         throw new Error(data.error || `HTTP ${response.status}`)
-      onPayload(data)
+      // Research refresh returns a deliberately small, research-only payload;
+      // keep the existing dashboard payload intact instead of replacing it
+      // with a response that has no trading/readiness sections.
       setIntelligence(data.intelligence ?? null)
     } catch (nextError) {
       setError(

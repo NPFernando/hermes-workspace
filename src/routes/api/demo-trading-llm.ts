@@ -11,6 +11,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
@@ -22,7 +25,7 @@ import {
 export const Route = createFileRoute('/api/demo-trading-llm')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -41,6 +44,9 @@ export const Route = createFileRoute('/api/demo-trading-llm')({
         }
         const csrf = requireJsonContentType(request)
         if (csrf) return csrf
+        if (!rateLimit(`demo-trading-llm:post:${getClientIp(request)}`, 6, 60_000)) {
+          return rateLimitResponse()
+        }
         try {
           const body = (await request.json().catch(() => ({}))) as {
             action?: string

@@ -20,3 +20,13 @@ export function formatSignedAmount(value: number): string {
 export function formatFractionPct(value: number): string {
   return `${(value * 100).toFixed(1)}%`
 }
+
+export function formatDateTime(value: string | number | Date | null | undefined): string {
+  if (value === null || value === undefined || value === '') return 'Unknown time'
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Unknown time'
+  return new Intl.DateTimeFormat('en-LK', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+}

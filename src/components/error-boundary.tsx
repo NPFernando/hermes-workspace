@@ -39,13 +39,24 @@ function isReactDomReconciliationError(error: Error): boolean {
  */
 export function isStaleAssetError(error: Error): boolean {
   const message = `${error.name}: ${error.message}`.toLowerCase()
+  // Firefox reports a stale TanStack Router route-table/module pairing as
+  // `can't access property "component", d is undefined` instead of exposing
+  // the underlying failed module load. Treat both Firefox and Chromium's
+  // equivalent wording as a stale-build signal so an old tab recovers
+  // automatically after a deployment.
+  const staleRouteComponentLookup =
+    message.includes('component') &&
+    message.includes('undefined') &&
+    (message.includes('access property') ||
+      message.includes('cannot read properties'))
   return (
     message.includes('failed to fetch dynamically imported module') ||
     message.includes('importing a module script failed') ||
     message.includes('loading chunk') ||
     message.includes('loading css chunk') ||
     message.includes('unable to preload css') ||
-    message.includes('load failed') // Safari's generic dynamic-import/module error text
+    message.includes('load failed') || // Safari's generic dynamic-import/module error text
+    staleRouteComponentLookup
   )
 }
 
@@ -153,11 +164,16 @@ export class ErrorBoundary extends Component<
           <p className="mt-2 text-pretty text-sm text-[var(--theme-muted)]">
             {description}
           </p>
-          <pre className="mt-3 max-h-32 overflow-auto rounded bg-red-50 p-2 text-left text-[10px] text-red-800">
-            {error.message}
-            {'\n'}
-            {error.stack?.split('\n').slice(0, 5).join('\n')}
-          </pre>
+          <details className="mt-4 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)]/60 text-left">
+            <summary className="cursor-pointer px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-inset">
+              Technical details
+            </summary>
+            <pre className="max-h-32 overflow-auto border-t border-[var(--theme-border)] px-3 py-2 text-[10px] text-[var(--theme-muted)]">
+              {error.message}
+              {'\n'}
+              {error.stack?.split('\n').slice(0, 5).join('\n')}
+            </pre>
+          </details>
           <div className="mt-5 flex justify-center">
             <Button onClick={() => this.reloadPage()}>Reload</Button>
           </div>

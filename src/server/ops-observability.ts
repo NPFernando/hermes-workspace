@@ -16,12 +16,13 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { homedir } from 'node:os'
 import {
   FINANCE_STORAGE_MONITOR_STATE_PATH,
   readFinanceStorageMonitorState,
 } from './finance-storage-monitor'
+import { redactSensitiveErrorMessage } from './rate-limit'
 
 const execFileAsync = promisify(execFile)
 
@@ -311,6 +312,12 @@ function readString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
+/** Keep operational diagnostics useful without returning host paths or secrets. */
+function safeOpsMessage(value: string | null): string | null {
+  if (!value) return null
+  return redactSensitiveErrorMessage(value).replaceAll(HERMES_HOME, '[hermes-home]')
+}
+
 function readCronJobsFile(path: string): Array<CronJobRecord> | null {
   if (!existsSync(path)) return null
   try {
@@ -389,10 +396,14 @@ function readCronOutputArtifacts(
         const runTimeMatch = body.match(/^\*\*Run Time:\*\*\s*(.+)$/m)
         const failed = /\bfinance-storage-monitor-smoke FAILED\b/.test(body)
         return {
-          path: entry.path,
+          // The client only needs a stable display name; absolute paths expose
+          // the service account and filesystem layout.
+          path: basename(entry.path),
           outputAt: new Date(entry.mtimeMs).toISOString(),
           runTime: runTimeMatch?.[1]?.trim() ?? null,
-          status: failed ? 'failed' : (statusMatch?.[1]?.trim() ?? null),
+          status: failed
+            ? 'failed'
+            : safeOpsMessage(statusMatch?.[1]?.trim() ?? null),
           failed,
         }
       })
@@ -434,12 +445,12 @@ export function getFinanceStorageSmokeCronSummary(
     state: readString(job.state),
     lastStatus: readString(job.last_status),
     lastRunAt: readString(job.last_run_at),
-    lastError: readString(job.last_error),
-    lastDeliveryError: readString(job.last_delivery_error),
+    lastError: safeOpsMessage(readString(job.last_error)),
+    lastDeliveryError: safeOpsMessage(readString(job.last_delivery_error)),
     nextRunAt: readString(job.next_run_at),
     completedRuns: completed,
     deliver: readString(job.deliver),
-    latestOutputPath: latestOutput?.path ?? null,
+    latestOutputPath: latestOutput ? basename(latestOutput.path) : null,
     latestOutputAt: latestOutput?.outputAt ?? null,
     latestOutputStatus: latestOutput?.status ?? null,
     recentOutputs,
@@ -490,13 +501,15 @@ export function getFinanceStorageMonitorSummary(
       ? options.staleAfterMs
       : FINANCE_STORAGE_HEARTBEAT_STALE_MS
   return {
-    statePath,
+    statePath: basename(statePath),
     lastCheckedAt: state.lastCheckedAt,
     lastHealthyAt: state.lastHealthyAt,
     lastAlertAt: state.lastAlertAt,
     consecutiveFailures: state.consecutiveFailures,
     lastStatus: state.lastStatus,
-    lastWarnings: state.lastWarnings,
+    lastWarnings: state.lastWarnings
+      .map((warning) => safeOpsMessage(warning))
+      .filter((warning): warning is string => Boolean(warning)),
     lastSelfHealAttempts: state.lastSelfHealAttempts,
     lastSelfHealSucceeded: state.lastSelfHealSucceeded,
     heartbeatAgeMs,

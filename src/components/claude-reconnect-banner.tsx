@@ -49,6 +49,7 @@ export function ClaudeReconnectBanner({
   >(null)
   const wasDisconnectedRef = useRef(false)
   const flashTimerRef = useRef<number | null>(null)
+  const bannerRef = useRef<HTMLDivElement>(null)
   // Silent auto-restart: if the gateway disappears mid-session, fire
   // /api/start-claude once. After that, fall back to the manual "Start Agent"
   // button so we don't loop forever on a busted environment.
@@ -235,6 +236,31 @@ export function ClaudeReconnectBanner({
   const wanted = enabled && bannerState !== 'hidden'
   const slotActive = useBannerSlot('claude-reconnect', 100, wanted)
 
+  // The notification bell is fixed on mobile. Publish the banner's measured
+  // height so the bell can move below this lane instead of covering it.
+  useEffect(() => {
+    if (!wanted || !slotActive || !bannerRef.current) {
+      document.documentElement.style.removeProperty('--connection-banner-h')
+      return undefined
+    }
+
+    const updateHeight = () => {
+      const height = bannerRef.current?.getBoundingClientRect().height ?? 0
+      document.documentElement.style.setProperty(
+        '--connection-banner-h',
+        `${Math.ceil(height)}px`,
+      )
+    }
+
+    updateHeight()
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(bannerRef.current)
+    return () => {
+      observer.disconnect()
+      document.documentElement.style.removeProperty('--connection-banner-h')
+    }
+  }, [slotActive, wanted])
+
   if (!wanted || !slotActive) {
     return null
   }
@@ -243,12 +269,13 @@ export function ClaudeReconnectBanner({
 
   return (
     <div
-      className={cn('fixed inset-x-0 px-4 pt-3', Z_LAYER.banner)}
-      style={{ top: 'var(--titlebar-h, 0px)' }}
+      ref={bannerRef}
+      data-connection-banner
+      className={cn('relative px-4 py-3', Z_LAYER.banner)}
     >
       <div
         className={cn(
-          'mx-auto flex min-h-12 w-full max-w-5xl items-center justify-between gap-3 rounded-lg border px-4 py-3 shadow-lg bg-[var(--theme-card)]',
+          'mx-auto flex min-h-12 w-full max-w-5xl flex-col items-stretch justify-between gap-3 rounded-lg border px-4 py-3 shadow-lg sm:flex-row sm:items-center bg-[var(--theme-card)]',
           isDisconnected
             ? 'border-[var(--theme-danger)] text-[var(--theme-danger)]'
             : 'border-[var(--theme-border)]',
@@ -274,12 +301,12 @@ export function ClaudeReconnectBanner({
         </div>
 
         {isDisconnected ? (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
             <button
               type="button"
               onClick={() => void handleRetry()}
               disabled={isChecking || isStarting}
-              className="rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex-1 rounded-md border border-[var(--theme-border)] bg-[var(--theme-card)] px-3 py-1.5 text-sm font-medium motion-safe:transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
             >
               {isChecking ? 'Retrying…' : 'Retry'}
             </button>
@@ -287,7 +314,7 @@ export function ClaudeReconnectBanner({
               type="button"
               onClick={() => void handleStartAgent()}
               disabled={isStarting}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60 bg-[var(--theme-danger)]"
+              className="flex-1 rounded-md px-3 py-1.5 text-sm font-medium text-white motion-safe:transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-danger)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none bg-[var(--theme-danger)]"
             >
               {isStarting ? 'Starting…' : 'Start Agent'}
             </button>

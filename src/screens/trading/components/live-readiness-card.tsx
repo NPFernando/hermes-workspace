@@ -12,8 +12,8 @@ type Gate = {
 type ReadinessPayload = {
   ok?: boolean
   liveReadiness: {
-    live: { allPassed: boolean; blockers: string[]; gates: Gate[]; computedAt: string }
-    stored: { snapshot: { allPassed: boolean; blockers: string[] } | null; approval: { status: string; expiresAt: string | null } | null }
+    live: { allPassed: boolean; blockers: Array<string>; gates: Array<Gate>; computedAt: string }
+    stored: { snapshot: { allPassed: boolean; blockers: Array<string> } | null; approval: { status: string; expiresAt: string | null } | null }
   }
 }
 

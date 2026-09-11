@@ -7,7 +7,13 @@ import {
 } from '../../server/gateway-capabilities'
 import { getBearerToken } from '../../server/openai-compat-api'
 
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 
 type DecomposeRequest = {
   prompt?: unknown
@@ -219,6 +225,11 @@ export const Route = createFileRoute('/api/swarm-decompose')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`swarm-decompose:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
         }
         await ensureGatewayProbed()
         let body: DecomposeRequest

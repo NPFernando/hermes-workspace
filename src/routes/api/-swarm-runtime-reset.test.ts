@@ -12,6 +12,9 @@ vi.mock('../../server/auth-middleware', () => ({
 }))
 
 vi.mock('../../server/rate-limit', () => ({
+  getClientIp: () => 'test-client',
+  rateLimit: () => true,
+  rateLimitResponse: () => new Response('rate limited', { status: 429 }),
   requireJsonContentType: () => null,
 }))
 

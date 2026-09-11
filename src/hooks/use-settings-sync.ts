@@ -26,10 +26,10 @@ export function useSettingsSync() {
   // On mount: pull settings + Google profile from server and hydrate local stores
   useEffect(() => {
     Promise.all([
-      fetch('/api/user-settings')
+      fetch('/api/user-settings', { cache: 'no-store' })
         .then((r) => (r.ok ? (r.json() as Promise<SyncedSettings>) : null))
         .catch(() => null),
-      fetch('/api/user-profile')
+      fetch('/api/user-profile', { cache: 'no-store' })
         .then((r) => (r.ok ? (r.json() as Promise<GoogleProfile>) : null))
         .catch(() => null),
     ])

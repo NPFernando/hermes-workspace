@@ -12,34 +12,47 @@ import {
 import { StatCard } from '../finance/components/stat-card'
 import { DataTable } from '../finance/components/data-table'
 import { BudgetPanel } from './components/budget-panel'
+import { ForecastingPanel } from './components/forecasting-panel'
 import { PendingIngestionPanel } from './components/pending-ingestion-panel'
+import { DocumentVaultPanel } from './components/document-vault-panel'
 import { FinanceAlertsCard } from './components/finance-alerts-card'
+import { FinancialRulesPanel } from './components/financial-rules-panel'
+import { FinancialHealthCard } from './components/financial-health-card'
+import { FinancialInsightsCard } from './components/financial-insights-card'
 import { FinanceAnalystCard } from './components/finance-analyst-card'
+import { FinanceManagerPanel } from './components/finance-manager-panel'
 import { FinanceTrendsCard } from './components/finance-trends-card'
 import { SavingsGoalsProgress } from './components/savings-goals-progress'
 import { SinkingFundsPanel } from './components/sinking-funds-panel'
 import { UpcomingMoney } from './components/upcoming-money'
 import { RecurringBillsInsight } from './components/recurring-bills-insight'
 import { DataHealthCard } from './components/data-health-card'
+import { ExchangeRatesPanel } from './components/exchange-rates-panel'
+import { BaseCurrencyPanel } from './components/base-currency-panel'
+import { SafeToSpendCard } from './components/safe-to-spend-card'
+import { TaxDocumentsPanel, TaxReviewQueue } from './components/tax-review-queue'
 import { EmergencyFundCard } from './components/emergency-fund-card'
 import { SavingsRateTargetCard } from './components/savings-rate-target-card'
 import { WealthGoalCard } from './components/wealth-goal-card'
+import { NetWorthSnapshotsPanel } from './components/net-worth-snapshots-panel'
 import { IncomeSourcesPanel } from './components/income-sources-panel'
+import { IncomeHistoryCard } from './components/income-history-card'
 import { StockHoldingsPanel } from './components/stock-holdings-panel'
 import { FixedDepositsPanel } from './components/fixed-deposits-panel'
+import { InvestmentJournalPanel } from './components/investment-journal-panel'
 import { LoansPanel } from './components/loans-panel'
 import { BeneficiariesPanel } from './components/beneficiaries-panel'
 import { PropertiesPanel } from './components/properties-panel'
+import { InsurancePoliciesPanel } from './components/insurance-policies-panel'
 import { AccountsPanel } from './components/accounts-panel'
 import { TransactionsPanel } from './components/transactions-panel'
+import { ReconciliationIssuesPanel } from './components/reconciliation-issues-panel'
 import { CategoriesPanel } from './components/categories-panel'
 import { MerchantsPanel } from './components/merchants-panel'
 import { TagsPanel } from './components/tags-panel'
-import { formatLkr, formatMoney, formatPct } from './utils'
-import {
-  optionalNumberField as numberField,
-  stringField,
-} from './field-helpers'
+import { formatMoney, formatPct } from './utils'
+import { currencyExposure } from './currency-exposure'
+import { optionalNumberField as numberField } from './field-helpers'
 import { buttonClass } from './shared-styles'
 import {
   usePendingIngestionCount,
@@ -49,45 +62,6 @@ import {
 import type { PersonalFinancePayload } from './types'
 
 type Tab = 'overview' | 'income' | 'investments' | 'records' | 'ingestion'
-
-/**
- * Grouped by currency, not converted to one figure — this codebase has no
- * FX-conversion service (only a manually-entered per-record rate on one-off
- * income entries), so summing across currencies here would invent a
- * conversion the rest of the app deliberately doesn't do either.
- */
-function currencyExposure(
-  payload: PersonalFinancePayload,
-): Array<{ currency: string; amount: number }> {
-  const totals = new Map<string, number>()
-  const add = (currency: string, amount: number) =>
-    totals.set(currency, (totals.get(currency) ?? 0) + amount)
-
-  for (const job of payload.data.income_sources) {
-    if (stringField(job, 'status') !== 'active') continue
-    const amount = numberField(job, 'monthlyIncomeAmount')
-    if (amount !== undefined) add(stringField(job, 'currency') || 'LKR', amount)
-  }
-  for (const holding of payload.data.stock_holdings) {
-    const qty = numberField(holding, 'quantity') ?? 0
-    const price =
-      numberField(holding, 'lastKnownPrice') ??
-      numberField(holding, 'buyPrice') ??
-      0
-    add(stringField(holding, 'currency') || 'LKR', qty * price)
-  }
-  for (const fd of payload.data.fixed_deposits) {
-    if (stringField(fd, 'status') === 'withdrawn') continue
-    const principal = numberField(fd, 'principal')
-    if (principal !== undefined)
-      add(stringField(fd, 'currency') || 'LKR', principal)
-  }
-
-  return Array.from(totals.entries())
-    .filter(([, amount]) => amount > 0)
-    .map(([currency, amount]) => ({ currency, amount }))
-    .sort((a, b) => b.amount - a.amount)
-}
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -125,7 +99,7 @@ export function PersonalFinanceScreen() {
         <p className="mt-2 text-sm">
           {financeQuery.error instanceof Error
             ? financeQuery.error.message
-            : 'Finance API failed'}
+            : 'Finance data unavailable'}
         </p>
       </main>
     )
@@ -133,26 +107,43 @@ export function PersonalFinanceScreen() {
 
   const payload = financeQuery.data
   const { summary } = payload
+  const baseCurrency = summary.baseCurrency ?? payload.baseCurrency ?? 'LKR'
+  const baseSummary = summary.baseSummary ?? {
+    netWorth: summary.netWorthLkr,
+    liquidNetWorth: summary.liquidNetWorthLkr,
+    lockedWealth: summary.lockedWealthLkr,
+    cashBalance: summary.cashBalanceLkr,
+    netSavings: summary.netSavingsLkr,
+    savingsRate: summary.savingsRate,
+    totalIncome: summary.totalIncomeLkr,
+    totalExpenses: summary.totalExpensesLkr,
+    stockHoldingsValue: summary.stockHoldingsValueLkr,
+    unrealizedStockPnl: summary.unrealizedStockPnlLkr,
+    unrealizedStockPnlPct: summary.unrealizedStockPnlPct,
+    fixedDepositsValue: summary.fixedDepositsValueLkr,
+    debt: summary.debtLkr,
+  }
+  const formatBase = (value: number) => formatMoney(value, baseCurrency)
 
   const netWorthBreakdown = [
     {
       name: 'Cash',
-      value: Math.max(0, summary.cashBalanceLkr),
+      value: Math.max(0, baseSummary.cashBalance),
       fill: 'var(--theme-accent)',
     },
     {
       name: 'Stocks',
-      value: Math.max(0, summary.stockHoldingsValueLkr),
+      value: Math.max(0, baseSummary.stockHoldingsValue),
       fill: 'var(--theme-accent-secondary)',
     },
     {
       name: 'Fixed deposits',
-      value: Math.max(0, summary.fixedDepositsValueLkr),
+      value: Math.max(0, baseSummary.fixedDepositsValue),
       fill: 'var(--theme-success)',
     },
     {
       name: 'Debt',
-      value: Math.max(0, summary.debtLkr),
+      value: Math.max(0, baseSummary.debt),
       fill: 'var(--theme-danger)',
     },
   ].filter((entry) => entry.value > 0)
@@ -185,48 +176,57 @@ export function PersonalFinanceScreen() {
       </section>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Net worth" value={formatLkr(summary.netWorthLkr)} />
+        <StatCard label={`Net worth (${baseCurrency})`} value={formatBase(baseSummary.netWorth)} />
+        <StatCard
+          label="Liquid net worth"
+          value={formatBase(baseSummary.liquidNetWorth)}
+          tone={baseSummary.liquidNetWorth >= 0 ? 'good' : 'danger'}
+        />
+        <StatCard
+          label="Locked wealth"
+          value={formatBase(baseSummary.lockedWealth)}
+        />
         <StatCard
           label="Cash balance"
-          value={formatLkr(summary.cashBalanceLkr)}
+          value={formatBase(baseSummary.cashBalance)}
         />
         <StatCard
           label="Net savings"
-          value={formatLkr(summary.netSavingsLkr)}
-          tone={summary.netSavingsLkr >= 0 ? 'good' : 'danger'}
+          value={formatBase(baseSummary.netSavings)}
+          tone={baseSummary.netSavings >= 0 ? 'good' : 'danger'}
         />
         <StatCard
           label="Savings rate"
-          value={formatPct(summary.savingsRate)}
-          tone={summary.savingsRate >= 20 ? 'good' : 'warn'}
+          value={formatPct(baseSummary.savingsRate)}
+          tone={baseSummary.savingsRate >= 20 ? 'good' : 'warn'}
         />
         <StatCard
           label="Total income"
-          value={formatLkr(summary.totalIncomeLkr)}
+          value={formatBase(baseSummary.totalIncome)}
           tone="good"
         />
         <StatCard
           label="Total expenses"
-          value={formatLkr(summary.totalExpensesLkr)}
+          value={formatBase(baseSummary.totalExpenses)}
           tone={
-            summary.totalExpensesLkr > summary.totalIncomeLkr &&
-            summary.totalIncomeLkr > 0
+            baseSummary.totalExpenses > baseSummary.totalIncome &&
+            baseSummary.totalIncome > 0
               ? 'danger'
               : 'neutral'
           }
         />
         <StatCard
           label="Stock holdings"
-          value={formatLkr(summary.stockHoldingsValueLkr)}
+          value={formatBase(baseSummary.stockHoldingsValue)}
         />
         <StatCard
           label="Unrealized P/L"
-          value={`${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatLkr(summary.unrealizedStockPnlLkr)} (${summary.unrealizedStockPnlLkr >= 0 ? '+' : ''}${formatPct(summary.unrealizedStockPnlPct)})`}
-          tone={summary.unrealizedStockPnlLkr >= 0 ? 'good' : 'danger'}
+          value={`${baseSummary.unrealizedStockPnl >= 0 ? '+' : ''}${formatBase(baseSummary.unrealizedStockPnl)} (${baseSummary.unrealizedStockPnl >= 0 ? '+' : ''}${formatPct(baseSummary.unrealizedStockPnlPct)})`}
+          tone={baseSummary.unrealizedStockPnl >= 0 ? 'good' : 'danger'}
         />
         <StatCard
           label="Fixed deposits"
-          value={formatLkr(summary.fixedDepositsValueLkr)}
+          value={formatBase(baseSummary.fixedDepositsValue)}
         />
       </section>
 
@@ -272,7 +272,7 @@ export function PersonalFinanceScreen() {
                     borderRadius: 8,
                     fontSize: 11,
                   }}
-                  formatter={(value: number) => formatLkr(value)}
+                  formatter={(value: number) => formatBase(value)}
                 />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                   {netWorthBreakdown.map((entry) => (
@@ -288,16 +288,22 @@ export function PersonalFinanceScreen() {
       {exposure.length > 0 && (
         <section className="mt-4 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
           <p className="text-xs font-medium text-[var(--theme-muted)]">
-            Currency exposure (active jobs, holdings, and fixed deposits — not
-            converted)
+            Currency exposure (active jobs, holdings, and fixed deposits)
           </p>
           <div className="mt-2 flex flex-wrap gap-3">
-            {exposure.map(({ currency, amount }) => (
+            {exposure.map(({ currency, amount, baseAmount }) => (
               <span
                 key={currency}
                 className="text-sm font-medium text-[var(--theme-text)]"
               >
                 {formatMoney(amount, currency)}
+                {currency !== baseCurrency && (
+                  <span className="ml-2 text-xs text-[var(--theme-muted)]">
+                    {baseAmount !== undefined
+                      ? <>≈ {formatMoney(baseAmount, baseCurrency)}</>
+                      : '· rate unavailable'}
+                  </span>
+                )}
               </span>
             ))}
           </div>
@@ -333,8 +339,20 @@ export function PersonalFinanceScreen() {
 
       {tab === 'overview' && (
         <>
-          <FinanceAlertsCard payload={payload} />
+          <FinanceAlertsCard payload={payload} onPayload={setPayload} />
+          <BaseCurrencyPanel payload={payload} onPayload={setPayload} />
+          <FinancialHealthCard payload={payload} />
+          <FinancialInsightsCard payload={payload} onPayload={setPayload} />
+          <NetWorthSnapshotsPanel payload={payload} onPayload={setPayload} />
+          <FinancialRulesPanel payload={payload} onPayload={setPayload} />
+          <SafeToSpendCard payload={payload} onPayload={setPayload} />
           <FinanceAnalystCard payload={payload} onPayload={setPayload} />
+          <FinanceManagerPanel payload={payload} onPayload={setPayload} />
+          <ForecastingPanel
+            incomeRecords={payload.data.income_records}
+            expenseRecords={payload.data.expense_records}
+            incomeSources={payload.data.income_sources}
+          />
           <FinanceTrendsCard payload={payload} />
           <SavingsGoalsProgress payload={payload} onPayload={setPayload} />
           <SinkingFundsPanel payload={payload} onPayload={setPayload} />
@@ -350,6 +368,7 @@ export function PersonalFinanceScreen() {
       {tab === 'income' && (
         <>
           <IncomeSourcesPanel payload={payload} onPayload={setPayload} />
+          <IncomeHistoryCard payload={payload} onPayload={setPayload} />
           <BudgetPanel payload={payload} onPayload={setPayload} />
         </>
       )}
@@ -357,9 +376,11 @@ export function PersonalFinanceScreen() {
       {tab === 'investments' && (
         <>
           <StockHoldingsPanel payload={payload} onPayload={setPayload} />
+          <InvestmentJournalPanel payload={payload} onPayload={setPayload} />
           <FixedDepositsPanel payload={payload} onPayload={setPayload} />
           <LoansPanel payload={payload} onPayload={setPayload} />
           <PropertiesPanel payload={payload} onPayload={setPayload} />
+          <InsurancePoliciesPanel payload={payload} onPayload={setPayload} />
           <BeneficiariesPanel payload={payload} onPayload={setPayload} />
         </>
       )}
@@ -367,10 +388,14 @@ export function PersonalFinanceScreen() {
       {tab === 'records' && (
         <section className="mt-6 grid gap-4">
           <AccountsPanel payload={payload} onPayload={setPayload} />
+          <ExchangeRatesPanel payload={payload} onPayload={setPayload} />
+          <ReconciliationIssuesPanel payload={payload} onPayload={setPayload} />
           <TransactionsPanel payload={payload} onPayload={setPayload} />
           <CategoriesPanel payload={payload} onPayload={setPayload} />
           <MerchantsPanel payload={payload} onPayload={setPayload} />
           <TagsPanel payload={payload} onPayload={setPayload} />
+          <TaxReviewQueue payload={payload} onPayload={setPayload} />
+          <TaxDocumentsPanel payload={payload} />
           <DataTable
             title="Budget categories"
             rows={payload.data.budget_categories}
@@ -424,7 +449,10 @@ export function PersonalFinanceScreen() {
       )}
 
       {tab === 'ingestion' && (
-        <PendingIngestionPanel payload={payload} onConfirmed={setPayload} />
+        <>
+          <DocumentVaultPanel />
+          <PendingIngestionPanel payload={payload} onConfirmed={setPayload} />
+        </>
       )}
     </main>
   )

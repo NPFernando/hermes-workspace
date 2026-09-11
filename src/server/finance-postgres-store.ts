@@ -36,6 +36,9 @@ export interface FinanceAuditEntry {
   details: Record<string, unknown>
   source: string
   createdAt: string
+  chainVersion?: number
+  previousHash?: string | null
+  entryHash?: string
 }
 
 const FINANCE_COLLECTIONS = [
@@ -802,8 +805,14 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   details_json TEXT NOT NULL,
   source TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  chain_version INTEGER,
+  previous_hash TEXT,
+  entry_hash TEXT
 );
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_version INTEGER;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS previous_hash TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entry_hash TEXT;
 
 CREATE TABLE IF NOT EXISTS trading_plans (
   id TEXT PRIMARY KEY,
@@ -1210,7 +1219,7 @@ export function appendFinanceAuditPostgres(entry: FinanceAuditEntry): boolean {
   const result = runPsql(
     FINANCE_PG_DATABASE,
     `
-INSERT INTO audit_logs (id, action, actor, details_json, source, created_at, updated_at)
+INSERT INTO audit_logs (id, action, actor, details_json, source, created_at, updated_at, chain_version, previous_hash, entry_hash)
 VALUES (
   ${sqlText(entry.id)},
   ${sqlText(entry.action)},
@@ -1218,7 +1227,10 @@ VALUES (
   ${sqlText(JSON.stringify(entry.details))},
   ${sqlText(entry.source)},
   ${sqlText(entry.createdAt)},
-  ${sqlText(entry.createdAt)}
+  ${sqlText(entry.createdAt)},
+  ${entry.chainVersion ?? 'NULL'},
+  ${entry.previousHash ? sqlText(entry.previousHash) : 'NULL'},
+  ${entry.entryHash ? sqlText(entry.entryHash) : 'NULL'}
 )
 ON CONFLICT (id) DO NOTHING;
 `,

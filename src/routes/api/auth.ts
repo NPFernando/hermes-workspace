@@ -2,9 +2,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { z } from 'zod'
 import {
+  clearSessionCookie,
   createSessionCookie,
   generateSessionToken,
+  getSessionTokenFromCookie,
   isPasswordProtectionEnabled,
+  revokeSessionToken,
   storeSessionToken,
   verifyPassword,
 } from '../../server/auth-middleware'
@@ -15,10 +18,13 @@ import {
   requireJsonContentType,
 } from '../../server/rate-limit'
 
-const AuthSchema = z.object({
-  password: z.string().max(1000),
-  rememberMe: z.boolean().optional(),
-})
+const AuthSchema = z.union([
+  z.object({ action: z.literal('logout') }),
+  z.object({
+    password: z.string().max(1000),
+    rememberMe: z.boolean().optional(),
+  }),
+])
 
 export const Route = createFileRoute('/api/auth')({
   server: {
@@ -46,6 +52,24 @@ export const Route = createFileRoute('/api/auth')({
           const parsed = AuthSchema.safeParse(raw)
 
           if (!parsed.success) {
+            return json(
+              { ok: false, error: 'Invalid request' },
+              { status: 400 },
+            )
+          }
+
+          if ('action' in parsed.data) {
+            const token = getSessionTokenFromCookie(
+              request.headers.get('cookie'),
+            )
+            if (token) revokeSessionToken(token)
+            return json(
+              { ok: true },
+              { headers: { 'Set-Cookie': clearSessionCookie() } },
+            )
+          }
+
+          if (!('password' in parsed.data)) {
             return json(
               { ok: false, error: 'Invalid request' },
               { status: 400 },

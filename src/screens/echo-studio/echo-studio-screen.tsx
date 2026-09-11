@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { WorkspaceThemePicker } from '@/screens/settings/sections/workspace-theme-picker'
 
 type Tab = 'create' | 'manage' | 'theme'
 
@@ -37,9 +38,8 @@ export function EchoStudioScreen() {
   }
 
   const handleTemplate = (id: string) => {
-    const templates: Record<
-      string,
-      { id: string; title: string; prompt: string }
+    const templates: Partial<
+      Record<string, { id: string; title: string; prompt: string }>
     > = {
       analytics: {
         id: 'tool-analytics',
@@ -231,14 +231,17 @@ export function EchoStudioScreen() {
 
         {/* Theme Tab */}
         {tab === 'theme' && (
-          <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-8 text-center">
-            <p className="text-lg text-[var(--theme-muted)]">
-              Theme customization coming soon.
-            </p>
-            <p className="mt-1 text-sm text-[var(--theme-muted)]">
-              Choose from light, dark, and custom color schemes for your
-              dashboards.
-            </p>
+          <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-6">
+            <div className="mb-5">
+              <h2 className="text-lg font-semibold text-ink">
+                Workspace theme
+              </h2>
+              <p className="mt-1 text-sm text-[var(--theme-muted)]">
+                Choose a theme for Echo Studio and the rest of this workspace.
+                Your selection is saved automatically.
+              </p>
+            </div>
+            <WorkspaceThemePicker />
           </div>
         )}
       </div>

@@ -2,6 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { listTasks, updateTask } from '../../server/tasks-store'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+} from '../../server/rate-limit'
 
 export function isStubReviewTask(task: {
   column: string
@@ -33,7 +39,13 @@ export function isStubReviewTask(task: {
 export const Route = createFileRoute('/api/tasks-replan-stubs')({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        if (!rateLimit(`tasks-replan-stubs:${getClientIp(request)}`, 5, 60_000)) {
+          return rateLimitResponse()
+        }
         const now = new Date().toISOString()
         const stubs = listTasks({ column: 'review' }).filter(isStubReviewTask)
 

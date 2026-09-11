@@ -55,9 +55,21 @@ echo "[stable] starting Hermes Workspace on port $PORT..."
 nohup env PORT="$PORT" NODE_OPTIONS="--max-old-space-size=2048" node server-entry.js >>"$LOG_FILE" 2>&1 &
 new_pid=$!
 echo "$new_pid" >"$PID_FILE"
+EXPECTED_BUILD="${HERMES_BUILD_ID:-}"
+if [[ -z "$EXPECTED_BUILD" ]]; then
+  EXPECTED_BUILD="$(sha256sum dist/server/server.js | cut -c1-16)"
+fi
 
 for _ in {1..40}; do
   if curl -fsS "http://127.0.0.1:$PORT/chat/new" >/dev/null 2>&1; then
+    if ! RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" \
+      node scripts/release-smoke.mjs "http://127.0.0.1:$PORT" \
+      >>"$LOG_FILE" 2>&1; then
+      echo "[stable] release smoke failed; refusing to report a healthy service (see $LOG_FILE)" >&2
+      stop_pid "$new_pid"
+      rm -f "$PID_FILE"
+      exit 1
+    fi
     echo "[stable] up on http://127.0.0.1:$PORT/chat/new"
     echo "[stable] pid=$new_pid"
     echo "[stable] log=$LOG_FILE"

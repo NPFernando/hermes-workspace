@@ -144,9 +144,9 @@ export async function* streamResponses(
   // events that only carry the item, not the call_id.
   const itemIdToCallId = new Map<string, string>()
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+  let result = await reader.read()
+  while (!result.done) {
+    const value = result.value
     buffer += decoder.decode(value, { stream: true })
 
     let boundary = buffer.indexOf('\n\n')
@@ -243,5 +243,6 @@ export async function* streamResponses(
 
       boundary = buffer.indexOf('\n\n')
     }
+    result = await reader.read()
   }
 }

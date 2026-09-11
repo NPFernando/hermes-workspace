@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import type { TaskColumn, TaskPriority } from '@/lib/tasks-api'
+import type { TaskOperationFilter } from './format-utils'
 
 export type FilterPreset = {
   name: string
@@ -10,6 +11,7 @@ export type FilterPreset = {
   activeAgent: boolean
   inReview: boolean
   timedOut: boolean
+  operation?: TaskOperationFilter
   age: 'fresh' | 'aging' | 'stale' | null
   priority: TaskPriority | null
   tag: string | null
@@ -26,6 +28,8 @@ export function useTaskFilters(initialAssignee: string | null) {
   const [filterActiveAgent, setFilterActiveAgent] = useState(false)
   const [filterInReview, setFilterInReview] = useState(false)
   const [filterTimedOut, setFilterTimedOut] = useState(false)
+  const [operationFilter, setOperationFilter] =
+    useState<TaskOperationFilter>('all')
   const [ageFilter, setAgeFilter] = useState<
     'fresh' | 'aging' | 'stale' | null
   >(null)
@@ -83,6 +87,7 @@ export function useTaskFilters(initialAssignee: string | null) {
         activeAgent: filterActiveAgent,
         inReview: filterInReview,
         timedOut: filterTimedOut,
+        operation: operationFilter,
         age: ageFilter,
         priority: priorityFilter,
         tag: tagFilter,
@@ -101,6 +106,7 @@ export function useTaskFilters(initialAssignee: string | null) {
       filterActiveAgent,
       filterInReview,
       filterTimedOut,
+      operationFilter,
       ageFilter,
       priorityFilter,
       tagFilter,
@@ -115,6 +121,7 @@ export function useTaskFilters(initialAssignee: string | null) {
     setFilterActiveAgent(p.activeAgent)
     setFilterInReview(p.inReview)
     setFilterTimedOut(p.timedOut)
+    setOperationFilter(p.operation ?? 'all')
     setAgeFilter(p.age)
     setPriorityFilter(p.priority)
     setTagFilter(p.tag)
@@ -135,6 +142,7 @@ export function useTaskFilters(initialAssignee: string | null) {
     setFilterActiveAgent(false)
     setFilterInReview(false)
     setFilterTimedOut(false)
+    setOperationFilter('all')
     setAgeFilter(null)
     setPriorityFilter(null)
     setTagFilter(null)
@@ -155,6 +163,8 @@ export function useTaskFilters(initialAssignee: string | null) {
     setFilterInReview,
     filterTimedOut,
     setFilterTimedOut,
+    operationFilter,
+    setOperationFilter,
     ageFilter,
     setAgeFilter,
     priorityFilter,

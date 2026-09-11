@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildDashboardOverview } from './dashboard-aggregator'
 import type { DashboardFetcher } from './dashboard-aggregator'
 
@@ -22,6 +22,27 @@ function makeFetcher(routes: Record<string, unknown>): DashboardFetcher {
 }
 
 describe('buildDashboardOverview', () => {
+  it('returns partial data when one upstream never responds', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetcher: DashboardFetcher = async (path) => {
+        if (path.startsWith('/api/status'))
+          return new Promise<Response>(() => {})
+        return new Response('upstream unavailable', { status: 503 })
+      }
+
+      const pending = buildDashboardOverview({ fetcher })
+      await vi.advanceTimersByTimeAsync(4_000)
+      const overview = await pending
+
+      expect(overview.status).toBeNull()
+      expect(overview.cron).toBeNull()
+      expect(overview.analytics).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('returns null sections when every upstream call fails', async () => {
     const fetcher: DashboardFetcher = async () =>
       new Response('boom', { status: 500 })

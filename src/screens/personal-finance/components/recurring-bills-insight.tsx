@@ -32,6 +32,7 @@ export function detectRecurringVendors(
   const byVendor = new Map<string, Bucket>()
 
   for (const row of expenseRecords) {
+    if (row.deletedAt || stringField(row, 'transactionType') === 'transfer') continue
     const date = stringField(row, 'date')
     const month = date.slice(0, 7)
     if (!month || month < cutoffMonth) continue
