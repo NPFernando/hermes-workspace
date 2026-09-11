@@ -86,6 +86,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     match: (p: string) => p.startsWith('/personal-finance'),
   },
   {
+    id: 'dify',
+    label: 'Dify Workbench',
+    icon: PuzzleIcon,
+    to: '/dify',
+    match: (p: string) => p.startsWith('/dify'),
+  },
+  {
     id: 'command',
     label: 'Command Center',
     icon: UserMultipleIcon,
