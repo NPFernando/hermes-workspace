@@ -438,7 +438,7 @@ export function PersonalFinanceScreen() {
         <>
           <PendingIngestionPanel payload={payload} onConfirmed={setPayload} />
           <div className="mt-4">
-            <CsvImportPanel onPayload={setPayload} />
+            <CsvImportPanel payload={payload} onPayload={setPayload} />
           </div>
         </>
       )}

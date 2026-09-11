@@ -7,6 +7,7 @@ import {
   positiveTone,
   warningTone,
 } from '../shared-styles'
+import { stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
 /**
@@ -33,6 +34,7 @@ type ColumnMapping = {
   category: string
   currency: string
   kindColumn: string
+  accountColumn: string
 }
 
 type KindMode = 'all-expense' | 'all-income' | 'sign' | 'column'
@@ -113,7 +115,18 @@ export function autoDetect(headers: Array<string>): ColumnMapping {
     category: find('category'),
     currency: find('currency'),
     kindColumn: find('kind', 'type'),
+    accountColumn: find('account'),
   }
+}
+
+/** Case-insensitive, trimmed name match — CSVs (including this app's own export) carry account *names*, not ids. */
+export function matchAccountId(
+  name: string,
+  accounts: Array<{ id: string; name: string }>,
+): string | undefined {
+  const target = name.trim().toLowerCase()
+  if (!target) return undefined
+  return accounts.find((a) => a.name.trim().toLowerCase() === target)?.id
 }
 
 export function normalizeKind(raw: string): 'income' | 'expense' | null {
@@ -130,6 +143,7 @@ type Normalized = {
   currency: string
   vendorOrSource: string
   category?: string
+  accountId?: string
 }
 
 export function normalizeRow(
@@ -137,6 +151,8 @@ export function normalizeRow(
   row: Array<string>,
   mapping: ColumnMapping,
   kindMode: KindMode,
+  accounts: Array<{ id: string; name: string }> = [],
+  defaultAccountId?: string,
 ): Normalized | { error: string } {
   const col = (name: string) => {
     const i = headers.indexOf(name)
@@ -162,9 +178,16 @@ export function normalizeRow(
   }
   amount = Math.abs(amount)
 
+  // A row's own account column wins by name match; otherwise fall back to
+  // whichever account the user picked as the default for this whole file.
+  // Neither set — the row imports unassigned, same as before this feature.
+  const accountId =
+    matchAccountId(col(mapping.accountColumn), accounts) ?? defaultAccountId
+
   return {
     kind,
     date,
+    accountId,
     amount,
     currency: col(mapping.currency) || 'LKR',
     vendorOrSource,
@@ -173,14 +196,21 @@ export function normalizeRow(
 }
 
 export function CsvImportPanel({
+  payload,
   onPayload,
 }: {
+  payload: PersonalFinancePayload
   onPayload: (payload: PersonalFinancePayload) => void
 }) {
+  const accounts = payload.data.finance_accounts.map((a, i) => ({
+    id: stringField(a, 'id') || String(i),
+    name: stringField(a, 'name'),
+  }))
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [parsed, setParsed] = useState<ParsedCsv | null>(null)
   const [mapping, setMapping] = useState<ColumnMapping | null>(null)
   const [kindMode, setKindMode] = useState<KindMode>('sign')
+  const [defaultAccountId, setDefaultAccountId] = useState('')
   const [importing, setImporting] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [result, setResult] = useState<{
@@ -209,7 +239,16 @@ export function CsvImportPanel({
     parsed && mapping
       ? parsed.rows
           .slice(0, 5)
-          .map((row) => normalizeRow(parsed.headers, row, mapping, kindMode))
+          .map((row) =>
+            normalizeRow(
+              parsed.headers,
+              row,
+              mapping,
+              kindMode,
+              accounts,
+              defaultAccountId || undefined,
+            ),
+          )
       : []
 
   async function runImport() {
@@ -219,7 +258,14 @@ export function CsvImportPanel({
     setResult(null)
     try {
       const normalized = parsed.rows.map((row) =>
-        normalizeRow(parsed.headers, row, mapping, kindMode),
+        normalizeRow(
+          parsed.headers,
+          row,
+          mapping,
+          kindMode,
+          accounts,
+          defaultAccountId || undefined,
+        ),
       )
       const rows = normalized.filter(
         (r): r is Normalized => !('error' in r),
@@ -308,6 +354,7 @@ export function CsvImportPanel({
                 ['vendor', 'Vendor / counterparty'],
                 ['category', 'Category (optional)'],
                 ['currency', 'Currency (optional)'],
+                ['accountColumn', 'Account name (optional)'],
               ] as const
             ).map(([key, label]) => (
               <label key={key} className="text-xs text-[var(--theme-muted)]">
@@ -329,6 +376,24 @@ export function CsvImportPanel({
               </label>
             ))}
           </div>
+
+          {accounts.length > 0 && (
+            <label className="mt-2 block text-xs text-[var(--theme-muted)]">
+              Default account for rows with no match above (optional)
+              <select
+                value={defaultAccountId}
+                onChange={(e) => setDefaultAccountId(e.target.value)}
+                className={`${inputClass} mt-1 w-full sm:w-64`}
+              >
+                <option value="">— leave unassigned —</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <div className="mt-3">
             <p className="text-xs text-[var(--theme-muted)]">
@@ -399,14 +464,15 @@ export function CsvImportPanel({
                   <th className="pr-3">Vendor</th>
                   <th className="pr-3">Amount</th>
                   <th className="pr-3">Currency</th>
-                  <th>Category</th>
+                  <th className="pr-3">Category</th>
+                  <th>Account</th>
                 </tr>
               </thead>
               <tbody>
                 {normalizedPreview.map((r, i) =>
                   'error' in r ? (
                     <tr key={i} className={dangerTone}>
-                      <td colSpan={6}>Row {i + 1}: {r.error}</td>
+                      <td colSpan={7}>Row {i + 1}: {r.error}</td>
                     </tr>
                   ) : (
                     <tr key={i}>
@@ -415,7 +481,11 @@ export function CsvImportPanel({
                       <td className="pr-3">{r.vendorOrSource}</td>
                       <td className="pr-3">{r.amount}</td>
                       <td className="pr-3">{r.currency}</td>
-                      <td>{r.category ?? ''}</td>
+                      <td className="pr-3">{r.category ?? ''}</td>
+                      <td>
+                        {accounts.find((a) => a.id === r.accountId)?.name ??
+                          (r.accountId ? r.accountId : '—')}
+                      </td>
                     </tr>
                   ),
                 )}
