@@ -122,6 +122,23 @@ vi.mock('../../server/finance-store', () => ({
   tradingPerformanceSummary: vi.fn(() => ({})),
   updateExchangeRate: vi.fn(),
   writeFinanceStore: vi.fn(),
+  listPendingIngestions: vi.fn(() => []),
+  updatePendingIngestion: vi.fn(),
+  getCategoryCorrections: vi.fn(() => ({})),
+}))
+// Neither of these was mocked before (the pending_ingestions actions —
+// submit_ingestion_password, confirm_pending_ingestion, and now
+// retry_pending_extraction — had zero test coverage in this file), which
+// meant the *real* network-calling functions would run if any test ever
+// exercised those actions. Mock them explicitly rather than leaving that trap.
+vi.mock('../../server/finance-extraction', () => ({
+  answerFinanceQuestion: vi.fn(),
+  extractEmploymentContract: vi.fn(),
+  extractTransactionFromImage: vi.fn(),
+}))
+vi.mock('../../server/document-normalizer', () => ({
+  isPdfEncrypted: vi.fn(() => false),
+  pdfToImages: vi.fn(),
 }))
 vi.mock('../../server/exchange-rate.service', () => ({
   fetchLkrExchangeRates: vi.fn(),
@@ -542,41 +559,52 @@ describe('/api/finance fetch_news', () => {
   })
 
   it('refresh_exchange_rates writes both legs per currency, reverse = reciprocal (PF-201)', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    const svc = await import('../../server/exchange-rate.service')
-    vi.mocked(store.updateExchangeRate).mockClear()
-    vi.mocked(svc.fetchLkrExchangeRates).mockResolvedValue({
-      lkrPer: { USD: 300, AUD: 200 },
-      asOf: '2026-09-10T00:02:31.000Z',
-      source: 'open.er-api.com',
-    })
+    // The handler derives its stored date from the real clock
+    // (`new Date().toISOString().slice(0, 10)` in finance.ts), not from the
+    // fetched `asOf` — a hardcoded expected date here broke every day after
+    // it was written (confirmed: failed once the wall clock rolled past
+    // 2026-09-10). Pin the clock instead of hardcoding "today".
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-10T12:00:00.000Z'))
+    try {
+      state.authenticated = true
+      const store = await import('../../server/finance-store')
+      const svc = await import('../../server/exchange-rate.service')
+      vi.mocked(store.updateExchangeRate).mockClear()
+      vi.mocked(svc.fetchLkrExchangeRates).mockResolvedValue({
+        lkrPer: { USD: 300, AUD: 200 },
+        asOf: '2026-09-10T00:02:31.000Z',
+        source: 'open.er-api.com',
+      })
 
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'refresh_exchange_rates' }),
-      }),
-    })
+      const response = await (
+        await handlers()
+      ).POST({
+        request: new Request('http://localhost/api/finance', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'refresh_exchange_rates' }),
+        }),
+      })
 
-    expect(response.status).toBe(200)
-    const body = (await response.json()) as {
-      ok: boolean
-      source: string
-      updated: Array<{ pair: string }>
+      expect(response.status).toBe(200)
+      const body = (await response.json()) as {
+        ok: boolean
+        source: string
+        updated: Array<{ pair: string }>
+      }
+      expect(body.ok).toBe(true)
+      expect(body.source).toBe('open.er-api.com')
+      expect(body.updated.map((u) => u.pair).sort()).toEqual(['AUD/LKR', 'USD/LKR'])
+
+      const calls = vi.mocked(store.updateExchangeRate).mock.calls
+      // USD: <cur>->LKR at 300, LKR-><cur> at 1/300
+      expect(calls).toContainEqual(['USD', 'LKR', 300, '2026-09-10'])
+      const usdBack = calls.find((c) => c[0] === 'LKR' && c[1] === 'USD')
+      expect(usdBack?.[2]).toBeCloseTo(1 / 300)
+      expect(calls).toContainEqual(['AUD', 'LKR', 200, '2026-09-10'])
+    } finally {
+      vi.useRealTimers()
     }
-    expect(body.ok).toBe(true)
-    expect(body.source).toBe('open.er-api.com')
-    expect(body.updated.map((u) => u.pair).sort()).toEqual(['AUD/LKR', 'USD/LKR'])
-
-    const calls = vi.mocked(store.updateExchangeRate).mock.calls
-    // USD: <cur>->LKR at 300, LKR-><cur> at 1/300
-    expect(calls).toContainEqual(['USD', 'LKR', 300, '2026-09-10'])
-    const usdBack = calls.find((c) => c[0] === 'LKR' && c[1] === 'USD')
-    expect(usdBack?.[2]).toBeCloseTo(1 / 300)
-    expect(calls).toContainEqual(['AUD', 'LKR', 200, '2026-09-10'])
   })
 
   it('refresh_exchange_rates returns 502 and writes nothing when the source is down', async () => {
@@ -597,6 +625,163 @@ describe('/api/finance fetch_news', () => {
 
     expect(response.status).toBe(502)
     expect(vi.mocked(store.updateExchangeRate)).not.toHaveBeenCalled()
+  })
+
+  it('retry_pending_extraction re-runs extraction from the saved preview image and clears the prior error on success', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const extraction = await import('../../server/finance-extraction')
+    vi.mocked(store.listPendingIngestions).mockReturnValue([
+      {
+        id: 'p1',
+        status: 'awaiting_review',
+        source: 'gmail',
+        documentType: 'transaction',
+        sourceRef: '/tmp/original.pdf',
+        rawPreviewImagePath: '/tmp/preview.png',
+        error: 'all_routes_failed',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ])
+    vi.mocked(extraction.extractTransactionFromImage).mockResolvedValue({
+      ok: true,
+      data: {
+        kind: 'expense',
+        amount: 500,
+        currency: 'LKR',
+        vendorOrSource: 'Starlink',
+        date: '2026-01-01',
+        confidence: 'high',
+      },
+    })
+    vi.mocked(store.updatePendingIngestion).mockImplementation((id, patch) => ({
+      id,
+      status: 'awaiting_review',
+      source: 'gmail',
+      documentType: 'transaction',
+      sourceRef: '/tmp/original.pdf',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      ...patch,
+    }))
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'retry_pending_extraction', id: 'p1' }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(vi.mocked(extraction.extractTransactionFromImage)).toHaveBeenCalledWith(
+      '/tmp/preview.png',
+      {},
+    )
+    expect(vi.mocked(store.updatePendingIngestion)).toHaveBeenCalledWith('p1', {
+      extracted: expect.objectContaining({ vendorOrSource: 'Starlink' }),
+      error: undefined,
+    })
+    const body = (await response.json()) as {
+      ok: boolean
+      pendingIngestion: { extracted?: { vendorOrSource: string } }
+    }
+    expect(body.ok).toBe(true)
+    expect(body.pendingIngestion.extracted?.vendorOrSource).toBe('Starlink')
+  })
+
+  it('retry_pending_extraction records the new failure reason when it fails again', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const extraction = await import('../../server/finance-extraction')
+    vi.mocked(store.listPendingIngestions).mockReturnValue([
+      {
+        id: 'p2',
+        status: 'awaiting_review',
+        source: 'gmail',
+        documentType: 'transaction',
+        sourceRef: '/tmp/original.pdf',
+        rawPreviewImagePath: '/tmp/preview.png',
+        error: 'all_routes_failed',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ])
+    vi.mocked(extraction.extractTransactionFromImage).mockResolvedValue({
+      ok: false,
+      reason: 'all_routes_failed',
+    })
+    vi.mocked(store.updatePendingIngestion).mockImplementation((id, patch) => ({
+      id,
+      status: 'awaiting_review',
+      source: 'gmail',
+      documentType: 'transaction',
+      sourceRef: '/tmp/original.pdf',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      ...patch,
+    }))
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'retry_pending_extraction', id: 'p2' }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(vi.mocked(store.updatePendingIngestion)).toHaveBeenCalledWith('p2', {
+      extracted: undefined,
+      error: 'all_routes_failed',
+    })
+  })
+
+  it('retry_pending_extraction returns 400 when there is no saved preview image to retry from', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.listPendingIngestions).mockReturnValue([
+      {
+        id: 'p3',
+        status: 'awaiting_review',
+        source: 'upload',
+        documentType: 'transaction',
+        sourceRef: '/tmp/original.pdf',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'retry_pending_extraction', id: 'p3' }),
+      }),
+    })
+
+    expect(response.status).toBe(400)
+  })
+
+  it('retry_pending_extraction returns 404 for an unknown id', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.listPendingIngestions).mockReturnValue([])
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'retry_pending_extraction', id: 'missing' }),
+      }),
+    })
+
+    expect(response.status).toBe(404)
   })
 
   it('list_transactions pages the unified history by id cursor (PF review item 9)', async () => {
