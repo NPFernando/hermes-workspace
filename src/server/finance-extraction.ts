@@ -11,9 +11,23 @@
  * tuned for text tasks) — so this keeps its own short, explicit vision
  * route list instead of trusting selectHarpRoutes() for this task type,
  * with Gemini (already configured via GOOGLE_API_KEY for tier-4 routing)
- * as the final fallback since OpenRouter's free vision models are the same
+ * as the next fallback since OpenRouter's free vision models are the same
  * ones that get rate-limited elsewhere in this app.
+ *
+ * Final fallback: the Claude Code CLI (flat-rate subscription, not
+ * per-token — see callClaudeCliVision), only for image extraction. This is
+ * deliberately NOT routed through selectHarpRoutes() — that function only
+ * ever returns free-tier OpenRouter routes by design (llm-signal-engine.ts),
+ * after an incident where an unfiltered chain silently escalated to a paid
+ * model in an *autonomous* trading loop. This call site is different: it
+ * only ever runs once per manually-triggered sync/upload item, so the same
+ * runaway-spend risk doesn't apply, and a subscription CLI call is ~$0
+ * marginal cost anyway. Confirmed live (2026-09-11) that both free OpenRouter
+ * vision models and direct Gemini can be simultaneously rate-limited
+ * (429 from all three) — this exists so a queued item doesn't just sit with
+ * no extracted data until someone happens to retry it later.
  */
+import { spawnSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -467,6 +481,51 @@ async function callGeminiText(prompt: string): Promise<string | null> {
   return callGemini([{ text: prompt }])
 }
 
+const CLAUDE_CLI_BIN =
+  process.env.CLAUDE_BIN || '/home/ubuntu/.hermes/node/bin/claude'
+// Haiku is plenty for structured bill/receipt extraction and keeps this
+// fallback cheap+fast relative to the default Sonnet session — see
+// claude_cli_delegate.sh for the same --model override convention.
+const CLAUDE_CLI_MODEL = 'claude-haiku-4-5-20251001'
+
+/**
+ * Last-resort vision extraction via the Claude Code CLI subscription
+ * (flat-rate, not per-token — see the module header for why this bypasses
+ * selectHarpRoutes()). Passes the image by file path rather than piping
+ * base64 through argv/stdin — `--restricted` strips every tool except the
+ * ones the prompt explicitly needs, and `Read` is exactly the one Claude
+ * needs to look at the image; nothing here can run a shell command or
+ * write a file. `--dangerously-skip-permissions` is paired with
+ * `--restricted` specifically so it's safe: there's nothing dangerous left
+ * to auto-approve once code-exec tools are removed.
+ */
+export function callClaudeCliVision(
+  imagePath: string,
+  instructions: string,
+): string | null {
+  try {
+    const prompt = `${instructions}\n\nThe document to extract from is the image at this exact path: ${imagePath}\nUse the Read tool to view it, then respond with ONLY the JSON object described above — no other text.`
+    const result = spawnSync(
+      CLAUDE_CLI_BIN,
+      [
+        '-p',
+        prompt,
+        '--model',
+        CLAUDE_CLI_MODEL,
+        '--restricted',
+        '--allowedTools',
+        'Read',
+        '--dangerously-skip-permissions',
+      ],
+      { encoding: 'utf-8', timeout: 60_000 },
+    )
+    if (result.status !== 0 || !result.stdout) return null
+    return result.stdout
+  } catch {
+    return null
+  }
+}
+
 export async function extractTransactionFromImage(
   imagePath: string,
   categoryHints?: Record<string, string>,
@@ -494,6 +553,9 @@ export async function extractTransactionFromImage(
     image.mimeType,
   )
   if (geminiContent) return parseExtractionJson(geminiContent)
+
+  const claudeContent = callClaudeCliVision(imagePath, instructions)
+  if (claudeContent) return parseExtractionJson(claudeContent)
 
   return { ok: false, reason: 'all_routes_failed' }
 }
