@@ -4,6 +4,7 @@ import path from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { listTasks } from '../../server/tasks-store'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 export type SweepStats = {
   lastSweepAt: string
@@ -18,7 +19,10 @@ export type SweepStats = {
 export const Route = createFileRoute('/api/tasks-sweep-stats')({
   server: {
     handlers: {
-      GET: () => {
+      GET: ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         const todayDate = new Date().toISOString().slice(0, 10)
 
         let dispatched = 0,
@@ -37,14 +41,13 @@ export const Route = createFileRoute('/api/tasks-sweep-stats')({
             fs.readFileSync(statsFile, 'utf-8'),
           ) as SweepStats
           dispatched =
-            stats.executedDate === todayDate ? (stats.executedToday ?? 0) : 0
-          completed =
-            stats.outcomeDate === todayDate ? (stats.completedToday ?? 0) : 0
+            stats.executedDate === todayDate ? stats.executedToday : 0
+          completed = stats.outcomeDate === todayDate ? stats.completedToday : 0
           blockedOutcome =
-            stats.outcomeDate === todayDate ? (stats.blockedToday ?? 0) : 0
+            stats.outcomeDate === todayDate ? stats.blockedToday : 0
           needsInput =
-            stats.outcomeDate === todayDate ? (stats.needsInputToday ?? 0) : 0
-          lastSweepAt = stats.lastSweepAt ?? null
+            stats.outcomeDate === todayDate ? stats.needsInputToday : 0
+          lastSweepAt = stats.lastSweepAt
         } catch {
           /* no stats yet */
         }

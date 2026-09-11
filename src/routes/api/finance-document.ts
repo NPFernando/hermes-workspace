@@ -12,6 +12,7 @@ import * as path from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { resolveFinanceFilePath } from '../../server/finance-file-security'
 import { FINANCE_DATA_DIR, readFinanceStore } from '../../server/finance-store'
 
 function contentTypeFor(filePath: string): string {
@@ -33,15 +34,20 @@ export const Route = createFileRoute('/api/finance-document')({
         const id = url.searchParams.get('id')
         if (
           !id ||
-          (kind !== 'income_source' &&
+          (kind !== 'finance_account' &&
+            kind !== 'income_source' &&
             kind !== 'income_record' &&
-            kind !== 'expense_record')
+            kind !== 'expense_record' &&
+            kind !== 'stock_holding' &&
+            kind !== 'fixed_deposit' &&
+            kind !== 'tax_record' &&
+            kind !== 'insurance_policy')
         ) {
           return json(
             {
               ok: false,
               error:
-                'kind=income_source|income_record|expense_record and id are required.',
+                'kind=finance_account|income_source|income_record|expense_record|stock_holding|fixed_deposit|tax_record|insurance_policy and id are required.',
             },
             { status: 400 },
           )
@@ -49,11 +55,21 @@ export const Route = createFileRoute('/api/finance-document')({
 
         const db = readFinanceStore()
         const record =
-          kind === 'income_source'
-            ? db.income_sources.find((r) => r.id === id)
-            : kind === 'income_record'
-              ? db.income_records.find((r) => r.id === id)
-              : db.expense_records.find((r) => r.id === id)
+          kind === 'finance_account'
+            ? db.finance_accounts.find((r) => r.id === id)
+            : kind === 'income_source'
+              ? db.income_sources.find((r) => r.id === id)
+              : kind === 'income_record'
+                ? db.income_records.find((r) => r.id === id)
+                : kind === 'expense_record'
+                  ? db.expense_records.find((r) => r.id === id)
+                  : kind === 'stock_holding'
+                    ? db.stock_holdings.find((r) => r.id === id)
+                    : kind === 'fixed_deposit'
+                      ? db.fixed_deposits.find((r) => r.id === id)
+                      : kind === 'tax_record'
+                        ? db.tax_records.find((r) => r.id === id)
+                        : db.insurance_policies.find((r) => r.id === id)
         const documentRef = record?.documentRef
         if (!documentRef)
           return json(
@@ -61,8 +77,8 @@ export const Route = createFileRoute('/api/finance-document')({
             { status: 404 },
           )
 
-        const resolved = path.resolve(documentRef)
-        if (!resolved.startsWith(path.resolve(FINANCE_DATA_DIR) + path.sep)) {
+        const resolved = resolveFinanceFilePath(documentRef, FINANCE_DATA_DIR)
+        if (!resolved) {
           return json(
             { ok: false, error: 'Invalid document path.' },
             { status: 400 },

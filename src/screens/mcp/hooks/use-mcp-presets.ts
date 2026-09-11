@@ -37,10 +37,17 @@ export function useMcpPresets() {
         throw new Error(`MCP presets failed (${res.status})`)
       }
       const body = (await res.json()) as Partial<McpPresetsResponse>
+      const sourceValue: unknown = body.source
+      const source: McpPresetSource =
+        sourceValue === 'user-file' ||
+        sourceValue === 'seed' ||
+        sourceValue === 'invalid'
+          ? sourceValue
+          : 'invalid'
       return {
         ok: body.ok ?? false,
         presets: body.presets ?? [],
-        source: (body.source as McpPresetSource) ?? 'invalid',
+        source,
         error: body.error,
         errorPath: body.errorPath,
         validationErrors: body.validationErrors,

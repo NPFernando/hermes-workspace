@@ -21,9 +21,12 @@ export function formatFractionPct(value: number): string {
   return `${(value * 100).toFixed(1)}%`
 }
 
-/** Locale date-time string; echoes the raw value on an unparseable date. */
-export function formatDateTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString()
+export function formatDateTime(value: string | number | Date | null | undefined): string {
+  if (value === null || value === undefined || value === '') return 'Unknown time'
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Unknown time'
+  return new Intl.DateTimeFormat('en-LK', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }

@@ -6,6 +6,11 @@ import {
   ensureLocalSession,
 } from '../../server/local-session-store'
 import { listTasks } from '../../server/tasks-store'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+} from '../../server/rate-limit'
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -17,9 +22,12 @@ function jsonResponse(data: unknown, status = 200) {
 export const Route = createFileRoute('/api/tasks-ask-astra')({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
+        }
+        if (!rateLimit(`tasks-ask-astra:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
         }
 
         const allTasks = listTasks({ includeDone: false })

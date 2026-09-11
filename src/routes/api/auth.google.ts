@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   buildGoogleAuthUrl,
+  createOAuthStateCookie,
   isGoogleOAuthEnabled,
   storeOAuthState,
 } from '../../server/google-oauth'
@@ -9,7 +10,7 @@ import {
 export const Route = createFileRoute('/api/auth/google')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         const url = new URL(request.url)
 
         // ?check=1 — used by the login screen to detect if Google OAuth is configured
@@ -27,7 +28,10 @@ export const Route = createFileRoute('/api/auth/google')({
 
         return new Response(null, {
           status: 302,
-          headers: { Location: authUrl },
+          headers: {
+            Location: authUrl,
+            'Set-Cookie': createOAuthStateCookie(state),
+          },
         })
       },
     },

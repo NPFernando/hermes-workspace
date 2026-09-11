@@ -102,21 +102,21 @@ export function ConnectionCheckStep({
 
       <p className="mb-6 max-w-md text-base leading-relaxed text-[var(--theme-muted)]">
         {status === 'connected'
-          ? 'Your backend is reachable and ready for setup.'
+          ? 'Your AI service is reachable and ready for setup.'
           : status === 'checking'
-            ? 'Checking whether an OpenAI-compatible backend is available...'
-            : 'No compatible backend is connected yet.'}
+            ? 'Checking whether a compatible AI service is available...'
+            : 'No compatible AI service is connected yet.'}
       </p>
 
       {status === 'disconnected' && (
         <div className="mb-6 w-full rounded-2xl border border-red-200 bg-red-50 p-4 text-left">
           <p className="mb-3 text-sm font-medium text-red-700">
-            Make sure the Hermes Agent HTTP API server is enabled:
+            Make sure workspace access is enabled for Hermes:
           </p>
           <div className="space-y-2">
             <div>
               <p className="text-xs font-medium text-red-700 mb-1">
-                1. Enable the API server in <code>~/.hermes/.env</code>:
+                1. Enable workspace access in <code>~/.hermes/.env</code>:
               </p>
               <code className="block overflow-x-auto rounded-lg bg-red-100 px-3 py-2 text-xs text-red-900">
                 API_SERVER_ENABLED=true
@@ -124,7 +124,7 @@ export function ConnectionCheckStep({
             </div>
             <div>
               <p className="text-xs font-medium text-red-700 mb-1">
-                2. Restart the gateway:
+                2. Restart Hermes:
               </p>
               <code className="block overflow-x-auto rounded-lg bg-red-100 px-3 py-2 text-xs text-red-900">
                 cd hermes-agent && hermes --gateway
@@ -132,8 +132,8 @@ export function ConnectionCheckStep({
             </div>
           </div>
           <p className="mt-3 text-xs text-red-700">
-            Or point <code>HERMES_API_URL</code> at any OpenAI-compatible
-            backend (Ollama, LiteLLM, vLLM, etc.).
+            Or point <code>HERMES_API_URL</code> at a compatible AI service
+            such as Ollama, LiteLLM, or vLLM.
           </p>
           {lastError && (
             <p className="mt-3 text-xs text-red-700">{lastError}</p>
@@ -213,8 +213,8 @@ export function ModelConfigurationStep({
       </h2>
 
       <p className="mb-6 max-w-md text-base leading-relaxed text-[var(--theme-muted)]">
-        Core chat works with any OpenAI-compatible backend. Hermes Agent gateway
-        APIs make provider and model setup editable from the workspace.
+        Core chat works with any compatible AI service. Hermes Workspace lets
+        you manage your provider and model settings here.
       </p>
 
       <div className="mb-6 w-full rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-hover)]/70 p-4 text-left">
@@ -231,9 +231,8 @@ export function ModelConfigurationStep({
               className="mt-0.5 size-5 shrink-0"
             />
             <p className="text-sm">
-              Could not load editable backend configuration right now. You can
-              still continue if chat works and update settings where your
-              backend manages them.
+              Could not load your AI service settings right now. You can still
+              continue if chat works and update them later in Provider Settings.
             </p>
           </div>
         )}
@@ -252,9 +251,8 @@ export function ModelConfigurationStep({
               className="mt-0.5 size-5 shrink-0"
             />
             <p className="text-sm">
-              No model is reported yet. If your backend manages models
-              externally, finish setup there and use the chat test to verify the
-              connection.
+              No model is configured yet. Finish setup with your AI service and
+              use the chat test to verify the connection.
             </p>
           </div>
         )}

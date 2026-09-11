@@ -2,7 +2,13 @@ import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 
 const ODYSSEUS_BASE = 'http://127.0.0.1:7100'
 
@@ -12,6 +18,11 @@ export const Route = createFileRoute('/api/odysseus-bootstrap')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`odysseus-bootstrap:${getClientIp(request)}`, 5, 60_000)) {
+          return rateLimitResponse()
         }
 
         try {

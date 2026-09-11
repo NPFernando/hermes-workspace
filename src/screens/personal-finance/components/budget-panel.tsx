@@ -1,29 +1,147 @@
 import { useState } from 'react'
-import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
 import { StatCard } from '../../finance/components/stat-card'
-import { formatLkr } from '../utils'
-import {
-  buttonClass,
-  confirmButtonClass,
-  dangerButtonClass,
-  inputClass,
-} from '../shared-styles'
-import { boolField, numberField, stringField } from '../field-helpers'
+import { formatLkr, formatMoney } from '../utils'
+import { numberField, stringField } from '../field-helpers'
+import { buttonClass, inputClass } from '../shared-styles'
 import type { PersonalFinancePayload } from '../types'
 
-function budgetTone(percentUsed: number): 'good' | 'warn' | 'danger' {
-  if (percentUsed > 100) return 'danger'
-  if (percentUsed >= 80) return 'warn'
+function budgetTone(row: {
+  percentUsed: number
+  approachingBudget: boolean
+  overBudget: boolean
+}): 'good' | 'warn' | 'danger' {
+  if (row.overBudget || row.percentUsed > 100) return 'danger'
+  if (row.approachingBudget) return 'warn'
   return 'good'
 }
 
-type BudgetDraft = {
-  month: string
+export type ProjectedSpendRow = {
   category: string
-  budgetAmount: string
-  currency: string
-  rolloverEnabled: boolean
+  budget: number
+  actual: number
+  projected: number
+  variance: number
+  percentUsed: number
+}
+
+export type CommittedSpendSummary = {
+  totalLkr: number
+  categories: Array<{ category: string; amountLkr: number }>
+}
+
+export type BudgetRolloverRow = {
+  category: string
+  budget: number
+  rollover: number
+  available: number
+}
+
+function previousMonth(month: string): string {
+  const date = new Date(`${month}-01T12:00:00.000Z`)
+  date.setUTCMonth(date.getUTCMonth() - 1)
+  return date.toISOString().slice(0, 7)
+}
+
+/** PF-809: read-only carry-forward of unused prior-month LKR budget. */
+export function buildBudgetRollover(
+  month: string,
+  currentRows: Array<{ category: string; currency: string; budget: number }>,
+  budgetRecords: Array<Record<string, unknown>>,
+  expenseRecords: Array<Record<string, unknown>>,
+): Array<BudgetRolloverRow> {
+  const prior = previousMonth(month)
+  const priorBudget = new Map<string, number>()
+  for (const row of budgetRecords) {
+    if (stringField(row, 'month') !== prior || (stringField(row, 'currency') || 'LKR') !== 'LKR') continue
+    const category = stringField(row, 'category') || 'Other'
+    priorBudget.set(category, (priorBudget.get(category) ?? 0) + numberField(row, 'budgetAmount'))
+  }
+  const priorActual = new Map<string, number>()
+  for (const expense of expenseRecords) {
+    if (
+      stringField(expense, 'date').slice(0, 7) !== prior ||
+      (stringField(expense, 'currency') || 'LKR') !== 'LKR' ||
+      expense.deletedAt ||
+      stringField(expense, 'transactionType') === 'transfer'
+    ) continue
+    const category = stringField(expense, 'category') || 'Other'
+    priorActual.set(category, (priorActual.get(category) ?? 0) + numberField(expense, 'convertedLkrAmount'))
+  }
+  return currentRows
+    .filter((row) => row.currency === 'LKR')
+    .map((row) => {
+      const rollover = Math.max(0, (priorBudget.get(row.category) ?? 0) - (priorActual.get(row.category) ?? 0))
+      return { category: row.category, budget: row.budget, rollover, available: row.budget + rollover }
+    })
+}
+
+/** PF-805: only explicitly flagged recurring LKR records are counted. */
+export function buildCommittedSpend(
+  month: string,
+  expenseRecords: Array<Record<string, unknown>>,
+): CommittedSpendSummary {
+  const totals = new Map<string, number>()
+  for (const expense of expenseRecords) {
+    if (
+      stringField(expense, 'date').slice(0, 7) !== month ||
+      expense.recurring !== true ||
+      (stringField(expense, 'currency') || 'LKR') !== 'LKR' ||
+      expense.deletedAt ||
+      stringField(expense, 'transactionType') === 'transfer'
+    )
+      continue
+    const category = stringField(expense, 'category') || 'Other'
+    totals.set(
+      category,
+      (totals.get(category) ?? 0) + numberField(expense, 'convertedLkrAmount'),
+    )
+  }
+  const categories = Array.from(totals.entries())
+    .map(([category, amountLkr]) => ({ category, amountLkr }))
+    .sort((a, b) => b.amountLkr - a.amountLkr)
+  return {
+    totalLkr: categories.reduce((sum, row) => sum + row.amountLkr, 0),
+    categories,
+  }
+}
+
+/** PF-807: run-rate projection plus explicitly future-dated recurring entries. */
+export function buildProjectedSpend(
+  month: string,
+  budgetRows: Array<{ category: string; currency: string; budget: number; actual: number }>,
+  expenseRecords: Array<Record<string, unknown>>,
+  asOf = new Date(),
+): Array<ProjectedSpendRow> {
+  const year = Number(month.slice(0, 4))
+  const monthIndex = Number(month.slice(5, 7)) - 1
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
+  const asOfMonth = `${asOf.getFullYear()}-${String(asOf.getMonth() + 1).padStart(2, '0')}`
+  const elapsedDays = asOfMonth === month ? Math.max(1, asOf.getDate()) : daysInMonth
+  return budgetRows
+    .filter((row) => row.currency === 'LKR')
+    .map((row) => {
+      const futureRecurring = expenseRecords
+        .filter((expense) =>
+          stringField(expense, 'date').slice(0, 7) === month &&
+          stringField(expense, 'date') > (asOfMonth === month ? asOf.toISOString().slice(0, 10) : '') &&
+          expense.recurring === true &&
+          !expense.deletedAt &&
+          stringField(expense, 'transactionType') !== 'transfer' &&
+          (stringField(expense, 'category') || 'Other') === row.category,
+        )
+        .reduce((sum, expense) => sum + numberField(expense, 'convertedLkrAmount'), 0)
+      const runRate = row.actual * (daysInMonth / elapsedDays)
+      const projected = Math.max(row.actual, runRate, row.actual + futureRecurring)
+      return {
+        category: row.category,
+        budget: row.budget,
+        actual: row.actual,
+        projected,
+        variance: row.budget - projected,
+        percentUsed: row.budget > 0 ? (projected / row.budget) * 100 : 0,
+      }
+    })
 }
 
 export function BudgetPanel({
@@ -43,16 +161,10 @@ export function BudgetPanel({
   const [budgetMonth, setBudgetMonth] = useState(currentMonth)
   const [budgetCategory, setBudgetCategory] = useState('')
   const [budgetAmount, setBudgetAmount] = useState('')
-  // PF-201: a budget is a plan in the currency the user thinks in — default it
-  // to the configured reporting currency. It's stored in that currency;
-  // getBudgetVsActual converts it to LKR for the vs-actual comparison.
-  const [budgetCurrency, setBudgetCurrency] = useState(payload.baseCurrency)
-  const [budgetRollover, setBudgetRollover] = useState(false)
-  const [copyingBudgets, setCopyingBudgets] = useState(false)
-  const [copyNote, setCopyNote] = useState<string | null>(null)
-  const budgetCurrencyOptions = [
-    ...new Set([payload.baseCurrency, 'LKR', 'USD', 'AUD']),
-  ]
+  const [budgetCurrency, setBudgetCurrency] = useState('LKR')
+  const [templateName, setTemplateName] = useState('')
+  const [templateApplyMonth, setTemplateApplyMonth] = useState(currentMonth)
+  const [budgetExplanation, setBudgetExplanation] = useState<string | null>(null)
   const [expenseDate, setExpenseDate] = useState(
     new Date().toISOString().slice(0, 10),
   )
@@ -60,93 +172,34 @@ export function BudgetPanel({
   const [expenseCategory, setExpenseCategory] = useState('')
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseCurrency, setExpenseCurrency] = useState('LKR')
-
-  const [editOpenId, setEditOpenId] = useState<string | null>(null)
-  const [editDrafts, setEditDrafts] = useState<Record<string, BudgetDraft>>({})
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-
-  const allBudgets = [...payload.data.budget_categories].sort((a, b) =>
-    stringField(a, 'month') < stringField(b, 'month') ? 1 : -1,
+  const [thresholdPct, setThresholdPct] = useState(
+    String(payload.budgetAlertThresholdPct),
+  )
+  const projectedSpend = buildProjectedSpend(
+    currentMonth,
+    payload.budgetVsActual,
+    payload.data.expense_records,
+  )
+  const committedSpend = buildCommittedSpend(
+    currentMonth,
+    payload.data.expense_records,
+  )
+  const budgetRollover = buildBudgetRollover(
+    currentMonth,
+    payload.budgetVsActual,
+    payload.data.budget_categories,
+    payload.data.expense_records,
   )
 
-  function startEdit(row: Record<string, unknown>) {
-    const id = stringField(row, 'id')
-    setEditDrafts((prev) => ({
-      ...prev,
-      [id]: {
-        month: stringField(row, 'month'),
-        category: stringField(row, 'category'),
-        budgetAmount: String(numberField(row, 'budgetAmount')),
-        currency: stringField(row, 'currency') || 'LKR',
-        rolloverEnabled: boolField(row, 'rolloverEnabled'),
-      },
-    }))
-    setEditOpenId(id)
-  }
-
-  async function saveEdit(id: string) {
-    const draft = editDrafts[id]
-    if (!draft.category.trim()) {
-      setErr('Category is required')
-      return
-    }
+  async function saveThreshold() {
     const data = await post(
       {
-        action: 'update_record',
-        kind: 'budget_category',
-        id,
-        payload: {
-          month: draft.month,
-          category: draft.category.trim(),
-          currency: draft.currency,
-          budgetAmount: Number(draft.budgetAmount) || 0,
-          rolloverEnabled: draft.rolloverEnabled,
-        },
+        action: 'set_budget_alert_threshold',
+        pct: Number(thresholdPct) || 80,
       },
-      `edit-${id}`,
+      'threshold',
     )
-    if (data) setEditOpenId(null)
-  }
-
-  async function copyLastMonth() {
-    setCopyingBudgets(true)
-    setErr(null)
-    setCopyNote(null)
-    try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'copy_budgets_to_month', targetMonth: currentMonth }),
-      })
-      const data = (await res.json()) as {
-        ok?: boolean
-        error?: string
-        copied?: number
-        skippedExisting?: number
-      }
-      if (data.ok === false) {
-        setErr(data.error || 'Could not copy budgets')
-        return
-      }
-      onPayload(data as unknown as PersonalFinancePayload)
-      setCopyNote(
-        `Copied ${data.copied ?? 0} budget(s) from the prior month${
-          (data.skippedExisting ?? 0) > 0
-            ? ` (${data.skippedExisting} already had a budget this month, left untouched)`
-            : ''
-        }.`,
-      )
-    } finally {
-      setCopyingBudgets(false)
-    }
-  }
-
-  async function deleteBudget(id: string) {
-    const data = await post(
-      { action: 'delete_record', kind: 'budget_category', id },
-      `delete-${id}`,
-    )
-    if (data) setConfirmDeleteId(null)
+    if (data) setThresholdPct(String(data.budgetAlertThresholdPct))
   }
 
   async function submitBudget() {
@@ -163,7 +216,6 @@ export function BudgetPanel({
           category: budgetCategory.trim(),
           currency: budgetCurrency,
           budgetAmount: Number(budgetAmount) || 0,
-          rolloverEnabled: budgetRollover,
         },
       },
       'budget',
@@ -171,7 +223,6 @@ export function BudgetPanel({
     if (data) {
       setBudgetCategory('')
       setBudgetAmount('')
-      setBudgetRollover(false)
     }
   }
 
@@ -201,6 +252,55 @@ export function BudgetPanel({
     }
   }
 
+  async function saveCurrentBudgetTemplate() {
+    const lines = payload.data.budget_categories
+      .filter((row) => stringField(row, 'month') === budgetMonth)
+      .map((row) => ({
+        category: stringField(row, 'category') || 'Other',
+        currency: stringField(row, 'currency') || 'LKR',
+        budgetAmount: numberField(row, 'budgetAmount'),
+      }))
+      .filter((line) => line.budgetAmount > 0)
+    if (!templateName.trim()) {
+      setErr('Template name is required')
+      return
+    }
+    if (lines.length === 0) {
+      setErr(`Add at least one budget for ${budgetMonth} before saving a template`)
+      return
+    }
+    const data = await post(
+      { action: 'save_budget_template', template: { name: templateName.trim(), lines } },
+      'template-save',
+    )
+    if (data) setTemplateName('')
+  }
+
+  async function applyBudgetTemplate(templateId: string) {
+    await post(
+      { action: 'apply_budget_template', templateId, month: templateApplyMonth },
+      `template-apply-${templateId}`,
+    )
+  }
+
+  async function removeBudgetTemplate(templateId: string) {
+    await post(
+      { action: 'delete_budget_template', id: templateId },
+      `template-delete-${templateId}`,
+    )
+  }
+
+  async function explainBudget() {
+    const data = await post(
+      {
+        action: 'ask_finance_question',
+        question: `Explain my ${currentMonth} budget versus actual spending. Identify the categories most over or under budget, mention projected spend and rollover when present, and give at most three practical observations. Use only the recorded data and clearly say when there is not enough data.`,
+      },
+      'budget-explain',
+    ) as (PersonalFinancePayload & { answer?: string }) | undefined
+    if (data?.answer) setBudgetExplanation(data.answer)
+  }
+
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -208,14 +308,40 @@ export function BudgetPanel({
           <h2 className="text-lg font-semibold">Budget vs. actual spending</h2>
           <p className="text-xs text-[var(--theme-muted)]">
             Set a monthly budget per category, log expenses, and see how actual
-            spending compares — updates instantly below. A non-LKR budget is
-            converted at the exchange rate on file; the comparison is always in
-            LKR-converted terms.
+            spending compares — updates instantly below. Enter budgets in LKR;
+            actual spend is compared using LKR totals.
           </p>
         </div>
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3 lg:col-span-2">
+          <h3 className="text-sm font-semibold">Budget warning threshold</h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            Highlight a category when spending reaches this percentage of its budget.
+            The value is kept between 50% and 100%.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              type="number"
+              min="50"
+              max="100"
+              value={thresholdPct}
+              onChange={(e) => setThresholdPct(e.target.value)}
+              className={`${inputClass} w-24`}
+              aria-label="Budget warning threshold percentage"
+            />
+            <span className="text-sm">%</span>
+            <button
+              type="button"
+              disabled={busy === 'threshold'}
+              onClick={() => void saveThreshold()}
+              className={buttonClass}
+            >
+              {busy === 'threshold' ? 'Saving...' : 'Save threshold'}
+            </button>
+          </div>
+        </div>
         <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
           <h3 className="text-sm font-semibold">Add a budget</h3>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -245,20 +371,10 @@ export function BudgetPanel({
               onChange={(e) => setBudgetCurrency(e.target.value)}
               className={inputClass}
             >
-              {budgetCurrencyOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              <option value="LKR">LKR</option>
+              <option value="USD">USD</option>
+              <option value="AUD">AUD</option>
             </select>
-            <label className="flex items-center gap-1 text-xs text-[var(--theme-muted)]">
-              <input
-                type="checkbox"
-                checked={budgetRollover}
-                onChange={(e) => setBudgetRollover(e.target.checked)}
-              />
-              Roll over unspent amount
-            </label>
             <button
               type="button"
               disabled={busy === 'budget'}
@@ -268,6 +384,93 @@ export function BudgetPanel({
               {busy === 'budget' ? 'Saving...' : 'Add budget'}
             </button>
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3 lg:col-span-2">
+          <h3 className="text-sm font-semibold">Budget templates</h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            Save the budgets from a month as a reusable plan. Applying a template only fills missing categories and never overwrites an existing budget.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <input
+              type="text"
+              placeholder="Template name (e.g. Normal month)"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              className={`${inputClass} min-w-56`}
+            />
+            <button
+              type="button"
+              disabled={busy === 'template-save'}
+              onClick={() => void saveCurrentBudgetTemplate()}
+              className={buttonClass}
+            >
+              {busy === 'template-save' ? 'Saving...' : `Save ${budgetMonth} as template`}
+            </button>
+            <input
+              type="month"
+              value={templateApplyMonth}
+              onChange={(e) => setTemplateApplyMonth(e.target.value)}
+              className={inputClass}
+              aria-label="Template target month"
+            />
+          </div>
+          {(payload.budgetTemplates ?? []).length > 0 && (
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {(payload.budgetTemplates ?? []).map((template) => (
+                <div key={template.id} className="rounded-xl border border-[var(--theme-border)]/60 p-2.5 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold">{template.name}</div>
+                      <div className="mt-1 text-[var(--theme-muted)]">
+                        {template.lines.length} categor{template.lines.length === 1 ? 'y' : 'ies'} · {template.lines.map((line) => formatMoney(line.budgetAmount, line.currency)).join(' + ')}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-[var(--theme-muted)] underline"
+                      disabled={busy === `template-delete-${template.id}`}
+                      onClick={() => void removeBudgetTemplate(template.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className={`${buttonClass} mt-2 w-full`}
+                    disabled={busy === `template-apply-${template.id}`}
+                    onClick={() => void applyBudgetTemplate(template.id)}
+                  >
+                    {busy === `template-apply-${template.id}` ? 'Applying...' : `Apply to ${templateApplyMonth}`}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3 lg:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold">AI budget explanation</h3>
+              <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                Summarizes this month’s recorded budget, actuals, projections, and rollover. It does not change any data.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={busy === 'budget-explain'}
+              onClick={() => void explainBudget()}
+              className={buttonClass}
+            >
+              {busy === 'budget-explain' ? 'Explaining…' : 'Explain this budget'}
+            </button>
+          </div>
+          {budgetExplanation && (
+            <p className="mt-3 rounded-xl bg-[color-mix(in_srgb,var(--theme-text)_6%,transparent)] p-3 text-sm leading-6 text-[var(--theme-text)]">
+              {budgetExplanation}
+            </p>
+          )}
         </div>
 
         <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3">
@@ -324,188 +527,107 @@ export function BudgetPanel({
 
       {err && <p className="mt-3 text-xs text-[var(--theme-danger)]">{err}</p>}
 
-      <div className="mt-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">This month ({currentMonth})</h3>
-          <button
-            type="button"
-            disabled={copyingBudgets}
-            onClick={() => void copyLastMonth()}
-            className={buttonClass}
-          >
-            {copyingBudgets ? 'Copying…' : "Copy last month's budgets"}
-          </button>
+      {committedSpend.totalLkr > 0 && (
+        <div className="mt-4 rounded-2xl border border-[var(--theme-border)]/70 p-3">
+          <h3 className="text-sm font-semibold">Recorded committed spend</h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            {formatLkr(committedSpend.totalLkr)} this month from expenses explicitly marked recurring. Unrecorded commitments are excluded.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {committedSpend.categories.map((row) => (
+              <span key={row.category} className="rounded-xl bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-2.5 py-1 text-xs">
+                {row.category}: {formatLkr(row.amountLkr)}
+              </span>
+            ))}
+          </div>
         </div>
-        {copyNote && (
-          <p className="mt-1 text-xs text-[var(--theme-muted)]">{copyNote}</p>
-        )}
+      )}
+
+      <div className="mt-4">
+        <h3 className="text-sm font-semibold">This month ({currentMonth})</h3>
         {payload.budgetVsActual.length === 0 ? (
           <p className="mt-2 text-sm text-[var(--theme-muted)]">
-            No budgets set for this month yet — add one above, or copy last
-            month's forward with the button above.
+            No budgets set for this month yet — add one above to see how actual
+            spending compares.
           </p>
         ) : (
           <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {payload.budgetVsActual.map((row) => (
               <StatCard
                 key={`${row.month}-${row.category}`}
-                label={`${row.category} — ${Math.round(row.percentUsed)}% used`}
-                value={`${formatLkr(row.actual, row.currency)} / ${formatLkr(row.budget, row.currency)} · ${row.variance >= 0 ? 'Remaining' : 'Over by'} ${formatLkr(Math.abs(row.variance), row.currency)}`}
-                tone={budgetTone(row.percentUsed)}
+                label={`${row.category} — ${row.actualConversionAvailable === false ? 'FX unavailable' : `${Math.round(row.percentUsed)}% used${row.approachingBudget ? ' · Approaching' : ''}`}`}
+                value={row.actualConversionAvailable === false
+                  ? `Add a dated ${row.currency}/LKR rate to compare this budget`
+                  : `${formatMoney(row.actual, row.currency)} / ${formatMoney(row.budget, row.currency)} · ${row.variance >= 0 ? 'Remaining' : 'Over by'} ${formatMoney(Math.abs(row.variance), row.currency)}`}
+                tone={budgetTone(row)}
               />
             ))}
           </div>
         )}
       </div>
 
-      {allBudgets.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-sm font-semibold">All budgets</h3>
-          <div className="mt-2 grid gap-2">
-            {allBudgets.map((row, index) => {
-              const id = stringField(row, 'id') || String(index)
-              const isEditing = editOpenId === id
-              return (
-                <div
-                  key={id}
-                  className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
-                >
-                  {isEditing ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        type="month"
-                        value={editDrafts[id].month}
-                        onChange={(e) =>
-                          setEditDrafts((prev) => ({
-                            ...prev,
-                            [id]: { ...prev[id], month: e.target.value },
-                          }))
-                        }
-                        className={inputClass}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Category"
-                        value={editDrafts[id].category}
-                        onChange={(e) =>
-                          setEditDrafts((prev) => ({
-                            ...prev,
-                            [id]: { ...prev[id], category: e.target.value },
-                          }))
-                        }
-                        list="pf-known-categories"
-                        className={inputClass}
-                      />
-                      <input
-                        type="number"
-                        placeholder="Budget amount"
-                        value={editDrafts[id].budgetAmount}
-                        onChange={(e) =>
-                          setEditDrafts((prev) => ({
-                            ...prev,
-                            [id]: { ...prev[id], budgetAmount: e.target.value },
-                          }))
-                        }
-                        className={`${inputClass} w-32`}
-                      />
-                      <select
-                        value={editDrafts[id].currency}
-                        onChange={(e) =>
-                          setEditDrafts((prev) => ({
-                            ...prev,
-                            [id]: { ...prev[id], currency: e.target.value },
-                          }))
-                        }
-                        className={inputClass}
-                      >
-                        {budgetCurrencyOptions.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                      <label className="flex items-center gap-1 text-xs text-[var(--theme-muted)]">
-                        <input
-                          type="checkbox"
-                          checked={editDrafts[id].rolloverEnabled}
-                          onChange={(e) =>
-                            setEditDrafts((prev) => ({
-                              ...prev,
-                              [id]: { ...prev[id], rolloverEnabled: e.target.checked },
-                            }))
-                          }
-                        />
-                        Roll over unspent
-                      </label>
-                      <button
-                        type="button"
-                        disabled={busy === `edit-${id}`}
-                        onClick={() => void saveEdit(id)}
-                        className={confirmButtonClass}
-                      >
-                        {busy === `edit-${id}` ? 'Saving…' : 'Save'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditOpenId(null)}
-                        className={buttonClass}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-sm text-[var(--theme-text)]">
-                        <span className="text-[var(--theme-muted)]">
-                          {stringField(row, 'month')}
-                        </span>{' '}
-                        · {stringField(row, 'category')} ·{' '}
-                        {formatLkr(
-                          numberField(row, 'budgetAmount'),
-                          stringField(row, 'currency') || 'LKR',
-                        )}
-                        {boolField(row, 'rolloverEnabled') && (
-                          <span className="ml-1 text-[var(--theme-muted)]">
-                            (rolls over)
-                          </span>
-                        )}
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => startEdit(row)}
-                          className={buttonClass}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy === `delete-${id}`}
-                          onClick={() => setConfirmDeleteId(id)}
-                          className={dangerButtonClass}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+      {projectedSpend.length > 0 && (
+        <div className="mt-5 rounded-2xl border border-[var(--theme-border)]/70 p-3">
+          <h3 className="text-sm font-semibold">Projected month-end spend</h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            LKR run-rate estimate plus explicitly future-dated recurring entries; it does not invent unrecorded bills.
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {projectedSpend.map((row) => (
+              <StatCard
+                key={`projected-${row.category}`}
+                label={`${row.category} — ${Math.round(row.percentUsed)}% projected`}
+                value={`${formatLkr(row.projected)} / ${formatLkr(row.budget)}`}
+                tone={budgetTone({
+                  percentUsed: row.percentUsed,
+                  approachingBudget: row.percentUsed >= payload.budgetAlertThresholdPct,
+                  overBudget: row.projected > row.budget,
+                })}
+              />
+            ))}
           </div>
         </div>
       )}
 
-      {confirmDeleteId && (
-        <ConfirmDialog
-          title="Delete this budget?"
-          body="This can't be undone."
-          confirmLabel="Delete"
-          busy={busy === `delete-${confirmDeleteId}`}
-          onConfirm={() => void deleteBudget(confirmDeleteId)}
-          onCancel={() => setConfirmDeleteId(null)}
-        />
+      {budgetRollover.some((row) => row.rollover > 0) && (
+        <div className="mt-5 rounded-2xl border border-[var(--theme-border)]/70 p-3">
+          <h3 className="text-sm font-semibold">Available with rollover</h3>
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">
+            Unused prior-month LKR budget shown as a read-only carry-forward; saved budgets are unchanged.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {budgetRollover.filter((row) => row.rollover > 0).map((row) => (
+              <span key={`rollover-${row.category}`} className="rounded-xl bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] px-2.5 py-1 text-xs">
+                {row.category}: {formatLkr(row.available)} available ({formatLkr(row.rollover)} rollover)
+              </span>
+            ))}
+          </div>
+        </div>
       )}
+
+      <div className="mt-6 border-t border-[var(--theme-border)]/70 pt-4">
+        <h3 className="text-sm font-semibold">
+          Year to date ({new Date().getUTCFullYear()})
+        </h3>
+        {payload.annualBudgetVsActual.length === 0 ? (
+          <p className="mt-2 text-sm text-[var(--theme-muted)]">
+            Add monthly budgets to see an annual rollup.
+          </p>
+        ) : (
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {payload.annualBudgetVsActual.map((row) => (
+              <StatCard
+                key={`annual-${row.year}-${row.category}`}
+                label={`${row.category} — ${row.actualConversionAvailable === false ? 'FX unavailable' : `${Math.round(row.percentUsed)}% used · ${row.monthsTracked} month${row.monthsTracked === 1 ? '' : 's'}`}`}
+                value={row.actualConversionAvailable === false
+                  ? `Add a dated ${row.currency}/LKR rate to compare this budget`
+                  : `${formatMoney(row.actual, row.currency)} / ${formatMoney(row.budget, row.currency)} · ${row.variance >= 0 ? 'Remaining' : 'Over by'} ${formatMoney(Math.abs(row.variance), row.currency)}`}
+                tone={budgetTone(row)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   )
 }

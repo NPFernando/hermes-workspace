@@ -6,6 +6,13 @@ import {
 } from '../../server/astra-tasks'
 import { listTasks, updateTask } from '../../server/tasks-store'
 import { editTelegramClarification } from '../../server/telegram-clarify'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 import type {
   ActivityEntry,
   ClarificationQuestion,
@@ -98,6 +105,20 @@ export const Route = createFileRoute('/api/telegram-task-clarify')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return jsonResponse({ ok: false, error: 'Unauthorized' }, 401)
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (
+          !rateLimit(
+            `telegram-task-clarify:${getClientIp(request)}`,
+            20,
+            60_000,
+          )
+        ) {
+          return rateLimitResponse()
+        }
         let body: Record<string, unknown>
         try {
           body = (await request.json()) as Record<string, unknown>

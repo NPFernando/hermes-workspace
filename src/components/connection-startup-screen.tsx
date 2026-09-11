@@ -4,6 +4,8 @@ import { writeTextToClipboard } from '@/lib/clipboard'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import { safeErrorMessage } from '@/lib/error-utils'
 
+/* eslint-disable @typescript-eslint/no-unnecessary-condition -- state changes from async connection polling */
+
 const POLL_INTERVAL_MS = 2_000
 const FAILURE_REVEAL_MS = 5_000
 // Fire one silent auto-start attempt this many ms after we still can't connect.
@@ -57,7 +59,10 @@ declare global {
 }
 
 export function ConnectionStartupScreen({ onConnected }: Props) {
-  const [showFailureState, setShowFailureState] = useState(false)
+  const [failureState, setFailureState] = useState<'pending' | 'shown'>(
+    'pending',
+  )
+  const showFailureState: boolean = failureState === 'shown'
   const [serverStarting, setServerStarting] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [serverLog, setServerLog] = useState<Array<string>>([])
@@ -90,7 +95,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
 
     const failureTimer = setTimeout(() => {
       if (!isDone.current) {
-        setShowFailureState(true)
+        setFailureState('shown')
       }
     }, FAILURE_REVEAL_MS)
 
@@ -210,72 +215,86 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
     }
   }
 
+  // The root document owns the pre-hydration loading marker. Once React has
+  // mounted, replace the blank waiting interval with one small non-blocking
+  // status pill. This avoids a second full-screen loader while still giving
+  // users feedback during a slow backend connection.
+  if (!showFailureState) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-none fixed inset-x-3 top-[calc(var(--titlebar-h,0px)+0.75rem)] z-[100] flex justify-end sm:inset-x-auto sm:right-4"
+      >
+        <div className="flex items-center gap-2 rounded-full border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-bg)_94%,transparent)] px-3 py-1.5 text-[10px] font-medium text-[var(--theme-muted)] shadow-lg backdrop-blur-md">
+          <span
+            aria-hidden
+            className="size-1.5 rounded-full bg-[var(--theme-accent)] motion-safe:animate-pulse"
+          />
+          Connecting to backend…
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto px-6 py-10 text-white"
-      style={{
-        backgroundColor: '#0A0E1A',
-        fontFamily: 'Inter, system-ui, sans-serif',
-      }}
+      role="region"
+      aria-labelledby="connection-startup-title"
+      className="pointer-events-none fixed inset-x-3 top-[calc(var(--titlebar-h,0px)+1rem)] z-[100] flex max-h-[calc(100dvh-2rem)] items-start justify-center overflow-y-auto text-[var(--theme-text)] sm:inset-x-auto sm:right-4 sm:w-[min(30rem,calc(100vw-2rem))]"
+      style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
     >
-      <div className="flex w-full max-w-lg flex-col items-center text-center">
-        <img
-          src="/claude-avatar.webp"
-          alt="Hermes Agent"
-          className="mb-5 h-20 w-20 rounded-2xl object-cover shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
-        />
-
-        <h1 className="text-[2rem] font-semibold tracking-tight text-white">
-          Hermes Workspace
+      <div className="pointer-events-auto flex w-full flex-col rounded-xl border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-bg)_96%,transparent)] p-3 text-left shadow-2xl backdrop-blur-md sm:p-4">
+        <h1
+          id="connection-startup-title"
+          className="text-sm font-semibold tracking-tight text-[var(--theme-text)]"
+        >
+          Backend connection needed
         </h1>
 
         {/* Connecting spinner */}
         <div
           className={[
-            'mt-4 flex items-center gap-3 text-sm text-white/72 transition-opacity duration-300',
+            'mt-4 flex items-center gap-3 text-sm text-[var(--theme-muted)] motion-safe:transition-opacity duration-300',
             showFailureState ? 'opacity-0 h-0' : 'opacity-100',
           ].join(' ')}
           aria-hidden={showFailureState}
         >
-          <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+          <span className="inline-block h-5 w-5 motion-safe:animate-spin rounded-full border-2 border-[var(--theme-border)] border-t-[var(--theme-accent)]" />
           <span>Connecting to your backend...</span>
         </div>
 
         {/* Failure state — setup guide */}
         <div
           className={[
-            'w-full overflow-hidden transition-all duration-500 ease-out',
+            'w-full overflow-hidden motion-safe:transition-all duration-500 ease-out',
             showFailureState
               ? 'mt-6 max-h-[60rem] translate-y-0 opacity-100'
               : 'max-h-0 translate-y-2 opacity-0',
           ].join(' ')}
         >
-          <div className="w-full rounded-3xl border border-white/10 bg-white/5 p-5 text-left shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-sm">
-            <p className="text-base font-medium text-white">
-              Welcome! Let&apos;s connect your backend
-            </p>
-            <p className="mt-2 text-sm leading-6 text-white/60">
-              Hermes Workspace works with any OpenAI-compatible backend. Hermes
-              Agent gateway APIs unlock enhanced features automatically when
-              they are available.
+          <div className="w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)]/95 p-3 shadow-xl backdrop-blur-sm sm:p-4">
+            <p className="text-xs leading-5 text-[var(--theme-muted)]">
+              Connect an OpenAI-compatible backend. Hermes Agent gateway APIs
+              unlock enhanced features automatically when available.
             </p>
 
             {/* Auto-start section */}
-            <div className="mt-5">
+            <div className="mt-3">
               <button
                 type="button"
                 disabled={serverStarting}
                 onClick={handleAutoStart}
                 className={[
-                  'w-full rounded-xl px-5 py-3 text-sm font-semibold transition',
+                  'min-h-11 w-full rounded-lg px-4 py-2.5 text-sm font-semibold motion-safe:transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-bg)]',
                   serverStarting
-                    ? 'cursor-not-allowed bg-indigo-900/70 text-indigo-200'
-                    : 'bg-indigo-500 text-white hover:bg-indigo-400',
+                    ? 'cursor-not-allowed bg-[var(--theme-accent)]/30 text-[var(--theme-muted)]'
+                    : 'bg-[var(--theme-accent)] text-[var(--theme-on-accent,white)] hover:opacity-90',
                 ].join(' ')}
               >
                 {serverStarting ? (
                   <span className="flex items-center justify-center gap-2">
-                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white/90" />
+                    <span className="inline-block h-4 w-4 motion-safe:animate-spin rounded-full border-2 border-white/30 border-t-white/90" />
                     Detecting...
                   </span>
                 ) : (
@@ -292,8 +311,10 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                       ? 'border-red-500/20 bg-red-950/30'
                       : 'border-emerald-500/20 bg-emerald-950/30',
                   ].join(' ')}
+                  role={serverError ? 'alert' : 'status'}
+                  aria-live="polite"
                 >
-                  <pre className="whitespace-pre-wrap font-mono text-xs leading-5 text-white/70">
+                  <pre className="whitespace-pre-wrap font-mono text-xs leading-5 text-[var(--theme-muted)]">
                     {serverLog.join('\n')}
                   </pre>
                 </div>
@@ -301,22 +322,26 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
             </div>
 
             {/* Divider */}
-            <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/10" />
+            <div className="my-3 flex items-center gap-3">
+              <div className="h-px flex-1 bg-[var(--theme-border)]" />
               <button
                 type="button"
                 onClick={() => setShowManual(!showManual)}
-                className="text-xs font-medium text-white/50 transition hover:text-white/70"
+                aria-expanded={showManual}
+                aria-controls="manual-setup-steps"
+                className="rounded px-2 py-1 text-xs font-medium text-[var(--theme-muted)] motion-safe:transition hover:text-[var(--theme-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)]"
               >
                 {showManual ? 'Hide' : 'Show'} manual setup
               </button>
-              <div className="h-px flex-1 bg-white/10" />
+              <div className="h-px flex-1 bg-[var(--theme-border)]" />
             </div>
 
             {/* Manual setup steps */}
             <div
+              id="manual-setup-steps"
+              inert={!showManual}
               className={[
-                'overflow-hidden transition-all duration-300',
+                'overflow-hidden motion-safe:transition-all duration-300',
                 showManual ? 'max-h-[40rem] opacity-100' : 'max-h-0 opacity-0',
               ].join(' ')}
             >
@@ -324,45 +349,47 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
                 {steps.map((step, idx) => (
                   <div
                     key={idx}
-                    className="rounded-xl border border-white/8 bg-black/20 p-4"
+                    className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/60 p-4"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-xs font-bold text-indigo-300">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--theme-accent)]/15 text-xs font-bold text-[var(--theme-accent)]">
                           {idx + 1}
                         </span>
-                        <span className="text-sm font-medium text-white/90">
+                        <span className="text-sm font-medium text-[var(--theme-text)]">
                           {step.title}
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleCopy(step.command, idx)}
-                        className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white/80"
+                        className="min-h-9 shrink-0 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] px-2.5 py-1 text-xs font-medium text-[var(--theme-muted)] transition hover:text-[var(--theme-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)]"
                       >
                         {copiedIdx === idx ? '✓ Copied' : 'Copy'}
                       </button>
                     </div>
-                    <pre className="mt-2 overflow-x-auto rounded-lg bg-black/40 p-3 font-mono text-xs leading-5 text-white/80">
+                    <pre className="mt-2 overflow-x-auto rounded-lg bg-[var(--theme-bg)] p-3 font-mono text-xs leading-5 text-[var(--theme-text)]/80">
                       <code>{step.command}</code>
                     </pre>
                     {step.note ? (
-                      <p className="mt-2 text-xs text-white/40">{step.note}</p>
+                      <p className="mt-2 text-xs text-[var(--theme-muted)]">
+                        {step.note}
+                      </p>
                     ) : null}
                   </div>
                 ))}
               </div>
 
               {/* Env var hint */}
-              <div className="mt-4 rounded-xl border border-white/6 bg-white/3 p-3">
-                <p className="text-xs font-medium text-white/50">
+              <div className="mt-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/60 p-3">
+                <p className="text-xs font-medium text-[var(--theme-muted)]">
                   Point{' '}
-                  <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-white/70">
+                  <code className="rounded bg-[var(--theme-hover)] px-1.5 py-0.5 font-mono text-[var(--theme-text)]/80">
                     HERMES_API_URL
                   </code>{' '}
                   at any OpenAI-compatible backend:
                 </p>
-                <pre className="mt-2 overflow-x-auto font-mono text-xs text-white/60">
+                <pre className="mt-2 overflow-x-auto font-mono text-xs text-[var(--theme-muted)]">
                   HERMES_API_URL=http://your-server:8642 pnpm dev
                 </pre>
               </div>
@@ -371,7 +398,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
         </div>
 
         {!showFailureState ? (
-          <p className="mt-6 text-xs text-white/45">
+          <p className="mt-6 text-xs text-[var(--theme-muted)]">
             This page auto-refreshes when a compatible backend is detected
           </p>
         ) : null}

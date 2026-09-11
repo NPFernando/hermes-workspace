@@ -3,6 +3,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { listTasks } from '../../server/tasks-store'
 import { resolveHermesBin } from '../../server/hermes-bin'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 // ---------------------------------------------------------------------------
 // POST /api/telegram-find
@@ -28,6 +35,14 @@ export const Route = createFileRoute('/api/telegram-find')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`telegram-find:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
+        }
         let body: { keyword?: string; chat_id?: string; limit?: number } = {}
         try {
           body = (await request.json()) as typeof body
@@ -49,7 +64,7 @@ export const Route = createFileRoute('/api/telegram-find')({
         const matches = all
           .filter((t) => {
             const haystack =
-              `${t.title} ${t.description ?? ''} ${(t.tags ?? []).join(' ')}`.toLowerCase()
+              `${t.title} ${t.description} ${t.tags.join(' ')}`.toLowerCase()
             return haystack.includes(keyword)
           })
           .slice(0, limit)
@@ -82,7 +97,7 @@ export const Route = createFileRoute('/api/telegram-find')({
             {
               ok: false,
               error: 'hermes send failed',
-              stderr: r.stderr?.slice(0, 200),
+              stderr: r.stderr.slice(0, 200),
             },
             { status: 500 },
           )
@@ -92,7 +107,10 @@ export const Route = createFileRoute('/api/telegram-find')({
       },
 
       // GET with ?q= for quick curl testing
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         const url = new URL(request.url)
         const keyword = url.searchParams.get('q')?.toLowerCase() ?? ''
         if (!keyword)
@@ -100,7 +118,7 @@ export const Route = createFileRoute('/api/telegram-find')({
         const all = listTasks({ includeDone: false })
         const matches = all
           .filter((t) =>
-            `${t.title} ${t.description ?? ''}`.toLowerCase().includes(keyword),
+            `${t.title} ${t.description}`.toLowerCase().includes(keyword),
           )
           .slice(0, 10)
           .map((t) => ({

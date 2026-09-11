@@ -5,13 +5,21 @@ import {
   injectIdeasAsBacklog,
   runAgentDeployBackground,
 } from '../../server/astra-tasks'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+} from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/tasks-inject-ideas')({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        if (!rateLimit(`tasks-inject-ideas:${getClientIp(request)}`, 5, 60_000)) {
+          return rateLimitResponse()
         }
         const result = injectIdeasAsBacklog()
         // Auto-start the review pipeline for the first injected task.

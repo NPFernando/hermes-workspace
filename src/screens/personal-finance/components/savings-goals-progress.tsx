@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { useFinanceAction } from '../../finance/hooks/use-finance-action'
-import { formatLkr } from '../utils'
 import { numberField, stringField, toneFor } from '../field-helpers'
+import { formatGoalAmount } from './goal-amount'
 import type { PersonalFinancePayload } from '../types'
 
 /**
@@ -28,16 +27,24 @@ function LinkedAccountControl({
   const linkedAccount = accounts.find(
     (a) => stringField(a, 'id') === linkedAccountId,
   )
-  const { run } = useFinanceAction<PersonalFinancePayload>(onPayload)
 
   async function setLinkedAccount(nextId: string) {
     setEditingId(null)
-    await run({
-      action: 'update_record',
-      kind: 'goal',
-      id,
-      payload: { linkedAccountId: nextId || null },
+    await fetch('/api/finance', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'update_record',
+        kind: 'goal',
+        id,
+        payload: { linkedAccountId: nextId || null },
+      }),
     })
+      .then((r) => r.json())
+      .then((data: PersonalFinancePayload) => {
+        if (data.ok) onPayload(data)
+      })
+      .catch(() => {})
   }
 
   if (linkedAccountId && editingId !== id) {
@@ -101,6 +108,16 @@ export function SavingsGoalsProgress({
       <h2 className="text-lg font-semibold text-[var(--theme-text)]">
         Savings goal progress
       </h2>
+      {(payload.goalCompletionEvents ?? []).length > 0 && (
+        <div className="mt-2 rounded-xl border border-[var(--theme-success)]/40 bg-[color-mix(in_srgb,var(--theme-success)_8%,transparent)] p-2 text-xs text-[var(--theme-muted)]">
+          <span className="font-semibold text-[var(--theme-success)]">Recent completions:</span>{' '}
+          {(payload.goalCompletionEvents ?? []).slice(-3).reverse().map((event, index) => (
+            <span key={event.id}>
+              {index > 0 ? ' · ' : ''}{event.goalName} ({event.completedAt.slice(0, 10)})
+            </span>
+          ))}
+        </div>
+      )}
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         {goals.map((goal, index) => {
           const target = numberField(goal, 'targetAmount')
@@ -125,7 +142,7 @@ export function SavingsGoalsProgress({
               } else {
                 const monthsUntil = Math.max(1, Math.ceil(daysUntil / 30))
                 requiredLine = {
-                  text: `Needs ${formatLkr(remaining / monthsUntil)}/mo to reach by ${targetDate}`,
+                  text: `Needs ${formatGoalAmount(goal, remaining / monthsUntil)}/mo to reach by ${targetDate}`,
                   tone: 'text-[var(--theme-muted)]',
                 }
               }
@@ -149,7 +166,7 @@ export function SavingsGoalsProgress({
                 />
               </div>
               <p className="mt-1 text-xs text-[var(--theme-muted)]">
-                {formatLkr(current)} / {formatLkr(target)}
+                {formatGoalAmount(goal, current)} / {formatGoalAmount(goal, target)}
               </p>
               {requiredLine && (
                 <p className={`mt-1 text-xs ${requiredLine.tone}`}>

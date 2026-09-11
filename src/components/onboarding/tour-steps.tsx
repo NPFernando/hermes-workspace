@@ -82,7 +82,7 @@ export const tourSteps: Array<Step> = [
     placement: 'bottom',
     title: 'Usage Monitor',
     content:
-      'Monitor your AI provider usage in real-time. Track costs and API consumption.',
+      'Monitor your AI provider usage in real-time. Track costs and provider requests.',
   },
   // Step 10: Settings
   {

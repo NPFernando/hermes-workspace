@@ -1,5 +1,28 @@
 import { describe, expect, it, vi } from 'vitest'
 
+type NewsIngestionResult = Awaited<
+  ReturnType<
+    typeof import('../../server/finance-news.service').fetchAndStoreGoogleNews
+  >
+>
+type PaperDecisionResult = ReturnType<
+  typeof import('../../server/paper-decision-journal').appendPaperDecisionSnapshot
+>
+type CompositeResult = ReturnType<
+  typeof import('../../server/finance-intelligence').buildCompositeSentiment
+>
+type ResearchRiskResult = ReturnType<
+  typeof import('../../server/finance-intelligence').assessResearchRisk
+>
+type IntelligenceStoreResult = ReturnType<
+  typeof import('../../server/finance-store').storeIntelligenceRecords
+>
+type FxQuote = Awaited<
+  ReturnType<
+    typeof import('../../server/finance-fx-provider').fetchFrankfurterRate
+  >
+>
+
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: () => (options: unknown) => options,
 }))
@@ -13,28 +36,51 @@ vi.mock('@tanstack/react-start', () => ({
 
 const state = vi.hoisted(() => ({
   authenticated: true,
-  // Generics kept wide (like readPaperDecisionJournal below) so per-test
-  // `.mockReturnValueOnce({...})` overrides with richer shapes don't trip
-  // TS2353 excess-property checks.
-  assessResearchRisk: vi.fn<(...a: Array<unknown>) => unknown>(() => ({
-    ok: true,
-    risk: 'low',
+  scheduledTransactions: [] as Array<Record<string, unknown>>,
+  postedIncome: [] as Array<Record<string, unknown>>,
+  postedExpense: [] as Array<Record<string, unknown>>,
+  assessResearchRisk: vi.fn<() => ResearchRiskResult>(() => ({
+    riskLevel: 'low_risk' as const,
+    riskScore: 0,
+    confidenceScore: 0.5,
+    blockers: [],
+    inputs: {},
   })),
-  buildCompositeSentiment: vi.fn<(...a: Array<unknown>) => unknown>(() => ({
+  buildCompositeSentiment: vi.fn<() => CompositeResult>(() => ({
     symbol: 'BTCUSDT',
     score: 0,
     confidence: 0.5,
-    label: 'neutral',
+    label: 'neutral' as const,
+    freshness: 1,
+    sourceIds: [],
+    disagreement: false,
+    blockers: [],
+    formulaVersion: 'research-v1',
+    observedAt: '2026-08-20T12:00:00.000Z',
+    expiresAt: '2026-08-22T12:00:00.000Z',
   })),
-  fetchNews: vi.fn<(...a: Array<unknown>) => Promise<unknown>>(async () => ({
+  fetchNews: vi.fn<() => Promise<NewsIngestionResult>>(async () => ({
     fetched: 2,
     stored: 1,
+    items: [],
   })),
-  appendPaperDecisionSnapshot: vi.fn<(...a: Array<unknown>) => unknown>(() => ({
-    id: 'decision-1',
-    symbol: 'BTCUSDT',
-    composite: { score: 0, confidence: 0.5 },
-    researchOnly: true,
+  appendPaperDecisionSnapshot: vi.fn<() => PaperDecisionResult>(() => ({
+    appended: true,
+    entry: {
+      id: 'decision-1',
+      kind: 'research_snapshot',
+      symbol: 'BTCUSDT',
+      compositeIntelligenceId: 'intelligence-1',
+      compositeScore: 0,
+      provenance: {
+        formulaVersion: 'research-v1',
+        sourceIds: [],
+        observedAt: '',
+      },
+      recordedAt: '',
+      idempotencyKey: 'test',
+      side_effects: false,
+    },
   })),
   readPaperDecisionJournal: vi.fn<() => Array<unknown>>(() => [
     { id: 'decision-1', symbol: 'BTCUSDT', composite: { score: 0 } },
@@ -44,26 +90,33 @@ const state = vi.hoisted(() => ({
     sideEffects: false,
     validations: { enoughPaperData: false },
   })),
-  storeIntelligenceRecords: vi.fn(() => ({ stored: true })),
-  // A stand-in FinanceDatabase: known keys are real, any other collection the
-  // handler reads (financePayload / recoverValidationRunAutomationIfStale touch
-  // several) resolves to an empty array instead of `undefined` — so an added
-  // `db.<collection>.filter(...)` upstream can't turn into a runtime TypeError
-  // in this fully-mocked test.
-  mockFinanceDb: (overrides: Record<string, unknown> = {}) =>
-    new Proxy(
-      { settings: {}, connectivityBreaker: {}, ...overrides },
-      {
-        get: (t, p) =>
-          p in t ? (t as Record<string | symbol, unknown>)[p] : [],
-      },
-    ),
+  storeIntelligenceRecords: vi.fn<() => IntelligenceStoreResult>(() => ({
+    stored: true,
+    sentiment: {} as IntelligenceStoreResult['sentiment'],
+    risk: {} as IntelligenceStoreResult['risk'],
+    intelligence: {} as IntelligenceStoreResult['intelligence'],
+  })),
+  fetchFx: vi.fn<() => Promise<FxQuote>>(async () => ({
+    base: 'LKR',
+    target: 'USD',
+    rate: 0.0031,
+    date: '2026-09-10',
+    source: 'frankfurter:v2',
+    observedAt: '2026-09-10T12:00:00.000Z',
+  })),
 }))
 vi.mock('../../server/auth-middleware', () => ({
   isAuthenticated: () => state.authenticated,
 }))
 vi.mock('../../server/finance-news.service', () => ({
   fetchAndStoreGoogleNews: state.fetchNews,
+}))
+vi.mock('../../server/finance-fx-provider', () => ({
+  fetchFrankfurterRate: state.fetchFx,
+  assessFxProviderHealth: vi.fn(() => ({
+    status: 'unknown',
+    detail: 'test fixture',
+  })),
 }))
 vi.mock('../../server/finance-intelligence', () => ({
   INTELLIGENCE_FORMULA_VERSION: 'research-v1',
@@ -83,17 +136,58 @@ vi.mock('../../server/finance-storage-monitor', () => ({
 vi.mock('../../server/finance-store', () => ({
   FINANCE_AUDIT_PATH: '/tmp/audit.jsonl',
   FINANCE_DATA_PATH: '/tmp/finance.json',
+  SUPPORTED_CURRENCIES: ['LKR', 'AUD', 'USD'],
   TRADING_MODES: [],
-  addFinanceRecord: vi.fn(),
+  addFinanceSplit: vi.fn(),
+  addFinanceTransfer: vi.fn(),
+  addFinanceRecord: vi.fn((kind: string, payload: Record<string, unknown>) => {
+    const record = { id: `posted-${kind}`, ...payload }
+    if (kind === 'income') state.postedIncome.push(record)
+    else state.postedExpense.push(record)
+    return {
+      settings: {},
+      connectivityBreaker: {},
+      historical_candles: [],
+      strategy_results: [],
+      news_items: [],
+      sentiment_scores: [],
+      exchange_rates: [],
+      scheduled_transactions: state.scheduledTransactions,
+      finance_accounts: [],
+      income_records: state.postedIncome,
+      expense_records: state.postedExpense,
+      net_worth_snapshots: [],
+    }
+  }),
+  updateFinanceRecord: vi.fn((kind: string, id: string, payload: Record<string, unknown>) => {
+    if (kind === 'scheduled_transaction') {
+      const row = state.scheduledTransactions.find((item) => item.id === id)
+      if (row) Object.assign(row, payload)
+    }
+  }),
   appendAuditLog: vi.fn(),
+  annualBudgetVsActualSummary: vi.fn(() => []),
   budgetVsActualSummary: vi.fn(() => []),
-  computeAccountLedgerBalance: vi.fn(() => null),
-  ledgerTransactionsForDb: vi.fn(() => []),
-  recordNetWorthSnapshot: vi.fn((db) => ({
-    db,
-    snapshot: { date: '2026-09-10', netWorthLkr: 0 },
+  buildTransactionsCsv: vi.fn(() => 'id,kind\n'),
+  buildTaxRecordsCsv: vi.fn(() => 'id,taxYear\n'),
+  cseProviderHealth: vi.fn(() => ({
+    status: 'unknown',
+    holdingsCount: 0,
+    cseQuoteCount: 0,
+    manualFallbackCount: 0,
+    staleQuoteCount: 0,
+    latestQuoteAt: null,
   })),
-  ensureFinanceStore: vi.fn(() => state.mockFinanceDb()),
+  ensureFinanceStore: vi.fn(() => ({
+    settings: {},
+    connectivityBreaker: {},
+    historical_candles: [],
+    strategy_results: [],
+    news_items: [],
+    sentiment_scores: [],
+    exchange_rates: [],
+    scheduled_transactions: [],
+  })),
   financeAlerts: vi.fn(() => []),
   financeStorageAlerts: vi.fn(() => []),
   financeStorageStatus: vi.fn(() => ({
@@ -101,56 +195,42 @@ vi.mock('../../server/finance-store', () => ({
     postgres: { database: 'finance' },
   })),
   financeSummary: vi.fn(() => ({})),
-  getUnifiedTransactions: vi.fn(() => []),
-  maskSensitive: vi.fn((obj) => obj),
-  readFinanceStore: vi.fn(() => state.mockFinanceDb()),
-  SUPPORTED_CURRENCIES: ['LKR', 'AUD', 'USD'],
-  convertCurrency: vi.fn((amount: number) => amount),
-  getExchangeRate: vi.fn(() => undefined),
-  getFinanceTrends: vi.fn(() => ({ series: [], categoriesThisMonth: [] })),
-  getRecurringBills: vi.fn(() => []),
-  getUpcomingMoney: vi.fn(() => ({
-    paydays: [],
-    contracts: [],
-    fdMaturities: [],
-    scheduled: [],
-  })),
-  getCurrencyExposure: vi.fn(() => []),
-  getFxGainLoss: vi.fn(() => ({
-    entries: [],
-    totalAssetGainLkr: 0,
-    totalFxGainLkr: 0,
-    totalReturnLkr: 0,
-    excludedCount: 0,
+  financialHealthSummary: vi.fn(() => ({
+    score: 50,
+    band: 'needs_attention',
+    components: [],
   })),
   getAverageMonthlyExpensesLkr: vi.fn(() => 0),
-  getAverageMonthlySavingsRatePct: vi.fn(() => ({ actualPct: 0, hasData: false })),
+  getAverageMonthlySavingsRatePct: vi.fn(() => 0),
+  getUnifiedTransactions: vi.fn(() => []),
+  maskSensitive: vi.fn((obj) => obj),
+  readFinanceStore: vi.fn(() => ({
+    settings: {},
+    connectivityBreaker: {},
+    historical_candles: [],
+    strategy_results: [],
+    news_items: [],
+    sentiment_scores: [],
+    exchange_rates: [],
+    finance_accounts: [],
+    income_records: [],
+    expense_records: [],
+    net_worth_snapshots: [],
+    scheduled_transactions: state.scheduledTransactions,
+  })),
+  readFinanceAuditLog: vi.fn(() => ''),
+  readTransactionAudit: vi.fn(() => []),
+  safeToSpendSummary: vi.fn(() => ({
+    cashLkr: 0,
+    reserveLkr: 0,
+    amountLkr: 0,
+    configured: false,
+    basis: 'test',
+  })),
   storeIntelligenceRecords: state.storeIntelligenceRecords,
   tradingPerformanceSummary: vi.fn(() => ({})),
   updateExchangeRate: vi.fn(),
   writeFinanceStore: vi.fn(),
-  listPendingIngestions: vi.fn(() => []),
-  updatePendingIngestion: vi.fn(),
-  getCategoryCorrections: vi.fn(() => ({})),
-  findPossibleDuplicate: vi.fn(() => null),
-  copyBudgetsToMonth: vi.fn(() => ({ copied: 0, skippedExisting: 0 })),
-}))
-// Neither of these was mocked before (the pending_ingestions actions —
-// submit_ingestion_password, confirm_pending_ingestion, and now
-// retry_pending_extraction — had zero test coverage in this file), which
-// meant the *real* network-calling functions would run if any test ever
-// exercised those actions. Mock them explicitly rather than leaving that trap.
-vi.mock('../../server/finance-extraction', () => ({
-  answerFinanceQuestion: vi.fn(),
-  extractEmploymentContract: vi.fn(),
-  extractTransactionFromImage: vi.fn(),
-}))
-vi.mock('../../server/document-normalizer', () => ({
-  isPdfEncrypted: vi.fn(() => false),
-  pdfToImages: vi.fn(),
-}))
-vi.mock('../../server/exchange-rate.service', () => ({
-  fetchLkrExchangeRates: vi.fn(),
 }))
 vi.mock('../../server/binance-market.service', () => ({
   addBinanceCandles: vi.fn(),
@@ -160,7 +240,8 @@ vi.mock('../../server/binance-market.service', () => ({
 }))
 vi.mock('../../server/trading-strategies', () => ({ STRATEGIES: [] }))
 vi.mock('../../server/demo-trading-engine', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../server/demo-trading-engine')>()
+  const actual =
+    await importOriginal<typeof import('../../server/demo-trading-engine')>()
   return {
     ...actual,
     applyLearningCandidate: vi.fn(),
@@ -210,7 +291,8 @@ vi.mock('../../server/demo-trading-engine', async (importOriginal) => {
   }
 })
 vi.mock('../../server/connectivity-breaker', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../server/connectivity-breaker')>()
+  const actual =
+    await importOriginal<typeof import('../../server/connectivity-breaker')>()
   return {
     ...actual,
     isConnectivityBreakerTripped: vi.fn(() => false),
@@ -218,10 +300,15 @@ vi.mock('../../server/connectivity-breaker', async (importOriginal) => {
   }
 })
 vi.mock('../../server/rate-limit', () => ({
+  getClientIp: () => 'test-client',
+  rateLimit: () => true,
+  rateLimitResponse: () => new Response('too many requests', { status: 429 }),
+  requireJsonContentType: () => null,
   safeErrorMessage: (error: unknown) => String(error),
 }))
 vi.mock('../../server/validation-run', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../server/validation-run')>()
+  const actual =
+    await importOriginal<typeof import('../../server/validation-run')>()
   return {
     ...actual,
     ensureValidationRunAutomation: vi.fn(),
@@ -240,98 +327,501 @@ async function handlers() {
   return (module.Route as any).server.handlers
 }
 
-describe('/api/finance?scope=personal_finance windowing (PF review item 1)', () => {
-  it('drops income/expense rows older than the window and stamps transactionsWindowMonths', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    const old = new Date()
-    old.setFullYear(old.getFullYear() - 5)
-    const recent = new Date().toISOString().slice(0, 10)
-    vi.mocked(store.financeSummary).mockReturnValue({
-      baseCurrency: 'LKR',
-    } as never)
-    vi.mocked(store.readFinanceStore).mockReturnValue(
-      state.mockFinanceDb({
-        income_records: [
-          { id: 'i-old', dateReceived: old.toISOString().slice(0, 10) },
-          { id: 'i-new', dateReceived: recent },
-        ],
-        expense_records: [
-          { id: 'e-old', date: old.toISOString().slice(0, 10) },
-          { id: 'e-new', date: recent },
-        ],
-      }) as never,
-    )
-    vi.mocked(store.ensureFinanceStore).mockReturnValue(
-      state.mockFinanceDb({
-        income_records: [
-          { id: 'i-old', dateReceived: old.toISOString().slice(0, 10) },
-          { id: 'i-new', dateReceived: recent },
-        ],
-        expense_records: [
-          { id: 'e-old', date: old.toISOString().slice(0, 10) },
-          { id: 'e-new', date: recent },
-        ],
-      }) as never,
-    )
-
-    const response = await (
-      await handlers()
-    ).GET({
-      request: new Request(
-        'http://localhost/api/finance?scope=personal_finance',
-      ),
-    })
-    const body = (await response.json()) as {
-      transactionsWindowMonths: number
-      data: {
-        income_records: Array<{ id: string }>
-        expense_records: Array<{ id: string }>
-      }
-    }
-    expect(body.transactionsWindowMonths).toBe(36)
-    expect(body.data.income_records.map((r) => r.id)).toEqual(['i-new'])
-    expect(body.data.expense_records.map((r) => r.id)).toEqual(['e-new'])
-  })
-
-  it('data.exchange_rates collapses history to the latest row per base->target pair', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    vi.mocked(store.financeSummary).mockReturnValue({
-      baseCurrency: 'LKR',
-    } as never)
-    const rows = [
-      { base: 'USD', target: 'LKR', rate: 300, date: '2026-09-08' },
-      { base: 'USD', target: 'LKR', rate: 328.4, date: '2026-09-10' },
-      { base: 'USD', target: 'LKR', rate: 320, date: '2026-09-09' },
-      { base: 'LKR', target: 'USD', rate: 1 / 328.4, date: '2026-09-10' },
-      { base: 'AUD', target: 'LKR', rate: 236.8, date: '2026-09-10' },
-    ]
-    vi.mocked(store.readFinanceStore).mockReturnValue(
-      state.mockFinanceDb({ exchange_rates: rows }) as never,
-    )
-    vi.mocked(store.ensureFinanceStore).mockReturnValue(
-      state.mockFinanceDb({ exchange_rates: rows }) as never,
-    )
-
-    const response = await (
-      await handlers()
-    ).GET({
-      request: new Request(
-        'http://localhost/api/finance?scope=personal_finance',
-      ),
-    })
-    const body = (await response.json()) as {
-      data: { exchange_rates: Array<{ base: string; target: string; rate: number; date: string }> }
-    }
-    const er = body.data.exchange_rates
-    expect(er).toHaveLength(3) // USD->LKR, LKR->USD, AUD->LKR — one each
-    const usdLkr = er.find((r) => r.base === 'USD' && r.target === 'LKR')
-    expect(usdLkr).toMatchObject({ rate: 328.4, date: '2026-09-10' })
-  })
-})
-
 describe('/api/finance fetch_news', () => {
+  it('rejects posting a missing scheduled transaction without mutation', async () => {
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'post_scheduled', id: 'missing' }),
+      }),
+    })
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toMatchObject({ ok: false })
+  })
+
+  it('posts a pending scheduled expense into the ledger and marks it posted', async () => {
+    state.scheduledTransactions.push({
+      id: 'scheduled-1',
+      dueDate: '2026-10-01',
+      kind: 'expense',
+      counterparty: 'Landlord',
+      category: 'Rent',
+      amount: 100000,
+      notes: 'October rent',
+      status: 'pending',
+    })
+    const store = await import('../../server/finance-store')
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'post_scheduled', id: 'scheduled-1' }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledWith('expense', {
+      date: '2026-10-01',
+      vendor: 'Landlord',
+      category: 'Rent',
+      amount: 100000,
+      currency: 'LKR',
+      accountId: undefined,
+      notes: 'October rent',
+    })
+    expect(vi.mocked(store.updateFinanceRecord)).toHaveBeenCalledWith(
+      'scheduled_transaction',
+      'scheduled-1',
+      { status: 'posted', postedRecordId: 'posted-expense' },
+    )
+  })
+
+  it('rejects reposting a scheduled transaction already marked posted', async () => {
+    state.scheduledTransactions.push({
+      id: 'scheduled-posted',
+      dueDate: '2026-10-02',
+      kind: 'expense',
+      counterparty: 'Landlord',
+      category: 'Rent',
+      amount: 100000,
+      status: 'posted',
+      postedRecordId: 'expense-existing',
+    })
+    const store = await import('../../server/finance-store')
+    const before = vi.mocked(store.addFinanceRecord).mock.calls.length
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'post_scheduled', id: 'scheduled-posted' }),
+      }),
+    })
+
+    expect(response.status).toBe(404)
+    expect(vi.mocked(store.addFinanceRecord).mock.calls.length).toBe(before)
+  })
+
+  it('posts a pending scheduled income into the ledger and marks it posted', async () => {
+    state.scheduledTransactions.push({
+      id: 'scheduled-income-1',
+      dueDate: '2026-10-15',
+      kind: 'income',
+      counterparty: 'Client',
+      category: 'Consulting',
+      amount: 250000,
+      status: 'pending',
+    })
+    const store = await import('../../server/finance-store')
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'post_scheduled',
+          id: 'scheduled-income-1',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledWith('income', {
+      dateReceived: '2026-10-15',
+      sourceName: 'Client',
+      incomeType: 'Consulting',
+      originalAmount: 250000,
+      originalCurrency: 'LKR',
+      accountId: undefined,
+      notes: undefined,
+    })
+    expect(vi.mocked(store.updateFinanceRecord)).toHaveBeenCalledWith(
+      'scheduled_transaction',
+      'scheduled-income-1',
+      { status: 'posted', postedRecordId: 'posted-income' },
+    )
+  })
+
+  it('dispatches an authenticated split-expense action', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'add_split',
+          payload: {
+            vendor: 'Supermarket',
+            splits: [
+              { category: 'Food', amount: 10 },
+              { category: 'Home', amount: 5 },
+            ],
+          },
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(vi.mocked(store.addFinanceSplit)).toHaveBeenCalledWith({
+      vendor: 'Supermarket',
+      splits: [
+        { category: 'Food', amount: 10 },
+        { category: 'Home', amount: 5 },
+      ],
+    })
+  })
+
+  it('serves the authenticated unified transaction CSV as a download', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.buildTransactionsCsv).mockReturnValueOnce(
+      'id,kind\ntransaction-1,expense\n',
+    )
+    const response = await (
+      await handlers()
+    ).GET({
+      request: new Request(
+        'http://localhost/api/finance?scope=personal_finance&format=csv',
+      ),
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('text/csv')
+    expect(response.headers.get('content-disposition')).toContain(
+      'hermes-transactions-',
+    )
+    expect(await response.text()).toContain('transaction-1')
+    expect(vi.mocked(store.buildTransactionsCsv)).toHaveBeenCalled()
+  })
+
+  it('persists a bounded budget warning threshold', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'set_budget_alert_threshold',
+          pct: 125,
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(vi.mocked(store.writeFinanceStore)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({ budgetAlertThresholdPct: 100 }),
+      }),
+    )
+    expect(vi.mocked(store.appendAuditLog)).toHaveBeenCalledWith(
+      'budget_alert_threshold_updated',
+      { pct: 100 },
+    )
+    vi.clearAllMocks()
+  })
+
+  it('validates and stores a manual exchange rate', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'set_exchange_rate',
+          base: 'lkr',
+          target: 'usd',
+          rate: 0.0032,
+          date: '2026-09-10',
+        }),
+      }),
+    })
+    expect(response.status).toBe(200)
+    expect(vi.mocked(store.updateExchangeRate)).toHaveBeenCalledWith(
+      'LKR',
+      'USD',
+      0.0032,
+      '2026-09-10',
+    )
+    vi.clearAllMocks()
+  })
+
+  it('refreshes an exchange rate through the explicit provider action', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'refresh_exchange_rate',
+          base: 'lkr',
+          target: 'usd',
+        }),
+      }),
+    })
+    expect(response.status).toBe(200)
+    expect(state.fetchFx).toHaveBeenCalledWith('LKR', 'USD')
+    expect(vi.mocked(store.updateExchangeRate)).toHaveBeenCalledWith(
+      'LKR',
+      'USD',
+      0.0031,
+      '2026-09-10',
+      'frankfurter:v2',
+      '2026-09-10T12:00:00.000Z',
+    )
+    vi.clearAllMocks()
+  })
+
+  it('persists a validated reporting currency without rewriting records', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'set_base_currency',
+          baseCurrency: 'usd',
+        }),
+      }),
+    })
+    expect(response.status).toBe(200)
+    expect(vi.mocked(store.writeFinanceStore)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({ baseCurrency: 'USD' }),
+      }),
+    )
+    expect(vi.mocked(store.appendAuditLog)).toHaveBeenCalledWith(
+      'base_currency_updated',
+      { baseCurrency: 'USD' },
+    )
+    vi.clearAllMocks()
+  })
+
+  it('persists the explicit opt-in policy for review-only proactive insights', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'set_proactive_insights',
+          enabled: true,
+        }),
+      }),
+    })
+    expect(response.status).toBe(200)
+    expect(vi.mocked(store.writeFinanceStore)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({ proactiveInsightsEnabled: true }),
+      }),
+    )
+    expect(vi.mocked(store.appendAuditLog)).toHaveBeenCalledWith(
+      'proactive_insights_policy_updated',
+      { enabled: true, source: 'finance_api' },
+    )
+    vi.clearAllMocks()
+  })
+
+  it('queues an approval-gated proactive review only after opt-in', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.readFinanceStore).mockReturnValueOnce({
+      settings: { proactiveInsightsEnabled: true },
+      ai_tasks: [],
+    } as unknown as ReturnType<typeof store.readFinanceStore>)
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'queue_proactive_finance_review' }),
+      }),
+    })
+    expect(response.status).toBe(200)
+    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledWith(
+      'ai_task',
+      expect.objectContaining({
+        taskType: 'proactive_finance_review',
+        status: 'awaiting_approval',
+        approvalRequired: true,
+      }),
+    )
+    vi.clearAllMocks()
+  })
+
+  it('returns only a scheduler acknowledgement when requested', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.readFinanceStore).mockReturnValueOnce({
+      settings: { proactiveInsightsEnabled: true },
+      ai_tasks: [],
+    } as unknown as ReturnType<typeof store.readFinanceStore>)
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'queue_proactive_finance_review',
+          responseMode: 'scheduler_ack',
+        }),
+      }),
+    })
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        ok: true,
+        queued: true,
+        taskType: 'proactive_finance_review',
+        status: 'awaiting_approval',
+      }),
+    )
+    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledWith(
+      'ai_task',
+      expect.objectContaining({ taskType: 'proactive_finance_review' }),
+    )
+    vi.clearAllMocks()
+  })
+
+  it('persists quiet mode as a separate non-critical notification policy', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'set_quiet_mode', enabled: true }),
+      }),
+    })
+    expect(response.status).toBe(200)
+    expect(vi.mocked(store.writeFinanceStore)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({ quietModeEnabled: true }),
+      }),
+    )
+    expect(vi.mocked(store.appendAuditLog)).toHaveBeenCalledWith(
+      'quiet_mode_updated',
+      { enabled: true, source: 'finance_api' },
+    )
+    vi.clearAllMocks()
+  })
+
+  it('persists an effective-dated salary-rate change separately from income events', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.readFinanceStore).mockReturnValueOnce({
+      settings: {},
+      salaryHistory: [],
+    } as unknown as ReturnType<typeof store.readFinanceStore>)
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'add_salary_history',
+          employerName: 'Acme',
+          effectiveDate: '2026-09-01',
+          amount: 250000,
+          currency: 'LKR',
+          reason: 'Annual review',
+        }),
+      }),
+    })
+    expect(response.status).toBe(200)
+    expect(vi.mocked(store.writeFinanceStore)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          salaryHistory: [
+            expect.objectContaining({
+              employerName: 'Acme',
+              effectiveDate: '2026-09-01',
+              amount: 250000,
+              currency: 'LKR',
+            }),
+          ],
+        }),
+      }),
+    )
+    expect(vi.mocked(store.appendAuditLog)).toHaveBeenCalledWith(
+      'salary_history_added',
+      expect.objectContaining({ employerName: 'Acme' }),
+    )
+    vi.clearAllMocks()
+  })
+
+  it('serves an authenticated tax CSV as a download', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const response = await (
+      await handlers()
+    ).GET({
+      request: new Request(
+        'http://localhost/api/finance?scope=personal_finance&format=tax-csv',
+      ),
+    })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('text/csv')
+    expect(response.headers.get('content-disposition')).toContain('tax-records')
+    expect(vi.mocked(store.buildTaxRecordsCsv)).toHaveBeenCalled()
+  })
+
+  it('serves an authenticated read-only monthly finance report', async () => {
+    state.authenticated = true
+    const response = await (
+      await handlers()
+    ).GET({
+      request: new Request(
+        'http://localhost/api/finance?scope=personal_finance&format=monthly-report&month=2026-09',
+      ),
+    })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('text/markdown')
+    expect(response.headers.get('content-disposition')).toContain(
+      'finance-report-2026-09.md',
+    )
+    expect(await response.text()).toContain('# Monthly finance report — 2026-09')
+  })
+
+  it('serves an authenticated encrypted finance backup without plaintext data', async () => {
+    state.authenticated = true
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'download_encrypted_backup',
+          passphrase: 'correct horse battery staple',
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-disposition')).toContain(
+      'hermes-finance-backup-',
+    )
+    const body = await response.text()
+    expect(body).toContain('aes-256-gcm')
+    expect(body).not.toContain('battery')
+  })
+
   it('exposes read-only paper-decision quality only through the authenticated finance payload', async () => {
     state.authenticated = true
     state.readPaperDecisionJournal.mockReturnValueOnce([
@@ -407,29 +897,41 @@ describe('/api/finance fetch_news', () => {
   it('records an authenticated paper research snapshot without touching intelligence storage or execution state', async () => {
     state.authenticated = true
     const store = await import('../../server/finance-store')
-    vi.mocked(store.readFinanceStore).mockReturnValue(
-      state.mockFinanceDb({
-        news_items: [{ id: 'news-1' }],
-        sentiment_scores: [{ id: 'fg-1' }],
-      }) as any,
-    )
+    vi.mocked(store.readFinanceStore).mockReturnValue({
+      news_items: [{ id: 'news-1' }],
+      sentiment_scores: [{ id: 'fg-1' }],
+    } as any)
     const composite = {
       symbol: 'BTCUSDT',
       score: 20,
-      label: 'positive',
+      label: 'positive' as const,
       confidence: 0.6,
       freshness: 0.8,
       sourceIds: ['fg-1', 'news-1'],
       disagreement: false,
       blockers: [],
-      formulaVersion: 'research-v1',
+      formulaVersion: 'research-v1' as const,
       observedAt: '2026-08-20T12:00:00.000Z',
       expiresAt: '2026-08-22T12:00:00.000Z',
     }
     state.buildCompositeSentiment.mockReturnValueOnce(composite)
     state.appendPaperDecisionSnapshot.mockReturnValueOnce({
       appended: true,
-      entry: { id: 'paper-decision:1', side_effects: false },
+      entry: {
+        id: 'paper-decision:1',
+        kind: 'research_snapshot',
+        symbol: 'BTCUSDT',
+        compositeIntelligenceId: 'intelligence-1',
+        compositeScore: 20,
+        provenance: {
+          formulaVersion: 'research-v1',
+          sourceIds: ['fg-1', 'news-1'],
+          observedAt: '2026-08-20T12:00:00.000Z',
+        },
+        recordedAt: '2026-08-20T12:00:00.000Z',
+        idempotencyKey: 'click-1',
+        side_effects: false,
+      },
     })
 
     const response = await (
@@ -489,405 +991,39 @@ describe('/api/finance fetch_news', () => {
     expect(state.appendPaperDecisionSnapshot).not.toHaveBeenCalled()
   })
 
-  it('rejects set_base_currency with an invalid currency code (PF-201)', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    vi.mocked(store.writeFinanceStore).mockClear()
-    vi.mocked(store.appendAuditLog).mockClear()
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'set_base_currency', currency: 'dollars' }),
-      }),
-    })
-
-    expect(response.status).toBe(400)
-    expect(vi.mocked(store.writeFinanceStore)).not.toHaveBeenCalled()
-    expect(vi.mocked(store.appendAuditLog)).not.toHaveBeenCalled()
-  })
-
-  it('set_wealth_goal rejects a non-LKR amount with no exchange rate on file (PF-201)', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    vi.mocked(store.writeFinanceStore).mockClear()
-    vi.mocked(store.appendAuditLog).mockClear()
-    vi.mocked(store.getExchangeRate).mockReturnValue(undefined)
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'set_wealth_goal',
-          targetLkr: 1000,
-          currency: 'USD',
-        }),
-      }),
-    })
-
-    expect(response.status).toBe(400)
-    expect(vi.mocked(store.writeFinanceStore)).not.toHaveBeenCalled()
-    expect(vi.mocked(store.appendAuditLog)).not.toHaveBeenCalled()
-  })
-
-  it('set_wealth_goal converts the entered base-currency amount to LKR for storage (PF-201)', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    vi.mocked(store.writeFinanceStore).mockClear()
-    // getExchangeRate('LKR', 'USD') -> LKR->base rate; the handler inverts it.
-    // Once — the handler makes exactly one getExchangeRate('LKR', ...) call
-    // before it resolves, and this must not leak into later tests in the file.
-    vi.mocked(store.getExchangeRate).mockImplementationOnce(
-      (from: string, to: string) =>
-        from === 'LKR' && to === 'USD' ? 0.0033 : undefined,
-    )
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'set_wealth_goal',
-          targetLkr: 1000,
-          currency: 'USD',
-        }),
-      }),
-    })
-
-    expect(response.status).toBe(200)
-    const writes = vi.mocked(store.writeFinanceStore).mock.calls
-    expect(writes).toHaveLength(1)
-    const savedDb = writes[0][0] as { settings: { wealthGoalTargetLkr: number } }
-    // 1000 USD / 0.0033 ~= 303030 LKR — stored, not the entered 1000.
-    expect(savedDb.settings.wealthGoalTargetLkr).toBe(Math.round(1000 / 0.0033))
-  })
-
-  it('refresh_exchange_rates writes both legs per currency, reverse = reciprocal (PF-201)', async () => {
-    // The handler derives its stored date from the real clock
-    // (`new Date().toISOString().slice(0, 10)` in finance.ts), not from the
-    // fetched `asOf` — a hardcoded expected date here broke every day after
-    // it was written (confirmed: failed once the wall clock rolled past
-    // 2026-09-10). Pin the clock instead of hardcoding "today".
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-09-10T12:00:00.000Z'))
-    try {
-      state.authenticated = true
-      const store = await import('../../server/finance-store')
-      const svc = await import('../../server/exchange-rate.service')
-      vi.mocked(store.updateExchangeRate).mockClear()
-      vi.mocked(svc.fetchLkrExchangeRates).mockResolvedValue({
-        lkrPer: { USD: 300, AUD: 200 },
-        asOf: '2026-09-10T00:02:31.000Z',
-        source: 'open.er-api.com',
-      })
-
-      const response = await (
-        await handlers()
-      ).POST({
-        request: new Request('http://localhost/api/finance', {
-          method: 'POST',
-          body: JSON.stringify({ action: 'refresh_exchange_rates' }),
-        }),
-      })
-
-      expect(response.status).toBe(200)
-      const body = (await response.json()) as {
-        ok: boolean
-        source: string
-        updated: Array<{ pair: string }>
-      }
-      expect(body.ok).toBe(true)
-      expect(body.source).toBe('open.er-api.com')
-      expect(body.updated.map((u) => u.pair).sort()).toEqual(['AUD/LKR', 'USD/LKR'])
-
-      const calls = vi.mocked(store.updateExchangeRate).mock.calls
-      // USD: <cur>->LKR at 300, LKR-><cur> at 1/300
-      expect(calls).toContainEqual(['USD', 'LKR', 300, '2026-09-10'])
-      const usdBack = calls.find((c) => c[0] === 'LKR' && c[1] === 'USD')
-      expect(usdBack?.[2]).toBeCloseTo(1 / 300)
-      expect(calls).toContainEqual(['AUD', 'LKR', 200, '2026-09-10'])
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('refresh_exchange_rates returns 502 and writes nothing when the source is down', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    const svc = await import('../../server/exchange-rate.service')
-    vi.mocked(store.updateExchangeRate).mockClear()
-    vi.mocked(svc.fetchLkrExchangeRates).mockResolvedValue(null)
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'refresh_exchange_rates' }),
-      }),
-    })
-
-    expect(response.status).toBe(502)
-    expect(vi.mocked(store.updateExchangeRate)).not.toHaveBeenCalled()
-  })
-
-  it('retry_pending_extraction re-runs extraction from the saved preview image and clears the prior error on success', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    const extraction = await import('../../server/finance-extraction')
-    vi.mocked(store.listPendingIngestions).mockReturnValue([
-      {
-        id: 'p1',
-        status: 'awaiting_review',
-        source: 'gmail',
-        documentType: 'transaction',
-        sourceRef: '/tmp/original.pdf',
-        rawPreviewImagePath: '/tmp/preview.png',
-        error: 'all_routes_failed',
-        createdAt: '2026-01-01T00:00:00.000Z',
-        updatedAt: '2026-01-01T00:00:00.000Z',
-      },
-    ])
-    vi.mocked(extraction.extractTransactionFromImage).mockResolvedValue({
-      ok: true,
-      data: {
-        kind: 'expense',
-        amount: 500,
-        currency: 'LKR',
-        vendorOrSource: 'Starlink',
-        date: '2026-01-01',
-        confidence: 'high',
-      },
-    })
-    vi.mocked(store.updatePendingIngestion).mockImplementation((id, patch) => ({
-      id,
-      status: 'awaiting_review',
-      source: 'gmail',
-      documentType: 'transaction',
-      sourceRef: '/tmp/original.pdf',
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-02T00:00:00.000Z',
-      ...patch,
-    }))
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'retry_pending_extraction', id: 'p1' }),
-      }),
-    })
-
-    expect(response.status).toBe(200)
-    expect(vi.mocked(extraction.extractTransactionFromImage)).toHaveBeenCalledWith(
-      '/tmp/preview.png',
-      {},
-    )
-    expect(vi.mocked(store.updatePendingIngestion)).toHaveBeenCalledWith('p1', {
-      extracted: expect.objectContaining({ vendorOrSource: 'Starlink' }),
-      error: undefined,
-    })
-    const body = (await response.json()) as {
-      ok: boolean
-      pendingIngestion: { extracted?: { vendorOrSource: string } }
-    }
-    expect(body.ok).toBe(true)
-    expect(body.pendingIngestion.extracted?.vendorOrSource).toBe('Starlink')
-  })
-
-  it('retry_pending_extraction records the new failure reason when it fails again', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    const extraction = await import('../../server/finance-extraction')
-    vi.mocked(store.listPendingIngestions).mockReturnValue([
-      {
-        id: 'p2',
-        status: 'awaiting_review',
-        source: 'gmail',
-        documentType: 'transaction',
-        sourceRef: '/tmp/original.pdf',
-        rawPreviewImagePath: '/tmp/preview.png',
-        error: 'all_routes_failed',
-        createdAt: '2026-01-01T00:00:00.000Z',
-        updatedAt: '2026-01-01T00:00:00.000Z',
-      },
-    ])
-    vi.mocked(extraction.extractTransactionFromImage).mockResolvedValue({
-      ok: false,
-      reason: 'all_routes_failed',
-    })
-    vi.mocked(store.updatePendingIngestion).mockImplementation((id, patch) => ({
-      id,
-      status: 'awaiting_review',
-      source: 'gmail',
-      documentType: 'transaction',
-      sourceRef: '/tmp/original.pdf',
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-02T00:00:00.000Z',
-      ...patch,
-    }))
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'retry_pending_extraction', id: 'p2' }),
-      }),
-    })
-
-    expect(response.status).toBe(200)
-    expect(vi.mocked(store.updatePendingIngestion)).toHaveBeenCalledWith('p2', {
-      extracted: undefined,
-      error: 'all_routes_failed',
-    })
-  })
-
-  it('retry_pending_extraction returns 400 when there is no saved preview image to retry from', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    vi.mocked(store.listPendingIngestions).mockReturnValue([
-      {
-        id: 'p3',
-        status: 'awaiting_review',
-        source: 'upload',
-        documentType: 'transaction',
-        sourceRef: '/tmp/original.pdf',
-        createdAt: '2026-01-01T00:00:00.000Z',
-        updatedAt: '2026-01-01T00:00:00.000Z',
-      },
-    ])
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'retry_pending_extraction', id: 'p3' }),
-      }),
-    })
-
-    expect(response.status).toBe(400)
-  })
-
-  it('retry_pending_extraction returns 404 for an unknown id', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    vi.mocked(store.listPendingIngestions).mockReturnValue([])
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'retry_pending_extraction', id: 'missing' }),
-      }),
-    })
-
-    expect(response.status).toBe(404)
-  })
-
-  it('list_transactions pages the unified history by id cursor (PF review item 9)', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    const rows = Array.from({ length: 5 }, (_, i) => ({
-      id: `t-${i}`,
-      kind: i % 2 ? 'income' : 'expense',
-      date: `2026-06-${10 - i}`,
-      amount: 100 + i,
-    }))
-    vi.mocked(store.getUnifiedTransactions).mockReturnValue(rows as never)
-
-    const call = (bodyObj: Record<string, unknown>) =>
-      handlers().then((h) =>
-        h.POST({
-          request: new Request('http://localhost/api/finance', {
-            method: 'POST',
-            body: JSON.stringify({ action: 'list_transactions', ...bodyObj }),
-          }),
-        }),
-      )
-
-    const first = (await (await call({ limit: 2 })).json()) as {
-      ok: boolean
-      transactions: Array<{ id: string }>
-      nextCursor: string | null
-      total: number
-    }
-    expect(first.ok).toBe(true)
-    expect(first.transactions.map((t) => t.id)).toEqual(['t-0', 't-1'])
-    expect(first.nextCursor).toBe('t-1')
-    expect(first.total).toBe(5)
-
-    const second = (await (
-      await call({ limit: 2, cursor: first.nextCursor })
-    ).json()) as { transactions: Array<{ id: string }>; nextCursor: string | null }
-    expect(second.transactions.map((t) => t.id)).toEqual(['t-2', 't-3'])
-    expect(second.nextCursor).toBe('t-3')
-
-    const third = (await (
-      await call({ limit: 2, cursor: second.nextCursor })
-    ).json()) as { transactions: Array<{ id: string }>; nextCursor: string | null }
-    expect(third.transactions.map((t) => t.id)).toEqual(['t-4'])
-    expect(third.nextCursor).toBeNull()
-  })
-
-  it('list_transactions clamps limit and restarts on an unknown cursor', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    const rows = Array.from({ length: 3 }, (_, i) => ({ id: `x-${i}`, date: '2026-06-01' }))
-    vi.mocked(store.getUnifiedTransactions).mockReturnValue(rows as never)
-
-    const res = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'list_transactions',
-          limit: 9999,
-          cursor: 'nope',
-        }),
-      }),
-    })
-    const data = (await res.json()) as { transactions: Array<{ id: string }> }
-    // limit clamped to 500 (> 3 rows) and unknown cursor -> from the top
-    expect(data.transactions.map((t) => t.id)).toEqual(['x-0', 'x-1', 'x-2'])
-  })
-
   it('derives and stores research-only intelligence from existing data', async () => {
     state.authenticated = true
     const store = await import('../../server/finance-store')
-    vi.mocked(store.readFinanceStore).mockReturnValue(
-      state.mockFinanceDb({
-        news_items: [{ id: 'news-1' }],
-        sentiment_scores: [{ id: 'fg-1' }],
-      }) as any,
-    )
+    vi.mocked(store.readFinanceStore).mockReturnValue({
+      news_items: [{ id: 'news-1' }],
+      sentiment_scores: [{ id: 'fg-1' }],
+    } as any)
     state.buildCompositeSentiment.mockReturnValueOnce({
+      symbol: 'BTCUSDT',
       score: 20,
-      label: 'positive',
+      label: 'positive' as const,
       confidence: 0.6,
       freshness: 0.8,
       sourceIds: ['fg-1', 'news-1'],
+      disagreement: false,
+      blockers: [],
       formulaVersion: 'research-v1',
       observedAt: '2026-08-20T12:00:00.000Z',
       expiresAt: '2026-08-22T12:00:00.000Z',
     })
     state.assessResearchRisk.mockReturnValueOnce({
-      riskLevel: 'low_risk',
+      riskLevel: 'low_risk' as const,
       riskScore: 25,
       confidenceScore: 0.6,
       blockers: [],
       inputs: {},
     })
-    state.storeIntelligenceRecords.mockReturnValueOnce({ stored: true })
+    state.storeIntelligenceRecords.mockReturnValueOnce({
+      stored: true,
+      sentiment: {} as IntelligenceStoreResult['sentiment'],
+      risk: {} as IntelligenceStoreResult['risk'],
+      intelligence: {} as IntelligenceStoreResult['intelligence'],
+    })
 
     const response = await (
       await handlers()
@@ -924,253 +1060,5 @@ describe('/api/finance fetch_news', () => {
       ok: true,
       intelligence: { researchOnly: true, stored: { stored: true } },
     })
-  })
-})
-
-describe('import_transactions_csv', () => {
-  it('creates a record per valid row and reports the count', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    vi.mocked(store.addFinanceRecord).mockClear()
-    vi.mocked(store.findPossibleDuplicate).mockReturnValue(null)
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'import_transactions_csv',
-          rows: [
-            {
-              kind: 'expense',
-              date: '2026-01-01',
-              amount: 1500,
-              currency: 'LKR',
-              vendorOrSource: 'Cargills',
-              category: 'Groceries',
-            },
-            {
-              kind: 'income',
-              date: '2026-01-02',
-              amount: 5000,
-              currency: 'LKR',
-              vendorOrSource: 'Employer',
-            },
-          ],
-        }),
-      }),
-    })
-
-    expect(response.status).toBe(200)
-    const body = (await response.json()) as {
-      ok: boolean
-      created: number
-      skippedDuplicates: number
-      errors: Array<unknown>
-    }
-    expect(body.ok).toBe(true)
-    expect(body.created).toBe(2)
-    expect(body.skippedDuplicates).toBe(0)
-    expect(body.errors).toEqual([])
-    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledTimes(2)
-    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledWith(
-      'expense',
-      expect.objectContaining({ vendor: 'Cargills', date: '2026-01-01', amount: 1500 }),
-    )
-    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledWith(
-      'income',
-      expect.objectContaining({ sourceName: 'Employer', dateReceived: '2026-01-02' }),
-    )
-  })
-
-  it('skips a row findPossibleDuplicate flags, without creating a record', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    vi.mocked(store.addFinanceRecord).mockClear()
-    vi.mocked(store.findPossibleDuplicate).mockReturnValueOnce({
-      id: 'existing-1',
-      vendorOrSource: 'Cargills',
-      date: '2026-01-01',
-      amount: 1500,
-    })
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'import_transactions_csv',
-          rows: [
-            {
-              kind: 'expense',
-              date: '2026-01-01',
-              amount: 1500,
-              vendorOrSource: 'Cargills',
-            },
-          ],
-        }),
-      }),
-    })
-
-    const body = (await response.json()) as {
-      created: number
-      skippedDuplicates: number
-    }
-    expect(body.created).toBe(0)
-    expect(body.skippedDuplicates).toBe(1)
-    expect(vi.mocked(store.addFinanceRecord)).not.toHaveBeenCalled()
-  })
-
-  it('force:true bypasses the duplicate check', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    vi.mocked(store.addFinanceRecord).mockClear()
-    vi.mocked(store.findPossibleDuplicate).mockReturnValue({
-      id: 'existing-1',
-      vendorOrSource: 'Cargills',
-      date: '2026-01-01',
-      amount: 1500,
-    })
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'import_transactions_csv',
-          force: true,
-          rows: [
-            { kind: 'expense', date: '2026-01-01', amount: 1500, vendorOrSource: 'Cargills' },
-          ],
-        }),
-      }),
-    })
-
-    const body = (await response.json()) as { created: number }
-    expect(body.created).toBe(1)
-    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledTimes(1)
-  })
-
-  it('collects a per-row error for an invalid row without failing the whole batch', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    vi.mocked(store.addFinanceRecord).mockClear()
-    vi.mocked(store.findPossibleDuplicate).mockReturnValue(null)
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'import_transactions_csv',
-          rows: [
-            { kind: 'expense', date: '2026-01-01', amount: 1500, vendorOrSource: 'Cargills' },
-            { kind: 'transfer', date: '2026-01-01', amount: 100, vendorOrSource: 'X' },
-            { kind: 'expense', date: '2026-01-01', amount: -5, vendorOrSource: 'Y' },
-          ],
-        }),
-      }),
-    })
-
-    const body = (await response.json()) as {
-      created: number
-      errors: Array<{ index: number; reason: string }>
-    }
-    expect(body.created).toBe(1)
-    expect(body.errors).toEqual([
-      { index: 1, reason: 'kind must be income or expense' },
-      { index: 2, reason: 'amount must be a positive number' },
-    ])
-  })
-
-  it('returns 400 for an empty rows array', async () => {
-    state.authenticated = true
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'import_transactions_csv', rows: [] }),
-      }),
-    })
-    expect(response.status).toBe(400)
-  })
-
-  it('returns 400 when rows exceeds the 1000-row cap', async () => {
-    state.authenticated = true
-    const rows = Array.from({ length: 1001 }, (_, i) => ({
-      kind: 'expense',
-      date: '2026-01-01',
-      amount: 1,
-      vendorOrSource: `V${i}`,
-    }))
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'import_transactions_csv', rows }),
-      }),
-    })
-    expect(response.status).toBe(400)
-  })
-})
-
-describe('copy_budgets_to_month', () => {
-  it('calls copyBudgetsToMonth with the target month and writes the store', async () => {
-    state.authenticated = true
-    const store = await import('../../server/finance-store')
-    vi.mocked(store.copyBudgetsToMonth).mockReturnValue({
-      copied: 2,
-      skippedExisting: 1,
-    })
-    vi.mocked(store.writeFinanceStore).mockClear()
-
-    const response = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'copy_budgets_to_month', targetMonth: '2026-08' }),
-      }),
-    })
-
-    expect(response.status).toBe(200)
-    const body = (await response.json()) as { copied: number; skippedExisting: number }
-    expect(body.copied).toBe(2)
-    expect(body.skippedExisting).toBe(1)
-    expect(vi.mocked(store.copyBudgetsToMonth)).toHaveBeenCalledWith(
-      expect.anything(),
-      '2026-08',
-    )
-    expect(vi.mocked(store.writeFinanceStore)).toHaveBeenCalled()
-  })
-
-  it('returns 400 for a missing or malformed targetMonth', async () => {
-    state.authenticated = true
-
-    const missing = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'copy_budgets_to_month' }),
-      }),
-    })
-    expect(missing.status).toBe(400)
-
-    const malformed = await (
-      await handlers()
-    ).POST({
-      request: new Request('http://localhost/api/finance', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'copy_budgets_to_month', targetMonth: 'August 2026' }),
-      }),
-    })
-    expect(malformed.status).toBe(400)
   })
 })

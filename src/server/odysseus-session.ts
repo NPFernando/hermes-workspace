@@ -37,6 +37,7 @@ export async function getOdysseusCookie(): Promise<string | null> {
   return cachedCookie
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await -- keep invalidation compatible with the async cookie lifecycle API
 export async function invalidateOdysseusCookie(): Promise<void> {
   cachedCookie = null
 }

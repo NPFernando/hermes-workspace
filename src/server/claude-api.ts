@@ -423,9 +423,9 @@ export async function streamChat(
     }
   }
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+  let result = await reader.read()
+  while (!result.done) {
+    const value = result.value
 
     buffer += decoder.decode(value, { stream: true })
     const lines = buffer.split('\n')
@@ -457,6 +457,7 @@ export async function streamChat(
         }
       }
     }
+    result = await reader.read()
   }
   if (toolDebugStream) {
     try {

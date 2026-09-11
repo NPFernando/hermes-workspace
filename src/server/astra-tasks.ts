@@ -3,6 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { normalizeTaskTitle } from './task-title'
+import { parseMaxConcurrentExecutions } from './task-execution-config'
 import { createTask, getTask, listTasks, updateTask } from './tasks-store'
 import { openaiChat } from './openai-compat-api'
 import {
@@ -501,8 +503,8 @@ setInterval(
           (t.agent_history ?? []).some(
             (h) =>
               h.action === 'planned' &&
-              !h.note?.includes('Plan unavailable') &&
-              (h.note?.length ?? 0) >= 80,
+              !h.note.includes('Plan unavailable') &&
+              h.note.length >= 80,
           ),
       ).length
       const depWaiting = all.filter(
@@ -636,7 +638,7 @@ setInterval(
           if (t.waiting_for_user) return false
           if (Array.isArray(t.depends_on) && t.depends_on.length > 0)
             return false // gated
-          if ((t.description ?? '').trim().length >= 30) return false // already has description
+          if (t.description.trim().length >= 30) return false // already has description
           if (
             (t.agent_history ?? []).some(
               (h) => h.action === 'description_enriched',
@@ -668,7 +670,7 @@ setInterval(
             { encoding: 'utf-8', timeout: 60_000, maxBuffer: 2 * 1024 * 1024 },
           )
 
-          const desc = (r.stdout ?? '').trim().replace(/^["']|["']$/g, '')
+          const desc = r.stdout.trim().replace(/^["']|["']$/g, '')
           if (!desc || desc.length < 20) continue
 
           const nowIso = new Date().toISOString()
@@ -2195,9 +2197,8 @@ export function executeTaskBackground(taskId: string): void {
 // "user replied" conversational-continuation path.
 // ---------------------------------------------------------------------------
 
-const MAX_CONCURRENT_EXECUTIONS = parseInt(
-  process.env.HERMES_MAX_CONCURRENT ?? '5',
-  10,
+const MAX_CONCURRENT_EXECUTIONS = parseMaxConcurrentExecutions(
+  process.env.HERMES_MAX_CONCURRENT,
 )
 
 function isOpenRouterReachable(): boolean {
@@ -3040,13 +3041,15 @@ export function injectIdeasAsBacklog(): {
 
   // Get existing task titles (case-insensitive) to avoid duplicates
   const allTasks = listTasks({ includeDone: true })
-  const existingTitles = new Set(allTasks.map((t) => t.title.toLowerCase()))
+  const existingTitles = new Set(
+    allTasks.map((t) => normalizeTaskTitle(t.title)),
+  )
 
   const injectedTitles: Array<string> = []
 
   for (const idea of ideas) {
     if (!idea.title) continue
-    if (existingTitles.has(idea.title.toLowerCase())) continue
+    if (existingTitles.has(normalizeTaskTitle(idea.title))) continue
 
     const effortToPriority = (effort: string | undefined) => {
       if (effort === 'high') return 'high' as const
@@ -3065,7 +3068,7 @@ export function injectIdeasAsBacklog(): {
     })
 
     injectedTitles.push(idea.title)
-    existingTitles.add(idea.title.toLowerCase())
+    existingTitles.add(normalizeTaskTitle(idea.title))
   }
 
   return { injected: injectedTitles.length, ideas: injectedTitles }

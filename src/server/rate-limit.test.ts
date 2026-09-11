@@ -1,47 +1,81 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { describe, expect, it } from 'vitest'
+import {
+  getClientIp,
+  MAX_SAFE_ERROR_MESSAGE_LENGTH,
+  rateLimit,
+  rateLimitResponse,
+  redactSensitiveErrorMessage,
+  requireJsonContentType,
+} from './rate-limit'
 
-/**
- * Regression tests for #125 — x-forwarded-for trust boundary on rate-limit
- * identity.
- */
+describe('rate-limit helpers', () => {
+  it('uses the request remote address unless proxy trust is enabled', () => {
+    const request = new Request('http://localhost')
+    Object.defineProperty(request, 'remoteAddress', { value: '10.0.0.7' })
+    request.headers.set('x-forwarded-for', '203.0.113.10')
 
-beforeEach(() => {
-  vi.resetModules()
-})
-
-afterEach(() => {
-  delete process.env.TRUST_PROXY
-})
-
-describe('getClientIp (#125)', () => {
-  function makeRequest(headers: Record<string, string>): Request {
-    return new Request('http://localhost/', { headers })
-  }
-
-  it("falls back to 'local' when TRUST_PROXY is unset", async () => {
+    const previous = process.env.TRUST_PROXY
     delete process.env.TRUST_PROXY
-    const { getClientIp } = await import('./rate-limit')
-    const ip = getClientIp(makeRequest({ 'x-forwarded-for': '198.51.100.5' }))
-    expect(ip).toBe('local')
-  })
+    expect(getClientIp(request)).toBe('10.0.0.7')
 
-  it('honors x-forwarded-for when TRUST_PROXY=1', async () => {
     process.env.TRUST_PROXY = '1'
-    const { getClientIp } = await import('./rate-limit')
-    const ip = getClientIp(
-      makeRequest({ 'x-forwarded-for': '198.51.100.5, 10.0.0.1' }),
-    )
-    expect(ip).toBe('198.51.100.5')
+    expect(getClientIp(request)).toBe('203.0.113.10')
+
+    if (previous === undefined) delete process.env.TRUST_PROXY
+    else process.env.TRUST_PROXY = previous
   })
 
-  it('rate-limit key cannot be rotated by header spoofing when TRUST_PROXY is off', async () => {
-    delete process.env.TRUST_PROXY
-    const { getClientIp } = await import('./rate-limit')
-    const a = getClientIp(makeRequest({ 'x-forwarded-for': '1.1.1.1' }))
-    const b = getClientIp(makeRequest({ 'x-forwarded-for': '2.2.2.2' }))
-    const c = getClientIp(makeRequest({ 'x-forwarded-for': '3.3.3.3' }))
-    expect(a).toBe(b)
-    expect(b).toBe(c)
-    expect(a).toBe('local')
+  it('allows requests up to the configured limit and rejects the next one', () => {
+    const key = `rate-limit-test:${randomUUID()}`
+    expect(rateLimit(key, 2, 60_000)).toBe(true)
+    expect(rateLimit(key, 2, 60_000)).toBe(true)
+    expect(rateLimit(key, 2, 60_000)).toBe(false)
+  })
+
+  it('requires JSON content type for state-changing requests', () => {
+    expect(requireJsonContentType(new Request('http://localhost'))).toBeNull()
+    expect(
+      requireJsonContentType(
+        new Request('http://localhost', { method: 'POST' }),
+      ),
+    ).toBeInstanceOf(Response)
+    expect(
+      requireJsonContentType(
+        new Request('http://localhost', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json; charset=utf-8' },
+        }),
+      ),
+    ).toBeNull()
+  })
+
+  it('returns a JSON 429 response', async () => {
+    const response = rateLimitResponse()
+    expect(response.status).toBe(429)
+    expect(response.headers.get('content-type')).toContain('application/json')
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('retry-after')).toBe('60')
+    expect(await response.json()).toEqual({
+      error: 'Too many requests, please try again later',
+    })
+  })
+
+  it('redacts common credentials from development error messages', () => {
+    const message = redactSensitiveErrorMessage(
+      'request failed api_key=sk-live-secret Bearer abc.def password="open-sesame" https://user:pw@example.test/api',
+    )
+    expect(message).not.toContain('sk-live-secret')
+    expect(message).not.toContain('abc.def')
+    expect(message).not.toContain('open-sesame')
+    expect(message).not.toContain('user:pw@example.test')
+    expect(message).toContain('api_key=[REDACTED]')
+    expect(message).toContain('Bearer [REDACTED]')
+  })
+
+  it('caps oversized diagnostics after redaction', () => {
+    const message = redactSensitiveErrorMessage('x'.repeat(2_000))
+    expect(message).toHaveLength(MAX_SAFE_ERROR_MESSAGE_LENGTH)
+    expect(message.endsWith('…')).toBe(true)
   })
 })

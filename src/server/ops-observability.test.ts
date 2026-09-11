@@ -39,7 +39,11 @@ describe('ops-observability finance storage monitor', () => {
       lastAlertAt: '2026-07-08T00:20:00.000Z',
       consecutiveFailures: 3,
       lastStatus: 'postgres_behind',
-      lastWarnings: ['Postgres mirror is 45s behind JSON finance storage.'],
+      lastWarnings: [
+        'Postgres mirror is 45s behind JSON finance storage. password=topsecret',
+      ],
+      lastSelfHealAttempts: 2,
+      lastSelfHealSucceeded: false,
     })
 
     expect(
@@ -49,11 +53,16 @@ describe('ops-observability finance storage monitor', () => {
         staleAfterMs: 30 * 60_000,
       }),
     ).toMatchObject({
-      statePath,
+      statePath: 'storage-monitor.json',
       lastStatus: 'postgres_behind',
+      lastWarnings: [
+        'Postgres mirror is 45s behind JSON finance storage. password=[REDACTED]',
+      ],
       consecutiveFailures: 3,
       heartbeatAgeMs: 45 * 60_000,
       stale: true,
+      lastSelfHealAttempts: 2,
+      lastSelfHealSucceeded: false,
     })
   })
 
@@ -126,12 +135,12 @@ describe('ops-observability finance storage smoke cron', () => {
       nextRunAt: '2026-07-08T06:27:00+05:30',
       completedRuns: 1,
       deliver: 'telegram:2130622225',
-      latestOutputPath: outputPath,
+      latestOutputPath: '2026-07-08_05-49-45.md',
       latestOutputStatus: 'silent (empty output)',
       recentFailureCount: 0,
       recentOutputs: [
         expect.objectContaining({
-          path: outputPath,
+          path: '2026-07-08_05-49-45.md',
           status: 'silent (empty output)',
           failed: false,
         }),
@@ -262,19 +271,19 @@ describe('ops-observability finance storage smoke cron', () => {
     })
 
     expect(summary).toMatchObject({
-      latestOutputPath: successPath,
+      latestOutputPath: '2026-07-08_07-27-48.md',
       latestOutputStatus: 'silent (empty output)',
       recentFailureCount: 1,
     })
     expect(summary?.recentOutputs).toEqual([
       expect.objectContaining({
-        path: successPath,
+        path: '2026-07-08_07-27-48.md',
         runTime: '2026-07-08 07:27:48',
         status: 'silent (empty output)',
         failed: false,
       }),
       expect.objectContaining({
-        path: failurePath,
+        path: '2026-07-08_06-27-46.md',
         runTime: '2026-07-08 06:27:46',
         status: 'failed',
         failed: true,

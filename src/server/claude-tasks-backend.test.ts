@@ -111,6 +111,36 @@ describe('claude-tasks-backend', () => {
     })
   })
 
+  it('reuses an active task when its title only differs by case or whitespace', async () => {
+    const { mod, createKanbanCard } = await loadBackend({
+      cards: [
+        {
+          id: 'existing-task',
+          title: '  Review   monthly report ',
+          spec: 'Already queued',
+          acceptanceCriteria: [],
+          assignedWorker: null,
+          reviewer: null,
+          status: 'ready',
+          missionId: null,
+          reportPath: null,
+          createdBy: 'maia',
+          createdAt: 1_700_000_000_000,
+          updatedAt: 1_700_000_000_000,
+        },
+      ],
+    })
+
+    const task = await mod.createClaudeTask({
+      title: 'review monthly    report',
+      description: 'Do not create a second active task',
+      column: 'backlog',
+    })
+
+    expect(task).toMatchObject({ id: 'existing-task' })
+    expect(createKanbanCard).not.toHaveBeenCalled()
+  })
+
   it('moves running and blocked cards through kanban status updates', async () => {
     const { mod, updateKanbanCard } = await loadBackend({
       updatedCard: {

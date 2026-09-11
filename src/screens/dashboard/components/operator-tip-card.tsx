@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Idea01Icon, Refresh01Icon } from '@hugeicons/core-free-icons'
+import {
+  ArrowRight01Icon,
+  Idea01Icon,
+  Refresh01Icon,
+} from '@hugeicons/core-free-icons'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 
 type Tip = {
@@ -36,8 +40,6 @@ const TIPS: ReadonlyArray<Tip> = [
     title: 'Cache hit rate is low',
     body: 'Reusable system prompts get cached on most providers. Pin shared scaffolding (skills, persona, tools) into a stable preamble so the next request hits cache instead of paying for fresh input.',
     tone: 'warn',
-    cta: 'Open analytics',
-    href: '/analytics',
     score: (o) => {
       const a = o?.analytics
       if (!a || a.source !== 'analytics') return 0
@@ -129,8 +131,9 @@ const TIPS: ReadonlyArray<Tip> = [
     title: 'Things have been quiet',
     body: 'Session count is below the prior period — could be intentional, could be silent breakage. Worth scanning recent logs and reviewing your cron / heartbeat schedule.',
     tone: 'info',
-    cta: 'Open sessions',
-    href: '/sessions',
+    cta: 'Open chat',
+    // Session history is surfaced from the chat workspace.
+    href: '/chat',
     score: (o) => {
       const a = o?.analytics
       if (!a || a.source !== 'analytics') return 0
@@ -149,15 +152,15 @@ const TIPS: ReadonlyArray<Tip> = [
     title: 'One model is doing all the work',
     body: 'Concentration risk: if your top model is handling >70% of calls, an outage or pricing change hits hard. Worth setting up a fallback even if you never use it.',
     tone: 'info',
-    cta: 'Open models',
-    href: '/models',
+    cta: 'Open settings',
+    // Model preferences live in Settings until a dedicated models route exists.
+    href: '/settings',
     score: (o) => {
       const a = o?.analytics
       if (!a || a.source !== 'analytics') return 0
       const total = a.topModels.reduce((x, m) => x + m.calls, 0)
       if (total === 0) return 0
       const top = a.topModels[0]
-      if (!top) return 0
       return top.calls / total > 0.7 ? 45 : 0
     },
   },
@@ -220,7 +223,12 @@ export function OperatorTipCard({
   // changing tip set never crashes.
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    let raw: string | null = null
+    try {
+      raw = window.localStorage.getItem(STORAGE_KEY)
+    } catch {
+      return
+    }
     if (!raw) return
     const n = Number(raw)
     if (Number.isFinite(n) && n >= 0) setIndex(n % Math.max(1, ranked.length))
@@ -229,27 +237,19 @@ export function OperatorTipCard({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    window.localStorage.setItem(STORAGE_KEY, String(index))
+    try {
+      window.localStorage.setItem(STORAGE_KEY, String(index))
+    } catch {
+      // Tip rotation remains usable when preference storage is restricted.
+    }
   }, [index])
 
   if (ranked.length === 0) return null
   const tip = ranked[index % ranked.length]
+  const href = tip.href
   const tone = TONE_COLORS[tip.tone ?? 'info']
 
   const handleNext = () => setIndex((i) => (i + 1) % ranked.length)
-  const handleCta = () => {
-    if (!tip.href) return
-    if (tip.href.startsWith('http')) {
-      window.open(tip.href, '_blank', 'noopener,noreferrer')
-      return
-    }
-    if (tip.href === '/chat/new') {
-      navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'new' } })
-      return
-    }
-    navigate({ to: tip.href as never })
-  }
-
   return (
     <div
       className="relative flex items-stretch gap-3 overflow-hidden rounded-xl border border-[var(--theme-border)] p-3"
@@ -291,30 +291,62 @@ export function OperatorTipCard({
             Tip · {index + 1}/{ranked.length}
           </span>
           <div className="flex items-center gap-1.5">
-            {tip.href ? (
-              <button
-                type="button"
-                onClick={handleCta}
-                className="rounded-full border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] transition-all hover:scale-[1.03] hover:bg-[var(--theme-card)]/70 text-[var(--theme-text)]"
+            {href ? (
+              <a
+                href={href}
+                target={href.startsWith('http') ? '_blank' : undefined}
+                rel={
+                  href.startsWith('http') ? 'noopener noreferrer' : undefined
+                }
+                onClick={(event) => {
+                  if (
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey ||
+                    href.startsWith('http')
+                  ) {
+                    return
+                  }
+                  event.preventDefault()
+                  if (href === '/chat/new') {
+                    void navigate({
+                      to: '/chat/$sessionKey',
+                      params: { sessionKey: 'new' },
+                    })
+                    return
+                  }
+                  void navigate({ to: href as never })
+                }}
+                className="inline-flex min-h-11 items-center gap-1 rounded-full border border-[var(--theme-border)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-[var(--theme-text)] motion-safe:transition-all motion-safe:hover:scale-[1.03] hover:bg-[var(--theme-card)]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] lg:min-h-0"
               >
-                {tip.cta ?? 'Open'} →
-              </button>
+                <span>{tip.cta ?? 'Open'}</span>
+                <HugeiconsIcon
+                  icon={ArrowRight01Icon}
+                  size={12}
+                  strokeWidth={1.8}
+                />
+              </a>
             ) : null}
             <button
               type="button"
               onClick={handleNext}
               aria-label="Next tip"
               title="Next tip"
-              className="inline-flex size-6 items-center justify-center rounded-full border border-[var(--theme-border)] transition-all hover:scale-[1.05] hover:bg-[var(--theme-card)]/70 text-[var(--theme-muted)]"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--theme-border)] text-[var(--theme-muted)] motion-safe:transition-all motion-safe:hover:scale-[1.05] hover:bg-[var(--theme-card)]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] lg:min-h-0 lg:min-w-0 lg:size-6"
             >
               <HugeiconsIcon icon={Refresh01Icon} size={11} strokeWidth={1.8} />
             </button>
           </div>
         </div>
-        <h3 className="text-[12px] font-semibold leading-tight text-[var(--theme-text)]">
+        <h2 className="text-[12px] font-semibold leading-tight text-[var(--theme-text)]">
           {tip.title}
-        </h3>
-        <p className="text-[11px] leading-snug text-[var(--theme-muted)]">
+        </h2>
+        <p
+          className="line-clamp-3 text-[11px] leading-snug text-[var(--theme-muted)]"
+          title={tip.body}
+        >
           {tip.body}
         </p>
       </div>

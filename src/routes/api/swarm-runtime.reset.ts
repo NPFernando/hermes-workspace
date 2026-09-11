@@ -1,7 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 import {
   resetSwarmWorkerRuntimes,
   resolveResetTargetWorkerIds,
@@ -26,6 +31,9 @@ export const Route = createFileRoute('/api/swarm-runtime/reset')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`swarm-runtime-reset:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
+        }
 
         let body: ResetBody
         try {

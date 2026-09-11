@@ -4,9 +4,9 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { readFinanceStore } from '../../server/finance-store'
 import {
   buildGmailConnectAuthUrl,
+  createOAuthStateCookie,
   isGmailConnected,
   isGoogleOAuthEnabled,
-  readGmailConnectedAccount,
   storeOAuthState,
 } from '../../server/google-oauth'
 
@@ -31,18 +31,13 @@ export const Route = createFileRoute('/api/auth/gmail-connect')({
                   queued: number
                   skippedAlreadyQueued: number
                 }>
-                lastError?: { at: number; message: string }
               }
             | undefined
-          const account = readGmailConnectedAccount()
           return Response.json({
             enabled: isGoogleOAuthEnabled(),
             connected: isGmailConnected(),
-            email: account?.email ?? null,
-            connectedAt: account?.connectedAt ?? null,
             lastSyncedAtSeconds: gmailIngest?.lastSyncedAtSeconds ?? null,
             syncHistory: gmailIngest?.syncHistory ?? [],
-            lastError: gmailIngest?.lastError ?? null,
           })
         }
 
@@ -54,7 +49,10 @@ export const Route = createFileRoute('/api/auth/gmail-connect')({
         storeOAuthState(state, 'gmail_connect')
         return new Response(null, {
           status: 302,
-          headers: { Location: buildGmailConnectAuthUrl(state) },
+          headers: {
+            Location: buildGmailConnectAuthUrl(state),
+            'Set-Cookie': createOAuthStateCookie(state),
+          },
         })
       },
     },

@@ -3,7 +3,13 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { openaiChat } from '../../../server/openai-compat-api'
 
-import { safeErrorMessage } from '../../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 
 const MAX_MSG_CHARS = 600
 const MAX_TITLE_LENGTH = 60
@@ -24,6 +30,11 @@ export const Route = createFileRoute('/api/sessions/generate-title')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`session-title:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
         }
 
         let body: { messages?: Array<{ role: string; content: string }> }

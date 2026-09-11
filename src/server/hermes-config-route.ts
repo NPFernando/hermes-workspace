@@ -18,6 +18,12 @@ import {
   getDiscoveredModels,
   getDiscoveryStatus,
 } from './local-provider-discovery'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from './rate-limit'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type AuthResult = Response | true
@@ -198,6 +204,11 @@ export async function handleHermesConfigPatch({
 }): Promise<Response> {
   const auth = await authorize(request)
   if (auth !== true) return auth
+  const csrfCheck = requireJsonContentType(request)
+  if (csrfCheck) return csrfCheck
+  if (!rateLimit(`hermes-config-write:${getClientIp(request)}`, 30, 60_000)) {
+    return rateLimitResponse()
+  }
 
   if (!getCapabilities().config) {
     return new Response(

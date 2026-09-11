@@ -28,6 +28,12 @@ import {
   readSwarmMode,
 } from '../../server/swarm-mode'
 import { isSwarmWorkerId, readSwarmRoster } from '../../server/swarm-roster'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 import type { ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 
 type LoopRequest = {
@@ -510,6 +516,17 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (
+          !rateLimit(
+            `swarm-orchestrator-loop:${getClientIp(request)}`,
+            5,
+            60_000,
+          )
+        ) {
+          return rateLimitResponse()
         }
         let body: LoopRequest
         try {

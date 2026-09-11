@@ -26,16 +26,22 @@ import {
 import { TaskCard, isStuckAgent } from './task-card'
 import { TaskDialog } from './task-dialog'
 import { useTaskFilters } from './use-task-filters'
+import { buildGroupedTodoRows } from './task-row-utils'
+import { getTaskBoardStats } from './task-stats-utils'
 import {
+  TASK_OPERATION_FILTERS,
   TASK_STATS_ROW_CLASS,
-  countExecutableReviewTasks,
+  doesTaskMatchOperationFilter,
   formatBlockedTaskBreakdownLabel,
   formatBlockedTaskBreakdownTitle,
   formatCompactTaskColumnActionLabel,
   formatCompactTaskColumnAriaLabel,
   formatTaskFilterAriaLabel,
   formatTaskFilterSummary,
+  formatTaskLastUpdated,
   formatTaskRefreshStatus,
+  getRecentTaskNotificationEvents,
+  getTaskOperationFilterLabel,
   isTypingTarget,
 } from './format-utils'
 import {
@@ -135,6 +141,8 @@ export function TasksScreen() {
     setFilterInReview,
     filterTimedOut,
     setFilterTimedOut,
+    operationFilter,
+    setOperationFilter,
     ageFilter,
     setAgeFilter,
     priorityFilter,
@@ -335,8 +343,9 @@ export function TasksScreen() {
   const [showArchiveWizard, setShowArchiveWizard] = useState(false)
   const [archiveDays, setArchiveDays] = useState(60)
   const [archiving, setArchiving] = useState(false)
-  const [archivePreview, setArchivePreview] =
-    useState<ArchivePreview | null>(null)
+  const [archivePreview, setArchivePreview] = useState<ArchivePreview | null>(
+    null,
+  )
 
   // Notification feed
   const [notifLastSeen, setNotifLastSeen] = useState<string>(
@@ -457,6 +466,7 @@ export function TasksScreen() {
         )
       )
         continue
+      if (!doesTaskMatchOperationFilter(t, operationFilter)) continue
       if (ageFilter) {
         const createdAt = (t as unknown as { created_at?: string }).created_at
         const ageDays = createdAt
@@ -485,6 +495,7 @@ export function TasksScreen() {
       effActiveAgent ||
       effInReview ||
       effTimedOut ||
+      operationFilter !== 'all' ||
       ageFilter ||
       priorityFilter ||
       effTag ||
@@ -501,6 +512,7 @@ export function TasksScreen() {
     filterActiveAgent,
     filterInReview,
     filterTimedOut,
+    operationFilter,
     ageFilter,
     priorityFilter,
     tagFilter,
@@ -512,6 +524,7 @@ export function TasksScreen() {
     tasksQuery.isFetching,
     tasksQuery.isLoading,
   )
+  const taskLastUpdated = formatTaskLastUpdated(tasksQuery.dataUpdatedAt)
 
   // Queue position map — mirrors server-side priority sort in runAgentDeployBackground
   const queuePositions = useMemo(() => {
@@ -544,129 +557,7 @@ export function TasksScreen() {
     return map
   }, [tasks])
 
-  const stats = useMemo(() => {
-    const total = tasks.length
-    const running = tasks.filter((t) => t.column === 'in_progress').length
-    const blockedTasks = tasks.filter((t) => t.column === 'blocked')
-    const blocked = blockedTasks.length
-    const blockedWaiting = blockedTasks.filter((t) => t.waiting_for_user).length
-    const blockedExecFail = blockedTasks.filter(
-      (t) => !t.waiting_for_user,
-    ).length
-    const done = tasks.filter((t) => t.column === 'done').length
-    const overdue = tasks.filter(
-      (t) => isOverdue(t) && t.column !== 'done',
-    ).length
-    const completion = total > 0 ? Math.round((done / total) * 100) : 0
-    const agentActive = tasks.filter((t) => t.agent_state).length
-    const readyToExecute = countExecutableReviewTasks(tasks)
-    // Group gated tasks by prereq ID so we can show unlock buttons
-    const prereqGroups = new Map<string, { count: number; title: string }>()
-    tasks.forEach((t) => {
-      if (!Array.isArray(t.depends_on) || t.depends_on.length === 0) return
-      t.depends_on.forEach((depId) => {
-        const prereq = tasks.find((p) => p.id === depId)
-        const entry = prereqGroups.get(depId)
-        if (entry) {
-          entry.count++
-        } else {
-          prereqGroups.set(depId, {
-            count: 1,
-            title: prereq?.title ?? 'prerequisite',
-          })
-        }
-      })
-    })
-    const gatedPrereqs = [...prereqGroups.entries()].map(
-      ([id, { count, title }]) => ({ id, count, title }),
-    )
-    const timedOut = tasks.filter(
-      (t) =>
-        t.column !== 'done' &&
-        (t.agent_history ?? []).some(
-          (h: { action: string }) => h.action === 'timed_out',
-        ),
-    ).length
-    const workingTasks = tasks.filter((t) => t.agent_state === 'working')
-    const stubReviewCount = tasks.filter((t) => {
-      if (t.column !== 'review' || t.agent_state) return false
-      const planned = (t.agent_history ?? []).filter(
-        (h: { action: string }) => h.action === 'planned',
-      )
-      if (planned.length === 0) return true
-      const note = (planned[planned.length - 1] as { note?: string }).note ?? ''
-      return note.includes('Plan unavailable') || note.length < 80
-    }).length
-    const sisterLoad: Record<string, number> = {}
-    tasks
-      .filter(
-        (t) => t.column !== 'done' && t.column !== 'deleted' && t.assignee,
-      )
-      .forEach((t) => {
-        sisterLoad[t.assignee!] = (sisterLoad[t.assignee!] ?? 0) + 1
-      })
-    const sisterChips = Object.entries(sisterLoad)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-
-    // Today's wins: tasks with a 'completed' history entry dated today
-    const today = new Date().toISOString().slice(0, 10)
-    const todayWins: Array<{
-      task: ClaudeTask
-      completedAt: string
-      note: string
-    }> = []
-    tasks.forEach((t) => {
-      ;(t.agent_history ?? []).forEach(
-        (h: { action: string; at?: string; note?: string }) => {
-          if (h.action === 'completed' && (h.at ?? '').startsWith(today)) {
-            todayWins.push({
-              task: t,
-              completedAt: h.at ?? '',
-              note: h.note ?? '',
-            })
-          }
-        },
-      )
-    })
-    todayWins.sort((a, b) => b.completedAt.localeCompare(a.completedAt))
-
-    // Inbox: tasks waiting for user input
-    const inboxTasks = tasks.filter(
-      (t) => t.waiting_for_user || t.column === 'blocked',
-    )
-
-    // Tag cloud across all active tasks
-    const tagCloud: Record<string, number> = {}
-    tasks
-      .filter((t) => t.column !== 'done' && t.column !== 'deleted')
-      .forEach((t) =>
-        t.tags.forEach((tag) => {
-          tagCloud[tag] = (tagCloud[tag] ?? 0) + 1
-        }),
-      )
-
-    return {
-      total,
-      running,
-      blocked,
-      blockedWaiting,
-      blockedExecFail,
-      done,
-      overdue,
-      completion,
-      agentActive,
-      readyToExecute,
-      gatedPrereqs,
-      timedOut,
-      workingTasks,
-      stubReviewCount,
-      sisterChips,
-      todayWins,
-      inboxTasks,
-      tagCloud,
-    }
-  }, [tasks])
+  const stats = useMemo(() => getTaskBoardStats(tasks), [tasks])
 
   const invalidate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
@@ -675,66 +566,12 @@ export function TasksScreen() {
   // Grouped rows for todo column when groupByParent is enabled
   const groupedTodoRows = useMemo<Array<VirtualRow> | null>(() => {
     if (!groupByParent) return null
-    const taskColumnsByStatus = tasksByColumn.columns
-    const todoTasks = taskColumnsByStatus.todo
-    const allById = new Map(tasks.map((t) => [t.id, t]))
-
-    // Separate tasks with known parent vs ungrouped
-    const parentGroups = new Map<
-      string,
-      { label: string; items: Array<ClaudeTask> }
-    >()
-    const byAssignee = new Map<string, Array<ClaudeTask>>()
-
-    todoTasks.forEach((t) => {
-      const parentId = t.depends_on?.[0]
-      if (parentId && allById.has(parentId)) {
-        const parent = allById.get(parentId)!
-        if (!parentGroups.has(parentId))
-          parentGroups.set(parentId, { label: parent.title, items: [] })
-        parentGroups.get(parentId)!.items.push(t)
-      } else {
-        const asgn = t.assignee ?? 'unassigned'
-        if (!byAssignee.has(asgn)) byAssignee.set(asgn, [])
-        byAssignee.get(asgn)!.push(t)
-      }
-    })
-
-    const rows: Array<VirtualRow> = []
-
-    // Parent-linked groups first
-    for (const [parentId, { label, items }] of parentGroups) {
-      const collapsed = collapsedGroups.has(parentId)
-      rows.push({
-        kind: 'group-header',
-        label,
-        count: items.length,
-        groupId: parentId,
-        collapsed,
-        onToggle: () => toggleGroup(parentId),
-      })
-      if (!collapsed) items.forEach((t) => rows.push({ kind: 'task', task: t }))
-    }
-
-    // Assignee groups as fallback
-    const sortedAssignees = [...byAssignee.entries()].sort(
-      (a, b) => b[1].length - a[1].length,
+    return buildGroupedTodoRows(
+      tasksByColumn.columns.todo,
+      tasks,
+      collapsedGroups,
+      toggleGroup,
     )
-    for (const [asgn, items] of sortedAssignees) {
-      const groupId = `__asgn__${asgn}`
-      const collapsed = collapsedGroups.has(groupId)
-      rows.push({
-        kind: 'group-header',
-        label: asgn,
-        count: items.length,
-        groupId,
-        collapsed,
-        onToggle: () => toggleGroup(groupId),
-      })
-      if (!collapsed) items.forEach((t) => rows.push({ kind: 'task', task: t }))
-    }
-
-    return rows
   }, [
     groupByParent,
     tasksByColumn.columns,
@@ -744,46 +581,10 @@ export function TasksScreen() {
   ])
 
   // Notification feed: recent agent_history events across all tasks
-  const notifEvents = useMemo(() => {
-    const events: Array<{
-      taskId: string
-      taskTitle: string
-      action: string
-      at: string
-      note: string
-      by: string
-    }> = []
-    const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString() // last 24h
-    tasks.forEach((t) => {
-      ;(t.agent_history ?? []).forEach(
-        (h: { action?: string; at?: string; note?: string; by?: string }) => {
-          if (!h.at || h.at < cutoff) return
-          const action = h.action ?? ''
-          if (
-            ![
-              'completed',
-              'blocked',
-              'question',
-              'timed_out',
-              'rescued',
-              'planned',
-            ].includes(action)
-          )
-            return
-          events.push({
-            taskId: t.id,
-            taskTitle: t.title,
-            action,
-            at: h.at,
-            note: h.note ?? '',
-            by: h.by ?? 'astra',
-          })
-        },
-      )
-    })
-    events.sort((a, b) => b.at.localeCompare(a.at))
-    return events.slice(0, 60)
-  }, [tasks])
+  const notifEvents = useMemo(
+    () => getRecentTaskNotificationEvents(tasks),
+    [tasks],
+  )
 
   const unreadNotifCount = useMemo(
     () => notifEvents.filter((e) => e.at > notifLastSeen).length,
@@ -1092,6 +893,7 @@ export function TasksScreen() {
     !!assigneeFilter,
     !!ageFilter,
     !!tagFilter,
+    operationFilter !== 'all',
   ].filter(Boolean).length
 
   // Pre-compute live panel task (avoids tasks.find inside JSX IIFE every render)
@@ -2334,6 +2136,41 @@ export function TasksScreen() {
                       ))}
                     </div>
                   </div>
+                  {/* Operation history */}
+                  <div>
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 mb-1.5">
+                      Operation history
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {TASK_OPERATION_FILTERS.map((filter) => {
+                        const active = operationFilter === filter
+                        const label = getTaskOperationFilterLabel(filter)
+                        return (
+                          <button
+                            key={filter}
+                            type="button"
+                            onClick={() => setOperationFilter(filter)}
+                            aria-pressed={active}
+                            aria-label={`${active ? 'Showing' : 'Show'} tasks with ${label.toLowerCase()} operation history`}
+                            className="text-[10px] px-2 py-0.5 rounded-full border transition-colors"
+                            style={{
+                              borderColor: active
+                                ? 'var(--theme-accent)'
+                                : 'var(--theme-border)',
+                              color: active
+                                ? 'var(--theme-accent)'
+                                : 'var(--theme-muted)',
+                              background: active
+                                ? 'color-mix(in srgb, var(--theme-accent) 12%, transparent)'
+                                : 'transparent',
+                            }}
+                          >
+                            {label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
                   {/* Priority */}
                   <div>
                     <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--theme-muted)] opacity-50 mb-1.5">
@@ -2385,9 +2222,24 @@ export function TasksScreen() {
                     <div className="flex gap-1.5">
                       {(
                         [
-                          ['fresh', 'Fresh <1d', 'fresh age', 'var(--theme-success)'],
-                          ['aging', 'Aging 1-3d', 'aging age', 'var(--theme-warning)'],
-                          ['stale', 'Stale >3d', 'stale age', 'var(--theme-danger)'],
+                          [
+                            'fresh',
+                            'Fresh <1d',
+                            'fresh age',
+                            'var(--theme-success)',
+                          ],
+                          [
+                            'aging',
+                            'Aging 1-3d',
+                            'aging age',
+                            'var(--theme-warning)',
+                          ],
+                          [
+                            'stale',
+                            'Stale >3d',
+                            'stale age',
+                            'var(--theme-danger)',
+                          ],
                         ] as Array<
                           ['fresh' | 'aging' | 'stale', string, string, string]
                         >
@@ -2693,7 +2545,7 @@ export function TasksScreen() {
               tasksByColumn.hasAnyFilter && 'ml-0',
             )}
           >
-            {taskRefreshStatus ?? 'Task board is up to date'}
+            {taskRefreshStatus ?? taskLastUpdated ?? 'Task board is up to date'}
           </span>
         </div>
       </div>

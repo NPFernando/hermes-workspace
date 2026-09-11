@@ -498,7 +498,7 @@ export const useMissionStore = create<MissionStore>()(
         const activeMission: ActiveMission = {
           id: checkpoint.id,
           goal: checkpoint.goal ?? '',
-          name: checkpoint.name ?? checkpoint.label ?? '',
+          name: checkpoint.name || checkpoint.label || '',
           state: checkpoint.status === 'paused' ? 'paused' : 'running',
           team: checkpoint.team.map((member) => ({
             ...member,
@@ -506,7 +506,7 @@ export const useMissionStore = create<MissionStore>()(
           })),
           tasks: restoredTasks,
           agentSessionMap: {
-            ...(checkpoint.agentSessions ?? checkpoint.agentSessionMap ?? {}),
+            ...(checkpoint.agentSessions ?? checkpoint.agentSessionMap),
           },
           agentSessionModelMap: { ...(checkpoint.agentSessionModelMap ?? {}) },
           agentSessionStatus: {},
@@ -696,9 +696,7 @@ export const useMissionStore = create<MissionStore>()(
           }
         }
         state.missionHistory = {
-          reports: clampHistory(
-            state.missionHistory?.reports ?? initialHistory,
-          ),
+          reports: clampHistory(state.missionHistory.reports),
         }
       },
     },

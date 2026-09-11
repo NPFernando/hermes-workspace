@@ -1,7 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import {
   appendSwarmMemoryEvent,
   ensureWorkerMemoryScaffold,
@@ -68,7 +74,7 @@ function asEventType(value: unknown): SwarmMemoryEventType {
 export const Route = createFileRoute('/api/swarm-memory')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -86,6 +92,11 @@ export const Route = createFileRoute('/api/swarm-memory')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`swarm-memory-write:${getClientIp(request)}`, 60, 60_000)) {
+          return rateLimitResponse()
         }
 
         let body: SwarmMemoryPostBody

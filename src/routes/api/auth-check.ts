@@ -6,6 +6,18 @@ import {
 } from '../../server/auth-middleware'
 import { ensureGatewayProbed } from '../../server/gateway-capabilities'
 
+const AUTH_CHECK_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+  Vary: 'Cookie',
+}
+
+export function authCheckResponse(
+  body: Record<string, unknown>,
+  status = 200,
+): Response {
+  return json(body, { status, headers: AUTH_CHECK_HEADERS })
+}
+
 export const Route = createFileRoute('/api/auth-check')({
   server: {
     handlers: {
@@ -20,17 +32,17 @@ export const Route = createFileRoute('/api/auth-check')({
           const reachable = caps.health || caps.chatCompletions || caps.models
 
           if (!reachable) {
-            return json(
+            return authCheckResponse(
               {
                 authenticated: false,
                 authRequired: true,
                 error: 'claude_agent_unreachable',
               },
-              { status: 503 },
+              503,
             )
           }
         } catch (error) {
-          return json(
+          return authCheckResponse(
             {
               authenticated: false,
               authRequired: true,
@@ -39,14 +51,14 @@ export const Route = createFileRoute('/api/auth-check')({
                   ? 'claude_agent_timeout'
                   : 'claude_agent_unreachable',
             },
-            { status: 503 },
+            503,
           )
         }
 
         const authRequired = isPasswordProtectionEnabled()
         const authenticated = isAuthenticated(request)
 
-        return json({
+        return authCheckResponse({
           authenticated,
           authRequired,
         })

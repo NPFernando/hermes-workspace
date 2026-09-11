@@ -48,7 +48,7 @@ export function getPaydayStatus(
   const monthlyIncomeAmount = optionalNumberField(job, 'monthlyIncomeAmount')
   const paydayDay = optionalNumberField(job, 'expectedPaydayDayOfMonth')
   if (
-    status !== 'active' ||
+    !['active', 'notice_period'].includes(status) ||
     monthlyIncomeAmount === undefined ||
     paydayDay === undefined
   ) {
@@ -61,6 +61,7 @@ export function getPaydayStatus(
   const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
   const matches = incomeRecords.filter((record) => {
+    if (record.deletedAt || stringField(record, 'transactionType') === 'transfer') return false
     const dateReceived = stringField(record, 'dateReceived')
     if (dateReceived.slice(0, 7) !== currentMonthKey) return false
     const linkedId = stringField(record, 'incomeSourceId')

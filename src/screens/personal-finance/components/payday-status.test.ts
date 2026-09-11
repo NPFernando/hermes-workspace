@@ -25,6 +25,14 @@ describe('getPaydayStatus', () => {
     expect(getPaydayStatus(job, [])).toEqual({ state: 'not_tracked' })
   })
 
+  it('continues tracking payday during a notice period', () => {
+    const today = new Date(2026, 7, 13)
+    expect(getPaydayStatus({ ...baseJob, status: 'notice_period' }, [], today)).toEqual({
+      state: 'due_soon',
+      daysUntil: 2,
+    })
+  })
+
   it('returns paid when a linked income record exists this month (incomeSourceId match)', () => {
     const today = new Date(2026, 7, 20) // 2026-08-20
     const records = [
@@ -97,6 +105,18 @@ describe('getPaydayStatus', () => {
   it('ignores income records from a different month', () => {
     const today = new Date(2026, 7, 20)
     const records = [{ dateReceived: '2026-07-15', incomeSourceId: 'job-1' }]
+    expect(getPaydayStatus(baseJob, records, today)).toEqual({
+      state: 'overdue',
+      daysOverdue: 5,
+    })
+  })
+
+  it('does not treat deleted or transfer records as paid income', () => {
+    const today = new Date(2026, 7, 20)
+    const records = [
+      { dateReceived: '2026-08-15', incomeSourceId: 'job-1', deletedAt: '2026-08-16T00:00:00Z' },
+      { dateReceived: '2026-08-16', incomeSourceId: 'job-1', transactionType: 'transfer' },
+    ]
     expect(getPaydayStatus(baseJob, records, today)).toEqual({
       state: 'overdue',
       daysOverdue: 5,

@@ -159,7 +159,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
 
   async function handleDelete(provider: ProviderSummary) {
     const confirmed = window.confirm(
-      `Remove provider "${provider.name}"? This will delete the API key from your local config.`,
+      `Remove provider "${provider.name}"? This will delete its provider key from this device.`,
     )
     if (!confirmed) return
 
@@ -239,7 +239,7 @@ export function ProvidersScreen({ embedded = false }: ProvidersScreenProps) {
                 Settings
               </h1>
               <p className="text-sm text-[var(--theme-muted)]">
-                Configure providers plus Hermes Agent defaults in one place.
+                Configure connected AI services and workspace defaults in one place.
               </p>
             </div>
 

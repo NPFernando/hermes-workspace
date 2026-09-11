@@ -1,94 +1,50 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../../components/confirm-dialog'
 import { useFinanceAction } from '../../finance/hooks/use-finance-action'
-import { formatMoney } from '../utils'
+import { formatDateTime, formatMoney } from '../utils'
+import { transactionAmountLabel } from '../transaction-display'
 import { buttonClass, confirmButtonClass, dangerButtonClass, inputClass } from '../shared-styles'
 import { numberField, splitTags, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
-type TxnKind = 'income' | 'expense' | 'transfer'
+type TxnKind = 'income' | 'expense'
+type LedgerKind = TxnKind | 'transfer' | 'split'
+const AUDIT_PAGE_SIZE = 8
 
-/** Rows rendered before the "show more" cut — keeps the DOM bounded on a
- *  many-year history. Filters/search still run over the whole list. */
-const RENDER_PAGE = 100
+type ImportPreview = {
+  fingerprint: string
+  rowCount: number
+  items: Array<unknown>
+  errors: Array<string>
+  duplicates: Array<{ rowNumbers: Array<number>; counterparty: string; amount: number }>
+}
 
-/**
- * PF review D1: the payload no longer ships a pre-unified `transactions` array
- * (it duplicated `data.income_records` + `data.expense_records`). This mirrors
- * the server's `getUnifiedTransactions` shape from the two raw arrays, which
- * are already `maskSensitive`-d in the payload.
- */
-export function unifyTransactions(
-  income: ReadonlyArray<Record<string, unknown>>,
-  expense: ReadonlyArray<Record<string, unknown>>,
-  transfers: ReadonlyArray<Record<string, unknown>> = [],
-): Array<Record<string, unknown>> {
-  const rows: Array<Record<string, unknown>> = [
-    ...income.map((r) => ({
-      id: r.id,
-      kind: 'income',
-      date: r.dateReceived,
-      counterparty: r.sourceName,
-      category: r.incomeType,
-      accountId: r.accountId,
-      currency: r.originalCurrency,
-      amount: r.originalAmount,
-      convertedLkrAmount: r.convertedLkrAmount,
-      notes: r.notes,
-      documentRef: r.documentRef,
-      taxable: r.taxable,
-      incomeSourceId: r.incomeSourceId,
-      tags: r.tags,
-      status: r.status,
-      source: r.source,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-    })),
-    ...expense.map((r) => ({
-      id: r.id,
-      kind: 'expense',
-      date: r.date,
-      counterparty: r.vendor,
-      category: r.category,
-      accountId: r.accountId,
-      currency: r.currency,
-      amount: r.amount,
-      convertedLkrAmount: r.convertedLkrAmount,
-      notes: r.notes,
-      documentRef: r.documentRef,
-      recurring: r.recurring,
-      subcategory: r.subcategory,
-      splits: r.splits,
-      tags: r.tags,
-      status: r.status,
-      source: r.source,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-    })),
-    ...transfers.map((r) => ({
-      id: r.id,
-      kind: 'transfer',
-      date: r.date,
-      counterparty: [r.fromAccountId, r.toAccountId].filter(Boolean).join(' → '),
-      category: 'Transfer',
-      accountId: r.fromAccountId,
-      fromAccountId: r.fromAccountId,
-      toAccountId: r.toAccountId,
-      currency: r.currency,
-      amount: r.amount,
-      convertedLkrAmount: r.convertedLkrAmount,
-      notes: r.notes,
-      source: r.source,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-    })),
-  ]
-  return rows.sort((a, b) => {
-    const ad = String(a.date ?? '')
-    const bd = String(b.date ?? '')
-    if (ad !== bd) return ad < bd ? 1 : -1
-    return String(a.createdAt ?? '') < String(b.createdAt ?? '') ? 1 : -1
+export function splitRowsFromPercents(
+  rows: Array<{ category: string; percent: number }>,
+  total: number,
+): Array<{ category: string; amount: string }> {
+  const safeTotal = Number.isFinite(total) ? total : 0
+  let allocated = 0
+  return rows.map((row, index) => {
+    const amount = index === rows.length - 1
+      ? Math.round((safeTotal - allocated) * 100) / 100
+      : Math.round((safeTotal * row.percent / 100) * 100) / 100
+    allocated += amount
+    return { category: row.category, amount: String(amount) }
   })
+}
+
+export function unifyTransactions(
+  income: Array<Record<string, any>>,
+  expenses: Array<Record<string, any>>,
+  transfers: Array<Record<string, any>> = [],
+) {
+  const rows = [
+    ...income.map((row) => ({ id: row.id, kind: 'income', date: row.dateReceived, counterparty: row.sourceName, category: row.incomeType, accountId: row.accountId, currency: row.originalCurrency, amount: row.originalAmount, exchangeRateUsed: row.exchangeRateUsed, convertedLkrAmount: row.convertedLkrAmount, notes: row.notes, documentRef: row.documentRef, taxable: row.taxable, incomeSourceId: row.incomeSourceId, tags: row.tags, status: row.status, transactionType: row.transactionType ?? 'income', transferId: row.transferId, transferAccountId: row.transferAccountId, source: row.source, createdAt: row.createdAt, updatedAt: row.updatedAt, deletedAt: row.deletedAt })),
+    ...expenses.map((row) => ({ id: row.id, kind: 'expense', date: row.date, counterparty: row.vendor, category: row.category, accountId: row.accountId, currency: row.currency, amount: row.amount, exchangeRateUsed: row.exchangeRateUsed, convertedLkrAmount: row.convertedLkrAmount, notes: row.notes, documentRef: row.documentRef, recurring: row.recurring, subcategory: row.subcategory, tags: row.tags, status: row.status, transactionType: row.transactionType ?? 'expense', transferId: row.transferId, transferAccountId: row.transferAccountId, splitGroupId: row.splitGroupId, splitIndex: row.splitIndex, source: row.source, createdAt: row.createdAt, updatedAt: row.updatedAt, deletedAt: row.deletedAt })),
+    ...transfers.map((row) => ({ id: row.id, kind: 'transfer', date: row.date, counterparty: `${row.fromAccountId ?? ''} → ${row.toAccountId ?? ''}`, category: 'Transfer', accountId: row.fromAccountId, currency: row.currency, amount: row.amount, convertedLkrAmount: row.convertedLkrAmount ?? row.amount, status: row.status ?? 'cleared', transactionType: 'transfer', notes: row.notes, source: row.source, createdAt: row.createdAt, updatedAt: row.updatedAt })),
+  ]
+  return rows.sort((a, b) => a.date === b.date ? String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')) : String(b.date).localeCompare(String(a.date)))
 }
 
 function boolField(row: Record<string, unknown>, key: string): boolean {
@@ -108,219 +64,44 @@ function merchantDefaultCategory(
   return defaultCategory || undefined
 }
 
-/** The remembered `{category, percent}` split for an exact-name vendor match. */
-function merchantDefaultSplits(
-  merchants: Array<Record<string, unknown>>,
-  vendorName: string,
-): Array<{ category: string; percent: number }> | undefined {
-  const match = merchants.find((m) => stringField(m, 'name') === vendorName)
-  const raw = match ? match.defaultSplits : undefined
-  if (!Array.isArray(raw) || raw.length < 2) return undefined
-  return raw.map((p) => {
-    const row = (p ?? {}) as Record<string, unknown>
-    return {
-      category: stringField(row, 'category'),
-      percent: Number(row.percent) || 0,
-    }
-  })
-}
-
-/** One row of the split editor — strings while typing, parsed on submit. */
-type SplitRow = { category: string; amount: string }
-
-/** `{category, percent}[]` + a total → split rows, remainder on the last row. */
-export function splitRowsFromPercents(
-  parts: Array<{ category: string; percent: number }>,
-  total: number,
-): Array<SplitRow> {
-  const amounts = parts.map((p) => Math.round(((total * p.percent) / 100) * 100) / 100)
-  const drift = Math.round((total - amounts.reduce((s, a) => s + a, 0)) * 100) / 100
-  if (amounts.length) amounts[amounts.length - 1] += drift
-  return parts.map((p, i) => ({
-    category: p.category,
-    amount: String(amounts[i]),
-  }))
+function auditDetailText(details: Record<string, unknown>): string {
+  const candidate = details.after ?? details.before
+  const record = Array.isArray(candidate) ? candidate[0] : candidate
+  if (!record || typeof record !== 'object') return 'transaction metadata changed'
+  const row = record as Record<string, unknown>
+  const counterparty = stringField(row, 'counterparty')
+  const category = stringField(row, 'category')
+  const amount = numberField(row, 'amount')
+  const currency = stringField(row, 'currency')
+  const label = [counterparty, category].filter(Boolean).join(' · ')
+  return label
+    ? `${label}${Number.isFinite(amount) ? ` · ${formatMoney(amount, currency || 'LKR')}` : ''}`
+    : 'transaction metadata changed'
 }
 
 type EditDraft = {
   date: string
   counterparty: string
   category: string
+  incomeSubtype: 'salary' | 'dividend' | 'interest' | 'freelance' | 'other'
   subcategory: string
   tags: string
   status: string
   currency: string
   amount: string
+  exchangeRateUsed: string
   accountId: string
   notes: string
   taxable: boolean
   recurring: boolean
-  // transfer-only legs
-  fromAccountId: string
-  toAccountId: string
-  // expense-only: category splits ([] = not split)
-  splits: Array<SplitRow>
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
-}
-
-/**
- * PF review item 2: split one expense across several categories. Rows of
- * {category, amount}; the parts must sum to the expense amount. A per-row
- * "%" input is a write-through convenience — typing a percentage sets that
- * row's amount to `expenseAmount * pct / 100`; the shown % is always
- * derived from the amount. "Balance" puts the leftover on the last row so
- * percentages that don't divide evenly (33/33/34) still reconcile.
- */
-function SplitsField({
-  rows,
-  expenseAmount,
-  onChange,
-  onSaveAsDefault,
-}: {
-  rows: Array<SplitRow>
-  expenseAmount: number
-  onChange: (rows: Array<SplitRow>) => void
-  onSaveAsDefault?: () => void
-}) {
-  const assigned = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
-  const remaining = round2(expenseAmount - assigned)
-  const pctOf = (amount: string) =>
-    expenseAmount > 0 && Number(amount)
-      ? String(round2((Number(amount) / expenseAmount) * 100))
-      : ''
-  return (
-    <div className="mt-2 w-full rounded-xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_5%,transparent)] p-2">
-      <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--theme-muted)]">
-        <span>Split across categories</span>
-        <span
-          className={
-            Math.abs(remaining) > 0.01
-              ? 'text-[var(--theme-warning)]'
-              : 'text-[var(--theme-success)]'
-          }
-        >
-          {Math.abs(remaining) > 0.01
-            ? `${remaining > 0 ? 'Unassigned' : 'Over by'} ${Math.abs(remaining)}`
-            : '✓ balanced'}
-        </span>
-      </div>
-      {rows.map((row, i) => (
-        <div key={i} className="mb-1 flex flex-wrap items-center gap-2">
-          <input
-            type="text"
-            placeholder="Category"
-            value={row.category}
-            onChange={(e) => {
-              const next = rows.slice()
-              next[i] = { ...next[i], category: e.target.value }
-              onChange(next)
-            }}
-            list="pf-known-categories"
-            className={inputClass}
-          />
-          <input
-            type="number"
-            placeholder="%"
-            value={pctOf(row.amount)}
-            onChange={(e) => {
-              const pct = Number(e.target.value) || 0
-              const next = rows.slice()
-              next[i] = {
-                ...next[i],
-                amount: pct ? String(round2((expenseAmount * pct) / 100)) : '',
-              }
-              onChange(next)
-            }}
-            className={`${inputClass} w-16`}
-          />
-          <input
-            type="number"
-            placeholder="Amount"
-            value={row.amount}
-            onChange={(e) => {
-              const next = rows.slice()
-              next[i] = { ...next[i], amount: e.target.value }
-              onChange(next)
-            }}
-            className={`${inputClass} w-28`}
-          />
-          <button
-            type="button"
-            onClick={() => onChange(rows.filter((_, j) => j !== i))}
-            className="text-xs text-[var(--theme-danger)]"
-          >
-            Remove
-          </button>
-        </div>
-      ))}
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() =>
-            onChange([
-              ...rows,
-              { category: '', amount: remaining > 0 ? String(remaining) : '' },
-            ])
-          }
-          className="text-xs font-medium text-[var(--theme-text)] underline"
-        >
-          + Add split
-        </button>
-        {rows.length >= 2 && Math.abs(remaining) > 0.01 && (
-          <button
-            type="button"
-            onClick={() => {
-              const next = rows.slice()
-              const last = next.length - 1
-              next[last] = {
-                ...next[last],
-                amount: String(
-                  round2((Number(next[last].amount) || 0) + remaining),
-                ),
-              }
-              onChange(next)
-            }}
-            className="text-xs font-medium text-[var(--theme-text)] underline"
-          >
-            Balance last row
-          </button>
-        )}
-        {onSaveAsDefault && rows.length >= 2 && Math.abs(remaining) <= 0.01 && (
-          <button
-            type="button"
-            onClick={onSaveAsDefault}
-            className="text-xs font-medium text-[var(--theme-text)] underline"
-          >
-            Save as vendor default
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/** Parse split rows → payload `splits` (or `[]` to clear when <2 valid rows). */
-function toSplitsPayload(
-  rows: Array<SplitRow>,
-): Array<{ category: string; amount: number }> {
-  const valid = rows
-    .map((r) => ({
-      category: r.category.trim() || 'Other',
-      amount: Number(r.amount) || 0,
-    }))
-    .filter((r) => r.amount > 0)
-  return valid.length >= 2 ? valid : []
 }
 
 /**
  * Unified Transactions — additive read+CRUD layer over income_records +
  * expense_records (PF-104). Storage stays split (financeSummary/budgetVsActual
  * keep reading the original collections unchanged); this panel only presents
- * both as one list and routes adds/edits/deletes to the correct existing
- * `kind: 'income' | 'expense'` under the hood.
+ * both as one list and routes ordinary adds/edits/deletes plus grouped
+ * split/transfer writes through the finance API.
  */
 export function TransactionsPanel({
   payload,
@@ -338,43 +119,32 @@ export function TransactionsPanel({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<Record<string, EditDraft>>({})
+  const [auditSearch, setAuditSearch] = useState('')
+  const [auditPage, setAuditPage] = useState(0)
 
-  const [addKind, setAddKind] = useState<TxnKind>('expense')
+  const [addKind, setAddKind] = useState<LedgerKind>('expense')
   const [date, setDate] = useState(todayIso())
   const [counterparty, setCounterparty] = useState('')
   const [category, setCategory] = useState('')
+  const [incomeSubtype, setIncomeSubtype] = useState<EditDraft['incomeSubtype']>('other')
   const [subcategory, setSubcategory] = useState('')
   const [tags, setTags] = useState('')
   const [status, setStatus] = useState('cleared')
   const [currency, setCurrency] = useState('LKR')
   const [amount, setAmount] = useState('')
+  const [exchangeRateOverride, setExchangeRateOverride] = useState('')
   const [accountId, setAccountId] = useState('')
+  const [destinationAccountId, setDestinationAccountId] = useState('')
+  const [splitLines, setSplitLines] = useState([
+    { category: '', amount: '' },
+    { category: '', amount: '' },
+  ])
   const [notes, setNotes] = useState('')
   const [taxable, setTaxable] = useState(true)
   const [recurring, setRecurring] = useState(false)
-  // Item 2: category splits for the expense being added ([] = not split).
-  const [addSplits, setAddSplits] = useState<Array<SplitRow>>([])
-  // Item 12 UI: account-to-account transfer.
-  const [transferFrom, setTransferFrom] = useState('')
-  const [transferTo, setTransferTo] = useState('')
-
-  // Item 7: the payload only ships the trailing `transactionsWindowMonths` of
-  // history. "Load full history" pages the rest in via the `list_transactions`
-  // action; once loaded it becomes the source list until the next mutation
-  // (which would make it stale) or an explicit reset.
-  const [fullHistory, setFullHistory] = useState<Array<
-    Record<string, unknown>
-  > | null>(null)
-  const [historyBusy, setHistoryBusy] = useState(false)
-  const [historyError, setHistoryError] = useState<string | null>(null)
 
   const [search, setSearch] = useState('')
-  const [filterKind, setFilterKind] = useState<'all' | TxnKind>('all')
-  // Item 5: account-to-account transfers are noise in a spend/earn list for
-  // some users — this hides them from the rendered list without touching the
-  // kind dropdown (which is single-select). The `net` total already excludes
-  // transfers; trends and budget-vs-actual never include them by design.
-  const [hideTransfers, setHideTransfers] = useState(false)
+  const [filterKind, setFilterKind] = useState<'all' | LedgerKind>('all')
   const [filterStatus, setFilterStatus] = useState<
     'all' | 'pending' | 'cleared' | 'reconciled'
   >('all')
@@ -382,133 +152,222 @@ export function TransactionsPanel({
   const [dateTo, setDateTo] = useState('')
   const [amountMin, setAmountMin] = useState('')
   const [amountMax, setAmountMax] = useState('')
+  const [importCsv, setImportCsv] = useState<string | null>(null)
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
+  const [allowImportDuplicates, setAllowImportDuplicates] = useState(false)
 
   const accounts = payload.data.finance_accounts
-  const incomeRecords = payload.data.income_records
-  const expenseRecords = payload.data.expense_records
-  const transferRecords = payload.data.transfers
-  const windowedTransactions = useMemo(
-    () => unifyTransactions(incomeRecords, expenseRecords, transferRecords),
-    [incomeRecords, expenseRecords, transferRecords],
-  )
-  const transactions = fullHistory ?? windowedTransactions
+  const transactions = payload.transactions
 
-  async function loadFullHistory() {
-    setHistoryBusy(true)
-    setHistoryError(null)
+  async function downloadTransactionsCsv() {
     try {
-      const rows: Array<Record<string, unknown>> = []
-      let cursor: string | null = null
-      // Bounded loop — 500 rows/page, cap at 200 pages (100k txns).
-      for (let guard = 0; guard < 200; guard += 1) {
-        const res: Response = await fetch('/api/finance', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            action: 'list_transactions',
-            limit: 500,
-            cursor: cursor ?? undefined,
-          }),
-        })
-        const data = (await res.json()) as {
-          ok?: boolean
-          error?: string
-          transactions?: Array<Record<string, unknown>>
-          nextCursor?: string | null
-        }
-        if (!res.ok || !data.ok) {
-          setHistoryError(data.error ?? 'Could not load full history.')
-          return
-        }
-        rows.push(...(data.transactions ?? []))
-        cursor = data.nextCursor ?? null
-        if (!cursor) break
-      }
-      setFullHistory(rows)
-    } catch {
-      setHistoryError('Could not load full history.')
-    } finally {
-      setHistoryBusy(false)
+      const response = await fetch(
+        '/api/finance?scope=personal_finance&format=csv',
+        { credentials: 'same-origin' },
+      )
+      if (!response.ok) throw new Error(`Export failed (${response.status})`)
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `hermes-transactions-${todayIso()}.csv`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Export failed')
     }
   }
 
-  // A mutation invalidates a loaded full-history snapshot — drop back to the
-  // (freshly refetched) payload window so edited rows don't linger.
-  async function mutate(
-    body: Record<string, unknown>,
-    busyKey?: string,
-  ): Promise<PersonalFinancePayload | undefined> {
-    const data = await post(body, busyKey)
-    if (data) setFullHistory(null)
-    return data
+  async function downloadEncryptedBackup() {
+    const passphrase = window.prompt(
+      'Enter a passphrase (12+ characters). It will not be stored.',
+    )
+    if (!passphrase) return
+    try {
+      const response = await fetch('/api/finance', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'download_encrypted_backup',
+          passphrase,
+        }),
+      })
+      if (!response.ok) {
+        const body = (await response.json()) as { error?: string }
+        throw new Error(body.error || `Backup failed (${response.status})`)
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `hermes-finance-backup-${todayIso()}.enc.json`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Backup failed')
+    }
+  }
+
+  async function previewTransactionsCsv(file: File) {
+    try {
+      const csv = await file.text()
+      const response = await fetch('/api/finance', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'preview_transaction_import', csv }),
+      })
+      const body = (await response.json()) as {
+        transactionImportPreview?: ImportPreview
+        error?: string
+      }
+      if (!response.ok || !body.transactionImportPreview) {
+        throw new Error(body.error || `Import preview failed (${response.status})`)
+      }
+      setImportCsv(csv)
+      setImportPreview(body.transactionImportPreview)
+      setAllowImportDuplicates(false)
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Import preview failed')
+    }
+  }
+
+  async function commitTransactionsCsv() {
+    if (!importCsv || !importPreview) return
+    try {
+      const response = await fetch('/api/finance', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'commit_transaction_import',
+          csv: importCsv,
+          previewHash: importPreview.fingerprint,
+          confirm: true,
+          allowDuplicates: allowImportDuplicates,
+        }),
+      })
+      const body = (await response.json()) as PersonalFinancePayload & {
+        transactionImportPreview?: ImportPreview
+        error?: string
+      }
+      if (!response.ok) {
+        if (body.transactionImportPreview) {
+          setImportPreview(body.transactionImportPreview)
+        }
+        throw new Error(body.error || `Import failed (${response.status})`)
+      }
+      onPayload(body)
+      setImportCsv(null)
+      setImportPreview(null)
+      setAllowImportDuplicates(false)
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Import failed')
+    }
   }
 
   async function submitTransaction() {
-    const busyKey = 'add-transaction'
-
-    if (addKind === 'transfer') {
-      const amt = Number(amount) || 0
-      if (amt <= 0) {
-        setErr('Transfer amount must be greater than 0')
+    if (addKind === 'split') {
+      if (!counterparty.trim()) {
+        setErr('Vendor is required')
         return
       }
-      if (transferFrom && transferTo && transferFrom === transferTo) {
-        setErr('“From” and “To” accounts must differ')
+      if (
+        splitLines.some(
+          (line) => !line.category.trim() || Number(line.amount) <= 0,
+        )
+      ) {
+        setErr('Each split needs a category and positive amount')
         return
       }
-      const data = await mutate(
+      const data = await post(
         {
-          action: 'add_record',
-          kind: 'transfer',
+          action: 'add_split',
           payload: {
             date,
-            fromAccountId: transferFrom || undefined,
-            toAccountId: transferTo || undefined,
-            amount: amt,
+            vendor: counterparty.trim(),
+            accountId: accountId || undefined,
             currency,
-            convertedLkrAmount: amt,
             notes: notes.trim() || undefined,
+            tags: tags.trim() || undefined,
+            status,
+            splits: splitLines.map((line) => ({
+              category: line.category.trim(),
+              amount: Number(line.amount) || 0,
+              convertedLkrAmount: Number(line.amount) || 0,
+            })),
           },
         },
-        busyKey,
+        'add-transaction',
       )
       if (data) {
-        setAmount('')
+        setCounterparty('')
+        setAccountId('')
+        setSplitLines([
+          { category: '', amount: '' },
+          { category: '', amount: '' },
+        ])
+        setTags('')
+        setStatus('cleared')
         setNotes('')
-        setTransferFrom('')
-        setTransferTo('')
         setDate(todayIso())
       }
       return
     }
-
+    if (addKind === 'transfer') {
+      if (!accountId || !destinationAccountId) {
+        setErr('Source and destination accounts are required')
+        return
+      }
+      const data = await post(
+        {
+          action: 'add_transfer',
+          payload: {
+            date,
+            sourceAccountId: accountId,
+            destinationAccountId,
+            currency,
+            amount: Number(amount) || 0,
+            convertedLkrAmount: Number(amount) || 0,
+            notes: notes.trim() || undefined,
+            tags: tags.trim() || undefined,
+            status,
+          },
+        },
+        'add-transaction',
+      )
+      if (data) {
+        setAccountId('')
+        setDestinationAccountId('')
+        setTags('')
+        setStatus('cleared')
+        setAmount('')
+        setNotes('')
+        setDate(todayIso())
+      }
+      return
+    }
     if (!counterparty.trim()) {
       setErr(
-        addKind === 'income' ? 'Source name is required' : 'Vendor is required',
+      addKind === 'income' ? 'Source name is required' : 'Vendor is required',
       )
       return
     }
+    const busyKey = 'add-transaction'
     const shared = {
       accountId: accountId || undefined,
       notes: notes.trim() || undefined,
       tags: tags.trim() || undefined,
       status,
     }
-    const expenseAmount = Number(amount) || 0
-    const splitsPayload =
-      addKind === 'expense' ? toSplitsPayload(addSplits) : []
-    if (splitsPayload.length) {
-      const splitSum = splitsPayload.reduce((s, p) => s + p.amount, 0)
-      if (Math.abs(splitSum - expenseAmount) > 0.01) {
-        setErr(
-          `Split parts (${splitSum}) must add up to the amount (${expenseAmount})`,
-        )
-        return
-      }
-    }
     const data =
       addKind === 'income'
-        ? await mutate(
+        ? await post(
             {
               action: 'add_record',
               kind: 'income',
@@ -516,16 +375,18 @@ export function TransactionsPanel({
                 dateReceived: date,
                 sourceName: counterparty.trim(),
                 incomeType: category.trim() || 'Other income',
+                incomeSubtype,
                 originalCurrency: currency,
                 originalAmount: Number(amount) || 0,
                 convertedLkrAmount: Number(amount) || 0,
+                exchangeRateUsed: Number(exchangeRateOverride) || undefined,
                 taxable,
                 ...shared,
               },
             },
             busyKey,
           )
-        : await mutate(
+        : await post(
             {
               action: 'add_record',
               kind: 'expense',
@@ -534,10 +395,10 @@ export function TransactionsPanel({
                 vendor: counterparty.trim(),
                 category: category.trim() || 'Other',
                 subcategory: subcategory.trim() || undefined,
-                splits: splitsPayload.length ? splitsPayload : undefined,
                 currency,
-                amount: expenseAmount,
-                convertedLkrAmount: expenseAmount,
+                amount: Number(amount) || 0,
+                convertedLkrAmount: Number(amount) || 0,
+                exchangeRateUsed: Number(exchangeRateOverride) || undefined,
                 recurring,
                 ...shared,
               },
@@ -547,87 +408,37 @@ export function TransactionsPanel({
     if (data) {
       setCounterparty('')
       setCategory('')
+      setIncomeSubtype('other')
       setSubcategory('')
       setTags('')
       setStatus('cleared')
       setAmount('')
+      setExchangeRateOverride('')
       setNotes('')
+      setAccountId('')
       setDate(todayIso())
-      setAddSplits([])
     }
-  }
-
-  /**
-   * Persist the current add-form split as this vendor's remembered
-   * `defaultSplits` (as percentages) — updates the merchant if it exists,
-   * otherwise creates it.
-   */
-  async function saveMerchantDefaultSplit() {
-    const vendorName = counterparty.trim()
-    const total = Number(amount) || 0
-    if (!vendorName || total <= 0) {
-      setErr('Enter a vendor and amount before saving a default split')
-      return
-    }
-    const percents = addSplits
-      .map((r) => ({
-        category: r.category.trim() || 'Other',
-        percent: round2(((Number(r.amount) || 0) / total) * 100),
-      }))
-      .filter((p) => p.percent > 0)
-    if (percents.length < 2) {
-      setErr('Need at least two non-zero split parts to save a default')
-      return
-    }
-    const existing = payload.data.merchants.find(
-      (m) => stringField(m, 'name') === vendorName,
-    )
-    await mutate(
-      existing
-        ? {
-            action: 'update_record',
-            kind: 'merchant',
-            id: stringField(existing, 'id'),
-            payload: { defaultSplits: percents },
-          }
-        : {
-            action: 'add_record',
-            kind: 'merchant',
-            payload: { name: vendorName, defaultSplits: percents },
-          },
-      'save-merchant-split',
-    )
   }
 
   function startEdit(txn: Record<string, unknown>) {
     const id = stringField(txn, 'id')
-    // Unified rows don't carry `splits` — read them off the raw expense record.
-    const rawExpense = expenseRecords.find((r) => stringField(r, 'id') === id)
-    const rawSplitsValue = rawExpense ? rawExpense.splits : undefined
-    const rawSplits = Array.isArray(rawSplitsValue)
-      ? (rawSplitsValue as Array<Record<string, unknown>>).map((s) => ({
-          category: stringField(s, 'category'),
-          amount: String(numberField(s, 'amount')),
-        }))
-      : []
     setEditDrafts((prev) => ({
       ...prev,
       [id]: {
         date: stringField(txn, 'date'),
         counterparty: stringField(txn, 'counterparty'),
         category: stringField(txn, 'category'),
+        incomeSubtype: (stringField(txn, 'incomeSubtype') || 'other') as EditDraft['incomeSubtype'],
         subcategory: stringField(txn, 'subcategory'),
         tags: stringField(txn, 'tags'),
         status: stringField(txn, 'status') || 'cleared',
         currency: stringField(txn, 'currency') || 'LKR',
         amount: String(numberField(txn, 'amount')),
+        exchangeRateUsed: String(numberField(txn, 'exchangeRateUsed') || ''),
         accountId: stringField(txn, 'accountId'),
         notes: stringField(txn, 'notes'),
         taxable: boolField(txn, 'taxable'),
         recurring: boolField(txn, 'recurring'),
-        fromAccountId: stringField(txn, 'fromAccountId'),
-        toAccountId: stringField(txn, 'toAccountId'),
-        splits: rawSplits,
       },
     }))
     setEditOpenId(id)
@@ -639,42 +450,6 @@ export function TransactionsPanel({
 
   async function saveEdit(id: string, kind: TxnKind) {
     const draft = editDrafts[id]
-
-    if (kind === 'transfer') {
-      const amt = Number(draft.amount) || 0
-      if (amt <= 0) {
-        setErr('Transfer amount must be greater than 0')
-        return
-      }
-      if (
-        draft.fromAccountId &&
-        draft.toAccountId &&
-        draft.fromAccountId === draft.toAccountId
-      ) {
-        setErr('“From” and “To” accounts must differ')
-        return
-      }
-      const data = await mutate(
-        {
-          action: 'update_record',
-          kind: 'transfer',
-          id,
-          payload: {
-            date: draft.date,
-            fromAccountId: draft.fromAccountId || undefined,
-            toAccountId: draft.toAccountId || undefined,
-            amount: amt,
-            currency: draft.currency,
-            convertedLkrAmount: amt,
-            notes: draft.notes.trim() || undefined,
-          },
-        },
-        `edit-${id}`,
-      )
-      if (data) setEditOpenId(null)
-      return
-    }
-
     if (!draft.counterparty.trim()) {
       setErr(
         kind === 'income' ? 'Source name is required' : 'Vendor is required',
@@ -687,20 +462,9 @@ export function TransactionsPanel({
       tags: draft.tags.trim() || undefined,
       status: draft.status,
     }
-    const editAmount = Number(draft.amount) || 0
-    const editSplits = kind === 'expense' ? toSplitsPayload(draft.splits) : []
-    if (editSplits.length) {
-      const splitSum = editSplits.reduce((s, p) => s + p.amount, 0)
-      if (Math.abs(splitSum - editAmount) > 0.01) {
-        setErr(
-          `Split parts (${splitSum}) must add up to the amount (${editAmount})`,
-        )
-        return
-      }
-    }
     const data =
       kind === 'income'
-        ? await mutate(
+        ? await post(
             {
               action: 'update_record',
               kind: 'income',
@@ -709,16 +473,18 @@ export function TransactionsPanel({
                 dateReceived: draft.date,
                 sourceName: draft.counterparty.trim(),
                 incomeType: draft.category.trim() || 'Other income',
+                incomeSubtype: draft.incomeSubtype,
                 originalCurrency: draft.currency,
                 originalAmount: Number(draft.amount) || 0,
                 convertedLkrAmount: Number(draft.amount) || 0,
+                exchangeRateUsed: Number(draft.exchangeRateUsed) || undefined,
                 taxable: draft.taxable,
                 ...shared,
               },
             },
             `edit-${id}`,
           )
-        : await mutate(
+        : await post(
             {
               action: 'update_record',
               kind: 'expense',
@@ -728,13 +494,10 @@ export function TransactionsPanel({
                 vendor: draft.counterparty.trim(),
                 category: draft.category.trim() || 'Other',
                 subcategory: draft.subcategory.trim() || undefined,
-                // Always send `splits` on an expense edit: a non-empty array
-                // replaces, `[]` clears — so an amount change can't silently
-                // leave stale parts behind.
-                splits: editSplits,
                 currency: draft.currency,
-                amount: editAmount,
-                convertedLkrAmount: editAmount,
+                amount: Number(draft.amount) || 0,
+                convertedLkrAmount: Number(draft.amount) || 0,
+                exchangeRateUsed: Number(draft.exchangeRateUsed) || undefined,
                 recurring: draft.recurring,
                 ...shared,
               },
@@ -745,19 +508,31 @@ export function TransactionsPanel({
   }
 
   async function deleteTransaction(id: string, kind: TxnKind) {
-    const data = await mutate(
+    const data = await post(
       { action: 'delete_record', kind, id },
       `delete-${id}`,
     )
     if (data) setConfirmDeleteId(null)
   }
 
+  async function restoreTransaction(id: string, kind: TxnKind) {
+    await post(
+      { action: 'restore_record', kind, id },
+      `restore-${id}`,
+    )
+  }
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
     return transactions.filter((txn) => {
       const kind = stringField(txn, 'kind')
-      if (hideTransfers && kind === 'transfer') return false
-      if (filterKind !== 'all' && kind !== filterKind) return false
+      const ledgerKind =
+        stringField(txn, 'transactionType') === 'transfer'
+          ? 'transfer'
+          : stringField(txn, 'splitGroupId')
+            ? 'split'
+          : kind
+      if (filterKind !== 'all' && ledgerKind !== filterKind) return false
       if (
         filterStatus !== 'all' &&
         (stringField(txn, 'status') || 'cleared') !== filterStatus
@@ -778,7 +553,6 @@ export function TransactionsPanel({
     transactions,
     search,
     filterKind,
-    hideTransfers,
     filterStatus,
     dateFrom,
     dateTo,
@@ -786,38 +560,55 @@ export function TransactionsPanel({
     amountMax,
   ])
 
-  // Cap how many rows are in the DOM. Reset to the first page whenever the
-  // filters change, so narrowing to 5 results never shows a stale "300 of 5".
-  const [visibleCount, setVisibleCount] = useState(RENDER_PAGE)
-  useEffect(() => {
-    setVisibleCount(RENDER_PAGE)
-  }, [
-    search,
-    filterKind,
-    hideTransfers,
-    filterStatus,
-    dateFrom,
-    dateTo,
-    amountMin,
-    amountMax,
-    fullHistory,
-  ])
-  const visible = filtered.slice(0, visibleCount)
+  const deletedTransactions = useMemo(() => {
+    const seen = new Set<string>()
+    return payload.deletedTransactions.filter((transaction) => {
+      const group =
+        stringField(transaction, 'transferId') ||
+        stringField(transaction, 'splitGroupId') ||
+        stringField(transaction, 'id')
+      if (seen.has(group)) return false
+      seen.add(group)
+      return true
+    })
+  }, [payload.deletedTransactions])
+
+  const filteredAudit = useMemo(() => {
+    const query = auditSearch.trim().toLowerCase()
+    return (payload.transactionAudit ?? []).filter((entry) => {
+      if (!query) return true
+      return `${entry.action} ${JSON.stringify(entry.details)}`
+        .toLowerCase()
+        .includes(query)
+    })
+  }, [payload.transactionAudit, auditSearch])
+  const auditPageCount = Math.max(
+    1,
+    Math.ceil(filteredAudit.length / AUDIT_PAGE_SIZE),
+  )
+  const visibleAudit = filteredAudit.slice(
+    auditPage * AUDIT_PAGE_SIZE,
+    (auditPage + 1) * AUDIT_PAGE_SIZE,
+  )
 
   const totalsByCurrency = new Map<string, number>()
   let incomeCount = 0
   let expenseCount = 0
   let transferCount = 0
+  const splitGroups = new Set<string>()
   for (const txn of transactions) {
     const kind = stringField(txn, 'kind')
-    if (kind === 'income') incomeCount += 1
-    if (kind === 'expense') expenseCount += 1
-    if (kind === 'transfer') {
+    if (stringField(txn, 'transactionType') === 'transfer') {
       transferCount += 1
-      // transfers move money between the user's own accounts — they net to
-      // zero and must not shift the income/expense total.
       continue
     }
+    const splitGroupId = stringField(txn, 'splitGroupId')
+    if (splitGroupId) {
+      splitGroups.add(splitGroupId)
+      continue
+    }
+    if (kind === 'income') incomeCount += 1
+    if (kind === 'expense') expenseCount += 1
     const txnCurrency = stringField(txn, 'currency') || 'LKR'
     const signed =
       kind === 'income'
@@ -838,12 +629,13 @@ export function TransactionsPanel({
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
       <h2 className="text-lg font-semibold">Transactions</h2>
       <p className="text-xs text-[var(--theme-muted)]">
-        A unified view of income, expenses and transfers — added here writes to
-        the same underlying records shown elsewhere.
+        A unified view of income and expenses — added here writes to the same
+        underlying records shown elsewhere.
       </p>
       <p className="mt-2 text-sm font-medium text-[var(--theme-text)]">
         {incomeCount} income · {expenseCount} expense
-        {transferCount > 0 && <> · {transferCount} transfer</>}
+        {transferCount > 0 && ` · ${transferCount / 2} transfer${transferCount === 2 ? '' : 's'}`}
+        {splitGroups.size > 0 && ` · ${splitGroups.size} split${splitGroups.size === 1 ? '' : 's'}`}
         {totalsText && (
           <>
             {' '}
@@ -851,6 +643,83 @@ export function TransactionsPanel({
           </>
         )}
       </p>
+      <button
+        type="button"
+        onClick={() => void downloadTransactionsCsv()}
+        className={`${buttonClass} mt-3`}
+      >
+        Export CSV
+      </button>
+      <label className={`${buttonClass} mt-3 ml-2 inline-block cursor-pointer`}>
+        Import CSV
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          className="sr-only"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) void previewTransactionsCsv(file)
+            event.currentTarget.value = ''
+          }}
+        />
+      </label>
+      <button
+        type="button"
+        onClick={() => void downloadEncryptedBackup()}
+        className={`${buttonClass} mt-3 ml-2`}
+      >
+        Encrypted backup
+      </button>
+
+      {importPreview && (
+        <div className="mt-3 rounded-xl border border-[var(--theme-border)] p-3 text-xs">
+          <p className="font-medium text-[var(--theme-text)]">
+            Import preview: {importPreview.rowCount} row(s),{' '}
+            {importPreview.items.length} item(s)
+          </p>
+          {importPreview.errors.length > 0 && (
+            <ul className="mt-2 list-disc pl-4 text-[var(--theme-danger)]">
+              {importPreview.errors.slice(0, 8).map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          )}
+          {importPreview.duplicates.length > 0 && (
+            <label className="mt-2 flex items-center gap-2 text-[var(--theme-warning)]">
+              <input
+                type="checkbox"
+                checked={allowImportDuplicates}
+                onChange={(event) => setAllowImportDuplicates(event.target.checked)}
+              />
+              Allow {importPreview.duplicates.length} possible duplicate(s)
+            </label>
+          )}
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              disabled={
+                importPreview.errors.length > 0 ||
+                (importPreview.duplicates.length > 0 && !allowImportDuplicates)
+              }
+              onClick={() => void commitTransactionsCsv()}
+              className={confirmButtonClass}
+            >
+              Confirm import
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setImportCsv(null)
+                setImportPreview(null)
+                setAllowImportDuplicates(false)
+              }}
+              className={buttonClass}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2">
         <div className="flex overflow-hidden rounded-xl border border-[var(--theme-border)]">
@@ -871,9 +740,16 @@ export function TransactionsPanel({
           <button
             type="button"
             onClick={() => setAddKind('transfer')}
-            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'transfer' ? 'bg-[color-mix(in_srgb,var(--theme-accent)_25%,transparent)] text-[var(--theme-accent)]' : 'bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'}`}
+            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'transfer' ? 'bg-[color-mix(in_srgb,var(--theme-accent-secondary)_25%,transparent)] text-[var(--theme-accent-secondary)]' : 'bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'}`}
           >
             Transfer
+          </button>
+          <button
+            type="button"
+            onClick={() => setAddKind('split')}
+            className={`px-3 py-1.5 text-xs font-medium ${addKind === 'split' ? 'bg-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] text-[var(--theme-warning)]' : 'bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]'}`}
+          >
+            Split expense
           </button>
         </div>
         <input
@@ -882,43 +758,7 @@ export function TransactionsPanel({
           onChange={(e) => setDate(e.target.value)}
           className={inputClass}
         />
-        {addKind === 'transfer' && (
-          <>
-            <select
-              value={transferFrom}
-              onChange={(e) => setTransferFrom(e.target.value)}
-              className={inputClass}
-              aria-label="From account"
-            >
-              <option value="">From account…</option>
-              {accounts.map((account, index) => {
-                const id = stringField(account, 'id') || String(index)
-                return (
-                  <option key={id} value={id}>
-                    {stringField(account, 'name')}
-                  </option>
-                )
-              })}
-            </select>
-            <select
-              value={transferTo}
-              onChange={(e) => setTransferTo(e.target.value)}
-              className={inputClass}
-              aria-label="To account"
-            >
-              <option value="">To account…</option>
-              {accounts.map((account, index) => {
-                const id = stringField(account, 'id') || String(index)
-                return (
-                  <option key={id} value={id}>
-                    {stringField(account, 'name')}
-                  </option>
-                )
-              })}
-            </select>
-          </>
-        )}
-        {addKind !== 'transfer' && (
+        {(addKind === 'income' || addKind === 'expense') && (
           <>
             <input
               type="text"
@@ -926,24 +766,12 @@ export function TransactionsPanel({
               value={counterparty}
               onChange={(e) => setCounterparty(e.target.value)}
               onBlur={() => {
-                if (addKind !== 'expense') return
-                const vendorName = counterparty.trim()
-                if (!category.trim()) {
-                  const guess = merchantDefaultCategory(
-                    payload.data.merchants,
-                    vendorName,
-                  )
-                  if (guess) setCategory(guess)
-                }
-                // Pre-fill a remembered split, scaled to the entered amount.
-                if (addSplits.length === 0 && Number(amount) > 0) {
-                  const ds = merchantDefaultSplits(
-                    payload.data.merchants,
-                    vendorName,
-                  )
-                  if (ds)
-                    setAddSplits(splitRowsFromPercents(ds, Number(amount)))
-                }
+                if (addKind !== 'expense' || category.trim()) return
+                const guess = merchantDefaultCategory(
+                  payload.data.merchants,
+                  counterparty.trim(),
+                )
+                if (guess) setCategory(guess)
               }}
               list={addKind === 'expense' ? 'pf-known-merchants' : undefined}
               className={inputClass}
@@ -956,57 +784,125 @@ export function TransactionsPanel({
               list="pf-known-categories"
               className={inputClass}
             />
-            {addKind === 'expense' && (
-              <input
-                type="text"
-                placeholder="Subcategory (optional)"
-                value={subcategory}
-                onChange={(e) => setSubcategory(e.target.value)}
-                list="pf-known-subcategories"
-                className={inputClass}
-              />
-            )}
-            {addKind === 'expense' && addSplits.length > 0 && (
-              <SplitsField
-                rows={addSplits}
-                expenseAmount={Number(amount) || 0}
-                onChange={setAddSplits}
-                onSaveAsDefault={() => void saveMerchantDefaultSplit()}
-              />
-            )}
-            {addKind === 'expense' && addSplits.length === 0 && (
-              <button
-                type="button"
-                onClick={() =>
-                  setAddSplits([
-                    { category: category.trim(), amount: amount || '' },
-                    { category: '', amount: '' },
-                  ])
+            {addKind === 'income' && (
+              <select
+                value={incomeSubtype}
+                onChange={(e) =>
+                  setIncomeSubtype(e.target.value as EditDraft['incomeSubtype'])
                 }
-                className="self-center text-xs font-medium text-[var(--theme-text)] underline"
+                className={inputClass}
+                title="Structured income subtype"
               >
-                Split
-              </button>
+                <option value="salary">Salary</option>
+                <option value="dividend">Dividend</option>
+                <option value="interest">Interest</option>
+                <option value="freelance">Freelance</option>
+                <option value="other">Other</option>
+              </select>
             )}
-            <input
-              type="text"
-              placeholder="Tags (comma-separated, optional)"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              list="pf-known-tags"
-              className={inputClass}
-            />
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className={inputClass}
-            >
-              <option value="pending">Pending</option>
-              <option value="cleared">Cleared</option>
-              <option value="reconciled">Reconciled</option>
-            </select>
           </>
         )}
+        {addKind === 'split' && (
+          <input
+            type="text"
+            placeholder="Vendor"
+            value={counterparty}
+            onChange={(e) => setCounterparty(e.target.value)}
+            list="pf-known-merchants"
+            className={inputClass}
+          />
+        )}
+        {addKind === 'expense' && (
+          <input
+            type="text"
+            placeholder="Subcategory (optional)"
+            value={subcategory}
+            onChange={(e) => setSubcategory(e.target.value)}
+            list="pf-known-subcategories"
+            className={inputClass}
+          />
+        )}
+        {addKind === 'split' && (
+          <div className="flex flex-wrap items-center gap-2">
+            {splitLines.map((line, index) => (
+              <div key={index} className="flex items-center gap-1">
+                <input
+                  type="text"
+                  placeholder={`Category ${index + 1}`}
+                  value={line.category}
+                  onChange={(e) =>
+                    setSplitLines((prev) =>
+                      prev.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, category: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                  list="pf-known-categories"
+                  className={inputClass}
+                />
+                <input
+                  type="number"
+                  placeholder="Amount"
+                  value={line.amount}
+                  onChange={(e) =>
+                    setSplitLines((prev) =>
+                      prev.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, amount: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                  className={`${inputClass} w-28`}
+                />
+                {splitLines.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSplitLines((prev) =>
+                        prev.filter((_, itemIndex) => itemIndex !== index),
+                      )
+                    }
+                    className={dangerButtonClass}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                setSplitLines((prev) => [
+                  ...prev,
+                  { category: '', amount: '' },
+                ])
+              }
+              className={buttonClass}
+            >
+              Add category
+            </button>
+          </div>
+        )}
+        <input
+          type="text"
+          placeholder="Tags (comma-separated, optional)"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          list="pf-known-tags"
+          className={inputClass}
+        />
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className={inputClass}
+        >
+          <option value="pending">Pending</option>
+          <option value="cleared">Cleared</option>
+          <option value="reconciled">Reconciled</option>
+        </select>
         <select
           value={currency}
           onChange={(e) => setCurrency(e.target.value)}
@@ -1016,20 +912,49 @@ export function TransactionsPanel({
           <option value="USD">USD</option>
           <option value="AUD">AUD</option>
         </select>
-        <input
-          type="number"
-          placeholder="Amount"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className={`${inputClass} w-32`}
-        />
-        {addKind !== 'transfer' && (
+        {addKind !== 'split' && (
+          <input
+            type="number"
+            placeholder="Amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className={`${inputClass} w-32`}
+          />
+        )}
+        {(addKind === 'income' || addKind === 'expense') && (
+          <input
+            type="number"
+            min="0"
+            step="any"
+            placeholder="FX override (optional)"
+            value={exchangeRateOverride}
+            onChange={(e) => setExchangeRateOverride(e.target.value)}
+            title="Optional rate from this transaction currency to LKR. Leave blank to use the dated stored rate."
+            className={`${inputClass} w-40`}
+          />
+        )}
+        <select
+          value={accountId}
+          onChange={(e) => setAccountId(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">{addKind === 'transfer' ? 'From account' : 'No account'}</option>
+          {accounts.map((account, index) => {
+            const id = stringField(account, 'id') || String(index)
+            return (
+              <option key={id} value={id}>
+                {stringField(account, 'name')}
+              </option>
+            )
+          })}
+        </select>
+        {addKind === 'transfer' && (
           <select
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
+            value={destinationAccountId}
+            onChange={(e) => setDestinationAccountId(e.target.value)}
             className={inputClass}
           >
-            <option value="">No account</option>
+            <option value="">To account</option>
             {accounts.map((account, index) => {
               const id = stringField(account, 'id') || String(index)
               return (
@@ -1047,7 +972,7 @@ export function TransactionsPanel({
           onChange={(e) => setNotes(e.target.value)}
           className={inputClass}
         />
-        {addKind === 'income' && (
+        {addKind === 'income' ? (
           <label className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
             <input
               type="checkbox"
@@ -1056,8 +981,7 @@ export function TransactionsPanel({
             />
             Taxable
           </label>
-        )}
-        {addKind === 'expense' && (
+        ) : addKind === 'expense' ? (
           <label className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
             <input
               type="checkbox"
@@ -1066,22 +990,121 @@ export function TransactionsPanel({
             />
             Recurring
           </label>
-        )}
+        ) : null}
         <button
           type="button"
           disabled={busy === 'add-transaction'}
           onClick={() => void submitTransaction()}
           className={buttonClass}
         >
-          {busy === 'add-transaction'
-            ? 'Saving…'
-            : addKind === 'transfer'
-              ? 'Add transfer'
-              : 'Add transaction'}
+          {busy === 'add-transaction' ? 'Saving…' : 'Add transaction'}
         </button>
       </div>
 
       {err && <p className="mt-2 text-xs text-[var(--theme-danger)]">{err}</p>}
+
+      {(payload.transactionAudit?.length ?? 0) > 0 && (
+        <details className="mt-3 rounded-xl border border-[var(--theme-border)]/70 p-3">
+          <summary className="cursor-pointer text-xs font-medium text-[var(--theme-muted)]">
+            Recent transaction changes ({payload.transactionAudit?.length})
+          </summary>
+          <input
+            type="search"
+            value={auditSearch}
+            onChange={(event) => {
+              setAuditSearch(event.target.value)
+              setAuditPage(0)
+            }}
+            placeholder="Search changes"
+            aria-label="Search transaction changes"
+            className={`${inputClass} mt-2 w-full sm:max-w-sm`}
+          />
+          <div className="mt-2 grid gap-1.5">
+            {visibleAudit.map((entry) => (
+              <div
+                key={entry.id}
+                className="flex flex-wrap items-center justify-between gap-2 text-xs"
+              >
+                <span className="text-[var(--theme-text)]">
+                  {entry.action.replace('record_', '').replace(':', ' · ')} ·{' '}
+                  {auditDetailText(entry.details)}
+                </span>
+                <time
+                  dateTime={entry.createdAt}
+                  className="text-[var(--theme-muted)]"
+                >
+                  {entry.createdAt
+                    ? formatDateTime(entry.createdAt)
+                    : 'unknown time'}
+                </time>
+              </div>
+            ))}
+            {filteredAudit.length === 0 && (
+                <p className="text-xs text-[var(--theme-muted)]">
+                  No changes match this search.
+                </p>
+            )}
+          </div>
+          {filteredAudit.length > AUDIT_PAGE_SIZE && (
+            <div className="mt-2 flex items-center justify-between gap-2 text-xs text-[var(--theme-muted)]">
+              <button
+                type="button"
+                className={inputClass}
+                disabled={auditPage === 0}
+                onClick={() => setAuditPage((page) => Math.max(0, page - 1))}
+              >
+                Previous
+              </button>
+              <span>
+                Page {Math.min(auditPage + 1, auditPageCount)} of {auditPageCount}
+              </span>
+              <button
+                type="button"
+                className={inputClass}
+                disabled={auditPage >= auditPageCount - 1}
+                onClick={() =>
+                  setAuditPage((page) => Math.min(auditPageCount - 1, page + 1))
+                }
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </details>
+      )}
+
+      {deletedTransactions.length > 0 && (
+        <details className="mt-3 rounded-xl border border-[var(--theme-border)]/70 p-3">
+          <summary className="cursor-pointer text-xs font-medium text-[var(--theme-muted)]">
+            Recently deleted ({deletedTransactions.length})
+          </summary>
+          <div className="mt-2 grid gap-1.5">
+            {deletedTransactions.slice(0, 8).map((transaction, index) => {
+              const id = stringField(transaction, 'id') || String(index)
+              const kind = (stringField(transaction, 'kind') || 'expense') as TxnKind
+              return (
+                <div
+                  key={id}
+                  className="flex flex-wrap items-center justify-between gap-2 text-xs"
+                >
+                  <span>
+                    {stringField(transaction, 'counterparty') || 'Transaction'}{' '}
+                    · {formatMoney(numberField(transaction, 'amount'), stringField(transaction, 'currency') || 'LKR')}
+                  </span>
+                  <button
+                    type="button"
+                    className={buttonClass}
+                    disabled={busy === `restore-${id}`}
+                    onClick={() => void restoreTransaction(id, kind)}
+                  >
+                    {busy === `restore-${id}` ? 'Restoring…' : 'Restore'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </details>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <input
@@ -1093,22 +1116,15 @@ export function TransactionsPanel({
         />
         <select
           value={filterKind}
-          onChange={(e) => setFilterKind(e.target.value as 'all' | TxnKind)}
+          onChange={(e) => setFilterKind(e.target.value as 'all' | LedgerKind)}
           className={inputClass}
         >
           <option value="all">All</option>
           <option value="income">Income</option>
           <option value="expense">Expense</option>
           <option value="transfer">Transfer</option>
+          <option value="split">Split expense</option>
         </select>
-        <label className="flex items-center gap-1.5 text-xs text-[var(--theme-muted)]">
-          <input
-            type="checkbox"
-            checked={hideTransfers}
-            onChange={(e) => setHideTransfers(e.target.checked)}
-          />
-          Hide transfers
-        </label>
         <select
           value={filterStatus}
           onChange={(e) =>
@@ -1153,66 +1169,28 @@ export function TransactionsPanel({
         />
       </div>
 
-      {fullHistory ? (
-        <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-[var(--theme-muted)]">
-          <span>
-            Showing full history —{' '}
-            {fullHistory.length.toLocaleString('en-LK')} transactions.
-          </span>
-          <button
-            type="button"
-            onClick={() => setFullHistory(null)}
-            className="font-medium text-[var(--theme-text)] underline"
-          >
-            Back to last {payload.transactionsWindowMonths} months
-          </button>
-        </p>
-      ) : (
-        payload.transactionsWindowMonths > 0 && (
-          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-[var(--theme-muted)]">
-            <span>
-              Showing the last {payload.transactionsWindowMonths} months.
-            </span>
-            <button
-              type="button"
-              onClick={() => void loadFullHistory()}
-              disabled={historyBusy}
-              className="rounded-lg border border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_12%,transparent)] px-2 py-0.5 font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_20%,transparent)] disabled:opacity-50"
-            >
-              {historyBusy ? 'Loading…' : 'Load full history'}
-            </button>
-          </p>
-        )
-      )}
-      {historyError && (
-        <p className="mt-1 text-xs text-[var(--theme-danger)]">{historyError}</p>
-      )}
-
       <div className="mt-3 grid gap-2">
         {filtered.length === 0 && (
           <p className="text-sm text-[var(--theme-muted)]">
             No transactions match.
           </p>
         )}
-        {visible.map((txn, index) => {
+        {filtered.map((txn, index) => {
           const id = stringField(txn, 'id') || String(index)
           const kind = (stringField(txn, 'kind') || 'expense') as TxnKind
+          const isTransfer = stringField(txn, 'transactionType') === 'transfer'
+          const isSplit = Boolean(stringField(txn, 'splitGroupId'))
           const isEditing = editOpenId === id
-          const txnCurrency = stringField(txn, 'currency') || 'LKR'
-          const amountValue = numberField(txn, 'amount')
           const txnStatus = stringField(txn, 'status') || 'cleared'
           const documentRef = stringField(txn, 'documentRef')
           const txnSource = stringField(txn, 'source') || 'manual'
-          const txnSplits = Array.isArray(txn.splits)
-            ? (txn.splits as Array<Record<string, unknown>>)
-            : []
 
           return (
             <div
               key={id}
               className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] p-3"
             >
-              {isEditing && kind === 'transfer' ? (
+              {isEditing ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="date"
@@ -1225,117 +1203,28 @@ export function TransactionsPanel({
                     }
                     className={inputClass}
                   />
-                  <select
-                    value={editDrafts[id].fromAccountId}
-                    onChange={(e) =>
-                      setEditDrafts((prev) => ({
-                        ...prev,
-                        [id]: { ...prev[id], fromAccountId: e.target.value },
-                      }))
-                    }
-                    className={inputClass}
-                    aria-label="From account"
-                  >
-                    <option value="">From account…</option>
-                    {accounts.map((account, accountIndex) => {
-                      const accountRowId =
-                        stringField(account, 'id') || String(accountIndex)
-                      return (
-                        <option key={accountRowId} value={accountRowId}>
-                          {stringField(account, 'name')}
-                        </option>
-                      )
-                    })}
-                  </select>
-                  <select
-                    value={editDrafts[id].toAccountId}
-                    onChange={(e) =>
-                      setEditDrafts((prev) => ({
-                        ...prev,
-                        [id]: { ...prev[id], toAccountId: e.target.value },
-                      }))
-                    }
-                    className={inputClass}
-                    aria-label="To account"
-                  >
-                    <option value="">To account…</option>
-                    {accounts.map((account, accountIndex) => {
-                      const accountRowId =
-                        stringField(account, 'id') || String(accountIndex)
-                      return (
-                        <option key={accountRowId} value={accountRowId}>
-                          {stringField(account, 'name')}
-                        </option>
-                      )
-                    })}
-                  </select>
-                  <select
-                    value={editDrafts[id].currency}
-                    onChange={(e) =>
-                      setEditDrafts((prev) => ({
-                        ...prev,
-                        [id]: { ...prev[id], currency: e.target.value },
-                      }))
-                    }
-                    className={inputClass}
-                  >
-                    <option value="LKR">LKR</option>
-                    <option value="USD">USD</option>
-                    <option value="AUD">AUD</option>
-                  </select>
-                  <input
-                    type="number"
-                    placeholder="Amount"
-                    value={editDrafts[id].amount}
-                    onChange={(e) =>
-                      setEditDrafts((prev) => ({
-                        ...prev,
-                        [id]: { ...prev[id], amount: e.target.value },
-                      }))
-                    }
-                    className={`${inputClass} w-32`}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Notes"
-                    value={editDrafts[id].notes}
-                    onChange={(e) =>
-                      setEditDrafts((prev) => ({
-                        ...prev,
-                        [id]: { ...prev[id], notes: e.target.value },
-                      }))
-                    }
-                    className={inputClass}
-                  />
-                  <button
-                    type="button"
-                    disabled={busy === `edit-${id}`}
-                    onClick={() => void saveEdit(id, kind)}
-                    className={confirmButtonClass}
-                  >
-                    {busy === `edit-${id}` ? 'Saving…' : 'Save'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    className={buttonClass}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : isEditing ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="date"
-                    value={editDrafts[id].date}
-                    onChange={(e) =>
-                      setEditDrafts((prev) => ({
-                        ...prev,
-                        [id]: { ...prev[id], date: e.target.value },
-                      }))
-                    }
-                    className={inputClass}
-                  />
+                  {kind === 'income' && (
+                    <select
+                      value={editDrafts[id].incomeSubtype}
+                      onChange={(e) =>
+                        setEditDrafts((prev) => ({
+                          ...prev,
+                          [id]: {
+                            ...prev[id],
+                            incomeSubtype: e.target.value as EditDraft['incomeSubtype'],
+                          },
+                        }))
+                      }
+                      className={inputClass}
+                      title="Structured income subtype"
+                    >
+                      <option value="salary">Salary</option>
+                      <option value="dividend">Dividend</option>
+                      <option value="interest">Interest</option>
+                      <option value="freelance">Freelance</option>
+                      <option value="other">Other</option>
+                    </select>
+                  )}
                   <input
                     type="text"
                     placeholder={kind === 'income' ? 'Source name' : 'Vendor'}
@@ -1390,41 +1279,6 @@ export function TransactionsPanel({
                       className={inputClass}
                     />
                   )}
-                  {kind === 'expense' &&
-                    (editDrafts[id].splits.length > 0 ? (
-                      <SplitsField
-                        rows={editDrafts[id].splits}
-                        expenseAmount={Number(editDrafts[id].amount) || 0}
-                        onChange={(next) =>
-                          setEditDrafts((prev) => ({
-                            ...prev,
-                            [id]: { ...prev[id], splits: next },
-                          }))
-                        }
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditDrafts((prev) => ({
-                            ...prev,
-                            [id]: {
-                              ...prev[id],
-                              splits: [
-                                {
-                                  category: prev[id].category,
-                                  amount: prev[id].amount,
-                                },
-                                { category: '', amount: '' },
-                              ],
-                            },
-                          }))
-                        }
-                        className="self-center text-xs font-medium text-[var(--theme-text)] underline"
-                      >
-                        Split
-                      </button>
-                    ))}
                   <input
                     type="text"
                     placeholder="Tags (comma-separated)"
@@ -1477,6 +1331,21 @@ export function TransactionsPanel({
                       }))
                     }
                     className={`${inputClass} w-32`}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="FX override"
+                    value={editDrafts[id].exchangeRateUsed}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], exchangeRateUsed: e.target.value },
+                      }))
+                    }
+                    title="Optional rate from this transaction currency to LKR. Leave blank to use the dated stored rate."
+                    className={`${inputClass} w-36`}
                   />
                   <select
                     value={editDrafts[id].accountId}
@@ -1560,13 +1429,9 @@ export function TransactionsPanel({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <span
-                      className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${kind === 'income' ? 'bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] text-[var(--theme-success)]' : kind === 'transfer' ? 'bg-[color-mix(in_srgb,var(--theme-accent)_25%,transparent)] text-[var(--theme-accent)]' : 'bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] text-[var(--theme-muted)]'}`}
+                      className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${isTransfer ? 'bg-[color-mix(in_srgb,var(--theme-accent-secondary)_25%,transparent)] text-[var(--theme-accent-secondary)]' : isSplit ? 'bg-[color-mix(in_srgb,var(--theme-warning)_25%,transparent)] text-[var(--theme-warning)]' : kind === 'income' ? 'bg-[color-mix(in_srgb,var(--theme-success)_25%,transparent)] text-[var(--theme-success)]' : 'bg-[color-mix(in_srgb,var(--theme-text)_16%,transparent)] text-[var(--theme-muted)]'}`}
                     >
-                      {kind === 'income'
-                        ? 'Income'
-                        : kind === 'transfer'
-                          ? 'Transfer'
-                          : 'Expense'}
+                      {isTransfer ? 'Transfer' : isSplit ? 'Split' : kind === 'income' ? 'Income' : 'Expense'}
                     </span>
                     {txnStatus !== 'cleared' && (
                       <span
@@ -1592,23 +1457,8 @@ export function TransactionsPanel({
                       {stringField(txn, 'subcategory') &&
                         ` / ${stringField(txn, 'subcategory')}`}{' '}
                       · {stringField(txn, 'date')} ·{' '}
-                      {formatMoney(amountValue, txnCurrency)}
+                      {transactionAmountLabel(txn)}
                     </span>
-                    {txnSplits.length > 0 && (
-                      <span className="ml-1 text-[10px] text-[var(--theme-muted)]">
-                        (split:{' '}
-                        {txnSplits
-                          .map(
-                            (s) =>
-                              `${stringField(s, 'category') || 'Other'} ${formatMoney(
-                                numberField(s, 'amount'),
-                                txnCurrency,
-                              )}`,
-                          )
-                          .join(' · ')}
-                        )
-                      </span>
-                    )}
                     {splitTags(stringField(txn, 'tags')).length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {splitTags(stringField(txn, 'tags')).map((t) => (
@@ -1633,13 +1483,15 @@ export function TransactionsPanel({
                         View document
                       </a>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => startEdit(txn)}
-                      className={buttonClass}
-                    >
-                      Edit
-                    </button>
+                    {!isTransfer && !isSplit && (
+                      <button
+                        type="button"
+                        onClick={() => startEdit(txn)}
+                        className={buttonClass}
+                      >
+                        Edit
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={busy === `delete-${id}`}
@@ -1654,30 +1506,13 @@ export function TransactionsPanel({
             </div>
           )
         })}
-        {filtered.length > visibleCount && (
-          <div className="flex items-center justify-between gap-3 pt-1 text-xs text-[var(--theme-muted)]">
-            <span>
-              Showing {visibleCount.toLocaleString('en-LK')} of{' '}
-              {filtered.length.toLocaleString('en-LK')}
-            </span>
-            <button
-              type="button"
-              onClick={() =>
-                setVisibleCount((n) => n + RENDER_PAGE * 5)
-              }
-              className={buttonClass}
-            >
-              Show more
-            </button>
-          </div>
-        )}
       </div>
 
       {confirmDeleteId && (
         <ConfirmDialog
-          title="Delete this transaction?"
-          body="This can't be undone."
-          confirmLabel="Delete"
+          title="Move this transaction to trash?"
+          body="You can restore it from Recently deleted."
+          confirmLabel="Move to trash"
           busy={busy === `delete-${confirmDeleteId}`}
           onConfirm={() => {
             const txn = transactions.find(

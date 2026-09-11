@@ -266,8 +266,8 @@ export function ActiveModelCard({
             Model Configuration
           </h3>
           <p className="text-sm text-[var(--theme-muted)]">
-            Update the primary model, optional fallback, and stream timeout
-            settings saved in the active profile configuration.
+            Choose the primary model, optional fallback, and response timing
+            saved for the active profile.
           </p>
         </div>
         <Button
@@ -285,13 +285,13 @@ export function ActiveModelCard({
         </p>
       ) : configQuery.error ? (
         <p className="mt-4 text-sm text-red-500">
-          Could not load config — is Hermes Agent running?
+          Could not load model settings — is the workspace service running?
         </p>
       ) : (
         <div className="mt-5 space-y-4">
           <ModelConfigSection
             title="Primary Model"
-            description="Default provider, model, and base URL used for new Hermes Agent requests."
+            description="Default provider, model, and service address used for new workspace requests."
             value={primaryConfig}
             onChange={setPrimaryConfig}
             modelOptions={modelOptions}
@@ -306,8 +306,8 @@ export function ActiveModelCard({
                   Fallback Model
                 </h3>
                 <p className="text-sm text-[var(--theme-muted)]">
-                  Optional secondary model Hermes Agent can use if the primary
-                  path fails.
+                  Optional secondary model the workspace can use if the primary
+                  service is unavailable.
                 </p>
               </div>
               <Button

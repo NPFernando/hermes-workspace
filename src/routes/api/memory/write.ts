@@ -5,6 +5,9 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { getMemoryWorkspaceRoot } from '../../../server/memory-browser'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../../server/rate-limit'
@@ -45,6 +48,9 @@ export const Route = createFileRoute('/api/memory/write')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`memory-write:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
         // Memory writes go directly to local fs ($HERMES_HOME/memory/...).
         // No remote gateway endpoint is involved.
         try {

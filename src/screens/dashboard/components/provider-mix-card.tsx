@@ -1,5 +1,11 @@
 import { useMemo } from 'react'
+import {
+  DashboardEmptyState,
+  DashboardLoadingState,
+  DashboardUnavailableState,
+} from './dashboard-empty-state'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import { safeAnalyticsModels } from '@/screens/dashboard/lib/analytics-normalizers'
 
 function formatTokens(n: number): string {
   if (!n || n <= 0) return '0'
@@ -80,13 +86,17 @@ function classify(modelId: string): { key: string; label: string } {
 
 export function ProviderMixCard({
   analytics,
+  loading = false,
+  unavailable = false,
 }: {
   analytics: DashboardOverview['analytics']
+  loading?: boolean
+  unavailable?: boolean
 }) {
   const buckets: Array<Bucket> = useMemo(() => {
     if (!analytics || analytics.source !== 'analytics') return []
     const map = new Map<string, Bucket>()
-    for (const m of analytics.topModels) {
+    for (const m of safeAnalyticsModels(analytics)) {
       const klass = classify(m.id)
       const existing = map.get(klass.key)
       if (existing) {
@@ -105,10 +115,37 @@ export function ProviderMixCard({
     return Array.from(map.values()).sort((a, b) => b.tokens - a.tokens)
   }, [analytics])
 
-  if (buckets.length === 0) return null
+  if (loading) return <DashboardLoadingState title="Provider mix" />
+  if (unavailable) return <DashboardUnavailableState title="Provider mix" />
+  if (!analytics || analytics.source === 'unavailable') {
+    return <DashboardUnavailableState title="Provider mix" />
+  }
+  if (analytics.source !== 'analytics') {
+    return (
+      <DashboardEmptyState
+        title="Provider mix"
+        description="Provider distribution will be calculated when model usage is available."
+      />
+    )
+  }
+  if (buckets.length === 0) {
+    return (
+      <DashboardEmptyState
+        title="Provider mix"
+        description="Provider distribution will be calculated when model usage is available."
+      />
+    )
+  }
 
   const totalTokens = buckets.reduce((a, b) => a + b.tokens, 0)
-  if (totalTokens === 0) return null
+  if (totalTokens === 0) {
+    return (
+      <DashboardEmptyState
+        title="Provider mix"
+        description="Provider distribution will be calculated when token usage is available."
+      />
+    )
+  }
 
   // Build a CSS conic-gradient donut. We accumulate angles as we
   // walk the sorted bucket list so each slice's start equals the
@@ -144,24 +181,17 @@ export function ProviderMixCard({
       />
 
       <div className="flex items-center justify-between">
-        <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-        >
+        <h2 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
           Provider mix
-        </h3>
-        <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-        >
-          {analytics ? `${analytics.windowDays}d` : ''} · {buckets.length} fam
+        </h2>
+        <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
+          {analytics.windowDays}d · {buckets.length} fam
         </span>
       </div>
 
       <div className="flex items-center gap-3">
         {/* Donut */}
-        <div
-          className="relative shrink-0"
-          style={{ width: 64, height: 64 }}
-        >
+        <div className="relative shrink-0" style={{ width: 64, height: 64 }}>
           <div
             className="absolute inset-0 rounded-full"
             style={{ background: conic }}
@@ -172,14 +202,10 @@ export function ProviderMixCard({
             aria-hidden
           />
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center leading-none">
-            <span
-              className="font-mono text-[12px] font-bold tabular-nums text-[var(--theme-text)]"
-            >
+            <span className="font-mono text-[12px] font-bold tabular-nums text-[var(--theme-text)]">
               {topPct.toFixed(0)}%
             </span>
-            <span
-              className="mt-0.5 font-mono text-[7px] uppercase tracking-[0.12em] text-[var(--theme-muted)]"
-            >
+            <span className="mt-0.5 font-mono text-[7px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
               {top.label}
             </span>
           </div>
@@ -201,9 +227,7 @@ export function ProviderMixCard({
                     className="inline-block size-1.5 shrink-0 rounded-full"
                     style={{ background: b.tone }}
                   />
-                  <span
-                    className="truncate font-mono uppercase tracking-[0.1em] text-[var(--theme-text)]"
-                  >
+                  <span className="truncate font-mono uppercase tracking-[0.1em] text-[var(--theme-text)]">
                     {b.label}
                   </span>
                 </span>
@@ -214,9 +238,7 @@ export function ProviderMixCard({
             )
           })}
           {buckets.length > 4 ? (
-            <li
-              className="text-[9px] font-mono uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-            >
+            <li className="text-[9px] font-mono uppercase tracking-[0.1em] text-[var(--theme-muted)]">
               +{buckets.length - 4} more
             </li>
           ) : null}

@@ -53,6 +53,8 @@ interface FinanceStorageMonitorSummary {
   consecutiveFailures: number
   lastStatus: string | null
   lastWarnings: Array<string>
+  lastSelfHealAttempts: number
+  lastSelfHealSucceeded: boolean | null
   heartbeatAgeMs: number | null
   stale: boolean
 }
@@ -82,25 +84,6 @@ interface FinanceStorageSmokeCronOutput {
   status: string | null
   failed: boolean
 }
-interface HeadroomAgent {
-  label: string
-  requests: number
-  tokensSaved: number
-  savingsPercent: number
-  topModels: Array<{ model: string; requests: number }>
-}
-interface HeadroomStats {
-  running: true
-  apiRequests: number
-  requestsCompressed: number
-  avgCompressionPct: number
-  bestCompressionPct: number
-  tokensSaved: number
-  tokensBefore: number
-  costSavedUsd: number
-  savingsPct: number
-  agents: Array<HeadroomAgent>
-}
 interface OpsPayload {
   ok: boolean
   error?: string
@@ -112,7 +95,19 @@ interface OpsPayload {
   cronJobs: Array<OpsCronJob> | null
   financeStorageMonitor: FinanceStorageMonitorSummary | null
   financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
-  headroom: HeadroomStats | null
+}
+
+interface ProviderHealth {
+  provider: string
+  displayName: string
+  status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
+  message?: string
+  plan?: string
+  updatedAt: number
+}
+interface ProviderHealthSnapshot {
+  capturedAt: number
+  providers: Array<Pick<ProviderHealth, 'provider' | 'status'>>
 }
 
 function money(v: number | null | undefined): string {
@@ -187,6 +182,21 @@ export function OpsCostScreen() {
     },
     refetchInterval: 60_000,
   })
+  const providerQuery = useQuery({
+    queryKey: ['provider-usage', 'ops-health'],
+    queryFn: async () => {
+      const res = await fetch('/api/provider-usage', {
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return (await res.json()) as {
+        ok: boolean
+        providers: Array<ProviderHealth>
+        providerHealthHistory?: Array<ProviderHealthSnapshot>
+      }
+    },
+    refetchInterval: 60_000,
+  })
 
   if (opsQuery.isPending) {
     return (
@@ -223,7 +233,6 @@ export function OpsCostScreen() {
     cronJobs,
     financeStorageMonitor,
     financeStorageSmokeCron,
-    headroom,
   } = opsQuery.data
   const runwayDays =
     cost?.remaining != null &&
@@ -291,86 +300,95 @@ export function OpsCostScreen() {
         />
       </div>
 
-      {/* Headroom context-compression proxy (delegated-subagent OpenRouter traffic) */}
-      <Panel title="Context compression — Headroom proxy">
-        {headroom == null ? (
+      <Panel title="AI provider health">
+        {providerQuery.isPending ? (
           <p className="text-sm text-[var(--theme-muted)]">
-            Headroom proxy not running (or unreachable at{' '}
-            <code>127.0.0.1:8787</code>). Delegated subagent traffic goes direct.
+            Checking providers…
+          </p>
+        ) : providerQuery.isError || !providerQuery.data.ok ? (
+          <p className="text-sm text-[var(--theme-muted)]">
+            Provider health unavailable. Retry from the usage meter if needed.
           </p>
         ) : (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <StatTile
-                label="Avg compression"
-                value={`${headroom.avgCompressionPct.toFixed(1)}%`}
-                hint={`best ${headroom.bestCompressionPct.toFixed(0)}%`}
-              />
-              <StatTile
-                label="Tokens saved"
-                value={headroom.tokensSaved.toLocaleString()}
-                hint={
-                  headroom.tokensBefore > 0
-                    ? `of ${headroom.tokensBefore.toLocaleString()} sent`
-                    : undefined
-                }
-              />
-              <StatTile
-                label="Requests compressed"
-                value={`${headroom.requestsCompressed} / ${headroom.apiRequests}`}
-              />
-              <StatTile
-                label="Cost saved"
-                value={money(headroom.costSavedUsd)}
-                hint={
-                  headroom.savingsPct > 0
-                    ? `${headroom.savingsPct.toFixed(1)}%`
-                    : undefined
-                }
-              />
-            </div>
-            {headroom.agents.length > 0 && (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-[var(--theme-muted)]">
-                    <th className="pb-2 font-normal">Client</th>
-                    <th className="pb-2 font-normal text-right">Requests</th>
-                    <th className="pb-2 font-normal text-right">Saved %</th>
-                    <th className="pb-2 font-normal text-right">Tokens saved</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {headroom.agents.map((a) => (
-                    <tr
-                      key={a.label}
-                      className="border-t border-[var(--theme-border,rgba(128,128,128,0.15))]"
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            {providerQuery.data.providers.map((provider) => {
+              const healthy = provider.status === 'ok'
+              const label =
+                provider.status === 'missing_credentials'
+                  ? 'not configured'
+                  : provider.status === 'auth_expired'
+                    ? 'auth expired'
+                    : provider.status
+              return (
+                <div
+                  key={provider.provider}
+                  className="rounded-lg border border-[var(--theme-border,rgba(128,128,128,0.2))] px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-[var(--theme-text)]">
+                      {provider.displayName}
+                    </span>
+                    <span
+                      className={
+                        healthy
+                          ? 'text-xs text-emerald-400'
+                          : 'text-xs text-amber-400'
+                      }
                     >
-                      <td className="py-1.5 text-[var(--theme-text)]">
-                        {a.label}
-                        {a.topModels.length > 0 && (
-                          <span className="ml-2 text-xs text-[var(--theme-muted)]">
-                            {a.topModels
-                              .map((m) => m.model.split('/').pop())
-                              .join(', ')}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-1.5 text-right tabular-nums">
-                        {a.requests}
-                      </td>
-                      <td className="py-1.5 text-right tabular-nums">
-                        {a.savingsPercent.toFixed(1)}%
-                      </td>
-                      <td className="py-1.5 text-right tabular-nums">
-                        {a.tokensSaved.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                      {healthy ? 'healthy' : label}
+                    </span>
+                  </div>
+                  {provider.plan ? (
+                    <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                      {provider.plan}
+                    </p>
+                  ) : null}
+                  {!healthy && provider.message ? (
+                    <p className="mt-1 truncate text-xs text-[var(--theme-muted)]">
+                      {provider.message}
+                    </p>
+                  ) : null}
+                </div>
+              )
+            })}
           </div>
         )}
+        {providerQuery.data?.providerHealthHistory?.length ? (
+          <div className="mt-3 border-t border-[var(--theme-border,rgba(128,128,128,0.15))] pt-2">
+            <p className="text-xs uppercase tracking-wide text-[var(--theme-muted)]">
+              Recent provider status
+            </p>
+            <div className="mt-1 space-y-1 text-xs">
+              {providerQuery.data.providerHealthHistory
+                .slice(-6)
+                .reverse()
+                .map((snapshot) => {
+                  const degraded = snapshot.providers.filter(
+                    (provider) => provider.status !== 'ok',
+                  ).length
+                  return (
+                    <div
+                      key={snapshot.capturedAt}
+                      className="flex flex-wrap items-center justify-between gap-2 text-[var(--theme-muted)]"
+                    >
+                      <span>{new Date(snapshot.capturedAt).toLocaleString()}</span>
+                      <span
+                        className={
+                          degraded === 0
+                            ? 'text-emerald-400'
+                            : 'text-amber-400'
+                        }
+                      >
+                        {degraded === 0
+                          ? 'all healthy'
+                          : `${degraded} degraded`}
+                      </span>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        ) : null}
       </Panel>
 
       {/* Per-model costs (single-series magnitude → table with inline accent bars) */}
@@ -518,6 +536,15 @@ export function OpsCostScreen() {
                 {financeStorageMonitor.lastHealthyAt
                   ? ` · healthy ${new Date(financeStorageMonitor.lastHealthyAt).toLocaleString()}`
                   : ''}
+              </p>
+              <p className="text-[var(--theme-muted)]">
+                Self-heal:{' '}
+                {financeStorageMonitor.lastSelfHealSucceeded == null
+                  ? 'not needed'
+                  : financeStorageMonitor.lastSelfHealSucceeded
+                    ? 'resolved'
+                    : 'unresolved'}{' '}
+                after {financeStorageMonitor.lastSelfHealAttempts} attempt(s)
               </p>
               {financeStorageMonitor.lastWarnings.length > 0 ? (
                 <ul className="space-y-1 text-[var(--theme-muted)]">

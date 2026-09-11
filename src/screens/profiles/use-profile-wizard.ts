@@ -73,7 +73,7 @@ export function useProfileWizard(createOpen: boolean) {
             setSwarmData(data)
             // Pre-fill recommended presets
             const defaults: Record<string, string> = {}
-            for (const rec of data.recommendations ?? []) {
+            for (const rec of data.recommendations) {
               defaults[rec.workerId] = rec.recommendedPreset
             }
             setWorkerPresets(defaults)

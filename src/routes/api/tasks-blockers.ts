@@ -13,7 +13,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { getTask, listTasks, updateTask } from '../../server/tasks-store'
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import type { TaskRecord } from '../../server/tasks-store'
 
 type BlockerGroup = {
@@ -195,7 +201,7 @@ function findResumableTasks(): Array<{
 export const Route = createFileRoute('/api/tasks-blockers')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -221,6 +227,11 @@ export const Route = createFileRoute('/api/tasks-blockers')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`tasks-blockers:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
         }
 
         try {

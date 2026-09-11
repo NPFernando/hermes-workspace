@@ -6,24 +6,29 @@ import {
   appendFinanceAuditPostgres,
   financePostgresStatus,
   readFinancePostgresNormalized,
+  readFinancePostgresStore,
   writeFinancePostgresNormalized,
+  writeFinancePostgresStore,
 } from './finance-postgres-store'
 import {
-  getCachedCategoryPreferences,
-  proposeCategoryPreference,
-} from './harp-memory-client'
-import { decryptSecret, encryptSecret } from './secret-crypto'
+  readPersonalFinancePostgresStore,
+  writePersonalFinancePostgresStore,
+} from './personal-finance-postgres-store'
+import { readTradingStore, writeTradingStore } from './trading-store'
+import type { ContractChange } from './contract-change-detection'
 import type { ConnectivityBreakerState } from './connectivity-breaker'
+import type { FinancialRules } from './financial-rules'
+import type { FinanceDocumentClass } from './finance-document-classifier'
 
 export const FINANCE_SCHEMA_VERSION = 1
-// Still used for the audit-log recovery buffer and ingestion uploads. Honours
-// a HOME override so isolated tests never touch the real ~/.hermes/finance.
+// Respect HOME overrides used by isolated tests while retaining the normal
+// ~/.hermes/finance location in production.
 export const FINANCE_DATA_DIR = path.join(
   process.env.HOME || os.homedir(),
   '.hermes',
   'finance',
 )
-/** Recovery buffer for audit entries that could not reach Postgres (see appendAuditLog). */
+export const FINANCE_DATA_PATH = path.join(FINANCE_DATA_DIR, 'finance.json')
 export const FINANCE_AUDIT_PATH = path.join(FINANCE_DATA_DIR, 'audit.jsonl')
 /** Original documents/photos from both ingestion paths (upload, Gmail attachments) — referenced by pending_ingestions.sourceRef. */
 export const FINANCE_INGESTION_UPLOAD_DIR = path.join(
@@ -108,26 +113,24 @@ export type FinanceAccount = {
   /** Balance recorded when the user started tracking this account, distinct from the live `balance` above. */
   openingBalance?: number
   openingBalanceDate?: string
-  /**
-   * When true (and an `openingBalance` is set), this account's contribution
-   * to net worth / cash / card-debt uses the ledger-derived balance
-   * (openingBalance + tagged income − expenses + transfer legs) instead of
-   * the manually-entered `balance`. Falls back to `balance` when the ledger
-   * figure can't be computed. Default (absent/false) = manual balance.
-   */
-  deriveBalanceFromLedger?: boolean
   maskedIdentifier?: string
   platform?: string
+  /** Original bank/account document path inside the private finance directory. */
+  documentRef?: string
   source: string
   createdAt: string
   updatedAt: string
 }
+
+export type TransactionType = 'income' | 'expense' | 'transfer'
 
 export type IncomeRecord = {
   id: string
   dateReceived: string
   sourceName: string
   incomeType: string
+  /** Structured reporting hint while preserving the existing free-text incomeType label. */
+  incomeSubtype?: 'salary' | 'dividend' | 'interest' | 'freelance' | 'other'
   originalCurrency: CurrencyCode
   originalAmount: number
   exchangeRateUsed: number
@@ -138,28 +141,21 @@ export type IncomeRecord = {
   documentRef?: string
   /** Links this logged payment back to the job (IncomeSource) it came from, when known. */
   incomeSourceId?: string
+  /** Links dividend income back to the stock holding that paid it, when known. */
+  stockHoldingId?: string
   /** Comma-separated free text — matches the Tag catalogue (PF-112) by name, no FK. */
   tags?: string
   /** Reconciliation status (PF-113). Defaults to 'cleared' to match prior implicit behavior. */
   status?: 'pending' | 'cleared' | 'reconciled'
+  /** Paired transfer metadata; ordinary income records leave these absent. */
+  transactionType?: TransactionType
+  transferId?: string
+  transferAccountId?: string
+  /** Soft-delete tombstone; retained for recovery and audit instead of being physically removed. */
+  deletedAt?: string
   source: string
   createdAt: string
   updatedAt: string
-}
-
-/**
- * PF review item 2: one expense line split across several categories (e.g. a
- * supermarket receipt that's part Groceries, part Household). Additive and
- * optional — an expense with no `splits` behaves exactly as before. `amount`
- * is in the record's `currency`; the parts must sum to the record `amount`
- * (enforced on write). Category-level aggregations attribute each part its
- * pro-rata share of `convertedLkrAmount`; record-level totals are untouched.
- */
-export type ExpenseSplit = {
-  category: string
-  subcategory?: string
-  amount: number
-  notes?: string
 }
 
 export type ExpenseRecord = {
@@ -168,10 +164,11 @@ export type ExpenseRecord = {
   vendor: string
   category: string
   subcategory?: string
-  splits?: Array<ExpenseSplit>
   accountId?: string
   currency: CurrencyCode
   amount: number
+  /** Rate used to convert this transaction into the reporting currency, when available. */
+  exchangeRateUsed?: number
   convertedLkrAmount: number
   recurring: boolean
   workRelated: boolean
@@ -182,73 +179,21 @@ export type ExpenseRecord = {
   tags?: string
   /** Reconciliation status (PF-113). Defaults to 'cleared' to match prior implicit behavior. */
   status?: 'pending' | 'cleared' | 'reconciled'
+  /** Paired transfer metadata; ordinary expense records leave these absent. */
+  transactionType?: TransactionType
+  transferId?: string
+  transferAccountId?: string
+  /** Group metadata for an expense split; each row is one category allocation. */
+  splitGroupId?: string
+  splitIndex?: number
+  /** Soft-delete tombstone; retained for recovery and audit instead of being physically removed. */
+  deletedAt?: string
   source: string
   createdAt: string
   updatedAt: string
 }
 
-/**
- * PF review item 12 (unified-ledger, first slice): an account-to-account move.
- * Modelling it as its own kind — rather than a paired fake income + fake
- * expense — keeps it out of `financeSummary`'s income/expense/savings totals,
- * which it should never affect. Amount is informational; per-account balances
- * remain manually maintained (roadmap ADR-001 — no derived ledger yet).
- */
-export type Transfer = {
-  id: string
-  date: string
-  fromAccountId?: string
-  toAccountId?: string
-  amount: number
-  currency: CurrencyCode
-  convertedLkrAmount: number
-  notes?: string
-  source: string
-  createdAt: string
-  updatedAt: string
-}
-
-/**
- * A planned future income or expense. LKR-denominated (v1). It is NOT part
- * of any total until it is posted — "Post now" (or a future auto-post)
- * turns it into a real income/expense record and flips `status` to
- * 'posted'. Shown in "Coming up" while pending.
- */
-export type ScheduledTransaction = {
-  id: string
-  dueDate: string
-  kind: 'income' | 'expense'
-  counterparty: string
-  category: string
-  amount: number
-  accountId?: string
-  notes?: string
-  status: 'pending' | 'posted' | 'cancelled'
-  postedRecordId?: string
-  source: string
-  createdAt: string
-  updatedAt: string
-}
-
-/**
- * A daily point-in-time snapshot of net worth (and its main components), all
- * LKR-denominated like every other stored figure. Written by the
- * `snapshot_net_worth` action / the nightly cron; upserted by `date` so at
- * most one row per calendar day. Drives the net-worth history chart.
- */
-export type NetWorthSnapshot = {
-  id: string
-  date: string
-  netWorthLkr: number
-  cashLkr: number
-  investmentsLkr: number
-  debtLkr: number
-  source: string
-  createdAt: string
-  updatedAt: string
-}
-
-/** Read-only unified view over income_records + expense_records + transfers for a single combined transaction list/UI. Storage stays split; this is computed on read, never persisted. */
+/** Read-only unified view over income_records + expense_records for a single combined transaction list/UI. Storage stays split; this is computed on read, never persisted. */
 export type UnifiedTransaction = {
   id: string
   kind: 'income' | 'expense' | 'transfer'
@@ -256,11 +201,9 @@ export type UnifiedTransaction = {
   counterparty: string
   category: string
   accountId?: string
-  // transfer-only: the two legs, so a transfer row can be edited in place.
-  fromAccountId?: string
-  toAccountId?: string
   currency: CurrencyCode
   amount: number
+  exchangeRateUsed?: number
   convertedLkrAmount: number
   notes?: string
   documentRef?: string
@@ -268,12 +211,18 @@ export type UnifiedTransaction = {
   taxable?: boolean
   incomeSourceId?: string
   subcategory?: string
-  splits?: Array<ExpenseSplit>
   tags?: string
   status?: 'pending' | 'cleared' | 'reconciled'
+  /** Stable type in the unified read model; legacy rows are inferred from their collection. */
+  transactionType: TransactionType
+  transferId?: string
+  transferAccountId?: string
+  splitGroupId?: string
+  splitIndex?: number
   source: string
   createdAt: string
   updatedAt: string
+  deletedAt?: string
 }
 
 export type BudgetCategory = {
@@ -282,11 +231,33 @@ export type BudgetCategory = {
   category: string
   currency: CurrencyCode
   budgetAmount: number
-  /** When true, copyBudgetsToMonth() adds last month's positive leftover (budget - actual) on top of the copied amount. Default/undefined behaves as false — budgets stay static until explicitly copied. */
-  rolloverEnabled?: boolean
   source: string
   createdAt: string
   updatedAt: string
+}
+
+export type BudgetTemplateLine = {
+  category: string
+  currency: string
+  budgetAmount: number
+}
+
+export type BudgetTemplate = {
+  id: string
+  name: string
+  lines: Array<BudgetTemplateLine>
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type GoalCompletionEvent = {
+  id: string
+  goalId: string
+  goalName: string
+  targetAmount: number
+  currency: string
+  completedAt: string
 }
 
 /**
@@ -331,13 +302,6 @@ export type Merchant = {
   id: string
   name: string
   defaultCategory?: string
-  /**
-   * PF splits: a remembered percentage split for this vendor (e.g. a
-   * supermarket that's usually 60% Groceries / 40% Household). When the
-   * vendor is typed on an expense, the split editor pre-fills these parts
-   * scaled to the entered amount. Percentages should sum to ~100.
-   */
-  defaultSplits?: Array<{ category: string; percent: number }>
   notes?: string
   source: string
   createdAt: string
@@ -392,6 +356,8 @@ export type TaxRecord = {
   requiresConfirmation: boolean
   notes?: string
   supportingDocument?: string
+  /** Original tax document path inside the private finance directory. */
+  documentRef?: string
   source: string
   createdAt: string
   updatedAt: string
@@ -412,10 +378,23 @@ export type IncomeSource = {
   expectedPaydayDayOfMonth?: number
   /** Free-text pay timing that doesn't reduce to a fixed day, e.g. "Last business day of each month". Informational only. */
   paySchedule?: string
-  status: 'active' | 'ended'
+  status: 'active' | 'paused' | 'notice_period' | 'ended' | 'terminated'
   notes?: string
   /** Path to the original uploaded contract/offer letter, when created via that intake path. */
   documentRef?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type SalaryHistoryEntry = {
+  id: string
+  incomeSourceId?: string
+  employerName: string
+  effectiveDate: string
+  amount: number
+  currency: CurrencyCode
+  reason?: string
   source: string
   createdAt: string
   updatedAt: string
@@ -434,10 +413,40 @@ export type StockHolding = {
   lastKnownPrice?: number
   lastPriceUpdatedAt?: string
   priceSource: 'cse_api' | 'manual'
+  /** Latest optional daily quote statistics from the CSE provider. */
+  lastPriceHigh?: number
+  lastPriceLow?: number
+  lastPriceClose?: number
+  lastPriceVolume?: number
+  lastPriceTurnover?: number
+  /** Bounded price observations captured from CSE refreshes or manual updates. */
+  priceHistory?: Array<StockPricePoint>
   notes?: string
+  /** Original broker/trade document path inside the private finance directory. */
+  documentRef?: string
   source: string
   createdAt: string
   updatedAt: string
+}
+
+export type CseProviderHealth = {
+  status: 'healthy' | 'degraded' | 'stale' | 'manual' | 'unknown'
+  holdingsCount: number
+  cseQuoteCount: number
+  manualFallbackCount: number
+  staleQuoteCount: number
+  latestQuoteAt: string | null
+}
+
+export type StockPricePoint = {
+  price: number
+  observedAt: string
+  source: 'cse_api' | 'manual'
+  high?: number
+  low?: number
+  close?: number
+  volume?: number
+  turnover?: number
 }
 
 export type FixedDeposit = {
@@ -447,13 +456,115 @@ export type FixedDeposit = {
   currency: CurrencyCode
   interestRatePct: number
   interestPayout: 'monthly' | 'quarterly' | 'annually' | 'at_maturity'
+  /** Manually recorded gross interest already paid by the bank. */
+  interestReceived?: number
+  /** Manually recorded withholding/tax deducted from received interest. */
+  taxDeducted?: number
+  /** Optional finance account where the bank pays out interest. */
+  payoutAccountId?: string
+  /** Preference only; no renewal or money movement is performed automatically. */
+  autoRenew?: boolean
   startDate: string
   maturityDate: string
   status: 'active' | 'matured' | 'withdrawn'
   notes?: string
+  /** Original certificate path, retained inside the private finance data directory. */
+  documentRef?: string
   source: string
   createdAt: string
   updatedAt: string
+}
+
+export type NetWorthSnapshot = {
+  id: string
+  snapshotDate: string
+  netWorthLkr: number
+  cashLkr: number
+  debtLkr: number
+  investmentsLkr: number
+  liquidNetWorthLkr: number
+  lockedWealthLkr: number
+  /** Holdings valued at the moment this snapshot was captured. */
+  portfolioPositions?: Array<PortfolioSnapshotPosition>
+  source: 'manual' | 'scheduled'
+  createdAt: string
+}
+
+export type ScheduledTransaction = {
+  id: string
+  dueDate: string
+  kind: 'income' | 'expense'
+  counterparty: string
+  category: string
+  amount: number
+  accountId?: string
+  notes?: string
+  status: 'pending' | 'paused' | 'posted' | 'cancelled'
+  postedRecordId?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type PortfolioSnapshotPosition = {
+  holdingId: string
+  symbol: string
+  currency: CurrencyCode
+  quantity: number
+  price: number
+  marketValue: number
+  costBasis: number
+  priceSource: 'cse_api' | 'manual' | 'buy_price_fallback'
+}
+
+export type InvestmentJournalEntry = {
+  id: string
+  stockHoldingId?: string
+  symbol: string
+  entryDate: string
+  entryType: 'thesis' | 'review' | 'buy' | 'sell' | 'note'
+  content: string
+  thesis?: string
+  invalidationCondition?: string
+  nextReviewDate?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type FinanceAiTaskStatus =
+  | 'queued'
+  | 'running'
+  | 'awaiting_approval'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+
+export type FinanceAiTaskStatusEvent = {
+  status: FinanceAiTaskStatus
+  at: string
+  by?: 'human' | 'finance_agent' | 'system'
+}
+
+export type FinanceAiTask = {
+  id: string
+  auditCorrelationId: string
+  taskType: string
+  title: string
+  status: FinanceAiTaskStatus
+  risk: 'low' | 'medium' | 'high'
+  requestedAction: string
+  inputSummary: string
+  resultSummary?: string
+  errorMessage?: string
+  approvalRequired: boolean
+  source: string
+  agentName?: string
+  createdAt: string
+  updatedAt: string
+  startedAt?: string
+  completedAt?: string
+  statusHistory?: Array<FinanceAiTaskStatusEvent>
 }
 
 /** Phase 40 (WEALTH-100/101): unlike FixedDeposit's principal, currentBalance decreases as the loan is paid down. */
@@ -484,7 +595,7 @@ export type Property = {
   currency: CurrencyCode
   purchaseDate: string
   notes?: string
-  /** Informational only (PF-1004 precedent) — does not affect debtBase/propertyValueBase/netWorthBase, each already counted once independently. */
+  /** Informational only (PF-1004 precedent) — does not affect debtLkr/propertyValueLkr/netWorthLkr, each already counted once independently. */
   linkedLoanId?: string
   source: string
   createdAt: string
@@ -497,6 +608,27 @@ export type Beneficiary = {
   name: string
   relationship: string
   note?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** DOC-109: informational policy register; premiums and coverage are not assets or liabilities. */
+export type InsurancePolicy = {
+  id: string
+  provider: string
+  policyNumber?: string
+  policyType: string
+  insuredItem: string
+  premiumAmount?: number
+  premiumFrequency?: string
+  coverageAmount?: number
+  currency: CurrencyCode
+  startDate: string
+  endDate?: string
+  status: 'active' | 'expired' | 'cancelled'
+  notes?: string
+  documentRef?: string
   source: string
   createdAt: string
   updatedAt: string
@@ -515,6 +647,17 @@ export type PendingIngestionStatus =
   | 'confirmed'
   | 'rejected'
 
+export type KnownSender = {
+  id: string
+  label: string
+  matchAddress?: string
+  matchDomain?: string
+  passwordScheme?: string
+  encryptedPassword?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type ExtractedTransaction = {
   kind: 'income' | 'expense'
   amount: number
@@ -522,6 +665,49 @@ export type ExtractedTransaction = {
   vendorOrSource: string
   date: string
   category?: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+/** Payroll-specific fields retained until the user confirms the payment. */
+export type ExtractedSalarySlip = {
+  employerName: string
+  employeeName?: string
+  payPeriod?: string
+  paymentDate?: string
+  grossAmount?: number
+  deductions?: number
+  netAmount: number
+  currency: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+/** Trade-confirmation fields retained for review; confirming creates a journal entry, not a position. */
+export type ExtractedContractNote = {
+  symbol: string
+  companyName?: string
+  side: 'buy' | 'sell'
+  quantity: number
+  price: number
+  grossAmount?: number
+  fees?: number
+  currency: string
+  broker?: string
+  tradeDate?: string
+  settlementDate?: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+/** Fixed-deposit certificate fields retained until the user approves creation. */
+export type ExtractedFdCertificate = {
+  bankName: string
+  certificateNumber?: string
+  principal: number
+  currency: string
+  interestRatePct: number
+  interestPayout: 'monthly' | 'quarterly' | 'annually' | 'at_maturity'
+  startDate?: string
+  maturityDate?: string
+  autoRenew?: boolean
   confidence: 'high' | 'medium' | 'low'
 }
 
@@ -555,39 +741,22 @@ export type PendingIngestion = {
   status: PendingIngestionStatus
   source: 'gmail' | 'upload'
   /** Defaults to 'transaction' — 'contract' drives a different extracted shape and confirm path. */
-  documentType: 'transaction' | 'contract'
+  documentType: 'transaction' | 'statement' | 'contract'
+  documentClass?: FinanceDocumentClass
   sourceRef: string
+  /** SHA-256 of the original uploaded bytes, used for duplicate intake detection. */
+  checksumSha256?: string
   passwordHint?: string
-  /** Set when the Gmail sender matched a registered gmailIngest.knownSenders entry — lets the UI show "Example Bank" instead of a raw grep hint. */
   matchedSenderId?: string
   matchedSenderLabel?: string
   extracted?: ExtractedTransaction
+  extractedSalarySlip?: ExtractedSalarySlip
+  extractedContractNote?: ExtractedContractNote
+  extractedFdCertificate?: ExtractedFdCertificate
   extractedContract?: ExtractedContract
+  contractChanges?: Array<ContractChange>
   rawPreviewImagePath?: string
   error?: string
-  createdAt: string
-  updatedAt: string
-}
-
-/**
- * A biller/bank the user has explicitly registered so Gmail sync can (a)
- * broaden its search beyond generic keywords and (b) auto-unlock a matching
- * encrypted PDF attachment instead of just surfacing a grepped hint.
- * `encryptedPassword` (see secret-crypto.ts) is the only real secret this
- * app stores at rest, by explicit user request — it never appears in an API
- * response; list_known_senders reports `hasPassword` instead.
- */
-export type KnownSender = {
-  id: string
-  label: string
-  /** At least one of matchDomain/matchAddress should be set; both may match a given From header. */
-  matchDomain?: string
-  matchAddress?: string
-  /** Human-readable, non-secret description of how the password is derived (e.g. "date of birth, DDMMYYYY") — shown when no password is stored or auto-unlock fails. */
-  passwordScheme?: string
-  /** Links to finance_accounts[].id when this sender's statements belong to one specific account. */
-  accountId?: string
-  encryptedPassword?: string
   createdAt: string
   updatedAt: string
 }
@@ -818,17 +987,8 @@ export type RiskState = {
 }
 
 export type FinanceSettings = {
-  /** PF-201: the reporting currency all aggregate `*Lkr` figures are expressed
-   * in. Storage stays LKR-denominated; this is display/reporting only.
-   * Defaults to 'LKR'. */
   baseCurrency: CurrencyCode
   reportingCurrencies: Array<CurrencyCode>
-  /** PF-201: percentage markup applied by `refresh_exchange_rates` on top of
-   * the fetched mid-market rate, to approximate the user's actual bank
-   * transfer rate (the cost of *buying* the foreign currency). The reverse
-   * leg is written as the exact reciprocal so display round-trips stay
-   * stable. Defaults to 0 (pure mid-market). */
-  exchangeRateSpreadPct?: number
   tradingMode: TradingMode
   liveTradingEnabled: boolean
   emergencyKillSwitch: boolean
@@ -858,16 +1018,32 @@ export type FinanceSettings = {
   autoRefinement?: Record<string, unknown>
   /** Gates non-critical (info/warning) Telegram delivery in alerts.ts. Off by default — critical alerts always send regardless. */
   alertsEnabled?: boolean
+  /** AUTO-110: suppresses non-critical Telegram delivery without hiding in-app alerts. */
+  quietModeEnabled?: boolean
   /** PF-303: user-set emergency fund target, in months of average expenses. Unset/0 means no target configured yet. */
   emergencyFundTargetMonths?: number
   /** PF-304: user-set savings rate target, as a percentage. Unset/0 means no target configured yet. */
   savingsRateTargetPct?: number
+  /** PF-808: monthly budget warning threshold, as a percentage of the budget. */
+  budgetAlertThresholdPct?: number
+  /** PF-810: reusable monthly budget plans; applying one never overwrites existing rows. */
+  budgetTemplates?: Array<BudgetTemplate>
+  /** PF-1009: bounded goal completion events; informational, never a balance mutation. */
+  goalCompletionEvents?: Array<GoalCompletionEvent>
+  /** PF-302: minimum cash reserve in LKR used by the safe-to-spend estimate. */
+  minimumCashReserveLkr?: number
+  /** PF-300: explicit user-authored thresholds used by future rule evaluations. */
+  financialRules?: FinancialRules
   /** WEALTH-107: user-set long-term net worth target. Unset/0 means no target configured yet. */
   wealthGoalTargetLkr?: number
   /** WEALTH-107: optional target date for wealthGoalTargetLkr — a target date without an amount is meaningless, so this is only read when wealthGoalTargetLkr is set. */
   wealthGoalTargetDate?: string
   /** AI-202: capped (last 10) recent-activity list for the Finance Analyst — same "bounded log" convention as AI-506's gmailIngest.syncHistory. */
   financeQaHistory?: Array<{ at: number; question: string; answer: string }>
+  /** AI-205: explicit opt-in for review-only proactive finance tasks. */
+  proactiveInsightsEnabled?: boolean
+  /** PF-505: explicit salary-rate changes, separate from posted income events. */
+  salaryHistory?: Array<SalaryHistoryEntry>
   strategyDecayDetection?: Record<string, unknown>
   /** Per-strategy validated backtest baselines, keyed by strategyId. See strategy-decay.ts. */
   strategyBaselines?: Record<string, unknown>
@@ -896,9 +1072,8 @@ export type FinanceDatabase = {
   finance_accounts: Array<FinanceAccount>
   income_records: Array<IncomeRecord>
   expense_records: Array<ExpenseRecord>
-  transfers: Array<Transfer>
-  net_worth_snapshots: Array<NetWorthSnapshot>
-  scheduled_transactions: Array<ScheduledTransaction>
+  /** PF-104: standalone transfer rows retained for unified-ledger consumers. */
+  transfers: Array<Record<string, unknown>>
   budget_categories: Array<BudgetCategory>
   categories: Array<Category>
   subcategories: Array<Subcategory>
@@ -910,9 +1085,14 @@ export type FinanceDatabase = {
   income_sources: Array<IncomeSource>
   stock_holdings: Array<StockHolding>
   fixed_deposits: Array<FixedDeposit>
+  investment_journal: Array<InvestmentJournalEntry>
+  ai_tasks: Array<FinanceAiTask>
+  net_worth_snapshots: Array<NetWorthSnapshot>
+  scheduled_transactions: Array<ScheduledTransaction>
   loans: Array<Loan>
   properties: Array<Property>
   beneficiaries: Array<Beneficiary>
+  insurance_policies: Array<InsurancePolicy>
   exchange_rates: Array<Record<string, unknown>>
   investment_accounts: Array<Record<string, unknown>>
   trading_platforms: Array<Record<string, unknown>>
@@ -940,32 +1120,225 @@ export type FinanceDatabase = {
   connectivityBreaker: ConnectivityBreakerState
 }
 
-/**
- * Postgres is the sole finance persistence layer, so storage health is now a
- * plain reachability signal — there is no second store to drift against.
- * - `healthy`             — Postgres reachable, finance data present.
- * - `postgres_unavailable` — Postgres enabled but unreachable / no data yet.
- * - `json_primary`        — Postgres disabled (HERMES_FINANCE_STORE=json) or a
- *                           dev / in-memory backend is active.
- */
 export type FinanceStorageHealthStatus =
   | 'healthy'
-  | 'postgres_unavailable'
   | 'json_primary'
+  | 'postgres_unavailable'
+  | 'postgres_behind'
+  | 'mirror_mismatch'
 
 export type FinanceStorageHealth = {
   status: FinanceStorageHealthStatus
   warnings: Array<string>
+  jsonUpdatedAt: string | null
   postgresUpdatedAt: string | null
+  postgresLagMs: number
+  isPostgresBehindJson: boolean
+  selfHeal: {
+    attempted: boolean
+    attempts: number
+    succeeded: boolean
+    lastAttemptAt: string | null
+  }
   rowCounts: {
+    json: Record<string, number>
     postgres: Record<string, number>
+    lagging: Record<string, { json: number; postgres: number }>
   }
 }
 
 type AddPayload = Record<string, unknown>
 
+function isTransferRecord(record: { transactionType?: string }): boolean {
+  return record.transactionType === 'transfer'
+}
+
+function isDeletedRecord(record: { deletedAt?: string }): boolean {
+  return Boolean(record.deletedAt)
+}
+
 function nowIso(): string {
   return new Date().toISOString()
+}
+
+function recordGoalCompletionEvent(
+  db: FinanceDatabase,
+  goal: Record<string, unknown>,
+): void {
+  const goalId = stringField(goal, 'id', '')
+  const events = db.settings.goalCompletionEvents ?? []
+  if (!goalId || events.some((event) => event.goalId === goalId)) return
+  db.settings.goalCompletionEvents = [
+    ...events,
+    {
+      id: randomUUID(),
+      goalId,
+      goalName: stringField(goal, 'name', 'Savings goal'),
+      targetAmount: numberField(goal, 'targetAmount', 0),
+      currency: stringField(goal, 'currency', 'LKR'),
+      completedAt: nowIso(),
+    },
+  ].slice(-20)
+}
+
+function normalizedStockPriceHistory(value: unknown): Array<StockPricePoint> {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter(
+      (point): point is Record<string, unknown> =>
+        typeof point === 'object' && point !== null,
+    )
+    .map((point) => {
+      const source: StockPricePoint['source'] =
+        point.source === 'cse_api' ? 'cse_api' : 'manual'
+      const normalized: StockPricePoint = {
+        price: typeof point.price === 'number' ? point.price : Number.NaN,
+        observedAt:
+          typeof point.observedAt === 'string' ? point.observedAt : '',
+        source,
+      }
+      if (typeof point.high === 'number' && point.high > 0)
+        normalized.high = point.high
+      if (typeof point.low === 'number' && point.low > 0)
+        normalized.low = point.low
+      if (typeof point.close === 'number' && point.close > 0)
+        normalized.close = point.close
+      if (typeof point.volume === 'number' && point.volume > 0)
+        normalized.volume = point.volume
+      if (typeof point.turnover === 'number' && point.turnover > 0)
+        normalized.turnover = point.turnover
+      return normalized
+    })
+    .filter(
+      (point) =>
+        Number.isFinite(point.price) && point.price > 0 && point.observedAt,
+    )
+    .slice(-365)
+}
+
+function appendStockPricePoint(
+  existing: unknown,
+  point: StockPricePoint,
+): Array<StockPricePoint> {
+  const history = normalizedStockPriceHistory(existing)
+  const last = history.at(-1)
+  if (last?.observedAt === point.observedAt && last.price === point.price) {
+    return history
+  }
+  return [...history, point].slice(-365)
+}
+
+function budgetTemplateLines(value: unknown): Array<BudgetTemplateLine> {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((line) => {
+      if (!line || typeof line !== 'object' || Array.isArray(line)) return null
+      const item = line as Record<string, unknown>
+      const category =
+        typeof item.category === 'string' ? item.category.trim() : ''
+      const currency =
+        typeof item.currency === 'string'
+          ? item.currency.trim().toUpperCase()
+          : 'LKR'
+      const budgetAmount =
+        typeof item.budgetAmount === 'number'
+          ? item.budgetAmount
+          : Number(item.budgetAmount)
+      if (
+        !category ||
+        !SUPPORTED_CURRENCIES.includes(
+          currency as (typeof SUPPORTED_CURRENCIES)[number],
+        ) ||
+        !Number.isFinite(budgetAmount) ||
+        budgetAmount <= 0
+      )
+        return null
+      return {
+        category,
+        currency,
+        budgetAmount: Math.round(budgetAmount * 100) / 100,
+      }
+    })
+    .filter((line): line is BudgetTemplateLine => line !== null)
+}
+
+export function saveBudgetTemplate(
+  db: FinanceDatabase,
+  payload: Record<string, unknown>,
+): BudgetTemplate {
+  const name =
+    typeof payload.name === 'string' ? payload.name.trim().slice(0, 80) : ''
+  const lines = budgetTemplateLines(payload.lines)
+  if (!name) throw new Error('Template name is required.')
+  if (lines.length === 0)
+    throw new Error('At least one valid budget line is required.')
+  const existingId = typeof payload.id === 'string' ? payload.id : ''
+  const existing = db.settings.budgetTemplates?.find(
+    (template) => template.id === existingId,
+  )
+  const now = nowIso()
+  const template: BudgetTemplate = {
+    id: existing?.id ?? randomUUID(),
+    name,
+    lines,
+    source: existing?.source ?? 'manual',
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  }
+  db.settings.budgetTemplates = [
+    ...(db.settings.budgetTemplates ?? []).filter(
+      (item) => item.id !== template.id,
+    ),
+    template,
+  ]
+  return template
+}
+
+export function deleteBudgetTemplate(db: FinanceDatabase, id: string): boolean {
+  const templates = db.settings.budgetTemplates ?? []
+  const next = templates.filter((template) => template.id !== id)
+  db.settings.budgetTemplates = next
+  return next.length !== templates.length
+}
+
+export function applyBudgetTemplate(
+  db: FinanceDatabase,
+  templateId: string,
+  month: string,
+): { appliedCount: number; skippedCount: number; template: BudgetTemplate } {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))
+    throw new Error('A valid target month is required.')
+  const template = (db.settings.budgetTemplates ?? []).find(
+    (item) => item.id === templateId,
+  )
+  if (!template) throw new Error('Budget template was not found.')
+  let appliedCount = 0
+  let skippedCount = 0
+  for (const line of template.lines) {
+    const exists = db.budget_categories.some(
+      (row) =>
+        row.month === month &&
+        row.category === line.category &&
+        row.currency === line.currency,
+    )
+    if (exists) {
+      skippedCount += 1
+      continue
+    }
+    const now = nowIso()
+    db.budget_categories.push({
+      id: randomUUID(),
+      month,
+      category: line.category,
+      currency: line.currency,
+      budgetAmount: line.budgetAmount,
+      source: `budget_template:${template.id}`,
+      createdAt: now,
+      updatedAt: now,
+    })
+    appliedCount += 1
+  }
+  return { appliedCount, skippedCount, template }
 }
 
 function defaultSettings(): FinanceSettings {
@@ -984,6 +1357,7 @@ function defaultSettings(): FinanceSettings {
     livePerOrderCapUsdt: 10,
     liveBinanceApprovedAt: null,
     liveBinanceApprovalId: null,
+    budgetAlertThresholdPct: 80,
   }
 }
 
@@ -998,8 +1372,6 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     income_records: [],
     expense_records: [],
     transfers: [],
-    net_worth_snapshots: [],
-    scheduled_transactions: [],
     budget_categories: [],
     categories: [],
     subcategories: [],
@@ -1011,9 +1383,14 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     income_sources: [],
     stock_holdings: [],
     fixed_deposits: [],
+    investment_journal: [],
+    ai_tasks: [],
+    net_worth_snapshots: [],
+    scheduled_transactions: [],
     loans: [],
     properties: [],
     beneficiaries: [],
+    insurance_policies: [],
     exchange_rates: [],
     investment_accounts: [],
     trading_platforms: [
@@ -1079,6 +1456,14 @@ export function ensureFinanceStore(): FinanceDatabase {
   return readFinanceStore()
 }
 
+/** Test-only cache reset hook; production callers have no reason to use it. */
+export function __resetFinanceTestStore(): void {
+  financeStoreCache = null
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') {
+    writeFinanceJsonStore(createEmptyFinanceDatabase())
+  }
+}
+
 /** How long a `readFinanceStore()` result may be reused before re-reading
  * from disk/Postgres. `readFinanceStore()` is expensive — it parses a
  * multi-MB JSON file, queries Postgres, and (in the normal case) writes
@@ -1105,7 +1490,278 @@ export function readFinanceStore(): FinanceDatabase {
 }
 
 function readFinanceStoreUncached(): FinanceDatabase {
-  return financeBackend.read()
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') {
+    return readFinanceStoreJsonCompatibility()
+  }
+  const postgresDb = readFinancePostgresNormalized()
+  if (!postgresDb) {
+    throw new Error(
+      'Finance PostgreSQL runtime store is unavailable; refusing JSON fallback.',
+    )
+  }
+  return migrateFinanceStore(postgresDb)
+}
+
+function readFinanceStoreJsonCompatibility(): FinanceDatabase {
+  const jsonDb = readFinanceJsonStore()
+  const pgDb = readFinancePostgresStore()
+  if (pgDb && shouldPreferPostgresStore(pgDb, jsonDb)) {
+    const migrated = migrateFinanceStore(pgDb)
+    writeFinanceJsonStore(migrated)
+    return migrated
+  }
+  if (jsonDb) {
+    const migrated = migrateFinanceStore(jsonDb)
+    writeFinancePostgresStore(migrated)
+    return migrated
+  }
+  const db = createEmptyFinanceDatabase()
+  writeFinanceStore(db)
+  appendAuditLog('database_recreated_after_read_failure', {})
+  return db
+}
+
+function writeFinanceJsonStore(db: FinanceDatabase): void {
+  fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+  fs.writeFileSync(FINANCE_DATA_PATH, `${JSON.stringify(db, null, 2)}\n`, {
+    mode: 0o600,
+  })
+  mirrorIntoSplitStores(db)
+}
+
+/**
+ * Phase 5 (dual-write step) of the finance/trading backend split — mirror
+ * into the two split stores in preparation for the eventual read cutover.
+ * Best-effort only: writeFinanceJsonStore's own write above (and the
+ * Postgres mirror alongside it) remain the sole source of truth. Never let
+ * a mirror failure propagate — see each store's own module doc.
+ *
+ * Hooked into writeFinanceJsonStore() specifically (not writeFinanceStore())
+ * because readFinanceStore()'s self-heal path calls writeFinanceJsonStore()
+ * directly when Postgres data should be preferred over local JSON — that
+ * path bypasses writeFinanceStore() entirely, and since Postgres is
+ * generally preferred in this environment, it's the dominant write path in
+ * practice. Confirmed via production journal: the JSON file's mtime updates
+ * on plain reads through that self-heal branch even with no engine cycle
+ * having run.
+ */
+function mirrorIntoSplitStores(db: FinanceDatabase): void {
+  // Postgres Migration Phase D: calls the Postgres write directly instead of
+  // through the now-removed personal-finance-store.ts JSON split-store
+  // mirror (frozen at ~/.hermes/finance/personal-finance.json.frozen-phaseD-*
+  // as a rollback-only snapshot, no longer written to).
+  writePersonalFinancePostgresStore({
+    finance_accounts: db.finance_accounts,
+    income_records: db.income_records,
+    expense_records: db.expense_records,
+    budget_categories: db.budget_categories,
+    categories: db.categories,
+    subcategories: db.subcategories,
+    merchants: db.merchants,
+    tags: db.tags,
+    savings_goals: db.savings_goals,
+    tax_records: db.tax_records,
+    exchange_rates: db.exchange_rates,
+    investment_accounts: db.investment_accounts,
+    pending_ingestions: db.pending_ingestions,
+    income_sources: db.income_sources,
+    stock_holdings: db.stock_holdings,
+    fixed_deposits: db.fixed_deposits,
+    investment_journal: db.investment_journal,
+    ai_tasks: db.ai_tasks,
+    net_worth_snapshots: db.net_worth_snapshots,
+    loans: db.loans,
+    properties: db.properties,
+    beneficiaries: db.beneficiaries,
+    personalFinanceSettings: {
+      baseCurrency: db.settings.baseCurrency,
+      alertsEnabled: db.settings.alertsEnabled,
+      quietModeEnabled: db.settings.quietModeEnabled,
+      emergencyFundTargetMonths: db.settings.emergencyFundTargetMonths,
+      savingsRateTargetPct: db.settings.savingsRateTargetPct,
+      budgetAlertThresholdPct: db.settings.budgetAlertThresholdPct,
+      budgetTemplates: db.settings.budgetTemplates,
+      goalCompletionEvents: db.settings.goalCompletionEvents,
+      minimumCashReserveLkr: db.settings.minimumCashReserveLkr,
+      financialRules: db.settings.financialRules,
+      wealthGoalTargetLkr: db.settings.wealthGoalTargetLkr,
+      wealthGoalTargetDate: db.settings.wealthGoalTargetDate,
+      financeQaHistory: db.settings.financeQaHistory,
+      proactiveInsightsEnabled: db.settings.proactiveInsightsEnabled,
+      salaryHistory: db.settings.salaryHistory,
+      gmailIngestState: (db.settings as unknown as Record<string, unknown>)
+        .gmailIngest as
+        | {
+            lastSyncedAtSeconds?: number
+            syncHistory?: Array<{
+              at: number
+              found: number
+              queued: number
+              skippedAlreadyQueued: number
+            }>
+          }
+        | undefined,
+      categoryCorrections: (db.settings as unknown as Record<string, unknown>)
+        .categoryCorrections as Record<string, string> | undefined,
+    },
+  })
+  writeTradingStore({
+    assets: db.assets,
+    market_prices: db.market_prices,
+    historical_candles: db.historical_candles,
+    news_items: db.news_items,
+    sentiment_scores: db.sentiment_scores,
+    risk_scores: db.risk_scores,
+    intelligence_records: db.intelligence_records,
+    trading_plans: db.trading_plans,
+    trade_orders: db.trade_orders,
+    trade_executions: db.trade_executions,
+    virtual_accounts: db.virtual_accounts,
+    portfolio_positions: db.portfolio_positions,
+    account_balances: db.account_balances,
+    strategy_results: db.strategy_results,
+    prediction_results: db.prediction_results,
+    trading_signals: db.trading_signals,
+    riskState: db.riskState,
+    connectivityBreaker: db.connectivityBreaker,
+  })
+}
+
+function readFinanceJsonStore(): FinanceDatabase | null {
+  let base: FinanceDatabase
+  try {
+    base = JSON.parse(
+      fs.readFileSync(FINANCE_DATA_PATH, 'utf8'),
+    ) as FinanceDatabase
+  } catch {
+    return null
+  }
+  return overlaySplitStores(base)
+}
+
+/**
+ * Phase 5 (read cutover step) of the finance/trading backend split.
+ * mirrorIntoSplitStores() writes the trading split store from this same
+ * base file's own data on every write, so in the normal case it's never
+ * staler than it — overlay it here so callers gradually source trading
+ * collections from the split file, while the trading-shared remainder of
+ * settings and the still-unsplit misc collections (trading_platforms,
+ * api_connections, agent_memory, audit_logs, error_logs) keep coming from
+ * this shared base file (never split — see the plan's own rationale).
+ *
+ * Postgres Migration Phase D: personal-finance collections and settings are
+ * now a clean TWO-tier fallback: Postgres (via
+ * readPersonalFinancePostgresStore()) when it succeeds, otherwise whatever
+ * is already in `base` (no explicit override applied) — the old JSON split
+ * store (personal-finance.json) is retired (frozen as a rollback snapshot,
+ * see personal-finance-store.ts's history) since nothing writes it anymore
+ * and it would otherwise silently go stale forever. The base file itself
+ * never goes stale for these fields despite having no dedicated mirror-
+ * write step: overlaySplitStores() already populates it with fresh
+ * Postgres data on every read, and the app's normal read-mutate-write cycle
+ * serializes that already-current object straight back to disk. Set
+ * HERMES_PERSONAL_FINANCE_READ_SOURCE=json to skip Postgres and use the
+ * base file directly — still an instant, no-redeploy rollback.
+ */
+function overlaySplitStores(base: FinanceDatabase): FinanceDatabase {
+  const baseUpdatedMs = updatedAtMs(base)
+  const personalSource =
+    process.env.HERMES_PERSONAL_FINANCE_READ_SOURCE === 'json'
+      ? null
+      : readPersonalFinancePostgresStore()
+  const trading = readTradingStore()
+  const tradingFresh = trading && Date.parse(trading.updatedAt) >= baseUpdatedMs
+  const postgresSettings = personalSource?.personalFinanceSettings
+
+  const merged = {
+    ...base,
+    ...(personalSource
+      ? {
+          finance_accounts: personalSource.finance_accounts,
+          income_records: personalSource.income_records,
+          expense_records: personalSource.expense_records,
+          budget_categories: personalSource.budget_categories,
+          categories: personalSource.categories ?? [],
+          subcategories: personalSource.subcategories ?? [],
+          merchants: personalSource.merchants ?? [],
+          tags: personalSource.tags ?? [],
+          savings_goals: personalSource.savings_goals,
+          tax_records: personalSource.tax_records,
+          exchange_rates: personalSource.exchange_rates,
+          investment_accounts: personalSource.investment_accounts,
+          pending_ingestions: personalSource.pending_ingestions,
+          income_sources: personalSource.income_sources,
+          stock_holdings: personalSource.stock_holdings,
+          fixed_deposits: personalSource.fixed_deposits,
+          investment_journal: personalSource.investment_journal ?? [],
+          ai_tasks: personalSource.ai_tasks ?? [],
+          net_worth_snapshots: personalSource.net_worth_snapshots ?? [],
+          loans: personalSource.loans ?? [],
+          properties: personalSource.properties ?? [],
+          beneficiaries: personalSource.beneficiaries ?? [],
+          insurance_policies: personalSource.insurance_policies ?? [],
+        }
+      : {}),
+    ...(postgresSettings
+      ? {
+          settings: {
+            ...base.settings,
+            ...(postgresSettings.baseCurrency !== undefined
+              ? { baseCurrency: postgresSettings.baseCurrency }
+              : {}),
+            ...(postgresSettings.alertsEnabled !== undefined
+              ? { alertsEnabled: postgresSettings.alertsEnabled }
+              : {}),
+            emergencyFundTargetMonths:
+              postgresSettings.emergencyFundTargetMonths,
+            savingsRateTargetPct: postgresSettings.savingsRateTargetPct,
+            budgetAlertThresholdPct: postgresSettings.budgetAlertThresholdPct,
+            budgetTemplates:
+              postgresSettings.budgetTemplates as FinanceSettings['budgetTemplates'],
+            goalCompletionEvents:
+              postgresSettings.goalCompletionEvents as FinanceSettings['goalCompletionEvents'],
+            minimumCashReserveLkr: postgresSettings.minimumCashReserveLkr,
+            financialRules: postgresSettings.financialRules,
+            wealthGoalTargetLkr: postgresSettings.wealthGoalTargetLkr,
+            wealthGoalTargetDate: postgresSettings.wealthGoalTargetDate,
+            financeQaHistory: postgresSettings.financeQaHistory,
+            salaryHistory:
+              postgresSettings.salaryHistory as FinanceSettings['salaryHistory'],
+            gmailIngest: postgresSettings.gmailIngestState,
+            categoryCorrections: postgresSettings.categoryCorrections,
+          } as FinanceSettings,
+        }
+      : {}),
+    ...(tradingFresh
+      ? {
+          assets: trading.assets,
+          market_prices: trading.market_prices,
+          historical_candles: trading.historical_candles,
+          news_items: trading.news_items,
+          sentiment_scores: trading.sentiment_scores,
+          risk_scores: trading.risk_scores,
+          intelligence_records: trading.intelligence_records,
+          trading_plans: trading.trading_plans,
+          trade_orders: trading.trade_orders,
+          trade_executions: trading.trade_executions,
+          virtual_accounts: trading.virtual_accounts,
+          portfolio_positions: trading.portfolio_positions,
+          account_balances: trading.account_balances,
+          strategy_results: trading.strategy_results,
+          prediction_results: trading.prediction_results,
+          trading_signals: trading.trading_signals,
+          riskState: trading.riskState as RiskState,
+          connectivityBreaker:
+            trading.connectivityBreaker as ConnectivityBreakerState,
+        }
+      : {}),
+  } as FinanceDatabase
+  return normalizeFinanceCurrencyFields(merged)
+}
+
+function updatedAtMs(db: FinanceDatabase): number {
+  const value = Date.parse(db.updatedAt)
+  return Number.isFinite(value) ? value : 0
 }
 
 const STORAGE_HEALTH_COLLECTIONS = [
@@ -1133,7 +1789,26 @@ export function financeCollectionCounts(
   return counts
 }
 
+function financeDataWeight(db: FinanceDatabase): number {
+  return Object.values(financeCollectionCounts(db)).reduce(
+    (sum, count) => sum + count,
+    0,
+  )
+}
+
+function shouldPreferPostgresStore(
+  pgDb: FinanceDatabase,
+  jsonDb: FinanceDatabase | null,
+): boolean {
+  if (!jsonDb) return true
+  const pgUpdated = updatedAtMs(pgDb)
+  const jsonUpdated = updatedAtMs(jsonDb)
+  if (pgUpdated !== jsonUpdated) return pgUpdated > jsonUpdated
+  return financeDataWeight(pgDb) >= financeDataWeight(jsonDb)
+}
+
 export function buildFinanceStorageHealth(input: {
+  jsonDb: FinanceDatabase | null
   postgresDb: FinanceDatabase | null
   postgres: {
     enabled: boolean
@@ -1142,170 +1817,196 @@ export function buildFinanceStorageHealth(input: {
     reason?: string
     lastWriteError?: string
   }
+  selfHeal?: FinanceStorageHealth['selfHeal']
 }): FinanceStorageHealth {
+  const jsonUpdatedAt = input.jsonDb?.updatedAt ?? null
+  const postgresUpdatedAt = input.postgresDb?.updatedAt ?? null
+  const jsonUpdatedMs = input.jsonDb ? updatedAtMs(input.jsonDb) : 0
+  const postgresUpdatedMs = input.postgresDb ? updatedAtMs(input.postgresDb) : 0
+  const postgresLagMs =
+    jsonUpdatedMs > postgresUpdatedMs ? jsonUpdatedMs - postgresUpdatedMs : 0
+  const jsonCounts = financeCollectionCounts(input.jsonDb)
+  const postgresCounts = financeCollectionCounts(input.postgresDb)
+  const lagging: Record<string, { json: number; postgres: number }> = {}
+  for (const key of STORAGE_HEALTH_COLLECTIONS) {
+    if (jsonCounts[key] > postgresCounts[key]) {
+      lagging[key] = { json: jsonCounts[key], postgres: postgresCounts[key] }
+    }
+  }
+
   const warnings: Array<string> = []
   let status: FinanceStorageHealthStatus = 'healthy'
 
   if (!input.postgres.enabled) {
     status = 'json_primary'
-    warnings.push(
-      'Postgres persistence is disabled (dev / in-memory backend).',
-    )
-  } else if (
-    !input.postgres.available ||
-    !input.postgres.snapshotAvailable ||
-    !input.postgresDb
-  ) {
+  } else if (!input.postgres.available) {
     status = 'postgres_unavailable'
     warnings.push(
       input.postgres.reason
-        ? `Postgres finance store unavailable: ${input.postgres.reason}.`
-        : 'Postgres finance store unavailable.',
+        ? `Postgres mirror unavailable: ${input.postgres.reason}.`
+        : 'Postgres mirror unavailable; using JSON fallback.',
+    )
+  } else if (!input.postgres.snapshotAvailable || !input.postgresDb) {
+    status = 'postgres_unavailable'
+    warnings.push('Postgres mirror has no finance snapshot yet.')
+  } else if (postgresLagMs > 0) {
+    status = 'postgres_behind'
+    warnings.push(
+      `Postgres mirror is ${Math.ceil(postgresLagMs / 1000)}s behind JSON finance storage.`,
+    )
+  } else if (Object.keys(lagging).length > 0) {
+    status = 'mirror_mismatch'
+    const summary = Object.entries(lagging)
+      .slice(0, 3)
+      .map(([key, counts]) => `${key} ${counts.postgres}/${counts.json}`)
+      .join(', ')
+    warnings.push(
+      `Postgres mirror has fewer rows than JSON storage (${summary}).`,
     )
   }
   if (input.postgres.lastWriteError) {
     warnings.push(
-      `Last Postgres write failed: ${input.postgres.lastWriteError}.`,
+      `Last Postgres mirror write failed: ${input.postgres.lastWriteError}.`,
     )
   }
 
   return {
     status,
     warnings,
-    postgresUpdatedAt: input.postgresDb?.updatedAt ?? null,
+    jsonUpdatedAt,
+    postgresUpdatedAt,
+    postgresLagMs,
+    isPostgresBehindJson:
+      status === 'postgres_behind' || status === 'mirror_mismatch',
+    selfHeal: input.selfHeal ?? {
+      attempted: false,
+      attempts: 0,
+      succeeded: false,
+      lastAttemptAt: null,
+    },
     rowCounts: {
-      postgres: financeCollectionCounts(input.postgresDb),
+      json: jsonCounts,
+      postgres: postgresCounts,
+      lagging,
     },
   }
 }
 
-function migrateFinanceStore(db: FinanceDatabase): FinanceDatabase {
+export function migrateFinanceStore(
+  db: Partial<FinanceDatabase> & {
+    schemaVersion?: unknown
+    settings?: Partial<FinanceSettings> | null
+  },
+): FinanceDatabase {
+  if (typeof db !== 'object' || Array.isArray(db)) {
+    throw new Error('Finance store snapshot must be an object')
+  }
+  const rawVersion = db.schemaVersion
+  const incomingVersion = rawVersion === undefined ? 0 : rawVersion
+  if (!Number.isInteger(incomingVersion) || incomingVersion < 0) {
+    throw new Error('Finance schema version must be a non-negative integer')
+  }
+  if (incomingVersion > FINANCE_SCHEMA_VERSION) {
+    throw new Error(
+      `Finance schema version ${incomingVersion} is newer than the supported version ${FINANCE_SCHEMA_VERSION}`,
+    )
+  }
   const baseline = createEmptyFinanceDatabase()
-  return {
+  const migrated = {
     ...baseline,
     ...db,
-    settings: { ...baseline.settings, ...db.settings },
+    settings:
+      db.settings &&
+      typeof db.settings === 'object' &&
+      !Array.isArray(db.settings)
+        ? { ...baseline.settings, ...db.settings }
+        : baseline.settings,
     schemaVersion: FINANCE_SCHEMA_VERSION,
   }
-}
-
-/**
- * Persistence backend seam for `readFinanceStore` / `writeFinanceStore`.
- *
- * Production: the `finance` Postgres normalized store
- * (`readFinancePostgresNormalized` / `writeFinancePostgresNormalized`) — the
- * only place finance data is ever saved.
- *
- * Under vitest / `NODE_ENV=test`: an in-process store held on `globalThis` so
- * it survives `vi.resetModules()` and is shared by every `finance-store`
- * module instance in a run (many suites pin this module via `vi.importActual`
- * and reset it by writing through the store in `beforeEach` — the old
- * tmp-`HOME` `finance.json` gave them that persistence; the global slot
- * replaces it). No filesystem, no real database — upholds the 2026-07-27
- * anti-pollution guard by construction. A suite wanting hard isolation still
- * calls `__setFinanceBackend(__inMemoryFinanceBackend(seed))`.
- */
-export interface FinanceStoreBackend {
-  read: () => FinanceDatabase
-  write: (db: FinanceDatabase) => void
-}
-
-const postgresFinanceBackend: FinanceStoreBackend = {
-  read() {
-    const db = readFinancePostgresNormalized()
-    if (!db) {
-      throw new Error(
-        'Finance PostgreSQL store is unavailable; refusing to continue without persistence.',
-      )
+  for (const [key, baselineValue] of Object.entries(baseline)) {
+    if (
+      Array.isArray(baselineValue) &&
+      !Array.isArray(migrated[key as keyof FinanceDatabase])
+    ) {
+      Object.assign(migrated as unknown as Record<string, unknown>, {
+        [key]: baselineValue,
+      })
     }
-    return migrateFinanceStore(db)
-  },
-  write(db) {
-    if (!writeFinancePostgresNormalized(db)) {
-      throw new Error(
-        'Finance PostgreSQL store is unavailable; write was not persisted.',
-      )
-    }
-  },
-}
-
-const FINANCE_TEST_STORE_KEY = '__hermesFinanceTestStore__'
-
-const globalTestFinanceBackend: FinanceStoreBackend = {
-  read() {
-    const g = globalThis as Record<string, unknown>
-    let db = g[FINANCE_TEST_STORE_KEY] as FinanceDatabase | undefined
-    if (!db) {
-      db = migrateFinanceStore(createEmptyFinanceDatabase())
-      g[FINANCE_TEST_STORE_KEY] = db
-    }
-    return migrateFinanceStore(db)
-  },
-  write(db) {
-    // Some readiness checks (e.g. emergencyStopReadinessGate) stat
-    // FINANCE_DATA_DIR for writability; the old JSON backend created it on
-    // every write, so keep doing that even though nothing is written to disk.
-    try {
-      fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
-    } catch {
-      /* best-effort — tests that don't set HOME still work */
-    }
-    ;(globalThis as Record<string, unknown>)[FINANCE_TEST_STORE_KEY] =
-      migrateFinanceStore(db)
-  },
-}
-
-/** Test-only: wipe the shared global finance store back to empty. */
-export function __resetFinanceTestStore(): void {
-  delete (globalThis as Record<string, unknown>)[FINANCE_TEST_STORE_KEY]
-  financeStoreCache = null
-}
-
-function defaultFinanceBackend(): FinanceStoreBackend {
-  return process.env.VITEST || process.env.NODE_ENV === 'test'
-    ? globalTestFinanceBackend
-    : postgresFinanceBackend
-}
-
-let financeBackend: FinanceStoreBackend = defaultFinanceBackend()
-
-/** Test-only: swap the persistence backend and drop the read cache. */
-export function __setFinanceBackend(backend: FinanceStoreBackend): void {
-  financeBackend = backend
-  financeStoreCache = null
-}
-
-/** Test-only: restore the environment default backend. */
-export function __resetFinanceBackend(): void {
-  financeBackend = defaultFinanceBackend()
-  financeStoreCache = null
-}
-
-/**
- * Test-only: a pure in-memory backend seeded from `initial` (or an empty DB).
- * Holds one migrated `FinanceDatabase` in a closure; every read/write is a
- * deep-ish copy via `migrateFinanceStore` so callers can't mutate the store
- * through a returned reference.
- */
-export function __inMemoryFinanceBackend(
-  initial?: FinanceDatabase,
-): FinanceStoreBackend {
-  let current = migrateFinanceStore(initial ?? createEmptyFinanceDatabase())
-  return {
-    read: () => migrateFinanceStore(current),
-    write: (db) => {
-      current = migrateFinanceStore(db)
-    },
   }
+
+  // Repair legacy/imported casing at the compatibility boundary. This is a
+  // read-time normalization only; it never changes amounts or creates FX data.
+  const currencyCollections = [
+    'finance_accounts',
+    'income_records',
+    'expense_records',
+    'budget_categories',
+    'tax_records',
+    'income_sources',
+    'stock_holdings',
+    'fixed_deposits',
+    'loans',
+    'properties',
+    'insurance_policies',
+  ] as const
+  for (const key of currencyCollections) {
+    const records = migrated[key]
+    if (!Array.isArray(records)) continue
+    migrated[key] = records.map((record) => {
+      if (typeof record !== 'object' || Array.isArray(record)) return record
+      const normalized = { ...record } as Record<string, unknown>
+      for (const field of ['currency', 'originalCurrency', 'feeCurrency']) {
+        if (field in normalized)
+          normalized[field] = normalizeCurrencyCode(normalized[field])
+      }
+      return normalized
+    }) as never
+  }
+  if (Array.isArray(migrated.exchange_rates)) {
+    migrated.exchange_rates = migrated.exchange_rates.map((rate) => ({
+      ...rate,
+      ...(typeof rate.base === 'string'
+        ? { base: normalizeCurrencyCode(rate.base) }
+        : {}),
+      ...(typeof rate.target === 'string'
+        ? { target: normalizeCurrencyCode(rate.target) }
+        : {}),
+    }))
+  }
+  const reportingCurrencies = Array.isArray(
+    migrated.settings.reportingCurrencies,
+  )
+    ? migrated.settings.reportingCurrencies.map((currency) =>
+        normalizeCurrencyCode(currency),
+      )
+    : baseline.settings.reportingCurrencies
+  migrated.settings = {
+    ...migrated.settings,
+    baseCurrency: normalizeCurrencyCode(migrated.settings.baseCurrency),
+    reportingCurrencies,
+  }
+  return migrated
 }
 
 export function writeFinanceStore(db: FinanceDatabase): void {
   const updated = { ...db, updatedAt: nowIso() }
-  financeBackend.write(updated)
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') {
+    fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+    writeFinanceJsonStore(updated)
+    writeFinancePostgresStore(updated)
+  } else if (!writeFinancePostgresNormalized(updated)) {
+    throw new Error(
+      'Finance PostgreSQL runtime store is unavailable; write was not persisted.',
+    )
+  }
   // Invalidate (rather than repopulate) the read cache: `updated` here is
   // the raw pre-overlay object, not the merged result readFinanceStore()
-  // normally returns. Invalidating just means the next read pays the full
-  // uncached cost once, rare next to the read-heavy dashboard access pattern.
+  // normally returns (Postgres-sourced personal-finance collections/settings,
+  // split-store trading data, etc. — see overlaySplitStores()). Caching it
+  // directly would let callers observe a write that skips that merge.
+  // Invalidating just means the very next read after a write pays the full
+  // uncached cost once, which is rare next to the read-heavy dashboard
+  // access pattern this cache targets.
   financeStoreCache = null
 }
 
@@ -1313,11 +2014,11 @@ export function setNonLiveExecutionMode(
   mode: 'observe_only' | 'paper_trade' | 'testnet_execute',
 ): FinanceDatabase {
   const db = readFinanceStore()
-  const validationRuns = (db.settings as Record<string, unknown>)
-    .validationRuns
+  const validationRuns = (db.settings as Record<string, unknown>).validationRuns
   const activeRuns =
     validationRuns && typeof validationRuns === 'object'
-      ? (validationRuns as { active?: Array<{ stage?: string }> }).active ?? []
+      ? ((validationRuns as { active?: Array<{ stage?: string }> }).active ??
+        [])
       : []
   const expectedStage =
     mode === 'paper_trade'
@@ -1345,57 +2046,462 @@ export function setNonLiveExecutionMode(
   return db
 }
 
-/**
- * Postgres `audit_logs` is the system of record. The local
- * `~/.hermes/finance/audit.jsonl` is a best-effort **recovery buffer** —
- * written only when the Postgres insert did not land, so a later run (or the
- * `finance-pg-sync` cron) can replay it. Neither write can suppress the other,
- * and neither may ever throw back into a finance mutation or trading cycle.
- */
 export function appendAuditLog(
   action: string,
   details: Record<string, unknown>,
 ): void {
-  const entry = {
+  const previousHash = latestFinanceAuditHash()
+  const unsignedEntry = {
     id: randomUUID(),
     action,
     details: maskSensitive(details) as Record<string, unknown>,
     source: 'hermes-finance',
     createdAt: nowIso(),
+    chainVersion: 1,
+    previousHash,
   }
-
-  let pgOk = false
+  const entry = {
+    ...unsignedEntry,
+    entryHash: hashFinanceAuditEntry(unsignedEntry),
+  }
   try {
-    pgOk = appendFinanceAuditPostgres(entry)
-  } catch {
-    pgOk = false
-  }
-
-  if (!pgOk) {
-    try {
-      fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
-      fs.appendFileSync(FINANCE_AUDIT_PATH, `${JSON.stringify(entry)}\n`, {
-        mode: 0o600,
-      })
-    } catch {
-      // Buffer write failed too — the entry is lost. Swallowed on purpose so
-      // audit-log I/O can never crash the caller.
+    fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+    fs.appendFileSync(FINANCE_AUDIT_PATH, `${JSON.stringify(entry)}\n`, {
+      mode: 0o600,
+    })
+    if (process.env.VITEST || process.env.NODE_ENV === 'test') {
+      appendFinanceAuditPostgres(entry)
+      return
     }
+    if (!appendFinanceAuditPostgres(entry)) {
+      // Best-effort persistence: keep the local audit trail authoritative even
+      // when Postgres is temporarily unavailable, rather than crashing a live
+      // trading cycle or dashboard request.
+      return
+    }
+  } catch {
+    // Fall back silently to the local JSONL file; the local audit trail is still
+    // valuable even when the database is unavailable.
   }
 }
 
-export function financeStorageStatus() {
-  const pg = financePostgresStatus()
-  const postgresDb = readFinancePostgresNormalized()
-  const health = buildFinanceStorageHealth({
-    postgresDb,
-    postgres: {
-      ...pg,
-      snapshotAvailable: postgresDb !== null,
-    },
-  })
+function hashFinanceAuditEntry(entry: {
+  id: string
+  action: string
+  details: Record<string, unknown>
+  source: string
+  createdAt: string
+  chainVersion: number
+  previousHash: string | null
+}): string {
+  return createHash('sha256').update(JSON.stringify(entry)).digest('hex')
+}
+
+function latestFinanceAuditHash(): string | null {
+  try {
+    const lines = fs
+      .readFileSync(FINANCE_AUDIT_PATH, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      const parsed = JSON.parse(lines[index]) as Record<string, unknown>
+      if (typeof parsed.entryHash === 'string' && parsed.entryHash)
+        return parsed.entryHash
+      // A legacy tail starts a new verifiable chain segment.
+      return null
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+export type FinanceAuditChainStatus = {
+  valid: boolean
+  entries: number
+  chainedEntries: number
+  legacyEntries: number
+  firstInvalidAt: string | null
+  latestHash: string | null
+  fileBytes: number
+  retentionDays: number
+  retentionWarning: boolean
+}
+
+/** AI-114: verifies the append-only audit chain without mutating it. */
+export function verifyFinanceAuditChain(): FinanceAuditChainStatus {
+  let raw = ''
+  try {
+    raw = fs.readFileSync(FINANCE_AUDIT_PATH, 'utf8')
+  } catch {
+    raw = ''
+  }
+  const lines = raw.split('\n').filter(Boolean)
+  let previousHash: string | null = null
+  let chainedEntries = 0
+  let legacyEntries = 0
+  let firstInvalidAt: string | null = null
+  let latestHash: string | null = null
+  for (const line of lines) {
+    let entry: Record<string, unknown>
+    try {
+      entry = JSON.parse(line) as Record<string, unknown>
+    } catch {
+      if (!firstInvalidAt) firstInvalidAt = 'unparseable-line'
+      continue
+    }
+    if (
+      typeof entry.entryHash !== 'string' ||
+      typeof entry.chainVersion !== 'number'
+    ) {
+      legacyEntries += 1
+      previousHash = null
+      continue
+    }
+    const unsigned = {
+      id: typeof entry.id === 'string' ? entry.id : '',
+      action: typeof entry.action === 'string' ? entry.action : '',
+      details:
+        entry.details && typeof entry.details === 'object'
+          ? (entry.details as Record<string, unknown>)
+          : {},
+      source: typeof entry.source === 'string' ? entry.source : '',
+      createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : '',
+      chainVersion: entry.chainVersion,
+      previousHash:
+        typeof entry.previousHash === 'string' ? entry.previousHash : null,
+    }
+    const valid =
+      unsigned.previousHash === previousHash &&
+      hashFinanceAuditEntry(unsigned) === entry.entryHash
+    if (!valid && !firstInvalidAt) {
+      firstInvalidAt = unsigned.createdAt || 'unknown-time'
+    }
+    if (valid) {
+      chainedEntries += 1
+      previousHash = entry.entryHash
+      latestHash = entry.entryHash
+    }
+  }
+  const retentionRaw = Number(process.env.HERMES_FINANCE_AUDIT_RETENTION_DAYS)
+  const retentionDays =
+    Number.isFinite(retentionRaw) && retentionRaw >= 1
+      ? Math.floor(retentionRaw)
+      : 3650
+  const oldestEntry = lines[0]
+    ? (() => {
+        try {
+          return (JSON.parse(lines[0]) as Record<string, unknown>).createdAt
+        } catch {
+          return undefined
+        }
+      })()
+    : undefined
+  const oldestMs =
+    typeof oldestEntry === 'string' ? Date.parse(oldestEntry) : NaN
   return {
-    active: postgresDb ? ('postgres' as const) : ('unavailable' as const),
+    valid: !firstInvalidAt,
+    entries: lines.length,
+    chainedEntries,
+    legacyEntries,
+    firstInvalidAt,
+    latestHash,
+    fileBytes: Buffer.byteLength(raw, 'utf8'),
+    retentionDays,
+    retentionWarning:
+      Number.isFinite(oldestMs) &&
+      Date.now() - oldestMs > retentionDays * 86_400_000,
+  }
+}
+
+export type FinanceAuditPrunePreview = {
+  retentionDays: number
+  cutoff: string
+  totalEntries: number
+  eligibleEntries: number
+  retainedEntries: number
+  oldestEntry: string | null
+  newestEntry: string | null
+}
+
+function auditRetentionDays(value?: number): number {
+  const candidate =
+    value ?? Number(process.env.HERMES_FINANCE_AUDIT_RETENTION_DAYS)
+  return Number.isFinite(candidate) && candidate >= 1
+    ? Math.floor(candidate)
+    : 3650
+}
+
+function readFinanceAuditEntriesForRetention(): Array<Record<string, unknown>> {
+  let raw = ''
+  try {
+    raw = fs.readFileSync(FINANCE_AUDIT_PATH, 'utf8')
+  } catch {
+    return []
+  }
+  return raw
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
+}
+
+export function previewFinanceAuditPrune(
+  requestedRetentionDays?: number,
+  now = new Date(),
+): FinanceAuditPrunePreview {
+  const retentionDays = auditRetentionDays(requestedRetentionDays)
+  const cutoffMs = now.getTime() - retentionDays * 86_400_000
+  const entries = readFinanceAuditEntriesForRetention()
+  const dated = entries
+    .map((entry) =>
+      typeof entry.createdAt === 'string' ? entry.createdAt : null,
+    )
+    .filter((createdAt): createdAt is string => createdAt !== null)
+  const eligibleEntries = entries.filter((entry) => {
+    const createdAt =
+      typeof entry.createdAt === 'string' ? Date.parse(entry.createdAt) : NaN
+    return Number.isFinite(createdAt) && createdAt < cutoffMs
+  }).length
+  return {
+    retentionDays,
+    cutoff: new Date(cutoffMs).toISOString(),
+    totalEntries: entries.length,
+    eligibleEntries: Math.min(eligibleEntries, Math.max(0, entries.length - 1)),
+    retainedEntries:
+      entries.length -
+      Math.min(eligibleEntries, Math.max(0, entries.length - 1)),
+    oldestEntry: dated.at(0) ?? null,
+    newestEntry: dated.at(-1) ?? null,
+  }
+}
+
+/** AI-115: prune only after an encrypted archive has been successfully written. */
+export function pruneFinanceAudit(
+  preview: FinanceAuditPrunePreview,
+  archiveCompleted: boolean,
+): { prunedEntries: number; retainedEntries: number } {
+  if (!archiveCompleted)
+    throw new Error('Encrypted audit archive is required before pruning.')
+  const entries = readFinanceAuditEntriesForRetention()
+  const cutoffMs = Date.parse(preview.cutoff)
+  const eligible = entries.filter((entry) => {
+    const createdAt =
+      typeof entry.createdAt === 'string' ? Date.parse(entry.createdAt) : NaN
+    return Number.isFinite(createdAt) && createdAt < cutoffMs
+  })
+  const keepCount = Math.max(
+    1,
+    entries.length - Math.min(eligible.length, Math.max(0, entries.length - 1)),
+  )
+  const retained = entries.slice(-keepCount)
+  let previousHash: string | null = null
+  const reanchored = retained.map((entry) => {
+    const unsigned = {
+      id: typeof entry.id === 'string' ? entry.id : randomUUID(),
+      action: typeof entry.action === 'string' ? entry.action : 'unknown',
+      details:
+        entry.details && typeof entry.details === 'object'
+          ? (entry.details as Record<string, unknown>)
+          : {},
+      source: typeof entry.source === 'string' ? entry.source : 'unknown',
+      createdAt:
+        typeof entry.createdAt === 'string' ? entry.createdAt : nowIso(),
+      chainVersion: 1,
+      previousHash,
+    }
+    const next = { ...unsigned, entryHash: hashFinanceAuditEntry(unsigned) }
+    previousHash = next.entryHash
+    return next
+  })
+  const temporary = `${FINANCE_AUDIT_PATH}.${randomUUID()}.tmp`
+  fs.mkdirSync(FINANCE_DATA_DIR, { recursive: true, mode: 0o700 })
+  fs.writeFileSync(
+    temporary,
+    reanchored.map((entry) => JSON.stringify(entry)).join('\n') +
+      (reanchored.length ? '\n' : ''),
+    { mode: 0o600, flag: 'wx' },
+  )
+  fs.renameSync(temporary, FINANCE_AUDIT_PATH)
+  return {
+    prunedEntries: entries.length - retained.length,
+    retainedEntries: retained.length,
+  }
+}
+
+export type TransactionAuditEntry = {
+  id: string
+  action: string
+  details: Record<string, unknown>
+  source: string
+  createdAt: string
+}
+
+/** Read the redacted transaction mutation history for the Personal Finance UI. */
+export function readTransactionAudit(limit = 50): Array<TransactionAuditEntry> {
+  try {
+    const entries = fs
+      .readFileSync(FINANCE_AUDIT_PATH, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .flatMap((line) => {
+        try {
+          return [JSON.parse(line) as Record<string, unknown>]
+        } catch {
+          // A truncated or manually-corrupted line must not hide every valid
+          // transaction entry that follows it. The chain verifier remains the
+          // authoritative integrity signal for operators.
+          return []
+        }
+      })
+      .filter((entry) => {
+        const action = typeof entry.action === 'string' ? entry.action : ''
+        return /^record_(added|updated|deleted):(income|expense|transfer|split)$/.test(
+          action,
+        )
+      })
+      .map((entry) => ({
+        id: typeof entry.id === 'string' ? entry.id : randomUUID(),
+        action: String(entry.action),
+        details:
+          entry.details && typeof entry.details === 'object'
+            ? (entry.details as Record<string, unknown>)
+            : {},
+        source: typeof entry.source === 'string' ? entry.source : 'unknown',
+        createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : '',
+      }))
+    return entries.slice(-Math.max(1, Math.min(limit, 100))).reverse()
+  } catch {
+    return []
+  }
+}
+
+/** Read the raw local audit stream only for encryption into a backup envelope. */
+export function readFinanceAuditLog(): string {
+  try {
+    return fs.readFileSync(FINANCE_AUDIT_PATH, 'utf8')
+  } catch {
+    return ''
+  }
+}
+
+function transactionAuditSnapshot(
+  record: IncomeRecord | ExpenseRecord | undefined,
+): Record<string, unknown> | undefined {
+  if (!record) return undefined
+  const isIncome = 'dateReceived' in record
+  return {
+    id: record.id,
+    kind: isIncome ? 'income' : 'expense',
+    date: isIncome ? record.dateReceived : record.date,
+    counterparty: isIncome ? record.sourceName : record.vendor,
+    category: isIncome ? record.incomeType : record.category,
+    amount: isIncome ? record.originalAmount : record.amount,
+    currency: isIncome ? record.originalCurrency : record.currency,
+    exchangeRateUsed: record.exchangeRateUsed,
+    convertedLkrAmount: record.convertedLkrAmount,
+    accountId: record.accountId,
+    status: record.status,
+    transactionType: record.transactionType,
+    transferId: record.transferId,
+    splitGroupId: 'splitGroupId' in record ? record.splitGroupId : undefined,
+    splitIndex: 'splitIndex' in record ? record.splitIndex : undefined,
+    deletedAt: record.deletedAt,
+  }
+}
+
+function storageHealthNeedsSelfHeal(health: FinanceStorageHealth): boolean {
+  return (
+    health.status === 'postgres_behind' ||
+    health.status === 'mirror_mismatch' ||
+    health.status === 'postgres_unavailable'
+  )
+}
+
+export function financeStorageStatus(
+  options: { selfHeal?: boolean; selfHealRetries?: number } = {},
+) {
+  if (!(process.env.VITEST || process.env.NODE_ENV === 'test')) {
+    const pg = financePostgresStatus()
+    const postgresDb = readFinancePostgresNormalized()
+    const health = buildFinanceStorageHealth({
+      jsonDb: null,
+      postgresDb,
+      postgres: {
+        ...pg,
+        snapshotAvailable: postgresDb !== null,
+      },
+    })
+    return {
+      active: postgresDb ? 'postgres' : 'unavailable',
+      fallback: 'none',
+      jsonPath: FINANCE_DATA_PATH,
+      auditPath: FINANCE_AUDIT_PATH,
+      postgres: pg,
+      health,
+    }
+  }
+  let pg = financePostgresStatus()
+  const jsonDb = readFinanceJsonStore()
+  let postgresDb = readFinancePostgresStore()
+  let selfHeal: FinanceStorageHealth['selfHeal'] = {
+    attempted: false,
+    attempts: 0,
+    succeeded: false,
+    lastAttemptAt: null,
+  }
+  let health = buildFinanceStorageHealth({
+    jsonDb,
+    postgresDb,
+    postgres: pg,
+    selfHeal,
+  })
+
+  if (
+    options.selfHeal &&
+    jsonDb &&
+    pg.enabled &&
+    pg.available &&
+    storageHealthNeedsSelfHeal(health)
+  ) {
+    const retries = Math.max(1, Math.min(options.selfHealRetries ?? 2, 5))
+    for (let attempt = 1; attempt <= retries; attempt += 1) {
+      selfHeal = {
+        attempted: true,
+        attempts: attempt,
+        succeeded: false,
+        lastAttemptAt: nowIso(),
+      }
+      const ok = writeFinancePostgresStore(jsonDb)
+      pg = financePostgresStatus()
+      postgresDb = readFinancePostgresStore()
+      health = buildFinanceStorageHealth({
+        jsonDb,
+        postgresDb,
+        postgres: pg,
+        selfHeal: { ...selfHeal, succeeded: ok },
+      })
+      if (ok && !storageHealthNeedsSelfHeal(health)) break
+    }
+    const healed = !storageHealthNeedsSelfHeal(health)
+    appendAuditLog(
+      healed
+        ? 'finance_postgres_mirror_self_healed'
+        : 'finance_postgres_mirror_self_heal_failed',
+      {
+        attempts: selfHeal.attempts,
+        status: health.status,
+        warnings: health.warnings,
+      },
+    )
+  }
+
+  return {
+    active:
+      pg.available && pg.snapshotAvailable && !health.isPostgresBehindJson
+        ? 'postgres'
+        : 'json',
+    fallback: 'json',
+    jsonPath: FINANCE_DATA_PATH,
     auditPath: FINANCE_AUDIT_PATH,
     postgres: pg,
     health,
@@ -1411,8 +2517,12 @@ export function financeStorageAlerts(health: FinanceStorageHealth): Array<{
   return [
     {
       level: health.status === 'postgres_unavailable' ? 'critical' : 'warning',
-      title: 'Finance storage unhealthy',
-      detail: health.warnings.join(' '),
+      title: 'Finance storage mirror unhealthy',
+      detail: `${health.warnings.join(' ')}${
+        health.selfHeal.attempted
+          ? ` Self-heal ${health.selfHeal.succeeded ? 'succeeded' : 'did not resolve it'} after ${health.selfHeal.attempts} attempt(s).`
+          : ''
+      }`,
     },
   ]
 }
@@ -1508,50 +2618,65 @@ export function addFinanceRecord(
   }
 
   if (kind === 'income') {
+    const dateReceived = stringField(
+      payload,
+      'dateReceived',
+      createdAt.slice(0, 10),
+    )
+    const originalCurrency = currencyField(payload, 'originalCurrency', 'LKR')
+    const originalAmount = numberField(payload, 'originalAmount', 0)
+    const fx = resolveTransactionFx(
+      originalAmount,
+      originalCurrency,
+      dateReceived,
+      optionalNumber(payload, 'exchangeRateUsed'),
+      numberField(payload, 'convertedLkrAmount', originalAmount),
+    )
     db.income_records.push({
       ...base,
-      dateReceived: stringField(
-        payload,
-        'dateReceived',
-        createdAt.slice(0, 10),
-      ),
+      dateReceived,
       sourceName: stringField(payload, 'sourceName', 'Unspecified income'),
       incomeType: stringField(payload, 'incomeType', 'Other income'),
-      originalCurrency: stringField(payload, 'originalCurrency', 'LKR'),
-      originalAmount: numberField(payload, 'originalAmount', 0),
-      exchangeRateUsed: numberField(payload, 'exchangeRateUsed', 1),
-      convertedLkrAmount: numberField(
-        payload,
-        'convertedLkrAmount',
-        numberField(payload, 'originalAmount', 0),
-      ),
+      incomeSubtype: incomeSubtypeField(payload.incomeSubtype),
+      originalCurrency,
+      originalAmount,
+      exchangeRateUsed: fx.exchangeRateUsed ?? 1,
+      convertedLkrAmount: fx.convertedLkrAmount,
       accountId: optionalString(payload, 'accountId'),
       taxable: booleanField(payload, 'taxable', true),
       notes: optionalString(payload, 'notes'),
       documentRef: optionalString(payload, 'documentRef'),
       incomeSourceId: optionalString(payload, 'incomeSourceId'),
+      stockHoldingId: optionalString(payload, 'stockHoldingId'),
       tags: optionalString(payload, 'tags'),
       status: reconciliationStatus(payload.status),
+      transactionType:
+        payload.transactionType === 'transfer' ? 'transfer' : undefined,
+      transferId: optionalString(payload, 'transferId'),
+      transferAccountId: optionalString(payload, 'transferAccountId'),
     })
   } else if (kind === 'expense') {
-    const expenseAmount = numberField(payload, 'amount', 0)
-    const expenseSplits = parseExpenseSplits(payload)
-    assertValidExpenseSplits(expenseSplits, expenseAmount)
+    const date = stringField(payload, 'date', createdAt.slice(0, 10))
+    const currency = currencyField(payload, 'currency', 'LKR')
+    const amount = numberField(payload, 'amount', 0)
+    const fx = resolveTransactionFx(
+      amount,
+      currency,
+      date,
+      optionalNumber(payload, 'exchangeRateUsed'),
+      numberField(payload, 'convertedLkrAmount', amount),
+    )
     db.expense_records.push({
       ...base,
-      date: stringField(payload, 'date', createdAt.slice(0, 10)),
+      date,
       vendor: stringField(payload, 'vendor', 'Unspecified vendor'),
       category: stringField(payload, 'category', 'Other'),
       subcategory: optionalString(payload, 'subcategory'),
-      ...(expenseSplits ? { splits: expenseSplits } : {}),
       accountId: optionalString(payload, 'accountId'),
-      currency: stringField(payload, 'currency', 'LKR'),
-      amount: expenseAmount,
-      convertedLkrAmount: numberField(
-        payload,
-        'convertedLkrAmount',
-        expenseAmount,
-      ),
+      currency,
+      amount,
+      exchangeRateUsed: fx.exchangeRateUsed,
+      convertedLkrAmount: fx.convertedLkrAmount,
       recurring: booleanField(payload, 'recurring', false),
       workRelated: booleanField(payload, 'workRelated', false),
       taxDeductiblePossible: booleanField(
@@ -1563,20 +2688,42 @@ export function addFinanceRecord(
       documentRef: optionalString(payload, 'documentRef'),
       tags: optionalString(payload, 'tags'),
       status: reconciliationStatus(payload.status),
+      transactionType:
+        payload.transactionType === 'transfer' ? 'transfer' : undefined,
+      transferId: optionalString(payload, 'transferId'),
+      transferAccountId: optionalString(payload, 'transferAccountId'),
+    })
+  } else if (kind === 'scheduled_transaction') {
+    const dueDate = stringField(payload, 'dueDate', createdAt.slice(0, 10))
+    const scheduledKind = payload.kind === 'income' ? 'income' : 'expense'
+    const counterparty = stringField(payload, 'counterparty', '').trim()
+    const amount = numberField(payload, 'amount', 0)
+    if (!counterparty) throw new Error('Counterparty is required')
+    if (!Number.isFinite(amount) || amount <= 0)
+      throw new Error('Scheduled amount must be greater than zero')
+    db.scheduled_transactions.push({
+      ...base,
+      dueDate,
+      kind: scheduledKind,
+      counterparty,
+      category: stringField(payload, 'category', 'Other'),
+      amount,
+      accountId: optionalString(payload, 'accountId'),
+      notes: optionalString(payload, 'notes'),
+      status: 'pending',
     })
   } else if (kind === 'account') {
     db.finance_accounts.push({
       ...base,
       name: stringField(payload, 'name', 'Account'),
       type: accountType(payload.type),
-      currency: stringField(payload, 'currency', 'LKR'),
+      currency: currencyField(payload, 'currency', 'LKR'),
       balance: numberField(payload, 'balance', 0),
       openingBalance: optionalNumber(payload, 'openingBalance'),
       openingBalanceDate: optionalString(payload, 'openingBalanceDate'),
-      deriveBalanceFromLedger:
-        payload.deriveBalanceFromLedger === true ? true : undefined,
       maskedIdentifier: optionalString(payload, 'maskedIdentifier'),
       platform: optionalString(payload, 'platform'),
+      documentRef: optionalString(payload, 'documentRef'),
     })
   } else if (kind === 'goal') {
     db.savings_goals.push({
@@ -1584,7 +2731,7 @@ export function addFinanceRecord(
       name: stringField(payload, 'name', 'Savings goal'),
       targetAmount: numberField(payload, 'targetAmount', 0),
       currentAmount: numberField(payload, 'currentAmount', 0),
-      currency: stringField(payload, 'currency', 'LKR'),
+      currency: currencyField(payload, 'currency', 'LKR'),
       targetDate: optionalString(payload, 'targetDate'),
       monthlyContribution: numberField(payload, 'monthlyContribution', 0),
       priority: numberField(payload, 'priority', 3),
@@ -1592,6 +2739,14 @@ export function addFinanceRecord(
       status: goalStatus(payload.status),
       goalKind: goalKindField(payload.goalKind),
     })
+    const goal = db.savings_goals.at(-1)
+    if (
+      goal &&
+      goal.currentAmount >= goal.targetAmount &&
+      goal.targetAmount > 0
+    ) {
+      recordGoalCompletionEvent(db, goal)
+    }
   } else if (kind === 'tax') {
     db.tax_records.push({
       ...base,
@@ -1602,7 +2757,7 @@ export function addFinanceRecord(
       ),
       incomeType: stringField(payload, 'incomeType', 'Other income'),
       amount: numberField(payload, 'amount', 0),
-      currency: stringField(payload, 'currency', 'LKR'),
+      currency: currencyField(payload, 'currency', 'LKR'),
       convertedLkrAmount: numberField(
         payload,
         'convertedLkrAmount',
@@ -1622,9 +2777,8 @@ export function addFinanceRecord(
       ...base,
       month: stringField(payload, 'month', nowIso().slice(0, 7)),
       category: stringField(payload, 'category', 'Other'),
-      currency: stringField(payload, 'currency', 'LKR'),
+      currency: currencyField(payload, 'currency', 'LKR'),
       budgetAmount: numberField(payload, 'budgetAmount', 0),
-      rolloverEnabled: booleanField(payload, 'rolloverEnabled', false) || undefined,
     })
   } else if (kind === 'category') {
     db.categories.push({
@@ -1641,12 +2795,10 @@ export function addFinanceRecord(
       parentCategory: stringField(payload, 'parentCategory', 'Other'),
     })
   } else if (kind === 'merchant') {
-    const merchantSplits = parseMerchantDefaultSplits(payload)
     db.merchants.push({
       ...base,
       name: stringField(payload, 'name', 'Untitled'),
       defaultCategory: optionalString(payload, 'defaultCategory'),
-      ...(merchantSplits ? { defaultSplits: merchantSplits } : {}),
       notes: optionalString(payload, 'notes'),
     })
   } else if (kind === 'tag') {
@@ -1661,7 +2813,7 @@ export function addFinanceRecord(
       employerName: stringField(payload, 'employerName', 'Employer'),
       employmentType: employmentTypeField(payload.employmentType),
       monthlyIncomeAmount: optionalNumber(payload, 'monthlyIncomeAmount'),
-      currency: stringField(payload, 'currency', 'LKR'),
+      currency: currencyField(payload, 'currency', 'LKR'),
       contractStartDate: optionalString(payload, 'contractStartDate'),
       contractEndDate: optionalString(payload, 'contractEndDate'),
       jobTitle: optionalString(payload, 'jobTitle'),
@@ -1670,7 +2822,7 @@ export function addFinanceRecord(
         'expectedPaydayDayOfMonth',
       ),
       paySchedule: optionalString(payload, 'paySchedule'),
-      status: payload.status === 'ended' ? 'ended' : 'active',
+      status: incomeSourceStatusField(payload.status),
       notes: optionalString(payload, 'notes'),
       documentRef: optionalString(payload, 'documentRef'),
     })
@@ -1683,20 +2835,31 @@ export function addFinanceRecord(
       quantity: numberField(payload, 'quantity', 0),
       buyPrice: numberField(payload, 'buyPrice', 0),
       buyDate: stringField(payload, 'buyDate', createdAt.slice(0, 10)),
-      currency: stringField(payload, 'currency', 'LKR'),
+      currency: currencyField(payload, 'currency', 'LKR'),
       lastKnownPrice: optionalNumber(payload, 'lastKnownPrice'),
       lastPriceUpdatedAt: optionalString(payload, 'lastPriceUpdatedAt'),
       priceSource: payload.priceSource === 'cse_api' ? 'cse_api' : 'manual',
+      lastPriceHigh: optionalNumber(payload, 'lastPriceHigh'),
+      lastPriceLow: optionalNumber(payload, 'lastPriceLow'),
+      lastPriceClose: optionalNumber(payload, 'lastPriceClose'),
+      lastPriceVolume: optionalNumber(payload, 'lastPriceVolume'),
+      lastPriceTurnover: optionalNumber(payload, 'lastPriceTurnover'),
+      priceHistory: normalizedStockPriceHistory(payload.priceHistory),
       notes: optionalString(payload, 'notes'),
+      documentRef: optionalString(payload, 'documentRef'),
     })
   } else if (kind === 'fixed_deposit') {
     db.fixed_deposits.push({
       ...base,
       bankName: stringField(payload, 'bankName', 'Bank'),
       principal: numberField(payload, 'principal', 0),
-      currency: stringField(payload, 'currency', 'LKR'),
+      currency: currencyField(payload, 'currency', 'LKR'),
       interestRatePct: numberField(payload, 'interestRatePct', 0),
       interestPayout: interestPayoutField(payload.interestPayout),
+      interestReceived: optionalNumber(payload, 'interestReceived'),
+      taxDeducted: optionalNumber(payload, 'taxDeducted'),
+      payoutAccountId: optionalString(payload, 'payoutAccountId'),
+      autoRenew: booleanField(payload, 'autoRenew', false),
       startDate: stringField(payload, 'startDate', createdAt.slice(0, 10)),
       maturityDate: stringField(
         payload,
@@ -1705,14 +2868,29 @@ export function addFinanceRecord(
       ),
       status: fixedDepositStatusField(payload.status),
       notes: optionalString(payload, 'notes'),
+      documentRef: optionalString(payload, 'documentRef'),
     })
+  } else if (kind === 'investment_journal') {
+    db.investment_journal.push({
+      ...base,
+      stockHoldingId: optionalString(payload, 'stockHoldingId'),
+      symbol: stringField(payload, 'symbol', 'Portfolio'),
+      entryDate: stringField(payload, 'entryDate', createdAt.slice(0, 10)),
+      entryType: investmentJournalEntryTypeField(payload.entryType),
+      content: stringField(payload, 'content', ''),
+      thesis: optionalString(payload, 'thesis'),
+      invalidationCondition: optionalString(payload, 'invalidationCondition'),
+      nextReviewDate: optionalString(payload, 'nextReviewDate'),
+    })
+  } else if (kind === 'ai_task') {
+    db.ai_tasks.push(normalizeFinanceAiTask(payload, base))
   } else if (kind === 'loan') {
     db.loans.push({
       ...base,
       lender: stringField(payload, 'lender', 'Lender'),
       principal: numberField(payload, 'principal', 0),
       currentBalance: numberField(payload, 'currentBalance', 0),
-      currency: stringField(payload, 'currency', 'LKR'),
+      currency: currencyField(payload, 'currency', 'LKR'),
       interestRatePct: numberField(payload, 'interestRatePct', 0),
       monthlyPayment: optionalNumber(payload, 'monthlyPayment'),
       startDate: stringField(payload, 'startDate', createdAt.slice(0, 10)),
@@ -1727,7 +2905,7 @@ export function addFinanceRecord(
       propertyType: propertyTypeField(payload.propertyType),
       purchasePrice: numberField(payload, 'purchasePrice', 0),
       currentValue: numberField(payload, 'currentValue', 0),
-      currency: stringField(payload, 'currency', 'LKR'),
+      currency: currencyField(payload, 'currency', 'LKR'),
       purchaseDate: stringField(
         payload,
         'purchaseDate',
@@ -1743,34 +2921,22 @@ export function addFinanceRecord(
       relationship: stringField(payload, 'relationship', ''),
       note: optionalString(payload, 'note'),
     })
-  } else if (kind === 'transfer') {
-    const amount = numberField(payload, 'amount', 0)
-    const currency = stringField(payload, 'currency', 'LKR')
-    db.transfers.push({
+  } else if (kind === 'insurance_policy') {
+    db.insurance_policies.push({
       ...base,
-      date: stringField(payload, 'date', createdAt.slice(0, 10)),
-      fromAccountId: optionalString(payload, 'fromAccountId'),
-      toAccountId: optionalString(payload, 'toAccountId'),
-      amount,
-      currency,
-      // Convert-on-write: derive the LKR figure from the FX table rather
-      // than trust the client, which posts the raw amount as
-      // `convertedLkrAmount`. Same shape as `set_wealth_goal`. Falls back
-      // to the raw amount when no rate is on file (matches financeSummary).
-      convertedLkrAmount: amountToLkr(db, amount, currency),
+      provider: stringField(payload, 'provider', 'Insurance provider'),
+      policyNumber: optionalString(payload, 'policyNumber'),
+      policyType: stringField(payload, 'policyType', 'Other'),
+      insuredItem: stringField(payload, 'insuredItem', 'Insured item'),
+      premiumAmount: optionalNumber(payload, 'premiumAmount'),
+      premiumFrequency: optionalString(payload, 'premiumFrequency'),
+      coverageAmount: optionalNumber(payload, 'coverageAmount'),
+      currency: currencyField(payload, 'currency', 'LKR'),
+      startDate: stringField(payload, 'startDate', createdAt.slice(0, 10)),
+      endDate: optionalString(payload, 'endDate'),
+      status: insuranceStatusField(payload.status),
       notes: optionalString(payload, 'notes'),
-    })
-  } else if (kind === 'scheduled_transaction') {
-    db.scheduled_transactions.push({
-      ...base,
-      dueDate: stringField(payload, 'dueDate', createdAt.slice(0, 10)),
-      kind: payload.kind === 'income' ? 'income' : 'expense',
-      counterparty: stringField(payload, 'counterparty', 'Unspecified'),
-      category: stringField(payload, 'category', 'Other'),
-      amount: numberField(payload, 'amount', 0),
-      accountId: optionalString(payload, 'accountId'),
-      notes: optionalString(payload, 'notes'),
-      status: 'pending',
+      documentRef: optionalString(payload, 'documentRef'),
     })
   } else if (kind === 'trading_plan') {
     db.trading_plans.push(createTradingPlan(payload, base))
@@ -1787,7 +2953,216 @@ export function addFinanceRecord(
   }
 
   writeFinanceStore(db)
-  appendAuditLog(`record_added:${kind}`, { id: base.id, kind })
+  if (kind === 'income' || kind === 'expense') {
+    const record =
+      kind === 'income'
+        ? db.income_records.find((item) => item.id === base.id)
+        : db.expense_records.find((item) => item.id === base.id)
+    appendAuditLog(`record_added:${kind}`, {
+      id: base.id,
+      kind,
+      after: transactionAuditSnapshot(record),
+    })
+  } else {
+    appendAuditLog(`record_added:${kind}`, {
+      id: base.id,
+      kind,
+      ...(kind === 'ai_task'
+        ? { auditCorrelationId: db.ai_tasks.at(-1)?.auditCorrelationId }
+        : {}),
+    })
+  }
+  return db
+}
+
+/**
+ * Add a balanced, same-currency account transfer as two linked records.
+ * Keeping the pair in the existing income/expense collections preserves the
+ * current Postgres/JSON contract while making the transfer visible in the
+ * unified ledger and neutral to income/expense summaries.
+ */
+export function addFinanceTransfer(payload: AddPayload): FinanceDatabase {
+  const db = ensureFinanceStore()
+  const sourceAccountId = stringField(payload, 'sourceAccountId', '')
+  const destinationAccountId = stringField(payload, 'destinationAccountId', '')
+  const amount = numberField(payload, 'amount', 0)
+  if (!sourceAccountId || !destinationAccountId) {
+    throw new Error('sourceAccountId and destinationAccountId are required')
+  }
+  if (sourceAccountId === destinationAccountId) {
+    throw new Error('A transfer must use two different accounts')
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Transfer amount must be greater than zero')
+  }
+  const source = db.finance_accounts.find(
+    (account) => account.id === sourceAccountId,
+  )
+  const destination = db.finance_accounts.find(
+    (account) => account.id === destinationAccountId,
+  )
+  if (!source || !destination) {
+    throw new Error('Both transfer accounts must exist')
+  }
+  if (source.currency !== destination.currency) {
+    throw new Error(
+      'Transfers currently require accounts with the same currency',
+    )
+  }
+
+  const createdAt = nowIso()
+  const transferId = randomUUID()
+  const date = stringField(payload, 'date', createdAt.slice(0, 10))
+  const currency = currencyField(payload, 'currency', source.currency)
+  if (currency !== source.currency) {
+    throw new Error('Transfer currency must match the source account')
+  }
+  const convertedLkrAmount = numberField(payload, 'convertedLkrAmount', amount)
+  const shared = {
+    transferId,
+    transactionType: 'transfer' as const,
+    currency,
+    amount,
+    convertedLkrAmount,
+    notes: optionalString(payload, 'notes'),
+    tags: optionalString(payload, 'tags'),
+    status: reconciliationStatus(payload.status),
+    source: stringField(payload, 'source', 'manual'),
+    createdAt,
+    updatedAt: createdAt,
+  }
+  db.expense_records.push({
+    id: randomUUID(),
+    date,
+    vendor: `Transfer to ${destination.name}`,
+    category: 'Transfer',
+    accountId: sourceAccountId,
+    transferAccountId: destinationAccountId,
+    recurring: false,
+    workRelated: false,
+    taxDeductiblePossible: false,
+    ...shared,
+  })
+  db.income_records.push({
+    id: randomUUID(),
+    dateReceived: date,
+    sourceName: `Transfer from ${source.name}`,
+    incomeType: 'Transfer',
+    originalCurrency: currency,
+    originalAmount: amount,
+    exchangeRateUsed: 1,
+    accountId: destinationAccountId,
+    transferAccountId: sourceAccountId,
+    taxable: false,
+    ...shared,
+  })
+  source.balance -= amount
+  source.updatedAt = createdAt
+  destination.balance += amount
+  destination.updatedAt = createdAt
+  writeFinanceStore(db)
+  appendAuditLog('record_added:transfer', {
+    transferId,
+    sourceAccountId,
+    destinationAccountId,
+    amount,
+    after: [
+      transactionAuditSnapshot(db.expense_records.at(-1)),
+      transactionAuditSnapshot(db.income_records.at(-1)),
+    ],
+  })
+  return db
+}
+
+/**
+ * Add one expense split as several ordinary expense rows sharing a group ID.
+ * The existing summaries already aggregate expense rows, so category budgets
+ * remain correct without introducing a second ledger table or a data rewrite.
+ */
+export function addFinanceSplit(payload: AddPayload): FinanceDatabase {
+  const db = ensureFinanceStore()
+  const rawSplits = Array.isArray(payload.splits) ? payload.splits : []
+  const splits = rawSplits.filter(
+    (split): split is Record<string, unknown> =>
+      typeof split === 'object' && split !== null,
+  )
+  if (splits.length < 2) {
+    throw new Error('A split expense requires at least two categories')
+  }
+  const amounts = splits.map((split) => numberField(split, 'amount', 0))
+  if (amounts.some((value) => !Number.isFinite(value) || value <= 0)) {
+    throw new Error('Every split amount must be greater than zero')
+  }
+  const vendor = stringField(payload, 'vendor', '').trim()
+  if (!vendor) throw new Error('Vendor is required')
+  const accountId = optionalString(payload, 'accountId')
+  const account = accountId
+    ? db.finance_accounts.find((candidate) => candidate.id === accountId)
+    : undefined
+  if (accountId && !account) throw new Error('Expense account does not exist')
+
+  const createdAt = nowIso()
+  const splitGroupId = randomUUID()
+  const date = stringField(payload, 'date', createdAt.slice(0, 10))
+  const currency = currencyField(
+    payload,
+    'currency',
+    account?.currency ?? 'LKR',
+  )
+  const shared = {
+    date,
+    vendor,
+    subcategory: optionalString(payload, 'subcategory'),
+    accountId,
+    currency,
+    recurring: booleanField(payload, 'recurring', false),
+    workRelated: booleanField(payload, 'workRelated', false),
+    taxDeductiblePossible: booleanField(
+      payload,
+      'taxDeductiblePossible',
+      false,
+    ),
+    notes: optionalString(payload, 'notes'),
+    tags: optionalString(payload, 'tags'),
+    status: reconciliationStatus(payload.status),
+    source: stringField(payload, 'source', 'manual'),
+    splitGroupId,
+    createdAt,
+    updatedAt: createdAt,
+  }
+  splits.forEach((split, index) => {
+    const amount = amounts[index]
+    const fx = resolveTransactionFx(
+      amount,
+      currency,
+      date,
+      optionalNumber(split, 'exchangeRateUsed') ??
+        optionalNumber(payload, 'exchangeRateUsed'),
+      numberField(split, 'convertedLkrAmount', amount),
+    )
+    db.expense_records.push({
+      id: randomUUID(),
+      category: stringField(split, 'category', '').trim() || 'Other',
+      amount,
+      exchangeRateUsed: fx.exchangeRateUsed,
+      convertedLkrAmount: fx.convertedLkrAmount,
+      splitIndex: index,
+      ...shared,
+    })
+  })
+  if (account) {
+    account.balance -= amounts.reduce((sum, amount) => sum + amount, 0)
+    account.updatedAt = createdAt
+  }
+  writeFinanceStore(db)
+  appendAuditLog('record_added:split', {
+    splitGroupId,
+    vendor,
+    count: splits.length,
+    after: db.expense_records
+      .filter((record) => record.splitGroupId === splitGroupId)
+      .map((record) => transactionAuditSnapshot(record)),
+  })
   return db
 }
 
@@ -1797,34 +3172,88 @@ export function updateFinanceRecord(
   payload: AddPayload,
 ): FinanceDatabase {
   const db = ensureFinanceStore()
+  const beforeTransaction =
+    kind === 'income'
+      ? transactionAuditSnapshot(
+          db.income_records.find((r) => r.id === id && !isDeletedRecord(r)),
+        )
+      : kind === 'expense'
+        ? transactionAuditSnapshot(
+            db.expense_records.find((r) => r.id === id && !isDeletedRecord(r)),
+          )
+        : undefined
   let updated = false
   if (kind === 'income') {
-    const index = db.income_records.findIndex((r) => r.id === id)
+    const index = db.income_records.findIndex(
+      (r) => r.id === id && !isDeletedRecord(r),
+    )
     if (index !== -1) {
-      db.income_records[index] = {
+      const nextRecord = {
         ...db.income_records[index],
         ...payload,
         updatedAt: nowIso(),
+      } as IncomeRecord
+      const fx = resolveTransactionFx(
+        nextRecord.originalAmount,
+        nextRecord.originalCurrency,
+        nextRecord.dateReceived,
+        optionalNumber(payload, 'exchangeRateUsed'),
+        nextRecord.convertedLkrAmount,
+      )
+      db.income_records[index] = {
+        ...nextRecord,
+        exchangeRateUsed: fx.exchangeRateUsed ?? 1,
+        convertedLkrAmount: fx.convertedLkrAmount,
       }
       updated = true
     }
   } else if (kind === 'expense') {
-    const index = db.expense_records.findIndex((r) => r.id === id)
+    const index = db.expense_records.findIndex(
+      (r) => r.id === id && !isDeletedRecord(r),
+    )
     if (index !== -1) {
-      const merged = {
+      const nextRecord = {
         ...db.expense_records[index],
         ...payload,
         updatedAt: nowIso(),
+      } as ExpenseRecord
+      const fx = resolveTransactionFx(
+        nextRecord.amount,
+        nextRecord.currency,
+        nextRecord.date,
+        optionalNumber(payload, 'exchangeRateUsed'),
+        nextRecord.convertedLkrAmount,
+      )
+      db.expense_records[index] = {
+        ...nextRecord,
+        exchangeRateUsed: fx.exchangeRateUsed,
+        convertedLkrAmount: fx.convertedLkrAmount,
       }
-      // `splits` needs parse + validation, and an explicit `null`/`[]` clears
-      // it. Only touch it when the caller actually sent the key.
-      if ('splits' in payload) {
-        const parsed = parseExpenseSplits(payload)
-        assertValidExpenseSplits(parsed, merged.amount)
-        if (parsed) merged.splits = parsed
-        else delete merged.splits
+      updated = true
+    }
+  } else if (kind === 'scheduled_transaction') {
+    const index = db.scheduled_transactions.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      const current = db.scheduled_transactions[index]
+      const amount = payload.amount === undefined
+        ? current.amount
+        : numberField(payload, 'amount', current.amount)
+      if (!Number.isFinite(amount) || amount <= 0)
+        throw new Error('Scheduled amount must be greater than zero')
+      db.scheduled_transactions[index] = {
+        ...current,
+        ...payload,
+        kind: payload.kind === 'income' ? 'income' : current.kind,
+        amount,
+        status:
+          payload.status === 'posted' ||
+          payload.status === 'cancelled' ||
+          payload.status === 'paused' ||
+          payload.status === 'pending'
+            ? payload.status
+            : current.status,
+        updatedAt: nowIso(),
       }
-      db.expense_records[index] = merged
       updated = true
     }
   } else if (kind === 'account') {
@@ -1840,10 +3269,22 @@ export function updateFinanceRecord(
   } else if (kind === 'goal') {
     const index = db.savings_goals.findIndex((r) => r.id === id)
     if (index !== -1) {
+      const wasComplete =
+        db.savings_goals[index].targetAmount > 0 &&
+        db.savings_goals[index].currentAmount >=
+          db.savings_goals[index].targetAmount
       db.savings_goals[index] = {
         ...db.savings_goals[index],
         ...payload,
         updatedAt: nowIso(),
+      }
+      const goal = db.savings_goals[index]
+      if (
+        !wasComplete &&
+        goal.targetAmount > 0 &&
+        goal.currentAmount >= goal.targetAmount
+      ) {
+        recordGoalCompletionEvent(db, goal)
       }
       updated = true
     }
@@ -1890,17 +3331,11 @@ export function updateFinanceRecord(
   } else if (kind === 'merchant') {
     const index = db.merchants.findIndex((r) => r.id === id)
     if (index !== -1) {
-      const merged = {
+      db.merchants[index] = {
         ...db.merchants[index],
         ...payload,
         updatedAt: nowIso(),
       }
-      if ('defaultSplits' in payload) {
-        const parsed = parseMerchantDefaultSplits(payload)
-        if (parsed) merged.defaultSplits = parsed
-        else delete merged.defaultSplits
-      }
-      db.merchants[index] = merged
       updated = true
     }
   } else if (kind === 'tag') {
@@ -1915,6 +3350,10 @@ export function updateFinanceRecord(
       db.income_sources[index] = {
         ...db.income_sources[index],
         ...payload,
+        status:
+          payload.status === undefined
+            ? db.income_sources[index].status
+            : incomeSourceStatusField(payload.status),
         updatedAt: nowIso(),
       }
       updated = true
@@ -1922,11 +3361,34 @@ export function updateFinanceRecord(
   } else if (kind === 'stock_holding') {
     const index = db.stock_holdings.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.stock_holdings[index] = {
-        ...db.stock_holdings[index],
-        ...payload,
-        updatedAt: nowIso(),
+      const updatedAt = nowIso()
+      const current = db.stock_holdings[index]
+      const next = { ...current, ...payload, updatedAt }
+      const price = optionalNumber(payload, 'lastKnownPrice')
+      if (price !== undefined && price > 0) {
+        const observedAt =
+          optionalString(payload, 'lastPriceUpdatedAt') ?? updatedAt
+        const source = payload.priceSource === 'cse_api' ? 'cse_api' : 'manual'
+        const point: StockPricePoint = {
+          price,
+          observedAt,
+          source,
+        }
+        const high = optionalNumber(payload, 'lastPriceHigh')
+        const low = optionalNumber(payload, 'lastPriceLow')
+        const close = optionalNumber(payload, 'lastPriceClose')
+        const volume = optionalNumber(payload, 'lastPriceVolume')
+        const turnover = optionalNumber(payload, 'lastPriceTurnover')
+        if (high !== undefined && high > 0) point.high = high
+        if (low !== undefined && low > 0) point.low = low
+        if (close !== undefined && close > 0) point.close = close
+        if (volume !== undefined && volume > 0) point.volume = volume
+        if (turnover !== undefined && turnover > 0) point.turnover = turnover
+        next.priceHistory = appendStockPricePoint(current.priceHistory, point)
+      } else {
+        next.priceHistory = normalizedStockPriceHistory(current.priceHistory)
       }
+      db.stock_holdings[index] = next
       updated = true
     }
   } else if (kind === 'fixed_deposit') {
@@ -1937,6 +3399,27 @@ export function updateFinanceRecord(
         ...payload,
         updatedAt: nowIso(),
       }
+      updated = true
+    }
+  } else if (kind === 'investment_journal') {
+    const index = db.investment_journal.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.investment_journal[index] = {
+        ...db.investment_journal[index],
+        ...payload,
+        entryType: investmentJournalEntryTypeField(payload.entryType),
+        updatedAt: nowIso(),
+      }
+      updated = true
+    }
+  } else if (kind === 'ai_task') {
+    const index = db.ai_tasks.findIndex((r) => r.id === id)
+    if (index !== -1) {
+      db.ai_tasks[index] = normalizeFinanceAiTask(
+        payload,
+        db.ai_tasks[index],
+        true,
+      )
       updated = true
     }
   } else if (kind === 'loan') {
@@ -1965,25 +3448,16 @@ export function updateFinanceRecord(
       }
       updated = true
     }
-  } else if (kind === 'transfer') {
-    const index = db.transfers.findIndex((r) => r.id === id)
+  } else if (kind === 'insurance_policy') {
+    const index = db.insurance_policies.findIndex((r) => r.id === id)
     if (index !== -1) {
-      const merged = { ...db.transfers[index], ...payload }
-      db.transfers[index] = {
-        ...merged,
-        // `convertedLkrAmount` is derived, never trusted from the client —
-        // recompute from the merged amount/currency on every update.
-        convertedLkrAmount: amountToLkr(db, merged.amount, merged.currency),
-        updatedAt: nowIso(),
-      }
-      updated = true
-    }
-  } else if (kind === 'scheduled_transaction') {
-    const index = db.scheduled_transactions.findIndex((r) => r.id === id)
-    if (index !== -1) {
-      db.scheduled_transactions[index] = {
-        ...db.scheduled_transactions[index],
+      db.insurance_policies[index] = {
+        ...db.insurance_policies[index],
         ...payload,
+        status:
+          payload.status === undefined
+            ? db.insurance_policies[index].status
+            : insuranceStatusField(payload.status),
         updatedAt: nowIso(),
       }
       updated = true
@@ -1997,7 +3471,29 @@ export function updateFinanceRecord(
   }
 
   writeFinanceStore(db)
-  appendAuditLog(`record_updated:${kind}`, { id, kind })
+  if (kind === 'income' || kind === 'expense') {
+    const afterTransaction =
+      kind === 'income'
+        ? transactionAuditSnapshot(db.income_records.find((r) => r.id === id))
+        : transactionAuditSnapshot(db.expense_records.find((r) => r.id === id))
+    appendAuditLog(`record_updated:${kind}`, {
+      id,
+      kind,
+      before: beforeTransaction,
+      after: afterTransaction,
+    })
+  } else {
+    appendAuditLog(`record_updated:${kind}`, {
+      id,
+      kind,
+      ...(kind === 'ai_task'
+        ? {
+            auditCorrelationId: db.ai_tasks.find((task) => task.id === id)
+              ?.auditCorrelationId,
+          }
+        : {}),
+    })
+  }
   return db
 }
 
@@ -2012,15 +3508,116 @@ export function updateFinanceRecord(
 export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
   const db = ensureFinanceStore()
   let removed = false
+  let removedAuditCorrelationId: string | undefined
+  const beforeTransaction =
+    kind === 'income'
+      ? transactionAuditSnapshot(db.income_records.find((r) => r.id === id))
+      : kind === 'expense'
+        ? transactionAuditSnapshot(db.expense_records.find((r) => r.id === id))
+        : undefined
 
   if (kind === 'income') {
-    const before = db.income_records.length
-    db.income_records = db.income_records.filter((r) => r.id !== id)
-    removed = db.income_records.length !== before
+    const target = db.income_records.find(
+      (r) => r.id === id && !isDeletedRecord(r),
+    )
+    const transferId =
+      target && isTransferRecord(target) ? target.transferId : undefined
+    if (target && transferId && target.accountId && target.transferAccountId) {
+      const destination = db.finance_accounts.find(
+        (account) => account.id === target.accountId,
+      )
+      const source = db.finance_accounts.find(
+        (account) => account.id === target.transferAccountId,
+      )
+      if (destination && source) {
+        destination.balance -= target.originalAmount
+        source.balance += target.originalAmount
+        destination.updatedAt = nowIso()
+        source.updatedAt = destination.updatedAt
+      }
+    }
+    const deletedAt = nowIso()
+    for (const record of db.income_records) {
+      if (
+        record.id === id ||
+        (transferId && record.transferId === transferId)
+      ) {
+        record.deletedAt = deletedAt
+        record.updatedAt = deletedAt
+        removed = true
+      }
+    }
+    if (transferId) {
+      for (const record of db.expense_records) {
+        if (record.transferId === transferId && !isDeletedRecord(record)) {
+          record.deletedAt = deletedAt
+          record.updatedAt = deletedAt
+          removed = true
+        }
+      }
+    }
   } else if (kind === 'expense') {
-    const before = db.expense_records.length
-    db.expense_records = db.expense_records.filter((r) => r.id !== id)
-    removed = db.expense_records.length !== before
+    const target = db.expense_records.find(
+      (r) => r.id === id && !isDeletedRecord(r),
+    )
+    const transferId =
+      target && isTransferRecord(target) ? target.transferId : undefined
+    const splitGroupId = target?.splitGroupId
+    if (target && splitGroupId && target.accountId) {
+      const splitTotal = db.expense_records
+        .filter((record) => record.splitGroupId === splitGroupId)
+        .reduce((sum, record) => sum + record.amount, 0)
+      const account = db.finance_accounts.find(
+        (candidate) => candidate.id === target.accountId,
+      )
+      if (account) {
+        account.balance += splitTotal
+        account.updatedAt = nowIso()
+      }
+    }
+    if (target && transferId && target.accountId && target.transferAccountId) {
+      const source = db.finance_accounts.find(
+        (account) => account.id === target.accountId,
+      )
+      const destination = db.finance_accounts.find(
+        (account) => account.id === target.transferAccountId,
+      )
+      if (source && destination) {
+        source.balance += target.amount
+        destination.balance -= target.amount
+        source.updatedAt = nowIso()
+        destination.updatedAt = source.updatedAt
+      }
+    }
+    const deletedAt = nowIso()
+    for (const record of db.expense_records) {
+      if (
+        record.id === id ||
+        (transferId && record.transferId === transferId) ||
+        (splitGroupId && record.splitGroupId === splitGroupId)
+      ) {
+        if (!isDeletedRecord(record)) {
+          record.deletedAt = deletedAt
+          record.updatedAt = deletedAt
+          removed = true
+        }
+      }
+    }
+    if (transferId) {
+      for (const record of db.income_records) {
+        if (record.transferId === transferId && !isDeletedRecord(record)) {
+          record.deletedAt = deletedAt
+          record.updatedAt = deletedAt
+          removed = true
+        }
+      }
+    }
+  } else if (kind === 'scheduled_transaction') {
+    const before = db.scheduled_transactions.length
+    db.scheduled_transactions = db.scheduled_transactions.filter(
+      (record) => record.id !== id,
+    )
+    removed = db.scheduled_transactions.length !== before
   } else if (kind === 'account') {
     const before = db.finance_accounts.length
     db.finance_accounts = db.finance_accounts.filter((r) => r.id !== id)
@@ -2065,6 +3662,17 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.fixed_deposits.length
     db.fixed_deposits = db.fixed_deposits.filter((r) => r.id !== id)
     removed = db.fixed_deposits.length !== before
+  } else if (kind === 'investment_journal') {
+    const before = db.investment_journal.length
+    db.investment_journal = db.investment_journal.filter((r) => r.id !== id)
+    removed = db.investment_journal.length !== before
+  } else if (kind === 'ai_task') {
+    removedAuditCorrelationId = db.ai_tasks.find(
+      (task) => task.id === id,
+    )?.auditCorrelationId
+    const before = db.ai_tasks.length
+    db.ai_tasks = db.ai_tasks.filter((r) => r.id !== id)
+    removed = db.ai_tasks.length !== before
   } else if (kind === 'loan') {
     const before = db.loans.length
     db.loans = db.loans.filter((r) => r.id !== id)
@@ -2077,16 +3685,10 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
     const before = db.beneficiaries.length
     db.beneficiaries = db.beneficiaries.filter((r) => r.id !== id)
     removed = db.beneficiaries.length !== before
-  } else if (kind === 'transfer') {
-    const before = db.transfers.length
-    db.transfers = db.transfers.filter((r) => r.id !== id)
-    removed = db.transfers.length !== before
-  } else if (kind === 'scheduled_transaction') {
-    const before = db.scheduled_transactions.length
-    db.scheduled_transactions = db.scheduled_transactions.filter(
-      (r) => r.id !== id,
-    )
-    removed = db.scheduled_transactions.length !== before
+  } else if (kind === 'insurance_policy') {
+    const before = db.insurance_policies.length
+    db.insurance_policies = db.insurance_policies.filter((r) => r.id !== id)
+    removed = db.insurance_policies.length !== before
   } else {
     throw new Error(`Unsupported finance record kind for delete: ${kind}`)
   }
@@ -2096,7 +3698,177 @@ export function deleteFinanceRecord(kind: string, id: string): FinanceDatabase {
   }
 
   writeFinanceStore(db)
-  appendAuditLog(`record_deleted:${kind}`, { id, kind })
+  if (kind === 'income' || kind === 'expense') {
+    appendAuditLog(`record_deleted:${kind}`, {
+      id,
+      kind,
+      before: beforeTransaction,
+    })
+  } else {
+    appendAuditLog(`record_deleted:${kind}`, {
+      id,
+      kind,
+      ...(kind === 'ai_task'
+        ? {
+            auditCorrelationId:
+              db.ai_tasks.find((task) => task.id === id)?.auditCorrelationId ??
+              removedAuditCorrelationId,
+          }
+        : {}),
+    })
+  }
+  return db
+}
+
+export type FinanceAiTaskListFilters = {
+  status?: FinanceAiTaskStatus
+  risk?: FinanceAiTask['risk']
+  agentName?: string
+  from?: string
+  to?: string
+  terminalOnly?: boolean
+  limit?: number
+  offset?: number
+}
+
+export type FinanceAiTaskListItem = Omit<
+  FinanceAiTask,
+  'inputSummary' | 'resultSummary' | 'errorMessage'
+>
+
+/** AI-112: bounded server-side task history; never returns task summaries. */
+export function listFinanceAiTasks(filters: FinanceAiTaskListFilters = {}): {
+  items: Array<FinanceAiTaskListItem>
+  total: number
+  limit: number
+  offset: number
+  hasMore: boolean
+} {
+  const db = readFinanceStore()
+  const limit = Math.max(1, Math.min(Math.floor(filters.limit ?? 25), 100))
+  const offset = Math.max(0, Math.floor(filters.offset ?? 0))
+  const filtered = db.ai_tasks
+    .filter((task) => !filters.status || task.status === filters.status)
+    .filter((task) => !filters.risk || task.risk === filters.risk)
+    .filter(
+      (task) => !filters.agentName || task.agentName === filters.agentName,
+    )
+    .filter(
+      (task) =>
+        !filters.terminalOnly ||
+        task.status === 'completed' ||
+        task.status === 'cancelled',
+    )
+    .filter((task) => !filters.from || task.createdAt >= filters.from)
+    .filter((task) => !filters.to || task.createdAt <= filters.to)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const page = filtered.slice(offset, offset + limit)
+  return {
+    items: page.map(
+      ({
+        inputSummary: _input,
+        resultSummary: _result,
+        errorMessage: _error,
+        ...safe
+      }) => ({
+        ...safe,
+        auditCorrelationId: safe.auditCorrelationId || `ai-task:${safe.id}`,
+      }),
+    ),
+    total: filtered.length,
+    limit,
+    offset,
+    hasMore: offset + limit < filtered.length,
+  }
+}
+
+/** Restore a soft-deleted transaction (including its transfer/split peers). */
+export function restoreFinanceRecord(
+  kind: string,
+  id: string,
+): FinanceDatabase {
+  const db = ensureFinanceStore()
+  const target =
+    kind === 'income'
+      ? db.income_records.find((record) => record.id === id && record.deletedAt)
+      : kind === 'expense'
+        ? db.expense_records.find(
+            (record) => record.id === id && record.deletedAt,
+          )
+        : undefined
+  if (!target)
+    throw new Error(`Deleted record not found for kind ${kind} and id ${id}`)
+
+  const transferId = isTransferRecord(target) ? target.transferId : undefined
+  const splitGroupId =
+    'splitGroupId' in target ? target.splitGroupId : undefined
+  const peers: Array<IncomeRecord | ExpenseRecord> = []
+  for (const record of db.income_records) {
+    if (record.id === id || (transferId && record.transferId === transferId))
+      peers.push(record)
+  }
+  for (const record of db.expense_records) {
+    if (
+      record.id === id ||
+      (transferId && record.transferId === transferId) ||
+      (splitGroupId && record.splitGroupId === splitGroupId)
+    )
+      peers.push(record)
+  }
+
+  const restoredAt = nowIso()
+  if (
+    transferId &&
+    'accountId' in target &&
+    target.accountId &&
+    target.transferAccountId
+  ) {
+    const first = db.finance_accounts.find(
+      (account) => account.id === target.accountId,
+    )
+    const second = db.finance_accounts.find(
+      (account) => account.id === target.transferAccountId,
+    )
+    const amount =
+      'originalAmount' in target ? target.originalAmount : target.amount
+    if (first && second) {
+      if (kind === 'income') {
+        first.balance += amount
+        second.balance -= amount
+      } else {
+        first.balance -= amount
+        second.balance += amount
+      }
+      first.updatedAt = restoredAt
+      second.updatedAt = restoredAt
+    }
+  } else if (splitGroupId && 'accountId' in target && target.accountId) {
+    const account = db.finance_accounts.find(
+      (candidate) => candidate.id === target.accountId,
+    )
+    if (account) {
+      const total = db.expense_records
+        .filter(
+          (record) => record.splitGroupId === splitGroupId && record.deletedAt,
+        )
+        .reduce((sum, record) => sum + record.amount, 0)
+      account.balance -= total
+      account.updatedAt = restoredAt
+    }
+  }
+
+  for (const record of peers) {
+    if (record.deletedAt) {
+      delete record.deletedAt
+      record.updatedAt = restoredAt
+    }
+  }
+  writeFinanceStore(db)
+  appendAuditLog(`record_restored:${kind}`, {
+    id,
+    kind,
+    restoredCount: peers.length,
+  })
   return db
 }
 
@@ -2131,18 +3903,22 @@ export function findPossibleDuplicate(
     amount: number
   }> =
     kind === 'income'
-      ? db.income_records.map((r) => ({
-          id: r.id,
-          vendor: r.sourceName,
-          date: r.dateReceived,
-          amount: r.originalAmount,
-        }))
-      : db.expense_records.map((r) => ({
-          id: r.id,
-          vendor: r.vendor,
-          date: r.date,
-          amount: r.amount,
-        }))
+      ? db.income_records
+          .filter((r) => !isDeletedRecord(r))
+          .map((r) => ({
+            id: r.id,
+            vendor: r.sourceName,
+            date: r.dateReceived,
+            amount: r.originalAmount,
+          }))
+      : db.expense_records
+          .filter((r) => !isDeletedRecord(r))
+          .map((r) => ({
+            id: r.id,
+            vendor: r.vendor,
+            date: r.date,
+            amount: r.amount,
+          }))
 
   for (const r of records) {
     const sameVendor = r.vendor.trim().toLowerCase() === vendorKey
@@ -2184,172 +3960,44 @@ export function recordCategoryCorrection(
   corrections[vendor.trim().toLowerCase()] = category.trim()
   settings.categoryCorrections = corrections
   writeFinanceStore(db)
-  // Also propose it to HARP memory as a governed `preference` candidate.
-  // Best-effort, non-blocking — the flat map above stays authoritative for
-  // prompt hints until (and if) the candidate is approved.
-  void proposeCategoryPreference({ vendor, category })
 }
 
-/**
- * The flat `settings.categoryCorrections` map merged with any *approved* HARP
- * category rules (a HARP rule wins a key conflict — it reflects review). When
- * HARP memory is disabled or unreachable this is exactly the flat map.
- */
 export function getCategoryCorrections(): Record<string, string> {
   const db = ensureFinanceStore()
   const settings = db.settings as Record<string, unknown>
-  const flat =
-    settings.categoryCorrections &&
+  return settings.categoryCorrections &&
     typeof settings.categoryCorrections === 'object'
-      ? (settings.categoryCorrections as Record<string, string>)
-      : {}
-  const harp = getCachedCategoryPreferences()
-  return Object.keys(harp).length > 0 ? { ...flat, ...harp } : flat
+    ? (settings.categoryCorrections as Record<string, string>)
+    : {}
 }
 
-/**
- * Persists a Gmail sync failure onto settings.gmailIngest so the settings UI
- * can show "last sync failed: <reason>" even after the transient toast in
- * the ingestion panel is gone — `isGmailConnected()` only checks whether a
- * refresh token *file* exists, not whether Google still honours it, so this
- * is the only durable signal that a "connected" account actually needs
- * reconnecting (e.g. invalid_grant: token expired or revoked).
- */
-export function recordGmailSyncError(message: string): void {
-  const db = ensureFinanceStore()
-  const settings = db.settings as Record<string, unknown>
-  const gmailIngest = (
-    settings.gmailIngest && typeof settings.gmailIngest === 'object'
-      ? { ...(settings.gmailIngest as Record<string, unknown>) }
-      : {}
-  ) as Record<string, unknown>
-  gmailIngest.lastError = { at: Math.floor(Date.now() / 1000), message }
-  settings.gmailIngest = gmailIngest
-  writeFinanceStore(db)
-}
-
-function readKnownSenders(settings: Record<string, unknown>): Array<KnownSender> {
-  const gmailIngest =
-    settings.gmailIngest && typeof settings.gmailIngest === 'object'
-      ? (settings.gmailIngest as Record<string, unknown>)
-      : {}
-  return Array.isArray(gmailIngest.knownSenders)
-    ? (gmailIngest.knownSenders as Array<KnownSender>)
-    : []
-}
-
-function writeKnownSenders(
-  settings: Record<string, unknown>,
-  knownSenders: Array<KnownSender>,
-): void {
-  const gmailIngest = (
-    settings.gmailIngest && typeof settings.gmailIngest === 'object'
-      ? { ...(settings.gmailIngest as Record<string, unknown>) }
-      : {}
-  ) as Record<string, unknown>
-  gmailIngest.knownSenders = knownSenders
-  settings.gmailIngest = gmailIngest
-}
-
-/** Never includes encryptedPassword's plaintext — callers that need to actually try the password use decryptKnownSenderPassword(). */
 export function listKnownSenders(): Array<KnownSender> {
   const settings = ensureFinanceStore().settings as Record<string, unknown>
-  return readKnownSenders(settings)
+  return Array.isArray(settings.knownSenders) ? settings.knownSenders as Array<KnownSender> : []
 }
 
-export function upsertKnownSender(
-  input: Pick<KnownSender, 'label'> &
-    Partial<Pick<KnownSender, 'id' | 'matchDomain' | 'matchAddress' | 'passwordScheme' | 'accountId'>>,
-): KnownSender {
-  if (!input.label.trim()) throw new Error('label is required')
-  const db = ensureFinanceStore()
-  const settings = db.settings as Record<string, unknown>
-  const knownSenders = readKnownSenders(settings)
-  const now = nowIso()
-  const existingIndex = input.id
-    ? knownSenders.findIndex((s) => s.id === input.id)
-    : -1
-  const record: KnownSender = {
-    id: existingIndex >= 0 ? knownSenders[existingIndex].id : randomUUID(),
-    label: input.label.trim(),
-    matchDomain: input.matchDomain?.trim() || undefined,
-    matchAddress: input.matchAddress?.trim().toLowerCase() || undefined,
-    passwordScheme: input.passwordScheme?.trim() || undefined,
-    accountId: input.accountId || undefined,
-    encryptedPassword:
-      existingIndex >= 0 ? knownSenders[existingIndex].encryptedPassword : undefined,
-    createdAt: existingIndex >= 0 ? knownSenders[existingIndex].createdAt : now,
-    updatedAt: now,
-  }
-  const next =
-    existingIndex >= 0
-      ? knownSenders.map((s, i) => (i === existingIndex ? record : s))
-      : [...knownSenders, record]
-  writeKnownSenders(settings, next)
-  writeFinanceStore(db)
-  appendAuditLog('known_sender_upserted', { id: record.id, label: record.label })
-  return record
-}
-
-export function deleteKnownSender(id: string): void {
-  const db = ensureFinanceStore()
-  const settings = db.settings as Record<string, unknown>
-  const knownSenders = readKnownSenders(settings)
-  writeKnownSenders(settings, knownSenders.filter((s) => s.id !== id))
-  writeFinanceStore(db)
-  appendAuditLog('known_sender_deleted', { id })
-}
-
-/** Encrypts server-side via secret-crypto.ts — the plaintext password never gets stored or logged as-is. */
-export function setKnownSenderPassword(id: string, password: string): KnownSender {
-  if (!password) throw new Error('password is required')
-  const db = ensureFinanceStore()
-  const settings = db.settings as Record<string, unknown>
-  const knownSenders = readKnownSenders(settings)
-  const index = knownSenders.findIndex((s) => s.id === id)
-  if (index === -1) throw new Error(`Known sender not found: ${id}`)
-  const updated: KnownSender = {
-    ...knownSenders[index],
-    encryptedPassword: encryptSecret(password),
-    updatedAt: nowIso(),
-  }
-  const next = knownSenders.map((s, i) => (i === index ? updated : s))
-  writeKnownSenders(settings, next)
-  writeFinanceStore(db)
-  appendAuditLog('known_sender_password_set', { id }) // never logs the password itself
-  return updated
-}
-
-export function clearKnownSenderPassword(id: string): KnownSender {
-  const db = ensureFinanceStore()
-  const settings = db.settings as Record<string, unknown>
-  const knownSenders = readKnownSenders(settings)
-  const index = knownSenders.findIndex((s) => s.id === id)
-  if (index === -1) throw new Error(`Known sender not found: ${id}`)
-  const updated: KnownSender = {
-    ...knownSenders[index],
-    encryptedPassword: undefined,
-    updatedAt: nowIso(),
-  }
-  const next = knownSenders.map((s, i) => (i === index ? updated : s))
-  writeKnownSenders(settings, next)
-  writeFinanceStore(db)
-  appendAuditLog('known_sender_password_cleared', { id })
-  return updated
-}
-
-/** Server-internal only (gmail-ingest.ts) — decrypted value must never reach an API response. */
-export function decryptKnownSenderPassword(sender: KnownSender): string | undefined {
-  if (!sender.encryptedPassword) return undefined
-  try {
-    return decryptSecret(sender.encryptedPassword)
-  } catch {
-    return undefined
-  }
+export function decryptKnownSenderPassword(senderId: string): string | undefined {
+  const sender = listKnownSenders().find((item) => item.id === senderId)
+  // Password decryption is intentionally opt-in and delegated to the existing
+  // encrypted-finance credential path when a caller has stored one.
+  return sender?.encryptedPassword
 }
 
 export function listPendingIngestions(): Array<PendingIngestion> {
   return ensureFinanceStore().pending_ingestions
+}
+
+export function findPendingIngestionByChecksum(
+  checksumSha256: string,
+): PendingIngestion | null {
+  if (!/^[a-f0-9]{64}$/.test(checksumSha256)) return null
+  return (
+    ensureFinanceStore().pending_ingestions.find(
+      (pending) =>
+        pending.checksumSha256 === checksumSha256 &&
+        pending.status !== 'rejected',
+    ) ?? null
+  )
 }
 
 export function addPendingIngestion(
@@ -2359,11 +4007,17 @@ export function addPendingIngestion(
         PendingIngestion,
         | 'status'
         | 'documentType'
+        | 'documentClass'
         | 'passwordHint'
         | 'matchedSenderId'
         | 'matchedSenderLabel'
+        | 'checksumSha256'
         | 'extracted'
+        | 'extractedSalarySlip'
+        | 'extractedContractNote'
+        | 'extractedFdCertificate'
         | 'extractedContract'
+        | 'contractChanges'
         | 'rawPreviewImagePath'
         | 'error'
       >
@@ -2376,12 +4030,18 @@ export function addPendingIngestion(
     status: input.status ?? 'awaiting_review',
     source: input.source,
     documentType: input.documentType ?? 'transaction',
+    documentClass: input.documentClass,
     sourceRef: input.sourceRef,
+    checksumSha256: input.checksumSha256,
     passwordHint: input.passwordHint,
     matchedSenderId: input.matchedSenderId,
     matchedSenderLabel: input.matchedSenderLabel,
     extracted: input.extracted,
+    extractedSalarySlip: input.extractedSalarySlip,
+    extractedContractNote: input.extractedContractNote,
+    extractedFdCertificate: input.extractedFdCertificate,
     extractedContract: input.extractedContract,
+    contractChanges: input.contractChanges,
     rawPreviewImagePath: input.rawPreviewImagePath,
     error: input.error,
     createdAt,
@@ -2493,7 +4153,7 @@ export function createVirtualAccount(
   return {
     ...recordBase,
     platform: stringField(payload, 'platform', 'manual'),
-    currency: stringField(payload, 'currency', 'LKR'),
+    currency: currencyField(payload, 'currency', 'LKR'),
     balance: numberField(payload, 'balance', 10000),
     initialBalance: numberField(
       payload,
@@ -2598,317 +4258,430 @@ export function createTradingSignal(
   }
 }
 
-/**
- * PF-113: a row's reconciliation `status` gates whether it counts toward
- * *aggregate* money figures (net worth, savings rate, budget-vs-actual,
- * monthly rollups). A `pending` transaction is shown in the raw tables /
- * `getUnifiedTransactions()` but must not move the totals until it clears.
- * `status` is optional and predates the feature, so a missing value counts
- * as `cleared` (unchanged behaviour for existing data).
- */
-const TOTALS_STATUSES: ReadonlyArray<'pending' | 'cleared' | 'reconciled'> = [
-  'cleared',
-  'reconciled',
-]
-function includeInTotals(row: {
-  status?: 'pending' | 'cleared' | 'reconciled'
-}): boolean {
-  return TOTALS_STATUSES.includes(row.status ?? 'cleared')
-}
-
-/**
- * Latest `from`->`to` rate in THIS db's `exchange_rates` (most recent by date).
- * Pure over `db` — never reaches through `ensureFinanceStore`/`getExchangeRate`,
- * which re-read the backing store and would disagree with the `db` passed here.
- */
-function latestRateFromDb(
-  db: FinanceDatabase,
-  from: string,
-  to: string,
-): number | undefined {
-  const rows = (
-    db.exchange_rates as Array<{
-      base?: unknown
-      target?: unknown
-      rate?: unknown
-      date?: unknown
-    }>
-  )
-    .filter(
-      (r) => r.base === from && r.target === to && typeof r.rate === 'number',
-    )
-    .sort(
-      (a, b) =>
-        new Date(String(b.date ?? 0)).getTime() -
-        new Date(String(a.date ?? 0)).getTime(),
-    )
-  return rows.length ? (rows[0].rate as number) : undefined
-}
-
-/**
- * Convert `amount`, denominated in `currency`, to LKR via `latestRateFromDb`
- * (direct `currency->LKR`, else `1/inverse`). Returns `amount` unchanged when no
- * rate is on file — same fallback as `financeSummary`'s `toLkr`.
- */
-function amountToLkr(
+/** PF-201/PF-206: value an amount against the rates in the supplied snapshot. */
+function valuationToCurrency(
   db: FinanceDatabase,
   amount: number,
-  currency: string | undefined,
+  currency: string,
+  targetCurrency: string,
+  date: string,
 ): number {
-  if (!currency || currency === 'LKR') return amount
-  const direct = latestRateFromDb(db, currency, 'LKR')
-  if (direct !== undefined) return amount * direct
-  const inverse = latestRateFromDb(db, 'LKR', currency)
-  if (inverse) return amount / inverse
-  return amount
-}
-
-/**
- * Convert `amount` from `from` currency to `to` currency via this db's
- * `exchange_rates` (direct rate, else 1/inverse). Returns null when neither
- * leg is on file — the caller decides whether to skip or fall back.
- */
-function convertBetweenCurrencies(
-  db: FinanceDatabase,
-  amount: number,
-  from: string,
-  to: string,
-): number | null {
-  if (!from || !to || from === to) return amount
-  const direct = latestRateFromDb(db, from, to)
-  if (direct !== undefined) return amount * direct
-  const inverse = latestRateFromDb(db, to, from)
-  if (inverse) return amount / inverse
-  return null
-}
-
-/**
- * A signed movement against one account, in that record's own currency.
- * A transfer is fed in as TWO legs: `{kind: 'expense'}` on the source
- * account and `{kind: 'income'}` on the destination.
- */
-export type ReconcileTransaction = {
-  accountId?: string
-  currency: string
-  amount: number
-  kind: 'income' | 'expense'
-}
-
-/**
- * AI-600: what an account's own tagged transactions say its balance should
- * be, starting from `openingBalance`. Returns null when there's no
- * `openingBalance` (nothing to reconcile against). Lives here rather than in
- * `screens/…/utils.ts` so `financeSummary` can use it and so cross-currency
- * legs convert through the FX table. A record in a currency other than the
- * account's is converted via `exchange_rates`; it is skipped only when no
- * rate is on file.
- */
-export function computeAccountLedgerBalance(
-  db: FinanceDatabase,
-  account: { id: string; currency: string; openingBalance?: number },
-  records: Array<ReconcileTransaction>,
-): number | null {
-  if (account.openingBalance === undefined) return null
-  let balance = account.openingBalance
-  for (const record of records) {
-    if (record.accountId !== account.id) continue
-    let value = record.amount
-    if (record.currency !== account.currency) {
-      const converted = convertBetweenCurrencies(
-        db,
-        record.amount,
-        record.currency,
-        account.currency,
+  if (!Number.isFinite(amount)) return 0
+  if (currency === targetCurrency) return amount
+  const rates = Array.isArray(db.exchange_rates) ? db.exchange_rates : []
+  const lookup = (base: string, target: string): number | undefined => {
+    const candidates = rates
+      .filter(
+        (row) =>
+          row.base === base &&
+          row.target === target &&
+          typeof row.rate === 'number' &&
+          Number.isFinite(row.rate) &&
+          (!date || String(row.date) <= date),
       )
-      if (converted === null) continue // no rate on file — exclude, as before
-      value = converted
-    }
-    balance += record.kind === 'income' ? value : -value
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    return candidates[0]?.rate as number | undefined
   }
-  return balance
+  const direct = lookup(currency, targetCurrency)
+  if (direct !== undefined) return amount * direct
+  const inverse = lookup(targetCurrency, currency)
+  if (inverse !== undefined && inverse > 0) return amount / inverse
+  if (currency !== 'LKR' && targetCurrency !== 'LKR') {
+    const fromLkr = lookup(currency, 'LKR')
+    const toLkr = lookup('LKR', targetCurrency)
+    if (fromLkr !== undefined && toLkr !== undefined)
+      return amount * fromLkr * toLkr
+    const fromLkrInverse = lookup('LKR', currency)
+    const toLkrInverse = lookup(targetCurrency, 'LKR')
+    if (
+      fromLkrInverse !== undefined &&
+      fromLkrInverse > 0 &&
+      toLkrInverse !== undefined
+    )
+      return amount / fromLkrInverse / toLkrInverse
+  }
+  return 0
 }
 
-/** Every income, expense and transfer in `db` as reconcile legs. */
-export function ledgerTransactionsForDb(
+function valuationToLkr(
   db: FinanceDatabase,
-): Array<ReconcileTransaction> {
-  const legs: Array<ReconcileTransaction> = []
-  for (const inc of db.income_records) {
-    legs.push({
-      accountId: inc.accountId,
-      currency: inc.originalCurrency,
-      amount: inc.originalAmount,
-      kind: 'income',
-    })
-  }
-  for (const exp of db.expense_records) {
-    legs.push({
-      accountId: exp.accountId,
-      currency: exp.currency,
-      amount: exp.amount,
-      kind: 'expense',
-    })
-  }
-  for (const t of db.transfers) {
-    if (t.fromAccountId) {
-      legs.push({
-        accountId: t.fromAccountId,
-        currency: t.currency,
-        amount: t.amount,
-        kind: 'expense',
-      })
-    }
-    if (t.toAccountId) {
-      legs.push({
-        accountId: t.toAccountId,
-        currency: t.currency,
-        amount: t.amount,
-        kind: 'income',
-      })
-    }
-  }
-  return legs
-}
-
-/**
- * The balance to use for `account` in aggregates: the ledger-derived figure
- * when the account opted in (`deriveBalanceFromLedger`) AND it's computable,
- * otherwise the manually-entered `balance`. Fails closed — never 0, never
- * drops the account.
- */
-export function effectiveAccountBalance(
-  db: FinanceDatabase,
-  account: FinanceAccount,
-  legs: Array<ReconcileTransaction> = ledgerTransactionsForDb(db),
+  amount: number,
+  currency: string,
+  date: string,
 ): number {
-  if (!account.deriveBalanceFromLedger) return account.balance
-  const derived = computeAccountLedgerBalance(db, account, legs)
-  return derived ?? account.balance
+  return valuationToCurrency(db, amount, currency, 'LKR', date)
 }
 
-export function financeSummary(db: FinanceDatabase) {
-  // PF-201: the reporting currency. Stored amounts stay LKR-denominated
-  // (`convertedLkrAmount`, `wealthGoalTargetLkr`, …); this only changes what
-  // the aggregate `*Lkr` figures below are *expressed* in. Default 'LKR' keeps
-  // every existing install byte-identical.
-  const base = db.settings.baseCurrency || 'LKR'
+type BaseFinanceSummary = {
+  totalIncome: number
+  totalExpenses: number
+  netSavings: number
+  savingsRate: number
+  cashBalance: number
+  taxReserve: number
+  debt: number
+  netWorth: number
+  liquidNetWorth: number
+  lockedWealth: number
+  stockHoldingsValue: number
+  fixedDepositsValue: number
+  propertyValue: number
+  unrealizedStockPnl: number
+  unrealizedStockPnlPct: number
+  accountCount: number
+}
 
-  // Latest currency->currency rate from THIS db's `exchange_rates` (direct, or
-  // 1/inverse). Kept pure over `db` — see PF-206. `fxUnconverted` collects
-  // currencies with no rate on file; their raw amounts are still counted.
-  const fxUnconverted = new Set<string>()
-  const latestRate = (from: string, to: string): number | undefined =>
-    latestRateFromDb(db, from, to)
-  /** Convert an amount in `currency` to LKR. */
-  const toLkr = (amount: number, currency: CurrencyCode | undefined): number => {
-    if (!currency || currency === 'LKR') return amount
-    const direct = latestRate(currency, 'LKR')
-    if (direct !== undefined) return amount * direct
-    const inverse = latestRate('LKR', currency)
-    if (inverse) return amount / inverse
-    fxUnconverted.add(currency)
-    return amount
-  }
-  /** Convert an LKR amount to the configured reporting currency. */
-  const toBase = (lkr: number): number => {
-    if (base === 'LKR') return lkr
-    const direct = latestRate('LKR', base)
-    if (direct !== undefined) return lkr * direct
-    const inverse = latestRate(base, 'LKR')
-    if (inverse) return lkr / inverse
-    fxUnconverted.add(base)
-    return lkr
+function buildBaseFinanceSummary(
+  db: FinanceDatabase,
+  baseCurrency: string,
+  legacy: {
+    totalIncomeLkr: number
+    totalExpensesLkr: number
+    netSavingsLkr: number
+    savingsRate: number
+    cashBalanceLkr: number
+    taxReserveLkr: number
+    debtLkr: number
+    netWorthLkr: number
+    liquidNetWorthLkr: number
+    lockedWealthLkr: number
+    stockHoldingsValueLkr: number
+    fixedDepositsValueLkr: number
+    propertyValueLkr: number
+    unrealizedStockPnlLkr: number
+    unrealizedStockPnlPct: number
+    accountCount: number
+  },
+): BaseFinanceSummary {
+  if (baseCurrency === 'LKR') {
+    return {
+      totalIncome: legacy.totalIncomeLkr,
+      totalExpenses: legacy.totalExpensesLkr,
+      netSavings: legacy.netSavingsLkr,
+      savingsRate: legacy.savingsRate,
+      cashBalance: legacy.cashBalanceLkr,
+      taxReserve: legacy.taxReserveLkr,
+      debt: legacy.debtLkr,
+      netWorth: legacy.netWorthLkr,
+      liquidNetWorth: legacy.liquidNetWorthLkr,
+      lockedWealth: legacy.lockedWealthLkr,
+      stockHoldingsValue: legacy.stockHoldingsValueLkr,
+      fixedDepositsValue: legacy.fixedDepositsValueLkr,
+      propertyValue: legacy.propertyValueLkr,
+      unrealizedStockPnl: legacy.unrealizedStockPnlLkr,
+      unrealizedStockPnlPct: legacy.unrealizedStockPnlPct,
+      accountCount: legacy.accountCount,
+    }
   }
 
-  const totalIncomeBase = db.income_records
-    .filter(includeInTotals)
-    .reduce((sum, row) => sum + row.convertedLkrAmount, 0)
-  const totalExpensesBase = db.expense_records
-    .filter(includeInTotals)
-    .reduce((sum, row) => sum + row.convertedLkrAmount, 0)
-  const netSavingsBase = totalIncomeBase - totalExpensesBase
-  const savingsRate =
-    totalIncomeBase > 0 ? (netSavingsBase / totalIncomeBase) * 100 : 0
-  // Accounts that opted into `deriveBalanceFromLedger` contribute their
-  // ledger-derived balance (openingBalance + tagged movements) instead of the
-  // manual `balance`; the rest are unchanged. `legs` built once.
-  const reconcileLegs = ledgerTransactionsForDb(db)
-  const cashBalanceBase = db.finance_accounts.reduce(
+  const date = new Date().toISOString().slice(0, 10)
+  const income = db.income_records.reduce(
     (sum, row) =>
       sum +
-      toLkr(effectiveAccountBalance(db, row, reconcileLegs), row.currency),
+      (isDeletedRecord(row) || isTransferRecord(row)
+        ? 0
+        : valuationToCurrency(
+            db,
+            row.originalAmount,
+            row.originalCurrency,
+            baseCurrency,
+            date,
+          )),
     0,
   )
-  // PF-201: budget categories may be non-LKR (getBudgetVsActual converts them
-  // to LKR for the comparison). Run them through `toLkr` here for its side
-  // effect only — a missing rate then lands in `fxUnconverted`, raising the
-  // "Missing exchange rate" alert the same way an un-priced holding does.
-  for (const b of db.budget_categories) toLkr(b.budgetAmount, b.currency)
-  const taxReserveBase = db.savings_goals
+  const expenses = db.expense_records.reduce(
+    (sum, row) =>
+      sum +
+      (isDeletedRecord(row) || isTransferRecord(row)
+        ? 0
+        : valuationToCurrency(
+            db,
+            row.amount,
+            row.currency,
+            baseCurrency,
+            date,
+          )),
+    0,
+  )
+  const cash = db.finance_accounts.reduce(
+    (sum, row) =>
+      sum +
+      valuationToCurrency(db, row.balance, row.currency, baseCurrency, date),
+    0,
+  )
+  const taxReserve = db.savings_goals
     .filter((goal) => goal.name.toLowerCase().includes('tax'))
-    .reduce((sum, goal) => sum + goal.currentAmount, 0)
-  // 'loan'-type accounts no longer contribute here — Phase 40 gives loans a
-  // dedicated entity (principal/rate/term, remaining balance tracked
-  // separately from the original amount); 'card' stays account-based since
-  // credit cards have no term/rate model.
-  const debtBase =
+    .reduce(
+      (sum, goal) =>
+        sum +
+        valuationToCurrency(
+          db,
+          goal.currentAmount,
+          goal.currency,
+          baseCurrency,
+          date,
+        ),
+      0,
+    )
+  const debt =
     db.finance_accounts
       .filter((account) => account.type === 'card')
       .reduce(
         (sum, row) =>
-          sum + Math.abs(effectiveAccountBalance(db, row, reconcileLegs)),
+          sum +
+          valuationToCurrency(
+            db,
+            Math.abs(row.balance),
+            row.currency,
+            baseCurrency,
+            date,
+          ),
         0,
       ) +
     db.loans
       .filter((loan) => loan.status === 'active')
-      .reduce((sum, loan) => sum + loan.currentBalance, 0)
-  // PF-206: holdings / FDs / properties may be denominated in a non-LKR
-  // currency — `toLkr` (hoisted above) converts each via this db's
-  // `exchange_rates`. Never blocked on a live CSE price fetch succeeding —
-  // falls back to the buy price when no cached/manual current price is
-  // available yet.
-  const stockHoldingsValueBase = db.stock_holdings.reduce(
+      .reduce(
+        (sum, loan) =>
+          sum +
+          valuationToCurrency(
+            db,
+            loan.currentBalance,
+            loan.currency,
+            baseCurrency,
+            date,
+          ),
+        0,
+      )
+  const stocks = db.stock_holdings.reduce(
     (sum, holding) =>
       sum +
-      toLkr(
+      valuationToCurrency(
+        db,
         (holding.lastKnownPrice ?? holding.buyPrice) * holding.quantity,
         holding.currency,
+        baseCurrency,
+        date,
       ),
     0,
   )
-  const fixedDepositsValueBase = db.fixed_deposits
+  const fixedDeposits = db.fixed_deposits
     .filter((fd) => fd.status !== 'withdrawn')
-    .reduce((sum, fd) => sum + toLkr(fd.principal, fd.currency), 0)
-  const propertyValueBase = db.properties.reduce(
-    (sum, p) => sum + toLkr(p.currentValue, p.currency),
+    .reduce(
+      (sum, fd) =>
+        sum +
+        valuationToCurrency(db, fd.principal, fd.currency, baseCurrency, date),
+      0,
+    )
+  const property = db.properties.reduce(
+    (sum, row) =>
+      sum +
+      valuationToCurrency(
+        db,
+        row.currentValue,
+        row.currency,
+        baseCurrency,
+        date,
+      ),
     0,
   )
-  const unrealizedStockPnlBase = db.stock_holdings.reduce(
+  const goals = db.savings_goals.reduce(
+    (sum, goal) =>
+      sum +
+      valuationToCurrency(
+        db,
+        goal.currentAmount,
+        goal.currency,
+        baseCurrency,
+        date,
+      ),
+    0,
+  )
+  const unrealizedStockPnl = db.stock_holdings.reduce(
     (sum, holding) =>
       sum +
-      toLkr(
+      valuationToCurrency(
+        db,
         ((holding.lastKnownPrice ?? holding.buyPrice) - holding.buyPrice) *
           holding.quantity,
         holding.currency,
+        baseCurrency,
+        date,
+      ),
+    0,
+  )
+  const stockCostBasis = db.stock_holdings.reduce(
+    (sum, holding) =>
+      sum +
+      valuationToCurrency(
+        db,
+        holding.buyPrice * holding.quantity,
+        holding.currency,
+        baseCurrency,
+        date,
+      ),
+    0,
+  )
+  return {
+    totalIncome: income,
+    totalExpenses: expenses,
+    netSavings: income - expenses,
+    savingsRate: income > 0 ? ((income - expenses) / income) * 100 : 0,
+    cashBalance: cash,
+    taxReserve,
+    debt,
+    netWorth: cash + goals + stocks + fixedDeposits + property - debt,
+    liquidNetWorth: cash + goals + stocks - debt,
+    lockedWealth: fixedDeposits + property,
+    stockHoldingsValue: stocks,
+    fixedDepositsValue: fixedDeposits,
+    propertyValue: property,
+    unrealizedStockPnl,
+    unrealizedStockPnlPct:
+      stockCostBasis > 0 ? (unrealizedStockPnl / stockCostBasis) * 100 : 0,
+    accountCount: db.finance_accounts.length,
+  }
+}
+
+export function financeSummary(db: FinanceDatabase) {
+  const valuationDate = new Date().toISOString().slice(0, 10)
+  const totalIncomeLkr = db.income_records.reduce(
+    (sum, row) =>
+      sum +
+      (isDeletedRecord(row) || isTransferRecord(row)
+        ? 0
+        : row.convertedLkrAmount),
+    0,
+  )
+  const totalExpensesLkr = db.expense_records.reduce(
+    (sum, row) =>
+      sum +
+      (isDeletedRecord(row) || isTransferRecord(row)
+        ? 0
+        : row.convertedLkrAmount),
+    0,
+  )
+  const netSavingsLkr = totalIncomeLkr - totalExpensesLkr
+  const savingsRate =
+    totalIncomeLkr > 0 ? (netSavingsLkr / totalIncomeLkr) * 100 : 0
+  const cashBalanceLkr = db.finance_accounts.reduce(
+    (sum, row) =>
+      sum + valuationToLkr(db, row.balance, row.currency, valuationDate),
+    0,
+  )
+  const taxReserveLkr = db.savings_goals
+    .filter((goal) => goal.name.toLowerCase().includes('tax'))
+    .reduce(
+      (sum, goal) =>
+        sum +
+        valuationToLkr(db, goal.currentAmount, goal.currency, valuationDate),
+      0,
+    )
+  // 'loan'-type accounts no longer contribute here — Phase 40 gives loans a
+  // dedicated entity (principal/rate/term, remaining balance tracked
+  // separately from the original amount); 'card' stays account-based since
+  // credit cards have no term/rate model.
+  const debtLkr =
+    db.finance_accounts
+      .filter((account) => account.type === 'card')
+      .reduce(
+        (sum, row) =>
+          sum +
+          valuationToLkr(
+            db,
+            Math.abs(row.balance),
+            row.currency,
+            valuationDate,
+          ),
+        0,
+      ) +
+    db.loans
+      .filter((loan) => loan.status === 'active')
+      .reduce(
+        (sum, loan) =>
+          sum +
+          valuationToLkr(db, loan.currentBalance, loan.currency, valuationDate),
+        0,
+      )
+  // Never blocked on a live CSE price fetch succeeding — falls back to the
+  // buy price when no cached/manual current price is available yet.
+  const stockHoldingsValueLkr = db.stock_holdings.reduce(
+    (sum, holding) =>
+      sum +
+      valuationToLkr(
+        db,
+        (holding.lastKnownPrice ?? holding.buyPrice) * holding.quantity,
+        holding.currency,
+        valuationDate,
+      ),
+    0,
+  )
+  const fixedDepositsValueLkr = db.fixed_deposits
+    .filter((fd) => fd.status !== 'withdrawn')
+    .reduce(
+      (sum, fd) =>
+        sum + valuationToLkr(db, fd.principal, fd.currency, valuationDate),
+      0,
+    )
+  const propertyValueLkr = db.properties.reduce(
+    (sum, p) =>
+      sum + valuationToLkr(db, p.currentValue, p.currency, valuationDate),
+    0,
+  )
+  const unrealizedStockPnlLkr = db.stock_holdings.reduce(
+    (sum, holding) =>
+      sum +
+      valuationToLkr(
+        db,
+        ((holding.lastKnownPrice ?? holding.buyPrice) - holding.buyPrice) *
+          holding.quantity,
+        holding.currency,
+        valuationDate,
       ),
     0,
   )
   const totalStockCostBasisLkr = db.stock_holdings.reduce(
     (sum, holding) =>
-      sum + toLkr(holding.buyPrice * holding.quantity, holding.currency),
+      sum +
+      valuationToLkr(
+        db,
+        holding.buyPrice * holding.quantity,
+        holding.currency,
+        valuationDate,
+      ),
     0,
   )
   const unrealizedStockPnlPct =
     totalStockCostBasisLkr > 0
-      ? (unrealizedStockPnlBase / totalStockCostBasisLkr) * 100
+      ? (unrealizedStockPnlLkr / totalStockCostBasisLkr) * 100
       : 0
-  const netWorthBase =
-    cashBalanceBase +
-    db.savings_goals.reduce((sum, goal) => sum + goal.currentAmount, 0) +
-    stockHoldingsValueBase +
-    fixedDepositsValueBase +
-    propertyValueBase -
-    debtBase
+  const baseCurrency = SUPPORTED_CURRENCIES.includes(
+    db.settings.baseCurrency as (typeof SUPPORTED_CURRENCIES)[number],
+  )
+    ? db.settings.baseCurrency
+    : 'LKR'
+  const netWorthLkr =
+    cashBalanceLkr +
+    db.savings_goals.reduce(
+      (sum, goal) =>
+        sum +
+        valuationToLkr(db, goal.currentAmount, goal.currency, valuationDate),
+      0,
+    ) +
+    stockHoldingsValueLkr +
+    fixedDepositsValueLkr +
+    propertyValueLkr -
+    debtLkr
+  const liquidNetWorthLkr =
+    cashBalanceLkr +
+    db.savings_goals.reduce(
+      (sum, goal) =>
+        sum +
+        valuationToLkr(db, goal.currentAmount, goal.currency, valuationDate),
+      0,
+    ) +
+    stockHoldingsValueLkr -
+    debtLkr
+  const lockedWealthLkr = fixedDepositsValueLkr + propertyValueLkr
   const openPlans = db.trading_plans.filter(
     (plan) =>
       !['cancelled', 'expired', 'failed', 'blocked'].includes(plan.status),
@@ -2916,27 +4689,43 @@ export function financeSummary(db: FinanceDatabase) {
   const blockedPlans = db.trading_plans.filter(
     (plan) => plan.status === 'blocked' || plan.decision === 'BLOCKED',
   ).length
-  return {
-    // PF-201: every `*Lkr` figure is expressed in `baseCurrency` (default
-    // 'LKR', in which case `toBase` is the identity). Percentages
-    // (savingsRate, unrealizedStockPnlPct) are currency-free — not converted.
-    baseCurrency: base,
-    totalIncomeBase: toBase(totalIncomeBase),
-    totalExpensesBase: toBase(totalExpensesBase),
-    netSavingsBase: toBase(netSavingsBase),
+  const legacySummary = {
+    totalIncomeLkr,
+    totalExpensesLkr,
+    netSavingsLkr,
     savingsRate,
-    cashBalanceBase: toBase(cashBalanceBase),
-    taxReserveBase: toBase(taxReserveBase),
-    debtBase: toBase(debtBase),
-    netWorthBase: toBase(netWorthBase),
-    stockHoldingsValueBase: toBase(stockHoldingsValueBase),
-    fixedDepositsValueBase: toBase(fixedDepositsValueBase),
-    propertyValueBase: toBase(propertyValueBase),
-    unrealizedStockPnlBase: toBase(unrealizedStockPnlBase),
+    cashBalanceLkr,
+    taxReserveLkr,
+    debtLkr,
+    netWorthLkr,
+    liquidNetWorthLkr,
+    lockedWealthLkr,
+    stockHoldingsValueLkr,
+    fixedDepositsValueLkr,
+    propertyValueLkr,
+    unrealizedStockPnlLkr,
     unrealizedStockPnlPct,
-    /** Currencies (an asset's own, or `baseCurrency` itself) with no exchange
-     * rate on file — the affected amounts are still counted, unconverted. */
-    fxUnconverted: [...fxUnconverted].sort(),
+    accountCount: db.finance_accounts.length,
+  }
+  return {
+    ...legacySummary,
+    baseCurrency,
+    baseSummary: buildBaseFinanceSummary(db, baseCurrency, legacySummary),
+    totalIncomeLkr,
+    totalExpensesLkr,
+    netSavingsLkr,
+    savingsRate,
+    cashBalanceLkr,
+    taxReserveLkr,
+    debtLkr,
+    netWorthLkr,
+    liquidNetWorthLkr,
+    lockedWealthLkr,
+    stockHoldingsValueLkr,
+    fixedDepositsValueLkr,
+    propertyValueLkr,
+    unrealizedStockPnlLkr,
+    unrealizedStockPnlPct,
     accountCount: db.finance_accounts.length,
     goalCount: db.savings_goals.length,
     taxRecordCount: db.tax_records.length,
@@ -2954,38 +4743,110 @@ export function financeSummary(db: FinanceDatabase) {
   }
 }
 
-/**
- * Compute today's net-worth snapshot (all LKR) and upsert it into
- * `db.net_worth_snapshots` by `date` — at most one row per calendar day, so
- * re-running is idempotent. Mutates and returns `db`; the caller persists.
- */
-export function recordNetWorthSnapshot(
+
+/** OPS-103: read-only aggregate over stored quote provenance; never refreshes or rewrites holdings. */
+export function cseProviderHealth(
   db: FinanceDatabase,
-  today: string = nowIso().slice(0, 10),
-): { db: FinanceDatabase; snapshot: NetWorthSnapshot } {
-  // Pin to LKR — snapshots are stored LKR-denominated like every other figure.
-  const lkrDb = { ...db, settings: { ...db.settings, baseCurrency: 'LKR' } }
-  const s = financeSummary(lkrDb)
-  const investmentsLkr =
-    s.stockHoldingsValueBase + s.fixedDepositsValueBase + s.propertyValueBase
-  const now = nowIso()
-  const existing = db.net_worth_snapshots.find((r) => r.date === today)
-  const snapshot: NetWorthSnapshot = {
-    id: existing?.id ?? `nws-${today}`,
-    date: today,
-    netWorthLkr: s.netWorthBase,
-    cashLkr: s.cashBalanceBase,
-    investmentsLkr,
-    debtLkr: s.debtBase,
-    source: 'snapshot',
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
+  now = new Date(),
+): CseProviderHealth {
+  const holdings = db.stock_holdings
+  const cseQuotes = holdings.filter(
+    (holding) => holding.priceSource === 'cse_api',
+  )
+  const manualFallbackCount = holdings.filter(
+    (holding) => holding.priceSource === 'manual',
+  ).length
+  const quoteDates = cseQuotes
+    .map((holding) => holding.lastPriceUpdatedAt)
+    .filter((value): value is string =>
+      Boolean(value && Number.isFinite(Date.parse(value))),
+    )
+  const latestQuoteAt =
+    quoteDates.length > 0
+      ? quoteDates.reduce((latest, value) => (value > latest ? value : latest))
+      : null
+  const staleQuoteCount = cseQuotes.filter((holding) => {
+    const timestamp = holding.lastPriceUpdatedAt
+      ? Date.parse(holding.lastPriceUpdatedAt)
+      : NaN
+    return (
+      !Number.isFinite(timestamp) ||
+      now.getTime() - timestamp > 24 * 60 * 60 * 1000
+    )
+  }).length
+  let status: CseProviderHealth['status'] = 'unknown'
+  if (holdings.length > 0) {
+    if (cseQuotes.length === 0) status = 'manual'
+    else if (staleQuoteCount > 0) status = 'stale'
+    else if (manualFallbackCount > 0) status = 'degraded'
+    else status = 'healthy'
   }
-  db.net_worth_snapshots = [
-    ...db.net_worth_snapshots.filter((r) => r.date !== today),
-    snapshot,
-  ].sort((a, b) => (a.date < b.date ? -1 : 1))
-  return { db, snapshot }
+  return {
+    status,
+    holdingsCount: holdings.length,
+    cseQuoteCount: cseQuotes.length,
+    manualFallbackCount,
+    staleQuoteCount,
+    latestQuoteAt,
+  }
+}
+
+/** AN-100: manually captured, immutable-present-moment net-worth snapshot. */
+export function captureNetWorthSnapshot(
+  db: FinanceDatabase,
+  snapshotDate = new Date().toISOString().slice(0, 10),
+  source: NetWorthSnapshot['source'] = 'manual',
+): NetWorthSnapshot {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(snapshotDate) ||
+    !Number.isFinite(Date.parse(snapshotDate))
+  ) {
+    throw new Error('snapshotDate must be a valid YYYY-MM-DD date')
+  }
+  const existing = db.net_worth_snapshots.find(
+    (snapshot) => snapshot.snapshotDate === snapshotDate,
+  )
+  if (existing) return existing
+  const summary = financeSummary(db)
+  const snapshot: NetWorthSnapshot = {
+    id: randomUUID(),
+    snapshotDate,
+    netWorthLkr: summary.netWorthLkr,
+    cashLkr: summary.cashBalanceLkr,
+    debtLkr: summary.debtLkr,
+    investmentsLkr:
+      summary.stockHoldingsValueLkr + summary.fixedDepositsValueLkr,
+    liquidNetWorthLkr: summary.liquidNetWorthLkr,
+    lockedWealthLkr: summary.lockedWealthLkr,
+    portfolioPositions: db.stock_holdings
+      .map((holding): PortfolioSnapshotPosition | null => {
+        const price = holding.lastKnownPrice ?? holding.buyPrice
+        if (holding.quantity <= 0 || price <= 0) return null
+        return {
+          holdingId: holding.id,
+          symbol: holding.symbol,
+          currency: holding.currency,
+          quantity: holding.quantity,
+          price,
+          marketValue: holding.quantity * price,
+          costBasis: holding.quantity * holding.buyPrice,
+          priceSource:
+            holding.lastKnownPrice !== undefined
+              ? holding.priceSource
+              : 'buy_price_fallback',
+        }
+      })
+      .filter(
+        (position): position is PortfolioSnapshotPosition => position !== null,
+      ),
+    source,
+    createdAt: nowIso(),
+  }
+  db.net_worth_snapshots.push(snapshot)
+  db.net_worth_snapshots.sort((a, b) =>
+    b.snapshotDate.localeCompare(a.snapshotDate),
+  )
+  return snapshot
 }
 
 export function financeAlerts(db: FinanceDatabase): Array<{
@@ -2999,9 +4860,10 @@ export function financeAlerts(db: FinanceDatabase): Array<{
     title: string
     detail: string
   }> = []
+  alerts.push(...financialRuleAlerts(db))
   if (
-    summary.totalExpensesBase > summary.totalIncomeBase &&
-    summary.totalIncomeBase > 0
+    summary.totalExpensesLkr > summary.totalIncomeLkr &&
+    summary.totalIncomeLkr > 0
   ) {
     alerts.push({
       level: 'warning',
@@ -3034,44 +4896,182 @@ export function financeAlerts(db: FinanceDatabase): Array<{
       detail: 'Real order execution is disabled.',
     })
   }
-  if (summary.fxUnconverted.length > 0) {
-    alerts.push({
-      level: 'warning',
-      title: 'Missing exchange rate',
-      detail: `Some assets are held in ${summary.fxUnconverted.join(
-        ', ',
-      )} with no exchange rate on file — their value is counted at face amount, not converted to LKR. Add a rate to fix the totals.`,
-    })
+  return alerts
+}
+
+/** PF-306/307: evaluate only rules with an explicit user threshold. These are
+ * read-only, explainable alerts; they never create records or move money. */
+export function financialRuleAlerts(db: FinanceDatabase): Array<{
+  level: 'info' | 'warning' | 'critical'
+  title: string
+  detail: string
+}> {
+  const rules = db.settings.financialRules ?? {}
+  const alerts: Array<{
+    level: 'info' | 'warning' | 'critical'
+    title: string
+    detail: string
+  }> = []
+  const month = new Date().toISOString().slice(0, 7)
+  const transactions = getUnifiedTransactions(db).filter(
+    (transaction) =>
+      transaction.date.startsWith(month) &&
+      transaction.transactionType !== 'transfer',
+  )
+
+  if (rules.largeTransactionThresholdLkr) {
+    const large = transactions.filter(
+      (transaction) =>
+        Math.abs(transaction.convertedLkrAmount || transaction.amount) >=
+        rules.largeTransactionThresholdLkr!,
+    )
+    if (large.length > 0) {
+      alerts.push({
+        level: 'info',
+        title: 'Large transaction review',
+        detail: `${large.length} tracked transaction${large.length === 1 ? '' : 's'} this month meet your LKR ${rules.largeTransactionThresholdLkr.toLocaleString()} threshold.`,
+      })
+    }
   }
 
-  // Category-level budget alerts (this calendar month). Over budget is
-  // critical regardless of timing; "nearly spent" only fires while there is
-  // still a meaningful part of the month left, so it doesn't nag on the 30th.
-  const now = new Date()
-  const daysInMonth = new Date(
-    now.getFullYear(),
-    now.getMonth() + 1,
-    0,
-  ).getDate()
-  const daysLeft = daysInMonth - now.getDate()
-  const lkr = (n: number) => `LKR ${Math.round(n).toLocaleString('en-LK')}`
-  for (const row of budgetVsActualSummary(db)) {
-    if (row.budget <= 0) continue
-    if (row.overBudget) {
+  if (rules.monthlyInvestmentTargetLkr) {
+    const investedThisMonth =
+      db.stock_holdings
+        .filter(
+          (holding) =>
+            holding.buyDate.startsWith(month) && holding.currency === 'LKR',
+        )
+        .reduce(
+          (sum, holding) =>
+            sum + Math.max(0, holding.quantity * holding.buyPrice),
+          0,
+        ) +
+      db.fixed_deposits
+        .filter(
+          (deposit) =>
+            deposit.startDate.startsWith(month) && deposit.currency === 'LKR',
+        )
+        .reduce((sum, deposit) => sum + Math.max(0, deposit.principal), 0)
+    const target = rules.monthlyInvestmentTargetLkr
+    if (investedThisMonth >= target) {
       alerts.push({
-        level: 'critical',
-        title: `Over budget: ${row.category}`,
-        detail: `Spent ${lkr(row.actual)} of a ${lkr(row.budget)} budget this month (${Math.round(row.percentUsed)}%).`,
+        level: 'info',
+        title: 'Monthly investment target reached',
+        detail: `Tracked LKR ${Math.round(investedThisMonth).toLocaleString()} of your LKR ${target.toLocaleString()} target this month.`,
       })
-    } else if (row.percentUsed >= 90 && daysLeft >= 3) {
+    } else {
       alerts.push({
         level: 'warning',
-        title: `Budget nearly spent: ${row.category}`,
-        detail: `${Math.round(row.percentUsed)}% of the ${row.category} budget used with ${daysLeft} days left in the month.`,
+        title: 'Monthly investment target behind',
+        detail: `Tracked LKR ${Math.round(investedThisMonth).toLocaleString()} of your LKR ${target.toLocaleString()} target this month; the gap is LKR ${Math.round(target - investedThisMonth).toLocaleString()}.`,
+      })
+    }
+  }
+
+  if (rules.discretionarySpendingThresholdLkr) {
+    const discretionaryCategories = new Set([
+      'dining',
+      'entertainment',
+      'shopping',
+      'discretionary',
+      'hobbies',
+      'leisure',
+    ])
+    const discretionarySpend = transactions
+      .filter(
+        (transaction) =>
+          transaction.kind === 'expense' &&
+          discretionaryCategories.has(
+            transaction.category.trim().toLowerCase(),
+          ),
+      )
+      .reduce(
+        (sum, transaction) =>
+          sum +
+          Math.max(0, transaction.convertedLkrAmount || transaction.amount),
+        0,
+      )
+    if (discretionarySpend > rules.discretionarySpendingThresholdLkr) {
+      alerts.push({
+        level: 'warning',
+        title: 'Discretionary spending threshold exceeded',
+        detail: `Tracked categories Dining, Entertainment, Shopping, Discretionary, Hobbies, and Leisure total LKR ${Math.round(discretionarySpend).toLocaleString()} this month, above your LKR ${rules.discretionarySpendingThresholdLkr.toLocaleString()} threshold.`,
+      })
+    }
+  }
+
+  if (rules.investmentAllocationTargetPct) {
+    const hasNonLkrInvestment = [
+      ...db.stock_holdings,
+      ...db.fixed_deposits,
+    ].some((holding) => holding.currency !== 'LKR')
+    const summary = financeSummary(db)
+    if (hasNonLkrInvestment || summary.netWorthLkr <= 0) {
+      alerts.push({
+        level: 'info',
+        title: 'Investment allocation not evaluated',
+        detail:
+          'The allocation target needs positive net worth and LKR-denominated investment values; add FX valuation before relying on this comparison.',
+      })
+    } else {
+      const invested =
+        summary.stockHoldingsValueLkr + summary.fixedDepositsValueLkr
+      const allocationPct = (invested / summary.netWorthLkr) * 100
+      const target = rules.investmentAllocationTargetPct
+      alerts.push({
+        level: allocationPct >= target ? 'info' : 'warning',
+        title:
+          allocationPct >= target
+            ? 'Investment allocation target reached'
+            : 'Investment allocation below target',
+        detail: `Tracked LKR ${Math.round(invested).toLocaleString()} is ${allocationPct.toFixed(1)}% of net worth; target is ${target.toLocaleString()}%.`,
       })
     }
   }
   return alerts
+}
+
+export function safeToSpendSummary(db: FinanceDatabase): {
+  cashLkr: number
+  reserveLkr: number
+  committedLkr: number
+  amountLkr: number
+  configured: boolean
+  basis: string
+} {
+  const cashLkr = financeSummary(db).cashBalanceLkr
+  const reserveLkr = Math.max(0, db.settings.minimumCashReserveLkr ?? 0)
+  const cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - 2)
+  const cutoffMonth = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}`
+  const recurringExpenses = db.expense_records.filter(
+    (expense) =>
+      expense.recurring &&
+      !isDeletedRecord(expense) &&
+      !isTransferRecord(expense) &&
+      expense.date.slice(0, 7) >= cutoffMonth,
+  )
+  const recurringMonths = new Set(
+    recurringExpenses.map((expense) => expense.date.slice(0, 7)),
+  )
+  const recurringTotal = recurringExpenses.reduce(
+    (sum, expense) =>
+      sum + Math.max(0, expense.convertedLkrAmount || expense.amount),
+    0,
+  )
+  const committedLkr =
+    recurringMonths.size > 0 ? recurringTotal / recurringMonths.size : 0
+  return {
+    cashLkr,
+    reserveLkr,
+    committedLkr,
+    amountLkr: Math.max(0, cashLkr - reserveLkr - committedLkr),
+    configured: reserveLkr > 0,
+    basis:
+      committedLkr > 0
+        ? 'Cash balance minus the minimum reserve and average monthly recurring expenses from the last three months. Unrecorded commitments are not included.'
+        : 'Cash balance minus the minimum reserve. No recurring expenses were recorded in the last three months.',
+  }
 }
 
 export function maskSensitive(value: unknown): unknown {
@@ -3124,6 +5124,195 @@ function stringField(
   return typeof value === 'string' && value.trim() ? value.trim() : fallback
 }
 
+/** Keep currency joins deterministic across forms, imports, and legacy clients. */
+export function normalizeCurrencyCode(
+  value: unknown,
+  fallback = 'LKR',
+): CurrencyCode {
+  if (typeof value !== 'string' || !value.trim()) return fallback
+  return value.trim().toUpperCase()
+}
+
+function currencyField(
+  payload: AddPayload,
+  key: string,
+  fallback: string,
+): CurrencyCode {
+  return normalizeCurrencyCode(payload[key], fallback)
+}
+
+function normalizeFinanceCurrencyFields(db: FinanceDatabase): FinanceDatabase {
+  const currencyCollections = [
+    'finance_accounts',
+    'income_records',
+    'expense_records',
+    'budget_categories',
+    'tax_records',
+    'income_sources',
+    'stock_holdings',
+    'fixed_deposits',
+    'loans',
+    'properties',
+    'insurance_policies',
+  ] as const
+  const normalized = { ...db, settings: { ...db.settings } }
+  normalized.transfers = Array.isArray(normalized.transfers) ? normalized.transfers : []
+  normalized.scheduled_transactions = Array.isArray(normalized.scheduled_transactions)
+    ? normalized.scheduled_transactions
+    : []
+  for (const key of currencyCollections) {
+    normalized[key] = (Array.isArray(normalized[key]) ? normalized[key] : []).map((record) => {
+      const next = { ...record } as Record<string, unknown>
+      for (const field of ['currency', 'originalCurrency', 'feeCurrency']) {
+        if (field in next) next[field] = normalizeCurrencyCode(next[field])
+      }
+      return next
+    }) as never
+  }
+  normalized.exchange_rates = normalized.exchange_rates.map((rate) => ({
+    ...rate,
+    ...(typeof rate.base === 'string'
+      ? { base: normalizeCurrencyCode(rate.base) }
+      : {}),
+    ...(typeof rate.target === 'string'
+      ? { target: normalizeCurrencyCode(rate.target) }
+      : {}),
+  }))
+  normalized.settings.baseCurrency = normalizeCurrencyCode(
+    normalized.settings.baseCurrency,
+  )
+  normalized.settings.reportingCurrencies =
+    normalized.settings.reportingCurrencies.map((currency) =>
+      normalizeCurrencyCode(currency),
+    )
+  return normalized
+}
+
+const FINANCE_AI_TASK_STATUSES: Array<FinanceAiTaskStatus> = [
+  'queued',
+  'running',
+  'awaiting_approval',
+  'completed',
+  'failed',
+  'cancelled',
+]
+
+function financeAiTaskStatus(value: unknown): FinanceAiTaskStatus {
+  return FINANCE_AI_TASK_STATUSES.includes(value as FinanceAiTaskStatus)
+    ? (value as FinanceAiTaskStatus)
+    : 'queued'
+}
+
+function financeAiTaskRisk(value: unknown): FinanceAiTask['risk'] {
+  return value === 'high' || value === 'medium' ? value : 'low'
+}
+
+function normalizeFinanceAiTask(
+  payload: AddPayload,
+  base: Partial<FinanceAiTask> & {
+    id: string
+    createdAt: string
+    updatedAt: string
+  },
+  updating = false,
+): FinanceAiTask {
+  const currentStatus = base.status ?? 'queued'
+  const nextStatus =
+    payload.status === undefined && updating
+      ? currentStatus
+      : financeAiTaskStatus(payload.status)
+  if (updating && nextStatus !== currentStatus) {
+    const allowed: Record<FinanceAiTaskStatus, Array<FinanceAiTaskStatus>> = {
+      queued: ['running', 'cancelled'],
+      running: ['awaiting_approval', 'completed', 'failed', 'cancelled'],
+      awaiting_approval: ['running', 'completed', 'cancelled'],
+      completed: [],
+      failed: ['queued', 'running', 'cancelled'],
+      cancelled: ['queued'],
+    }
+    if (!allowed[currentStatus].includes(nextStatus)) {
+      throw new Error(
+        `Invalid AI task status transition: ${currentStatus} -> ${nextStatus}`,
+      )
+    }
+  }
+  const terminal =
+    nextStatus === 'completed' ||
+    nextStatus === 'failed' ||
+    nextStatus === 'cancelled'
+  const now = nowIso()
+  const priorHistory = Array.isArray(base.statusHistory)
+    ? base.statusHistory.filter(
+        (event): event is FinanceAiTaskStatusEvent =>
+          FINANCE_AI_TASK_STATUSES.includes(event.status) &&
+          typeof event.at === 'string',
+      )
+    : []
+  const statusHistory: Array<FinanceAiTaskStatusEvent> =
+    updating && nextStatus !== currentStatus
+      ? [
+          ...priorHistory,
+          {
+            status: nextStatus,
+            at: now,
+            by:
+              payload.statusChangedBy === 'finance_agent'
+                ? 'finance_agent'
+                : 'human',
+          },
+        ]
+      : priorHistory.length > 0
+        ? priorHistory
+        : [{ status: nextStatus, at: base.createdAt }]
+  return {
+    id: base.id,
+    auditCorrelationId:
+      base.auditCorrelationId ??
+      (updating ? `ai-task:${base.id}` : randomUUID()),
+    taskType: stringField(
+      payload,
+      'taskType',
+      base.taskType ?? 'finance_assist',
+    ),
+    title: stringField(payload, 'title', base.title ?? 'Finance AI task'),
+    status: nextStatus,
+    risk:
+      payload.risk === undefined && updating
+        ? (base.risk ?? 'low')
+        : financeAiTaskRisk(payload.risk),
+    requestedAction: stringField(
+      payload,
+      'requestedAction',
+      base.requestedAction ?? 'review',
+    ),
+    inputSummary: stringField(payload, 'inputSummary', base.inputSummary ?? ''),
+    resultSummary:
+      optionalString(payload, 'resultSummary') ??
+      (payload.resultSummary === undefined ? base.resultSummary : undefined),
+    errorMessage:
+      optionalString(payload, 'errorMessage') ??
+      (payload.errorMessage === undefined ? base.errorMessage : undefined),
+    approvalRequired: booleanField(
+      payload,
+      'approvalRequired',
+      base.approvalRequired ?? false,
+    ),
+    source: stringField(payload, 'source', base.source ?? 'finance-agent'),
+    agentName:
+      optionalString(payload, 'agentName') ??
+      (payload.agentName === undefined ? base.agentName : undefined),
+    createdAt: base.createdAt,
+    updatedAt: now,
+    startedAt:
+      optionalString(payload, 'startedAt') ??
+      (nextStatus === 'running' ? (base.startedAt ?? now) : base.startedAt),
+    completedAt:
+      optionalString(payload, 'completedAt') ??
+      (terminal ? (base.completedAt ?? now) : base.completedAt),
+    statusHistory,
+  }
+}
+
 function optionalString(payload: AddPayload, key: string): string | undefined {
   const value = payload[key]
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
@@ -3150,74 +5339,6 @@ function optionalNumber(payload: AddPayload, key: string): number | undefined {
   return Number.isFinite(value) ? value : undefined
 }
 
-/**
- * Parse `payload.splits` (from add/update_record) into `ExpenseSplit[]`, or
- * `undefined` when absent/empty. `null` / `[]` are treated as an explicit
- * "clear the splits" on update.
- */
-function parseExpenseSplits(payload: AddPayload): Array<ExpenseSplit> | undefined {
-  const raw = payload.splits
-  if (!Array.isArray(raw) || raw.length === 0) return undefined
-  return raw.map((entry) => {
-    const row: AddPayload =
-      entry && typeof entry === 'object' ? (entry as AddPayload) : {}
-    return {
-      category: stringField(row, 'category', 'Other'),
-      subcategory: optionalString(row, 'subcategory'),
-      amount: numberField(row, 'amount', 0),
-      notes: optionalString(row, 'notes'),
-    }
-  })
-}
-
-/** Throws when `splits` don't form a valid split of `amount`. */
-function assertValidExpenseSplits(
-  splits: Array<ExpenseSplit> | undefined,
-  amount: number,
-): void {
-  if (!splits) return
-  if (splits.length < 2) {
-    throw new Error('An expense split needs at least two parts')
-  }
-  const sum = splits.reduce((acc, part) => acc + part.amount, 0)
-  if (Math.abs(sum - amount) > 0.01) {
-    throw new Error(
-      `Split parts add up to ${sum}, which does not match the expense amount ${amount}`,
-    )
-  }
-}
-
-/**
- * Parse `payload.defaultSplits` (Merchant remembered split) into
- * `{category, percent}[]`, or `undefined` when absent/empty (`[]`/`null`
- * clears on update). Percentages must be positive and sum to ~100.
- */
-function parseMerchantDefaultSplits(
-  payload: AddPayload,
-): Array<{ category: string; percent: number }> | undefined {
-  const raw = payload.defaultSplits
-  if (!Array.isArray(raw) || raw.length === 0) return undefined
-  const parts = raw.map((entry) => {
-    const row: AddPayload =
-      entry && typeof entry === 'object' ? (entry as AddPayload) : {}
-    return {
-      category: stringField(row, 'category', 'Other'),
-      percent: numberField(row, 'percent', 0),
-    }
-  })
-  const sum = parts.reduce((acc, p) => acc + p.percent, 0)
-  if (
-    parts.length < 2 ||
-    parts.some((p) => p.percent <= 0) ||
-    Math.abs(sum - 100) > 0.5
-  ) {
-    throw new Error(
-      `Merchant default split percentages must be positive and sum to ~100 (got ${sum})`,
-    )
-  }
-  return parts
-}
-
 function booleanField(
   payload: AddPayload,
   key: string,
@@ -3225,6 +5346,21 @@ function booleanField(
 ): boolean {
   const value = payload[key]
   return typeof value === 'boolean' ? value : fallback
+}
+
+function investmentJournalEntryTypeField(
+  value: unknown,
+): InvestmentJournalEntry['entryType'] {
+  const allowed: Array<InvestmentJournalEntry['entryType']> = [
+    'thesis',
+    'review',
+    'buy',
+    'sell',
+    'note',
+  ]
+  return allowed.includes(value as InvestmentJournalEntry['entryType'])
+    ? (value as InvestmentJournalEntry['entryType'])
+    : 'note'
 }
 
 function stringArray(value: unknown): Array<string> {
@@ -3286,6 +5422,19 @@ function employmentTypeField(value: unknown): IncomeSource['employmentType'] {
     : 'other'
 }
 
+function incomeSourceStatusField(value: unknown): IncomeSource['status'] {
+  const allowed: Array<IncomeSource['status']> = [
+    'active',
+    'paused',
+    'notice_period',
+    'ended',
+    'terminated',
+  ]
+  return allowed.includes(value as IncomeSource['status'])
+    ? (value as IncomeSource['status'])
+    : 'active'
+}
+
 function interestPayoutField(value: unknown): FixedDeposit['interestPayout'] {
   const allowed: Array<FixedDeposit['interestPayout']> = [
     'monthly',
@@ -3296,6 +5445,19 @@ function interestPayoutField(value: unknown): FixedDeposit['interestPayout'] {
   return allowed.includes(value as FixedDeposit['interestPayout'])
     ? (value as FixedDeposit['interestPayout'])
     : 'at_maturity'
+}
+
+function incomeSubtypeField(value: unknown): IncomeRecord['incomeSubtype'] {
+  const allowed: Array<NonNullable<IncomeRecord['incomeSubtype']>> = [
+    'salary',
+    'dividend',
+    'interest',
+    'freelance',
+    'other',
+  ]
+  return allowed.includes(value as NonNullable<IncomeRecord['incomeSubtype']>)
+    ? (value as IncomeRecord['incomeSubtype'])
+    : 'other'
 }
 
 function fixedDepositStatusField(value: unknown): FixedDeposit['status'] {
@@ -3326,6 +5488,17 @@ function propertyTypeField(value: unknown): Property['propertyType'] {
   return allowed.includes(value as Property['propertyType'])
     ? (value as Property['propertyType'])
     : 'residential'
+}
+
+function insuranceStatusField(value: unknown): InsurancePolicy['status'] {
+  const allowed: Array<InsurancePolicy['status']> = [
+    'active',
+    'expired',
+    'cancelled',
+  ]
+  return allowed.includes(value as InsurancePolicy['status'])
+    ? (value as InsurancePolicy['status'])
+    : 'active'
 }
 
 function reconciliationStatus(
@@ -3391,40 +5564,13 @@ function parseDate(dateString: string): { year: number; month: number } | null {
   }
 }
 
-/**
- * PF review item 2: the category-level LKR breakdown of one expense. With
- * `splits`, each part gets its share of `convertedLkrAmount` pro-rata to its
- * `amount` (so an FX-converted record total is preserved exactly). Without
- * splits, the whole record lands under its own `category`. Category-level
- * aggregations (budget-vs-actual, trend category totals, the analyst's
- * category breakdown) go through this; record-level totals never do.
- */
-export function expenseCategoryBreakdown(
-  exp: ExpenseRecord,
-): Array<{ category: string; subcategory?: string; lkr: number }> {
-  if (!exp.splits || exp.splits.length === 0) {
-    return [
-      {
-        category: exp.category || 'Other',
-        subcategory: exp.subcategory,
-        lkr: exp.convertedLkrAmount,
-      },
-    ]
-  }
-  const partsTotal =
-    exp.amount || exp.splits.reduce((acc, p) => acc + p.amount, 0) || 1
-  return exp.splits.map((part) => ({
-    category: part.category || 'Other',
-    subcategory: part.subcategory,
-    lkr: exp.convertedLkrAmount * (part.amount / partsTotal),
-  }))
-}
-
 export function getUnifiedTransactions(
   db: FinanceDatabase,
+  options: { includeDeleted?: boolean } = {},
 ): Array<UnifiedTransaction> {
-  const fromIncome: Array<UnifiedTransaction> = db.income_records.map(
-    (inc) => ({
+  const fromIncome: Array<UnifiedTransaction> = db.income_records
+    .filter((inc) => options.includeDeleted || !isDeletedRecord(inc))
+    .map((inc) => ({
       id: inc.id,
       kind: 'income',
       date: inc.dateReceived,
@@ -3433,6 +5579,7 @@ export function getUnifiedTransactions(
       accountId: inc.accountId,
       currency: inc.originalCurrency,
       amount: inc.originalAmount,
+      exchangeRateUsed: inc.exchangeRateUsed,
       convertedLkrAmount: inc.convertedLkrAmount,
       notes: inc.notes,
       documentRef: inc.documentRef,
@@ -3440,14 +5587,18 @@ export function getUnifiedTransactions(
       incomeSourceId: inc.incomeSourceId,
       tags: inc.tags,
       status: inc.status,
+      transactionType: inc.transactionType ?? 'income',
+      transferId: inc.transferId,
+      transferAccountId: inc.transferAccountId,
       source: inc.source,
       createdAt: inc.createdAt,
       updatedAt: inc.updatedAt,
-    }),
-  )
+      deletedAt: inc.deletedAt,
+    }))
 
-  const fromExpense: Array<UnifiedTransaction> = db.expense_records.map(
-    (exp) => ({
+  const fromExpense: Array<UnifiedTransaction> = db.expense_records
+    .filter((exp) => options.includeDeleted || !isDeletedRecord(exp))
+    .map((exp) => ({
       id: exp.id,
       kind: 'expense',
       date: exp.date,
@@ -3456,42 +5607,151 @@ export function getUnifiedTransactions(
       accountId: exp.accountId,
       currency: exp.currency,
       amount: exp.amount,
+      exchangeRateUsed: exp.exchangeRateUsed,
       convertedLkrAmount: exp.convertedLkrAmount,
       notes: exp.notes,
       documentRef: exp.documentRef,
       recurring: exp.recurring,
       subcategory: exp.subcategory,
-      splits: exp.splits,
       tags: exp.tags,
       status: exp.status,
+      transactionType: exp.transactionType ?? 'expense',
+      transferId: exp.transferId,
+      transferAccountId: exp.transferAccountId,
+      splitGroupId: exp.splitGroupId,
+      splitIndex: exp.splitIndex,
       source: exp.source,
       createdAt: exp.createdAt,
       updatedAt: exp.updatedAt,
-    }),
-  )
+      deletedAt: exp.deletedAt,
+    }))
 
-  const fromTransfer: Array<UnifiedTransaction> = db.transfers.map((t) => ({
-    id: t.id,
-    kind: 'transfer',
-    date: t.date,
-    counterparty: [t.fromAccountId, t.toAccountId].filter(Boolean).join(' → '),
-    category: 'Transfer',
-    accountId: t.fromAccountId,
-    fromAccountId: t.fromAccountId,
-    toAccountId: t.toAccountId,
-    currency: t.currency,
-    amount: t.amount,
-    convertedLkrAmount: t.convertedLkrAmount,
-    notes: t.notes,
-    source: t.source,
-    createdAt: t.createdAt,
-    updatedAt: t.updatedAt,
-  }))
+  const fromTransfers: Array<UnifiedTransaction> = (db.transfers ?? [])
+    .filter((transfer) => options.includeDeleted || !isDeletedRecord(transfer))
+    .flatMap((transfer) => {
+      const row = transfer as Record<string, unknown>
+      const date = typeof row.date === 'string' ? row.date : ''
+      const fromAccountId = typeof row.fromAccountId === 'string' ? row.fromAccountId : ''
+      const toAccountId = typeof row.toAccountId === 'string' ? row.toAccountId : ''
+      const amount = typeof row.amount === 'number' ? row.amount : Number(row.amount)
+      if (!date || !Number.isFinite(amount)) return []
+      return [{
+        id: String(row.id ?? randomUUID()), kind: 'transfer' as const, date,
+        counterparty: `${fromAccountId} → ${toAccountId}`, category: 'Transfer',
+        accountId: fromAccountId || undefined, currency: String(row.currency ?? 'LKR') as CurrencyCode,
+        amount, convertedLkrAmount: Number(row.convertedLkrAmount ?? amount),
+        status: reconciliationStatus(row.status), source: String(row.source ?? 'unknown'),
+        transactionType: 'transfer' as const,
+        createdAt: String(row.createdAt ?? date), updatedAt: String(row.updatedAt ?? date),
+        notes: typeof row.notes === 'string' ? row.notes : undefined,
+      }]
+    })
 
-  return [...fromIncome, ...fromExpense, ...fromTransfer].sort((a, b) => {
+  return [...fromIncome, ...fromExpense, ...fromTransfers].sort((a, b) => {
     if (a.date !== b.date) return a.date < b.date ? 1 : -1
     return a.createdAt < b.createdAt ? 1 : -1
   })
+}
+
+function csvCell(value: unknown): string {
+  const text = value === undefined || value === null ? '' : String(value)
+  const safeText =
+    typeof value === 'string' && /^[=+\-@]/.test(text) ? `'${text}` : text
+  return `"${safeText.replace(/"/g, '""')}"`
+}
+
+/** AI-113: export review-safe task metadata, never task input/result summaries. */
+export function buildAiTaskReviewCsv(db: FinanceDatabase): string {
+  const columns = [
+    'auditCorrelationId',
+    'id',
+    'taskType',
+    'title',
+    'status',
+    'risk',
+    'requestedAction',
+    'approvalRequired',
+    'source',
+    'agentName',
+    'createdAt',
+    'updatedAt',
+    'startedAt',
+    'completedAt',
+    'statusHistory',
+  ] as const
+  const rows = [...db.ai_tasks]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((task) =>
+      columns
+        .map((column) =>
+          csvCell(
+            column === 'auditCorrelationId'
+              ? task.auditCorrelationId || `ai-task:${task.id}`
+              : column === 'statusHistory'
+                ? JSON.stringify(task.statusHistory || [])
+                : task[column],
+          ),
+        )
+        .join(','),
+    )
+  return [columns.map(csvCell).join(','), ...rows].join('\r\n') + '\r\n'
+}
+
+/** Build a formula-safe CSV export of the authenticated user's unified ledger. */
+export function buildTransactionsCsv(db: FinanceDatabase): string {
+  const columns = [
+    'id',
+    'kind',
+    'transactionType',
+    'date',
+    'counterparty',
+    'category',
+    'subcategory',
+    'accountId',
+    'transferId',
+    'transferAccountId',
+    'splitGroupId',
+    'splitIndex',
+    'currency',
+    'amount',
+    'convertedLkrAmount',
+    'status',
+    'tags',
+    'source',
+    'createdAt',
+    'updatedAt',
+  ] as const
+  const rows = getUnifiedTransactions(db).map((transaction) =>
+    columns.map((column) => csvCell(transaction[column])).join(','),
+  )
+  return [columns.map(csvCell).join(','), ...rows].join('\r\n') + '\r\n'
+}
+
+/** Build a formula-safe CSV export of tax records for external review/filing. */
+export function buildTaxRecordsCsv(db: FinanceDatabase): string {
+  const columns = [
+    'id',
+    'taxYear',
+    'incomeType',
+    'amount',
+    'currency',
+    'convertedLkrAmount',
+    'exchangeRateSource',
+    'deductionCategory',
+    'estimatedTaxableAmount',
+    'taxPaid',
+    'taxDue',
+    'requiresConfirmation',
+    'notes',
+    'supportingDocument',
+    'source',
+    'createdAt',
+    'updatedAt',
+  ] as const
+  const rows = db.tax_records.map((record) =>
+    columns.map((column) => csvCell(record[column])).join(','),
+  )
+  return [columns.map(csvCell).join(','), ...rows].join('\r\n') + '\r\n'
 }
 
 export function getMonthlySummary(
@@ -3509,7 +5769,7 @@ export function getMonthlySummary(
   const expenseMap = new Map<string, number>()
 
   for (const inc of db.income_records) {
-    if (!includeInTotals(inc)) continue
+    if (isDeletedRecord(inc) || isTransferRecord(inc)) continue
     const dateInfo = parseDate(inc.dateReceived)
     if (!dateInfo) continue
     if (year !== undefined && dateInfo.year !== year) continue
@@ -3520,7 +5780,7 @@ export function getMonthlySummary(
   }
 
   for (const exp of db.expense_records) {
-    if (!includeInTotals(exp)) continue
+    if (isDeletedRecord(exp) || isTransferRecord(exp)) continue
     const dateInfo = parseDate(exp.date)
     if (!dateInfo) continue
     if (year !== undefined && dateInfo.year !== year) continue
@@ -3558,537 +5818,6 @@ export function getMonthlySummary(
   })
 
   return result
-}
-
-// ---------------------------------------------------------------------------
-// PF review item 7: dashboard derivations that used to be recomputed in the
-// browser (finance-trends-card, recurring-bills-insight, upcoming-money) and
-// re-implemented a THIRD time in Python in personal-finance-digest.sh. Now
-// computed once here and carried on the payload. All amounts are raw LKR; the
-// payload applies the PF-201 `fxToBase` scaling for display.
-// ---------------------------------------------------------------------------
-
-/** Last `monthsBack` calendar months of income/expense/net plus this month's
- *  top expense categories. Mirrors the old client `buildTrendData` /
- *  `buildCategoryData` (no pending-status filter — matches prior UI). */
-export function getFinanceTrends(
-  db: FinanceDatabase,
-  monthsBack = 6,
-): {
-  series: Array<{
-    month: string
-    income: number
-    expense: number
-    net: number
-  }>
-  categoriesThisMonth: Array<{ category: string; amount: number }>
-} {
-  const now = new Date()
-  const months: Array<string> = []
-  for (let i = monthsBack - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    months.push(
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-    )
-  }
-  const incomeByMonth = new Map<string, number>()
-  const expenseByMonth = new Map<string, number>()
-  for (const row of db.income_records) {
-    const m = String(row.dateReceived).slice(0, 7)
-    incomeByMonth.set(m, (incomeByMonth.get(m) ?? 0) + row.convertedLkrAmount)
-  }
-  for (const row of db.expense_records) {
-    const m = String(row.date).slice(0, 7)
-    expenseByMonth.set(m, (expenseByMonth.get(m) ?? 0) + row.convertedLkrAmount)
-  }
-  const series = months.map((month) => {
-    const income = incomeByMonth.get(month) ?? 0
-    const expense = expenseByMonth.get(month) ?? 0
-    return { month, income, expense, net: income - expense }
-  })
-
-  const currentMonth = months[months.length - 1]
-  const catTotals = new Map<string, number>()
-  for (const row of db.expense_records) {
-    if (String(row.date).slice(0, 7) !== currentMonth) continue
-    for (const part of expenseCategoryBreakdown(row)) {
-      catTotals.set(
-        part.category,
-        (catTotals.get(part.category) ?? 0) + part.lkr,
-      )
-    }
-  }
-  const categoriesThisMonth = [...catTotals.entries()]
-    .map(([category, amount]) => ({ category, amount }))
-    .sort((a, b) => b.amount - a.amount)
-    .slice(0, 8)
-
-  return { series, categoriesThisMonth }
-}
-
-/** Vendors seen with a similar amount (±20%) in 2+ of the last `monthsBack`
- *  distinct months — the shape of a recurring bill. Port of the old client
- *  `detectRecurringVendors`. */
-export interface RecurringBill {
-  /** Lower-cased match key (stable identity for the UI list). */
-  vendor: string
-  /** Original casing of the vendor as first entered — for display + write-back. */
-  displayVendor: string
-  category: string
-  monthsSeen: number
-  averageAmount: number
-  /** True when an expense for this vendor already exists in the current
-   *  calendar month — the "Log this month" action hides itself then. */
-  loggedThisMonth: boolean
-  /** Total logged for this vendor in the current calendar month (LKR), or
-   *  null when nothing is logged yet. */
-  thisMonthAmount: number | null
-  /** Fractional change of `thisMonthAmount` vs `averageAmount` (e.g. 0.25 =
-   *  25% higher than usual), or null when this month isn't logged. */
-  drift: number | null
-}
-
-export function getRecurringBills(
-  db: FinanceDatabase,
-  monthsBack = 3,
-): Array<RecurringBill> {
-  const now = new Date()
-  const cutoff = new Date()
-  cutoff.setMonth(cutoff.getMonth() - monthsBack)
-  const cutoffMonth = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}`
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-
-  const byVendor = new Map<
-    string,
-    {
-      displayVendor: string
-      category: string
-      entries: Array<{ month: string; amount: number }>
-      loggedThisMonth: boolean
-      thisMonthAmount: number
-    }
-  >()
-  for (const row of db.expense_records) {
-    const month = row.date.slice(0, 7)
-    const vendorKey = row.vendor.trim().toLowerCase()
-    if (!vendorKey || !month) continue
-    const bucket = byVendor.get(vendorKey) ?? {
-      displayVendor: row.vendor.trim(),
-      category: row.category || 'Other',
-      entries: [],
-      loggedThisMonth: false,
-      thisMonthAmount: 0,
-    }
-    if (month === thisMonth) {
-      bucket.loggedThisMonth = true
-      bucket.thisMonthAmount += row.convertedLkrAmount || row.amount || 0
-    }
-    if (month >= cutoffMonth) {
-      const amount = row.convertedLkrAmount || row.amount || 0
-      bucket.entries.push({ month, amount })
-    }
-    byVendor.set(vendorKey, bucket)
-  }
-
-  const results: Array<RecurringBill> = []
-  for (const [vendor, bucket] of byVendor) {
-    const distinctMonths = new Set(bucket.entries.map((e) => e.month))
-    if (distinctMonths.size < 2) continue
-    const amounts = bucket.entries.map((e) => e.amount)
-    const avg = amounts.reduce((s, a) => s + a, 0) / amounts.length
-    if (!amounts.every((a) => avg > 0 && Math.abs(a - avg) / avg <= 0.2)) continue
-    const thisMonthAmount = bucket.loggedThisMonth
-      ? bucket.thisMonthAmount
-      : null
-    results.push({
-      vendor,
-      displayVendor: bucket.displayVendor,
-      category: bucket.category,
-      monthsSeen: distinctMonths.size,
-      averageAmount: avg,
-      loggedThisMonth: bucket.loggedThisMonth,
-      thisMonthAmount,
-      drift:
-        thisMonthAmount !== null && avg > 0
-          ? (thisMonthAmount - avg) / avg
-          : null,
-    })
-  }
-  return results.sort((a, b) => b.monthsSeen - a.monthsSeen)
-}
-
-/** This-month payday state for a job. Pure. The client keeps an identical copy
- *  in `payday-status.ts` (with its own test) for the per-row badge; this one
- *  feeds `getUpcomingMoney` + the payload so the digest cron stops
- *  re-implementing it in Python. */
-function paydayStatusFor(
-  job: Record<string, unknown>,
-  incomeRecords: Array<Record<string, unknown>>,
-  today: Date,
-):
-  | { state: 'not_tracked' }
-  | { state: 'paid'; lastPaidDate: string }
-  | { state: 'due_soon'; daysUntil: number }
-  | { state: 'overdue'; daysOverdue: number } {
-  const status = (job.status as string) || 'active'
-  const monthly = job.monthlyIncomeAmount
-  const paydayDay = job.expectedPaydayDayOfMonth
-  if (
-    status !== 'active' ||
-    typeof monthly !== 'number' ||
-    typeof paydayDay !== 'number'
-  ) {
-    return { state: 'not_tracked' }
-  }
-  const jobId = (job.id as string) || ''
-  const employer = String(job.employerName ?? '').trim().toLowerCase()
-  const now = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const matches = incomeRecords.filter((r) => {
-    if (String(r.dateReceived ?? '').slice(0, 7) !== monthKey) return false
-    const linked = String(r.incomeSourceId ?? '')
-    if (linked) return linked === jobId
-    return String(r.sourceName ?? '').trim().toLowerCase() === employer
-  })
-  if (matches.length > 0) {
-    const lastPaidDate = matches
-      .map((r) => String(r.dateReceived ?? ''))
-      .sort()
-      .at(-1) as string
-    return { state: 'paid', lastPaidDate }
-  }
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-  const payday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    Math.min(paydayDay, lastDay),
-  )
-  const daysDiff = Math.round(
-    (payday.getTime() - now.getTime()) / (24 * 60 * 60 * 1000),
-  )
-  if (daysDiff < -3) return { state: 'overdue', daysOverdue: -daysDiff }
-  return { state: 'due_soon', daysUntil: daysDiff }
-}
-
-/** Forward-looking money events (paydays due/overdue, contract expiries, FD
- *  maturities) as structured data — the UI and the digest each render their
- *  own labels. Port of the data half of the old client `upcoming-money`. */
-export function getUpcomingMoney(
-  db: FinanceDatabase,
-  today: Date = new Date(),
-): {
-  paydays: Array<{
-    name: string
-    state: 'due_soon' | 'overdue'
-    days: number
-  }>
-  contracts: Array<{ name: string; days: number }>
-  fdMaturities: Array<{ name: string; days: number }>
-  scheduled: Array<{
-    id: string
-    dueDate: string
-    kind: 'income' | 'expense'
-    counterparty: string
-    amount: number
-    days: number
-  }>
-} {
-  const dayMs = 24 * 60 * 60 * 1000
-  const paydays: Array<{
-    name: string
-    state: 'due_soon' | 'overdue'
-    days: number
-  }> = []
-  const contracts: Array<{ name: string; days: number }> = []
-  for (const job of db.income_sources as Array<Record<string, unknown>>) {
-    const name = String(job.employerName ?? '') || 'Income source'
-    const s = paydayStatusFor(job, db.income_records, today)
-    if (s.state === 'overdue')
-      paydays.push({ name, state: 'overdue', days: s.daysOverdue })
-    else if (s.state === 'due_soon' && s.daysUntil <= 3)
-      paydays.push({ name, state: 'due_soon', days: s.daysUntil })
-
-    if (job.employmentType === 'contract' && job.status === 'active') {
-      const end = Date.parse(String(job.contractEndDate ?? ''))
-      if (Number.isFinite(end)) {
-        const days = Math.ceil((end - today.getTime()) / dayMs)
-        if (days <= 30) contracts.push({ name, days })
-      }
-    }
-  }
-
-  const fdMaturities: Array<{ name: string; days: number }> = []
-  for (const fd of db.fixed_deposits) {
-    if (fd.status !== 'active') continue
-    const maturity = Date.parse(fd.maturityDate)
-    if (!Number.isFinite(maturity)) continue
-    const days = Math.ceil((maturity - today.getTime()) / dayMs)
-    if (days >= -7 && days <= 30) {
-      fdMaturities.push({ name: fd.bankName || 'Fixed deposit', days })
-    }
-  }
-
-  // Pending scheduled transactions from ~2 weeks overdue to ~45 days out.
-  const startOfToday = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  ).getTime()
-  const scheduled = db.scheduled_transactions
-    .filter((s) => s.status === 'pending')
-    .map((s) => ({
-      id: s.id,
-      dueDate: s.dueDate,
-      kind: s.kind,
-      counterparty: s.counterparty,
-      amount: s.amount,
-      days: Math.round((Date.parse(s.dueDate) - startOfToday) / dayMs),
-    }))
-    .filter((s) => Number.isFinite(s.days) && s.days >= -14 && s.days <= 45)
-    .sort((a, b) => a.days - b.days)
-
-  return { paydays, contracts, fdMaturities, scheduled }
-}
-
-/** Non-LKR exposure across active jobs, holdings and FDs — grouped by
- *  currency, never summed across (no single-figure conversion). Port of the
- *  old screen-level `currencyExposure`. */
-export type CurrencyExposureSource = 'jobs' | 'holdings' | 'fixed_deposits'
-
-export interface CurrencyExposure {
-  currency: string
-  amount: number
-  /** What drives this currency's exposure, so the UI can label it. */
-  breakdown: Array<{
-    source: CurrencyExposureSource
-    label: string
-    amount: number
-    count: number
-  }>
-}
-
-export function getCurrencyExposure(db: FinanceDatabase): Array<CurrencyExposure> {
-  // per currency → per source: { amount, count }
-  const byCurrency = new Map<
-    string,
-    Map<CurrencyExposureSource, { amount: number; count: number }>
-  >()
-  const add = (
-    currency: string,
-    source: CurrencyExposureSource,
-    amount: number,
-  ) => {
-    if (!(amount > 0)) return
-    const cur = byCurrency.get(currency) ?? new Map()
-    const entry = cur.get(source) ?? { amount: 0, count: 0 }
-    entry.amount += amount
-    entry.count += 1
-    cur.set(source, entry)
-    byCurrency.set(currency, cur)
-  }
-
-  for (const job of db.income_sources as Array<Record<string, unknown>>) {
-    if (job.status !== 'active') continue
-    const amount = job.monthlyIncomeAmount
-    if (typeof amount === 'number')
-      add((job.currency as string) || 'LKR', 'jobs', amount)
-  }
-  for (const h of db.stock_holdings) {
-    const qty = typeof h.quantity === 'number' ? h.quantity : 0
-    const price =
-      (typeof h.lastKnownPrice === 'number' ? h.lastKnownPrice : undefined) ??
-      (typeof h.buyPrice === 'number' ? h.buyPrice : 0)
-    add(h.currency || 'LKR', 'holdings', qty * price)
-  }
-  for (const fd of db.fixed_deposits) {
-    if (fd.status === 'withdrawn') continue
-    if (typeof fd.principal === 'number')
-      add(fd.currency || 'LKR', 'fixed_deposits', fd.principal)
-  }
-
-  const sourceLabel: Record<CurrencyExposureSource, string> = {
-    jobs: 'active job',
-    holdings: 'holding',
-    fixed_deposits: 'fixed deposit',
-  }
-
-  return [...byCurrency.entries()]
-    .map(([currency, sources]) => {
-      const breakdown = [...sources.entries()]
-        .map(([source, { amount, count }]) => ({
-          source,
-          label: `${count} ${sourceLabel[source]}${count === 1 ? '' : 's'}`,
-          amount,
-          count,
-        }))
-        .sort((a, b) => b.amount - a.amount)
-      const amount = breakdown.reduce((sum, b) => sum + b.amount, 0)
-      return { currency, amount, breakdown }
-    })
-    .filter((e) => e.amount > 0)
-    .sort((a, b) => b.amount - a.amount)
-}
-
-/**
- * Multi-currency FX gain/loss decomposition for stock holdings — closes the
- * gap that `unrealizedStockPnlBase` conflates asset price movement and
- * currency movement into one number (it converts both cost and current
- * value at *today's* rate, per PF-206's toLkr). This splits a holding's
- * total return in LKR into the part attributable to the asset's own price
- * change (assetGainLkr) and the part attributable purely to the
- * currency/LKR exchange rate moving between buyDate and now (fxGainLkr):
- *
- *   totalReturnLkr = valueAtCurrentFx - costAtBuyFx
- *   assetGainLkr   = (valueNative - costNative) converted at *today's* rate
- *   fxGainLkr      = totalReturnLkr - assetGainLkr
- *                  = costNative * (rateNow - rateAtBuy)
- *
- * A holding is excluded (insufficientHistory: true, zeroed fields) when
- * there's no exchange rate on file for its buyDate — convertCurrency()
- * only walks direct/pivot/inverse *known* rates, it never estimates.
- */
-export type FxGainLossEntry = {
-  id: string
-  symbol: string
-  currency: CurrencyCode
-  quantity: number
-  assetGainLkr: number
-  fxGainLkr: number
-  totalReturnLkr: number
-  insufficientHistory: boolean
-}
-
-/**
- * Same lookup logic as getExchangeRate(), but scoped to a given `db`
- * instead of calling ensureFinanceStore() itself. getFxGainLoss (and
- * getCurrencyExposure alongside it) is meant to operate purely on its `db`
- * argument — convertCurrency()/getExchangeRate() always re-read the real
- * global store regardless of what `db` is passed around them, which is
- * fine in production (same underlying data) but silently breaks any test
- * that builds its own in-memory `db` without also writing it to the store.
- */
-function localExchangeRate(
-  db: FinanceDatabase,
-  base: string,
-  target: string,
-  date?: string,
-): number | undefined {
-  let relevant = (
-    db.exchange_rates as Array<{
-      base?: unknown
-      target?: unknown
-      rate?: unknown
-      date?: unknown
-    }>
-  ).filter(
-    (r) => r.base === base && r.target === target && typeof r.rate === 'number',
-  )
-  if (date !== undefined) {
-    const targetDate = new Date(date).getTime()
-    relevant = relevant.filter(
-      (r) => new Date((r.date as string) || 0).getTime() <= targetDate,
-    )
-  }
-  relevant = relevant.sort(
-    (a, b) =>
-      new Date((b.date as string) || 0).getTime() -
-      new Date((a.date as string) || 0).getTime(),
-  )
-  return relevant.length > 0 ? (relevant[0].rate as number) : undefined
-}
-
-function localConvertToLkr(
-  db: FinanceDatabase,
-  amount: number,
-  currency: string,
-  date?: string,
-): number | undefined {
-  if (currency === 'LKR') return amount
-  const direct = localExchangeRate(db, currency, 'LKR', date)
-  if (direct !== undefined) return amount * direct
-  const inverse = localExchangeRate(db, 'LKR', currency, date)
-  if (inverse !== undefined) return amount / inverse
-  return undefined
-}
-
-export function getFxGainLoss(db: FinanceDatabase): {
-  entries: Array<FxGainLossEntry>
-  totalAssetGainLkr: number
-  totalFxGainLkr: number
-  totalReturnLkr: number
-  excludedCount: number
-} {
-  let totalAssetGainLkr = 0
-  let totalFxGainLkr = 0
-  let totalReturnLkr = 0
-  let excludedCount = 0
-
-  const entries = db.stock_holdings.map((h): FxGainLossEntry => {
-    const currentPrice = h.lastKnownPrice ?? h.buyPrice
-    const costNative = h.buyPrice * h.quantity
-    const valueNative = currentPrice * h.quantity
-
-    if (h.currency === 'LKR') {
-      const returnLkr = valueNative - costNative
-      totalAssetGainLkr += returnLkr
-      totalReturnLkr += returnLkr
-      return {
-        id: h.id,
-        symbol: h.symbol,
-        currency: h.currency,
-        quantity: h.quantity,
-        assetGainLkr: returnLkr,
-        fxGainLkr: 0,
-        totalReturnLkr: returnLkr,
-        insufficientHistory: false,
-      }
-    }
-
-    const valueLkrNow = localConvertToLkr(db, valueNative, h.currency)
-    const costLkrAtBuy = localConvertToLkr(db, costNative, h.currency, h.buyDate)
-    const assetGainLkr = localConvertToLkr(db, valueNative - costNative, h.currency)
-    if (
-      valueLkrNow === undefined ||
-      costLkrAtBuy === undefined ||
-      assetGainLkr === undefined
-    ) {
-      excludedCount += 1
-      return {
-        id: h.id,
-        symbol: h.symbol,
-        currency: h.currency,
-        quantity: h.quantity,
-        assetGainLkr: 0,
-        fxGainLkr: 0,
-        totalReturnLkr: 0,
-        insufficientHistory: true,
-      }
-    }
-
-    const returnLkr = valueLkrNow - costLkrAtBuy
-    const fxGainLkr = returnLkr - assetGainLkr
-    totalAssetGainLkr += assetGainLkr
-    totalFxGainLkr += fxGainLkr
-    totalReturnLkr += returnLkr
-    return {
-      id: h.id,
-      symbol: h.symbol,
-      currency: h.currency,
-      quantity: h.quantity,
-      assetGainLkr,
-      fxGainLkr,
-      totalReturnLkr: returnLkr,
-      insufficientHistory: false,
-    }
-  })
-
-  return {
-    entries,
-    totalAssetGainLkr,
-    totalFxGainLkr,
-    totalReturnLkr,
-    excludedCount,
-  }
 }
 
 /**
@@ -4146,10 +5875,6 @@ export function getAverageMonthlySavingsRatePct(
  * here is new, grouping getUnifiedTransactions()'s expense rows by month.
  */
 export function buildFinanceQueryContext(db: FinanceDatabase): {
-  /** PF-201: every figure in this context is LKR, including `summary` — the
-   *  Finance Analyst prompt must not see base-currency aggregates next to the
-   *  raw-LKR `monthlySummary` / `categoryBreakdown` / `topVendors`. */
-  currency: 'LKR'
   summary: ReturnType<typeof financeSummary>
   monthlySummary: ReturnType<typeof getMonthlySummary>
   categoryBreakdown: {
@@ -4157,6 +5882,8 @@ export function buildFinanceQueryContext(db: FinanceDatabase): {
     lastMonth: Record<string, number>
   }
   topVendors: { thisMonth: Array<{ vendor: string; amount: number }> }
+  budgetVsActual: ReturnType<typeof budgetVsActualSummary>
+  budgetAlertThresholdPct: number
   tradingSummary: ReturnType<typeof tradingPerformanceSummary>
 } {
   const now = new Date()
@@ -4166,18 +5893,14 @@ export function buildFinanceQueryContext(db: FinanceDatabase): {
   const lastMonthKey = `${lastMonthDate.getUTCFullYear()}-${lastMonthDate.getUTCMonth() + 1}`
 
   const expenses = getUnifiedTransactions(db).filter(
-    (t) => t.kind === 'expense',
+    (t) => t.kind === 'expense' && t.transactionType !== 'transfer',
   )
   const byCategory = (monthKey: string) => {
     const totals: Record<string, number> = {}
-    // Iterate raw expense_records (not the unified list) so `splits` are
-    // visible and each part is attributed to its own category.
-    for (const exp of db.expense_records) {
-      const d = parseDate(exp.date)
+    for (const t of expenses) {
+      const d = parseDate(t.date)
       if (!d || `${d.year}-${d.month}` !== monthKey) continue
-      for (const part of expenseCategoryBreakdown(exp)) {
-        totals[part.category] = (totals[part.category] ?? 0) + part.lkr
-      }
+      totals[t.category] = (totals[t.category] ?? 0) + t.convertedLkrAmount
     }
     return totals
   }
@@ -4193,20 +5916,19 @@ export function buildFinanceQueryContext(db: FinanceDatabase): {
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 10)
 
-  // Pin the summary to LKR regardless of the configured reporting currency —
-  // the rest of this context (monthlySummary, categoryBreakdown, topVendors)
-  // is raw `convertedLkrAmount`, so a base-currency summary would be a
-  // units mismatch inside one LLM prompt.
-  const lkrDb = { ...db, settings: { ...db.settings, baseCurrency: 'LKR' } }
   return {
-    currency: 'LKR' as const,
-    summary: financeSummary(lkrDb),
+    summary: financeSummary(db),
     monthlySummary: getMonthlySummary(db).slice(-6),
     categoryBreakdown: {
       thisMonth: byCategory(thisMonthKey),
       lastMonth: byCategory(lastMonthKey),
     },
     topVendors: { thisMonth: topVendorsThisMonth },
+    budgetVsActual: budgetVsActualSummary(db),
+    budgetAlertThresholdPct: Math.max(
+      50,
+      Math.min(100, db.settings.budgetAlertThresholdPct ?? 80),
+    ),
     // AI-206: db already contains the trading tables (trading_plans etc.) —
     // tradingPerformanceSummary operates on the already-loaded db with no
     // extra readFinanceStore() calls, unlike the richer getTradingSummary()
@@ -4215,12 +5937,135 @@ export function buildFinanceQueryContext(db: FinanceDatabase): {
   }
 }
 
+/**
+ * AI-109: the stable, read-only context contract for finance agents. This is
+ * deliberately separate from the full finance payload and from the Q&A
+ * prompt context: agents get bounded aggregates plus task lifecycle counts,
+ * never raw transaction/account/document rows.
+ */
+export type FinanceAgentContext = {
+  contextVersion: 'finance-agent-v1'
+  generatedAt: string
+  sensitivity: 'aggregated_personal_finance'
+  dataClassification: Record<string, FinanceDataSensitivity>
+  aiRoutingPolicy: FinanceAiRoutingPolicy
+  excludedFields: Array<string>
+  data: ReturnType<typeof buildFinanceQueryContext> & {
+    aiTaskSummary: {
+      total: number
+      byStatus: Record<FinanceAiTaskStatus, number>
+      awaitingApproval: number
+      highRisk: number
+    }
+  }
+}
+
+export type FinanceDataSensitivity =
+  | 'public'
+  | 'internal'
+  | 'personal'
+  | 'highly_sensitive'
+  | 'secret'
+
+export type FinanceAiRoutingPolicy = {
+  policyVersion: 'finance-ai-routing-v1'
+  externalProvider: {
+    allowedDataClasses: Array<'public' | 'aggregated_personal_finance'>
+    explicitUserActionRequired: Array<'personal' | 'highly_sensitive'>
+    prohibitedDataClasses: Array<'secret'>
+  }
+  agentContext: {
+    rawRecordsAllowed: false
+    secretsAllowed: false
+  }
+}
+
+export const FINANCE_AI_ROUTING_POLICY: FinanceAiRoutingPolicy = {
+  policyVersion: 'finance-ai-routing-v1',
+  externalProvider: {
+    allowedDataClasses: ['public', 'aggregated_personal_finance'],
+    explicitUserActionRequired: ['personal', 'highly_sensitive'],
+    prohibitedDataClasses: ['secret'],
+  },
+  agentContext: {
+    rawRecordsAllowed: false,
+    secretsAllowed: false,
+  },
+}
+
+export const FINANCE_DATA_CLASSIFICATION: Record<
+  string,
+  FinanceDataSensitivity
+> = {
+  'context.summary': 'personal',
+  'context.monthlySummary': 'personal',
+  'context.categoryBreakdown': 'personal',
+  'context.topVendors': 'personal',
+  'context.budgetVsActual': 'personal',
+  'context.tradingSummary': 'personal',
+  'context.aiTaskSummary': 'internal',
+  'raw transaction rows': 'highly_sensitive',
+  'account identifiers and balances': 'highly_sensitive',
+  'document contents and source paths': 'highly_sensitive',
+  'credentials, tokens, and secrets': 'secret',
+}
+
+export function buildFinanceAgentContext(
+  db: FinanceDatabase,
+): FinanceAgentContext {
+  const byStatus: Record<FinanceAiTaskStatus, number> = {
+    queued: 0,
+    running: 0,
+    awaiting_approval: 0,
+    completed: 0,
+    failed: 0,
+    cancelled: 0,
+  }
+  let highRisk = 0
+  for (const task of db.ai_tasks) {
+    byStatus[task.status] += 1
+    if (task.risk === 'high') highRisk += 1
+  }
+  return {
+    contextVersion: 'finance-agent-v1',
+    generatedAt: nowIso(),
+    sensitivity: 'aggregated_personal_finance',
+    dataClassification: { ...FINANCE_DATA_CLASSIFICATION },
+    aiRoutingPolicy: {
+      ...FINANCE_AI_ROUTING_POLICY,
+      externalProvider: { ...FINANCE_AI_ROUTING_POLICY.externalProvider },
+      agentContext: { ...FINANCE_AI_ROUTING_POLICY.agentContext },
+    },
+    excludedFields: [
+      'raw income/expense transaction rows',
+      'account identifiers and balances by account',
+      'document contents and source paths',
+      'agent task input/result summaries',
+      'credentials, tokens, and secrets',
+    ],
+    data: {
+      ...buildFinanceQueryContext(db),
+      aiTaskSummary: {
+        total: db.ai_tasks.length,
+        byStatus,
+        awaitingApproval: byStatus.awaiting_approval,
+        highRisk,
+      },
+    },
+  }
+}
+
 export function getBudgetVsActual(
   db: FinanceDatabase,
   category: string,
   year: number,
   month: number,
-): { budget: number; actual: number; variance: number } | null {
+): {
+  budget: number
+  actual: number
+  variance: number
+  actualConversionAvailable?: boolean
+} | null {
   // Format month as MM with leading zero
   const monthStr = month.toString().padStart(2, '0')
   const monthKey = `${year}-${monthStr}`
@@ -4231,28 +6076,49 @@ export function getBudgetVsActual(
   )
   if (!budgetEntry) return null
 
-  // Calculate actual expenses for that category, year, month. Expenses are
-  // already stored LKR-converted (`convertedLkrAmount`), so the budget side
-  // must be LKR too — PF-201: a budget category may be denominated in a
-  // non-LKR currency, so normalise `budgetAmount` here rather than comparing
-  // (say) a USD budget against an LKR spend total.
+  // Calculate actual expenses for that category, year, month
   let actual = 0
+  let actualConversionAvailable = true
   for (const exp of db.expense_records) {
-    if (!includeInTotals(exp)) continue
+    if (isDeletedRecord(exp) || isTransferRecord(exp)) continue
     const dateInfo = parseDate(exp.date)
     if (!dateInfo) continue
-    if (dateInfo.year !== year || dateInfo.month !== month) continue
-    // A split expense contributes only the parts tagged to this category.
-    for (const part of expenseCategoryBreakdown(exp)) {
-      if (part.category === category) actual += part.lkr
+    if (
+      dateInfo.year === year &&
+      dateInfo.month === month &&
+      exp.category === category
+    ) {
+      if (
+        normalizeCurrencyCode(exp.currency) ===
+        normalizeCurrencyCode(budgetEntry.currency)
+      ) {
+        actual += exp.amount
+      } else if (normalizeCurrencyCode(budgetEntry.currency) === 'LKR') {
+        actual += exp.convertedLkrAmount
+      } else {
+        const converted = valuationToCurrency(
+          db,
+          exp.convertedLkrAmount,
+          'LKR',
+          budgetEntry.currency,
+          exp.date,
+        )
+        if (converted === 0 && exp.convertedLkrAmount !== 0) {
+          actualConversionAvailable = false
+        } else {
+          actual += converted
+        }
+      }
     }
   }
 
-  const budget = amountToLkr(db, budgetEntry.budgetAmount, budgetEntry.currency)
   return {
-    budget,
+    budget: budgetEntry.budgetAmount,
     actual,
-    variance: budget - actual,
+    variance: budgetEntry.budgetAmount - actual,
+    ...(normalizeCurrencyCode(budgetEntry.currency) !== 'LKR'
+      ? { actualConversionAvailable }
+      : {}),
   }
 }
 
@@ -4268,9 +6134,14 @@ export function budgetVsActualSummary(
   variance: number
   percentUsed: number
   overBudget: boolean
+  approachingBudget: boolean
 }> {
   const month = monthKey ?? nowIso().slice(0, 7)
   const [year, monthNum] = month.split('-').map(Number)
+  const threshold = Math.max(
+    50,
+    Math.min(100, db.settings.budgetAlertThresholdPct ?? 80),
+  )
   // De-duplicate by category: if the same category/month was submitted more
   // than once, getBudgetVsActual's find() always resolves to the first
   // matching entry — mirror that here so a form double-submit doesn't
@@ -4285,96 +6156,227 @@ export function budgetVsActualSummary(
     })
     .map((b) => {
       const result = getBudgetVsActual(db, b.category, year, monthNum)
-      const budget =
-        result?.budget ?? amountToLkr(db, b.budgetAmount, b.currency)
+      const budget = result?.budget ?? b.budgetAmount
       const actual = result?.actual ?? 0
       return {
         category: b.category,
         month: b.month,
-        // PF-201: budget/actual/variance below are all LKR-normalised.
-        currency: 'LKR' as CurrencyCode,
+        currency: b.currency,
         budget,
         actual,
         variance: result?.variance ?? budget,
+        ...(result?.actualConversionAvailable === undefined
+          ? {}
+          : { actualConversionAvailable: result.actualConversionAvailable }),
         percentUsed: budget > 0 ? (actual / budget) * 100 : 0,
         overBudget: actual > budget,
+        approachingBudget:
+          actual <= budget &&
+          budget > 0 &&
+          (actual / budget) * 100 >= threshold,
       }
     })
 }
 
-/**
- * Closes the "budgets are static" gap: budget_categories is a per-(category,
- * month) row with nothing that carries it forward — a category with no row
- * for the requested month simply doesn't appear in budgetVsActualSummary,
- * so today's budget stops applying the moment the calendar rolls over unless
- * the user manually re-enters every category again. This copies each
- * category from the most recent PRIOR month that has a budget row into
- * `targetMonth`, skipping any category that already has a row there (never
- * overwrites an explicit entry the user already set for this month).
- *
- * When a source row has `rolloverEnabled`, the copied amount also picks up
- * that category's *positive* leftover from the source month (budget minus
- * actual spend) — an intentional, per-category opt-in, not a default,
- * since carrying spending headroom forward isn't what every category
- * should do (e.g. it makes sense for "Home improvements", not "Groceries").
- * A negative leftover (already over budget) never reduces next month's
- * budget — this only ever adds unspent room, never subtracts overspend.
- */
-export function copyBudgetsToMonth(
+export function annualBudgetVsActualSummary(
   db: FinanceDatabase,
-  targetMonth: string,
-): { copied: number; skippedExisting: number } {
-  const existingCategories = new Set(
-    db.budget_categories.filter((b) => b.month === targetMonth).map((b) => b.category),
+  year = new Date().getUTCFullYear(),
+): Array<{
+  category: string
+  year: number
+  currency: CurrencyCode
+  budget: number
+  actual: number
+  variance: number
+  percentUsed: number
+  overBudget: boolean
+  approachingBudget: boolean
+  monthsTracked: number
+  actualConversionAvailable?: boolean
+}> {
+  const byCategory = new Map<
+    string,
+    {
+      currency: CurrencyCode
+      budget: number
+      actual: number
+      months: Set<string>
+      actualConversionAvailable: boolean
+    }
+  >()
+  for (const budgetEntry of db.budget_categories) {
+    if (!/^\d{4}-\d{2}$/.test(budgetEntry.month)) continue
+    if (Number(budgetEntry.month.slice(0, 4)) !== year) continue
+    const existing = byCategory.get(budgetEntry.category) ?? {
+      currency: budgetEntry.currency,
+      budget: 0,
+      actual: 0,
+      months: new Set<string>(),
+      actualConversionAvailable: true,
+    }
+    if (existing.months.has(budgetEntry.month)) continue
+    existing.budget += budgetEntry.budgetAmount
+    existing.months.add(budgetEntry.month)
+    const [entryYear, entryMonth] = budgetEntry.month.split('-').map(Number)
+    const monthly = getBudgetVsActual(
+      db,
+      budgetEntry.category,
+      entryYear,
+      entryMonth,
+    )
+    existing.actual += monthly?.actual ?? 0
+    if (monthly?.actualConversionAvailable === false) {
+      existing.actualConversionAvailable = false
+    }
+    byCategory.set(budgetEntry.category, existing)
+  }
+  const threshold = Math.max(
+    50,
+    Math.min(100, db.settings.budgetAlertThresholdPct ?? 80),
   )
-  // The most recent month strictly before targetMonth, per category — a
-  // plain string comparison works because month keys are YYYY-MM.
-  const latestPriorByCategory = new Map<string, BudgetCategory>()
-  for (const b of db.budget_categories) {
-    if (b.month >= targetMonth) continue
-    const current = latestPriorByCategory.get(b.category)
-    if (!current || b.month > current.month) {
-      latestPriorByCategory.set(b.category, b)
-    }
-  }
-
-  let copied = 0
-  let skippedExisting = 0
-  const createdAt = nowIso()
-  for (const [category, source] of latestPriorByCategory) {
-    if (existingCategories.has(category)) {
-      skippedExisting += 1
-      continue
-    }
-    let budgetAmount = source.budgetAmount
-    if (source.rolloverEnabled) {
-      const [year, monthNum] = source.month.split('-').map(Number)
-      const result = getBudgetVsActual(db, category, year, monthNum)
-      if (result && result.variance > 0) {
-        // result.variance is LKR-normalised; source.budgetAmount is in
-        // source.currency — convert the leftover back before adding.
-        const leftoverInSourceCurrency =
-          source.currency === 'LKR'
-            ? result.variance
-            : (convertCurrency(result.variance, 'LKR', source.currency) ??
-              result.variance)
-        budgetAmount += leftoverInSourceCurrency
-      }
-    }
-    db.budget_categories.push({
-      id: randomUUID(),
-      month: targetMonth,
+  return [...byCategory.entries()].map(([category, result]) => {
+    const percentUsed =
+      result.budget > 0 ? (result.actual / result.budget) * 100 : 0
+    return {
       category,
-      currency: source.currency,
-      budgetAmount,
-      rolloverEnabled: source.rolloverEnabled,
-      source: 'rollover',
-      createdAt,
-      updatedAt: createdAt,
-    })
-    copied += 1
-  }
-  return { copied, skippedExisting }
+      year,
+      currency: result.currency,
+      budget: result.budget,
+      actual: result.actual,
+      variance: result.budget - result.actual,
+      percentUsed,
+      overBudget: result.actual > result.budget,
+      approachingBudget:
+        result.actual <= result.budget &&
+        result.budget > 0 &&
+        percentUsed >= threshold,
+      monthsTracked: result.months.size,
+      ...(result.actualConversionAvailable
+        ? {}
+        : { actualConversionAvailable: false }),
+    }
+  })
+}
+
+export type FinancialHealthComponent = {
+  key: 'savings' | 'emergency' | 'budget' | 'debt' | 'data'
+  label: string
+  score: number
+  maxScore: number
+  detail: string
+}
+
+export type FinancialHealthSummary = {
+  score: number
+  band: 'excellent' | 'stable' | 'needs_attention' | 'at_risk'
+  components: Array<FinancialHealthComponent>
+}
+
+/**
+ * PF-412: a deterministic, explainable overview score. It is deliberately
+ * not an investment recommendation or an AI judgment; each weighted input is
+ * shown to the user so the score can be audited and improved.
+ */
+export function financialHealthSummary(
+  db: FinanceDatabase,
+  dataHealthStatus:
+    | 'healthy'
+    | 'json_primary'
+    | 'postgres_unavailable'
+    | 'postgres_behind'
+    | 'mirror_mismatch' = 'healthy',
+): FinancialHealthSummary {
+  const summary = financeSummary(db)
+  const budgetRows = budgetVsActualSummary(db)
+  const averageExpenses = getAverageMonthlyExpensesLkr(db, 3)
+  const emergencyTargetMonths = db.settings.emergencyFundTargetMonths ?? 0
+  const emergencyTargetLkr = emergencyTargetMonths * averageExpenses
+  const emergencyProgress =
+    emergencyTargetLkr > 0
+      ? Math.min(
+          100,
+          Math.max(0, (summary.cashBalanceLkr / emergencyTargetLkr) * 100),
+        )
+      : 50
+  const overBudgetCount = budgetRows.filter((row) => row.overBudget).length
+  const budgetAdherence =
+    budgetRows.length > 0
+      ? ((budgetRows.length - overBudgetCount) / budgetRows.length) * 100
+      : 50
+  const debtBase =
+    Math.max(0, summary.netWorthLkr) + Math.max(0, summary.debtLkr)
+  const debtRatio = debtBase > 0 ? summary.debtLkr / debtBase : 0.5
+  const dataScore =
+    dataHealthStatus === 'healthy' || dataHealthStatus === 'json_primary'
+      ? 10
+      : dataHealthStatus === 'postgres_behind' ||
+          dataHealthStatus === 'mirror_mismatch'
+        ? 6
+        : 2
+  const components: Array<FinancialHealthComponent> = [
+    {
+      key: 'savings',
+      label: 'Savings rate',
+      score: Math.min(30, Math.max(0, summary.savingsRate) * 1.5),
+      maxScore: 30,
+      detail:
+        summary.totalIncomeLkr > 0
+          ? `${Math.round(summary.savingsRate)}% of recorded income retained`
+          : 'Add income and expenses to measure savings',
+    },
+    {
+      key: 'emergency',
+      label: 'Emergency fund',
+      score: (emergencyProgress / 100) * 25,
+      maxScore: 25,
+      detail:
+        emergencyTargetMonths > 0
+          ? `${Math.round(emergencyProgress)}% of the ${emergencyTargetMonths}-month target`
+          : 'Set an emergency-fund target to make this measure personal',
+    },
+    {
+      key: 'budget',
+      label: 'Budget adherence',
+      score: (budgetAdherence / 100) * 20,
+      maxScore: 20,
+      detail:
+        budgetRows.length > 0
+          ? `${overBudgetCount} of ${budgetRows.length} budgets over limit`
+          : 'Set monthly budgets to track spending discipline',
+    },
+    {
+      key: 'debt',
+      label: 'Debt load',
+      score: Math.max(0, Math.min(15, (1 - debtRatio) * 15)),
+      maxScore: 15,
+      detail:
+        summary.debtLkr > 0
+          ? `${Math.round(debtRatio * 100)}% debt share of assets plus debt`
+          : 'No active debt recorded',
+    },
+    {
+      key: 'data',
+      label: 'Data confidence',
+      score: dataScore,
+      maxScore: 10,
+      detail:
+        dataHealthStatus === 'healthy' || dataHealthStatus === 'json_primary'
+          ? 'Financial data is available for this review'
+          : 'Storage needs attention; score may be incomplete',
+    },
+  ]
+  const score = Math.round(
+    components.reduce((total, item) => total + item.score, 0),
+  )
+  const band =
+    score >= 80
+      ? 'excellent'
+      : score >= 60
+        ? 'stable'
+        : score >= 40
+          ? 'needs_attention'
+          : 'at_risk'
+  return { score, band, components }
 }
 
 export function updateExchangeRate(
@@ -4382,28 +6384,39 @@ export function updateExchangeRate(
   target: string,
   rate: number,
   date?: string,
+  source = 'manual',
+  observedAt = new Date().toISOString(),
 ): FinanceDatabase {
   const db = ensureFinanceStore()
+  const normalizedBase = normalizeCurrencyCode(base)
+  const normalizedTarget = normalizeCurrencyCode(target)
   const dateStr = date ?? new Date().toISOString().split('T')[0]
   const rateRecord = {
-    base,
-    target,
+    base: normalizedBase,
+    target: normalizedTarget,
     rate,
     date: dateStr,
+    source,
+    observedAt,
     updatedAt: new Date().toISOString(),
   }
 
-  // Upsert by (base, target, date): getExchangeRate/latestRateFromDb both pick
-  // "latest by date", so a same-day duplicate makes the winner arbitrary. A
-  // daily refresh cron (or a manual re-entry) replaces the day's row in place
-  // rather than piling up.
-  const idx = db.exchange_rates.findIndex(
-    (r) => r.base === base && r.target === target && r.date === dateStr,
+  db.exchange_rates = db.exchange_rates.filter(
+    (existing) =>
+      !(
+        existing.base === normalizedBase &&
+        existing.target === normalizedTarget &&
+        existing.date === dateStr
+      ),
   )
-  if (idx >= 0) db.exchange_rates[idx] = rateRecord
-  else db.exchange_rates.push(rateRecord)
+  db.exchange_rates.push(rateRecord)
   writeFinanceStore(db)
-  appendAuditLog('exchange_rate_updated', { base, target, rate, date: dateStr })
+  appendAuditLog('exchange_rate_updated', {
+    base: normalizedBase,
+    target: normalizedTarget,
+    rate,
+    date: dateStr,
+  })
   return db
 }
 
@@ -4412,11 +6425,15 @@ export function getExchangeRate(
   target: string,
   date?: string,
 ): number | undefined {
+  const normalizedBase = normalizeCurrencyCode(base)
+  const normalizedTarget = normalizeCurrencyCode(target)
   // Filter rates for the base and target, then take the one with the latest date
   const db = ensureFinanceStore()
   let relevant = db.exchange_rates.filter(
     (r: any) =>
-      r.base === base && r.target === target && typeof r.rate === 'number',
+      r.base === normalizedBase &&
+      r.target === normalizedTarget &&
+      typeof r.rate === 'number',
   )
 
   // If a date is provided, only consider rates on or before that date
@@ -4445,33 +6462,72 @@ export function convertCurrency(
   toCurrency: CurrencyCode,
   date?: string,
 ): number | undefined {
-  if (fromCurrency === toCurrency) {
+  const normalizedFrom = normalizeCurrencyCode(fromCurrency)
+  const normalizedTo = normalizeCurrencyCode(toCurrency)
+  if (normalizedFrom === normalizedTo) {
     return amount
   }
 
   // Try direct rate
-  const rate = getExchangeRate(fromCurrency, toCurrency, date)
+  const rate = getExchangeRate(normalizedFrom, normalizedTo, date)
   if (rate !== undefined) {
     return amount * rate
   }
 
-  // Pivot via LKR (the storage currency — rates are stored LKR-denominated
-  // regardless of the configured reporting currency) if both legs exist.
+  // Try via base currency (LKR) if both legs exist
   const baseCurrency = 'LKR'
-  const rateFromToBase = getExchangeRate(fromCurrency, baseCurrency, date)
-  const rateBaseTo = getExchangeRate(baseCurrency, toCurrency, date)
+  const rateFromToBase = getExchangeRate(normalizedFrom, baseCurrency, date)
+  const rateBaseTo = getExchangeRate(baseCurrency, normalizedTo, date)
   if (rateFromToBase !== undefined && rateBaseTo !== undefined) {
     return amount * rateFromToBase * rateBaseTo
   }
 
   // Try the inverse: if we have toCurrency -> fromCurrency, then use 1/rate
-  const rateInverse = getExchangeRate(toCurrency, fromCurrency, date)
+  const rateInverse = getExchangeRate(normalizedTo, normalizedFrom, date)
   if (rateInverse !== undefined) {
     return amount / rateInverse
   }
 
   // If we still don't have a rate, return undefined
   return undefined
+}
+
+/**
+ * PF-205/PF-207: resolve a transaction into the reporting currency using the
+ * dated stored rate, while allowing an explicit per-transaction override.
+ * The fallback preserves legacy records when no rate is available.
+ */
+function resolveTransactionFx(
+  amount: number,
+  currency: string,
+  date: string,
+  overrideRate: number | undefined,
+  fallbackConvertedAmount: number,
+): { exchangeRateUsed?: number; convertedLkrAmount: number } {
+  if (currency === 'LKR') {
+    return { exchangeRateUsed: 1, convertedLkrAmount: amount }
+  }
+  if (
+    overrideRate !== undefined &&
+    Number.isFinite(overrideRate) &&
+    overrideRate > 0
+  ) {
+    return {
+      exchangeRateUsed: overrideRate,
+      convertedLkrAmount: amount * overrideRate,
+    }
+  }
+  const converted = convertCurrency(amount, currency, 'LKR', date)
+  if (converted !== undefined && Number.isFinite(converted)) {
+    return {
+      exchangeRateUsed: amount !== 0 ? converted / amount : undefined,
+      convertedLkrAmount: converted,
+    }
+  }
+  return {
+    exchangeRateUsed: undefined,
+    convertedLkrAmount: fallbackConvertedAmount,
+  }
 }
 
 export function tradingPerformanceSummary(db: FinanceDatabase) {

@@ -153,7 +153,9 @@ export function getDraftValue(
   config: ClaudeConfig | undefined,
   draftValues: Record<string, string>,
 ): string {
-  if (draftValues[setting.id] !== undefined) return draftValues[setting.id]
+  if (Object.prototype.hasOwnProperty.call(draftValues, setting.id)) {
+    return draftValues[setting.id]
+  }
   if (!setting.path) return ''
   const rawValue = readPath(config, setting.path)
   if (setting.formatter) return setting.formatter(rawValue)

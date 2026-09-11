@@ -89,15 +89,15 @@ export function ConnectionSection() {
     'h-9 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 text-sm text-[var(--theme-text)] font-mono outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]'
 
   const sourceLabel: Record<ConnectionSettings['source'], string> = {
-    override: 'Runtime override (saved in workspace-overrides.json)',
-    env: 'From HERMES_API_URL / HERMES_DASHBOARD_URL env vars',
-    default: 'Defaults — no override set',
+    override: 'Custom addresses saved for this workspace',
+    env: 'Addresses supplied by the environment',
+    default: 'Using local defaults',
   }
 
   return (
     <SettingsSection
       title="Connection"
-      description="Point the workspace at your Hermes Agent services. Useful for Tailscale, LAN, or remote-server setups (#101)."
+      description="Connect the workspace to local or remote services, including devices linked over Tailscale or your home network."
       icon={Link01Icon}
     >
       <div className="text-xs text-[var(--theme-muted)]">
@@ -105,8 +105,8 @@ export function ConnectionSection() {
       </div>
 
       <SettingsRow
-        label="Gateway URL"
-        description="Core chat + completions + health. Default http://127.0.0.1:8645."
+        label="Chat service address"
+        description="Used for chat, completions, and health checks. Local default: http://127.0.0.1:8645."
       >
         <input
           className={inputClass}
@@ -120,8 +120,8 @@ export function ConnectionSection() {
       </SettingsRow>
 
       <SettingsRow
-        label="Dashboard URL"
-        description="Extended APIs — sessions, skills, config, jobs. Default http://127.0.0.1:9119."
+        label="Workspace service address"
+        description="Used for sessions, skills, settings, and jobs. Local default: http://127.0.0.1:9119."
       >
         <input
           className={inputClass}
@@ -136,7 +136,7 @@ export function ConnectionSection() {
 
       <div className="flex items-center gap-2 pt-2">
         <Button size="sm" onClick={save} disabled={saving}>
-          {saving ? 'Saving…' : 'Save & reprobe'}
+          {saving ? 'Saving…' : 'Save & check connection'}
         </Button>
         <Button
           size="sm"
@@ -159,7 +159,7 @@ export function ConnectionSection() {
       </div>
 
       <div className="mt-3 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-3 text-xs text-[var(--theme-muted)]">
-        <strong className="font-semibold">Tailscale / remote tip:</strong> Set
+        <strong className="font-semibold">Remote connection tip:</strong> Set
         the gateway to its Tailscale IP (e.g. <code>http://100.x.y.z:8642</code>
         ) and ensure the gateway listens on <code>0.0.0.0</code> (set{' '}
         <code>API_SERVER_HOST=0.0.0.0</code> in the agent-side <code>.env</code>

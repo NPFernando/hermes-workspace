@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 
 const MAX_ATTEMPTS = 5
 const LOCKOUT_MS = 5 * 60 * 1000
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'unknown'
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   unauthorized_email: 'Access denied. This Google account is not authorised.',
@@ -399,7 +400,9 @@ export function LoginScreen() {
           </div>
         </div>
 
-        <div className="lp-footer">Secured by Hermes Agent &middot; v2.3.0</div>
+        <div className="lp-footer">
+          Secured by Hermes Agent &middot; v{APP_VERSION}
+        </div>
       </div>
     </div>
   )

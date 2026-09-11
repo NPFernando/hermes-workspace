@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -14,6 +22,38 @@ const HERMES_HOME =
 const PROFILE_FILE = join(HERMES_HOME, 'workspace-user-profile.json')
 const GMAIL_TOKEN_FILE = join(HERMES_HOME, 'finance', 'gmail-oauth.json')
 const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
+const OAUTH_STATE_COOKIE = 'hermes-oauth-state'
+const OAUTH_STATE_TTL_SECONDS = 10 * 60
+
+function writePrivateJsonAtomically(filePath: string, value: unknown): void {
+  const serialized = JSON.stringify(value, null, 2)
+  const tempFile = `${filePath}.${process.pid}.tmp`
+  try {
+    writeFileSync(tempFile, serialized, { encoding: 'utf8', mode: 0o600 })
+    chmodSync(tempFile, 0o600)
+    renameSync(tempFile, filePath)
+    try {
+      chmodSync(filePath, 0o600)
+    } catch {
+      // chmod is best-effort on platforms without POSIX permissions.
+    }
+  } catch (error) {
+    // Preserve compatibility with filesystems that cannot replace an existing
+    // file atomically (notably some Windows configurations).
+    try {
+      writeFileSync(filePath, serialized, { encoding: 'utf8', mode: 0o600 })
+      chmodSync(filePath, 0o600)
+    } catch {
+      throw error
+    } finally {
+      try {
+        unlinkSync(tempFile)
+      } catch {
+        // The temporary file may already have been renamed or never created.
+      }
+    }
+  }
+}
 
 export type GoogleUserProfile = {
   email: string
@@ -23,10 +63,7 @@ export type GoogleUserProfile = {
 
 export function storeUserProfile(profile: GoogleUserProfile): void {
   try {
-    writeFileSync(PROFILE_FILE, JSON.stringify(profile, null, 2), {
-      encoding: 'utf8',
-      mode: 0o600,
-    })
+    writePrivateJsonAtomically(PROFILE_FILE, profile)
   } catch {
     console.warn('[google-oauth] Failed to persist user profile')
   }
@@ -117,25 +154,30 @@ export async function exchangeCodeForEmail(
 export type OAuthStatePurpose = 'login' | 'gmail_connect'
 
 const STATE_TTL_MS = 10 * 60 * 1000 // 10 minutes
+const MAX_OAUTH_STATES = 1_000
 const _oauthStates = new Map<
   string,
   { expiry: number; purpose: OAuthStatePurpose }
 >()
 
-setInterval(
-  () => {
-    const now = Date.now()
-    for (const [s, entry] of _oauthStates) {
-      if (entry.expiry < now) _oauthStates.delete(s)
-    }
-  },
-  5 * 60 * 1000,
-)
+function pruneOAuthStates(now = Date.now()): void {
+  for (const [s, entry] of _oauthStates) {
+    if (entry.expiry < now) _oauthStates.delete(s)
+  }
+}
+
+setInterval(() => pruneOAuthStates(), 5 * 60 * 1000)
 
 export function storeOAuthState(
   state: string,
   purpose: OAuthStatePurpose = 'login',
 ): void {
+  pruneOAuthStates()
+  while (_oauthStates.size >= MAX_OAUTH_STATES) {
+    const oldest = _oauthStates.keys().next().value
+    if (!oldest) break
+    _oauthStates.delete(oldest)
+  }
   _oauthStates.set(state, { expiry: Date.now() + STATE_TTL_MS, purpose })
 }
 
@@ -144,6 +186,46 @@ export function consumeOAuthState(state: string): OAuthStatePurpose | null {
   if (!entry || entry.expiry < Date.now()) return null
   _oauthStates.delete(state)
   return entry.purpose
+}
+
+function oauthStateCookieSecure(): boolean {
+  const override = (process.env.COOKIE_SECURE || '').trim().toLowerCase()
+  if (override === '1' || override === 'true' || override === 'yes') return true
+  if (override === '0' || override === 'false' || override === 'no')
+    return false
+  return process.env.NODE_ENV === 'production'
+}
+
+/** Bind an OAuth state to the browser that initiated the flow. */
+export function createOAuthStateCookie(state: string): string {
+  const attrs = [
+    'HttpOnly',
+    'SameSite=Lax',
+    'Path=/api/auth',
+    `Max-Age=${OAUTH_STATE_TTL_SECONDS}`,
+  ]
+  if (oauthStateCookieSecure()) attrs.push('Secure')
+  return `${OAUTH_STATE_COOKIE}=${encodeURIComponent(state)}; ${attrs.join('; ')}`
+}
+
+export function clearOAuthStateCookie(): string {
+  const attrs = ['HttpOnly', 'SameSite=Lax', 'Path=/api/auth', 'Max-Age=0']
+  if (oauthStateCookieSecure()) attrs.push('Secure')
+  return `${OAUTH_STATE_COOKIE}=; ${attrs.join('; ')}`
+}
+
+export function getOAuthStateCookie(cookieHeader: string | null): string | null {
+  if (!cookieHeader) return null
+  for (const cookie of cookieHeader.split(';')) {
+    const trimmed = cookie.trim()
+    if (!trimmed.startsWith(`${OAUTH_STATE_COOKIE}=`)) continue
+    try {
+      return decodeURIComponent(trimmed.slice(OAUTH_STATE_COOKIE.length + 1))
+    } catch {
+      return null
+    }
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -228,33 +310,22 @@ export function storeGmailRefreshToken(
     connectedAt: new Date().toISOString(),
   }
   mkdirSync(join(HERMES_HOME, 'finance'), { recursive: true, mode: 0o700 })
-  writeFileSync(GMAIL_TOKEN_FILE, JSON.stringify(record, null, 2), {
-    encoding: 'utf8',
-    mode: 0o600,
-  })
+  writePrivateJsonAtomically(GMAIL_TOKEN_FILE, record)
 }
 
-function readGmailOAuthRecord(): GmailOAuthRecord | null {
+export function readGmailRefreshToken(): string | null {
   try {
-    return JSON.parse(readFileSync(GMAIL_TOKEN_FILE, 'utf8')) as GmailOAuthRecord
+    const record = JSON.parse(
+      readFileSync(GMAIL_TOKEN_FILE, 'utf8'),
+    ) as GmailOAuthRecord
+    return record.refreshToken || null
   } catch {
     return null
   }
 }
 
-export function readGmailRefreshToken(): string | null {
-  return readGmailOAuthRecord()?.refreshToken || null
-}
-
 export function isGmailConnected(): boolean {
   return Boolean(readGmailRefreshToken())
-}
-
-/** For the settings UI — which mailbox is connected and since when. Never returns the refresh token itself. */
-export function readGmailConnectedAccount(): { email: string; connectedAt: string } | null {
-  const record = readGmailOAuthRecord()
-  if (!record?.refreshToken) return null
-  return { email: record.email, connectedAt: record.connectedAt }
 }
 
 export async function getGmailAccessToken(): Promise<string> {

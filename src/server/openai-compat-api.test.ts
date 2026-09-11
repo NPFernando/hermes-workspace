@@ -83,6 +83,31 @@ describe('openaiChat', () => {
     expect(headers['X-Hermes-Session-Id']).toBe('workspace-session-2')
     expect(headers['X-Claude-Session-Id']).toBe('workspace-session-2')
   })
+
+  it('does not forward workspace credentials to an explicitly local endpoint', async () => {
+    process.env.HERMES_API_TOKEN = 'must-not-leak'
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await openaiChat([{ role: 'user', content: 'private finance prompt' }], {
+      model: 'llama3.2:latest',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      omitAuth: true,
+    })
+
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<
+      string,
+      string
+    >
+    expect(headers.Authorization).toBeUndefined()
+  })
 })
 
 describe('parseOpenAIStream', () => {

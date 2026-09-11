@@ -21,11 +21,11 @@ export function MobilePageHeader({
     <div
       className={cn(
         'md:hidden flex items-center h-12 px-2 shrink-0',
-        'border-b bg-surface',
+        'border-b bg-[var(--theme-panel)]/95 backdrop-blur-md',
         className,
       )}
       style={{
-        borderColor: 'var(--color-border, #e5e7eb)',
+        borderColor: 'var(--theme-border)',
         paddingTop: 'env(safe-area-inset-top, 0px)',
       }}
     >
@@ -33,7 +33,7 @@ export function MobilePageHeader({
         type="button"
         aria-label="Open navigation menu"
         onClick={openHamburgerMenu}
-        className="shrink-0 flex items-center justify-center w-11 h-11 rounded-xl active:bg-white/10 transition-colors touch-manipulation z-10"
+        className="z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--theme-text)] transition-colors active:bg-[var(--theme-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-panel)] touch-manipulation"
       >
         <svg
           width="20"

@@ -82,6 +82,25 @@ export function formatTaskSelectionToggleLabel(
   return `${isSelected ? 'Deselect' : 'Select'} task: ${title}`
 }
 
+export function formatTaskQueuePositionLabel(position: number): string {
+  return `Queue position ${position}; processed in priority order, high priority first, then oldest tasks`
+}
+
+export function formatTaskCardActionLabel(
+  title: string,
+  action: 'launch' | 'execute' | 'options',
+): string {
+  const taskLabel = title.trim() || 'unnamed task'
+  switch (action) {
+    case 'launch':
+      return `Launch chat session for task: ${taskLabel}`
+    case 'execute':
+      return `Execute task with AI agent: ${taskLabel}`
+    case 'options':
+      return `Open task options: ${taskLabel}`
+  }
+}
+
 const AGENT_STATE_CONFIG: Record<
   NonNullable<TaskAgentState>,
   { label: string; color: string; pulse: boolean }
@@ -228,7 +247,8 @@ export const TaskCard = memo(function TaskCardComponent({
           'hover:border-[var(--theme-accent)]',
           isDragging ? 'opacity-40' : '',
           isSelected && 'ring-1 ring-[var(--theme-accent)]',
-          isAgentActive && 'ring-1 ring-[color-mix(in_srgb,var(--theme-accent-secondary)_30%,transparent)]',
+          isAgentActive &&
+            'ring-1 ring-[color-mix(in_srgb,var(--theme-accent-secondary)_30%,transparent)]',
           isDimmed && 'opacity-40',
         )}
         style={{
@@ -284,7 +304,9 @@ export const TaskCard = memo(function TaskCardComponent({
           </span>
         )}
         {overdue && (
-          <span className="shrink-0 text-[9px] text-[var(--theme-danger)]">!</span>
+          <span className="shrink-0 text-[9px] text-[var(--theme-danger)]">
+            !
+          </span>
         )}
       </div>
     )
@@ -313,8 +335,11 @@ export const TaskCard = memo(function TaskCardComponent({
           : 'hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]',
         isSelected &&
           'ring-2 ring-[var(--theme-accent)] border-[var(--theme-accent)]',
-        isExecuting && 'ring-2 ring-[color-mix(in_srgb,var(--theme-warning)_50%,transparent)]',
-        isBreakingDown && !isExecuting && 'ring-2 ring-[color-mix(in_srgb,var(--theme-accent-secondary)_50%,transparent)]',
+        isExecuting &&
+          'ring-2 ring-[color-mix(in_srgb,var(--theme-warning)_50%,transparent)]',
+        isBreakingDown &&
+          !isExecuting &&
+          'ring-2 ring-[color-mix(in_srgb,var(--theme-accent-secondary)_50%,transparent)]',
         isAgentActive &&
           !isExecuting &&
           !isBreakingDown &&
@@ -385,6 +410,7 @@ export const TaskCard = memo(function TaskCardComponent({
             }}
             disabled={isLaunching}
             title="Launch chat session for this task"
+            aria-label={formatTaskCardActionLabel(task.title, 'launch')}
             className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
           >
             <HugeiconsIcon
@@ -407,6 +433,7 @@ export const TaskCard = memo(function TaskCardComponent({
             }}
             disabled={isExecuting}
             title="Execute task with AI agent"
+            aria-label={formatTaskCardActionLabel(task.title, 'execute')}
             className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
           >
             <HugeiconsIcon
@@ -423,7 +450,7 @@ export const TaskCard = memo(function TaskCardComponent({
           <MenuTrigger
             type="button"
             className="rounded p-0.5 hover:bg-[var(--theme-hover)] transition-colors"
-            aria-label="Task options"
+            aria-label={formatTaskCardActionLabel(task.title, 'options')}
           >
             <HugeiconsIcon
               icon={MoreVerticalIcon}
@@ -521,6 +548,7 @@ export const TaskCard = memo(function TaskCardComponent({
           (task.column === 'todo' || task.column === 'backlog') && (
             <span
               title={`Queue position ${queuePosition} — processed in priority order (high → medium → low, oldest first)`}
+              aria-label={formatTaskQueuePositionLabel(queuePosition)}
               className={cn(
                 'shrink-0 mt-0.5 inline-flex items-center rounded px-1 py-0 text-[9px] font-bold tabular-nums border',
                 queuePosition === 1
@@ -814,7 +842,9 @@ export const TaskCard = memo(function TaskCardComponent({
               task.waiting_for_user &&
               task.clarification_questions?.length && (
                 <div className="flex items-center gap-1.5 pt-1 border-t border-[var(--theme-border)]">
-                  <span className="text-[10px] text-[var(--theme-warning)]">❓</span>
+                  <span className="text-[10px] text-[var(--theme-warning)]">
+                    ❓
+                  </span>
                   <span className="text-[10px] text-[color-mix(in_srgb,var(--theme-warning)_80%,transparent)]">
                     {task.clarification_questions.length} question
                     {task.clarification_questions.length !== 1 ? 's' : ''} —
@@ -938,7 +968,9 @@ export const TaskCard = memo(function TaskCardComponent({
               {overdue && (
                 <>
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--theme-danger)] shrink-0" />
-                  <span className="text-[var(--theme-danger)] font-semibold">Overdue</span>
+                  <span className="text-[var(--theme-danger)] font-semibold">
+                    Overdue
+                  </span>
                   <span className="text-[var(--theme-muted)] mx-0.5">·</span>
                 </>
               )}

@@ -14,6 +14,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
@@ -58,11 +61,15 @@ export const Route = createFileRoute('/api/demo-trading')({
         }
         const csrf = requireJsonContentType(request)
         if (csrf) return csrf
+        if (
+          !rateLimit(`demo-trading:post:${getClientIp(request)}`, 6, 60_000)
+        ) {
+          return rateLimitResponse()
+        }
         try {
           const body = (await request.json().catch(() => ({}))) as {
             action?: string
             force?: boolean
-            config?: Record<string, unknown>
           }
           if (body.action !== 'run_cycle') {
             return json(
@@ -75,7 +82,6 @@ export const Route = createFileRoute('/api/demo-trading')({
           }
           const result = await runTradingCycle({
             force: body.force === true,
-            config: body.config as never,
           })
           return json({ ok: true, result })
         } catch (err) {

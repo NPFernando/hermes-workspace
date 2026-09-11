@@ -10,6 +10,24 @@ describe('dashboard widget catalog', () => {
 
     expect(new Set(ids).size).toBe(ids.length)
   })
+
+  it('keeps the editor column labels aligned with the rendered dashboard', () => {
+    const railIds = WIDGET_CATALOG.filter(
+      (widget) => widget.column === 'rail',
+    ).map((widget) => widget.id)
+
+    expect(railIds).toEqual([
+      'top_models',
+      'provider_mix',
+      'cache_efficiency',
+      'velocity',
+      'cost_ledger',
+      'proactive_suggestions',
+      'skills_usage',
+      'achievements',
+      'mix_rhythm',
+    ])
+  })
 })
 
 describe('dashboard layout edit mode', () => {

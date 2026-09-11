@@ -17,8 +17,9 @@ import {
   Telescope02Icon,
   UserGroupIcon,
   UserMultipleIcon,
+  Wallet03Icon,
 } from '@hugeicons/core-free-icons'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { getTheme, getThemeVariant, isDarkTheme, setTheme } from '@/lib/theme'
@@ -27,6 +28,8 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { useSettingsStore } from '@/hooks/use-settings'
+import { Z_LAYER } from '@/lib/z-layers'
+import { logoutWorkspace } from '@/lib/auth-session'
 
 export const MOBILE_HAMBURGER_NAV_ITEMS = [
   {
@@ -81,7 +84,7 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
   {
     id: 'personal-finance',
     label: 'Personal Finance',
-    icon: ChartCandleIcon,
+    icon: Wallet03Icon,
     to: '/personal-finance',
     match: (p: string) => p.startsWith('/personal-finance'),
   },
@@ -101,6 +104,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     icon: Rocket01Icon,
     to: '/conductor',
     match: (p: string) => p.startsWith('/conductor'),
+  },
+  {
+    id: 'dify',
+    label: 'Dify Workbench',
+    icon: Rocket01Icon,
+    to: '/dify',
+    match: (p: string) => p.startsWith('/dify'),
   },
   {
     id: 'swarm',
@@ -172,7 +182,7 @@ export function HamburgerTrigger({ className }: { className?: string }) {
       onClick={openHamburgerMenu}
       className={cn(
         'flex items-center justify-center size-9 rounded-xl',
-        'text-[var(--theme-muted)] hover:text-[var(--theme-muted)] active:scale-90 transition-all duration-150',
+        'text-[var(--theme-muted)] hover:text-[var(--theme-muted)] active:scale-90 motion-safe:transition-all motion-safe:duration-150',
         'touch-manipulation select-none',
         className,
       )}
@@ -185,6 +195,10 @@ export function HamburgerTrigger({ className }: { className?: string }) {
 /** Mount once in WorkspaceShell — renders the drawer + backdrop */
 export function MobileHamburgerMenu() {
   const [open, setOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [isDarkMode, setIsDarkMode] = useState(() => isDarkTheme(getTheme()))
+  const drawerRef = useRef<HTMLDivElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
   _setOpen = setOpen
 
   // Add/remove body class to push main content
@@ -213,13 +227,65 @@ export function MobileHamburgerMenu() {
     setOpen(false)
   }
 
+  async function handleLogout() {
+    if (loggingOut) return
+    setLoggingOut(true)
+    try {
+      await logoutWorkspace()
+    } catch {
+      setLoggingOut(false)
+    }
+  }
+
   useEffect(() => {
     if (!open) return
+
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    const focusFrame = window.requestAnimationFrame(() => {
+      drawerRef.current
+        ?.querySelector<HTMLElement>(
+          'button, a, [tabindex]:not([tabindex="-1"])',
+        )
+        ?.focus()
+    })
+
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setOpen(false)
+        return
+      }
+      if (e.key !== 'Tab' || !drawerRef.current) return
+
+      const focusable: Array<HTMLElement> = Array.from(
+        drawerRef.current.querySelectorAll<HTMLElement>(
+          'button, a, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute('disabled'))
+      if (focusable.length === 0) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      window.cancelAnimationFrame(focusFrame)
+      window.removeEventListener('keydown', handleKeyDown)
+      if (previousFocusRef.current?.isConnected) {
+        previousFocusRef.current.focus()
+      }
+      previousFocusRef.current = null
+    }
   }, [open])
 
   return (
@@ -229,35 +295,37 @@ export function MobileHamburgerMenu() {
       {/* Push-style layout wrapper — sidebar pushes content right */}
       <div
         className={cn(
-          'fixed inset-0 z-[95] md:hidden',
-          'transition-transform duration-300 ease-in-out',
+          'fixed inset-0 md:hidden',
+          Z_LAYER.navigation,
+          'motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-in-out',
           open ? 'translate-x-0' : 'pointer-events-none',
         )}
       >
         {/* Main content overlay — dims and shifts right when sidebar is open */}
         <div
           className={cn(
-            'absolute inset-0 transition-all duration-300 ease-in-out',
-            open
-              ? 'translate-x-72 opacity-40 scale-[0.92] rounded-2xl overflow-hidden'
-              : 'translate-x-0 opacity-100 scale-100',
+            'absolute inset-0 bg-black/40 backdrop-blur-[1px] motion-safe:transition-opacity motion-safe:duration-300 motion-safe:ease-in-out',
+            open ? 'opacity-100' : 'pointer-events-none opacity-0',
           )}
           onClick={() => open && setOpen(false)}
-          style={open ? { transformOrigin: 'left center' } : undefined}
         />
       </div>
 
       {/* Slide-over drawer */}
       <div
+        ref={drawerRef}
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
+        aria-hidden={!open}
+        inert={!open}
         className={cn(
-          'fixed top-0 left-0 bottom-0 z-[96] w-72 md:hidden',
-          'shadow-2xl bg-[var(--theme-panel)]',
+          'fixed top-0 left-0 bottom-0 w-72 md:hidden',
+          Z_LAYER.navigation,
+          'shadow-2xl border-r border-[var(--theme-border)] bg-[var(--theme-panel)]',
           'flex flex-col pt-[max(env(safe-area-inset-top,20px),20px)] pb-[max(env(safe-area-inset-bottom,20px),20px)]',
-          'transition-transform duration-300 ease-in-out',
-          open ? 'translate-x-0' : '-translate-x-full',
+          'motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-in-out',
+          open ? 'translate-x-0' : '-translate-x-full pointer-events-none',
         )}
       >
         {/* Header */}
@@ -265,12 +333,12 @@ export function MobileHamburgerMenu() {
           <div className="flex items-center gap-2.5">
             <img
               src="/claude-avatar.webp"
-              alt="Hermes Agent"
+              alt="Hermes Workspace logo"
               className="size-8 rounded-xl shrink-0"
             />
             <div className="flex flex-col leading-tight">
               <span className="font-bold text-[15px] tracking-tight text-[var(--theme-text)]">
-                Hermes Agent
+                Hermes Workspace
               </span>
               <span className="text-[11px] text-[var(--theme-muted)]">
                 Workspace
@@ -281,24 +349,39 @@ export function MobileHamburgerMenu() {
             type="button"
             aria-label="Close menu"
             onClick={() => setOpen(false)}
-            className="flex items-center justify-center size-8 rounded-full active:scale-90 transition-all text-[var(--theme-muted)]"
+            className="flex size-11 items-center justify-center rounded-full text-[var(--theme-muted)] motion-safe:transition-all hover:bg-[var(--theme-hover)] active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-panel)]"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={1.8} />
           </button>
         </div>
 
         {/* Nav items */}
-        <nav className="flex flex-col gap-1 px-3 pt-4 flex-1">
+        <nav className="scrollbar-none flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-3 pt-4">
           {visibleNavItems.map((item) => {
             const isActive = item.match(pathname)
             return (
-              <button
+              <a
                 key={item.id}
-                type="button"
-                onClick={() => handleNav(item.to)}
+                href={item.to}
+                onClick={(event) => {
+                  // Preserve browser link affordances such as Cmd/Ctrl-click
+                  // and context-menu open-in-new-tab behavior.
+                  if (
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  ) {
+                    return
+                  }
+                  event.preventDefault()
+                  handleNav(item.to)
+                }}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'flex items-center gap-3 px-3 py-3 rounded-xl text-left w-full',
-                  'transition-all duration-150 active:scale-[0.98]',
+                  'motion-safe:transition-all motion-safe:duration-150 hover:bg-[var(--theme-hover)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-panel)]',
                 )}
                 style={
                   isActive
@@ -320,7 +403,7 @@ export function MobileHamburgerMenu() {
                   strokeWidth={isActive ? 2 : 1.6}
                 />
                 <span className="text-[15px] font-medium">{item.label}</span>
-              </button>
+              </a>
             )
           })}
         </nav>
@@ -353,18 +436,16 @@ export function MobileHamburgerMenu() {
                 <circle cx="12" cy="7" r="4" />
               </svg>
             </div>
-            <span className="text-[15px] font-semibold truncate text-[var(--theme-text)]">
+            <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-[var(--theme-text)]">
               {profileDisplayName}
             </span>
-            <span className="size-2.5 rounded-full bg-green-500 shrink-0" />
-
-            <div className="flex-1" />
+            <span className="size-2.5 shrink-0 rounded-full bg-[var(--theme-success)]" />
 
             {/* Settings cog */}
             <button
               type="button"
               onClick={() => handleNav('/settings')}
-              className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors text-[var(--theme-muted)]"
+              className="flex size-11 items-center justify-center rounded-xl text-[var(--theme-muted)] motion-safe:transition-colors hover:bg-[var(--theme-hover)] active:bg-[var(--theme-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-panel)]"
               aria-label="Settings"
             >
               <HugeiconsIcon
@@ -372,6 +453,15 @@ export function MobileHamburgerMenu() {
                 size={20}
                 strokeWidth={1.5}
               />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              disabled={loggingOut}
+              className="rounded-xl px-2 py-2 text-xs font-medium text-[var(--theme-muted)] motion-safe:transition-colors hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-panel)]"
+            >
+              {loggingOut ? 'Signing out…' : 'Sign out'}
             </button>
 
             {/* Theme toggle — sun/moon */}
@@ -382,9 +472,15 @@ export function MobileHamburgerMenu() {
                 const dark = isDarkTheme(current)
                 const next = getThemeVariant(current, dark ? 'light' : 'dark')
                 setTheme(next)
+                setIsDarkMode(isDarkTheme(next))
               }}
-              className="flex items-center justify-center size-9 rounded-xl active:bg-white/10 transition-colors text-[var(--theme-muted)]"
-              aria-label="Toggle theme"
+              className="flex size-11 items-center justify-center rounded-xl text-[var(--theme-muted)] motion-safe:transition-colors hover:bg-[var(--theme-hover)] active:bg-[var(--theme-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-panel)]"
+              aria-label={
+                isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'
+              }
+              title={
+                isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'
+              }
             >
               <svg
                 width="18"

@@ -1,6 +1,16 @@
 import { useMemo } from 'react'
+import { BulbIcon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import {
+  DashboardEmptyState,
+  DashboardUnavailableState,
+} from './dashboard-empty-state'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { detectNovusOpportunity } from '@/lib/novus-opportunity-detector'
+import {
+  safeAnalyticsModels,
+  safeNumber,
+} from '@/screens/dashboard/lib/analytics-normalizers'
 
 const SUBSCRIPTION_PATTERNS: Array<RegExp> = [
   /(^|[\s:/-])codex(\b|[-/])/i,
@@ -38,7 +48,7 @@ function formatCostUsd(usd: number): string {
 
 /**
  * Enhanced Per-model cost ledger with Novus optimization suggestions.
- * 
+ *
  * This enhanced version:
  * - Splits each row into 'paid' (real $$) vs 'included' (subscription / local / oauth) categories
  * - Sorts paid rows by cost descending so the operator sees what is actually burning money first
@@ -49,30 +59,32 @@ function formatCostUsd(usd: number): string {
  */
 export function CostLedgerCard({
   analytics,
+  unavailable = false,
 }: {
   analytics: DashboardOverview['analytics']
+  unavailable?: boolean
 }) {
   const rows = useMemo(() => {
     if (!analytics || analytics.source !== 'analytics') return []
-    
-    return analytics.topModels
+
+    return safeAnalyticsModels(analytics)
       .map((m) => {
         const included = isSubscription(m.id)
-        
+
         // For non-included (paid) models, check for Novus optimization opportunities
         let novusSuggestion = null
         if (!included) {
           // Infer task type and risk from model usage patterns
-          // This is a simplified inference - in practice, you might want to 
+          // This is a simplified inference - in practice, you might want to
           // correlate with actual task data from analytics
           const taskContext = inferTaskContextFromModelUsage(m, analytics)
           novusSuggestion = detectNovusOpportunity(taskContext)
         }
-        
+
         return {
           ...m,
           included,
-          novusSuggestion
+          novusSuggestion,
         }
       })
       .sort((a, b) => {
@@ -84,7 +96,15 @@ export function CostLedgerCard({
       })
   }, [analytics])
 
-  if (rows.length === 0) return null
+  if (unavailable) return <DashboardUnavailableState title="Cost ledger" />
+  if (rows.length === 0) {
+    return (
+      <DashboardEmptyState
+        title="Cost ledger"
+        description="Cost attribution will appear after model usage is recorded."
+      />
+    )
+  }
 
   const paidTotal = rows
     .filter((r) => !r.included)
@@ -109,11 +129,9 @@ export function CostLedgerCard({
       />
 
       <div className="flex items-center justify-between">
-        <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-        >
+        <h2 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
           Cost ledger
-        </h3>
+        </h2>
         <span
           className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
           title="Total billed across non-subscription rows."
@@ -145,27 +163,29 @@ export function CostLedgerCard({
                 {row.id}
               </span>
             </span>
-            <span
-              className="shrink-0 font-mono tabular-nums text-[var(--theme-text)]"
-            >
+            <span className="shrink-0 font-mono tabular-nums text-[var(--theme-text)]">
               {row.included ? (
                 <span title={`${row.sessions} sessions`}>
                   {formatTokens(row.tokens)}
-                  <span
-                    className="ml-1 text-[var(--theme-muted)]"
-                  >
-                    incl
-                  </span>
+                  <span className="ml-1 text-[var(--theme-muted)]">incl</span>
                 </span>
               ) : (
-                <span title={`${row.sessions} sessions · ${row.tokens.toLocaleString()} tokens`}>
+                <span
+                  title={`${row.sessions} sessions · ${row.tokens.toLocaleString()} tokens`}
+                >
                   {formatCostUsd(row.cost)}
                   {row.novusSuggestion ? (
                     <span
                       className="ml-1.5 cursor-help text-[var(--theme-accent)]"
                       title={`Switch to ${row.novusSuggestion.suggestedModel} to save ~${row.novusSuggestion.potentialSavingsPercent}%`}
                     >
-                      💡 {row.novusSuggestion.potentialSavingsPercent}%↓
+                      <HugeiconsIcon
+                        icon={BulbIcon}
+                        size={11}
+                        strokeWidth={1.8}
+                        aria-hidden
+                      />
+                      {row.novusSuggestion.potentialSavingsPercent}%↓
                     </span>
                   ) : null}
                 </span>
@@ -185,31 +205,36 @@ export function CostLedgerCard({
  */
 function inferTaskContextFromModelUsage(
   model: any,
-  analytics: NonNullable<DashboardOverview['analytics']>
+  analytics: NonNullable<DashboardOverview['analytics']>,
 ): { type: string; risk: string; description?: string } {
   // Default values
   let type = 'text_summary' // Default to a type that Novus can handle
   let risk = 'standard'
   let description
-  
+
   // Simple heuristic: more expensive models likely used for more complex tasks
-  const costPerToken = model.cost > 0 && model.tokens > 0 ? model.cost / model.tokens : 0
-  
-  if (costPerToken > 0.00001) { // Expensive model (> $10/M tokens)
+  const costPerToken =
+    model.cost > 0 && model.tokens > 0 ? model.cost / model.tokens : 0
+
+  if (costPerToken > 0.00001) {
+    // Expensive model (> $10/M tokens)
     type = 'code_generation'
     risk = 'standard'
-  } else if (costPerToken > 0.000005) { // Moderately expensive ($5-10/M tokens)
+  } else if (costPerToken > 0.000005) {
+    // Moderately expensive ($5-10/M tokens)
     type = 'text_summary'
     risk = 'low'
-  } else { // Inexpensive model (< $5/M tokens)
+  } else {
+    // Inexpensive model (< $5/M tokens)
     type = 'documentation'
     risk = 'low'
   }
-  
+
   // Add description if available from analytics
-  if (analytics.topModels.length > 0) {
-    description = `${model.id} used in ${analytics.topModels.length} model comparisons`
+  const modelCount = safeAnalyticsModels(analytics).length
+  if (modelCount > 0) {
+    description = `${model.id} used in ${modelCount} model comparisons`
   }
-  
+
   return { type, risk, description }
 }

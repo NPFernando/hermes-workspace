@@ -72,10 +72,10 @@ export function NetworkAccessSection() {
         </p>
       </div>
 
-      {/* Gateway tip */}
+      {/* Remote connection tip */}
       <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-hover)] p-3 text-xs text-[var(--theme-muted)]">
         <span className="font-semibold text-[var(--theme-text)]">
-          Gateway tip —{' '}
+          Connection tip —{' '}
         </span>
         set the connection URL in{' '}
         <span className="font-medium text-[var(--theme-text)]">

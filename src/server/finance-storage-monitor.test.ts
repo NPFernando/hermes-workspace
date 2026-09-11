@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -31,42 +31,61 @@ function tempStatePath(): string {
 
 function storageStatusFor(health: FinanceStorageHealth): StorageStatus {
   return {
-    active: health.status === 'postgres_unavailable' ? 'unavailable' : 'postgres',
+    active: health.isPostgresBehindJson ? 'json' : 'postgres',
+    fallback: 'json',
+    jsonPath: '/tmp/finance.json',
     auditPath: '/tmp/audit.jsonl',
     postgres: {
       enabled: true,
-      available: health.status !== 'postgres_unavailable',
+      available: true,
       database: 'finance',
-      snapshotAvailable: health.status !== 'postgres_unavailable',
+      snapshotAvailable: true,
     },
     health,
   }
 }
 
-/** Postgres unreachable — the only "unhealthy" state now that there's one store. */
 function unhealthyStorageHealth(): FinanceStorageHealth {
+  const jsonDb = createEmptyFinanceDatabase()
+  const postgresDb = createEmptyFinanceDatabase()
+  jsonDb.updatedAt = '2026-07-08T00:00:30.000Z'
+  postgresDb.updatedAt = '2026-07-08T00:00:00.000Z'
   return buildFinanceStorageHealth({
-    postgresDb: null,
+    jsonDb,
+    postgresDb,
     postgres: {
       enabled: true,
-      available: false,
-      snapshotAvailable: false,
-      reason: 'connection refused',
+      available: true,
+      snapshotAvailable: true,
+      lastWriteError: 'psql exited 1',
+    },
+    selfHeal: {
+      attempted: true,
+      attempts: 2,
+      succeeded: false,
+      lastAttemptAt: '2026-07-08T00:00:31.000Z',
     },
   })
 }
 
 function healthyStorageHealth(): FinanceStorageHealth {
+  const jsonDb = createEmptyFinanceDatabase()
   const postgresDb = createEmptyFinanceDatabase()
-  postgresDb.updatedAt = '2026-07-08T00:00:30.000Z'
+  jsonDb.updatedAt = '2026-07-08T00:00:30.000Z'
+  postgresDb.updatedAt = jsonDb.updatedAt
   return buildFinanceStorageHealth({
+    jsonDb,
     postgresDb,
-    postgres: { enabled: true, available: true, snapshotAvailable: true },
+    postgres: {
+      enabled: true,
+      available: true,
+      snapshotAvailable: true,
+    },
   })
 }
 
 describe('finance-storage-monitor', () => {
-  it('sends an ops alert only after repeated unresolved storage failures', () => {
+  it('sends an ops alert only after repeated unresolved mirror failures', () => {
     const statePath = tempStatePath()
     const health = unhealthyStorageHealth()
     const sent: Array<string> = []
@@ -114,12 +133,12 @@ describe('finance-storage-monitor', () => {
       reason: null,
     })
     expect(sent).toHaveLength(1)
-    expect(sent[0]).toContain('Finance storage alert')
-    expect(sent[0]).toContain('connection refused')
+    expect(sent[0]).toContain('Finance storage mirror alert')
+    expect(sent[0]).toContain('Self-heal: unresolved after 2 attempt(s)')
     expect(auditLogger).toHaveBeenCalledWith(
       'finance_storage_monitor_alerted',
       expect.objectContaining({
-        status: 'postgres_unavailable',
+        status: 'postgres_behind',
         consecutiveFailures: 2,
         notificationSent: true,
       }),
@@ -162,8 +181,20 @@ describe('finance-storage-monitor', () => {
       'finance_storage_monitor_recovered',
       expect.objectContaining({
         previousConsecutiveFailures: 1,
-        previousStatus: 'postgres_unavailable',
+        previousStatus: 'postgres_behind',
       }),
     )
+  })
+
+  it('writes monitor state with private permissions', () => {
+    const statePath = tempStatePath()
+    runFinanceStorageHeartbeat({
+      statePath,
+      now: () => new Date('2026-07-08T00:01:00.000Z'),
+      storageStatus: () => storageStatusFor(healthyStorageHealth()),
+      auditLogger: vi.fn(),
+    })
+
+    expect(statSync(statePath).mode & 0o777).toBe(0o600)
   })
 })

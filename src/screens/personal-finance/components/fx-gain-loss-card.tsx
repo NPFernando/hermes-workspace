@@ -26,6 +26,7 @@ export function FxGainLossCard({
   payload: PersonalFinancePayload
 }) {
   const { fxGainLoss } = payload
+  if (!fxGainLoss) return null
   const nonLkrEntries = fxGainLoss.entries.filter(
     (e) => e.currency !== 'LKR',
   )

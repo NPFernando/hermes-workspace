@@ -259,12 +259,10 @@ export async function saveConfig(
     // Dashboards have historically wrapped the config in `{ config: {...} }`.
     // Support both shapes defensively.
     const base =
-      current && typeof current === 'object' && 'config' in current
+      'config' in current
         ? (current.config as Record<string, unknown>)
         : current
-    if (base && typeof base === 'object') {
-      merged = deepMerge(base, config)
-    }
+    merged = deepMerge(base, config)
   } catch {
     // If we can't read the current config, fall back to sending the raw patch.
     // The dashboard will reject or overwrite — this is no worse than the old

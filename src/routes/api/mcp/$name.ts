@@ -10,6 +10,9 @@ import {
   getCapabilities,
 } from '../../../server/gateway-capabilities'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../../server/rate-limit'
@@ -40,6 +43,9 @@ export const Route = createFileRoute('/api/mcp/$name')({
         // DELETE has no body, so requireJsonContentType allows it through.
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`mcp-delete:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.mcp && !capabilities.mcpFallback) {
           return json(

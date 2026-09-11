@@ -6,6 +6,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { listTasks } from '../../server/tasks-store'
 import { resolveHermesBin } from '../../server/hermes-bin'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 // ---------------------------------------------------------------------------
 // POST /api/telegram-board
@@ -35,7 +42,7 @@ function buildBoardMessage(): string {
       (h) => h.action === 'planned',
     )
     if (plannedHistory.length === 0) return false
-    const lastNote = plannedHistory[plannedHistory.length - 1].note ?? ''
+    const lastNote = plannedHistory[plannedHistory.length - 1].note
     return !lastNote.includes('Plan unavailable') && lastNote.length >= 80
   }).length
 
@@ -136,6 +143,14 @@ export const Route = createFileRoute('/api/telegram-board')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`telegram-board:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
+        }
         let body: { chat_id?: string } = {}
         try {
           body = (await request.json()) as typeof body
@@ -166,7 +181,10 @@ export const Route = createFileRoute('/api/telegram-board')({
       },
 
       // GET: just return the formatted message (useful for debugging)
-      GET: () => {
+      GET: ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         const msg = buildBoardMessage()
         return json({ ok: true, message: msg })
       },

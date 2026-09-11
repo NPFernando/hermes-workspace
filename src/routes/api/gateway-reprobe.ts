@@ -17,6 +17,12 @@ import {
   getGatewayMode,
 } from '../../server/gateway-capabilities'
 import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/gateway-reprobe')({
   server: {
@@ -24,6 +30,11 @@ export const Route = createFileRoute('/api/gateway-reprobe')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`gateway-reprobe:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
         }
 
         const capabilities = await forceReprobeGateway()

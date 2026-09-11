@@ -30,7 +30,7 @@ export type ToolArtifact = {
 }
 
 type ArtifactIndex = {
-  artifacts: Record<string, ToolArtifact>
+  artifacts: Record<string, ToolArtifact | undefined>
 }
 
 let index: ArtifactIndex = { artifacts: {} }
@@ -42,15 +42,23 @@ function ensureDataDir(): void {
 function loadIndex(): void {
   try {
     if (!existsSync(INDEX_FILE)) return
-    const parsed = JSON.parse(
-      readFileSync(INDEX_FILE, 'utf-8'),
-    ) as ArtifactIndex
-    if (parsed && typeof parsed === 'object' && parsed.artifacts) {
+    const parsed: unknown = JSON.parse(readFileSync(INDEX_FILE, 'utf-8'))
+    if (isArtifactIndex(parsed)) {
       index = parsed
     }
   } catch {
     index = { artifacts: {} }
   }
+}
+
+function isArtifactIndex(value: unknown): value is ArtifactIndex {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'artifacts' in value &&
+    typeof value.artifacts === 'object' &&
+    value.artifacts !== null
+  )
 }
 
 function saveIndex(): void {
@@ -103,7 +111,10 @@ function inferArtifactKind(toolName?: string, text?: string): ToolArtifactKind {
 
 export function listToolArtifacts(sessionId?: string): Array<ToolArtifact> {
   return Object.values(index.artifacts)
-    .filter((artifact) => !sessionId || artifact.sessionId === sessionId)
+    .filter((artifact): artifact is ToolArtifact => {
+      if (!artifact) return false
+      return !sessionId || artifact.sessionId === sessionId
+    })
     .sort((a, b) => b.createdAt - a.createdAt)
 }
 

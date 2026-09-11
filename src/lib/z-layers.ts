@@ -4,6 +4,7 @@
  *
  *   banner   — docked, non-blocking strips (connection, credits)
  *   bell     — floating notification bell + inbox panel
+ *   navigation — mobile navigation drawer above floating utilities
  *   modal    — blocking dialogs with a backdrop
  *   toast    — transient toasts (above modals so feedback is never hidden)
  *   critical — action-required overlays that must beat everything
@@ -11,6 +12,7 @@
 export const Z_LAYER = {
   banner: 'z-[9600]',
   bell: 'z-[9700]',
+  navigation: 'z-[9800]',
   modal: 'z-[9998]',
   toast: 'z-[9999]',
   critical: 'z-[10000]',
