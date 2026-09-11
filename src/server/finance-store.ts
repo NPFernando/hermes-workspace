@@ -282,6 +282,8 @@ export type BudgetCategory = {
   category: string
   currency: CurrencyCode
   budgetAmount: number
+  /** When true, copyBudgetsToMonth() adds last month's positive leftover (budget - actual) on top of the copied amount. Default/undefined behaves as false — budgets stay static until explicitly copied. */
+  rolloverEnabled?: boolean
   source: string
   createdAt: string
   updatedAt: string
@@ -1622,6 +1624,7 @@ export function addFinanceRecord(
       category: stringField(payload, 'category', 'Other'),
       currency: stringField(payload, 'currency', 'LKR'),
       budgetAmount: numberField(payload, 'budgetAmount', 0),
+      rolloverEnabled: booleanField(payload, 'rolloverEnabled', false) || undefined,
     })
   } else if (kind === 'category') {
     db.categories.push({
@@ -4297,6 +4300,81 @@ export function budgetVsActualSummary(
         overBudget: actual > budget,
       }
     })
+}
+
+/**
+ * Closes the "budgets are static" gap: budget_categories is a per-(category,
+ * month) row with nothing that carries it forward — a category with no row
+ * for the requested month simply doesn't appear in budgetVsActualSummary,
+ * so today's budget stops applying the moment the calendar rolls over unless
+ * the user manually re-enters every category again. This copies each
+ * category from the most recent PRIOR month that has a budget row into
+ * `targetMonth`, skipping any category that already has a row there (never
+ * overwrites an explicit entry the user already set for this month).
+ *
+ * When a source row has `rolloverEnabled`, the copied amount also picks up
+ * that category's *positive* leftover from the source month (budget minus
+ * actual spend) — an intentional, per-category opt-in, not a default,
+ * since carrying spending headroom forward isn't what every category
+ * should do (e.g. it makes sense for "Home improvements", not "Groceries").
+ * A negative leftover (already over budget) never reduces next month's
+ * budget — this only ever adds unspent room, never subtracts overspend.
+ */
+export function copyBudgetsToMonth(
+  db: FinanceDatabase,
+  targetMonth: string,
+): { copied: number; skippedExisting: number } {
+  const existingCategories = new Set(
+    db.budget_categories.filter((b) => b.month === targetMonth).map((b) => b.category),
+  )
+  // The most recent month strictly before targetMonth, per category — a
+  // plain string comparison works because month keys are YYYY-MM.
+  const latestPriorByCategory = new Map<string, BudgetCategory>()
+  for (const b of db.budget_categories) {
+    if (b.month >= targetMonth) continue
+    const current = latestPriorByCategory.get(b.category)
+    if (!current || b.month > current.month) {
+      latestPriorByCategory.set(b.category, b)
+    }
+  }
+
+  let copied = 0
+  let skippedExisting = 0
+  const createdAt = nowIso()
+  for (const [category, source] of latestPriorByCategory) {
+    if (existingCategories.has(category)) {
+      skippedExisting += 1
+      continue
+    }
+    let budgetAmount = source.budgetAmount
+    if (source.rolloverEnabled) {
+      const [year, monthNum] = source.month.split('-').map(Number)
+      const result = getBudgetVsActual(db, category, year, monthNum)
+      if (result && result.variance > 0) {
+        // result.variance is LKR-normalised; source.budgetAmount is in
+        // source.currency — convert the leftover back before adding.
+        const leftoverInSourceCurrency =
+          source.currency === 'LKR'
+            ? result.variance
+            : (convertCurrency(result.variance, 'LKR', source.currency) ??
+              result.variance)
+        budgetAmount += leftoverInSourceCurrency
+      }
+    }
+    db.budget_categories.push({
+      id: randomUUID(),
+      month: targetMonth,
+      category,
+      currency: source.currency,
+      budgetAmount,
+      rolloverEnabled: source.rolloverEnabled,
+      source: 'rollover',
+      createdAt,
+      updatedAt: createdAt,
+    })
+    copied += 1
+  }
+  return { copied, skippedExisting }
 }
 
 export function updateExchangeRate(

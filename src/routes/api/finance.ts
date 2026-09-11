@@ -14,6 +14,7 @@ import {
   clearKnownSenderPassword,
   computeAccountLedgerBalance,
   convertCurrency,
+  copyBudgetsToMonth,
   deleteFinanceRecord,
   deleteKnownSender,
   ensureFinanceStore,
@@ -2662,6 +2663,22 @@ export const Route = createFileRoute('/api/finance')({
               skippedDuplicates,
               errors,
             })
+          }
+          if (action === 'copy_budgets_to_month') {
+            const targetMonth =
+              typeof body.targetMonth === 'string' && /^\d{4}-\d{2}$/.test(body.targetMonth)
+                ? body.targetMonth
+                : ''
+            if (!targetMonth)
+              return json(
+                { ok: false, error: 'targetMonth (YYYY-MM) is required.' },
+                { status: 400 },
+              )
+            const db = ensureFinanceStore()
+            const result = copyBudgetsToMonth(db, targetMonth)
+            writeFinanceStore(db)
+            appendAuditLog('budgets_copied_to_month', { targetMonth, ...result })
+            return json({ ...financePayload(), ...result })
           }
           if (action === 'apply_recommended_safeguards') {
             const applied = applyRecommendedSafeguards()
