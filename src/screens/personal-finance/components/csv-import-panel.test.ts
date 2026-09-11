@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { autoDetect, normalizeKind, normalizeRow, parseCsv } from './csv-import-panel'
+import {
+  autoDetect,
+  matchAccountId,
+  normalizeKind,
+  normalizeRow,
+  parseCsv,
+} from './csv-import-panel'
 
 describe('parseCsv', () => {
   it('parses a simple header + rows', () => {
@@ -63,6 +69,7 @@ describe('autoDetect', () => {
       category: 'category',
       currency: 'currency',
       kindColumn: 'kind',
+      accountColumn: 'account',
     })
   })
 
@@ -82,7 +89,26 @@ describe('autoDetect', () => {
       category: '',
       currency: '',
       kindColumn: '',
+      accountColumn: '',
     })
+  })
+})
+
+describe('matchAccountId', () => {
+  const accounts = [
+    { id: 'a1', name: 'ComBank Savings' },
+    { id: 'a2', name: 'Cash' },
+  ]
+
+  it('matches case-insensitively, trimmed', () => {
+    expect(matchAccountId('  combank savings  ', accounts)).toBe('a1')
+    expect(matchAccountId('CASH', accounts)).toBe('a2')
+  })
+
+  it('returns undefined for no match or an empty name', () => {
+    expect(matchAccountId('Unknown Account', accounts)).toBeUndefined()
+    expect(matchAccountId('', accounts)).toBeUndefined()
+    expect(matchAccountId('   ', accounts)).toBeUndefined()
   })
 })
 
@@ -114,6 +140,7 @@ describe('normalizeRow', () => {
     category: 'category',
     currency: 'currency',
     kindColumn: 'kind',
+    accountColumn: '',
   }
 
   it('sign mode: negative amount -> expense, absolute value used', () => {
@@ -186,5 +213,47 @@ describe('normalizeRow', () => {
     const row = ['2026-01-01', '100', 'Keells', '', '', '']
     const result = normalizeRow(headers, row, { ...mapping, currency: '' }, 'sign')
     expect(result).toMatchObject({ currency: 'LKR' })
+  })
+
+  it('resolves accountId from the mapped account column by name, case-insensitively', () => {
+    const accountHeaders = [...headers, 'account']
+    const accountMapping = { ...mapping, accountColumn: 'account' }
+    const accounts = [{ id: 'acc-1', name: 'ComBank Savings' }]
+    const row = ['2026-01-01', '100', 'Keells', '', '', '', 'combank savings']
+    const result = normalizeRow(accountHeaders, row, accountMapping, 'sign', accounts)
+    expect(result).toMatchObject({ accountId: 'acc-1' })
+  })
+
+  it('falls back to the default account when the row has no account match', () => {
+    const accounts = [{ id: 'acc-1', name: 'ComBank Savings' }]
+    const row = ['2026-01-01', '100', 'Keells', '', '', '']
+    const result = normalizeRow(headers, row, mapping, 'sign', accounts, 'acc-1')
+    expect(result).toMatchObject({ accountId: 'acc-1' })
+  })
+
+  it('leaves accountId undefined when neither a column match nor a default is set', () => {
+    const row = ['2026-01-01', '100', 'Keells', '', '', '']
+    const result = normalizeRow(headers, row, mapping, 'sign')
+    expect(result).not.toHaveProperty('error')
+    if (!('error' in result)) expect(result.accountId).toBeUndefined()
+  })
+
+  it("the row's own account column wins over the default when both are set", () => {
+    const accountHeaders = [...headers, 'account']
+    const accountMapping = { ...mapping, accountColumn: 'account' }
+    const accounts = [
+      { id: 'acc-1', name: 'ComBank Savings' },
+      { id: 'acc-2', name: 'Cash' },
+    ]
+    const row = ['2026-01-01', '100', 'Keells', '', '', '', 'cash']
+    const result = normalizeRow(
+      accountHeaders,
+      row,
+      accountMapping,
+      'sign',
+      accounts,
+      'acc-1',
+    )
+    expect(result).toMatchObject({ accountId: 'acc-2' })
   })
 })
