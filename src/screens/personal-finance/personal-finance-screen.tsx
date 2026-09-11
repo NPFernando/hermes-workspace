@@ -20,6 +20,7 @@ import { PendingIngestionPanel } from './components/pending-ingestion-panel'
 import { FinanceAlertsCard } from './components/finance-alerts-card'
 import { FinanceAnalystCard } from './components/finance-analyst-card'
 import { FinanceTrendsCard } from './components/finance-trends-card'
+import { CashFlowForecastCard } from './components/cash-flow-forecast-card'
 import { NetWorthHistoryCard } from './components/net-worth-history-card'
 import { NetWorthByAccountCard } from './components/net-worth-by-account-card'
 import { SavingsGoalsProgress } from './components/savings-goals-progress'
@@ -363,6 +364,7 @@ export function PersonalFinanceScreen() {
           <FinanceAlertsCard payload={payload} />
           <FinanceAnalystCard payload={payload} onPayload={setPayload} />
           <FinanceTrendsCard payload={payload} />
+          <CashFlowForecastCard payload={payload} />
 
           <GoalsTargetsCard payload={payload} onPayload={setPayload} />
 

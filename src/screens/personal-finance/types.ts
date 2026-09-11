@@ -65,6 +65,21 @@ export type PersonalFinancePayload = {
     priceHikeStreak: number
     sustainedPriceHike: boolean
   }>
+  /** Forward cash-flow estimate from recent history and pending schedules. */
+  cashFlowForecast: {
+    averageMonthlyIncomeLkr: number
+    averageMonthlyExpenseLkr: number
+    recurringMonthlyLkr: number
+    safeToSpendLkr: number
+    months: Array<{
+      month: string
+      expectedIncomeLkr: number
+      expectedExpenseLkr: number
+      netLkr: number
+      endingCashLkr: number
+    }>
+    alerts: Array<{ level: 'warning' | 'critical'; detail: string }>
+  }
   upcomingMoney: {
     paydays: Array<{ name: string; state: 'due_soon' | 'overdue'; days: number }>
     contracts: Array<{ name: string; days: number }>
