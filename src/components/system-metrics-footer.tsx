@@ -116,7 +116,7 @@ function StatusDot({ tone }: { tone: 'ok' | 'warn' | 'critical' | 'muted' }) {
 export function SystemMetricsFooter({
   leftOffsetPx = 0,
 }: {
-  leftOffsetPx?: number
+  leftOffsetPx?: number | string
 }) {
   const { data, isError } = useQuery({
     queryKey: ['system-metrics-footer'],
