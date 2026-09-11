@@ -133,6 +133,7 @@ vi.mock('../../server/finance-store', () => ({
   updatePendingIngestion: vi.fn(),
   getCategoryCorrections: vi.fn(() => ({})),
   findPossibleDuplicate: vi.fn(() => null),
+  copyBudgetsToMonth: vi.fn(() => ({ copied: 0, skippedExisting: 0 })),
 }))
 // Neither of these was mocked before (the pending_ingestions actions —
 // submit_ingestion_password, confirm_pending_ingestion, and now
@@ -1116,5 +1117,60 @@ describe('import_transactions_csv', () => {
       }),
     })
     expect(response.status).toBe(400)
+  })
+})
+
+describe('copy_budgets_to_month', () => {
+  it('calls copyBudgetsToMonth with the target month and writes the store', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.copyBudgetsToMonth).mockReturnValue({
+      copied: 2,
+      skippedExisting: 1,
+    })
+    vi.mocked(store.writeFinanceStore).mockClear()
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'copy_budgets_to_month', targetMonth: '2026-08' }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { copied: number; skippedExisting: number }
+    expect(body.copied).toBe(2)
+    expect(body.skippedExisting).toBe(1)
+    expect(vi.mocked(store.copyBudgetsToMonth)).toHaveBeenCalledWith(
+      expect.anything(),
+      '2026-08',
+    )
+    expect(vi.mocked(store.writeFinanceStore)).toHaveBeenCalled()
+  })
+
+  it('returns 400 for a missing or malformed targetMonth', async () => {
+    state.authenticated = true
+
+    const missing = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'copy_budgets_to_month' }),
+      }),
+    })
+    expect(missing.status).toBe(400)
+
+    const malformed = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'copy_budgets_to_month', targetMonth: 'August 2026' }),
+      }),
+    })
+    expect(malformed.status).toBe(400)
   })
 })
