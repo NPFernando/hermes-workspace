@@ -2564,6 +2564,103 @@ export const Route = createFileRoute('/api/finance')({
             clearKnownSenderPassword(id)
             return json({ ok: true })
           }
+          if (action === 'import_transactions_csv') {
+            // Bulk counterpart to confirm_pending_ingestion — same
+            // duplicate check (findPossibleDuplicate) and the same
+            // addFinanceRecord field mapping, just over many rows instead
+            // of one. The client parses the CSV and does column mapping;
+            // this only ever receives already-normalized rows, never raw
+            // CSV text, so a bank's specific column layout is a client
+            // concern, not a server one.
+            const rows = Array.isArray(body.rows) ? body.rows : []
+            if (rows.length === 0)
+              return json(
+                { ok: false, error: 'rows must be a non-empty array.' },
+                { status: 400 },
+              )
+            if (rows.length > 1000)
+              return json(
+                { ok: false, error: 'Import is capped at 1000 rows per batch.' },
+                { status: 400 },
+              )
+            const force = body.force === true
+            let created = 0
+            let skippedDuplicates = 0
+            const errors: Array<{ index: number; reason: string }> = []
+            rows.forEach((row: unknown, index: number) => {
+              const r = (row && typeof row === 'object' ? row : {}) as Record<
+                string,
+                unknown
+              >
+              const kind = r.kind
+              if (kind !== 'income' && kind !== 'expense') {
+                errors.push({ index, reason: 'kind must be income or expense' })
+                return
+              }
+              const vendorOrSource =
+                typeof r.vendorOrSource === 'string' ? r.vendorOrSource.trim() : ''
+              const date = typeof r.date === 'string' ? r.date.trim() : ''
+              const amount =
+                typeof r.amount === 'number' ? r.amount : Number(r.amount)
+              if (!vendorOrSource) {
+                errors.push({ index, reason: 'vendorOrSource is required' })
+                return
+              }
+              if (!date) {
+                errors.push({ index, reason: 'date is required' })
+                return
+              }
+              if (!Number.isFinite(amount) || amount <= 0) {
+                errors.push({ index, reason: 'amount must be a positive number' })
+                return
+              }
+              if (!force) {
+                const duplicate = findPossibleDuplicate(
+                  kind,
+                  vendorOrSource,
+                  date,
+                  amount,
+                )
+                if (duplicate) {
+                  skippedDuplicates += 1
+                  return
+                }
+              }
+              const currency =
+                typeof r.currency === 'string' && r.currency.trim()
+                  ? r.currency.trim()
+                  : 'LKR'
+              const category =
+                typeof r.category === 'string' && r.category.trim()
+                  ? r.category.trim()
+                  : undefined
+              const accountId =
+                typeof r.accountId === 'string' && r.accountId ? r.accountId : undefined
+              addFinanceRecord(kind, {
+                amount,
+                currency,
+                category,
+                accountId,
+                source: 'csv_import',
+                ...(kind === 'income'
+                  ? { sourceName: vendorOrSource, dateReceived: date }
+                  : { vendor: vendorOrSource, date }),
+              })
+              created += 1
+            })
+            appendAuditLog('csv_import_run', {
+              rows: rows.length,
+              created,
+              skippedDuplicates,
+              errorCount: errors.length,
+            })
+            return json({
+              ...financePayload(),
+              created,
+              skippedDuplicates,
+              errors,
+            })
+          }
           if (action === 'apply_recommended_safeguards') {
             const applied = applyRecommendedSafeguards()
             return json({
