@@ -148,6 +148,42 @@ async function main(): Promise<void> {
     })
     db.strategy_results.push({ id: 'sr-1', kind: 'demo_trade_log', pnlQuote: 12.5 })
     db.riskState.dailyRealizedLoss = -3
+    db.budget_categories.push({
+      id: 'budget-july',
+      month: '2026-07',
+      category: 'Groceries',
+      currency: 'LKR',
+      budgetAmount: 20_000,
+      rolloverEnabled: true,
+      source: 'finance-pg-it',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    })
+    db.expense_records.push({
+      id: 'expense-groceries',
+      date: '2026-07-05',
+      vendor: 'Test market',
+      category: 'Groceries',
+      currency: 'LKR',
+      amount: 15_000,
+      convertedLkrAmount: 15_000,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'finance-pg-it',
+      createdAt: '2026-07-05T00:00:00.000Z',
+      updatedAt: '2026-07-05T00:00:00.000Z',
+    })
+    const rollover = store.copyBudgetsToMonth(db, '2026-08')
+    eq('budget rollover creates one target row', rollover, {
+      copied: 1,
+      skippedExisting: 0,
+    })
+    eq(
+      'budget rollover adds the positive leftover before PostgreSQL write',
+      db.budget_categories.find((row) => row.month === '2026-08')?.budgetAmount,
+      25_000,
+    )
 
     check('writeFinancePostgresNormalized returned true', pg.writeFinancePostgresNormalized(db) === true)
     const back = pg.readFinancePostgresNormalized()
@@ -162,6 +198,7 @@ async function main(): Promise<void> {
     eq('income_records[0].convertedLkrAmount', back.income_records[0].convertedLkrAmount, 400_000)
     eq('strategy_results[0].pnlQuote', back.strategy_results[0].pnlQuote, 12.5)
     eq('riskState pseudo-collection round-trips', back.riskState.dailyRealizedLoss, -3)
+    eq('budget rollover result round-trips', back.budget_categories.find((row) => row.month === '2026-08')?.budgetAmount, 25_000)
     eq('untouched collection defaults to []', back.trade_orders, [])
 
     console.log('\nC. write is replace-not-append')
