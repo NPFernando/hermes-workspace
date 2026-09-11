@@ -1,0 +1,9 @@
+[Unit]
+Description=Check Hermes Workspace operational health
+After=hermes-workspace.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/hermes-workspace-live
+ExecStart=/home/ubuntu/hermes-workspace-live/scripts/ops-monitor.mjs /home/ubuntu/hermes-workspace-live

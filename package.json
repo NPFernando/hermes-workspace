@@ -24,6 +24,7 @@
     "smoke:auth:browser": "node scripts/authenticated-browser-smoke.mjs",
     "smoke:release": "node scripts/release-smoke.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
+    "ops:monitor": "node scripts/ops-monitor.mjs",
     "playground:ws": "node scripts/playground-ws.mjs",
     "lint": "eslint",
     "format": "prettier",

@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodically monitor Hermes Workspace release state
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Unit=hermes-workspace-monitor.service
+
+[Install]
+WantedBy=timers.target
