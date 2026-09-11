@@ -1,0 +1,13 @@
+[Unit]
+Description=Queue the opt-in daily finance review task
+After=hermes-workspace.service
+Wants=hermes-workspace.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/hermes-workspace-live
+# Optional file. Keep it mode 0600 if it contains FINANCE_SESSION_COOKIE.
+EnvironmentFile=-/home/ubuntu/hermes-workspace-live/.env.finance-scheduler
+Environment=FINANCE_BASE_URL=http://127.0.0.1:3000
+ExecStart=/home/ubuntu/hermes-workspace-live/scripts/daily-finance-check.sh

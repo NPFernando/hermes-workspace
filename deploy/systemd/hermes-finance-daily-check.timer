@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the opt-in daily finance review check
+
+[Timer]
+# UTC keeps the duplicate-per-UTC-day policy and the schedule aligned.
+OnCalendar=*-*-* 06:15:00 UTC
+Persistent=true
+Unit=hermes-finance-daily-check.service
+
+[Install]
+WantedBy=timers.target
