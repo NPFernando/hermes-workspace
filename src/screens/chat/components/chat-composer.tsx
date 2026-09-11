@@ -98,6 +98,8 @@ type ChatComposerProps = {
   /** Called when user changes thinking level */
   onThinkingLevelChange?: (level: ThinkingLevel) => void
   onAbort?: () => void
+  /** Keep the composer usable for /queue commands while a response is running. */
+  allowQueueWhileLoading?: boolean
   onResearch?: (query: string) => void
   /** Embedded inside another surface (e.g. Operations card), so mobile composer
    * must stay inline instead of docking fixed to the viewport bottom. */
@@ -112,6 +114,7 @@ type ChatComposerHelpers = {
 }
 
 type ChatComposerHandle = {
+  focus: () => void
   setValue: (value: string) => void
   insertText: (value: string) => void
 }
@@ -320,7 +323,7 @@ async function fetchModels(): Promise<{
 
   return {
     ok: true,
-    models: models as Array<ModelCatalogEntry>,
+    models,
     configuredProviders,
   }
 }
@@ -896,6 +899,7 @@ function ChatComposerComponent({
   thinkingLevel: externalThinkingLevel,
   onThinkingLevelChange,
   onAbort,
+  allowQueueWhileLoading = false,
   onResearch,
   embedded = false,
   hideModelSelector = false,
@@ -925,6 +929,12 @@ function ChatComposerComponent({
     name: string
   } | null>(null)
   const [focusAfterSubmitTick, setFocusAfterSubmitTick] = useState(0)
+  const isQueueCommandDraft =
+    value.trim().toLowerCase() === '/queue' ||
+    value.trim().toLowerCase().startsWith('/queue ')
+  const canQueueWhileLoading =
+    isLoading && allowQueueWhileLoading && isQueueCommandDraft
+  const inputDisabled = disabled && !allowQueueWhileLoading
   const { settings: composerSettings } = useSettings()
   const chatNavMode = composerSettings.mobileChatNavMode
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -1435,8 +1445,8 @@ function ChatComposerComponent({
 
   useImperativeHandle(
     composerRef,
-    () => ({ setValue: setComposerValue, insertText }),
-    [insertText, setComposerValue],
+    () => ({ focus: focusPrompt, setValue: setComposerValue, insertText }),
+    [focusPrompt, insertText, setComposerValue],
   )
 
   const handleRemoveAttachment = useCallback((id: string) => {
@@ -1642,7 +1652,7 @@ function ChatComposerComponent({
   )
 
   const handleSubmit = useCallback(() => {
-    if (disabled) return
+    if (disabled && !canQueueWhileLoading) return
     if (submittingRef.current) return
     if (attachmentProcessingCount > 0) {
       // Queue a submit to fire once all attachments finish processing
@@ -1677,6 +1687,7 @@ function ChatComposerComponent({
   }, [
     attachmentProcessingCount,
     attachments,
+    canQueueWhileLoading,
     clearDraft,
     disabled,
     focusPrompt,
@@ -1715,7 +1726,7 @@ function ChatComposerComponent({
   }, [])
 
   const submitDisabled =
-    disabled ||
+    (disabled && !canQueueWhileLoading) ||
     (value.trim().length === 0 &&
       attachments.length === 0 &&
       attachmentProcessingCount === 0)
@@ -2011,8 +2022,7 @@ function ChatComposerComponent({
       if (typeof wrapperRef === 'function') {
         wrapperRef(node)
       } else if (wrapperRef && 'current' in wrapperRef) {
-        ;(wrapperRef as React.MutableRefObject<HTMLDivElement | null>).current =
-          node
+        wrapperRef.current = node
       }
     },
     [wrapperRef],
@@ -2092,7 +2102,7 @@ function ChatComposerComponent({
   const composerWrapperStyle = useMemo(() => {
     const chatContentMaxWidth = 'min(var(--chat-content-max-width), 100%)'
     if (!isMobileViewport || embedded)
-      return { maxWidth: chatContentMaxWidth } as CSSProperties
+      return { maxWidth: chatContentMaxWidth }
     const safeArea = 'env(safe-area-inset-bottom, 0px)'
     const tabBarH = 'var(--tabbar-h, 0px)'
     const tf = effectiveScrollHidden ? 'translateY(110%)' : 'translateY(0)'
@@ -2186,7 +2196,7 @@ function ChatComposerComponent({
         onValueChange={handleValueChange}
         onSubmit={handlePromptSubmit}
         isLoading={isLoading}
-        disabled={disabled}
+        disabled={inputDisabled}
         maxHeight={isMobileViewport ? 120 : 240}
         className={cn(
           'relative z-50 transition-all duration-300',
