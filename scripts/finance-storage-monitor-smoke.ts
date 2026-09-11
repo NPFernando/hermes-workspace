@@ -110,17 +110,31 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error(
-    JSON.stringify(
-      {
-        ok: false,
-        mode: 'finance-storage-monitor-failure-injection',
-        error: error instanceof Error ? error.message : String(error),
-      },
-      null,
-      2,
-    ),
-  )
-  process.exit(1)
-})
+main()
+  .then(() => {
+    // The hourly cron kept timing out after 600s despite this script's own
+    // work finishing in well under a second (confirmed with the exact
+    // command the cron runs: correct JSON prints immediately, then the
+    // process just sits with 0 active handles/requests per
+    // process._getActiveHandles()/._getActiveRequests() — nothing left
+    // pending, but tsx's own loader (a persistent worker thread for its
+    // ESM transform) doesn't unwind on its own when a script never calls
+    // process.exit()). Force the exit explicitly rather than relying on
+    // the event loop draining naturally, exactly like the existing
+    // process.exit(1) below already does on the failure path.
+    process.exit(0)
+  })
+  .catch((error) => {
+    console.error(
+      JSON.stringify(
+        {
+          ok: false,
+          mode: 'finance-storage-monitor-failure-injection',
+          error: error instanceof Error ? error.message : String(error),
+        },
+        null,
+        2,
+      ),
+    )
+    process.exit(1)
+  })
