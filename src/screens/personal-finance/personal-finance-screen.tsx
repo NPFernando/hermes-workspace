@@ -13,6 +13,7 @@ import { StatCard } from '../finance/components/stat-card'
 import { BaseCurrencySelect } from './components/base-currency-select'
 import { GmailConnectionCard } from './components/gmail-connection-card'
 import { KnownSendersCard } from './components/known-senders-card'
+import { CsvImportPanel } from './components/csv-import-panel'
 import { BudgetPanel } from './components/budget-panel'
 import { PendingIngestionPanel } from './components/pending-ingestion-panel'
 import { FinanceAlertsCard } from './components/finance-alerts-card'
@@ -432,7 +433,12 @@ export function PersonalFinanceScreen() {
       )}
 
       {tab === 'ingestion' && (
-        <PendingIngestionPanel payload={payload} onConfirmed={setPayload} />
+        <>
+          <PendingIngestionPanel payload={payload} onConfirmed={setPayload} />
+          <div className="mt-4">
+            <CsvImportPanel onPayload={setPayload} />
+          </div>
+        </>
       )}
     </main>
   )

@@ -125,6 +125,7 @@ vi.mock('../../server/finance-store', () => ({
   listPendingIngestions: vi.fn(() => []),
   updatePendingIngestion: vi.fn(),
   getCategoryCorrections: vi.fn(() => ({})),
+  findPossibleDuplicate: vi.fn(() => null),
 }))
 // Neither of these was mocked before (the pending_ingestions actions —
 // submit_ingestion_password, confirm_pending_ingestion, and now
@@ -915,5 +916,198 @@ describe('/api/finance fetch_news', () => {
       ok: true,
       intelligence: { researchOnly: true, stored: { stored: true } },
     })
+  })
+})
+
+describe('import_transactions_csv', () => {
+  it('creates a record per valid row and reports the count', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.addFinanceRecord).mockClear()
+    vi.mocked(store.findPossibleDuplicate).mockReturnValue(null)
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'import_transactions_csv',
+          rows: [
+            {
+              kind: 'expense',
+              date: '2026-01-01',
+              amount: 1500,
+              currency: 'LKR',
+              vendorOrSource: 'Cargills',
+              category: 'Groceries',
+            },
+            {
+              kind: 'income',
+              date: '2026-01-02',
+              amount: 5000,
+              currency: 'LKR',
+              vendorOrSource: 'Employer',
+            },
+          ],
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as {
+      ok: boolean
+      created: number
+      skippedDuplicates: number
+      errors: Array<unknown>
+    }
+    expect(body.ok).toBe(true)
+    expect(body.created).toBe(2)
+    expect(body.skippedDuplicates).toBe(0)
+    expect(body.errors).toEqual([])
+    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledWith(
+      'expense',
+      expect.objectContaining({ vendor: 'Cargills', date: '2026-01-01', amount: 1500 }),
+    )
+    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledWith(
+      'income',
+      expect.objectContaining({ sourceName: 'Employer', dateReceived: '2026-01-02' }),
+    )
+  })
+
+  it('skips a row findPossibleDuplicate flags, without creating a record', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.addFinanceRecord).mockClear()
+    vi.mocked(store.findPossibleDuplicate).mockReturnValueOnce({
+      id: 'existing-1',
+      vendorOrSource: 'Cargills',
+      date: '2026-01-01',
+      amount: 1500,
+    })
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'import_transactions_csv',
+          rows: [
+            {
+              kind: 'expense',
+              date: '2026-01-01',
+              amount: 1500,
+              vendorOrSource: 'Cargills',
+            },
+          ],
+        }),
+      }),
+    })
+
+    const body = (await response.json()) as {
+      created: number
+      skippedDuplicates: number
+    }
+    expect(body.created).toBe(0)
+    expect(body.skippedDuplicates).toBe(1)
+    expect(vi.mocked(store.addFinanceRecord)).not.toHaveBeenCalled()
+  })
+
+  it('force:true bypasses the duplicate check', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.addFinanceRecord).mockClear()
+    vi.mocked(store.findPossibleDuplicate).mockReturnValue({
+      id: 'existing-1',
+      vendorOrSource: 'Cargills',
+      date: '2026-01-01',
+      amount: 1500,
+    })
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'import_transactions_csv',
+          force: true,
+          rows: [
+            { kind: 'expense', date: '2026-01-01', amount: 1500, vendorOrSource: 'Cargills' },
+          ],
+        }),
+      }),
+    })
+
+    const body = (await response.json()) as { created: number }
+    expect(body.created).toBe(1)
+    expect(vi.mocked(store.addFinanceRecord)).toHaveBeenCalledTimes(1)
+  })
+
+  it('collects a per-row error for an invalid row without failing the whole batch', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.addFinanceRecord).mockClear()
+    vi.mocked(store.findPossibleDuplicate).mockReturnValue(null)
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'import_transactions_csv',
+          rows: [
+            { kind: 'expense', date: '2026-01-01', amount: 1500, vendorOrSource: 'Cargills' },
+            { kind: 'transfer', date: '2026-01-01', amount: 100, vendorOrSource: 'X' },
+            { kind: 'expense', date: '2026-01-01', amount: -5, vendorOrSource: 'Y' },
+          ],
+        }),
+      }),
+    })
+
+    const body = (await response.json()) as {
+      created: number
+      errors: Array<{ index: number; reason: string }>
+    }
+    expect(body.created).toBe(1)
+    expect(body.errors).toEqual([
+      { index: 1, reason: 'kind must be income or expense' },
+      { index: 2, reason: 'amount must be a positive number' },
+    ])
+  })
+
+  it('returns 400 for an empty rows array', async () => {
+    state.authenticated = true
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'import_transactions_csv', rows: [] }),
+      }),
+    })
+    expect(response.status).toBe(400)
+  })
+
+  it('returns 400 when rows exceeds the 1000-row cap', async () => {
+    state.authenticated = true
+    const rows = Array.from({ length: 1001 }, (_, i) => ({
+      kind: 'expense',
+      date: '2026-01-01',
+      amount: 1,
+      vendorOrSource: `V${i}`,
+    }))
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'import_transactions_csv', rows }),
+      }),
+    })
+    expect(response.status).toBe(400)
   })
 })
