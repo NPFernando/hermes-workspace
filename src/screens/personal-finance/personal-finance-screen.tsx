@@ -12,6 +12,7 @@ import {
 import { StatCard } from '../finance/components/stat-card'
 import { BaseCurrencySelect } from './components/base-currency-select'
 import { GmailConnectionCard } from './components/gmail-connection-card'
+import { KnownSendersCard } from './components/known-senders-card'
 import { BudgetPanel } from './components/budget-panel'
 import { PendingIngestionPanel } from './components/pending-ingestion-panel'
 import { FinanceAlertsCard } from './components/finance-alerts-card'
@@ -388,6 +389,7 @@ export function PersonalFinanceScreen() {
             <div className="px-2 pb-2 [&>*]:mt-3">
               <BaseCurrencySelect payload={payload} onPayload={setPayload} />
               <GmailConnectionCard />
+              <KnownSendersCard />
               <AssistantMemoryCard />
               <DataHealthCard payload={payload} />
             </div>

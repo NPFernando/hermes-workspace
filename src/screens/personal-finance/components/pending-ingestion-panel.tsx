@@ -462,6 +462,14 @@ export function PendingIngestionPanel({
                     </span>
                     <span>·</span>
                     <span>{item.status.replace('_', ' ')}</span>
+                    {item.matchedSenderLabel && (
+                      <>
+                        <span>·</span>
+                        <span className={`rounded-lg border px-1.5 py-0.5 text-[10px] ${infoTone}`}>
+                          {item.matchedSenderLabel}
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   {item.status === 'awaiting_password' && (
