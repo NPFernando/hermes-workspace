@@ -7,6 +7,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../../server/rate-limit'
+import {
   deleteHubSource,
   readHubSources,
   updateHubSource,
@@ -22,6 +28,11 @@ export const Route = createFileRoute('/api/mcp/hub-sources/$id')({
             { ok: false, error: 'Unauthorized' },
             { status: 401 },
           )
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`mcp-hub-source-update:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
         }
         let body: unknown
         try {
@@ -64,6 +75,9 @@ export const Route = createFileRoute('/api/mcp/hub-sources/$id')({
             { ok: false, error: 'Unauthorized' },
             { status: 401 },
           )
+        }
+        if (!rateLimit(`mcp-hub-source-delete:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
         }
         const result = await deleteHubSource(params.id)
         if (!result.ok) {

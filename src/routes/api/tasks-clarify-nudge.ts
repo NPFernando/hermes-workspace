@@ -1,6 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { listTasks, updateTask } from '../../server/tasks-store'
 import { sendTelegramClarificationReminder } from '../../server/telegram-clarify'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+} from '../../server/rate-limit'
 
 // ---------------------------------------------------------------------------
 // POST /api/tasks-clarify-nudge?hours=4
@@ -27,6 +33,12 @@ export const Route = createFileRoute('/api/tasks-clarify-nudge')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return jsonResponse({ ok: false, error: 'Unauthorized' }, 401)
+        }
+        if (!rateLimit(`tasks-clarify-nudge:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
+        }
         const url = new URL(request.url)
         const hoursParam = Number(url.searchParams.get('hours') ?? '4')
         const thresholdMs =

@@ -78,6 +78,8 @@ export type DashboardFinanceStorageMonitorSection = {
   consecutiveFailures: number
   lastStatus: string | null
   lastWarnings: Array<string>
+  lastSelfHealAttempts: number
+  lastSelfHealSucceeded: boolean | null
   heartbeatAgeMs: number | null
   stale: boolean
 }
@@ -266,7 +268,10 @@ export type DashboardAnalyticsSection = {
   source: 'analytics' | 'fallback' | 'unavailable'
 }
 
-export type DashboardFetcher = (path: string) => Promise<Response>
+export type DashboardFetcher = (
+  path: string,
+  init?: RequestInit,
+) => Promise<Response>
 
 export type BuildOverviewOptions = {
   /**
@@ -295,16 +300,32 @@ const DEFAULT_OPTIONS = {
   logsLimit: 24,
 }
 
+// A single unavailable upstream must not hold the whole dashboard response
+// open. The client has its own outer deadline, but keeping this boundary on
+// each fan-out request lets the aggregator return partial data first.
+const SAFE_JSON_TIMEOUT_MS = 4_000
+
 async function safeJson<T>(
   fetcher: DashboardFetcher,
   path: string,
 ): Promise<T | null> {
+  const controller = new AbortController()
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
   try {
-    const res = await fetcher(path)
-    if (!res.ok) return null
-    return (await res.json()) as T
+    const upstream = (async () => {
+      const res = await fetcher(path, { signal: controller.signal })
+      if (!res.ok) return null
+      return (await res.json()) as T
+    })()
+    const deadline = new Promise<null>((resolve) => {
+      timeoutId = setTimeout(() => resolve(null), SAFE_JSON_TIMEOUT_MS)
+    })
+    return await Promise.race([upstream, deadline])
   } catch {
     return null
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId)
+    controller.abort()
   }
 }
 

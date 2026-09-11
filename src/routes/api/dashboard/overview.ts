@@ -29,11 +29,13 @@ import {
 } from '../../../server/ops-observability'
 import type { DashboardFetcher } from '../../../server/dashboard-aggregator'
 
-const overviewFetcher: DashboardFetcher = (path) => dashboardFetch(path)
+const overviewFetcher: DashboardFetcher = (path, init) =>
+  dashboardFetch(path, init)
 // Gateway fetcher hits the gateway URL (8645/8642), which is where
 // `/health/detailed` lives. The Hermes Agent confirmed `active_agents`
 // from this endpoint is the canonical “currently running” count.
-const overviewGatewayFetcher: DashboardFetcher = (path) => gatewayFetch(path)
+const overviewGatewayFetcher: DashboardFetcher = (path, init) =>
+  gatewayFetch(path, init)
 
 export const Route = createFileRoute('/api/dashboard/overview')({
   server: {

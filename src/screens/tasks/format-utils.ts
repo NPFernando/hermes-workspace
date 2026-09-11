@@ -1,5 +1,113 @@
 import type { ClaudeTask } from '@/lib/tasks-api'
 
+export type TaskOperationFilter =
+  | 'all'
+  | 'dispatched'
+  | 'timed_out'
+  | 'rescued'
+  | 'replanned'
+
+export const TASK_OPERATION_FILTERS: Array<TaskOperationFilter> = [
+  'all',
+  'dispatched',
+  'timed_out',
+  'rescued',
+  'replanned',
+]
+
+const TASK_OPERATION_ACTIONS: Record<
+  Exclude<TaskOperationFilter, 'all'>,
+  ReadonlySet<string>
+> = {
+  dispatched: new Set(['dispatching', 'dispatched']),
+  timed_out: new Set(['timed_out']),
+  rescued: new Set(['rescued']),
+  replanned: new Set(['replan_requested', 'replanned']),
+}
+
+export function getTaskOperationFilterLabel(
+  filter: TaskOperationFilter,
+): string {
+  switch (filter) {
+    case 'all':
+      return 'All operations'
+    case 'dispatched':
+      return 'Dispatched'
+    case 'timed_out':
+      return 'Timed out'
+    case 'rescued':
+      return 'Rescued'
+    case 'replanned':
+      return 'Replanned'
+  }
+}
+
+export function doesTaskMatchOperationFilter(
+  task: Pick<ClaudeTask, 'agent_history'>,
+  filter: TaskOperationFilter,
+): boolean {
+  if (filter === 'all') return true
+  const actions = TASK_OPERATION_ACTIONS[filter]
+  return (task.agent_history ?? []).some((entry) => actions.has(entry.action))
+}
+
+export type TaskNotificationEvent = {
+  taskId: string
+  taskTitle: string
+  action: string
+  at: string
+  note: string
+  by: string
+}
+
+const TASK_NOTIFICATION_ACTIONS = new Set([
+  'completed',
+  'blocked',
+  'question',
+  'timed_out',
+  'rescued',
+  'planned',
+])
+
+export function getRecentTaskNotificationEvents(
+  tasks: Array<{
+    id: string
+    title: string
+    agent_history?: Array<{
+      id?: string
+      action?: string
+      at?: string
+      note?: string
+      by?: string
+      byEmoji?: string
+    }>
+  }>,
+  nowMs = Date.now(),
+  maxEvents = 60,
+): Array<TaskNotificationEvent> {
+  const cutoff = new Date(nowMs - 24 * 60 * 60_000).toISOString()
+  const events: Array<TaskNotificationEvent> = []
+
+  for (const task of tasks) {
+    for (const historyEntry of task.agent_history ?? []) {
+      const action = historyEntry.action ?? ''
+      const at = historyEntry.at ?? ''
+      if (!at || at < cutoff || !TASK_NOTIFICATION_ACTIONS.has(action)) continue
+      events.push({
+        taskId: task.id,
+        taskTitle: task.title,
+        action,
+        at,
+        note: historyEntry.note ?? '',
+        by: historyEntry.by ?? 'astra',
+      })
+    }
+  }
+
+  events.sort((a, b) => b.at.localeCompare(a.at))
+  return events.slice(0, Math.max(0, maxEvents))
+}
+
 export function isTypingTarget(target: EventTarget | null) {
   const el = target as HTMLElement | null
   return (
@@ -43,6 +151,20 @@ export function formatTaskRefreshStatus(
   if (isInitialLoading) return 'Loading task board…'
   if (isFetching) return 'Updating task board…'
   return null
+}
+
+export function formatTaskLastUpdated(
+  updatedAtMs: number,
+  nowMs = Date.now(),
+): string | null {
+  if (!Number.isFinite(updatedAtMs) || updatedAtMs <= 0) return null
+  const ageMs = Math.max(0, nowMs - updatedAtMs)
+  if (ageMs < 60_000) return 'Updated just now'
+  if (ageMs < 3_600_000)
+    return `Updated ${Math.max(1, Math.floor(ageMs / 60_000))}m ago`
+  if (ageMs < 86_400_000)
+    return `Updated ${Math.max(1, Math.floor(ageMs / 3_600_000))}h ago`
+  return `Updated ${Math.max(1, Math.floor(ageMs / 86_400_000))}d ago`
 }
 
 export function formatCompactTaskColumnAriaLabel(
@@ -101,4 +223,3 @@ export function formatBlockedTaskBreakdownTitle(
     .filter(Boolean)
     .join(', ')
 }
-

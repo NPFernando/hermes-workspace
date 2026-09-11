@@ -226,7 +226,10 @@ export function buildSwarm2ReportRows({
         workerName: runtime?.displayName || workerId,
         state,
         stateLabel: stateLabel(state),
-        updatedAt: assignment.completedAt ?? mission.updatedAt ?? runtime?.lastOutputAt ?? null,
+        updatedAt:
+          typeof assignment.completedAt === 'number'
+            ? assignment.completedAt
+            : null,
         summary: compact(checkpoint?.result ?? checkpoint?.blocker ?? checkpoint?.nextAction ?? assignment.task),
         checkpointStatus: checkpoint?.checkpointStatus ?? checkpoint?.stateLabel ?? null,
         blocker: checkpoint?.blocker ?? null,
@@ -666,9 +669,9 @@ export function Swarm2ReportsView({
     )
   }
 
-  function renderRowActions(row: Swarm2InboxItem, compact = false) {
+  function renderRowActions(row: Swarm2InboxItem, isCompact = false) {
     const prUrl = extractPullRequestUrl(row)
-    const buttonClass = compact
+    const buttonClass = isCompact
       ? 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1 text-[10px] font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]'
       : 'rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2.5 py-1.5 text-xs font-medium text-[var(--theme-text)] hover:border-[var(--theme-accent)]'
     return (

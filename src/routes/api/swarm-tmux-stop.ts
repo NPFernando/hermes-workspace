@@ -6,6 +6,12 @@ import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
+import {
   getSwarmProfilePath,
   patchSwarmRuntimeFile,
 } from '../../server/swarm-foundation'
@@ -80,6 +86,11 @@ export const Route = createFileRoute('/api/swarm-tmux-stop')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`swarm-tmux-stop:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
         }
 
         let body: StopRequest

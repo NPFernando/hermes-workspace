@@ -169,9 +169,6 @@ function emptyState(): ValidationRunState {
 
 function loadState(): ValidationRunState {
   const db = readFinanceStore()
-  if (!db || !db.settings || typeof db.settings !== 'object') {
-    return emptyState()
-  }
   const raw = (db.settings as Record<string, unknown>).validationRuns
   if (!raw || typeof raw !== 'object') return emptyState()
   const state = raw as Partial<ValidationRunState>

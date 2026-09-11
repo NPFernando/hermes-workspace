@@ -29,7 +29,7 @@ export function NetWorthHistoryCard({
 }: {
   payload: PersonalFinancePayload
 }) {
-  const history = payload.netWorthHistory
+  const history = payload.netWorthHistory ?? []
   const [view, setView] = useState<'total' | 'breakdown'>('total')
   if (history.length < 2) return null
 

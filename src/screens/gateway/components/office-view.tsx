@@ -66,19 +66,20 @@ type OfficeLayoutTemplate = 'grid' | 'roundtable' | 'warroom'
 type SocialSpotType = 'coffee' | 'water' | 'plant' | 'snack'
 type SocialSpot = { x: number; y: number; type: SocialSpotType }
 
+function isModelPresetId(value: string): value is ModelPresetId {
+  return value in OFFICE_MODEL_BADGE
+}
+
 export function getOfficeModelBadge(modelId: string): string {
-  return (
-    OFFICE_MODEL_BADGE[modelId as ModelPresetId] ?? DEFAULT_OFFICE_MODEL_BADGE
-  )
+  return isModelPresetId(modelId)
+    ? OFFICE_MODEL_BADGE[modelId]
+    : DEFAULT_OFFICE_MODEL_BADGE
 }
 
 export function getOfficeModelLabel(modelId: string): string {
   if (!modelId) return 'Unknown'
-  return (
-    OFFICE_MODEL_LABEL[modelId as ModelPresetId] ??
-    modelId.split('/')[1] ??
-    modelId
-  )
+  if (isModelPresetId(modelId)) return OFFICE_MODEL_LABEL[modelId]
+  return modelId.split('/')[1] || modelId
 }
 
 export function getAgentStatusMeta(status: AgentWorkingStatus): {

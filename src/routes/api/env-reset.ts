@@ -11,7 +11,13 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { forceReprobeGateway } from '../../server/gateway-capabilities'
 import { clearProbe, listProbes } from '../../server/mcp-tools-cache'
 
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/env-reset')({
   server: {
@@ -19,6 +25,11 @@ export const Route = createFileRoute('/api/env-reset')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`env-reset:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
         }
 
         // 1. Clear MCP tools probes so next load re-tests each server

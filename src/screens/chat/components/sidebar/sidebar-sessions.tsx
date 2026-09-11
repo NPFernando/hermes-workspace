@@ -3,6 +3,7 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { memo, useMemo } from 'react'
+import { Link } from '@tanstack/react-router'
 import { SessionItem } from './session-item'
 import type { SessionMeta } from '../../types'
 import {
@@ -32,7 +33,7 @@ type SidebarSessionsProps = {
   onRetry: () => void
 }
 
-export const SidebarSessions = memo(function SidebarSessions({
+export const SidebarSessions = memo(function SidebarSessionsView({
   sessions,
   activeFriendlyId,
   defaultOpen = true,
@@ -66,7 +67,7 @@ export const SidebarSessions = memo(function SidebarSessions({
 
   return (
     <Collapsible
-      className="flex h-full flex-col flex-1 min-h-0 w-full"
+      className="flex flex-col flex-1 min-h-0 w-full"
       defaultOpen={defaultOpen}
     >
       <CollapsibleTrigger className="w-full flex items-center gap-1.5 rounded-none px-5 pt-3 pb-1 shrink-0 text-[10px] font-semibold uppercase tracking-wider hover:bg-transparent data-panel-open:text-[var(--theme-muted)]">
@@ -107,18 +108,34 @@ export const SidebarSessions = memo(function SidebarSessions({
           <ScrollAreaViewport className="min-h-0">
             <div className="flex flex-col gap-px pl-3 pr-2">
               {loading ? (
-                <div className="px-2 py-2 text-xs text-[var(--theme-muted)]">
-                  Loading sessions…
+                <div
+                  role="status"
+                  aria-label="Loading sessions"
+                  className="space-y-2 px-2 py-2"
+                >
+                  <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+                    <span className="size-1.5 animate-pulse rounded-full bg-[var(--theme-accent)]" />
+                    Loading sessions
+                  </div>
+                  <div className="space-y-1.5" aria-hidden="true">
+                    <div className="h-7 animate-pulse rounded-md bg-[var(--theme-card2)]" />
+                    <div className="h-7 w-11/12 animate-pulse rounded-md bg-[var(--theme-card2)]" />
+                    <div className="h-7 w-4/5 animate-pulse rounded-md bg-[var(--theme-card2)]" />
+                  </div>
                 </div>
               ) : error ? (
-                <div className="px-2 py-2 text-xs text-[var(--theme-muted)]">
-                  <div className="mb-2">Failed to load sessions.</div>
-                  <div className="text-[11px] opacity-80">{error}</div>
+                <div className="rounded-md border border-[var(--theme-danger)]/25 bg-[var(--theme-danger)]/5 px-2.5 py-2.5 text-xs text-[var(--theme-muted)]">
+                  <div className="font-medium text-[var(--theme-text)]">
+                    Sessions are temporarily unavailable.
+                  </div>
+                  <div className="mt-1 text-[11px] opacity-80">
+                    Retry to reconnect your recent activity.
+                  </div>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="mt-2"
+                    className="mt-2 h-7 px-2 text-[11px]"
                     onClick={onRetry}
                   >
                     Retry
@@ -144,9 +161,21 @@ export const SidebarSessions = memo(function SidebarSessions({
                 </>
               ) : (
                 <div className="px-2 py-2 text-xs text-[var(--theme-muted)]">
-                  {pinnedSessions.length > 0
-                    ? 'All sessions are pinned.'
-                    : 'No sessions yet. Start a conversation →'}
+                  {pinnedSessions.length > 0 ? (
+                    'All sessions are pinned.'
+                  ) : (
+                    <>
+                      <p>No sessions yet.</p>
+                      <Link
+                        to="/chat/$sessionKey"
+                        params={{ sessionKey: 'new' }}
+                        className="mt-1 inline-flex font-medium text-[var(--theme-accent)] hover:underline"
+                        onClick={onSelect}
+                      >
+                        Start a conversation →
+                      </Link>
+                    </>
+                  )}
                 </div>
               )}
               {fetching && !loading && !error && sessions.length > 0 ? (

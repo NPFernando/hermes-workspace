@@ -11,7 +11,8 @@ export interface CliTestResult {
   error: string | null
 }
 
-const ANSI_RE = /\x1b\[[0-9;]*m/g
+const ANSI_ESCAPE = String.fromCharCode(27)
+const ANSI_RE = new RegExp(`${ANSI_ESCAPE}\\[[0-9;]*m`, 'g')
 const DEFAULT_TIMEOUT_MS = 60_000
 
 const HERMES_BIN_CANDIDATES = [

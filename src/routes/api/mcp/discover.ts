@@ -10,6 +10,9 @@ import {
   getCapabilities,
 } from '../../../server/gateway-capabilities'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../../server/rate-limit'
@@ -40,6 +43,9 @@ export const Route = createFileRoute('/api/mcp/discover')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`mcp-discover:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
+        }
         const capabilities = await ensureGatewayProbed()
         if (capabilities.mcpFallback && !capabilities.mcp) {
           // Phase 1.5: live discover requires the runtime endpoint.

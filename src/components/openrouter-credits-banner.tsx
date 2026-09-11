@@ -7,6 +7,7 @@ import { useBannerSlot } from '@/stores/popup-queue-store'
 type CreditsLevel = 'ok' | 'warning' | 'critical' | 'exhausted'
 
 type CreditsData = {
+  available?: boolean
   remaining: number
   level: CreditsLevel
 }
@@ -37,7 +38,8 @@ async function fetchCredits(): Promise<CreditsData | null> {
   try {
     const res = await fetch('/api/openrouter-credits', { cache: 'no-store' })
     if (!res.ok) return null
-    return res.json() as Promise<CreditsData>
+    const data = (await res.json()) as CreditsData
+    return data.available === false ? null : data
   } catch {
     return null
   }
@@ -123,7 +125,7 @@ export function OpenRouterCreditsBanner() {
         <div className="flex shrink-0 items-center gap-2">
           <a
             href="/settings?section=providers"
-            className="text-xs font-medium underline-offset-2 hover:underline"
+            className="text-xs font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)]"
             style={{ color: textColor }}
           >
             Manage
@@ -131,7 +133,7 @@ export function OpenRouterCreditsBanner() {
           <button
             type="button"
             onClick={handleDismiss}
-            className="text-xs opacity-60 hover:opacity-100 transition-opacity"
+            className="text-xs opacity-60 motion-safe:transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)]"
             style={{ color: textColor }}
             aria-label="Dismiss"
           >

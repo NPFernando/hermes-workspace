@@ -23,7 +23,7 @@ export function ResetEnvironmentSection() {
           ? `, ${data.mcpProbesCleared} MCP probe${data.mcpProbesCleared === 1 ? '' : 's'} cleared`
           : ''
       toast(
-        `Environment reset${probeMsg}. Gateway: ${data.gateway.available ? 'online' : 'offline'}`,
+        `Connection refresh complete${probeMsg}. Workspace service: ${data.gateway.available ? 'online' : 'offline'}`,
         { type: 'success' },
       )
     },
@@ -43,8 +43,8 @@ export function ResetEnvironmentSection() {
               Reset Environment
             </h3>
             <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
-              Clears cached MCP probes and re-checks gateway connectivity. Use
-              after restarting Hermes Agent.
+              Clears cached connection checks and re-tests workspace services.
+              Use after restarting the local service.
             </p>
           </div>
           <Button

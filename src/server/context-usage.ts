@@ -362,7 +362,7 @@ async function resolveMirroredRuntimeSessionId(
         return bUpdated - aUpdated
       })[0]
 
-    return candidate?.id ?? null
+    return candidate.id
   } catch {
     return null
   }

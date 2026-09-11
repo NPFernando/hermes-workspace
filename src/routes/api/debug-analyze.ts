@@ -10,7 +10,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 import { openaiChat } from '../../server/openai-compat-api'
 import { getCapabilities } from '../../server/gateway-capabilities'
 
@@ -55,6 +60,9 @@ export const Route = createFileRoute('/api/debug-analyze')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`debug-analyze:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
+        }
 
         let terminalOutput: string
         try {

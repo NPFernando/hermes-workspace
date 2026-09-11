@@ -1,6 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { listTasks, updateTask } from '../../server/tasks-store'
+import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+} from '../../server/rate-limit'
 
 // POST /api/tasks-rescue-timedout
 // Rescues tasks that are stuck or timed-out:
@@ -11,7 +17,13 @@ import { listTasks, updateTask } from '../../server/tasks-store'
 export const Route = createFileRoute('/api/tasks-rescue-timedout')({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        if (!rateLimit(`tasks-rescue-timedout:${getClientIp(request)}`, 5, 60_000)) {
+          return rateLimitResponse()
+        }
         const now = new Date().toISOString()
         const all = listTasks({})
         let rescued = 0
@@ -58,7 +70,10 @@ export const Route = createFileRoute('/api/tasks-rescue-timedout')({
         return json({ ok: true, rescued })
       },
 
-      GET: () => {
+      GET: ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         const all = listTasks({})
         const stuck = all.filter(
           (t) =>

@@ -1,6 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { listTasks, updateTask } from '../../server/tasks-store'
 import { sendTelegramProgressPing } from '../../server/telegram-clarify'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+} from '../../server/rate-limit'
 
 // ---------------------------------------------------------------------------
 // POST /api/tasks-progress-ping
@@ -29,7 +35,13 @@ function jsonResponse(data: unknown, status = 200) {
 export const Route = createFileRoute('/api/tasks-progress-ping')({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return jsonResponse({ ok: false, error: 'Unauthorized' }, 401)
+        }
+        if (!rateLimit(`tasks-progress-ping:${getClientIp(request)}`, 12, 60_000)) {
+          return rateLimitResponse()
+        }
         const now = Date.now()
         const allTasks = listTasks({ includeDone: false })
 

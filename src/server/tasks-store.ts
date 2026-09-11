@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { normalizeTaskTitle } from './task-title'
 
 export type TaskColumn =
   | 'backlog'
@@ -291,6 +292,17 @@ export function getTask(taskId: string): TaskRecord | null {
 export function createTask(input: CreateTaskInput): TaskRecord {
   return withTasksLock(() => {
     const file = readTaskFile()
+    const normalizedTitle = normalizeTaskTitle(input.title)
+    const existing = file.tasks
+      .map(normalizeTask)
+      .find(
+        (task) =>
+          task.column !== 'done' &&
+          task.column !== 'deleted' &&
+          normalizeTaskTitle(task.title) === normalizedTitle,
+      )
+    if (existing) return existing
+
     const now = new Date().toISOString()
     const task = normalizeTask({
       id: typeof input.id === 'string' && input.id ? input.id : randomUUID(),

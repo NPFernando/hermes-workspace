@@ -98,6 +98,8 @@ type ChatComposerProps = {
   /** Called when user changes thinking level */
   onThinkingLevelChange?: (level: ThinkingLevel) => void
   onAbort?: () => void
+  /** Keep the composer usable for /queue commands while a response is running. */
+  allowQueueWhileLoading?: boolean
   onResearch?: (query: string) => void
   /** Embedded inside another surface (e.g. Operations card), so mobile composer
    * must stay inline instead of docking fixed to the viewport bottom. */
@@ -112,6 +114,7 @@ type ChatComposerHelpers = {
 }
 
 type ChatComposerHandle = {
+  focus: () => void
   setValue: (value: string) => void
   insertText: (value: string) => void
 }
@@ -896,6 +899,7 @@ function ChatComposerComponent({
   thinkingLevel: externalThinkingLevel,
   onThinkingLevelChange,
   onAbort,
+  allowQueueWhileLoading = false,
   onResearch,
   embedded = false,
   hideModelSelector = false,
@@ -925,6 +929,12 @@ function ChatComposerComponent({
     name: string
   } | null>(null)
   const [focusAfterSubmitTick, setFocusAfterSubmitTick] = useState(0)
+  const isQueueCommandDraft =
+    value.trim().toLowerCase() === '/queue' ||
+    value.trim().toLowerCase().startsWith('/queue ')
+  const canQueueWhileLoading =
+    isLoading && allowQueueWhileLoading && isQueueCommandDraft
+  const inputDisabled = disabled && !allowQueueWhileLoading
   const { settings: composerSettings } = useSettings()
   const chatNavMode = composerSettings.mobileChatNavMode
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -1142,7 +1152,7 @@ function ChatComposerComponent({
   // dead onError handler were removed alongside it.
 
   const handleModelSelect = useCallback(
-    function handleModelSelect(nextModel: string, provider?: string) {
+    function handleModelSelectImpl(nextModel: string, provider?: string) {
       const model = nextModel.trim()
       if (!model) return
       const normalizedSessionKey =
@@ -1177,7 +1187,7 @@ function ChatComposerComponent({
   )
 
   const handleThinkingSelect = useCallback(
-    function handleThinkingSelect(level: ThinkingLevel) {
+    function handleThinkingSelectImpl(level: ThinkingLevel) {
       if (onThinkingLevelChange) {
         onThinkingLevelChange(level)
       } else {
@@ -1280,14 +1290,14 @@ function ChatComposerComponent({
     }
   }, [attachments.length, value])
 
-  const cancelFocusPromptFrame = useCallback(function cancelFocusPromptFrame() {
+  const cancelFocusPromptFrame = useCallback(function cancelFocusPromptFrameImpl() {
     if (focusFrameRef.current === null) return
     window.cancelAnimationFrame(focusFrameRef.current)
     focusFrameRef.current = null
   }, [])
 
   const focusPrompt = useCallback(
-    function focusPrompt() {
+    function focusPromptImpl() {
       if (typeof window === 'undefined') return
       cancelFocusPromptFrame()
       focusFrameRef.current = window.requestAnimationFrame(
@@ -1365,7 +1375,7 @@ function ChatComposerComponent({
   // Menu open/close state + outside-click handling: see use-composer-menus.ts
 
   const persistDraft = useCallback(
-    function persistDraft(nextValue: string) {
+    function persistDraftImpl(nextValue: string) {
       if (typeof window === 'undefined') return
       if (nextValue.length === 0) {
         window.sessionStorage.removeItem(draftStorageKey)
@@ -1377,7 +1387,7 @@ function ChatComposerComponent({
   )
 
   const clearDraft = useCallback(
-    function clearDraft() {
+    function clearDraftImpl() {
       if (typeof window === 'undefined') return
       window.sessionStorage.removeItem(draftStorageKey)
     },
@@ -1385,7 +1395,7 @@ function ChatComposerComponent({
   )
 
   const handleValueChange = useCallback(
-    function handleValueChange(nextValue: string) {
+    function handleValueChangeImpl(nextValue: string) {
       setIsSlashMenuDismissed(false)
       setValue(nextValue)
       persistDraft(nextValue)
@@ -1435,8 +1445,8 @@ function ChatComposerComponent({
 
   useImperativeHandle(
     composerRef,
-    () => ({ setValue: setComposerValue, insertText }),
-    [insertText, setComposerValue],
+    () => ({ focus: focusPrompt, setValue: setComposerValue, insertText }),
+    [focusPrompt, insertText, setComposerValue],
   )
 
   const handleRemoveAttachment = useCallback((id: string) => {
@@ -1642,7 +1652,7 @@ function ChatComposerComponent({
   )
 
   const handleSubmit = useCallback(() => {
-    if (disabled) return
+    if (disabled && !canQueueWhileLoading) return
     if (submittingRef.current) return
     if (attachmentProcessingCount > 0) {
       // Queue a submit to fire once all attachments finish processing
@@ -1677,6 +1687,7 @@ function ChatComposerComponent({
   }, [
     attachmentProcessingCount,
     attachments,
+    canQueueWhileLoading,
     clearDraft,
     disabled,
     focusPrompt,
@@ -1715,7 +1726,7 @@ function ChatComposerComponent({
   }, [])
 
   const submitDisabled =
-    disabled ||
+    (disabled && !canQueueWhileLoading) ||
     (value.trim().length === 0 &&
       attachments.length === 0 &&
       attachmentProcessingCount === 0)
@@ -1766,7 +1777,6 @@ function ChatComposerComponent({
   const handleClearDraft = useCallback(() => {
     reset()
   }, [reset])
-
 
   const sttConfig =
     (sttConfigQuery.data?.config?.stt as Record<string, unknown> | undefined) ||
@@ -1907,14 +1917,14 @@ function ChatComposerComponent({
   }, [voiceRecorder])
 
   const handleAbort = useCallback(
-    function handleAbort() {
+    function handleAbortImpl() {
       onAbort?.()
     },
     [onAbort],
   )
 
   const handleOpenAttachmentPicker = useCallback(
-    function handleOpenAttachmentPicker(
+    function handleOpenAttachmentPickerImpl(
       event: React.MouseEvent<HTMLButtonElement>,
     ) {
       event.preventDefault()
@@ -1925,7 +1935,7 @@ function ChatComposerComponent({
   )
 
   const handleAttachmentInputChange = useCallback(
-    function handleAttachmentInputChange(
+    function handleAttachmentInputChangeImpl(
       event: React.ChangeEvent<HTMLInputElement>,
     ) {
       const files = Array.from(event.target.files ?? [])
@@ -1938,7 +1948,7 @@ function ChatComposerComponent({
   )
 
   const handleSelectSlashCommand = useCallback(
-    function handleSelectSlashCommand(command: SlashCommandDefinition) {
+    function handleSelectSlashCommandImpl(command: SlashCommandDefinition) {
       if (command.command === '/fast') {
         setIsSlashMenuDismissed(false)
         setFastMode((previous) => !previous)
@@ -2186,7 +2196,7 @@ function ChatComposerComponent({
         onValueChange={handleValueChange}
         onSubmit={handlePromptSubmit}
         isLoading={isLoading}
-        disabled={disabled}
+        disabled={inputDisabled}
         maxHeight={isMobileViewport ? 120 : 240}
         className={cn(
           'relative z-50 transition-all duration-300',
@@ -2331,7 +2341,7 @@ function ChatComposerComponent({
 
               {/* Right side: stop / send / mic */}
               <div className="shrink-0">
-                {isLoading ? (
+                {isLoading && !canQueueWhileLoading ? (
                   <button
                     type="button"
                     onClick={handleAbort}
@@ -3460,7 +3470,7 @@ function ChatComposerComponent({
                     </Button>
                   </PromptInputAction>
                 ) : null}
-                {isLoading ? (
+                {isLoading && !canQueueWhileLoading ? (
                   <PromptInputAction tooltip="Stop generation">
                     <Button
                       onClick={handleAbort}

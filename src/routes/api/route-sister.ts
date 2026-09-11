@@ -5,6 +5,7 @@ import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
 } from '../../server/rate-limit'
 import { classifyOne } from '../../lib/sister-routing'
 
@@ -15,6 +16,8 @@ export const Route = createFileRoute('/api/route-sister')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         if (!rateLimit(`route-sister:${getClientIp(request)}`, 60, 60_000)) {
           return rateLimitResponse()
         }

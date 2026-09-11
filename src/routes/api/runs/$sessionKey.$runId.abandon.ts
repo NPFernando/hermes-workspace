@@ -3,7 +3,13 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { markRunStatus } from '../../../server/run-store'
 
-import { safeErrorMessage } from '../../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 
 export const Route = createFileRoute('/api/runs/$sessionKey/$runId/abandon')({
   server: {
@@ -11,6 +17,11 @@ export const Route = createFileRoute('/api/runs/$sessionKey/$runId/abandon')({
       POST: async ({ request, params }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`run-abandon:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
         }
 
         const sessionKey = params.sessionKey.trim()

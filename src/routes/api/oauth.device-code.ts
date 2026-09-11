@@ -3,7 +3,13 @@ import { json } from '@tanstack/react-start'
 import { z } from 'zod'
 import { isAuthenticated } from '../../server/auth-middleware'
 
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 
 const BodySchema = z.object({
   provider: z.string().min(1),
@@ -15,6 +21,11 @@ export const Route = createFileRoute('/api/oauth/device-code')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`oauth-device-code:${getClientIp(request)}`, 5, 60_000)) {
+          return rateLimitResponse()
         }
         let body: unknown
         try {

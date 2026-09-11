@@ -55,7 +55,14 @@ function getConfig(): Config {
   if (configResolved) return config
   configResolved = true
   const token = process.env.HARP_MEMORY_API_TOKEN
-  if (!token) {
+  // Never allow a developer's dotenv-loaded production credential to leak
+  // into unit tests. Tests opt in with their dedicated endpoint/token.
+  const isImplicitTestCredential =
+    process.env.NODE_ENV === 'test' &&
+    token &&
+    token !== 'test-token' &&
+    process.env.HARP_MEMORY_API_URL !== 'http://harp.test'
+  if (!token || isImplicitTestCredential) {
     config = null
     return config
   }

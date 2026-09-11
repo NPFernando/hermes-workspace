@@ -36,15 +36,15 @@ export interface FinanceAuditEntry {
   details: Record<string, unknown>
   source: string
   createdAt: string
+  chainVersion?: number
+  previousHash?: string | null
+  entryHash?: string
 }
 
 const FINANCE_COLLECTIONS = [
   'finance_accounts',
   'income_records',
   'expense_records',
-  'transfers',
-  'net_worth_snapshots',
-  'scheduled_transactions',
   'budget_categories',
   'categories',
   'subcategories',
@@ -805,8 +805,14 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   details_json TEXT NOT NULL,
   source TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  chain_version INTEGER,
+  previous_hash TEXT,
+  entry_hash TEXT
 );
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS chain_version INTEGER;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS previous_hash TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entry_hash TEXT;
 
 CREATE TABLE IF NOT EXISTS trading_plans (
   id TEXT PRIMARY KEY,
@@ -1018,26 +1024,11 @@ export function writeFinancePostgresNormalized(db: FinanceDatabase): boolean {
     const rowsSql = FINANCE_COLLECTIONS.flatMap((collection) => {
       const value = (db as unknown as Record<string, unknown>)[collection]
       if (!Array.isArray(value)) return []
-      // finance_engine_collections has a (collection_name, record_id) primary
-      // key, so any two rows in one collection that resolve to the same
-      // record_id abort the whole mirror transaction (ON_ERROR_STOP=1) and
-      // `persist()` in the trading engine then throws -> 500 on every cycle.
-      // This bit for real once strategy_results grew past ~6000 rows: an
-      // id-less row appended near the end got the old positional fallback
-      // `strategy_results:<index+1>`, which collided with an *explicit*
-      // stableId of the same `<collection>:<n>` shape. Fix: namespace the
-      // fallback with `#row` (a shape stableId never produces) and de-dupe by
-      // record_id, last write wins.
-      const byId = new Map<string, string>()
-      value.forEach((record, index) => {
+      return value.map((record, index) => {
         const row = isRecord(record) ? record : { value: record }
-        const id = firstText(row, ['id']) || `${collection}#row${index + 1}`
-        byId.set(
-          id,
-          `(${sqlText(collection)}, ${sqlText(id)}, ${sqlJsonb(row)}, ${sqlText(timestampValue(row, ['createdAt', 'created_at'], updatedAt))}, ${sqlText(timestampValue(row, ['updatedAt', 'updated_at'], updatedAt))})`,
-        )
+        const id = firstText(row, ['id'], `${collection}:${index + 1}`)
+        return `(${sqlText(collection)}, ${sqlText(id)}, ${sqlJsonb(row)}, ${sqlText(timestampValue(row, ['createdAt', 'created_at'], updatedAt))}, ${sqlText(timestampValue(row, ['updatedAt', 'updated_at'], updatedAt))})`
       })
-      return [...byId.values()]
     })
     const specialRows = [
       `('riskState', 'default', ${sqlJsonb(db.riskState)}, ${sqlText(updatedAt)}, ${sqlText(updatedAt)})`,
@@ -1228,7 +1219,7 @@ export function appendFinanceAuditPostgres(entry: FinanceAuditEntry): boolean {
   const result = runPsql(
     FINANCE_PG_DATABASE,
     `
-INSERT INTO audit_logs (id, action, actor, details_json, source, created_at, updated_at)
+INSERT INTO audit_logs (id, action, actor, details_json, source, created_at, updated_at, chain_version, previous_hash, entry_hash)
 VALUES (
   ${sqlText(entry.id)},
   ${sqlText(entry.action)},
@@ -1236,7 +1227,10 @@ VALUES (
   ${sqlText(JSON.stringify(entry.details))},
   ${sqlText(entry.source)},
   ${sqlText(entry.createdAt)},
-  ${sqlText(entry.createdAt)}
+  ${sqlText(entry.createdAt)},
+  ${entry.chainVersion ?? 'NULL'},
+  ${entry.previousHash ? sqlText(entry.previousHash) : 'NULL'},
+  ${entry.entryHash ? sqlText(entry.entryHash) : 'NULL'}
 )
 ON CONFLICT (id) DO NOTHING;
 `,

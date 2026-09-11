@@ -4,7 +4,13 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 import {
   BEARER_TOKEN,
   CLAUDE_API,
@@ -89,6 +95,11 @@ export const Route = createFileRoute('/api/claude-jobs/$jobId')({
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
           })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`claude-job-action:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
         }
         const url = new URL(request.url)
         const action = url.searchParams.get('action') || ''
@@ -175,6 +186,11 @@ export const Route = createFileRoute('/api/claude-jobs/$jobId')({
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
           })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`claude-job-update:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
         }
         const body = await request.text()
         const parsed = parseProfileJobId(params.jobId)
@@ -264,6 +280,9 @@ export const Route = createFileRoute('/api/claude-jobs/$jobId')({
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
           })
+        }
+        if (!rateLimit(`claude-job-delete:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
         }
         const parsed = parseProfileJobId(params.jobId)
         if (parsed.profile) {

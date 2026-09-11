@@ -76,12 +76,16 @@ function readDisk(): Record<string, CachedProbe> {
       !parsed ||
       typeof parsed !== 'object' ||
       Array.isArray(parsed) ||
-      (parsed as DiskSchema).version !== 1 ||
-      typeof (parsed as DiskSchema).probes !== 'object'
+      !('version' in parsed) ||
+      parsed.version !== 1 ||
+      !('probes' in parsed) ||
+      typeof parsed.probes !== 'object' ||
+      parsed.probes === null ||
+      Array.isArray(parsed.probes)
     ) {
       return {}
     }
-    return (parsed as DiskSchema).probes
+    return parsed.probes as DiskSchema['probes']
   } catch {
     // Corrupt or unreadable — start fresh
     return {}

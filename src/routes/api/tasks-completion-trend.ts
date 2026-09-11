@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { listTasks } from '../../server/tasks-store'
+import { isAuthenticated } from '../../server/auth-middleware'
 
 // GET /api/tasks-completion-trend
 // Returns daily completion counts for the last 7 days.
@@ -8,7 +9,10 @@ import { listTasks } from '../../server/tasks-store'
 export const Route = createFileRoute('/api/tasks-completion-trend')({
   server: {
     handlers: {
-      GET: () => {
+      GET: ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         const all = listTasks({ includeDone: true })
         const now = Date.now()
         const days: Record<string, number> = {}

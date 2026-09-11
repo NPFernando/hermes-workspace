@@ -5,6 +5,7 @@ import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
 } from '../../server/rate-limit'
 import { listSisters } from '../../server/sisters-registry'
 import { BEARER_TOKEN, CLAUDE_API } from '../../server/gateway-capabilities'
@@ -65,6 +66,8 @@ export const Route = createFileRoute('/api/orchestrate')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         if (!rateLimit(`orchestrate:${getClientIp(request)}`, 30, 60_000)) {
           return rateLimitResponse()
         }

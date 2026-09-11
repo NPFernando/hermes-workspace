@@ -95,6 +95,9 @@
 
 :root {
   --tabbar-h: 80px;
+  /* Preserve the roomy desktop navigation while giving tablet dashboards
+     enough horizontal space for their data surfaces. */
+  --desktop-sidebar-width: clamp(240px, 23.4375vw, 300px);
   /* Chat content max-width — controlled by Settings > Chat Display (see #89).
    * Keep 900px default to match prior layout; 'wide' = 1200px, 'full' = 100%. */
   --chat-content-max-width: 900px;
@@ -886,6 +889,19 @@ code {
   }
 }
 
+/* Dashboard controls use compact, low-contrast surfaces. Keep enabled
+   links and buttons discoverable on pointer devices without overriding
+   explicit disabled/waiting cursors. */
+[data-route-page]
+  :where(
+    button:not(:disabled),
+    [data-slot='button']:not(:disabled):not([data-disabled]),
+    a[href]:not([aria-disabled='true']),
+    [role='button']:not([aria-disabled='true'])
+  ) {
+  cursor: pointer;
+}
+
 /* Orange glow pulse on composer when agent is actively working */
 @keyframes pulse-glow {
   0%,
@@ -1177,6 +1193,13 @@ code {
   animation: page-enter 0.22s var(--snappy) both;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  [data-route-page] {
+    animation: none !important;
+  }
+}
+
 /* ── Unified surface system: container, highlight, motion ── */
 .surface-card {
   position: relative;
@@ -1213,6 +1236,11 @@ code {
 .surface-card:hover::before,
 .surface-card:focus-within::before {
   opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .surface-card::before {
+    transition: none;
+  }
 }
 .surface-card > * {
   position: relative;
@@ -1633,6 +1661,24 @@ kbd {
 }
 
 /* ── Hermes Workspace Themes ── */
+
+/* Keep foreground text legible on primary accent surfaces. Dark palettes use
+   their deep background as the on-accent color; light palettes use white
+   against their darker blue/green action colors. Components can consume this
+   token without duplicating per-theme contrast decisions. */
+[data-theme]:not([data-theme$='-light']) {
+  --theme-on-accent: var(--theme-bg);
+  --theme-on-success: var(--theme-bg);
+  --theme-on-warning: var(--theme-bg);
+  --theme-on-danger: #ffffff;
+}
+
+[data-theme$='-light'] {
+  --theme-on-accent: #ffffff;
+  --theme-on-success: #ffffff;
+  --theme-on-warning: #1f2937;
+  --theme-on-danger: #ffffff;
+}
 
 /* ============================================================
    Odysseus — dark, minimal, monospace-forward
@@ -2506,27 +2552,16 @@ kbd {
   transition-duration: 0.05s !important;
 }
 
-/* Mobile nav drawer — push content right + dim when open */
+/* Mobile nav drawer uses a fixed slide-over and backdrop. Keep the app shell
+   stationary so the drawer remains anchored to the viewport edge. */
 @media (max-width: 767px) {
-  body.nav-drawer-open > #root {
-    transform: translateX(288px) scale(0.92);
-    opacity: 0.4;
-    border-radius: 16px;
-    overflow: hidden;
-    transition:
-      transform 0.3s ease,
-      opacity 0.3s ease,
-      border-radius 0.3s ease;
-    pointer-events: none;
-  }
+  body.nav-drawer-open > #root,
   body:not(.nav-drawer-open) > #root {
-    transform: translateX(0) scale(1);
+    transform: none;
     opacity: 1;
     border-radius: 0;
-    transition:
-      transform 0.3s ease,
-      opacity 0.3s ease,
-      border-radius 0.3s ease;
+    overflow: visible;
+    transition: none;
   }
 }
 
@@ -2541,6 +2576,20 @@ kbd {
 *:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--theme-accent) 70%, transparent);
   outline-offset: 2px;
+}
+
+/* Respect the user's motion preference across third-party and newly added
+   surfaces as well as the component-specific motion rules above. Keeping a
+   single render frame preserves loading visibility while removing movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ── Cross-platform / dynamic sizing ────────────────────────────────────────

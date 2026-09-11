@@ -1,60 +1,83 @@
+import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
+import { buildMonthlyFinanceReport } from '../../screens/personal-finance/components/financial-report'
 import {
   FINANCE_AUDIT_PATH,
+  FINANCE_DATA_PATH,
   SUPPORTED_CURRENCIES,
   TRADING_MODES,
   addFinanceRecord,
+  addFinanceSplit,
+  addFinanceTransfer,
   addPendingIngestion,
+  annualBudgetVsActualSummary,
   appendAuditLog,
+  applyBudgetTemplate,
   budgetVsActualSummary,
+  buildAiTaskReviewCsv,
+  buildFinanceAgentContext,
   buildFinanceQueryContext,
-  clearKnownSenderPassword,
-  computeAccountLedgerBalance,
-  convertCurrency,
+  buildTaxRecordsCsv,
+  buildTransactionsCsv,
+  captureNetWorthSnapshot,
+  cseProviderHealth,
+  deleteBudgetTemplate,
   deleteFinanceRecord,
-  deleteKnownSender,
   ensureFinanceStore,
   financeAlerts,
   financeStorageAlerts,
   financeStorageStatus,
   financeSummary,
+  financialHealthSummary,
   findPossibleDuplicate,
   getAverageMonthlyExpensesLkr,
   getAverageMonthlySavingsRatePct,
   getCategoryCorrections,
-  getCurrencyExposure,
-  getExchangeRate,
-  getFinanceTrends,
-  getFxGainLoss,
-  getRecurringBills,
   getUnifiedTransactions,
-  getUpcomingMoney,
-  ledgerTransactionsForDb,
-  listKnownSenders,
+  listFinanceAiTasks,
   listPendingIngestions,
   maskSensitive,
+  previewFinanceAuditPrune,
+  pruneFinanceAudit,
+  readFinanceAuditLog,
   readFinanceStore,
+  readTransactionAudit,
   recordCategoryCorrection,
-  recordGmailSyncError,
-  recordNetWorthSnapshot,
-  setKnownSenderPassword,
+  restoreFinanceRecord,
+  safeToSpendSummary,
+  saveBudgetTemplate,
   setNonLiveExecutionMode,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
   updateExchangeRate,
   updateFinanceRecord,
   updatePendingIngestion,
-  upsertKnownSender,
+  verifyFinanceAuditChain,
   writeFinanceStore,
 } from '../../server/finance-store'
+import type { FinanceDatabase } from '../../server/finance-store'
 import { isPdfEncrypted, pdfToImages } from '../../server/document-normalizer'
+import { listFinanceDocuments } from '../../server/finance-document-vault'
+import {
+  assessFxProviderHealth,
+  fetchFrankfurterRate,
+} from '../../server/finance-fx-provider'
+import { detectContractChanges } from '../../server/contract-change-detection'
+import { getFinanceManagerAgentProfile } from '../../server/finance-agent-profile'
 import {
   answerFinanceQuestion,
   extractEmploymentContract,
   extractTransactionFromImage,
+  extractTransactionsFromImages,
 } from '../../server/finance-extraction'
 import {
   approveMemory,
@@ -68,8 +91,26 @@ import {
   rejectMemory,
 } from '../../server/harp-memory-client'
 import { syncGmailNow } from '../../server/gmail-ingest'
+import { validateFinancialRules } from '../../server/financial-rules'
+import {
+  financeAgentAuthenticationError,
+  financeAgentScopeGuard,
+  financeMutationGuard,
+  financeMutationRisk,
+} from '../../server/finance-action-guard'
 import { fetchCsePrice } from '../../server/cse-market.service'
-import { fetchLkrExchangeRates } from '../../server/exchange-rate.service'
+import { prepareTransactionImport } from '../../server/transaction-import'
+import {
+  decryptFinanceBackup,
+  encryptFinanceBackup,
+} from '../../server/encrypted-finance-backup'
+import {
+  defaultEncryptedBackupConfig,
+  encryptedFinanceBackupHealth,
+  listEncryptedFinanceAuditArchives,
+  verifyEncryptedFinanceAuditArchive,
+  writeEncryptedFinanceAuditArchive,
+} from '../../server/encrypted-finance-retention'
 import {
   addBinanceCandles,
   addMarketPrice,
@@ -108,6 +149,14 @@ import {
   assessResearchRisk,
   buildCompositeSentiment,
 } from '../../server/finance-intelligence'
+
+export function detectDurableFinancePreference(text: string): string | null {
+  if (!['1', 'true', 'yes'].includes((process.env.FINANCE_LEARNED_FACTS_ENABLED ?? '').toLowerCase())) return null
+  const value = text.trim()
+  if (value.length < 20 || /\?\s*$/.test(value)) return null
+  if (!/^(i\s+(always|never|prefer|avoid|only|usually)|my\s+rule\s+is\b)/i.test(value)) return null
+  return value
+}
 import {
   appendPaperDecisionSnapshot,
   readPaperDecisionJournal,
@@ -178,8 +227,6 @@ function unauthorized() {
 const PERSONAL_FINANCE_RECORD_KINDS = new Set([
   'income',
   'expense',
-  'transfer',
-  'scheduled_transaction',
   'account',
   'goal',
   'tax',
@@ -191,7 +238,13 @@ const PERSONAL_FINANCE_RECORD_KINDS = new Set([
   'income_source',
   'stock_holding',
   'fixed_deposit',
+  'investment_journal',
+  'ai_task',
   'beneficiary',
+  'insurance_policy',
+  'transfer',
+  'split',
+  'scheduled_transaction',
 ])
 
 function recordActionResponse(kind: string) {
@@ -236,39 +289,20 @@ function isLiveMode(mode: string): boolean {
   )
 }
 
-/**
- * Phase 4A (optional / opt-in): when the operator asks the finance analyst a
- * question that *states* a durable personal rule ("I always keep 6 months of
- * expenses in cash", "I never invest in crypto"), capture that statement so it
- * can become a governed HARP preference after review. Heuristic only — no extra
- * model call — and gated behind FINANCE_LEARNED_FACTS_ENABLED so nothing
- * accumulates in the review queue unless the operator opts in.
- */
-export function detectDurableFinancePreference(question: string): string | null {
-  if (!/^(1|true|yes|on)$/i.test(process.env.FINANCE_LEARNED_FACTS_ENABLED ?? ''))
-    return null
-  const q = question.trim()
-  if (q.length < 12 || q.length > 240) return null
-  if (q.endsWith('?')) return null // a question, not a statement of intent
-  const durable =
-    /\bI (?:always|never|prefer(?:\s+to)?|want to|try to|keep|aim to|won'?t|don'?t want to|refuse to|only)\b/i
-  const rulePhrase = /\bmy (?:rule|policy|plan|budget|target|goal) is\b/i
-  if (!durable.test(q) && !rulePhrase.test(q)) return null
-  return q
-}
-
 function financePayload() {
   recoverValidationRunAutomationIfStale()
   const db = ensureFinanceStore()
-  const storage = financeStorageStatus()
+  const storage = financeStorageStatus({ selfHeal: true })
+  const backupConfig = defaultEncryptedBackupConfig()
   const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
   return {
     ok: true,
     checkedAt: Date.now(),
+    baseCurrency: db.settings.baseCurrency,
     storage,
+    backupHealth: encryptedFinanceBackupHealth(backupConfig),
     paths: {
-      // Postgres is the sole store; this used to be a finance.json path.
-      database: `postgres:${storage.postgres.database}`,
+      database: FINANCE_DATA_PATH,
       postgresDatabase: storage.postgres.database,
       auditLog: FINANCE_AUDIT_PATH,
       secretStorage:
@@ -302,11 +336,11 @@ function financePayload() {
       },
     },
     summary: financeSummary(db),
+    cseProviderHealth: cseProviderHealth(db),
+    netWorthSnapshots: db.net_worth_snapshots,
+    safeToSpend: safeToSpendSummary(db),
     nextRecommendation: (() => {
-      // Defensive: `settings` is PG JSONB and a row written before `tradingMode`
-      // existed has no such key at runtime, whatever the static type says.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      const mode = String(db.settings.tradingMode ?? 'paper_trade')
+      const mode = db.settings.tradingMode
       if (mode === 'live_manual_approval' || mode === 'live_auto_trade') {
         return {
           decision: 'live_requires_manual_review',
@@ -361,7 +395,26 @@ function financePayload() {
       }
     })(),
     budgetVsActual: budgetVsActualSummary(db),
+    annualBudgetVsActual: annualBudgetVsActualSummary(db),
+    exchangeRates: (Array.isArray(db.exchange_rates) ? db.exchange_rates : [])
+      .filter(
+        (rate) =>
+          typeof rate.base === 'string' &&
+          typeof rate.target === 'string' &&
+          typeof rate.rate === 'number',
+      )
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      .slice(0, 100),
+    fxProviderHealth: assessFxProviderHealth(
+      Array.isArray(db.exchange_rates) ? db.exchange_rates : [],
+    ),
     transactions: maskSensitive(getUnifiedTransactions(db)),
+    deletedTransactions: maskSensitive(
+      getUnifiedTransactions(db, { includeDeleted: true }).filter(
+        (transaction) => transaction.deletedAt,
+      ),
+    ),
+    transactionAudit: readTransactionAudit(100),
     tradingPerformance: tradingPerformanceSummary(db),
     demoPerformance: demoTradingPerformance(),
     decisionQuality: decisionQualityReport(),
@@ -395,7 +448,17 @@ function financePayload() {
     // market_prices/risk_scores are fetched but never rendered anywhere in
     // the UI (confirmed via grep) — dropped here to shrink this response,
     // which finance-screen.tsx's polling/refetch cycle re-fetches in full.
-    data: maskSensitive({ ...db, market_prices: [], risk_scores: [] }),
+    data: maskSensitive({
+      ...db,
+      income_records: Array.isArray(db.income_records)
+        ? db.income_records.filter((record) => !record.deletedAt)
+        : [],
+      expense_records: Array.isArray(db.expense_records)
+        ? db.expense_records.filter((record) => !record.deletedAt)
+        : [],
+      market_prices: [],
+      risk_scores: [],
+    }),
   }
 }
 
@@ -411,83 +474,55 @@ function financePayload() {
  * underlying read/write/migration path. The Trading screen keeps using the
  * unscoped GET (financePayload()) unchanged.
  */
-/** PF review item 1: how many trailing months of income/expense rows the
- *  dashboard payload carries. Older rows are reachable via `list_transactions`
- *  and the JSON export. `financeSummary`'s all-time figures are computed from
- *  `db` server-side and are NOT windowed. */
-const TRANSACTIONS_WINDOW_MONTHS = 36
-
-function withinWindow<T extends Record<string, unknown>>(
-  rows: Array<T>,
-  dateKey: keyof T & string,
-): Array<T> {
-  const cutoff = new Date()
-  cutoff.setMonth(cutoff.getMonth() - TRANSACTIONS_WINDOW_MONTHS)
-  const cutoffIso = cutoff.toISOString().slice(0, 10)
-  return rows.filter((r) => String(r[dateKey] ?? '') >= cutoffIso)
-}
-
-type LatestRate = {
-  base: string
-  target: string
-  rate: number
-  date: string
-  updatedAt?: string
-}
-
-/**
- * The FX cron (`refresh_exchange_rates`) appends one `exchange_rates` row per
- * pair per day. The dashboard only needs the *current* value for each
- * `base -> target` pair, so collapse the history to the newest row per pair.
- */
-function latestExchangeRates(
-  rows: Array<Record<string, unknown>>,
-): Array<LatestRate> {
-  const byPair = new Map<string, LatestRate>()
-  for (const r of rows) {
-    if (
-      typeof r.base !== 'string' ||
-      typeof r.target !== 'string' ||
-      typeof r.rate !== 'number'
-    )
-      continue
-    const key = `${r.base}->${r.target}`
-    const date = String(r.date ?? '')
-    const current = byPair.get(key)
-    if (!current || date >= current.date) {
-      byPair.set(key, {
-        base: r.base,
-        target: r.target,
-        rate: r.rate,
-        date,
-        updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : undefined,
-      })
-    }
-  }
-  return [...byPair.values()].sort((a, b) =>
-    `${a.base}${a.target}`.localeCompare(`${b.base}${b.target}`),
-  )
-}
-
 function personalFinancePayload() {
   const db = ensureFinanceStore()
-  const accountLedgerLegs = ledgerTransactionsForDb(db)
-  const storage = financeStorageStatus()
-  const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
   const summary = financeSummary(db)
-  // PF-201: express LKR-denominated stored values (targets, budgets, averages)
-  // in the reporting currency so the whole payload is consistent with
-  // `summary`. Falls back to the LKR number when no rate is on file.
-  const base = summary.baseCurrency
-  const inBase = (lkr: number): number =>
-    base === 'LKR' ? lkr : (convertCurrency(lkr, 'LKR', base) ?? lkr)
-  // PF-201: LKR->base multiplier for client components that still sum raw
-  // LKR-denominated records locally (e.g. the trends chart). 1 when base is
-  // 'LKR' or no rate is on file.
-  const fxToBase = inBase(1)
+  const exchangeRateRows = Array.isArray(db.exchange_rates)
+    ? db.exchange_rates
+    : []
+  const fxUnconverted = (() => {
+    const base = String(summary.baseCurrency ?? 'LKR').toUpperCase()
+    const currencies = new Set<string>()
+    const add = (value: unknown) => {
+      if (typeof value !== 'string') return
+      const currency = value.trim().toUpperCase()
+      if (currency && currency !== base) currencies.add(currency)
+    }
+    const storedRows: Array<unknown> = [
+      db.finance_accounts as Array<unknown>,
+      db.income_records as Array<unknown>,
+      db.expense_records as Array<unknown>,
+      db.savings_goals as Array<unknown>,
+      db.stock_holdings as Array<unknown>,
+      db.fixed_deposits as Array<unknown>,
+      db.loans as Array<unknown>,
+    ].flatMap((rows: unknown) => (Array.isArray(rows) ? rows : []))
+    for (const row of storedRows) {
+      const record = row as Record<string, unknown>
+      add(record.currency ?? record.originalCurrency)
+    }
+    return [...currencies].filter(
+      (currency) =>
+        !exchangeRateRows.some((rate) => {
+          const record = rate as Record<string, unknown>
+          const value = Number(record.rate)
+          const from = String(record.base ?? '').toUpperCase()
+          const to = String(record.target ?? '').toUpperCase()
+          return value > 0 &&
+            ((from === base && to === currency) ||
+              (from === currency && to === base))
+        }),
+    ).sort()
+  })()
+  const snapshots = Array.isArray(db.net_worth_snapshots)
+    ? db.net_worth_snapshots
+    : []
+  const storage = financeStorageStatus({ selfHeal: true })
+  const backupConfig = defaultEncryptedBackupConfig()
+  const alerts = [...financeStorageAlerts(storage.health), ...financeAlerts(db)]
   const efTargetMonths = db.settings.emergencyFundTargetMonths ?? 0
-  const efAvgMonthlyExpensesLkr = inBase(getAverageMonthlyExpensesLkr(db, 3))
-  const efCurrentLkr = summary.cashBalanceBase
+  const efAvgMonthlyExpensesLkr = getAverageMonthlyExpensesLkr(db, 3)
+  const efCurrentLkr = summary.cashBalanceLkr
   const efTargetLkr = efTargetMonths * efAvgMonthlyExpensesLkr
   const efCoverageMonths =
     efAvgMonthlyExpensesLkr > 0 ? efCurrentLkr / efAvgMonthlyExpensesLkr : 0
@@ -500,9 +535,9 @@ function personalFinancePayload() {
     srTargetPct > 0
       ? Math.min(100, Math.max(0, (srActualPct / srTargetPct) * 100))
       : 0
-  const wgTargetLkr = inBase(db.settings.wealthGoalTargetLkr ?? 0)
+  const wgTargetLkr = db.settings.wealthGoalTargetLkr ?? 0
   const wgTargetDate = db.settings.wealthGoalTargetDate ?? null
-  const wgCurrentLkr = summary.netWorthBase
+  const wgCurrentLkr = summary.netWorthLkr
   const wgProgressPct =
     wgTargetLkr > 0
       ? Math.min(100, Math.max(0, (wgCurrentLkr / wgTargetLkr) * 100))
@@ -511,51 +546,57 @@ function personalFinancePayload() {
     ok: true,
     checkedAt: Date.now(),
     storage,
-    baseCurrency: base,
-    fxToBase,
-    summary,
-    // PF-201: budgetVsActualSummary now returns budget/actual/variance already
-    // LKR-normalised (a non-LKR budget category is converted at the join), so
-    // every row goes through `inBase` and carries the reporting currency.
-    budgetVsActual: budgetVsActualSummary(db).map((b) => ({
-      ...b,
-      currency: base,
-      budget: inBase(b.budget),
-      actual: inBase(b.actual),
-      variance: inBase(b.variance),
+    backupHealth: encryptedFinanceBackupHealth(backupConfig),
+    summary: {
+      ...summary,
+      fxUnconverted,
+    },
+    cseProviderHealth: cseProviderHealth(db),
+    netWorthSnapshots: snapshots,
+    netWorthHistory: snapshots.slice(-180).map((snapshot) => ({
+      date: snapshot.snapshotDate,
+      netWorthBase: snapshot.netWorthLkr,
+      cashBase: snapshot.cashLkr,
+      investmentsBase: snapshot.investmentsLkr,
+      debtBase: snapshot.debtLkr,
     })),
-    // PF review D1: `transactions` (a re-shaped copy of every income + expense
-    // row) used to ship here alongside `data.income_records` / `.expense_records`
-    // — the same rows twice. TransactionsPanel now unifies the two raw arrays
-    // client-side. `getUnifiedTransactions` stays for buildFinanceQueryContext
-    // and the future paged history endpoint.
-    //
-    // PF review item 7: trends / recurring bills / upcoming money / currency
-    // exposure are computed here once (were recomputed in 4 components + a
-    // Python port in personal-finance-digest.sh). Amounts are raw LKR — the
-    // client scales by `fxToBase` for display.
-    trends: getFinanceTrends(db),
-    recurringBills: getRecurringBills(db),
-    upcomingMoney: getUpcomingMoney(db),
-    currencyExposure: getCurrencyExposure(db),
-    fxGainLoss: getFxGainLoss(db),
-    // Daily net-worth history (written by the snapshot cron / action), most
-    // recent 180 points, converted to the reporting currency for the chart.
-    netWorthHistory: db.net_worth_snapshots
-      .slice(-180)
-      .map((snap) => ({
-        date: snap.date,
-        netWorthBase: inBase(snap.netWorthLkr),
-        cashBase: inBase(snap.cashLkr),
-        investmentsBase: inBase(snap.investmentsLkr),
-        debtBase: inBase(snap.debtLkr),
-      })),
+    safeToSpend: safeToSpendSummary(db),
+    financialHealth: financialHealthSummary(db, storage.health.status),
+    budgetVsActual: budgetVsActualSummary(db),
+    annualBudgetVsActual: annualBudgetVsActualSummary(db),
+    exchangeRates: (Array.isArray(db.exchange_rates) ? db.exchange_rates : [])
+      .filter(
+        (rate) =>
+          typeof rate.base === 'string' &&
+          typeof rate.target === 'string' &&
+          typeof rate.rate === 'number',
+      )
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      .slice(0, 100),
+    budgetAlertThresholdPct: Math.max(
+      50,
+      Math.min(100, db.settings.budgetAlertThresholdPct ?? 80),
+    ),
+    budgetTemplates: db.settings.budgetTemplates ?? [],
+    goalCompletionEvents: db.settings.goalCompletionEvents ?? [],
+    proactiveInsightsEnabled: db.settings.proactiveInsightsEnabled === true,
+    salaryHistory: db.settings.salaryHistory ?? [],
+    alertsEnabled: db.settings.alertsEnabled === true,
+    quietModeEnabled: db.settings.quietModeEnabled === true,
+    financialRules: db.settings.financialRules ?? {},
+    transactions: maskSensitive(getUnifiedTransactions(db)),
+    deletedTransactions: maskSensitive(
+      getUnifiedTransactions(db, { includeDeleted: true }).filter(
+        (transaction) => transaction.deletedAt,
+      ),
+    ),
+    transactionAudit: readTransactionAudit(100),
     alerts,
     emergencyFund: {
       targetMonths: efTargetMonths,
-      avgMonthlyExpensesBase: efAvgMonthlyExpensesLkr,
-      currentBase: efCurrentLkr,
-      targetBase: efTargetLkr,
+      avgMonthlyExpensesLkr: efAvgMonthlyExpensesLkr,
+      currentLkr: efCurrentLkr,
+      targetLkr: efTargetLkr,
       coverageMonths: efCoverageMonths,
       progressPct: efProgressPct,
     },
@@ -566,36 +607,20 @@ function personalFinancePayload() {
       hasData: srHasData,
     },
     wealthGoal: {
-      targetBase: wgTargetLkr,
+      targetLkr: wgTargetLkr,
       targetDate: wgTargetDate,
-      currentBase: wgCurrentLkr,
+      currentLkr: wgCurrentLkr,
       progressPct: wgProgressPct,
     },
     financeQaHistory: db.settings.financeQaHistory ?? [],
-    // PF review item 1: bound the two fastest-growing collections. The
-    // dashboard's own consumers all look at recent windows (trends 6mo,
-    // recurring-bills 3mo, upcoming-money forward-looking) and `financeSummary`
-    // reads `db` directly server-side, so its all-time totals are unaffected.
-    // Full history is on the `list_transactions` endpoint + the JSON export.
-    transactionsWindowMonths: TRANSACTIONS_WINDOW_MONTHS,
     data: maskSensitive({
-      // Item 3: each account row carries its ledger-derived balance
-      // (openingBalance + tagged income − expenses + transfer legs, in the
-      // account's own currency) so the panel can show a reconcile delta
-      // without re-implementing the math client-side. `null` when the
-      // account has no `openingBalance` to reconcile against.
-      finance_accounts: db.finance_accounts.map((account) => ({
-        ...account,
-        ledgerBalance: computeAccountLedgerBalance(
-          db,
-          account,
-          accountLedgerLegs,
-        ),
-      })),
-      income_records: withinWindow(db.income_records, 'dateReceived'),
-      expense_records: withinWindow(db.expense_records, 'date'),
-      transfers: withinWindow(db.transfers, 'date'),
-      scheduled_transactions: db.scheduled_transactions,
+      finance_accounts: db.finance_accounts,
+      income_records: Array.isArray(db.income_records)
+        ? db.income_records.filter((record) => !record.deletedAt)
+        : [],
+      expense_records: Array.isArray(db.expense_records)
+        ? db.expense_records.filter((record) => !record.deletedAt)
+        : [],
       budget_categories: db.budget_categories,
       categories: db.categories,
       subcategories: db.subcategories,
@@ -606,13 +631,25 @@ function personalFinancePayload() {
       income_sources: db.income_sources,
       stock_holdings: db.stock_holdings,
       fixed_deposits: db.fixed_deposits,
+      investment_journal: db.investment_journal,
+      ai_tasks: db.ai_tasks,
       loans: db.loans,
       properties: db.properties,
       beneficiaries: db.beneficiaries,
+      insurance_policies: db.insurance_policies,
       pending_ingestions: db.pending_ingestions,
-      // Latest rate per pair (from the FX cron / manual entry) so the
-      // reporting-currency picker can show "rates as of …" and flag staleness.
-      exchange_rates: latestExchangeRates(db.exchange_rates),
+      scheduled_transactions:
+        (db as FinanceDatabase & {
+          scheduled_transactions?: Array<Record<string, unknown>>
+        }).scheduled_transactions ?? [],
+      exchange_rates: (Array.isArray(db.exchange_rates) ? db.exchange_rates : [])
+        .filter(
+          (rate) =>
+            typeof rate.base === 'string' &&
+            typeof rate.target === 'string' &&
+            typeof rate.rate === 'number',
+        )
+        .slice(0, 100),
     }),
   }
 }
@@ -669,17 +706,111 @@ export const Route = createFileRoute('/api/finance')({
     handlers: {
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) return unauthorized()
-        const scope = new URL(request.url).searchParams.get('scope')
+        const searchParams = new URL(request.url).searchParams
+        const scope = searchParams.get('scope')
+        if (
+          scope === 'personal_finance' &&
+          searchParams.get('format') === 'monthly-report'
+        ) {
+          const requestedMonth = searchParams.get('month') ?? ''
+          const month = /^\d{4}-\d{2}$/.test(requestedMonth)
+            ? requestedMonth
+            : new Date().toISOString().slice(0, 7)
+          const report = buildMonthlyFinanceReport(
+            personalFinancePayload() as unknown as Parameters<
+              typeof buildMonthlyFinanceReport
+            >[0],
+            month,
+          )
+          return new Response(report, {
+            headers: {
+              'Content-Type': 'text/markdown; charset=utf-8',
+              'Content-Disposition': `attachment; filename="hermes-finance-report-${month}.md"`,
+              'Cache-Control': 'no-store',
+            },
+          })
+        }
+        if (
+          scope === 'personal_finance' &&
+          (searchParams.get('format') === 'csv' ||
+            searchParams.get('format') === 'tax-csv')
+        ) {
+          const taxExport = searchParams.get('format') === 'tax-csv'
+          const csv = taxExport
+            ? buildTaxRecordsCsv(ensureFinanceStore())
+            : buildTransactionsCsv(ensureFinanceStore())
+          return new Response(csv, {
+            headers: {
+              'Content-Type': 'text/csv; charset=utf-8',
+              'Content-Disposition': `attachment; filename="hermes-${taxExport ? 'tax-records' : 'transactions'}-${new Date().toISOString().slice(0, 10)}.csv"`,
+              'Cache-Control': 'no-store',
+            },
+          })
+        }
         if (scope === 'personal_finance') return json(personalFinancePayload())
         await getLiveMonitor()
         return json(financePayload())
       },
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) return unauthorized()
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`finance-write:${getClientIp(request)}`, 120, 60_000)) {
+          return rateLimitResponse()
+        }
         const body = await parseJsonBody(request)
         const action =
           typeof body.action === 'string' ? body.action : 'add_record'
         try {
+          const agentAuthenticationError = financeAgentAuthenticationError(
+            request,
+            body,
+          )
+          if (agentAuthenticationError) {
+            appendAuditLog('finance_agent_auth_rejected', {
+              action,
+              reason: agentAuthenticationError.error,
+              source: 'finance_agent_token_guard',
+            })
+            return json(
+              { ok: false, error: agentAuthenticationError.error },
+              { status: agentAuthenticationError.status },
+            )
+          }
+          const guardError = financeMutationGuard(action, body)
+          if (guardError) {
+            appendAuditLog('finance_action_rejected', {
+              action,
+              risk: financeMutationRisk(action),
+              reason: guardError,
+              source: 'finance_mutation_guard',
+            })
+            return json(
+              {
+                ok: false,
+                error: guardError,
+                risk: financeMutationRisk(action),
+              },
+              { status: 400 },
+            )
+          }
+          const agentScopeError = financeAgentScopeGuard(action, body)
+          if (agentScopeError) {
+            appendAuditLog('finance_agent_scope_rejected', {
+              action,
+              risk: financeMutationRisk(action),
+              reason: agentScopeError,
+              source: 'finance_agent_scope_guard',
+            })
+            return json(
+              {
+                ok: false,
+                error: agentScopeError,
+                risk: financeMutationRisk(action),
+              },
+              { status: 403 },
+            )
+          }
           if (action === 'add_record') {
             const kind = typeof body.kind === 'string' ? body.kind : ''
             const payload =
@@ -688,6 +819,170 @@ export const Route = createFileRoute('/api/finance')({
                 : {}
             addFinanceRecord(kind, payload)
             return recordActionResponse(kind)
+          }
+          if (action === 'add_transfer') {
+            const payload =
+              body.payload && typeof body.payload === 'object'
+                ? (body.payload as JsonRecord)
+                : {}
+            addFinanceTransfer(payload)
+            return recordActionResponse('transfer')
+          }
+          if (action === 'add_split') {
+            const payload =
+              body.payload && typeof body.payload === 'object'
+                ? (body.payload as JsonRecord)
+                : {}
+            addFinanceSplit(payload)
+            return recordActionResponse('split')
+          }
+          if (action === 'post_scheduled') {
+            const id = typeof body.id === 'string' ? body.id.trim() : ''
+            const db = readFinanceStore()
+            const scheduled = db.scheduled_transactions.find(
+              (record) => record.id === id,
+            )
+            if (!scheduled || scheduled.status !== 'pending') {
+              return json(
+                { ok: false, error: 'No pending scheduled transaction with that id.' },
+                { status: 404 },
+              )
+            }
+            const recordPayload =
+              scheduled.kind === 'income'
+                ? {
+                    dateReceived: scheduled.dueDate,
+                    sourceName: scheduled.counterparty,
+                    incomeType: scheduled.category,
+                    originalAmount: scheduled.amount,
+                    originalCurrency: 'LKR',
+                    accountId: scheduled.accountId,
+                    notes: scheduled.notes,
+                  }
+                : {
+                    date: scheduled.dueDate,
+                    vendor: scheduled.counterparty,
+                    category: scheduled.category,
+                    amount: scheduled.amount,
+                    currency: 'LKR',
+                    accountId: scheduled.accountId,
+                    notes: scheduled.notes,
+                  }
+            const fresh = addFinanceRecord(scheduled.kind, recordPayload)
+            const records =
+              scheduled.kind === 'income'
+                ? fresh.income_records
+                : fresh.expense_records
+            const posted = records.at(-1)
+            updateFinanceRecord('scheduled_transaction', id, {
+              status: 'posted',
+              postedRecordId: posted?.id,
+            })
+            appendAuditLog('scheduled_transaction_posted', {
+              id,
+              recordId: posted?.id,
+            })
+            return recordActionResponse('scheduled_transaction')
+          }
+          if (action === 'preview_transaction_import') {
+            const csv = typeof body.csv === 'string' ? body.csv : ''
+            const preview = prepareTransactionImport(csv, ensureFinanceStore())
+            return json({ ok: true, transactionImportPreview: preview })
+          }
+          if (action === 'commit_transaction_import') {
+            const csv = typeof body.csv === 'string' ? body.csv : ''
+            const preview = prepareTransactionImport(csv, ensureFinanceStore())
+            if (body.confirm !== true) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Explicit import confirmation is required.',
+                },
+                { status: 400 },
+              )
+            }
+            if (body.previewHash !== preview.fingerprint) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Import preview is stale; preview the file again.',
+                },
+                { status: 409 },
+              )
+            }
+            if (preview.errors.length > 0) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Import contains invalid rows.',
+                  transactionImportPreview: preview,
+                },
+                { status: 400 },
+              )
+            }
+            if (
+              preview.duplicates.length > 0 &&
+              body.allowDuplicates !== true
+            ) {
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Import contains possible duplicates; review and explicitly allow them.',
+                  transactionImportPreview: preview,
+                },
+                { status: 409 },
+              )
+            }
+            for (const item of preview.items) {
+              if (item.type === 'transfer') addFinanceTransfer(item.payload)
+              else if (item.type === 'split') addFinanceSplit(item.payload)
+              else addFinanceRecord(item.type, item.payload)
+            }
+            return json({
+              ...personalFinancePayload(),
+              transactionImportResult: {
+                importedItems: preview.items.length,
+                importedRows: preview.rowCount,
+                duplicatesAllowed: preview.duplicates.length > 0,
+              },
+            })
+          }
+          if (action === 'download_encrypted_backup') {
+            const passphrase =
+              typeof body.passphrase === 'string' ? body.passphrase : ''
+            const backup = encryptFinanceBackup(
+              readFinanceStore(),
+              readFinanceAuditLog(),
+              passphrase,
+            )
+            return new Response(backup, {
+              headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Content-Disposition': `attachment; filename="hermes-finance-backup-${new Date().toISOString().slice(0, 10)}.enc.json"`,
+                'Cache-Control': 'no-store',
+              },
+            })
+          }
+          if (action === 'verify_encrypted_backup') {
+            const serialized =
+              typeof body.backup === 'string' ? body.backup : ''
+            const passphrase =
+              typeof body.passphrase === 'string' ? body.passphrase : ''
+            const payload = decryptFinanceBackup(serialized, passphrase)
+            const schemaVersion =
+              payload.finance && typeof payload.finance === 'object'
+                ? (payload.finance as { schemaVersion?: unknown }).schemaVersion
+                : undefined
+            return json({
+              ok: true,
+              encryptedBackup: {
+                verified: true,
+                schemaVersion,
+                auditEntries: payload.auditLog.split('\n').filter(Boolean)
+                  .length,
+              },
+            })
           }
           if (action === 'update_record') {
             const kind = typeof body.kind === 'string' ? body.kind : ''
@@ -701,6 +996,15 @@ export const Route = createFileRoute('/api/finance')({
                 { ok: false, error: 'id is required.' },
                 { status: 400 },
               )
+            if (
+              kind === 'ai_task' &&
+              body.agentContext &&
+              typeof body.agentContext === 'object' &&
+              !Array.isArray(body.agentContext) &&
+              (body.agentContext as JsonRecord).actor === 'finance_agent'
+            ) {
+              payload.statusChangedBy = 'finance_agent'
+            }
             updateFinanceRecord(kind, id, payload)
             return recordActionResponse(kind)
           }
@@ -713,6 +1017,17 @@ export const Route = createFileRoute('/api/finance')({
                 { status: 400 },
               )
             deleteFinanceRecord(kind, id)
+            return recordActionResponse(kind)
+          }
+          if (action === 'restore_record') {
+            const kind = typeof body.kind === 'string' ? body.kind : ''
+            const id = typeof body.id === 'string' ? body.id : ''
+            if (!id)
+              return json(
+                { ok: false, error: 'id is required.' },
+                { status: 400 },
+              )
+            restoreFinanceRecord(kind, id)
             return recordActionResponse(kind)
           }
           if (action === 'fetch_market_price') {
@@ -740,9 +1055,9 @@ export const Route = createFileRoute('/api/finance')({
           if (action === 'refresh_intelligence') {
             // Derives and stores research-only records from already stored
             // inputs. It never creates plans, orders, positions, or execution.
-            const symbol = binanceSymbolFromBody(body)
+            const symbol = researchSymbolFromBody(body)
             const intelligence = refreshIntelligence(symbol)
-            return json({ ...financePayload(), intelligence })
+            return json({ ok: true, intelligence })
           }
           if (action === 'record_paper_decision') {
             // Authenticated research journal only. It derives a composite from
@@ -775,7 +1090,7 @@ export const Route = createFileRoute('/api/finance')({
               idempotencyKey,
             })
             return json({
-              ...financePayload(),
+              ok: true,
               paperDecisionJournal: { ...journal, researchOnly: true },
             })
           }
@@ -1029,7 +1344,9 @@ export const Route = createFileRoute('/api/finance')({
           }
           if (action === 'deactivate_live_readiness') {
             const result = deactivateLiveReadiness(
-              typeof body.reason === 'string' ? body.reason : 'manual deactivation',
+              typeof body.reason === 'string'
+                ? body.reason
+                : 'manual deactivation',
             )
             return json({ ...financePayload(), liveReadinessResult: result })
           }
@@ -1058,6 +1375,93 @@ export const Route = createFileRoute('/api/finance')({
             })
             return json(financePayload())
           }
+          if (action === 'set_quiet_mode') {
+            const enabled = body.enabled === true
+            const db = readFinanceStore()
+            db.settings.quietModeEnabled = enabled
+            writeFinanceStore(db)
+            appendAuditLog('quiet_mode_updated', {
+              enabled,
+              source: 'finance_api',
+            })
+            return json(financePayload())
+          }
+          if (action === 'add_salary_history') {
+            const employerName =
+              typeof body.employerName === 'string'
+                ? body.employerName.trim()
+                : ''
+            const effectiveDate =
+              typeof body.effectiveDate === 'string' ? body.effectiveDate : ''
+            const amount =
+              typeof body.amount === 'number'
+                ? body.amount
+                : Number(body.amount)
+            const currency =
+              typeof body.currency === 'string'
+                ? body.currency.trim().toUpperCase()
+                : ''
+            if (!employerName || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Employer and a valid effective date are required.',
+                },
+                { status: 400 },
+              )
+            }
+            if (
+              !Number.isFinite(amount) ||
+              amount <= 0 ||
+              !SUPPORTED_CURRENCIES.includes(
+                currency as (typeof SUPPORTED_CURRENCIES)[number],
+              )
+            ) {
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Amount must be positive and currency must be supported.',
+                },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            const now = new Date().toISOString()
+            const settings = db.settings
+            const history = Array.isArray(settings.salaryHistory)
+              ? [...settings.salaryHistory]
+              : []
+            history.push({
+              id: randomUUID(),
+              incomeSourceId:
+                typeof body.incomeSourceId === 'string'
+                  ? body.incomeSourceId
+                  : undefined,
+              employerName,
+              effectiveDate,
+              amount,
+              currency: currency as (typeof SUPPORTED_CURRENCIES)[number],
+              reason:
+                typeof body.reason === 'string' && body.reason.trim()
+                  ? body.reason.trim().slice(0, 240)
+                  : undefined,
+              source: 'manual',
+              createdAt: now,
+              updatedAt: now,
+            })
+            settings.salaryHistory = history
+              .sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))
+              .slice(0, 100)
+            writeFinanceStore(db)
+            appendAuditLog('salary_history_added', {
+              employerName,
+              effectiveDate,
+              currency,
+              source: 'finance_api',
+            })
+            return json(personalFinancePayload())
+          }
           if (action === 'set_emergency_fund_target') {
             // PF-303: user-set target, in months of average expenses. Clamped
             // to a sane range; 0 clears the target back to "not configured".
@@ -1080,129 +1484,304 @@ export const Route = createFileRoute('/api/finance')({
             appendAuditLog('savings_rate_target_updated', { pct })
             return json(personalFinancePayload())
           }
-          if (action === 'set_base_currency') {
-            // PF-201: the reporting currency every aggregate `*Lkr` figure in
-            // the personal-finance payload is expressed in. Storage stays
-            // LKR-denominated — this is display only. Accepts a known currency
-            // or any 3-letter ISO code (rate must then be on file, else the
-            // figure falls back to LKR and lands in `summary.fxUnconverted`).
-            const currency =
-              typeof body.currency === 'string'
-                ? body.currency.trim().toUpperCase()
-                : ''
-            const known = (SUPPORTED_CURRENCIES as ReadonlyArray<string>).includes(
-              currency,
-            )
-            if (!known && !/^[A-Z]{3}$/.test(currency)) {
+          if (action === 'set_budget_alert_threshold') {
+            const rawPct = typeof body.pct === 'number' ? body.pct : 80
+            const pct = Math.max(50, Math.min(100, Math.round(rawPct)))
+            const db = readFinanceStore()
+            db.settings.budgetAlertThresholdPct = pct
+            writeFinanceStore(db)
+            appendAuditLog('budget_alert_threshold_updated', { pct })
+            return json(personalFinancePayload())
+          }
+          if (action === 'save_budget_template') {
+            const payload =
+              body.template &&
+              typeof body.template === 'object' &&
+              !Array.isArray(body.template)
+                ? (body.template as JsonRecord)
+                : {}
+            try {
+              const db = readFinanceStore()
+              const template = saveBudgetTemplate(db, payload)
+              writeFinanceStore(db)
+              appendAuditLog('budget_template_saved', {
+                templateId: template.id,
+                name: template.name,
+              })
+              return json({
+                ...personalFinancePayload(),
+                budgetTemplateResult: { action: 'saved', template },
+              })
+            } catch (error) {
+              return json(
+                { ok: false, error: safeErrorMessage(error) },
+                { status: 400 },
+              )
+            }
+          }
+          if (action === 'delete_budget_template') {
+            const id = typeof body.id === 'string' ? body.id.trim() : ''
+            if (!id)
+              return json(
+                { ok: false, error: 'Template id is required.' },
+                { status: 400 },
+              )
+            const db = readFinanceStore()
+            const deleted = deleteBudgetTemplate(db, id)
+            if (!deleted)
+              return json(
+                { ok: false, error: 'Budget template was not found.' },
+                { status: 404 },
+              )
+            writeFinanceStore(db)
+            appendAuditLog('budget_template_deleted', { templateId: id })
+            return json({
+              ...personalFinancePayload(),
+              budgetTemplateResult: { action: 'deleted', templateId: id },
+            })
+          }
+          if (action === 'apply_budget_template') {
+            const templateId =
+              typeof body.templateId === 'string' ? body.templateId.trim() : ''
+            const month = typeof body.month === 'string' ? body.month : ''
+            if (!templateId || !month)
               return json(
                 {
                   ok: false,
-                  error: 'currency must be a 3-letter currency code.',
+                  error: 'Template id and target month are required.',
+                },
+                { status: 400 },
+              )
+            try {
+              const db = readFinanceStore()
+              const result = applyBudgetTemplate(db, templateId, month)
+              writeFinanceStore(db)
+              appendAuditLog('budget_template_applied', {
+                templateId,
+                month,
+                appliedCount: result.appliedCount,
+                skippedCount: result.skippedCount,
+              })
+              return json({
+                ...personalFinancePayload(),
+                budgetTemplateResult: { action: 'applied', ...result },
+              })
+            } catch (error) {
+              return json(
+                { ok: false, error: safeErrorMessage(error) },
+                { status: 400 },
+              )
+            }
+          }
+          if (action === 'set_financial_rules') {
+            const validation = validateFinancialRules(body.rules)
+            if (!validation.ok) {
+              return json(
+                { ok: false, error: validation.errors.join(' ') },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            db.settings.financialRules = validation.rules
+            writeFinanceStore(db)
+            appendAuditLog('financial_rules_updated', {
+              rules: validation.rules,
+              source: 'finance_api',
+            })
+            return json(personalFinancePayload())
+          }
+          if (action === 'set_base_currency') {
+            const baseCurrency =
+              typeof body.baseCurrency === 'string'
+                ? body.baseCurrency.trim().toUpperCase()
+                : ''
+            if (
+              !SUPPORTED_CURRENCIES.includes(
+                baseCurrency as (typeof SUPPORTED_CURRENCIES)[number],
+              )
+            ) {
+              return json(
+                {
+                  ok: false,
+                  error: `Base currency must be one of ${SUPPORTED_CURRENCIES.join(', ')}.`,
                 },
                 { status: 400 },
               )
             }
             const db = readFinanceStore()
-            db.settings.baseCurrency = currency
+            db.settings.baseCurrency = baseCurrency
             writeFinanceStore(db)
-            appendAuditLog('base_currency_updated', { currency })
+            appendAuditLog('base_currency_updated', { baseCurrency })
             return json(personalFinancePayload())
           }
-          if (action === 'refresh_exchange_rates') {
-            // PF-201: pull today's LKR<->reporting-currency rates from the FX
-            // source so non-LKR base mode works without hand entry and the
-            // "Missing exchange rate" alert clears. Idempotent per day
-            // (updateExchangeRate upserts by base/target/date). Intended for a
-            // daily cron; the manual `update_exchange_rate` action stays.
+          if (action === 'set_proactive_insights') {
+            const enabled = body.enabled === true
             const db = readFinanceStore()
-            const spreadPct =
-              typeof db.settings.exchangeRateSpreadPct === 'number' &&
-              Number.isFinite(db.settings.exchangeRateSpreadPct)
-                ? Math.max(0, db.settings.exchangeRateSpreadPct)
-                : 0
-            const configured = db.settings.reportingCurrencies as
-              | Array<string>
-              | undefined
-            const targets = (
-              configured && configured.length > 0
-                ? configured
-                : ['USD', 'AUD']
-            ).filter((c): c is string => typeof c === 'string' && c !== 'LKR')
-            const fetched = await fetchLkrExchangeRates(targets)
-            if (!fetched) {
+            db.settings.proactiveInsightsEnabled = enabled
+            writeFinanceStore(db)
+            appendAuditLog('proactive_insights_policy_updated', {
+              enabled,
+              source: 'finance_api',
+            })
+            return json(personalFinancePayload())
+          }
+          if (action === 'queue_proactive_finance_review') {
+            const schedulerAck = body.responseMode === 'scheduler_ack'
+            const db = readFinanceStore()
+            if (db.settings.proactiveInsightsEnabled !== true) {
+              return json(
+                { ok: false, error: 'Proactive finance reviews are disabled.' },
+                { status: 403 },
+              )
+            }
+            const today = new Date().toISOString().slice(0, 10)
+            const summary = financeSummary(db)
+            const storage = financeStorageStatus()
+            const duplicate = db.ai_tasks.some(
+              (task) =>
+                task.taskType === 'proactive_finance_review' &&
+                typeof task.createdAt === 'string' &&
+                task.createdAt.startsWith(today) &&
+                task.status !== 'cancelled',
+            )
+            if (duplicate) {
+              return json(
+                {
+                  ok: false,
+                  error: 'A proactive finance review is already queued today.',
+                },
+                { status: 409 },
+              )
+            }
+            addFinanceRecord('ai_task', {
+              taskType: 'proactive_finance_review',
+              title: 'Review current finance insights',
+              status: 'awaiting_approval',
+              risk: 'low',
+              requestedAction: 'review_finance_insights',
+              inputSummary: JSON.stringify({
+                asOf: today,
+                netWorthLkr: summary.netWorthLkr,
+                cashBalanceLkr: summary.cashBalanceLkr,
+                netSavingsLkr: summary.netSavingsLkr,
+                alertCount: financeStorageAlerts(storage.health).length,
+              }),
+              resultSummary:
+                'Review-only task. No financial record or trade will be changed automatically.',
+              approvalRequired: true,
+              source: 'proactive_finance_review',
+              agentName: 'finance-agent',
+            })
+            appendAuditLog('proactive_finance_review_queued', {
+              asOf: today,
+              source: 'finance_api',
+            })
+            return schedulerAck
+              ? json({
+                  ok: true,
+                  queued: true,
+                  taskType: 'proactive_finance_review',
+                  status: 'awaiting_approval',
+                  asOf: today,
+                })
+              : json(personalFinancePayload())
+          }
+          if (action === 'set_exchange_rate') {
+            const base =
+              typeof body.base === 'string'
+                ? body.base.trim().toUpperCase()
+                : ''
+            const target =
+              typeof body.target === 'string'
+                ? body.target.trim().toUpperCase()
+                : ''
+            const rate =
+              typeof body.rate === 'number' ? body.rate : Number(body.rate)
+            const date = typeof body.date === 'string' ? body.date : undefined
+            if (
+              !base ||
+              !target ||
+              base === target ||
+              !Number.isFinite(rate) ||
+              rate <= 0
+            ) {
               return json(
                 {
                   ok: false,
                   error:
-                    'Exchange-rate source unavailable — no rates changed, try again later.',
-                  updated: [],
-                  failed: targets,
+                    'Base, target, and a positive exchange rate are required.',
                 },
-                { status: 502 },
-              )
-            }
-            const date = new Date().toISOString().slice(0, 10)
-            const updated: Array<{ pair: string; lkrPerUnit: number }> = []
-            for (const [cur, midLkrPerUnit] of Object.entries(fetched.lkrPer)) {
-              // Spread = the markup on *buying* the foreign currency. The
-              // reverse leg is the exact reciprocal, so the set_wealth_goal /
-              // inBase display round-trip stays the identity.
-              const lkrPerUnit = midLkrPerUnit * (1 + spreadPct / 100)
-              updateExchangeRate(cur, 'LKR', lkrPerUnit, date)
-              updateExchangeRate('LKR', cur, 1 / lkrPerUnit, date)
-              updated.push({
-                pair: `${cur}/LKR`,
-                lkrPerUnit: Number(lkrPerUnit.toFixed(6)),
-              })
-            }
-            const failed = targets.filter(
-              (c) =>
-                !Object.prototype.hasOwnProperty.call(fetched.lkrPer, c),
-            )
-            appendAuditLog('exchange_rates_refreshed', {
-              source: fetched.source,
-              asOf: fetched.asOf,
-              spreadPct,
-              updated: updated.map((u) => u.pair),
-              failed,
-            })
-            return json({
-              ok: true,
-              source: fetched.source,
-              asOf: fetched.asOf,
-              date,
-              spreadPct,
-              updated,
-              failed,
-            })
-          }
-          if (action === 'update_exchange_rate') {
-            // PF-206: store a currency->LKR (or any pair) rate so non-LKR
-            // holdings/FDs/properties convert in the net-worth math. Fixes the
-            // "Missing exchange rate" alert.
-            const base = typeof body.base === 'string' ? body.base.trim().toUpperCase() : ''
-            const target =
-              typeof body.target === 'string' && body.target.trim()
-                ? body.target.trim().toUpperCase()
-                : 'LKR'
-            const rate = typeof body.rate === 'number' ? body.rate : NaN
-            const date =
-              typeof body.date === 'string' && body.date.trim()
-                ? body.date.trim()
-                : undefined
-            if (!/^[A-Z]{3}$/.test(base) || !/^[A-Z]{3}$/.test(target)) {
-              return json(
-                { ok: false, error: 'base and target must be 3-letter currency codes.' },
                 { status: 400 },
               )
             }
-            if (!Number.isFinite(rate) || rate <= 0) {
+            if (date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
               return json(
-                { ok: false, error: 'rate must be a positive number.' },
+                { ok: false, error: 'Exchange-rate date must be YYYY-MM-DD.' },
                 { status: 400 },
               )
             }
             updateExchangeRate(base, target, rate, date)
+            return json(personalFinancePayload())
+          }
+          if (action === 'refresh_exchange_rate') {
+            const base =
+              typeof body.base === 'string'
+                ? body.base.trim().toUpperCase()
+                : ''
+            const target =
+              typeof body.target === 'string'
+                ? body.target.trim().toUpperCase()
+                : ''
+            if (!base || !target || base === target) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Choose different base and target currencies.',
+                },
+                { status: 400 },
+              )
+            }
+            try {
+              const quote = await fetchFrankfurterRate(base, target)
+              updateExchangeRate(
+                quote.base,
+                quote.target,
+                quote.rate,
+                quote.date,
+                quote.source,
+                quote.observedAt,
+              )
+              return json({
+                ...personalFinancePayload(),
+                exchangeRateRefresh: quote,
+              })
+            } catch (error) {
+              return json(
+                { ok: false, error: safeErrorMessage(error) },
+                { status: 502 },
+              )
+            }
+          }
+          if (action === 'set_minimum_cash_reserve') {
+            const rawReserve =
+              typeof body.amountLkr === 'number'
+                ? body.amountLkr
+                : Number(body.amountLkr)
+            if (!Number.isFinite(rawReserve) || rawReserve < 0) {
+              return json(
+                {
+                  ok: false,
+                  error: 'Cash reserve must be a non-negative LKR amount.',
+                },
+                { status: 400 },
+              )
+            }
+            const db = readFinanceStore()
+            db.settings.minimumCashReserveLkr = Math.round(rawReserve)
+            writeFinanceStore(db)
+            appendAuditLog('minimum_cash_reserve_updated', {
+              amountLkr: db.settings.minimumCashReserveLkr,
+            })
             return json(personalFinancePayload())
           }
           if (action === 'set_wealth_goal') {
@@ -1211,47 +1790,36 @@ export const Route = createFileRoute('/api/finance')({
             // configured"; an empty/missing targetDate clears the date only.
             const rawTargetLkr =
               typeof body.targetLkr === 'number' ? body.targetLkr : 0
-            const enteredAmount = Math.max(0, Math.round(rawTargetLkr))
+            const targetLkr = Math.max(0, Math.round(rawTargetLkr))
             const targetDate =
               typeof body.targetDate === 'string' && body.targetDate
                 ? body.targetDate
                 : undefined
-            // PF-201: the amount is entered in the configured reporting
-            // currency. Storage stays LKR-denominated, so convert base->LKR
-            // here. Resolve the rate exactly the way financeSummary.toBase
-            // does — LKR->base direct first, then the base->LKR inverse — and
-            // invert it, so a set -> reload round-trip is the identity.
-            const enteredCurrency =
-              typeof body.currency === 'string' && body.currency.trim()
-                ? body.currency.trim().toUpperCase()
-                : 'LKR'
-            let targetLkr = enteredAmount
-            if (enteredAmount > 0 && enteredCurrency !== 'LKR') {
-              const lkrToBase = getExchangeRate('LKR', enteredCurrency)
-              const baseToLkr = getExchangeRate(enteredCurrency, 'LKR')
-              if (lkrToBase !== undefined && lkrToBase !== 0) {
-                targetLkr = Math.round(enteredAmount / lkrToBase)
-              } else if (baseToLkr !== undefined) {
-                targetLkr = Math.round(enteredAmount * baseToLkr)
-              } else {
-                return json(
-                  {
-                    ok: false,
-                    error: `No exchange rate on file for ${enteredCurrency}. Add one under Accounts & Records first.`,
-                  },
-                  { status: 400 },
-                )
-              }
-            }
             const db = readFinanceStore()
             db.settings.wealthGoalTargetLkr = targetLkr
             db.settings.wealthGoalTargetDate = targetDate
             writeFinanceStore(db)
-            appendAuditLog('wealth_goal_updated', {
-              targetLkr,
-              targetDate,
-              enteredCurrency,
-              enteredAmount,
+            appendAuditLog('wealth_goal_updated', { targetLkr, targetDate })
+            return json(personalFinancePayload())
+          }
+          if (action === 'capture_net_worth_snapshot') {
+            const snapshotDate =
+              typeof body.snapshotDate === 'string' && body.snapshotDate
+                ? body.snapshotDate
+                : new Date().toISOString().slice(0, 10)
+            const db = readFinanceStore()
+            const snapshotSource =
+              body.source === 'scheduled' ? 'scheduled' : 'manual'
+            const snapshot = captureNetWorthSnapshot(
+              db,
+              snapshotDate,
+              snapshotSource,
+            )
+            writeFinanceStore(db)
+            appendAuditLog('net_worth_snapshot_captured', {
+              id: snapshot.id,
+              snapshotDate: snapshot.snapshotDate,
+              source: snapshot.source,
             })
             return json(personalFinancePayload())
           }
@@ -1285,16 +1853,15 @@ export const Route = createFileRoute('/api/finance')({
               )
               .slice(-3)
             const db = readFinanceStore()
-            const context = buildFinanceQueryContext(db)
-            // Phase 4A: fold in approved user preferences/rules from HARP
-            // memory. Best-effort — an empty list (HARP off / slow / nothing)
-            // just means the analyst runs on the aggregated context alone.
             const userMemories = await getUserFinanceMemoriesForPrompt(question)
+            const context = {
+              ...(buildFinanceQueryContext(db) as Record<string, unknown>),
+              assistantMemories: userMemories,
+            }
             const result = await answerFinanceQuestion(
               question,
               context,
               priorTurns,
-              userMemories,
             )
             if (!result.ok)
               return json({ ok: false, error: result.reason }, { status: 502 })
@@ -1310,8 +1877,6 @@ export const Route = createFileRoute('/api/finance')({
               },
             ].slice(-10)
             writeFinanceStore(db)
-            // Opt-in: if the question stated a durable personal rule, propose it
-            // as a HARP candidate for the operator to review. Best-effort.
             const learned = detectDurableFinancePreference(question)
             if (learned) void proposeFinancialRule(learned)
             return json({
@@ -1321,8 +1886,6 @@ export const Route = createFileRoute('/api/finance')({
             })
           }
           if (action === 'list_finance_memories') {
-            // Phase 4C: "what the assistant knows" — approved rules plus the
-            // pending candidates awaiting the user's review.
             const [memories, pending] = await Promise.all([
               listActiveFinanceMemories(),
               listPendingFinanceCandidates(),
@@ -1352,22 +1915,16 @@ export const Route = createFileRoute('/api/finance')({
             return json(result)
           }
           if (action === 'add_financial_rule') {
-            const rule =
-              typeof body.rule === 'string' ? body.rule.trim() : ''
+            const rule = typeof body.rule === 'string' ? body.rule.trim() : ''
             if (!rule)
               return json(
                 { ok: false, error: 'rule is required.' },
                 { status: 400 },
               )
             const { submitted } = await proposeFinancialRule(rule)
-            // Candidate needs approval before it shows in list_finance_memories.
             return json({ ok: true, submitted })
           }
           if (action === 'set_category_rule') {
-            // Panel "edit" for a vendor -> category rule: propose the new
-            // mapping as a governed candidate and, if this replaces an existing
-            // rule, flag the old one so review supersedes it. Both are
-            // best-effort HARP writes; neither blocks.
             const vendor =
               typeof body.vendor === 'string' ? body.vendor.trim() : ''
             const category =
@@ -1393,6 +1950,166 @@ export const Route = createFileRoute('/api/finance')({
               )
             await flagFinanceMemory(memoryId)
             return json({ ok: true })
+          }
+          if (action === 'build_finance_context') {
+            const db = readFinanceStore()
+            const context = buildFinanceAgentContext(db)
+            appendAuditLog('finance_agent_context_read', {
+              contextVersion: context.contextVersion,
+              sensitivity: context.sensitivity,
+              source: 'finance_agent_context_builder',
+            })
+            return json({ ok: true, financeAgentContext: context })
+          }
+          if (action === 'get_finance_agent_profile') {
+            return json({
+              ok: true,
+              financeAgentProfile: getFinanceManagerAgentProfile(),
+            })
+          }
+          if (action === 'list_ai_tasks') {
+            const status =
+              typeof body.status === 'string' ? body.status : undefined
+            const risk = typeof body.risk === 'string' ? body.risk : undefined
+            const agentName =
+              typeof body.agentName === 'string'
+                ? body.agentName.trim()
+                : undefined
+            const from = typeof body.from === 'string' ? body.from : undefined
+            const to = typeof body.to === 'string' ? body.to : undefined
+            const terminalOnly = body.terminalOnly === true
+            const limit =
+              typeof body.limit === 'number' && Number.isFinite(body.limit)
+                ? body.limit
+                : undefined
+            const offset =
+              typeof body.offset === 'number' && Number.isFinite(body.offset)
+                ? body.offset
+                : undefined
+            return json({
+              ok: true,
+              aiTaskPage: listFinanceAiTasks({
+                status: status as NonNullable<
+                  Parameters<typeof listFinanceAiTasks>[0]
+                >['status'],
+                risk: risk as NonNullable<
+                  Parameters<typeof listFinanceAiTasks>[0]
+                >['risk'],
+                agentName,
+                from,
+                to,
+                terminalOnly,
+                limit,
+                offset,
+              }),
+            })
+          }
+          if (action === 'export_ai_task_review') {
+            const csv = buildAiTaskReviewCsv(readFinanceStore())
+            return new Response(csv, {
+              headers: {
+                'Content-Type': 'text/csv; charset=utf-8',
+                'Content-Disposition': `attachment; filename="finance-ai-task-review-${new Date().toISOString().slice(0, 10)}.csv"`,
+                'Cache-Control': 'no-store',
+              },
+            })
+          }
+          if (action === 'finance_audit_status') {
+            return json({ ok: true, financeAudit: verifyFinanceAuditChain() })
+          }
+          if (action === 'list_finance_audit_archives') {
+            const config = defaultEncryptedBackupConfig()
+            return json({
+              ok: true,
+              financeAuditArchives: listEncryptedFinanceAuditArchives(
+                config.auditArchiveDir,
+              ),
+            })
+          }
+          if (action === 'verify_finance_audit_archive') {
+            const name = typeof body.name === 'string' ? body.name : ''
+            if (!name) {
+              return json(
+                { ok: false, error: 'Archive name is required.' },
+                { status: 400 },
+              )
+            }
+            const config = defaultEncryptedBackupConfig()
+            const verification = verifyEncryptedFinanceAuditArchive({
+              archiveDir: config.auditArchiveDir,
+              passphraseFile: config.passphraseFile,
+              name,
+            })
+            return json(
+              { ok: verification.valid, financeAuditArchive: verification },
+              { status: verification.valid ? 200 : 422 },
+            )
+          }
+          if (action === 'preview_finance_audit_prune') {
+            const retentionDays =
+              typeof body.retentionDays === 'number' &&
+              Number.isFinite(body.retentionDays)
+                ? body.retentionDays
+                : undefined
+            return json({
+              ok: true,
+              financeAuditPrune: previewFinanceAuditPrune(retentionDays),
+            })
+          }
+          if (action === 'archive_and_prune_finance_audit') {
+            if (body.confirm !== true) {
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Explicit confirmation is required before pruning audit history.',
+                },
+                { status: 400 },
+              )
+            }
+            const retentionDays =
+              typeof body.retentionDays === 'number' &&
+              Number.isFinite(body.retentionDays)
+                ? body.retentionDays
+                : undefined
+            const preview = previewFinanceAuditPrune(retentionDays)
+            if (preview.eligibleEntries === 0) {
+              return json({
+                ok: true,
+                financeAuditPrune: {
+                  ...preview,
+                  archiveCreated: false,
+                  prunedEntries: 0,
+                },
+                financeAudit: verifyFinanceAuditChain(),
+              })
+            }
+            const config = defaultEncryptedBackupConfig()
+            appendAuditLog('finance_audit_archive_requested', {
+              retentionDays: preview.retentionDays,
+              eligibleEntries: preview.eligibleEntries,
+            })
+            writeEncryptedFinanceAuditArchive({
+              archiveDir: config.auditArchiveDir,
+              passphraseFile: config.passphraseFile,
+              auditLog: readFinanceAuditLog(),
+              metadata: {
+                retentionDays: preview.retentionDays,
+                cutoff: preview.cutoff,
+                eligibleEntries: preview.eligibleEntries,
+              },
+            })
+            const result = pruneFinanceAudit(preview, true)
+            appendAuditLog('finance_audit_pruned', result)
+            return json({
+              ok: true,
+              financeAuditPrune: {
+                ...preview,
+                ...result,
+                archiveCreated: true,
+              },
+              financeAudit: verifyFinanceAuditChain(),
+            })
           }
           if (action === 'set_demo_config' || action === 'set_engine_config') {
             // Update the demo engine's tunable knobs (settings.demoTrading), merged
@@ -1623,33 +2340,21 @@ export const Route = createFileRoute('/api/finance')({
               !Array.isArray(cfg.learningPolicy)
             ) {
               const lp = cfg.learningPolicy as JsonRecord
-              const existingPolicy = (
-                dt.learningPolicy && typeof dt.learningPolicy === 'object'
-                  ? { ...(dt.learningPolicy as Record<string, unknown>) }
-                  : {}
-              ) as Record<string, unknown>
-              let policyChanged = false
               if (Array.isArray(lp.autoApplyModes)) {
                 const modes = lp.autoApplyModes.filter(
                   (m): m is 'paper_trade' | 'testnet_execute' =>
                     m === 'paper_trade' || m === 'testnet_execute',
                 )
                 if (modes.length > 0) {
+                  const existingPolicy = (
+                    dt.learningPolicy && typeof dt.learningPolicy === 'object'
+                      ? { ...(dt.learningPolicy as Record<string, unknown>) }
+                      : {}
+                  ) as Record<string, unknown>
                   existingPolicy.autoApplyModes = Array.from(new Set(modes))
-                  policyChanged = true
+                  dt.learningPolicy = existingPolicy
                 }
               }
-              // autoRestore: enables the symmetric strategy *upgrade* path in
-              // applyStrategyOverrideRecommendations (docs/trading-strategy-
-              // lifecycle.md). Structurally safe to toggle from the UI — it
-              // only ever *lifts* automatic-source overrides one rung at a
-              // time behind a hysteresis band + 2-run streak, never touches
-              // tradingMode or the global quote base.
-              if (typeof lp.autoRestore === 'boolean') {
-                existingPolicy.autoRestore = lp.autoRestore
-                policyChanged = true
-              }
-              if (policyChanged) dt.learningPolicy = existingPolicy
             }
             settings.demoTrading = dt
             // autoRefinement.enabled: a top-level settings key (not nested
@@ -1699,8 +2404,7 @@ export const Route = createFileRoute('/api/finance')({
               maxHoldMinutes: dt.maxHoldMinutes,
               strategyGuardEnabled: dt.strategyGuardEnabled,
               strategyGuardMinClosedTrades: dt.strategyGuardMinClosedTrades,
-              strategyGuardLossRateThreshold:
-                dt.strategyGuardLossRateThreshold,
+              strategyGuardLossRateThreshold: dt.strategyGuardLossRateThreshold,
               strategyGuardMaxPnlQuote: dt.strategyGuardMaxPnlQuote,
               strategyGuardAction: dt.strategyGuardAction,
               learningPolicyAutoApplyModes: (
@@ -1991,105 +2695,6 @@ export const Route = createFileRoute('/api/finance')({
             appendAuditLog('llm_config_updated', { enabled: lc.enabled })
             return json(financePayload())
           }
-          if (action === 'list_transactions') {
-            // PF review item 9: paged unified transaction history. Lets the
-            // dashboard payload window `income_records`/`expense_records` to a
-            // recent slice (item 1) while the Records tab can still page back
-            // through everything. Cursor = the `id` of the last row seen (rows
-            // are date-desc then createdAt-desc, a stable order); the next page
-            // is the rows after it. An unknown cursor restarts from the top.
-            const rawLimit =
-              typeof body.limit === 'number' ? Math.floor(body.limit) : 200
-            const limit = Math.max(1, Math.min(500, rawLimit))
-            const cursor =
-              typeof body.cursor === 'string' && body.cursor.trim()
-                ? body.cursor.trim()
-                : null
-            const db = readFinanceStore()
-            const all = getUnifiedTransactions(db)
-            const startIdx = cursor
-              ? all.findIndex((t) => t.id === cursor) + 1
-              : 0
-            const page = all.slice(startIdx, startIdx + limit)
-            const nextCursor =
-              startIdx + limit < all.length && page.length > 0
-                ? page[page.length - 1].id
-                : null
-            return json({
-              ok: true,
-              transactions: maskSensitive(page),
-              nextCursor,
-              total: all.length,
-            })
-          }
-          if (action === 'post_scheduled') {
-            // Turn a pending scheduled transaction into a real income/expense
-            // record and mark it posted. LKR-only (see ScheduledTransaction).
-            const id = typeof body.id === 'string' ? body.id : ''
-            const db = readFinanceStore()
-            const sched = db.scheduled_transactions.find((s) => s.id === id)
-            if (!sched || sched.status !== 'pending') {
-              return json(
-                { ok: false, error: 'No pending scheduled transaction with that id.' },
-                { status: 400 },
-              )
-            }
-            const postDate =
-              typeof body.date === 'string' && body.date
-                ? body.date
-                : new Date().toISOString().slice(0, 10)
-            addFinanceRecord(
-              sched.kind,
-              sched.kind === 'income'
-                ? {
-                    dateReceived: postDate,
-                    sourceName: sched.counterparty,
-                    incomeType: sched.category,
-                    originalCurrency: 'LKR',
-                    originalAmount: sched.amount,
-                    convertedLkrAmount: sched.amount,
-                    accountId: sched.accountId,
-                    notes: sched.notes,
-                  }
-                : {
-                    date: postDate,
-                    vendor: sched.counterparty,
-                    category: sched.category,
-                    currency: 'LKR',
-                    amount: sched.amount,
-                    convertedLkrAmount: sched.amount,
-                    accountId: sched.accountId,
-                    notes: sched.notes,
-                  },
-            )
-            const fresh = readFinanceStore()
-            const newRecord =
-              sched.kind === 'income'
-                ? fresh.income_records[fresh.income_records.length - 1]
-                : fresh.expense_records[fresh.expense_records.length - 1]
-            updateFinanceRecord('scheduled_transaction', id, {
-              status: 'posted',
-              postedRecordId: newRecord.id,
-            })
-            appendAuditLog('scheduled_transaction_posted', {
-              id,
-              kind: sched.kind,
-              recordId: newRecord.id,
-            })
-            return json(personalFinancePayload())
-          }
-          if (action === 'snapshot_net_worth') {
-            // Idempotent per calendar day — the nightly cron and a manual
-            // trigger both land on the same upserted-by-date row.
-            const db = readFinanceStore()
-            const { db: next, snapshot } = recordNetWorthSnapshot(db)
-            writeFinanceStore(next)
-            appendAuditLog('net_worth_snapshot', {
-              date: snapshot.date,
-              netWorthLkr: snapshot.netWorthLkr,
-            })
-            return json({ ok: true, snapshot })
-          }
           if (action === 'list_pending_ingestions') {
             // Unmasked on purpose — financePayload()'s `data` blob runs
             // through maskSensitive(), which would redact passwordHint
@@ -2098,6 +2703,12 @@ export const Route = createFileRoute('/api/finance')({
             return json({
               ok: true,
               pendingIngestions: listPendingIngestions(),
+            })
+          }
+          if (action === 'list_finance_documents') {
+            return json({
+              ok: true,
+              financeDocuments: listFinanceDocuments(readFinanceStore()),
             })
           }
           if (action === 'submit_ingestion_password') {
@@ -2141,6 +2752,48 @@ export const Route = createFileRoute('/api/finance')({
               })
               return json({ ok: true, pendingIngestion: updated })
             }
+            if (pending.documentType === 'statement') {
+              const extraction = await extractTransactionsFromImages(
+                normalized.imagePaths,
+                getCategoryCorrections(),
+              )
+              if (!extraction.ok || extraction.data.length === 0) {
+                const updated = updatePendingIngestion(id, {
+                  status: 'awaiting_review',
+                  rawPreviewImagePath: previewImagePath,
+                  extracted: undefined,
+                  error: extraction.ok
+                    ? 'No posted transactions found.'
+                    : extraction.reason,
+                })
+                return json({ ok: true, pendingIngestion: updated })
+              }
+              const [first, ...rest] = extraction.data
+              const updated = updatePendingIngestion(id, {
+                status: 'awaiting_review',
+                rawPreviewImagePath: previewImagePath,
+                extracted: first,
+                error: undefined,
+              })
+              const additional = rest.map((extracted) =>
+                addPendingIngestion({
+                  source: pending.source,
+                  documentType: 'statement',
+                  sourceRef: pending.sourceRef,
+                  checksumSha256: pending.checksumSha256,
+                  status: 'awaiting_review',
+                  rawPreviewImagePath: previewImagePath,
+                  extracted,
+                }),
+              )
+              return json({
+                ok: true,
+                pendingIngestion: updated,
+                additionalPendingIngestionIds: additional.map(
+                  (item) => item.id,
+                ),
+              })
+            }
             const extraction = await extractTransactionFromImage(
               previewImagePath,
               getCategoryCorrections(),
@@ -2166,6 +2819,247 @@ export const Route = createFileRoute('/api/finance')({
                 { ok: false, error: 'Pending ingestion not found.' },
                 { status: 404 },
               )
+
+            if (pending.documentClass === 'salary_slip') {
+              const employerName =
+                typeof payload.employerName === 'string'
+                  ? payload.employerName.trim()
+                  : (pending.extractedSalarySlip?.employerName.trim() ?? '')
+              const paymentDate =
+                typeof payload.paymentDate === 'string'
+                  ? payload.paymentDate.trim()
+                  : (pending.extractedSalarySlip?.paymentDate?.trim() ?? '')
+              const netAmount =
+                typeof payload.netAmount === 'number'
+                  ? payload.netAmount
+                  : Number(payload.netAmount)
+              const currency =
+                typeof payload.currency === 'string' && payload.currency.trim()
+                  ? payload.currency.trim().toUpperCase()
+                  : (pending.extractedSalarySlip?.currency ?? 'LKR')
+              if (
+                !employerName ||
+                !paymentDate ||
+                !Number.isFinite(netAmount) ||
+                netAmount <= 0
+              ) {
+                return json(
+                  {
+                    ok: false,
+                    error:
+                      'Employer, payment date, and positive net pay are required.',
+                  },
+                  { status: 400 },
+                )
+              }
+              const grossAmount =
+                typeof payload.grossAmount === 'number'
+                  ? payload.grossAmount
+                  : pending.extractedSalarySlip?.grossAmount
+              const deductions =
+                typeof payload.deductions === 'number'
+                  ? payload.deductions
+                  : pending.extractedSalarySlip?.deductions
+              const payPeriod =
+                typeof payload.payPeriod === 'string'
+                  ? payload.payPeriod.trim()
+                  : pending.extractedSalarySlip?.payPeriod
+              const payrollNote = [
+                payPeriod ? `Pay period: ${payPeriod}` : '',
+                typeof grossAmount === 'number'
+                  ? `Gross: ${grossAmount} ${currency}`
+                  : '',
+                typeof deductions === 'number'
+                  ? `Deductions: ${deductions} ${currency}`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join('; ')
+              addFinanceRecord('income', {
+                sourceName: employerName,
+                incomeType: 'Salary',
+                incomeSubtype: 'salary',
+                originalCurrency: currency,
+                originalAmount: netAmount,
+                dateReceived: paymentDate,
+                notes: payrollNote || undefined,
+                documentRef: pending.sourceRef,
+                source: pending.source,
+              })
+              const updated = updatePendingIngestion(id, {
+                status: 'confirmed',
+              })
+              return json({ pendingIngestion: updated, ...financePayload() })
+            }
+
+            if (pending.documentClass === 'contract_note') {
+              const note = pending.extractedContractNote
+              const symbol =
+                typeof payload.symbol === 'string'
+                  ? payload.symbol.trim().toUpperCase()
+                  : (note?.symbol ?? '')
+              const side =
+                payload.side === 'sell' || note?.side === 'sell'
+                  ? 'sell'
+                  : 'buy'
+              const quantity =
+                typeof payload.quantity === 'number'
+                  ? payload.quantity
+                  : Number(payload.quantity ?? note?.quantity)
+              const price =
+                typeof payload.price === 'number'
+                  ? payload.price
+                  : Number(payload.price ?? note?.price)
+              if (
+                !symbol ||
+                !Number.isFinite(quantity) ||
+                quantity <= 0 ||
+                !Number.isFinite(price) ||
+                price <= 0
+              ) {
+                return json(
+                  {
+                    ok: false,
+                    error:
+                      'Symbol, positive quantity, and positive execution price are required.',
+                  },
+                  { status: 400 },
+                )
+              }
+              const currency =
+                typeof payload.currency === 'string' && payload.currency.trim()
+                  ? payload.currency.trim().toUpperCase()
+                  : (note?.currency ?? 'LKR')
+              const companyName =
+                typeof payload.companyName === 'string'
+                  ? payload.companyName.trim()
+                  : note?.companyName
+              const broker =
+                typeof payload.broker === 'string'
+                  ? payload.broker.trim()
+                  : note?.broker
+              const tradeDate =
+                typeof payload.tradeDate === 'string' &&
+                payload.tradeDate.trim()
+                  ? payload.tradeDate.trim()
+                  : (note?.tradeDate ?? new Date().toISOString().slice(0, 10))
+              const settlementDate =
+                typeof payload.settlementDate === 'string'
+                  ? payload.settlementDate.trim()
+                  : note?.settlementDate
+              const grossAmount =
+                typeof payload.grossAmount === 'number'
+                  ? payload.grossAmount
+                  : note?.grossAmount
+              const fees =
+                typeof payload.fees === 'number' ? payload.fees : note?.fees
+              const details = [
+                `${side.toUpperCase()} ${quantity} ${symbol} @ ${price} ${currency}`,
+                companyName ? `Company: ${companyName}` : '',
+                broker ? `Broker: ${broker}` : '',
+                typeof grossAmount === 'number'
+                  ? `Gross: ${grossAmount} ${currency}`
+                  : '',
+                typeof fees === 'number' ? `Fees: ${fees} ${currency}` : '',
+                settlementDate ? `Settlement: ${settlementDate}` : '',
+              ]
+                .filter(Boolean)
+                .join('; ')
+              addFinanceRecord('investment_journal', {
+                symbol,
+                entryDate: tradeDate,
+                entryType: side,
+                content: `Contract note confirmed: ${details}`,
+                source: pending.source,
+              })
+              const updated = updatePendingIngestion(id, {
+                status: 'confirmed',
+              })
+              return json({ pendingIngestion: updated, ...financePayload() })
+            }
+
+            if (pending.documentClass === 'fd_certificate') {
+              const certificate = pending.extractedFdCertificate
+              const bankName =
+                typeof payload.bankName === 'string'
+                  ? payload.bankName.trim()
+                  : (certificate?.bankName.trim() ?? '')
+              const principal =
+                typeof payload.principal === 'number'
+                  ? payload.principal
+                  : Number(payload.principal ?? certificate?.principal)
+              const interestRatePct =
+                typeof payload.interestRatePct === 'number'
+                  ? payload.interestRatePct
+                  : Number(
+                      payload.interestRatePct ?? certificate?.interestRatePct,
+                    )
+              if (
+                !bankName ||
+                !Number.isFinite(principal) ||
+                principal <= 0 ||
+                !Number.isFinite(interestRatePct) ||
+                interestRatePct < 0
+              ) {
+                return json(
+                  {
+                    ok: false,
+                    error:
+                      'Bank, positive principal, and valid interest rate are required.',
+                  },
+                  { status: 400 },
+                )
+              }
+              const currency =
+                typeof payload.currency === 'string' && payload.currency.trim()
+                  ? payload.currency.trim().toUpperCase()
+                  : (certificate?.currency ?? 'LKR')
+              const interestPayout =
+                payload.interestPayout === 'monthly' ||
+                payload.interestPayout === 'quarterly' ||
+                payload.interestPayout === 'annually' ||
+                payload.interestPayout === 'at_maturity'
+                  ? payload.interestPayout
+                  : (certificate?.interestPayout ?? 'at_maturity')
+              const startDate =
+                typeof payload.startDate === 'string' &&
+                payload.startDate.trim()
+                  ? payload.startDate.trim()
+                  : (certificate?.startDate ??
+                    new Date().toISOString().slice(0, 10))
+              const maturityDate =
+                typeof payload.maturityDate === 'string' &&
+                payload.maturityDate.trim()
+                  ? payload.maturityDate.trim()
+                  : (certificate?.maturityDate ?? startDate)
+              const autoRenew =
+                typeof payload.autoRenew === 'boolean'
+                  ? payload.autoRenew
+                  : (certificate?.autoRenew ?? false)
+              const certificateNumber =
+                typeof payload.certificateNumber === 'string'
+                  ? payload.certificateNumber.trim()
+                  : certificate?.certificateNumber
+              addFinanceRecord('fixed_deposit', {
+                bankName,
+                principal,
+                currency,
+                interestRatePct,
+                interestPayout,
+                startDate,
+                maturityDate,
+                autoRenew,
+                documentRef: pending.sourceRef,
+                notes: certificateNumber
+                  ? `Certificate: ${certificateNumber}`
+                  : undefined,
+                source: pending.source,
+              })
+              const updated = updatePendingIngestion(id, {
+                status: 'confirmed',
+              })
+              return json({ pendingIngestion: updated, ...financePayload() })
+            }
 
             if (pending.documentType === 'contract') {
               const employerName =
@@ -2335,56 +3229,6 @@ export const Route = createFileRoute('/api/finance')({
             const updated = updatePendingIngestion(id, { status: 'rejected' })
             return json({ ok: true, pendingIngestion: updated })
           }
-          if (action === 'retry_pending_extraction') {
-            // For when extraction failed transiently (all_routes_failed —
-            // e.g. every vision route rate-limited at once, confirmed live
-            // 2026-09-11) rather than the document being unreadable. Reuses
-            // the already-converted preview image rather than re-running
-            // pdfToImages, so this doesn't need the original password again
-            // for a document that unlocked fine the first time.
-            const id = typeof body.id === 'string' ? body.id : ''
-            if (!id)
-              return json(
-                { ok: false, error: 'id is required.' },
-                { status: 400 },
-              )
-            const pending = listPendingIngestions().find((p) => p.id === id)
-            if (!pending)
-              return json(
-                { ok: false, error: 'Pending ingestion not found.' },
-                { status: 404 },
-              )
-            if (pending.documentType === 'contract') {
-              const images = pending.rawPreviewImagePath
-                ? [pending.rawPreviewImagePath]
-                : []
-              if (images.length === 0)
-                return json(
-                  { ok: false, error: 'No preview image to retry from.' },
-                  { status: 400 },
-                )
-              const extraction = await extractEmploymentContract(images)
-              const updated = updatePendingIngestion(id, {
-                extractedContract: extraction.ok ? extraction.data : undefined,
-                error: extraction.ok ? undefined : extraction.reason,
-              })
-              return json({ ok: true, pendingIngestion: updated })
-            }
-            if (!pending.rawPreviewImagePath)
-              return json(
-                { ok: false, error: 'No preview image to retry from.' },
-                { status: 400 },
-              )
-            const extraction = await extractTransactionFromImage(
-              pending.rawPreviewImagePath,
-              getCategoryCorrections(),
-            )
-            const updated = updatePendingIngestion(id, {
-              extracted: extraction.ok ? extraction.data : undefined,
-              error: extraction.ok ? undefined : extraction.reason,
-            })
-            return json({ ok: true, pendingIngestion: updated })
-          }
           if (action === 'reanalyze_contract') {
             const incomeSourceId =
               typeof body.incomeSourceId === 'string' ? body.incomeSourceId : ''
@@ -2442,6 +3286,9 @@ export const Route = createFileRoute('/api/finance')({
               status: 'awaiting_review',
               rawPreviewImagePath: imagePaths[0],
               extractedContract: extraction.ok ? extraction.data : undefined,
+              contractChanges: extraction.ok
+                ? detectContractChanges(job, extraction.data)
+                : undefined,
               error: extraction.ok ? undefined : extraction.reason,
             })
             return json({ ok: true, pendingIngestionId: pending.id })
@@ -2471,6 +3318,11 @@ export const Route = createFileRoute('/api/finance')({
               lastKnownPrice: priceResult.price,
               lastPriceUpdatedAt: priceResult.asOf,
               priceSource: 'cse_api',
+              lastPriceHigh: priceResult.high,
+              lastPriceLow: priceResult.low,
+              lastPriceClose: priceResult.close,
+              lastPriceVolume: priceResult.volume,
+              lastPriceTurnover: priceResult.turnover,
             })
             return json({ priceFetchFailed: false, ...financePayload() })
           }
@@ -2480,188 +3332,11 @@ export const Route = createFileRoute('/api/finance')({
               appendAuditLog('gmail_sync_run', { ...result })
               return json({ ok: true, result })
             } catch (error) {
-              const message = safeErrorMessage(error)
-              recordGmailSyncError(message)
-              return json({ ok: false, error: message }, { status: 502 })
-            }
-          }
-          if (action === 'list_known_senders') {
-            // Never returns encryptedPassword — hasPassword is the only
-            // signal the client gets that a secret is stored for this sender.
-            return json({
-              ok: true,
-              knownSenders: listKnownSenders().map(
-                ({ encryptedPassword, ...rest }) => ({
-                  ...rest,
-                  hasPassword: Boolean(encryptedPassword),
-                }),
-              ),
-            })
-          }
-          if (action === 'upsert_known_sender') {
-            const label = typeof body.label === 'string' ? body.label : ''
-            if (!label.trim()) {
-              return json(
-                { ok: false, error: 'label is required.' },
-                { status: 400 },
-              )
-            }
-            const sender = upsertKnownSender({
-              id: typeof body.id === 'string' ? body.id : undefined,
-              label,
-              matchDomain:
-                typeof body.matchDomain === 'string'
-                  ? body.matchDomain
-                  : undefined,
-              matchAddress:
-                typeof body.matchAddress === 'string'
-                  ? body.matchAddress
-                  : undefined,
-              passwordScheme:
-                typeof body.passwordScheme === 'string'
-                  ? body.passwordScheme
-                  : undefined,
-              accountId:
-                typeof body.accountId === 'string'
-                  ? body.accountId
-                  : undefined,
-            })
-            const { encryptedPassword, ...rest } = sender
-            return json({
-              ok: true,
-              knownSender: { ...rest, hasPassword: Boolean(encryptedPassword) },
-            })
-          }
-          if (action === 'delete_known_sender') {
-            const id = typeof body.id === 'string' ? body.id : ''
-            if (!id)
-              return json({ ok: false, error: 'id is required.' }, { status: 400 })
-            deleteKnownSender(id)
-            return json({ ok: true })
-          }
-          if (action === 'set_known_sender_password') {
-            const id = typeof body.id === 'string' ? body.id : ''
-            const password =
-              typeof body.password === 'string' ? body.password : ''
-            if (!id || !password) {
-              return json(
-                { ok: false, error: 'id and password are required.' },
-                { status: 400 },
-              )
-            }
-            try {
-              setKnownSenderPassword(id, password)
-              return json({ ok: true })
-            } catch (error) {
               return json(
                 { ok: false, error: safeErrorMessage(error) },
-                { status: 400 },
+                { status: 502 },
               )
             }
-          }
-          if (action === 'clear_known_sender_password') {
-            const id = typeof body.id === 'string' ? body.id : ''
-            if (!id)
-              return json({ ok: false, error: 'id is required.' }, { status: 400 })
-            clearKnownSenderPassword(id)
-            return json({ ok: true })
-          }
-          if (action === 'import_transactions_csv') {
-            // Bulk counterpart to confirm_pending_ingestion — same
-            // duplicate check (findPossibleDuplicate) and the same
-            // addFinanceRecord field mapping, just over many rows instead
-            // of one. The client parses the CSV and does column mapping;
-            // this only ever receives already-normalized rows, never raw
-            // CSV text, so a bank's specific column layout is a client
-            // concern, not a server one.
-            const rows = Array.isArray(body.rows) ? body.rows : []
-            if (rows.length === 0)
-              return json(
-                { ok: false, error: 'rows must be a non-empty array.' },
-                { status: 400 },
-              )
-            if (rows.length > 1000)
-              return json(
-                { ok: false, error: 'Import is capped at 1000 rows per batch.' },
-                { status: 400 },
-              )
-            const force = body.force === true
-            let created = 0
-            let skippedDuplicates = 0
-            const errors: Array<{ index: number; reason: string }> = []
-            rows.forEach((row: unknown, index: number) => {
-              const r = (row && typeof row === 'object' ? row : {}) as Record<
-                string,
-                unknown
-              >
-              const kind = r.kind
-              if (kind !== 'income' && kind !== 'expense') {
-                errors.push({ index, reason: 'kind must be income or expense' })
-                return
-              }
-              const vendorOrSource =
-                typeof r.vendorOrSource === 'string' ? r.vendorOrSource.trim() : ''
-              const date = typeof r.date === 'string' ? r.date.trim() : ''
-              const amount =
-                typeof r.amount === 'number' ? r.amount : Number(r.amount)
-              if (!vendorOrSource) {
-                errors.push({ index, reason: 'vendorOrSource is required' })
-                return
-              }
-              if (!date) {
-                errors.push({ index, reason: 'date is required' })
-                return
-              }
-              if (!Number.isFinite(amount) || amount <= 0) {
-                errors.push({ index, reason: 'amount must be a positive number' })
-                return
-              }
-              if (!force) {
-                const duplicate = findPossibleDuplicate(
-                  kind,
-                  vendorOrSource,
-                  date,
-                  amount,
-                )
-                if (duplicate) {
-                  skippedDuplicates += 1
-                  return
-                }
-              }
-              const currency =
-                typeof r.currency === 'string' && r.currency.trim()
-                  ? r.currency.trim()
-                  : 'LKR'
-              const category =
-                typeof r.category === 'string' && r.category.trim()
-                  ? r.category.trim()
-                  : undefined
-              const accountId =
-                typeof r.accountId === 'string' && r.accountId ? r.accountId : undefined
-              addFinanceRecord(kind, {
-                amount,
-                currency,
-                category,
-                accountId,
-                source: 'csv_import',
-                ...(kind === 'income'
-                  ? { sourceName: vendorOrSource, dateReceived: date }
-                  : { vendor: vendorOrSource, date }),
-              })
-              created += 1
-            })
-            appendAuditLog('csv_import_run', {
-              rows: rows.length,
-              created,
-              skippedDuplicates,
-              errorCount: errors.length,
-            })
-            return json({
-              ...financePayload(),
-              created,
-              skippedDuplicates,
-              errors,
-            })
           }
           if (action === 'apply_recommended_safeguards') {
             const applied = applyRecommendedSafeguards()

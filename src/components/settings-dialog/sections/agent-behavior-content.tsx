@@ -39,7 +39,10 @@ export function AgentBehaviorContent() {
             className={cn(SETTINGS_SELECT_CLASS, 'w-20 text-center')}
           />
         </Row>
-        <Row label="Gateway timeout" description="Seconds before timeout">
+        <Row
+          label="Service timeout"
+          description="Seconds to wait for a response"
+        >
           <input
             type="number"
             min={10}

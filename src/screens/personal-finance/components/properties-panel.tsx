@@ -8,7 +8,7 @@ import type { PersonalFinancePayload } from '../types'
 
 /**
  * Property-loan linkage: purely informational (PF-1004 precedent) — does
- * not affect debtBase/propertyValueBase/netWorthBase, each already counted
+ * not affect debtLkr/propertyValueLkr/netWorthLkr, each already counted
  * once independently regardless of linkage.
  */
 function LinkedLoanControl({
@@ -86,7 +86,7 @@ function LinkedLoanControl({
 /**
  * Phase 40 (WEALTH-102/103): dedicated property tracking — currentValue is
  * manually updated (no valuation API), like Loan.currentBalance. Feeds
- * financeSummary()'s netWorthBase as an asset.
+ * financeSummary()'s netWorthLkr as an asset.
  */
 export function PropertiesPanel({
   payload,

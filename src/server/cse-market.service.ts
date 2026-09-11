@@ -16,18 +16,92 @@
  */
 const CSE_API_URL = 'https://www.cse.lk/api/companyInfoSummery'
 const REQUEST_TIMEOUT_MS = 8_000
+const MAX_REQUEST_ATTEMPTS = 2
+const RETRY_DELAY_MS = 100
 
 interface CseCompanyInfoSummeryResponse {
   reqSymbolInfo?: {
     symbol?: string
     lastTradedPrice?: number
     closingPrice?: number
+    hiTrade?: number
+    lowTrade?: number
+    tdyShareVolume?: number
+    tdyTurnover?: number
   }
 }
 
 export interface CsePriceResult {
   price: number
   asOf: string
+  high?: number
+  low?: number
+  close?: number
+  volume?: number
+  turnover?: number
+}
+
+/** Provider seam for replacing the unofficial endpoint without changing callers. */
+export interface CsePriceProvider {
+  readonly id: string
+  fetchPrice: (symbol: string) => Promise<CsePriceResult | null>
+}
+
+async function fetchUnofficialCsePrice(
+  symbol: string,
+): Promise<CsePriceResult | null> {
+  const trimmed = symbol.trim()
+  if (!trimmed) return null
+
+  for (let attempt = 1; attempt <= MAX_REQUEST_ATTEMPTS; attempt += 1) {
+    try {
+      const res = await fetch(CSE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `symbol=${encodeURIComponent(trimmed)}`,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+      if (!res.ok) {
+        if (attempt < MAX_REQUEST_ATTEMPTS) {
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS))
+          continue
+        }
+        return null
+      }
+
+      const data = (await res.json()) as CseCompanyInfoSummeryResponse
+      const price =
+        data.reqSymbolInfo?.lastTradedPrice ?? data.reqSymbolInfo?.closingPrice
+      if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0)
+        return null
+
+      const positiveNumber = (value: unknown): number | undefined =>
+        typeof value === 'number' && Number.isFinite(value) && value > 0
+          ? value
+          : undefined
+      return {
+        price,
+        asOf: new Date().toISOString(),
+        high: positiveNumber(data.reqSymbolInfo?.hiTrade),
+        low: positiveNumber(data.reqSymbolInfo?.lowTrade),
+        close: positiveNumber(data.reqSymbolInfo?.closingPrice),
+        volume: positiveNumber(data.reqSymbolInfo?.tdyShareVolume),
+        turnover: positiveNumber(data.reqSymbolInfo?.tdyTurnover),
+      }
+    } catch {
+      if (attempt < MAX_REQUEST_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS))
+        continue
+      }
+      return null
+    }
+  }
+  return null
+}
+
+export const unofficialCsePriceProvider: CsePriceProvider = {
+  id: 'cse_unofficial',
+  fetchPrice: fetchUnofficialCsePrice,
 }
 
 /**
@@ -37,27 +111,7 @@ export interface CsePriceResult {
  */
 export async function fetchCsePrice(
   symbol: string,
+  provider: CsePriceProvider = unofficialCsePriceProvider,
 ): Promise<CsePriceResult | null> {
-  const trimmed = symbol.trim()
-  if (!trimmed) return null
-
-  try {
-    const res = await fetch(CSE_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `symbol=${encodeURIComponent(trimmed)}`,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    })
-    if (!res.ok) return null
-
-    const data = (await res.json()) as CseCompanyInfoSummeryResponse
-    const price =
-      data.reqSymbolInfo?.lastTradedPrice ?? data.reqSymbolInfo?.closingPrice
-    if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0)
-      return null
-
-    return { price, asOf: new Date().toISOString() }
-  } catch {
-    return null
-  }
+  return provider.fetchPrice(symbol)
 }

@@ -29,17 +29,21 @@ export function useFinanceAction<T extends FinanceActionResponse>(
     body: Record<string, unknown>,
     busyKey = 'default',
   ): Promise<T | undefined> {
+    const guardedBody =
+      body.action === 'delete_record' && body.confirm === undefined
+        ? { ...body, confirm: true }
+        : body
     setBusy(busyKey)
     setError(null)
     try {
       const res = await fetch('/api/finance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(guardedBody),
       })
       const data = (await res.json()) as T
       if (!res.ok || data.ok === false) {
-        throw new Error(data.error || `HTTP ${res.status}`)
+        throw new Error(data.error || 'Unable to save this change')
       }
       onPayload(data)
       return data

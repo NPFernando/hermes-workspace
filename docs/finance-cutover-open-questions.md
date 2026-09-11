@@ -77,18 +77,7 @@ module under (A).
 
 ---
 
-## 2. Reconciliation `status` is ignored by all summary math — ✅ FIXED (2026-09-08)
-
-Resolved: `finance-store.ts` now has an `includeInTotals(row)` helper
-(`status ?? 'cleared'` ∈ `{cleared, reconciled}`). `financeSummary()`,
-`getMonthlySummary()` and `getBudgetVsActual()` filter through it; the raw
-record tables and `getUnifiedTransactions()` are unchanged (still show
-everything). Covered by
-`finance-store.test.ts` › "reconciliation status gates aggregate money figures
-(PF-113)". Original analysis kept below for context.
-
----
-
+## 2. Reconciliation `status` is ignored by all summary math
 
 PF-113 added `status: 'pending' | 'cleared' | 'reconciled'` to
 `ExpenseRecord` / `IncomeRecord` and plumbed it through

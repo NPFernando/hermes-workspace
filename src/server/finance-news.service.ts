@@ -11,6 +11,14 @@ const GOOGLE_NEWS_RSS = 'https://news.google.com/rss/search'
 const REQUEST_TIMEOUT_MS = 8_000
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 const MAX_ITEMS = 25
+const RETRY_DELAY_MS = 100
+
+class NewsFetchError extends Error {
+  constructor(message: string, readonly retryable: boolean) {
+    super(message)
+    this.name = 'NewsFetchError'
+  }
+}
 
 export type GoogleNewsRssItem = Pick<
   NewsItem,
@@ -38,7 +46,10 @@ function httpsGetText(url: string): Promise<string> {
         if ((response.statusCode ?? 500) >= 400) {
           response.resume()
           reject(
-            new Error(`Google News RSS returned HTTP ${response.statusCode}`),
+            new NewsFetchError(
+              `Google News RSS returned HTTP ${response.statusCode}`,
+              response.statusCode === 429 || (response.statusCode ?? 0) >= 500,
+            ),
           )
           return
         }
@@ -49,8 +60,9 @@ function httpsGetText(url: string): Promise<string> {
           bytes += Buffer.byteLength(chunk)
           if (bytes > MAX_RESPONSE_BYTES) {
             request.destroy(
-              new Error(
+              new NewsFetchError(
                 'Google News RSS response exceeded maximum allowed size',
+                false,
               ),
             )
             return
@@ -62,15 +74,38 @@ function httpsGetText(url: string): Promise<string> {
     )
     request.setTimeout(REQUEST_TIMEOUT_MS, () => {
       request.destroy(
-        new Error(
+        new NewsFetchError(
           `Google News RSS request timed out after ${REQUEST_TIMEOUT_MS}ms`,
+          true,
         ),
       )
     })
-    request.on('error', (error) =>
-      reject(new Error(`Failed to fetch Google News RSS: ${error.message}`)),
-    )
+    request.on('error', (error) => {
+      if (error instanceof NewsFetchError) {
+        reject(error)
+        return
+      }
+      reject(new NewsFetchError(`Failed to fetch Google News RSS: ${error.message}`, true))
+    })
   })
+}
+
+function isRetryableNewsError(error: unknown): boolean {
+  return !(error && typeof error === 'object' && 'retryable' in error && (error as { retryable?: unknown }).retryable === false)
+}
+
+/** Fetch RSS with one bounded retry for transient transport/provider failures. */
+export async function fetchGoogleNewsTextWithRetry(
+  fetchText: (url: string) => Promise<string>,
+  url: string,
+): Promise<string> {
+  try {
+    return await fetchText(url)
+  } catch (firstError) {
+    if (!isRetryableNewsError(firstError)) throw firstError
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS))
+    return fetchText(url)
+  }
 }
 
 function decodeXml(value: string): string {
@@ -188,7 +223,10 @@ export async function fetchAndStoreGoogleNews(
   if (!/^[A-Z0-9]{1,20}$/.test(normalizedSymbol))
     throw new Error('symbol must contain only letters and numbers')
   const items = parseGoogleNewsRss(
-    await fetchText(googleNewsRssUrl(normalizedSymbol)),
+    await fetchGoogleNewsTextWithRetry(
+      fetchText,
+      googleNewsRssUrl(normalizedSymbol),
+    ),
     normalizedSymbol,
   )
   return { fetched: items.length, stored: storeFinanceNewsItems(items), items }

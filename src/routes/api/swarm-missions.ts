@@ -8,8 +8,15 @@ import {
   getSwarmMission,
   listSwarmMissions,
   listSwarmReports,
+  markMissionAssignmentReviewed,
 } from '../../server/swarm-missions'
 import { resetSwarmWorkerRuntime } from '../../server/swarm-runtime-reset'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 type CancelPostBody = {
   action?: unknown
@@ -28,7 +35,7 @@ function cleanString(value: unknown): string | null {
 export const Route = createFileRoute('/api/swarm-missions')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -49,6 +56,11 @@ export const Route = createFileRoute('/api/swarm-missions')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        if (!rateLimit(`swarm-missions:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         let body: CancelPostBody
         try {
           body = (await request.json()) as CancelPostBody
@@ -59,6 +71,32 @@ export const Route = createFileRoute('/api/swarm-missions')({
           )
         }
         const action = cleanString(body.action)
+        if (action === 'mark_ready_for_eric') {
+          const missionId = cleanString(body.missionId)
+          const assignmentId = cleanString(body.assignmentId)
+          if (!missionId || !assignmentId)
+            return json(
+              { ok: false, error: 'missionId and assignmentId required' },
+              { status: 400 },
+            )
+          const result = markMissionAssignmentReviewed({
+            missionId,
+            assignmentId,
+            reviewerId: cleanString(body.actor) ?? 'eric',
+          })
+          if (!result)
+            return json(
+              { ok: false, error: 'Mission or assignment not found' },
+              { status: 404 },
+            )
+          return json({
+            ok: true,
+            action,
+            result,
+            readyForEric: true,
+            markedAt: Date.now(),
+          })
+        }
         if (action !== 'cancel')
           return json(
             { ok: false, error: 'Unsupported action' },

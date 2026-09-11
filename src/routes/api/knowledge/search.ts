@@ -8,7 +8,7 @@ import { safeErrorMessage } from '../../../server/rate-limit'
 export const Route = createFileRoute('/api/knowledge/search')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }

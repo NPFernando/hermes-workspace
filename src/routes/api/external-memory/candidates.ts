@@ -12,7 +12,13 @@ import {
 } from '../../../server/external-memory-browser'
 import { retainHindsight } from '../../../server/hindsight-client'
 
-import { safeErrorMessage } from '../../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 
 export const Route = createFileRoute('/api/external-memory/candidates')({
   server: {
@@ -20,6 +26,17 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
       GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (
+          !rateLimit(
+            `external-memory-candidates-write:${getClientIp(request)}`,
+            20,
+            60_000,
+          )
+        ) {
+          return rateLimitResponse()
         }
 
         try {
@@ -44,6 +61,17 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (
+          !rateLimit(
+            `external-memory-candidates-delete:${getClientIp(request)}`,
+            10,
+            60_000,
+          )
+        ) {
+          return rateLimitResponse()
         }
 
         try {
@@ -109,9 +137,20 @@ export const Route = createFileRoute('/api/external-memory/candidates')({
           )
         }
       },
-      DELETE: async ({ request }) => {
+      DELETE: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (
+          !rateLimit(
+            `external-memory-candidates-delete:${getClientIp(request)}`,
+            10,
+            60_000,
+          )
+        ) {
+          return rateLimitResponse()
         }
 
         try {

@@ -4,6 +4,12 @@ import {
   createClaudeTask,
   listClaudeTasks,
 } from '../../server/claude-tasks-backend'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 import type {
   TaskColumn,
   TaskPriority,
@@ -53,6 +59,11 @@ export const Route = createFileRoute('/api/claude-tasks')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return jsonResponse({ error: 'Unauthorized' }, 401)
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`claude-task-create:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
         }
 
         try {

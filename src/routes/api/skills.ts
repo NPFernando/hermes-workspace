@@ -13,6 +13,9 @@ import {
   getCapabilities,
 } from '../../server/gateway-capabilities'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
@@ -424,6 +427,9 @@ export const Route = createFileRoute('/api/skills')({
       GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        if (!rateLimit(`skills-action:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
         }
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.skills) {

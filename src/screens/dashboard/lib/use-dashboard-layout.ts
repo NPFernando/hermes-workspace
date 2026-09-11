@@ -49,7 +49,7 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     id: 'top_models',
     label: 'Top models',
     description: 'Routing share by model in the analytics window.',
-    column: 'main',
+    column: 'rail',
     hideable: true,
   },
   {
@@ -57,23 +57,21 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     label: 'Provider mix',
     description:
       'Token share by provider family (anthropic / openai / local / etc).',
-    column: 'main',
+    column: 'rail',
     hideable: true,
   },
   {
     id: 'cache_efficiency',
     label: 'Cache efficiency',
-    description:
-      'Cache-hit rate with daily sparkline. Higher = lower cost.',
-    column: 'main',
+    description: 'Cache-hit rate with daily sparkline. Higher = lower cost.',
+    column: 'rail',
     hideable: true,
   },
   {
     id: 'velocity',
     label: 'Velocity',
-    description:
-      'Sessions/day average + delta vs prior period + sparkline.',
-    column: 'main',
+    description: 'Sessions/day average + delta vs prior period + sparkline.',
+    column: 'rail',
     hideable: true,
   },
   {
@@ -81,7 +79,7 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
     label: 'Cost ledger',
     description:
       'Per-model cost split between paid providers and subscription/local.',
-    column: 'main',
+    column: 'rail',
     hideable: true,
   },
   {
@@ -132,14 +130,16 @@ export const WIDGET_CATALOG: ReadonlyArray<WidgetMeta> = [
   {
     id: 'finance_overview',
     label: 'Finance overview',
-    description: 'Net worth, savings rate, and the current controlled-trading mode.',
+    description:
+      'Net worth, savings rate, and the current controlled-trading mode.',
     column: 'main',
     hideable: true,
   },
   {
     id: 'trading_overview',
     label: 'Trading overview',
-    description: "Today's/total P&L, open positions, win rate, and per-engine status.",
+    description:
+      "Today's/total P&L, open positions, win rate, and per-engine status.",
     column: 'main',
     hideable: true,
   },
@@ -196,9 +196,7 @@ function readLayout(): StoredLayout {
     }
     const valid = new Set<WidgetId>(WIDGET_CATALOG.map((w) => w.id))
     const incoming = Array.isArray(parsed.hidden) ? parsed.hidden : []
-    const filtered = incoming.filter((id): id is WidgetId =>
-      valid.has(id),
-    )
+    const filtered = incoming.filter((id): id is WidgetId => valid.has(id))
     // Schema migration: when we introduce new widgets that should be
     // off-by-default, bump STORAGE_VERSION and union the prior user
     // hides with the new defaults so existing installs don't suddenly
@@ -217,15 +215,17 @@ function readLayout(): StoredLayout {
   }
 }
 
-function writeLayout(layout: StoredLayout) {
-  if (typeof window === 'undefined') return
+function writeLayout(layout: StoredLayout): boolean {
+  if (typeof window === 'undefined') return false
   try {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({ ...layout, version: STORAGE_VERSION }),
     )
+    return true
   } catch {
     /* quota / disabled storage — non-fatal */
+    return false
   }
 }
 
@@ -253,10 +253,15 @@ export function useDashboardLayout() {
   const [hidden, setHidden] = useState<Set<WidgetId>>(
     () => new Set(readLayout().hidden),
   )
+  const [persistenceStatus, setPersistenceStatus] = useState<
+    'pending' | 'saved' | 'unavailable'
+  >('pending')
 
   // Persist on every change. Cheap; ~1KB max.
   useEffect(() => {
-    writeLayout({ hidden: Array.from(hidden) })
+    setPersistenceStatus(
+      writeLayout({ hidden: Array.from(hidden) }) ? 'saved' : 'unavailable',
+    )
   }, [hidden])
 
   // Edit mode has an explicit button, but closing it from the keyboard keeps
@@ -299,15 +304,9 @@ export function useDashboardLayout() {
   // Reset returns to the iteration-006 defaults rather than "show
   // literally everything" so first-time users hitting Reset don't
   // suddenly see Logs they never asked for.
-  const reset = useCallback(
-    () => setHidden(new Set(DEFAULT_HIDDEN)),
-    [],
-  )
+  const reset = useCallback(() => setHidden(new Set(DEFAULT_HIDDEN)), [])
 
-  const isVisible = useCallback(
-    (id: WidgetId) => !hidden.has(id),
-    [hidden],
-  )
+  const isVisible = useCallback((id: WidgetId) => !hidden.has(id), [hidden])
 
   const counts = useMemo(() => {
     const total = WIDGET_CATALOG.length
@@ -323,6 +322,7 @@ export function useDashboardLayout() {
     toggleEdit,
     setEditMode,
     hidden,
+    persistenceStatus,
     hide,
     show,
     reset,

@@ -70,6 +70,7 @@ export function shouldBindMainToPortableSession({
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await -- callers uniformly await session resolution across storage backends
 export async function resolveSessionKey({
   rawSessionKey,
   friendlyId,

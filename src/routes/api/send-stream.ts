@@ -479,7 +479,7 @@ export const Route = createFileRoute('/api/send-stream')({
 
         const stream = new ReadableStream({
           async start(controller) {
-            let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+            let streamHeartbeatTimer: ReturnType<typeof setInterval> | null = null
             let lastClientEventAt = Date.now()
             // Track the last human-readable activity so the heartbeat can
             // forward it to the UI. Without this the ThinkingBubble shows a
@@ -503,7 +503,7 @@ export const Route = createFileRoute('/api/send-stream')({
             // lightweight recognized event periodically so public Workspace chats
             // do not sit at "Thinking…" until the frontend reports failure.
             enqueueRaw(`: ${' '.repeat(2048)}\n\n`)
-            heartbeatTimer = setInterval(() => {
+            streamHeartbeatTimer = setInterval(() => {
               if (streamClosed) return
               if (Date.now() - lastClientEventAt < 10_000) return
               // Heartbeat to keep Cloudflare/Access from culling the SSE stream.
@@ -517,9 +517,9 @@ export const Route = createFileRoute('/api/send-stream')({
             closeStream = () => {
               if (streamClosed) return
               streamClosed = true
-              if (heartbeatTimer) {
-                clearInterval(heartbeatTimer)
-                heartbeatTimer = null
+              if (streamHeartbeatTimer) {
+                clearInterval(streamHeartbeatTimer)
+                streamHeartbeatTimer = null
               }
               if (unregisterTimer) {
                 clearTimeout(unregisterTimer)
@@ -546,7 +546,7 @@ export const Route = createFileRoute('/api/send-stream')({
             // no-activity timer fires after 2-3 min and aborts the stream.
             // Every 10s we also forward the last known activity so the UI can
             // show meaningful progress instead of a static "Thinking…".
-            heartbeatTimer = setInterval(() => {
+            streamHeartbeatTimer = setInterval(() => {
               sendEvent('heartbeat', {
                 timestamp: Date.now(),
                 activity: lastActivity,
@@ -796,7 +796,7 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
                   }
 
-                  const stream = await openaiChat(portableMessages, {
+                  const portableStream = await openaiChat(portableMessages, {
                     model: localBaseUrl
                       ? bareModel
                       : typeof body.model === 'string'
@@ -812,16 +812,16 @@ export const Route = createFileRoute('/api/send-stream')({
                     baseUrl: localBaseUrl,
                   })
 
-                  let thinking = ''
+                  let portableThinking = ''
                   let toolEventCount = 0
-                  for await (const chunk of stream) {
+                  for await (const chunk of portableStream) {
                     if (chunk.type === 'reasoning') {
-                      thinking += chunk.text
+                      portableThinking += chunk.text
                       persistActiveRun((runSessionKey, activeId) =>
-                        setRunThinking(runSessionKey, activeId, thinking),
+                        setRunThinking(runSessionKey, activeId, portableThinking),
                       )
                       sendEvent('thinking', {
-                        text: thinking,
+                        text: portableThinking,
                         sessionKey: portableSessionKey,
                         runId,
                       })
@@ -1107,13 +1107,13 @@ export const Route = createFileRoute('/api/send-stream')({
                       }
 
                       if (event === 'message.started') {
-                        const message =
+                        const messagePayload =
                           data.message && typeof data.message === 'object'
                             ? (data.message as Record<string, unknown>)
                             : {}
                         const translated = {
                           message: {
-                            id: message.id,
+                            id: messagePayload.id,
                             role: 'assistant',
                             content: [],
                           },

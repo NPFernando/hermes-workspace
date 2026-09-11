@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { Refresh01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import type { MouseEvent } from 'react'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
 import { cn } from '@/lib/utils'
 import { CHANGELOG } from '@/lib/changelog'
+import { useDashboardRefresh } from '@/screens/dashboard/lib/dashboard-refresh-context'
 
 const SEEN_KEY = 'hermes-workspace-seen-version'
 
@@ -16,27 +20,6 @@ function formatPulse(iso: string | null): string {
   if (diff < 3_600_000) return `${Math.round(diff / 60_000)}m ago`
   if (diff < 86_400_000) return `${Math.round(diff / 3_600_000)}h ago`
   return `${Math.round(diff / 86_400_000)}d ago`
-}
-
-const PLATFORM_GLYPH: Record<string, string> = {
-  api_server: '🌐',
-  telegram: '✈️',
-  discord: '🎮',
-  whatsapp: '🟢',
-  slack: '💼',
-  signal: '🔵',
-  matrix: '#',
-  nostr: '⚡',
-  imessage: '💬',
-  bluebubbles: '🫧',
-  mattermost: '🔷',
-  feishu: '🪶',
-  line: '💚',
-  zalo: '⭐',
-  twitch: '🎬',
-  qqbot: '🐧',
-  msteams: '🟦',
-  irc: '#',
 }
 
 const STATE_TONE: Record<string, string> = {
@@ -60,7 +43,8 @@ function formatNextRun(iso: string | null): {
 } {
   if (!iso) return { text: 'no schedule', tone: 'var(--theme-muted)' }
   const ms = Date.parse(iso)
-  if (!Number.isFinite(ms)) return { text: 'no schedule', tone: 'var(--theme-muted)' }
+  if (!Number.isFinite(ms))
+    return { text: 'no schedule', tone: 'var(--theme-muted)' }
   const diff = ms - Date.now()
   if (diff < -7 * 86_400_000) {
     return { text: 'stale', tone: 'var(--theme-muted)' }
@@ -70,8 +54,14 @@ function formatNextRun(iso: string | null): {
   if (diff < 3_600_000)
     return { text: `${Math.round(diff / 60_000)}m`, tone: 'var(--theme-text)' }
   if (diff < 86_400_000)
-    return { text: `${Math.round(diff / 3_600_000)}h`, tone: 'var(--theme-text)' }
-  return { text: `${Math.round(diff / 86_400_000)}d`, tone: 'var(--theme-text)' }
+    return {
+      text: `${Math.round(diff / 3_600_000)}h`,
+      tone: 'var(--theme-text)',
+    }
+  return {
+    text: `${Math.round(diff / 86_400_000)}d`,
+    tone: 'var(--theme-text)',
+  }
 }
 
 /**
@@ -90,26 +80,100 @@ export function OpsStrip({
   cron,
   kanban,
   platforms,
+  unavailable = false,
 }: {
   status: DashboardOverview['status']
   cron: DashboardOverview['cron']
   kanban: DashboardOverview['kanban']
   platforms: DashboardOverview['platforms']
+  unavailable?: boolean
 }) {
   const navigate = useNavigate()
+  const refreshState = useDashboardRefresh()
   const [hasUnread, setHasUnread] = useState(false)
 
   useEffect(() => {
-    const seen = localStorage.getItem(SEEN_KEY)
-    setHasUnread(seen !== CHANGELOG[0].version)
+    try {
+      const seen = localStorage.getItem(SEEN_KEY)
+      setHasUnread(seen !== CHANGELOG[0].version)
+    } catch {
+      // Release-note status is best-effort when storage is restricted.
+      setHasUnread(true)
+    }
   }, [])
 
-  if (!status) return null
+  const openReleaseNotes = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return
+    }
+    event.preventDefault()
+    setHasUnread(false)
+    try {
+      localStorage.setItem(SEEN_KEY, CHANGELOG[0].version)
+    } catch {
+      // Navigation should still work when storage is restricted.
+    }
+    navigate({ to: '/settings', search: { section: 'whatsnew' } })
+  }
+
+  if (!status) {
+    if (!unavailable) return null
+    return (
+      <section
+        aria-label="Workspace operations status unavailable"
+        role="status"
+        className="surface-card card-glow flex items-center gap-3 rounded-md border bg-[var(--theme-card)]/50 px-3 py-2 text-[11px] border-[var(--theme-border)]"
+      >
+        <span
+          aria-hidden
+          className="size-1.5 shrink-0 rounded-full bg-[var(--theme-warning)]"
+        />
+        <span className="min-w-0 flex-1 font-mono uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+          Workspace operations status is temporarily unavailable.
+        </span>
+        {refreshState ? (
+          <button
+            type="button"
+            onClick={refreshState.refresh}
+            disabled={refreshState.isRefreshing}
+            aria-busy={refreshState.isRefreshing ? 'true' : undefined}
+            aria-label={
+              refreshState.isRefreshing
+                ? 'Retrying workspace telemetry'
+                : 'Retry workspace telemetry'
+            }
+            className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded border border-[var(--theme-border)] px-2 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-accent)] motion-safe:transition-colors hover:bg-[var(--theme-accent-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] disabled:cursor-wait disabled:opacity-60 lg:min-h-0"
+          >
+            <HugeiconsIcon
+              icon={Refresh01Icon}
+              size={12}
+              strokeWidth={1.8}
+              className={
+                refreshState.isRefreshing
+                  ? 'motion-safe:animate-spin'
+                  : undefined
+              }
+            />
+            {refreshState.isRefreshing ? 'Retrying…' : 'Retry sync'}
+          </button>
+        ) : null}
+      </section>
+    )
+  }
 
   const ok =
     status.gatewayState === 'running' ||
     status.gatewayState === 'connected' ||
     status.gatewayState === 'ok'
+  const isConnecting = ['connecting', 'starting'].includes(
+    status.gatewayState.toLowerCase(),
+  )
 
   const drift =
     status.configVersion !== null &&
@@ -123,47 +187,55 @@ export function OpsStrip({
   return (
     <section
       aria-label="Workspace operations status"
-      className="surface-card card-glow flex flex-col gap-2 rounded-md border bg-[var(--theme-card)]/50 px-3 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4 border-[var(--theme-border)]"
+      className="surface-card card-glow flex flex-col gap-1.5 rounded-md border bg-[var(--theme-card)]/50 px-3 py-2 max-[639px]:gap-1 border-[var(--theme-border)] lg:flex-row lg:items-center lg:justify-between lg:gap-4"
     >
       {/* Gateway block: state + version + active agents */}
-      <div className="flex flex-wrap items-center gap-3 text-[11px]">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] sm:gap-3">
         <span className="flex items-center gap-2">
           <span
             className={cn(
               'inline-flex h-1.5 w-1.5 rounded-full',
-              ok ? 'motion-safe:animate-pulse' : '',
+              isConnecting ? 'motion-safe:animate-pulse' : '',
             )}
             style={{
-              background: ok
-                ? 'var(--theme-success)'
-                : 'var(--theme-warning)',
+              background: ok ? 'var(--theme-success)' : 'var(--theme-warning)',
             }}
           />
-          <span
-            className="font-mono uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-          >
+          <span className="font-mono uppercase tracking-[0.15em] text-[var(--theme-muted)]">
             {ok ? 'gateway' : `gateway ${status.gatewayState}`}
           </span>
         </span>
         {status.version ? (
-          <span
-            className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]"
-          >
+          <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--theme-muted)]">
             v{status.version}
           </span>
         ) : null}
-        <span
-          className="font-mono uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-        >
-          · {status.activeAgents} active{' '}
-          {status.activeAgents === 1 ? 'run' : 'runs'}
+        <span className="font-mono uppercase tracking-[0.15em] text-[var(--theme-muted)]">
+          <span aria-hidden className="hidden sm:inline">
+            ·{' '}
+          </span>
+          <span className="sm:hidden">
+            {status.activeAgents} {status.activeAgents === 1 ? 'run' : 'runs'}
+          </span>
+          <span className="hidden sm:inline">
+            {status.activeAgents} active{' '}
+            {status.activeAgents === 1 ? 'run' : 'runs'}
+          </span>
         </span>
         {status.lastHeartbeatAt ? (
           <span
             className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
             title={`Last gateway heartbeat: ${status.lastHeartbeatAt}`}
           >
-            · pulse {formatPulse(status.lastHeartbeatAt)}
+            <span aria-hidden className="hidden sm:inline">
+              ·{' '}
+            </span>
+            <span className="sm:hidden">
+              {formatPulse(status.lastHeartbeatAt)}
+            </span>
+            <span className="hidden sm:inline">
+              pulse {formatPulse(status.lastHeartbeatAt)}
+            </span>
           </span>
         ) : null}
         {status.restartRequested ? (
@@ -181,11 +253,11 @@ export function OpsStrip({
           </span>
         ) : null}
         {drift > 0 ? (
-          <button
-            type="button"
-            onClick={() => navigate({ to: '/settings', search: {} })}
+          <Link
+            to="/settings"
+            search={{}}
             aria-label={`Open Settings: ${drift} configuration difference${drift === 1 ? '' : 's'} detected`}
-            className="rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors hover:bg-[var(--theme-card)]/80"
+            className="inline-flex min-h-11 items-center rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.15em] motion-safe:transition-colors hover:bg-[var(--theme-card)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-warning)] focus-visible:ring-inset lg:min-h-0"
             style={{
               background:
                 'color-mix(in srgb, var(--theme-warning) 12%, transparent)',
@@ -196,40 +268,45 @@ export function OpsStrip({
             title={`Local config v${status.configVersion} · latest v${status.latestConfigVersion}`}
           >
             {drift} config diff{drift === 1 ? '' : 's'}
-          </button>
+          </Link>
         ) : null}
       </div>
 
       {/* Platform pills + cron next-run */}
-      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] max-[359px]:grid max-[359px]:grid-cols-2 max-[359px]:justify-items-start max-[639px]:gap-x-1 min-[640px]:max-[1023px]:grid min-[640px]:max-[1023px]:grid-cols-2 min-[640px]:max-[1023px]:justify-items-start sm:gap-2">
         {platforms.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 max-[639px]:contents">
             {platforms.map((platform) => (
               <span
                 key={platform.name}
-                className="inline-flex items-center gap-1 rounded border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em]"
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em]"
                 style={{ color: platformTone(platform.state) }}
+                aria-label={`${platform.name.replace('_', ' ')}: ${platform.state}${platform.errorMessage ? `, ${platform.errorMessage}` : ''}`}
                 title={
                   platform.errorMessage
                     ? `${platform.name}: ${platform.errorMessage}`
                     : `${platform.name} · ${platform.state}`
                 }
               >
-                <span aria-hidden>
-                  {PLATFORM_GLYPH[platform.name] ?? '🔌'}
-                </span>
+                <span
+                  aria-hidden
+                  className="size-1.5 shrink-0 rounded-full"
+                  style={{ background: platformTone(platform.state) }}
+                />
                 {platform.name.replace('_', ' ')}
+                <span className="text-[8px] normal-case tracking-[0.04em] opacity-75 max-[639px]:hidden">
+                  · {platform.state}
+                </span>
               </span>
             ))}
           </div>
         ) : null}
 
         {kanban ? (
-          <button
-            type="button"
-            onClick={() => navigate({ to: '/swarm2' })}
+          <Link
+            to="/swarm2"
             aria-label={`Open Kanban board: ${kanban.total} total, ${kanban.ready} ready, ${kanban.running} running, ${kanban.blocked} blocked`}
-            className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
+            className="inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] motion-safe:transition-colors hover:bg-[var(--theme-card)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-inset text-[var(--theme-muted)] max-[639px]:px-1.5 lg:min-h-0"
             style={{
               borderColor:
                 kanban.blocked > 0
@@ -245,70 +322,82 @@ export function OpsStrip({
             <span>board</span>
             <span className="text-[var(--theme-text)]">{kanban.total}</span>
             {kanban.ready > 0 ? (
-              <span className="text-[var(--theme-text)]">· {kanban.ready} ready</span>
+              <span className="hidden text-[var(--theme-text)] sm:inline">
+                · {kanban.ready} ready
+              </span>
             ) : null}
             {kanban.running > 0 ? (
-              <span className="text-[var(--theme-success,#50fa7b)]">
+              <span className="hidden text-[var(--theme-success,#50fa7b)] sm:inline">
                 · {kanban.running} running
               </span>
             ) : null}
             {kanban.blocked > 0 ? (
-              <span className="text-amber-400">
+              <span className="hidden text-[var(--theme-warning)] sm:inline">
                 · {kanban.blocked} blocked
               </span>
             ) : null}
-          </button>
+          </Link>
         ) : null}
 
-        {cron ? (() => {
-          const isStale = next?.text === 'stale'
-          const isWarn = next?.text === 'overdue' || isStale
-          return (
-            <button
-              type="button"
-              onClick={() => navigate({ to: '/jobs' })}
-              aria-label={`Open cron jobs: ${cron.total} total, ${cron.paused} paused, ${cron.running} running${next ? `; next run ${next.text}` : ''}`}
-              className="inline-flex items-center gap-2 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80 text-[var(--theme-muted)]"
-              style={{
-                borderColor: isWarn
-                  ? 'color-mix(in srgb, var(--theme-warning) 35%, transparent)'
-                  : 'var(--theme-border)',
-                background: isWarn
-                  ? 'color-mix(in srgb, var(--theme-warning) 10%, transparent)'
-                  : 'transparent',
-              }}
-              title={
-                isStale
-                  ? 'Cron next-run is more than 7 days overdue'
-                  : 'Open cron jobs'
-              }
-            >
-              <span>cron</span>
-              <span className="text-[var(--theme-text)]">{cron.total}</span>
-              {cron.paused > 0 ? (
-                <span className="text-amber-400">
-                  · {cron.paused} paused
-                </span>
-              ) : null}
-              {cron.running > 0 ? (
-                <span className="text-[var(--theme-success,#50fa7b)]">
-                  · {cron.running} running
-                </span>
-              ) : null}
-              {next ? (
-                <span style={{ color: next.tone }}>· {next.text}</span>
-              ) : null}
-            </button>
-          )
-        })() : null}
+        {cron
+          ? (() => {
+              const isStale = next?.text === 'stale'
+              const isWarn = next?.text === 'overdue' || isStale
+              return (
+                <Link
+                  to="/jobs"
+                  aria-label={`Open cron jobs: ${cron.total} total, ${cron.paused} paused, ${cron.running} running${next ? `; next run ${next.text}` : ''}`}
+                  className="inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] motion-safe:transition-colors hover:bg-[var(--theme-card)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-inset text-[var(--theme-muted)] max-[639px]:px-1.5 lg:min-h-0"
+                  style={{
+                    borderColor: isWarn
+                      ? 'color-mix(in srgb, var(--theme-warning) 35%, transparent)'
+                      : 'var(--theme-border)',
+                    background: isWarn
+                      ? 'color-mix(in srgb, var(--theme-warning) 10%, transparent)'
+                      : 'transparent',
+                  }}
+                  title={
+                    isStale
+                      ? 'Cron next-run is more than 7 days overdue'
+                      : 'Open cron jobs'
+                  }
+                >
+                  <span>cron</span>
+                  <span className="text-[var(--theme-text)]">{cron.total}</span>
+                  {cron.paused > 0 ? (
+                    <span className="hidden text-[var(--theme-warning)] sm:inline">
+                      · {cron.paused} paused
+                    </span>
+                  ) : null}
+                  {cron.running > 0 ? (
+                    <span className="hidden text-[var(--theme-success,#50fa7b)] sm:inline">
+                      · {cron.running} running
+                    </span>
+                  ) : null}
+                  {next ? (
+                    <span
+                      className="hidden sm:inline"
+                      style={{ color: next.tone }}
+                    >
+                      · {next.text}
+                    </span>
+                  ) : null}
+                </Link>
+              )
+            })()
+          : null}
 
         {/* Workspace version + What's New */}
-        <button
-          type="button"
-          onClick={() => { setHasUnread(false); navigate({ to: '/settings', search: { section: 'whatsnew' } }) }}
-          aria-label={hasUnread ? "Open What's New: unread release notes" : 'Open release notes'}
+        <a
+          href="/settings?section=whatsnew"
+          onClick={openReleaseNotes}
+          aria-label={
+            hasUnread
+              ? "Open What's New: unread release notes"
+              : 'Open release notes'
+          }
           className={cn(
-            'inline-flex items-center gap-1.5 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:bg-[var(--theme-card)]/80',
+            'inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] motion-safe:transition-colors hover:bg-[var(--theme-card)]/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-inset max-[639px]:order-first max-[639px]:px-1.5 lg:min-h-0',
             hasUnread
               ? 'border-[var(--theme-accent)]/40 text-[var(--theme-accent)]'
               : 'border-[var(--theme-border)] text-[var(--theme-muted)] hover:text-[var(--theme-accent)]',
@@ -318,9 +407,12 @@ export function OpsStrip({
           {hasUnread && (
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--theme-accent)] motion-safe:animate-pulse" />
           )}
-          <span>ws</span>
-          <span className="text-[var(--theme-accent)]">v{CHANGELOG[0].version}</span>
-        </button>
+          <span className="sm:hidden">new</span>
+          <span className="hidden sm:inline">What&apos;s new</span>
+          <span className="text-[var(--theme-accent)]">
+            v{CHANGELOG[0].version}
+          </span>
+        </a>
       </div>
     </section>
   )

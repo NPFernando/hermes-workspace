@@ -1,7 +1,7 @@
 import { URL, fileURLToPath } from 'node:url'
 import { execSync, spawn } from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import net from 'node:net'
 import { resolve, dirname } from 'node:path'
 import os from 'node:os'
@@ -13,6 +13,13 @@ import tailwindcss from '@tailwindcss/vite'
 // nitro plugin removed (tanstackStart handles server runtime)
 import { defineConfig, loadEnv } from 'vite'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
+
+const appVersion =
+  (
+    JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
+      version?: string
+    }
+  ).version ?? 'unknown'
 
 // ---------------------------------------------------------------------------
 // Hermes Agent auto-start helpers
@@ -242,18 +249,20 @@ const config = defineConfig(({ mode, command }) => {
 
   const startOdysseus = async () => {
     if (odysseusStarted) return
+    // A separately managed companion may already be serving this workspace.
+    // Check health before requiring the local development venv so a healthy
+    // shared service does not produce a misleading startup warning.
+    if (await isOdysseusHealthy()) {
+      console.log('[odysseus] Already running — reusing existing process')
+      odysseusStarted = true
+      return
+    }
     if (!existsSync(odysseusVenvPython)) {
       console.warn(
         '[odysseus] venv not found — run: cd services/odysseus && python3 -m venv venv && venv/bin/pip install -r requirements.txt',
       )
       return
     }
-    if (await isOdysseusHealthy()) {
-      console.log('[odysseus] Already running — reusing existing process')
-      odysseusStarted = true
-      return
-    }
-
     const child = spawn(
       odysseusVenvPython,
       ['-m', 'uvicorn', 'app:app', '--host', '127.0.0.1', '--port', '7100'],
@@ -507,6 +516,7 @@ const config = defineConfig(({ mode, command }) => {
 
   return {
     test: {
+      setupFiles: ['./src/test/setup.ts'],
       exclude: [
         '**/node_modules/**',
         '**/dist/**',
@@ -520,8 +530,6 @@ const config = defineConfig(({ mode, command }) => {
         'testCurrencyConversion.ts',
         'testCurrencyConversion.js',
       ],
-      // Reset the in-process finance-store test backend before every test.
-      setupFiles: ['./src/test/setup-finance-store.ts'],
       // Force vitest to run React through its own transform pipeline so ESM
       // `import` and CJS `require('react')` share a single module instance.
       // Without this, react-dom sets the dispatcher on its CJS React copy while
@@ -536,6 +544,9 @@ const config = defineConfig(({ mode, command }) => {
       },
     },
     define: {
+      // Keep public shell versioning tied to the package that produced the
+      // build; hardcoded UI versions drift as soon as a release changes.
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
       // Note: Do NOT set 'process.env': {} here — TanStack Start uses environment-based
       // builds where isSsrBuild is unreliable. Blanket process.env replacement breaks
       // server-side code in Docker (kills runtime env var access).
@@ -560,6 +571,17 @@ const config = defineConfig(({ mode, command }) => {
             // Only split truly isolated libs that have no circular deps with the framework
             if (id.includes('/@hugeicons/') || id.includes('/@lobehub/icons'))
               return 'vendor-icons'
+            if (id.includes('/mermaid/') || id.includes('/@mermaid/'))
+              return 'vendor-mermaid'
+            if (
+              id.includes('/@monaco-editor/') ||
+              id.includes('/monaco-editor/')
+            )
+              return 'vendor-editor'
+            if (id.includes('/xterm/') || id.includes('/xterm-addon-'))
+              return 'vendor-terminal'
+            if (id.includes('/cytoscape') || id.includes('/dagre'))
+              return 'vendor-graph'
             return undefined
           },
         },

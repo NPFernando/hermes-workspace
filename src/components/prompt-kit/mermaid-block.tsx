@@ -62,12 +62,12 @@ export function MermaidBlock({ code }: { code: string }) {
   }
 
   if (error) {
-    return <CodeBlock content={code} language="text" className="w-full my-2" />
+    return <CodeBlock content={code} language="text" className="my-2 w-full" />
   }
 
   if (!svg) {
     return (
-      <div className="my-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-8 text-center text-xs text-[var(--theme-muted)] animate-pulse">
+      <div className="my-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-4 py-8 text-center text-xs text-[var(--theme-muted)] motion-safe:animate-pulse">
         Rendering diagram…
       </div>
     )
@@ -84,8 +84,9 @@ export function MermaidBlock({ code }: { code: string }) {
           onClick={() => {
             handleCopy().catch(() => {})
           }}
+          aria-label={copied ? 'Diagram source copied' : 'Copy diagram source'}
           className={cn(
-            'inline-flex items-center gap-1 text-xs text-[var(--theme-muted)] hover:text-[var(--theme-text)] transition-colors',
+            'inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-[var(--theme-muted)] transition-colors hover:text-[var(--theme-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card2)]',
           )}
         >
           <HugeiconsIcon

@@ -5,6 +5,9 @@ import {
   requireLocalOrAuth,
 } from '../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
@@ -39,6 +42,9 @@ export const Route = createFileRoute('/api/workflow-templates')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`workflow-template-write:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
 
         try {
           const body = (await request.json()) as { template?: unknown }
@@ -68,6 +74,9 @@ export const Route = createFileRoute('/api/workflow-templates')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`workflow-template-write:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
 
         try {
           const body = (await request.json()) as { templates?: unknown }
@@ -93,6 +102,9 @@ export const Route = createFileRoute('/api/workflow-templates')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`workflow-template-write:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
+        }
 
         try {
           const body = (await request.json()) as { id?: unknown }

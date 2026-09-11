@@ -4,7 +4,13 @@ import { z } from 'zod'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { dashboardFetch } from '../../server/gateway-capabilities'
 
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 
 const BodySchema = z.object({
   provider: z.string().min(1),
@@ -61,6 +67,11 @@ export const Route = createFileRoute('/api/oauth/poll-token')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`oauth-poll-token:${getClientIp(request)}`, 60, 60_000)) {
+          return rateLimitResponse()
         }
         let body: unknown
         try {

@@ -14,6 +14,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
@@ -426,6 +429,9 @@ export const Route = createFileRoute('/api/workspace')({
         }
         const contentTypeError = requireJsonContentType(request)
         if (contentTypeError) return contentTypeError
+        if (!rateLimit(`workspace-selection:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
         try {
           const body = (await request.json()) as {
             path?: string

@@ -3,7 +3,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { startClaudeAgent } from '../../server/claude-agent'
 
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/start-claude')({
   server: {
@@ -12,6 +17,9 @@ export const Route = createFileRoute('/api/start-claude')({
         try {
           if (!isAuthenticated(request)) {
             return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+          }
+          if (!rateLimit(`agent-start:${getClientIp(request)}`, 5, 60_000)) {
+            return rateLimitResponse()
           }
 
           const result = await startClaudeAgent()

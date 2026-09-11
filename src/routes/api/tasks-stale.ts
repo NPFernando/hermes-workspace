@@ -3,6 +3,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { listTasks, updateTask } from '../../server/tasks-store'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 // GET /api/tasks-stale  — returns age bucket stats for todo/backlog tasks
 // POST /api/tasks-stale — archives tasks older than age_days days
@@ -69,6 +75,11 @@ export const Route = createFileRoute('/api/tasks-stale')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request))
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`tasks-stale:${getClientIp(request)}`, 5, 60_000)) {
+          return rateLimitResponse()
+        }
 
         let body: { age_days?: number } = {}
         try {

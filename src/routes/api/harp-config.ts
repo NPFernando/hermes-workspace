@@ -6,12 +6,18 @@ import {
   createStarterHarpConfig,
   getHarpConfigView,
 } from '../../server/harp-config-store'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 import type { HarpPatch } from '../../server/harp-config-store'
 
 export const Route = createFileRoute('/api/harp-config')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
@@ -21,6 +27,11 @@ export const Route = createFileRoute('/api/harp-config')({
       PATCH: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`harp-config-write:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
         }
         let body: Record<string, unknown>
         try {
