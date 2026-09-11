@@ -515,7 +515,26 @@ export function callClaudeCliVision(
         '--restricted',
         '--allowedTools',
         'Read',
-        '--dangerously-skip-permissions',
+        // --dangerously-skip-permissions errors outright when combined with
+        // --restricted ("bypassPermissions not supported in restricted
+        // mode") — confirmed live 2026-09-11, meaning this fallback had
+        // been failing every single call since it shipped (#72). Auto mode
+        // auto-approves within --restricted's already-narrowed tool set,
+        // which is exactly the safety property --dangerously-skip-permissions
+        // was reaching for, without the invalid-combination crash.
+        '--permission-mode',
+        'auto',
+        // The image lives under FINANCE_INGESTION_UPLOAD_DIR (~/.hermes/
+        // finance/...), never inside this server process's own cwd — Claude
+        // Code's Read tool refuses paths outside the working directory (or
+        // an explicitly added one) regardless of --allowedTools, so without
+        // this the CLI runs cleanly (exit 0) but just replies that it can't
+        // access the file. Also confirmed live: this exact failure mode
+        // returns non-null, non-JSON prose, so parseExtractionJson() would
+        // have returned 'malformed_response' even after fixing the flag
+        // above alone.
+        '--add-dir',
+        path.dirname(imagePath),
       ],
       { encoding: 'utf-8', timeout: 60_000 },
     )

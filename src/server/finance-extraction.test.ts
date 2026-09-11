@@ -421,7 +421,7 @@ describe('callClaudeCliVision', () => {
     spawnSyncMock.mockReset()
   })
 
-  it('returns stdout on a successful run, with --restricted + Read-only tools + the image path in the prompt', () => {
+  it('returns stdout on a successful run, with --restricted + Read-only tools + --add-dir + the image path in the prompt', () => {
     spawnSyncMock.mockReturnValue({
       status: 0,
       stdout: '{"kind":"expense","amount":100,"currency":"LKR","vendorOrSource":"Test","date":"2026-01-01","confidence":"high"}',
@@ -436,7 +436,19 @@ describe('callClaudeCliVision', () => {
     expect(args).toContain('--restricted')
     expect(args).toContain('--allowedTools')
     expect(args).toContain('Read')
-    expect(args).toContain('--dangerously-skip-permissions')
+    // Confirmed live 2026-09-11: --dangerously-skip-permissions errors
+    // outright when combined with --restricted ("bypassPermissions not
+    // supported in restricted mode") — this fallback had been failing
+    // every call since #72 shipped it. --permission-mode auto is the fix.
+    expect(args).not.toContain('--dangerously-skip-permissions')
+    expect(args).toContain('--permission-mode')
+    expect(args[args.indexOf('--permission-mode') + 1]).toBe('auto')
+    // Confirmed live: without --add-dir, the CLI exits 0 but Read refuses
+    // any path outside its own working directory — the image never lives
+    // there (it's under FINANCE_INGESTION_UPLOAD_DIR), so this is required
+    // too, not just the permission-mode fix.
+    expect(args).toContain('--add-dir')
+    expect(args[args.indexOf('--add-dir') + 1]).toBe('/tmp')
     expect(args).toContain('-p')
     const promptArg = args[args.indexOf('-p') + 1]
     expect(promptArg).toContain('/tmp/bill.png')
