@@ -236,6 +236,27 @@ export function PendingIngestionPanel({
     }
   }
 
+  // For a transient extraction failure (e.g. every vision route
+  // rate-limited at once — confirmed live 2026-09-11) rather than the
+  // document itself being unreadable. Reuses the already-converted preview
+  // image, so this doesn't need the original password again.
+  async function retryExtraction(id: string) {
+    setBusyId(id)
+    setNote(null)
+    try {
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'retry_pending_extraction', id }),
+      })
+      const data = (await res.json()) as { ok: boolean; error?: string }
+      if (!data.ok) setNote(data.error || 'Retry failed')
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   async function confirmItem(item: PendingIngestion, force = false) {
     const draft = { ...item.extracted, ...editDrafts[item.id] }
     if (!draft.kind || !Number.isFinite(draft.amount)) {
@@ -798,6 +819,18 @@ export function PendingIngestionPanel({
                 </div>
 
                 <div className="flex gap-2">
+                  {item.status === 'awaiting_review' &&
+                    item.error &&
+                    item.rawPreviewImagePath && (
+                      <button
+                        type="button"
+                        disabled={busyId === item.id}
+                        onClick={() => void retryExtraction(item.id)}
+                        className={buttonClass}
+                      >
+                        Retry extraction
+                      </button>
+                    )}
                   {item.status === 'awaiting_review' &&
                     item.documentType === 'contract' && (
                       <button

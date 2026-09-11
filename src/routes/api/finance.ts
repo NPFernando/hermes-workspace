@@ -2333,6 +2333,56 @@ export const Route = createFileRoute('/api/finance')({
             const updated = updatePendingIngestion(id, { status: 'rejected' })
             return json({ ok: true, pendingIngestion: updated })
           }
+          if (action === 'retry_pending_extraction') {
+            // For when extraction failed transiently (all_routes_failed —
+            // e.g. every vision route rate-limited at once, confirmed live
+            // 2026-09-11) rather than the document being unreadable. Reuses
+            // the already-converted preview image rather than re-running
+            // pdfToImages, so this doesn't need the original password again
+            // for a document that unlocked fine the first time.
+            const id = typeof body.id === 'string' ? body.id : ''
+            if (!id)
+              return json(
+                { ok: false, error: 'id is required.' },
+                { status: 400 },
+              )
+            const pending = listPendingIngestions().find((p) => p.id === id)
+            if (!pending)
+              return json(
+                { ok: false, error: 'Pending ingestion not found.' },
+                { status: 404 },
+              )
+            if (pending.documentType === 'contract') {
+              const images = pending.rawPreviewImagePath
+                ? [pending.rawPreviewImagePath]
+                : []
+              if (images.length === 0)
+                return json(
+                  { ok: false, error: 'No preview image to retry from.' },
+                  { status: 400 },
+                )
+              const extraction = await extractEmploymentContract(images)
+              const updated = updatePendingIngestion(id, {
+                extractedContract: extraction.ok ? extraction.data : undefined,
+                error: extraction.ok ? undefined : extraction.reason,
+              })
+              return json({ ok: true, pendingIngestion: updated })
+            }
+            if (!pending.rawPreviewImagePath)
+              return json(
+                { ok: false, error: 'No preview image to retry from.' },
+                { status: 400 },
+              )
+            const extraction = await extractTransactionFromImage(
+              pending.rawPreviewImagePath,
+              getCategoryCorrections(),
+            )
+            const updated = updatePendingIngestion(id, {
+              extracted: extraction.ok ? extraction.data : undefined,
+              error: extraction.ok ? undefined : extraction.reason,
+            })
+            return json({ ok: true, pendingIngestion: updated })
+          }
           if (action === 'reanalyze_contract') {
             const incomeSourceId =
               typeof body.incomeSourceId === 'string' ? body.incomeSourceId : ''
