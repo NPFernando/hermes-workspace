@@ -38,6 +38,7 @@ const CLAUDE_ITEMS: Array<OverflowItem> = [
   { icon: MessageMultiple01Icon, label: 'Chat', to: '/chat' },
   { icon: PuzzleIcon, label: 'Skills', to: '/skills' },
   { icon: McpServerIcon, label: 'MCP', to: '/mcp' },
+  { icon: PuzzleIcon, label: 'Dify Workbench', to: '/dify' },
   { icon: UserGroupIcon, label: 'Profiles', to: '/profiles' },
   { icon: Settings01Icon, label: 'Settings', to: '/settings' },
 ]
