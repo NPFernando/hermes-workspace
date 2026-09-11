@@ -934,6 +934,84 @@ describe('recordCategoryCorrection / getCategoryCorrections', () => {
   })
 })
 
+describe('knownSenders (upsert/list/delete + password encryption)', () => {
+  let realKey: string | undefined
+  beforeEach(() => {
+    realKey = process.env.FINANCE_SECRET_KEY
+    process.env.FINANCE_SECRET_KEY = Buffer.alloc(32, 7).toString('base64')
+  })
+  afterEach(() => {
+    if (realKey === undefined) delete process.env.FINANCE_SECRET_KEY
+    else process.env.FINANCE_SECRET_KEY = realKey
+  })
+
+  it('creates a known sender and lists it back', async () => {
+    const store = await freshFinanceStore()
+    const sender = store.upsertKnownSender({
+      label: 'Example Bank',
+      matchDomain: 'example-bank.test',
+      passwordScheme: 'date of birth, DDMMYYYY',
+    })
+    expect(store.listKnownSenders()).toEqual([sender])
+    expect(sender.encryptedPassword).toBeUndefined()
+  })
+
+  it('updates an existing sender in place when id matches, preserving createdAt', async () => {
+    const store = await freshFinanceStore()
+    const created = store.upsertKnownSender({ label: 'Water Board' })
+    const updated = store.upsertKnownSender({
+      id: created.id,
+      label: 'NWSDB',
+      matchDomain: 'example-water.test',
+    })
+    expect(store.listKnownSenders()).toHaveLength(1)
+    expect(updated.id).toBe(created.id)
+    expect(updated.label).toBe('NWSDB')
+    expect(updated.createdAt).toBe(created.createdAt)
+  })
+
+  it('rejects an empty label', async () => {
+    const store = await freshFinanceStore()
+    expect(() => store.upsertKnownSender({ label: '  ' })).toThrow(/label/)
+  })
+
+  it('deletes a known sender', async () => {
+    const store = await freshFinanceStore()
+    const sender = store.upsertKnownSender({ label: 'Dialog' })
+    store.deleteKnownSender(sender.id)
+    expect(store.listKnownSenders()).toEqual([])
+  })
+
+  it('sets, decrypts, and clears a sender password without ever storing it as plaintext', async () => {
+    const store = await freshFinanceStore()
+    const sender = store.upsertKnownSender({ label: 'Dialog Finance' })
+    const withPassword = store.setKnownSenderPassword(sender.id, 'real-secret-pw')
+    expect(withPassword.encryptedPassword).toBeDefined()
+    expect(withPassword.encryptedPassword).not.toContain('real-secret-pw')
+    expect(store.decryptKnownSenderPassword(withPassword)).toBe('real-secret-pw')
+
+    const cleared = store.clearKnownSenderPassword(sender.id)
+    expect(cleared.encryptedPassword).toBeUndefined()
+  })
+
+  it('setKnownSenderPassword throws for an unknown id and an empty password', async () => {
+    const store = await freshFinanceStore()
+    expect(() => store.setKnownSenderPassword('missing-id', 'pw')).toThrow(
+      /not found/,
+    )
+    const sender = store.upsertKnownSender({ label: 'EDL' })
+    expect(() => store.setKnownSenderPassword(sender.id, '')).toThrow(
+      /password/,
+    )
+  })
+
+  it('decryptKnownSenderPassword returns undefined when no password is stored', async () => {
+    const store = await freshFinanceStore()
+    const sender = store.upsertKnownSender({ label: 'CSE' })
+    expect(store.decryptKnownSenderPassword(sender)).toBeUndefined()
+  })
+})
+
 describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)', () => {
   let tmp: string
   let realHome: string | undefined

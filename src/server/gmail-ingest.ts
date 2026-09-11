@@ -8,9 +8,20 @@
  * pending_ingestion — same review queue as finance-upload.ts, so the UI
  * doesn't need to know which path an item came from.
  *
- * Never guesses or auto-tries a password from a hint found in the email
- * body — only surfaces the hint text for the user to read and type the
- * real password themselves (explicit user decision, see the plan).
+ * The search query is the generic keyword group OR'd with `from:` clauses
+ * built from the user's registered settings.gmailIngest.knownSenders (see
+ * finance-store.ts) — this repo never hardcodes real bank/biller domains;
+ * they live in Postgres settings, populated by the user via
+ * upsert_known_sender. Falls back to the keyword group alone when no
+ * known senders are registered yet.
+ *
+ * For a password-protected PDF from a *known* sender with a stored
+ * password (explicit user opt-in via set_known_sender_password — see
+ * secret-crypto.ts), this tries that one registered secret before queueing
+ * for manual review. It still never guesses a password from body text —
+ * `findPasswordHint` remains the fallback hint shown when there's no known
+ * sender match, or the known sender has no password stored, or the stored
+ * password doesn't work.
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -19,7 +30,9 @@ import { getGmailAccessToken } from './google-oauth'
 import {
   FINANCE_INGESTION_UPLOAD_DIR,
   addPendingIngestion,
+  decryptKnownSenderPassword,
   getCategoryCorrections,
+  listKnownSenders,
   listPendingIngestions,
   readFinanceStore,
   writeFinanceStore,
@@ -29,13 +42,42 @@ import {
   extractTransactionFromImage,
   extractTransactionFromText,
 } from './finance-extraction'
+import type { KnownSender } from './finance-store'
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me'
 
 // Cheap keyword pre-filter before any LLM call — avoids burning quota
-// classifying newsletters, OTPs, and everything else in the inbox.
-const SEARCH_QUERY =
+// classifying newsletters, OTPs, and everything else in the inbox. OR'd
+// with known-sender `from:` clauses at query-build time (see buildSearchQuery).
+const KEYWORD_GROUP =
   '(invoice OR receipt OR bill OR statement OR payment OR salary OR "payment received" OR "amount due") -category:promotions -category:social'
+
+const MAX_PAGES = 4
+const PAGE_SIZE = 50
+
+export function buildSearchQuery(knownSenders: Array<KnownSender>, afterSeconds: number): string {
+  const senderClauses = knownSenders
+    .map((s) => (s.matchAddress ? `from:${s.matchAddress}` : s.matchDomain ? `from:${s.matchDomain}` : null))
+    .filter((clause): clause is string => Boolean(clause))
+  const group =
+    senderClauses.length > 0
+      ? `(${KEYWORD_GROUP}) OR (${senderClauses.join(' OR ')})`
+      : KEYWORD_GROUP
+  return `${group} after:${afterSeconds}`
+}
+
+/** Matches the message's From header against registered known senders — domain match first, exact address as a tiebreaker. */
+export function matchKnownSender(
+  fromHeader: string,
+  knownSenders: Array<KnownSender>,
+): KnownSender | undefined {
+  const lower = fromHeader.toLowerCase()
+  return knownSenders.find(
+    (s) =>
+      (s.matchAddress && lower.includes(s.matchAddress)) ||
+      (s.matchDomain && lower.includes(s.matchDomain.toLowerCase())),
+  )
+}
 
 interface GmailMessagePart {
   mimeType?: string
@@ -44,9 +86,21 @@ interface GmailMessagePart {
   parts?: Array<GmailMessagePart>
 }
 
+interface GmailMessageHeader {
+  name: string
+  value: string
+}
+
 interface GmailMessage {
   id: string
-  payload?: GmailMessagePart
+  payload?: GmailMessagePart & { headers?: Array<GmailMessageHeader> }
+}
+
+function findHeader(message: GmailMessage, name: string): string {
+  const header = message.payload?.headers?.find(
+    (h) => h.name.toLowerCase() === name.toLowerCase(),
+  )
+  return header?.value ?? ''
 }
 
 async function gmailFetch(url: string, accessToken: string): Promise<Response> {
@@ -159,17 +213,30 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
   // First sync ever: only look back 14 days, not the whole mailbox.
   const afterSeconds =
     lastSyncedAtSeconds || Math.floor(Date.now() / 1000) - 14 * 24 * 60 * 60
-  const query = `${SEARCH_QUERY} after:${afterSeconds}`
+  const knownSenders = listKnownSenders()
+  const query = buildSearchQuery(knownSenders, afterSeconds)
 
-  const listRes = await gmailFetch(
-    `${GMAIL_API}/messages?maxResults=25&q=${encodeURIComponent(query)}`,
-    accessToken,
-  )
-  if (!listRes.ok) throw new Error(`Gmail list failed: ${listRes.status}`)
-  const listData = (await listRes.json()) as {
-    messages?: Array<{ id: string }>
+  // Broadening the query with known-sender clauses means more candidates
+  // than a single 25-result page can hold — paginate (bounded) instead of
+  // relying on one flat maxResults, or a noisy month could push a real
+  // statement off the end of page one silently.
+  const messageIds: Array<string> = []
+  let pageToken: string | undefined
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const pageParam = pageToken ? `&pageToken=${pageToken}` : ''
+    const listRes = await gmailFetch(
+      `${GMAIL_API}/messages?maxResults=${PAGE_SIZE}&q=${encodeURIComponent(query)}${pageParam}`,
+      accessToken,
+    )
+    if (!listRes.ok) throw new Error(`Gmail list failed: ${listRes.status}`)
+    const listData = (await listRes.json()) as {
+      messages?: Array<{ id: string }>
+      nextPageToken?: string
+    }
+    messageIds.push(...(listData.messages ?? []).map((m) => m.id))
+    if (!listData.nextPageToken) break
+    pageToken = listData.nextPageToken
   }
-  const messageIds = (listData.messages ?? []).map((m) => m.id)
 
   let queued = 0
   let skippedAlreadyQueued = 0
@@ -188,6 +255,8 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
     if (!msgRes.ok) continue
     const message = (await msgRes.json()) as GmailMessage
     const bodyText = findPlainTextBody(message.payload)
+    const fromHeader = findHeader(message, 'From')
+    const matchedSender = matchKnownSender(fromHeader, knownSenders)
     const attachments = findAttachments(message.payload).filter(
       (a) =>
         a.mimeType === 'application/pdf' || a.mimeType.startsWith('image/'),
@@ -205,6 +274,8 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
         sourceRef: `gmail:${messageId}`,
         status: 'awaiting_review',
         extracted: extraction.data,
+        matchedSenderId: matchedSender?.id,
+        matchedSenderLabel: matchedSender?.label,
       })
       queued += 1
       continue
@@ -220,26 +291,45 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
     )
 
     const isPdf = savedPath.toLowerCase().endsWith('.pdf')
+    let unlockedPassword: string | undefined
     if (isPdf && isPdfEncrypted(savedPath)) {
-      addPendingIngestion({
-        source: 'gmail',
-        sourceRef: savedPath,
-        status: 'awaiting_password',
-        passwordHint: findPasswordHint(bodyText),
-      })
-      queued += 1
-      continue
+      // Try the one password the user explicitly registered for this
+      // sender (if any) before falling into the manual review queue —
+      // still not a guess, since it's a secret the user set on purpose.
+      const storedPassword = matchedSender
+        ? decryptKnownSenderPassword(matchedSender)
+        : undefined
+      if (storedPassword) {
+        const attempt = pdfToImages(savedPath, storedPassword)
+        if (attempt.ok) {
+          unlockedPassword = storedPassword
+        }
+      }
+      if (!unlockedPassword) {
+        addPendingIngestion({
+          source: 'gmail',
+          sourceRef: savedPath,
+          status: 'awaiting_password',
+          passwordHint: matchedSender?.passwordScheme ?? findPasswordHint(bodyText),
+          matchedSenderId: matchedSender?.id,
+          matchedSenderLabel: matchedSender?.label,
+        })
+        queued += 1
+        continue
+      }
     }
 
     let previewImagePath = savedPath
     if (isPdf) {
-      const normalized = pdfToImages(savedPath)
+      const normalized = pdfToImages(savedPath, unlockedPassword)
       if (!normalized.ok) {
         addPendingIngestion({
           source: 'gmail',
           sourceRef: savedPath,
           status: 'awaiting_review',
           error: `Could not process document: ${normalized.reason}`,
+          matchedSenderId: matchedSender?.id,
+          matchedSenderLabel: matchedSender?.label,
         })
         queued += 1
         continue
@@ -258,6 +348,8 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
       rawPreviewImagePath: previewImagePath,
       extracted: extraction.ok ? extraction.data : undefined,
       error: extraction.ok ? undefined : extraction.reason,
+      matchedSenderId: matchedSender?.id,
+      matchedSenderLabel: matchedSender?.label,
     })
     queued += 1
   }

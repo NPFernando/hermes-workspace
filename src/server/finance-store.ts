@@ -12,6 +12,7 @@ import {
   getCachedCategoryPreferences,
   proposeCategoryPreference,
 } from './harp-memory-client'
+import { decryptSecret, encryptSecret } from './secret-crypto'
 import type { ConnectivityBreakerState } from './connectivity-breaker'
 
 export const FINANCE_SCHEMA_VERSION = 1
@@ -555,10 +556,36 @@ export type PendingIngestion = {
   documentType: 'transaction' | 'contract'
   sourceRef: string
   passwordHint?: string
+  /** Set when the Gmail sender matched a registered gmailIngest.knownSenders entry — lets the UI show "Example Bank" instead of a raw grep hint. */
+  matchedSenderId?: string
+  matchedSenderLabel?: string
   extracted?: ExtractedTransaction
   extractedContract?: ExtractedContract
   rawPreviewImagePath?: string
   error?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * A biller/bank the user has explicitly registered so Gmail sync can (a)
+ * broaden its search beyond generic keywords and (b) auto-unlock a matching
+ * encrypted PDF attachment instead of just surfacing a grepped hint.
+ * `encryptedPassword` (see secret-crypto.ts) is the only real secret this
+ * app stores at rest, by explicit user request — it never appears in an API
+ * response; list_known_senders reports `hasPassword` instead.
+ */
+export type KnownSender = {
+  id: string
+  label: string
+  /** At least one of matchDomain/matchAddress should be set; both may match a given From header. */
+  matchDomain?: string
+  matchAddress?: string
+  /** Human-readable, non-secret description of how the password is derived (e.g. "date of birth, DDMMYYYY") — shown when no password is stored or auto-unlock fails. */
+  passwordScheme?: string
+  /** Links to finance_accounts[].id when this sender's statements belong to one specific account. */
+  accountId?: string
+  encryptedPassword?: string
   createdAt: string
   updatedAt: string
 }
@@ -2177,6 +2204,126 @@ export function getCategoryCorrections(): Record<string, string> {
   return Object.keys(harp).length > 0 ? { ...flat, ...harp } : flat
 }
 
+function readKnownSenders(settings: Record<string, unknown>): Array<KnownSender> {
+  const gmailIngest =
+    settings.gmailIngest && typeof settings.gmailIngest === 'object'
+      ? (settings.gmailIngest as Record<string, unknown>)
+      : {}
+  return Array.isArray(gmailIngest.knownSenders)
+    ? (gmailIngest.knownSenders as Array<KnownSender>)
+    : []
+}
+
+function writeKnownSenders(
+  settings: Record<string, unknown>,
+  knownSenders: Array<KnownSender>,
+): void {
+  const gmailIngest = (
+    settings.gmailIngest && typeof settings.gmailIngest === 'object'
+      ? { ...(settings.gmailIngest as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>
+  gmailIngest.knownSenders = knownSenders
+  settings.gmailIngest = gmailIngest
+}
+
+/** Never includes encryptedPassword's plaintext — callers that need to actually try the password use decryptKnownSenderPassword(). */
+export function listKnownSenders(): Array<KnownSender> {
+  const settings = ensureFinanceStore().settings as Record<string, unknown>
+  return readKnownSenders(settings)
+}
+
+export function upsertKnownSender(
+  input: Pick<KnownSender, 'label'> &
+    Partial<Pick<KnownSender, 'id' | 'matchDomain' | 'matchAddress' | 'passwordScheme' | 'accountId'>>,
+): KnownSender {
+  if (!input.label.trim()) throw new Error('label is required')
+  const db = ensureFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const knownSenders = readKnownSenders(settings)
+  const now = nowIso()
+  const existingIndex = input.id
+    ? knownSenders.findIndex((s) => s.id === input.id)
+    : -1
+  const record: KnownSender = {
+    id: existingIndex >= 0 ? knownSenders[existingIndex].id : randomUUID(),
+    label: input.label.trim(),
+    matchDomain: input.matchDomain?.trim() || undefined,
+    matchAddress: input.matchAddress?.trim().toLowerCase() || undefined,
+    passwordScheme: input.passwordScheme?.trim() || undefined,
+    accountId: input.accountId || undefined,
+    encryptedPassword:
+      existingIndex >= 0 ? knownSenders[existingIndex].encryptedPassword : undefined,
+    createdAt: existingIndex >= 0 ? knownSenders[existingIndex].createdAt : now,
+    updatedAt: now,
+  }
+  const next =
+    existingIndex >= 0
+      ? knownSenders.map((s, i) => (i === existingIndex ? record : s))
+      : [...knownSenders, record]
+  writeKnownSenders(settings, next)
+  writeFinanceStore(db)
+  appendAuditLog('known_sender_upserted', { id: record.id, label: record.label })
+  return record
+}
+
+export function deleteKnownSender(id: string): void {
+  const db = ensureFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const knownSenders = readKnownSenders(settings)
+  writeKnownSenders(settings, knownSenders.filter((s) => s.id !== id))
+  writeFinanceStore(db)
+  appendAuditLog('known_sender_deleted', { id })
+}
+
+/** Encrypts server-side via secret-crypto.ts — the plaintext password never gets stored or logged as-is. */
+export function setKnownSenderPassword(id: string, password: string): KnownSender {
+  if (!password) throw new Error('password is required')
+  const db = ensureFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const knownSenders = readKnownSenders(settings)
+  const index = knownSenders.findIndex((s) => s.id === id)
+  if (index === -1) throw new Error(`Known sender not found: ${id}`)
+  const updated: KnownSender = {
+    ...knownSenders[index],
+    encryptedPassword: encryptSecret(password),
+    updatedAt: nowIso(),
+  }
+  const next = knownSenders.map((s, i) => (i === index ? updated : s))
+  writeKnownSenders(settings, next)
+  writeFinanceStore(db)
+  appendAuditLog('known_sender_password_set', { id }) // never logs the password itself
+  return updated
+}
+
+export function clearKnownSenderPassword(id: string): KnownSender {
+  const db = ensureFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const knownSenders = readKnownSenders(settings)
+  const index = knownSenders.findIndex((s) => s.id === id)
+  if (index === -1) throw new Error(`Known sender not found: ${id}`)
+  const updated: KnownSender = {
+    ...knownSenders[index],
+    encryptedPassword: undefined,
+    updatedAt: nowIso(),
+  }
+  const next = knownSenders.map((s, i) => (i === index ? updated : s))
+  writeKnownSenders(settings, next)
+  writeFinanceStore(db)
+  appendAuditLog('known_sender_password_cleared', { id })
+  return updated
+}
+
+/** Server-internal only (gmail-ingest.ts) — decrypted value must never reach an API response. */
+export function decryptKnownSenderPassword(sender: KnownSender): string | undefined {
+  if (!sender.encryptedPassword) return undefined
+  try {
+    return decryptSecret(sender.encryptedPassword)
+  } catch {
+    return undefined
+  }
+}
+
 export function listPendingIngestions(): Array<PendingIngestion> {
   return ensureFinanceStore().pending_ingestions
 }
@@ -2189,6 +2336,8 @@ export function addPendingIngestion(
         | 'status'
         | 'documentType'
         | 'passwordHint'
+        | 'matchedSenderId'
+        | 'matchedSenderLabel'
         | 'extracted'
         | 'extractedContract'
         | 'rawPreviewImagePath'
@@ -2205,6 +2354,8 @@ export function addPendingIngestion(
     documentType: input.documentType ?? 'transaction',
     sourceRef: input.sourceRef,
     passwordHint: input.passwordHint,
+    matchedSenderId: input.matchedSenderId,
+    matchedSenderLabel: input.matchedSenderLabel,
     extracted: input.extracted,
     extractedContract: input.extractedContract,
     rawPreviewImagePath: input.rawPreviewImagePath,
