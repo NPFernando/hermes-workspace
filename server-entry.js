@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { join, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import server from './dist/server/server.js'
@@ -7,7 +9,29 @@ import server from './dist/server/server.js'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const CLIENT_DIR = join(__dirname, 'dist', 'client')
 
+// A short artifact fingerprint lets read-only release checks distinguish a
+// healthy process serving an older build from the build just verified. It is
+// content-derived and does not expose a source path or repository metadata.
+const WORKSPACE_BUILD_ID = (() => {
+  const configured = (process.env.HERMES_BUILD_ID || '').trim()
+  if (configured) {
+    const sanitized = configured.replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 32)
+    if (sanitized) return sanitized
+  }
+  try {
+    return createHash('sha256')
+      .update(readFileSync(join(__dirname, 'dist', 'server', 'server.js')))
+      .digest('hex')
+      .slice(0, 16)
+  } catch {
+    return 'unknown'
+  }
+})()
+
 const port = parseInt(process.env.PORT || '3000', 10)
+// Keep enough headroom for the largest supported multipart upload (25 MB)
+// while bounding memory used before a route-specific parser can run.
+const MAX_REQUEST_BODY_BYTES = 32 * 1024 * 1024
 // Default HOST to localhost-only. Operators who want the workspace reachable
 // on a LAN / Tailscale / public surface must opt in explicitly with
 // HOST=0.0.0.0 *and* set CLAUDE_PASSWORD (enforced below). See #122.
@@ -104,6 +128,24 @@ const MIME_TYPES = {
   '.webmanifest': 'application/manifest+json',
 }
 
+// Keep the response-level policy aligned with the document meta policy while
+// adding frame-ancestors, which browsers ignore when supplied via <meta>.
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' ws: wss: http: https:",
+  "worker-src 'self' blob:",
+  "media-src 'self' blob: data:",
+  "frame-src 'self' http: https:",
+].join('; ')
+
 async function tryServeStatic(req, res) {
   const url = parseRequestUrl(req.url, req.headers.host)
   if (!url) return false
@@ -187,6 +229,21 @@ function parseRequestUrl(rawUrl, host) {
 }
 
 async function requestHandler(req, res) {
+  // Apply conservative browser hardening at the HTTP boundary. The CSP is
+  // still owned by the application document because the client uses a small
+  // set of runtime-generated styles/scripts; these headers cover framing,
+  // MIME sniffing, referrer leakage, and unnecessary device APIs without
+  // disabling the voice-input microphone permission used by the workspace.
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN')
+  res.setHeader('X-Workspace-Build', WORKSPACE_BUILD_ID)
+  res.setHeader('Content-Security-Policy', CONTENT_SECURITY_POLICY)
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), geolocation=(), microphone=(self), payment=()',
+  )
+
   // Try static files first (client assets)
   if (req.method === 'GET' || req.method === 'HEAD') {
     const served = await tryServeStatic(req, res)
@@ -211,11 +268,49 @@ async function requestHandler(req, res) {
 
   let body = null
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    body = await new Promise((resolve) => {
+    const declaredLength = Number(req.headers['content-length'])
+    if (
+      Number.isFinite(declaredLength) &&
+      declaredLength > MAX_REQUEST_BODY_BYTES
+    ) {
+      res.writeHead(413, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      })
+      res.end(JSON.stringify({ error: 'Request body is too large' }))
+      req.resume()
+      return
+    }
+
+    const bodyResult = await new Promise((resolve) => {
       const chunks = []
-      req.on('data', (chunk) => chunks.push(chunk))
-      req.on('end', () => resolve(Buffer.concat(chunks)))
+      let total = 0
+      let rejected = false
+      req.on('data', (chunk) => {
+        if (rejected) return
+        total += chunk.length
+        if (total > MAX_REQUEST_BODY_BYTES) {
+          rejected = true
+          req.pause()
+          resolve({ tooLarge: true })
+          return
+        }
+        chunks.push(chunk)
+      })
+      req.on('end', () => {
+        if (!rejected) resolve({ tooLarge: false, body: Buffer.concat(chunks) })
+      })
     })
+    if (bodyResult.tooLarge) {
+      res.writeHead(413, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      })
+      res.end(JSON.stringify({ error: 'Request body is too large' }))
+      req.resume()
+      return
+    }
+    body = bodyResult.body
   }
 
   const request = new Request(url.toString(), {
@@ -224,11 +319,28 @@ async function requestHandler(req, res) {
     body,
     duplex: 'half',
   })
+  // Request has no standard peer-address field, but the auth middleware uses
+  // this deliberately non-enumerable adapter metadata for local-vs-remote
+  // automation decisions. Never let missing metadata imply loopback.
+  Object.defineProperty(request, 'remoteAddress', {
+    value: req.socket.remoteAddress || 'unknown',
+    enumerable: false,
+    configurable: false,
+  })
 
   try {
     const response = await server.fetch(request)
 
     const responseHeaders = Object.fromEntries(response.headers.entries())
+    // API responses may contain authenticated workspace data. Enforce a
+    // private, non-cacheable policy centrally so a newly added route cannot
+    // accidentally expose it through a browser/proxy cache.
+    if (url.pathname.startsWith('/api/')) {
+      responseHeaders['cache-control'] =
+        'no-store, no-cache, must-revalidate, private'
+      const vary = responseHeaders.vary
+      responseHeaders.vary = vary ? `${vary}, Cookie` : 'Cookie'
+    }
     // Prevent browsers from caching the HTML shell. The shell embeds hashed
     // asset references that change on every build — a stale cached copy causes
     // "Failed to fetch dynamically imported module" errors after a redeploy.
